@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -25,10 +25,18 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-class VerbHelp(Verb):
+import vcli_util
+
+class VerbShow(ProjectVerb):
     def __init__(self):
-        Verb.__init__(self, 'help',
-                      description = 'Display command help',
-                      usage       = '%prog help [COMMAND]')
+        ProjectVerb.__init__(self, 'configshow',
+                             description = 'Show project settings.',
+                             usage       = '%prog configshow [NAME ...]')
     def execute(self, runner):
-        runner.help(*runner.args)
+        if not runner.args:
+            for name, value in runner.project.iter_config_all():
+                print '%s=%s' % (name, value)
+        else:
+            for name in runner.args:
+                value = runner.project.get_config(name)
+                print '%s=%s' % (name, value)

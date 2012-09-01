@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -25,27 +25,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-__author__ = 'scooper'
-
-import os
-
-import vcli_opt
-import vcli_env
-import vcli_meta
-import vcli_run
-
-project_path = os.path.join(os.getcwd(), 'project.xml')
-
-def go():
-    # Parse the command line.
-    verb, options, args, verb_parser = vcli_opt.parse_cli()
-
-    # Initialize the environment
-    vcli_env.initialize()
-
-    # Run the command.
-    if verb.project_needed:
-        runner = vcli_run.VerbRunner(verb.name, options, args, verb_parser, project_path)
-    else:
-        runner = vcli_run.VerbRunner(verb.name, options, args, verb_parser, None)
-    verb.execute(runner)
+class VerbCompile(ProjectVerb):
+    def __init__(self):
+        ProjectVerb.__init__(self, 'compile',
+                             description = 'Run the VoltDB compiler to build the catalog',
+                             usage       = '%prog compile CLASSPATH PROJECT JAR')
+    def execute(self, runner):
+        # Run with the default Java options from vcli_env
+        runner.java('org.voltdb.compiler.VoltCompiler',
+                    None,
+                    runner.project_path,
+                    runner.project.get_config('catalog', required = True),
+                    *runner.args)

@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -33,7 +33,8 @@ import optparse
 # Use the internal utility module that has no circular dependencies.
 import _util
 
-import vcli_meta
+# Set during option processing
+debug = False
 
 # Volt CLI option parser
 
@@ -46,27 +47,29 @@ class VoltCLIOptionParser(optparse.OptionParser):
     and verb-specific arguments and options.
     '''
 
-    def __init__(self):
-        usage = '%s\n' % vcli_meta.cli.usage
-        for verb in vcli_meta.verbs:
-            usage += '\n       %s' % verb.metadata.usage
+    def __init__(self, verbs, options, usage, description, version):
+        self.verbs   = verbs
+        self.options = options
+        full_usage = '%s\n' % usage
+        for verb in verbs:
+            full_usage += '\n       %s' % verb.metadata.usage
         optparse.OptionParser.__init__(self,
-            description = vcli_meta.cli.description,
-            usage       = usage,
-            version     = vcli_meta.version_string)
-        for cli_option in vcli_meta.cli.options:
+            description = description,
+            usage       = full_usage,
+            version     = version)
+        for cli_option in options:
             self.add_option(*cli_option.args, **cli_option.kwargs)
 
-    def parse(self):
+    def parse(self, cmdargs):
 
         # Separate the global options preceding the command from
         # command-specific options that follow it.
-        iverb = 1
-        while iverb < len(sys.argv):
+        iverb = 0
+        while iverb < len(cmdargs):
             # Skip options and any associated option arguments.
-            if sys.argv[iverb].startswith('-'):
-                for opt in vcli_meta.cli.options:
-                    if sys.argv[iverb] in opt.args:
+            if cmdargs[iverb].startswith('-'):
+                for opt in self.options:
+                    if cmdargs[iverb] in opt.args:
                         # Skip the argument of an option that takes one
                         if (not 'action' in opt.kwargs or opt.kwargs['action'] == 'store'):
                             iverb += 1
@@ -76,19 +79,19 @@ class VoltCLIOptionParser(optparse.OptionParser):
             iverb += 1
 
         # Parse the global options. args should be empty
-        opts, args = optparse.OptionParser.parse_args(self, sys.argv[1:iverb])
+        opts, args = optparse.OptionParser.parse_args(self, list(cmdargs[:iverb]))
         assert len(args) == 0
 
         # Set all the options as module attributes.
-        for option in vcli_meta.cli.options:
+        for option in self.options:
             name = option.kwargs['dest']
             setattr(sys.modules[__name__], name, getattr(opts, name))
 
-        if iverb == len(sys.argv):
+        if iverb == len(cmdargs):
             self._abort('Missing command.')
-        verb_name = sys.argv[iverb].lower()
+        verb_name = cmdargs[iverb].lower()
         verb = None
-        for verb_chk in vcli_meta.verbs:
+        for verb_chk in self.verbs:
             if verb_chk.name == verb_name:
                 verb = verb_chk
                 break
@@ -97,36 +100,26 @@ class VoltCLIOptionParser(optparse.OptionParser):
 
         # Parse the command-specific options.
         verb_parser = optparse.OptionParser(description = verb.metadata.description,
-            usage = verb.metadata.usage)
-        if iverb + 1 < len(sys.argv):
+                                            usage = verb.metadata.usage)
+        if iverb < len(cmdargs):
             if verb.metadata.options:
                 for opt in verb.metadata.options:
                     verb_parser.add_option(*opt.args, **opt.kwargs)
-            options, args = verb_parser.parse_args(sys.argv[iverb+1:])
+            options, args = verb_parser.parse_args(list(cmdargs[iverb+1:]))
         else:
             options = None
             args = []
 
-        return verb, options, args, verb_parser
+        return verb, options, args, self, verb_parser
 
     def _abort(self, *msgs):
         _util.error(*msgs)
-        sys.stderr.write('\n')
+        sys.stdout.write('\n')
         self.print_help()
+        sys.stdout.write('\n')
         sys.stderr.write('\n')
         _util.abort()
 
     def format_epilog(self, formatter):
-        max_verb_width = 0
-        for verb in vcli_meta.verbs:
-            max_verb_width = max(max_verb_width, len(verb.name))
-        fmt = '%%-%ds  %%s' % max_verb_width
-        return '''
-COMMAND is one of the following:
-
-%s
-''' % '\n'.join([fmt % (verb.name, verb.metadata.description) for verb in vcli_meta.verbs])
-
-def parse_cli():
-    parser = VoltCLIOptionParser()
-    return parser.parse()
+        rows = ((verb.name, verb.metadata.description) for verb in self.verbs)
+        return '\n%s' % _util.format_table("Commands", None, rows)

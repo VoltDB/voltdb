@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -56,6 +56,10 @@ class Project(object):
             vcli_util.abort('"%s" is not configured in "%s".' % (tag, self.project_path),
                             'Use the "config" command to set (or manually edit).')
         return text
+
+    def iter_config_all(self):
+        for e in self.root.findall("info/*"):
+            yield e.tag, e.text
 
     def save(self):
         backup = '%s.%s' % (self.project_path, time.strftime('%y%m%d%H%M'))

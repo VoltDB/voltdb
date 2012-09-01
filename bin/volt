@@ -49,9 +49,9 @@ import os
 base_dir = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0])))
 sys.path.insert(0, os.path.join(base_dir, 'lib'))
 
-import voltcli.vcli_main
+import voltcli.vcli_run
 
 #### Command line main
 
 if __name__ == '__main__':
-    voltcli.vcli_main.go()
+    voltcli.vcli_run.main()

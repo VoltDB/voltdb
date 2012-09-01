@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -25,15 +25,22 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import glob
-import vcli_util
+java_ext_opts = (
+    '-server',
+    '-XX:+HeapDumpOnOutOfMemoryError',
+    '-XX:HeapDumpPath=/tmp',
+    '-XX:-ReduceInitialCardMarks'
+)
 
-class VerbSrcCompile(ProjectVerb):
+class VerbStart(ProjectVerb):
     def __init__(self):
-        ProjectVerb.__init__(self, 'srccompile',
-                             description = 'Build the Voter java classes.',
-                             usage       = '%prog srccompile')
+        Verb.__init__(self, 'start',
+                      description = 'Start the VoltDB server',
+                      usage       = '%prog start')
     def execute(self, runner):
-        runner.run_cmd('mkdir', '-p', 'obj')
-        runner.java_compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
-        vcli_util.info('Java compilation succeeded.')
+        catalog = runner.get_catalog()
+        runner.java('org.voltdb.VoltDB',
+                    java_ext_opts,
+                    runner.project_path,
+                    runner.project.get_config('catalog'),
+                    *runner.args)

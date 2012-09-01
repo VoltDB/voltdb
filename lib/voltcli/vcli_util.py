@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -74,7 +74,8 @@ def run_cmd(cmd, *args):
 
 def pipe_cmd(*args):
     """
-    Run external program, capture its output, and yield each output line for iteration.
+    Run an external program, capture its output, and yield each output line for
+    iteration.
     """
     try:
         proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -83,3 +84,47 @@ def pipe_cmd(*args):
         proc.stdout.close()
     except Exception, e:
         warning('Exception running command: %s' % ' '.join(args), e)
+
+def _flatten(*items):
+    for item in items:
+        try:
+            test_string = item + ''
+            # It's a string
+            yield item
+        except TypeError:
+            try:
+                test_iter = iter(item)
+                # Use recursion in case it's nested further.
+                for subitem in item:
+                    for subsubitem in _flatten(subitem):
+                        yield subsubitem
+            except TypeError:
+                # It's a non-iterable non-string
+                yield item
+
+def flatten(*items):
+    """
+    Flatten and yield individual items from a potentially nested list or tuple.
+    """
+    for item in _flatten(*items):
+        yield item
+
+def merge_java_options(*opts):
+    """
+    Merge redundant -X... java command line options. Keep others intact.
+    Arguments can be lists or individual arguments. Returns the reduced list.
+    """
+    ret_opts = []
+    xargs = set()
+    for opt in flatten(*opts):
+        if opt is not None:
+            # This is somewhat simplistic logic that might have unlikely failure scenarios.
+            if opt.startswith('-X'):
+                # The symbol is the initial string of contiguous alphabetic characters.
+                sym = ''.join([c for c in opt[2:] if c.isalpha()])
+                if sym not in xargs:
+                    xargs.add(sym)
+                    ret_opts.append(opt)
+            else:
+                ret_opts.append(opt)
+    return ret_opts

@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -41,6 +41,7 @@ version_string = '%%prog version %s' % version
 
 bin_dir, bin_name = os.path.split(os.path.realpath(sys.argv[0]))
 lib_dir = os.path.dirname(__file__)
+verbs_subdir = 'vcli.d'
 
 # Add the voltcli directory to the Python module load path so that verb modules
 # can import anything from here.
@@ -91,12 +92,13 @@ class ProjectVerb(BaseVerb):
         BaseVerb.__init__(self, name, True, **kwargs)
 
 # Verbs support the possible actions.
-# Look for Verb subclasses in the verbs.d subdirectory (relative to this file
-# and to the working directory). Also add ProjectVerb to the symbol table
-# provided to verb modules.
-verbs = _util.find_and_load_subclasses(BaseVerb, (lib_dir, '.'), 'verbs.d',
+# Look for Verb subclasses in the .d subdirectory (relative to this file and to
+# the working directory). Also add ProjectVerb to the symbol table provided to
+# verb modules.
+verbs = _util.find_and_load_subclasses(BaseVerb, (lib_dir, '.'), verbs_subdir,
                                        Verb = Verb,
                                        ProjectVerb = ProjectVerb)
+verbs.sort(cmp = lambda x, y: cmp(x.name, y.name))
 
 # Options define the CLI behavior modifiers.
 cli = CLISpec(
