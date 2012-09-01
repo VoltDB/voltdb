@@ -40,7 +40,7 @@ def get_branch_list(merged):
     print ('git branch -r %s' % '--merged' if merged else '--no-merged' )
     (returncode, stdout, stderr) = run_cmd ('git branch -r %s' % ('--merged' if merged else '--no-merged' ))
 
-    branches = [b.strip() for b in stdout.splitlines() if b.find('/master') < 0]
+    branches = [b.strip() for b in stdout.splitlines() if b.strip().find('origin/') == 0 and b.find('/master') < 0]
     #print branches
     #Filter others from list
     branches = list(set(branches) - set(exclusions))
