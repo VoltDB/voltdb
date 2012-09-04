@@ -283,7 +283,6 @@ public class SSHTools {
             InputStream in=channel.getInputStream();
 
             channel.connect();
-
             byte[] buf=new byte[1024];
 
             // send '\0'
