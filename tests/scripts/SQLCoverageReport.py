@@ -212,7 +212,7 @@ Generates HTML reports based on the given report files. The generated reports
 contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
-def generate_html_reports(seed, statements_path, hsql_path, jni_path,
+def generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
                           output_dir, report_all, cntonly = False, is_matching = False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -257,6 +257,7 @@ def generate_html_reports(seed, statements_path, hsql_path, jni_path,
     hsql_file.close()
     jni_file.close()
 
+    topLine = getTopSummaryLine()
     keyStats = createSummaryInHTML(count, failures, mismatches, seed)
     report = """
 <html>
@@ -268,9 +269,15 @@ h2 {text-transform: uppercase}
 </head>
 
 <body>
-"""
+    <h2>Test Suite Name: %s</h2>
+    <h4>Random Seed: <b>%d</b></h4>
+    <table border=1><tr>%s</tr>
+""" % (suite, seed, topLine)
 
-    report += keyStats
+    report += """
+<tr>%s</tr>
+</table>
+""" % (keyStats)
 
     def key(x):
         return int(x["id"])
@@ -291,7 +298,19 @@ h2 {text-transform: uppercase}
         summary.write(report.encode("utf-8"))
         summary.close()
 
-    return (failures, len(mismatches), keyStats)
+    results = {}
+    results["mis"] = len(mismatches)
+    results["keyStats"] = keyStats
+    return results
+
+def getTopSummaryLine():
+    topLine = """
+<td>Valid</td><td>Valid %</td>
+<td>Invalid</td><td>Invalid %</td>
+<td>Total</td>
+<td>Mismatched</td><td>Mismatched %</td>
+"""
+    return topLine
 
 def createSummaryInHTML(count, failures, mismatches, seed):
     passed = count - (failures + len(mismatches))
@@ -302,34 +321,32 @@ def createSummaryInHTML(count, failures, mismatches, seed):
         fail_ps = str("{0:.2f}".format((failures/float(count)) * 100)) + "%"
     if(len(mismatches) == 0):
         mis_ps = "0.00%"
-        color = "#00FF00" # green/lime
+        cell4misPct = "<td align=right>" + mis_ps + "</td>"
+        cell4misCnt = "<td align=right>" + str(len(mismatches)) + "</td>"
     else:
         color = "#FF0000" # red
         mis_ps = str("{0:.2f}".format((len(mismatches)/float(count)) * 100)) + "%"
-    cell4misPct = "<td align=right bgcolor=" + color + ">" + mis_ps + "</td>"
-    cell4misCnt = "<td align=right bgcolor=" + color + ">" + str(len(mismatches)) + "</td>"
+        cell4misPct = "<td align=right bgcolor=" + color + ">" + mis_ps + "</td>"
+        cell4misCnt = "<td align=right bgcolor=" + color + ">" + str(len(mismatches)) + "</td>"
     misRow = cell4misCnt + cell4misPct
 
     if(passed == count):
-        passed_ps = total = "100.00%"
+        passed_ps = "100.00%"
     else:
         passed_ps = str("{0:.2f}".format((passed/float(count)) * 100)) + "%"
-        total = str("{0:.2f}".format((passed + failures + len(mismatches))/float(count) * 100 )) + "%"
     stats = """
-<table border=1>
-<tr><td colspan=3 align=center><b>Test Summary</b></td></tr>
-<tr><td align=right>Random seed:</td><td colspan=2 align=left><b>%s</b></td></tr>
-<tr><td align=right>Passed statements:</td><td align=right>%d</td><td align=right>%s</td></tr>
-<tr><td align=right>Invalid statements:</td><td align=right>%d</td><td align=right>%s</td></tr>
-<tr><td align=right>Mismatched statements:</td>%s</tr>
-<tr bgcolor=#00FFFF><td align=right>Total statements:</td><td align=right>%d</td><td align=right>%s</td></tr>
-</table>
-""" % (seed, passed, passed_ps, failures, fail_ps, misRow, count, total)
+<td align=right>%d</td>
+<td align=right>%s</td>
+<td align=right>%d</td>
+<td align=right>%s</td>
+<td align=right>%d</td>%s</tr>
+""" % (passed, passed_ps, failures, fail_ps, count, misRow)
 
     return stats
 
 def generate_summary(output_dir, statistics):
     fd = open(os.path.join(output_dir, "index.html"), "w")
+    topLine = getTopSummaryLine()
     content = """
 <html>
 <head>
@@ -340,16 +357,27 @@ h2 {text-transform: uppercase}
 </head>
 
 <body>
-<h3>SQL Coverage Test Summary Grouped By Suites:</h3>
-<ul>
-"""
+<h2>SQL Coverage Test Summary Grouped By Suites:</h2>
+<h3>Random Seed: %d</h3>
+<table border=1>
+<tr>
+<td rowspan=2 align=center>Test Suite</td>
+<td colspan=5 align=center>Statements</td><td colspan=2 align=center>Test Failures</td></tr>
+<tr>%s</tr>
+""" % (statistics["seed"], topLine)
 
     def bullets(name, stats):
-        return "<li><a href=\"%s/index.html\">%s</a>:</li>%s<br>\n</body></html>" % \
+        return "<tr><td><a href=\"%s/index.html\">%s</a></td>%s</tr>" % \
             (name, name, stats)
 
-    for k, v in statistics.iteritems():
-        content += bullets(k, v[2])
+    for suiteName in sorted(statistics.iterkeys()):
+        if(suiteName != "seed"):
+            content += bullets(suiteName, statistics[suiteName])
+    content += """
+</table>
+</body>
+</html>
+"""
 
     fd.write(content)
     fd.close()
@@ -379,4 +407,4 @@ if __name__ == "__main__":
         __quiet = False
         is_matching = strtobool(options.flag)
 
-    generate_html_reports(data, options.output_dir, options.all, is_matching)
+    generate_html_reports("suite name", data, options.output_dir, options.all, is_matching)

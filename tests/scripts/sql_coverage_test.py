@@ -157,8 +157,9 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
     else:
         return 0
 
-def run_config(config, basedir, output_dir, random_seed, report_all, generate_only, args, testConfigKit):
+def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only, args, testConfigKit):
     for key in config.iterkeys():
+        print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if not os.path.isabs(config[key]):
             config[key] = os.path.abspath(os.path.join(basedir, config[key]))
     if not os.path.exists(output_dir):
@@ -223,7 +224,7 @@ def run_config(config, basedir, output_dir, random_seed, report_all, generate_on
 
     global compare_results
     compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
-    success = compare_results(random_seed, statements_path, hsql_path,
+    success = compare_results(suite_name, random_seed, statements_path, hsql_path,
                               jni_path, output_dir, report_all)
     return success
 
@@ -395,11 +396,11 @@ if __name__ == "__main__":
     parser.add_option("-l", "--leader", dest="hostname",
                       help="the hostname of the leader")
     parser.add_option("-n", "--number", dest="hostcount",
-                      help="the number of totald hosts used in this test")
+                      help="the number of total hosts used in this test")
     parser.add_option("-k", "--kfactor", dest="kfactor",
-                      help="the number of totald hosts used in this test")
+                      help="the number of kfactor used in this test")
     parser.add_option("-t", "--sitescount", dest="sitescount",
-                      help="the number of totald hosts used in this test")
+                      help="the number of partitions used in this test")
     parser.add_option("-p", "--port", dest="hostport",
                       help="the port number of the leader")
     parser.add_option("-f", "--flush", dest="flush",
@@ -470,10 +471,11 @@ if __name__ == "__main__":
             testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
             # To add one more key
             testConfigKits["testCatalog"] = testCatalog
-        result = run_config(config, basedir, report_dir, seed, options.report_all, \
+        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all, \
                             options.generate_only, args, testConfigKits)
-        statistics[config_name] = result
-        if result[1] != 0:
+        statistics[config_name] = result["keyStats"]
+        statistics["seed"] = seed
+        if result["mis"] != 0:
             success = False
 
     # Write the summary
