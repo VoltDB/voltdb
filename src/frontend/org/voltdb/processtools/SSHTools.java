@@ -48,18 +48,6 @@ public class SSHTools {
         }
    }
 
-    // Temporary - delete when finished implementation
-    private static void printCommandString(String command[])
-    {
-        StringBuilder sb = new StringBuilder();
-        if (command != null) {
-            for (String c : command) {
-                sb.append(c).append(" ");
-            }
-        }
-        else sb.append("null");
-    }
-
     // Execute a remote SSH command on the specified host.
     public String cmd(String hostname, String command) {
         return cmdSSH(m_username, m_keyFile, hostname, command);
@@ -132,7 +120,6 @@ public class SSHTools {
     }
 
     public ProcessData long_running_command(String hostname, String command[], String processName, OutputHandler handler) {
-        printCommandString(command);
         try{
             JSch jsch=new JSch();
             // Set the private key
