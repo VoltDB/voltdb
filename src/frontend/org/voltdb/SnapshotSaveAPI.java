@@ -116,7 +116,9 @@ public class SnapshotSaveAPI
                 //so that the info can be put in the digest.
                 SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.acquire();
-                SnapshotSiteProcessor.m_partitionLastSeenTransactionIds.add(partitionTxnId);
+                if (VoltDB.instance().isIV2Enabled()) {
+                    SnapshotSiteProcessor.m_partitionLastSeenTransactionIds.add(partitionTxnId);
+                }
             } catch (InterruptedException e) {
                 result.addRow(
                         context.getHostId(),
@@ -128,30 +130,32 @@ public class SnapshotSaveAPI
             }
 
             if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                List<Long>  partitionTransactionIds =
-                        SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
-                SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new ArrayList<Long>();
-                partitionTransactionIds.add(multiPartTxnId);
+                List<Long>  partitionTransactionIds = new ArrayList<Long>();
+                if (VoltDB.instance().isIV2Enabled()) {
+                    partitionTransactionIds = SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
+                    SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new ArrayList<Long>();
+                    partitionTransactionIds.add(multiPartTxnId);
 
-                /*
-                 * Do a quick sanity check that the provided IDs
-                 * don't conflict with currently active partitions. If they do
-                 * it isn't fatal we can just skip it.
-                 */
-                for (long txnId : legacyPerPartitionTxnIds) {
-                    final int legacyPartition = (int)TxnEgo.getPartitionId(txnId);
-                    boolean isDup = false;
-                    for (long existingId : partitionTransactionIds) {
-                        final int existingPartition = (int)TxnEgo.getPartitionId(existingId);
-                        if (existingPartition == legacyPartition) {
-                            HOST_LOG.warn("While saving a snapshot and propagating legacy " +
-                                    "transaction ids found an id that matches currently active partition" +
-                                    existingPartition);
-                            isDup = true;
+                    /*
+                     * Do a quick sanity check that the provided IDs
+                     * don't conflict with currently active partitions. If they do
+                     * it isn't fatal we can just skip it.
+                     */
+                    for (long txnId : legacyPerPartitionTxnIds) {
+                        final int legacyPartition = (int)TxnEgo.getPartitionId(txnId);
+                        boolean isDup = false;
+                        for (long existingId : partitionTransactionIds) {
+                            final int existingPartition = (int)TxnEgo.getPartitionId(existingId);
+                            if (existingPartition == legacyPartition) {
+                                HOST_LOG.warn("While saving a snapshot and propagating legacy " +
+                                        "transaction ids found an id that matches currently active partition" +
+                                        existingPartition);
+                                isDup = true;
+                            }
                         }
-                    }
-                    if (!isDup) {
-                        partitionTransactionIds.add(txnId);
+                        if (!isDup) {
+                            partitionTransactionIds.add(txnId);
+                        }
                     }
                 }
 
