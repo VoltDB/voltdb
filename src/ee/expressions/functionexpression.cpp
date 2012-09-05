@@ -30,7 +30,8 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     if (type == VALUE_TYPE_VARCHAR) {
         const int32_t valueLength = getObjectLength();
         const char *valueChars = reinterpret_cast<char*>(getObjectValue());
-        snprintf(msg_format_buffer, std::min((int32_t)sizeof(msg_format_buffer), valueLength+1), "%s", valueChars);
+        std::string valueStr(valueChars, valueLength);
+        snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
         msgtext = msg_format_buffer;
     } else {
@@ -73,7 +74,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         }
         const int32_t valueLength = strValue.getObjectLength();
         char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
-        snprintf(msg_format_buffer, std::min((int32_t)sizeof(msg_format_buffer), valueLength+1), "%s", valueChars);
+        std::string valueStr(valueChars, valueLength);
+        snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
     throw SQLException(sqlstatecode, msg_format_buffer);
 }
@@ -223,6 +225,10 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     case 1:
         if (functionId == FUNC_ABS) {
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
+        } else if (functionId == FUNC_OCTET_LENGTH) {
+            ret = new UnaryFunctionExpression<FUNC_OCTET_LENGTH>((*arguments)[0]);
+        } else if (functionId == FUNC_CHAR_LENGTH) {
+            ret = new UnaryFunctionExpression<FUNC_CHAR_LENGTH>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_YEAR) {
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_YEAR>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_MONTH) {
@@ -258,6 +264,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
         } else if (functionId == FUNC_VOLT_SQL_ERROR) {
             ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
+        } else if (functionId == FUNC_POSITION_CHAR) {
+            ret = new GeneralFunctionExpression<FUNC_POSITION_CHAR>(*arguments);
         }
     }
     // May return null, leaving it to the caller (with more context) to generate an exception.

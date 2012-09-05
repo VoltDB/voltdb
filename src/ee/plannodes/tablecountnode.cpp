@@ -24,6 +24,8 @@
 namespace voltdb {
 
 TableCountPlanNode::~TableCountPlanNode() {
+    delete getOutputTable();
+    setOutputTable(NULL);
 }
 
 std::string TableCountPlanNode::debugInfo(const std::string &spacer) const {

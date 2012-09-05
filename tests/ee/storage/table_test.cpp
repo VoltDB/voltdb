@@ -234,7 +234,9 @@ TEST_F(TableTest, TupleUpdate) {
                 }
             }
         }
-        if (update) EXPECT_EQ(true, temp_table->updateTuple(temp_tuple, tuple, true));
+        if (update) {
+            EXPECT_EQ(true, temp_table->updateTuple(tuple, temp_tuple));
+        }
     }
 
     //
@@ -386,7 +388,7 @@ TEST_F(TableTest, TupleDelete) {
         if (update) {
             //printf("BEFORE?: %s\n", tuple->debug(this->table.get()).c_str());
             //persistent_table->setUndoLog(undos[xact_ctr]);
-            EXPECT_EQ(true, persistent_table->updateTuple(temp_tuple, tuple, true));
+            EXPECT_EQ(true, persistent_table->updateTuple(tuple, temp_tuple, true));
             //printf("UNDO: %s\n", undos[xact_ctr]->debug().c_str());
         }
         //printf("AFTER: %s\n", temp_tuple->debug(this->table.get()).c_str());

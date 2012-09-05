@@ -107,6 +107,9 @@ public class CompiledPlan {
      */
     private boolean m_statementIsOrderDeterministic = false;
 
+    /** Which extracted param is the partitioning object (assuming parameterized plans) */
+    public int partitioningKeyIndex = -1;
+
     private Object m_partitioningKey;
 
     void resetPlanNodeIds() {

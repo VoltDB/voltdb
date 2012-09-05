@@ -18,21 +18,18 @@
 package org.voltdb.rejoin;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotTableTask;
+import org.voltdb.VoltDB;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -47,8 +44,10 @@ implements SnapshotDataTarget {
 
     // schemas for all the tables on this partition
     private final Map<Integer, byte[]> m_schemas;
-    // socket to the rejoining partition
-    private final SocketChannel m_sock;
+    // Mailbox used to transfer snapshot data
+    private Mailbox m_mb;
+    // HSId of the destination mailbox
+    private final long m_destHSId;
     // tracks all the acks for in-flight buffers
     private final StreamSnapshotAckTracker m_ackTracker;
     // input and output threads
@@ -62,57 +61,22 @@ implements SnapshotDataTarget {
     private int m_blockIndex = 0;
     private Runnable m_onCloseHandler = null;
 
-    public StreamSnapshotDataTarget(List<byte[]> addresses, int port,
-                                    Map<Integer, byte[]> schemas)
+    public StreamSnapshotDataTarget(long hsId, Map<Integer, byte[]> schemas)
     throws IOException {
         super();
         m_schemas = schemas;
-        m_sock = createConnection(addresses, port);
+        m_destHSId = hsId;
+        m_mb = VoltDB.instance().getHostMessenger().createMailbox();
 
         m_ackTracker = new StreamSnapshotAckTracker(m_numBuffers);
-        m_in = new StreamSnapshotAckReceiver(m_sock, m_ackTracker);
+        m_in = new StreamSnapshotAckReceiver(m_mb, m_ackTracker);
         m_inThread = new Thread(m_in);
         m_inThread.setDaemon(true);
-        m_out = new StreamSnapshotSender(m_sock);
+        m_out = new StreamSnapshotSender(m_mb, m_destHSId);
         m_outThread = new Thread(m_out);
 
         m_inThread.start();
         m_outThread.start();
-    }
-
-    private static SocketChannel createConnection(List<byte[]> addresses,
-                                                  int port)
-    throws IOException {
-        SocketChannel sc = null;
-        List<Exception> exceptions = new ArrayList<Exception>();
-
-        for (byte address[] : addresses) {
-            try {
-                InetAddress inetAddr = InetAddress.getByAddress(address);
-                InetSocketAddress inetSockAddr =
-                        new InetSocketAddress(inetAddr, port);
-                rejoinLog.debug("Attempting to create recovery connection to " +
-                        inetSockAddr);
-                sc = SocketChannel.open(inetSockAddr);
-                break;
-            } catch (Exception e) {
-                rejoinLog.debug("Failed to create a recovery connection", e);
-                exceptions.add(e);
-            }
-        }
-
-        if (sc == null) {
-            for (Exception e : exceptions) {
-                rejoinLog.error("Connection error", e);
-            }
-            throw new IOException("Unable to create recovery connection due " +
-                    "to previously logged exceptions");
-        }
-
-        sc.configureBlocking(true);
-        sc.socket().setTcpNoDelay(true);
-
-        return sc;
     }
 
     /**
@@ -201,14 +165,15 @@ implements SnapshotDataTarget {
          * could be called multiple times, because all tables share one stream
          * target
          */
-        if (m_sock.isOpen()) {
+        if (m_mb != null) {
             closeIO();
             /*
              * only join the out thread, once the socket is closed, the in
              * thread will terminate
              */
             m_outThread.join();
-            m_sock.close();
+            VoltDB.instance().getHostMessenger().removeMailbox(m_mb.getHSId());
+            m_mb = null;
         }
 
         if (m_onCloseHandler != null) {

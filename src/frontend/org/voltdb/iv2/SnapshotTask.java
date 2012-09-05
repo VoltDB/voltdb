@@ -17,13 +17,10 @@
 
 package org.voltdb.iv2;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.SiteProcedureConnection;
 
 public class SnapshotTask extends SiteTasker
 {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     public SnapshotTask()
     {
     }

@@ -19,6 +19,8 @@ package org.voltdb.messaging;
 
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.messaging.VoltMessageFactory;
+import org.voltdb.rejoin.RejoinDataAckMessage;
+import org.voltdb.rejoin.RejoinDataMessage;
 
 public class VoltDbMessageFactory extends VoltMessageFactory
 {
@@ -34,7 +36,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte IV2_REPAIR_LOG_REQUEST = VOLTCORE_MESSAGE_ID_MAX + 10;
     final public static byte IV2_REPAIR_LOG_RESPONSE = VOLTCORE_MESSAGE_ID_MAX + 11;
     final public static byte REJOIN_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 12;
-    final public static byte FRAGMENT_TASK_LOG_ID = VOLTCORE_MESSAGE_ID_MAX + 13;
+    final public static byte REJOIN_DATA_ID = VOLTCORE_MESSAGE_ID_MAX + 13;
+    final public static byte REJOIN_DATA_ACK_ID = VOLTCORE_MESSAGE_ID_MAX + 14;
+    final public static byte FRAGMENT_TASK_LOG_ID = VOLTCORE_MESSAGE_ID_MAX + 15;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -83,6 +87,12 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case REJOIN_RESPONSE_ID:
             message = new RejoinMessage();
+            break;
+        case REJOIN_DATA_ID:
+            message = new RejoinDataMessage();
+            break;
+        case REJOIN_DATA_ACK_ID:
+            message = new RejoinDataAckMessage();
             break;
         case FRAGMENT_TASK_LOG_ID:
             message = new FragmentTaskLogMessage();

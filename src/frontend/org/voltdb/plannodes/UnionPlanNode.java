@@ -17,6 +17,9 @@
 
 package org.voltdb.plannodes;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 
 public class UnionPlanNode extends AbstractPlanNode {
@@ -40,5 +43,10 @@ public class UnionPlanNode extends AbstractPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         return "UNION";
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
     }
 }

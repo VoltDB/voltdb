@@ -24,12 +24,15 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -140,6 +143,120 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
+    public void testOctetLength() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING OCTET_LENGTH");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 2, "Xin", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("OCTET_LENGTH", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(8, result.getLong(1));
+
+        cr = client.callProcedure("OCTET_LENGTH", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(3, result.getLong(1));
+
+        // null case
+        cr = client.callProcedure("OCTET_LENGTH", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
+    }
+
+    // this test is put here instead of TestFunctionSuite, because HSQL uses
+    // a different null case standard with standard sql
+    public void testPosition() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING Position");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("POSITION","Vo", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(3, result.getLong(1));
+
+        cr = client.callProcedure("POSITION","DB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(0, result.getLong(1));
+
+        cr = client.callProcedure("POSITION","Vo", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(5, result.getLong(1));
+
+        // null case
+        cr = client.callProcedure("POSITION","Vo", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
+    }
+
+    // this test is put here instead of TestFunctionSuite, because HSQL uses
+    // a different null case standard with standard sql
+    public void testCharLength() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING Char length");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CHAR_LENGTH", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(4, result.getLong(1));
+
+        cr = client.callProcedure("CHAR_LENGTH", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(8, result.getLong(1));
+
+        // null case
+        cr = client.callProcedure("CHAR_LENGTH", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
+    }
+
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -168,6 +285,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertFalse(true);
         }
         project.addPartitionInfo("P1", "ID");
+        // Test OCTET_LENGTH
+        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
+        // Test POSITION and CHAR_LENGTH
+        project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1 where id = ?");
+        project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

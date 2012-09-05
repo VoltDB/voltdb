@@ -164,12 +164,8 @@ public class HSQLInterface {
         try {
             cs = sessionProxy.compileStatement(sql);
         } catch (Throwable t) {
-            //t.printStackTrace();
             throw new HSQLParseException(t.getMessage());
         }
-
-        //ResultMetaData rmd = cs.getResultMetaData();
-        //ResultMetaData pmd = cs.getParametersMetaData();
 
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
@@ -178,6 +174,12 @@ public class HSQLInterface {
 
         VoltXMLElement xml = null;
         xml = cs.voltGetXML(sessionProxy);
+
+        // this releases some small memory hsql uses that builds up over time if not
+        // cleared
+        // if it's not called for every call of getXMLCompiledStatement, that's ok;
+        // it'll get called next time
+        sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
 
         assert(xml != null);
 

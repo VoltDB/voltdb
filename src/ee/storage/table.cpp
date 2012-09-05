@@ -158,6 +158,15 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 }
 
 // ------------------------------------------------------------------
+// OPERATIONS
+// ------------------------------------------------------------------
+
+bool Table::updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues) {
+    std::vector<TableIndex*> indexes = allIndexes();
+    return updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexes);
+}
+
+// ------------------------------------------------------------------
 // COLUMNS
 // ------------------------------------------------------------------
 
@@ -372,7 +381,7 @@ bool Table::equals(voltdb::Table *other) {
     if ((!m_schema->equals(otherSchema))) return false;
 
     voltdb::TableIterator firstTI = iterator();
-    voltdb::TableIterator secondTI = iterator();
+    voltdb::TableIterator secondTI = other->iterator();
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
     while(firstTI.next(firstTuple)) {

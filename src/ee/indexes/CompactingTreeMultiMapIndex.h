@@ -83,48 +83,36 @@ public:
         return deleteEntryPrivate(tuple, m_tmp1);
     }
 
-    bool replaceEntry(const TableTuple *oldTupleValue,
-                      const TableTuple* newTupleValue)
-    {
-        // this can probably be optimized
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-
-        // newTupleValue actually points to the existing tuple referenced by the index
-        // -- though its column values have already been updated not to match the key stored in the index.
-        // newTupleValue must be passed into deleteEntryPrivate to delete only the correct entry
-        // that matches the old key m_tmp1 (possibly one of many, each with a different tuple address value).
-        // deleteEntry can not be used for this because it constructs its key from the tuple's current column values.
-        bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
-        //TODO: addEntry COULD be used here instead of setting and using m_tmp2.
-        bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
-        --m_deletes;
-        --m_inserts;
-        ++m_updates;
-        return (deleted && inserted);
-    }
-
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) {
-        assert(oldTupleValue->address() != newTupleValue->address());
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
+    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+    {
+        assert(originalTuple.address() != destinationTuple.address());
+
+        // full delete and insert for certain key types
+        if (KeyType::keyDependsOnTupleAddress()) {
+            if (!deleteEntry(&originalTuple)) return false;
+            return addEntry(&destinationTuple);
+        }
+
+        m_tmp1.setFromTuple(&originalTuple, column_indices_, m_keySchema);
         std::pair<MMIter,MMIter> key_iter;
         for (key_iter = m_entries.equalRange(m_tmp1);
              !key_iter.first.equals(key_iter.second);
              key_iter.first.moveNext())
         {
-            if (key_iter.first.value() == oldTupleValue->address())
+            if (key_iter.first.value() == originalTuple.address())
             {
-                key_iter.first.setValue(newTupleValue->address());
+                key_iter.first.setValue(destinationTuple.address());
                 m_updates++;
                 return true;
             }
         }
         return false;
     }
+
+    bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
 
     bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs)
     {

@@ -83,39 +83,32 @@ public:
         return deleteEntryPrivate(m_tmp1);
     }
 
-    bool replaceEntry(const TableTuple* oldTupleValue,
-                      const TableTuple* newTupleValue)
-    {
-        // this can probably be optimized
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-
-        bool deleted = deleteEntryPrivate(m_tmp1);
-        //TODO: addEntry COULD be used here instead of setting and using m_tmp2.
-        bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
-        --m_deletes;
-        --m_inserts;
-        ++m_updates;
-        return (deleted && inserted);
-    }
-
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) {
-        assert(oldTupleValue->address() != newTupleValue->address());
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
+    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+    {
+        assert(originalTuple.address() != destinationTuple.address());
+
+        // full delete and insert for certain key types
+        if (KeyType::keyDependsOnTupleAddress()) {
+            if (!deleteEntry(&originalTuple)) return false;
+            return addEntry(&destinationTuple);
+        }
+
+        m_tmp1.setFromTuple(&originalTuple, column_indices_, m_keySchema);
         typename MapType::iterator mapiter = m_entries.find(m_tmp1);
         assert(!mapiter.isEnd());
         if (mapiter.isEnd()) {
             return false;
         }
-        mapiter.setValue(newTupleValue->address());
+        mapiter.setValue(destinationTuple.address());
 
         m_updates++;
         return true;
     }
+
+    bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
 
     bool checkForIndexChange(const TableTuple* lhs, const TableTuple* rhs)
     {
