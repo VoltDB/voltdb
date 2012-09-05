@@ -43,7 +43,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -57,6 +56,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.zk.ZKUtil.StringCallback;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
@@ -1008,6 +1008,29 @@ public class SnapshotRestore extends VoltSystemProcedure
             throw new VoltAbortException("Cluster has already been restored or has failed a restore." +
                 " Restart the cluster before doing another restore.");
         }
+
+        /*
+         * This list stores all the partition transaction ids ever seen even if the partition
+         * is no longer present. The values from here are added to snapshot digests to propagate
+         * partitions that were remove/add several time by SnapshotSave.
+         *
+         * Only the partitions that are no longer part of the cluster will have their ids retrieved,
+         * those that are active will populate their current values manually because they change after startup
+         *
+         * This is necessary to make sure that sequence numbers never go backwards as a result of a partition
+         * being removed and then added back by save restore sequences.
+         *
+         * They will be retrieved from ZK by the snapshot daemon
+         * and passed to @SnapshotSave which will use it to fill in transaction ids for
+         * partitions that are no longer present
+         */
+        ByteBuffer buf = ByteBuffer.allocate(perPartitionTxnIds.length * 8 + 4);
+        buf.putInt(perPartitionTxnIds.length);
+        for (long txnid : perPartitionTxnIds) {
+            buf.putLong(txnid);
+        }
+        VoltDB.instance().getHostMessenger().
+                getZK().create(VoltZK.perPartitionTxnIds, buf.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         /*
          * Serialize all the export sequence numbers and then distribute them in a

@@ -58,6 +58,10 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltdb.ExecutionSite.CheckTxnStateCompletionMessage;
+import org.voltdb.ExecutionSite.ExecutionSiteLocalSnapshotMessage;
+import org.voltdb.ExecutionSite.ExecutionSiteNodeFailureMessage;
+import org.voltdb.ExecutionSite.SystemProcedureContext;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -1780,6 +1784,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       (byte) 0x1,
                                       snapshotMsg.m_roadblockTransactionId,
                                       Long.MIN_VALUE,
+                                      new long[0],//this param not used pre-iv2
                                       null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress());
