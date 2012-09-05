@@ -64,7 +64,7 @@ public class SQLCommand
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     private static final String readme = "SQLCommandReadme.txt";
 
@@ -81,16 +81,18 @@ public class SQLCommand
         if (query == null)
             return null;
 
-        String[] command = new String[] {"exec", "execute"};
+        String[] command = new String[] {"exec", "execute", "explain", "explainproc"};
         String[] keyword = new String[] {"select", "insert", "update", "delete"};
         for(int i = 0;i<command.length;i++)
         {
-            for(int j = 0;j<command.length;j++)
+            for(int j = 0;j<keyword.length;j++)
             {
-                Pattern r = Pattern.compile("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+                String p = "\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*";
+                Pattern r = Pattern.compile(p, Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
                 query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
             }
         }
+
         query = SingleLineComments.matcher(query).replaceAll("");
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
         Matcher stringFragmentMatcher = Extract.matcher(query);
@@ -409,6 +411,8 @@ public class SQLCommand
 
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile("^(exec|execute) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern ExplainCall = Pattern.compile("^explain ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern ExplainProcCall = Pattern.compile("^explainProc ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern StripCRLF = Pattern.compile("[\r\n]+", Pattern.MULTILINE);
     private static final Pattern IsNull = Pattern.compile("null", Pattern.CASE_INSENSITIVE);
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -599,7 +603,19 @@ public class SQLCommand
                 printResponse(VoltDB.callProcedure(procedure, objectParams));
             }
         }
-        else
+        else if (ExplainCall.matcher(query).find())
+        {
+            query = query.substring("explain ".length());
+            query = StripCRLF.matcher(query).replaceAll(" ");
+            printResponse(VoltDB.callProcedure("@Explain", query));
+        }
+        else if (ExplainProcCall.matcher(query).find())
+        {
+            query = query.substring("explainProc ".length());
+            query = StripCRLF.matcher(query).replaceAll(" ");
+            printResponse(VoltDB.callProcedure("@ExplainProc", query));
+        }
+        else  // Ad hoc query
         {
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@AdHoc", query));
