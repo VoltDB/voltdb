@@ -163,6 +163,14 @@ public class HSQLInterface {
 
         try {
             cs = sessionProxy.compileStatement(sql);
+        } catch( HsqlException hex) {
+            // a switch in case we want to give more error details on additional error codes
+            switch( hex.getErrorCode()) {
+            case -ErrorCode.X_42581:
+                throw new HSQLParseException("SQL Syntax error in \"" + sql + "\" " + hex.getMessage());
+            default:
+                throw new HSQLParseException(hex.getMessage());
+            }
         } catch (Throwable t) {
             throw new HSQLParseException(t.getMessage());
         }
