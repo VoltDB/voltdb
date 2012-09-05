@@ -1180,6 +1180,8 @@ TEST CASES
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestVoltLicense.class" />
+                <exclude name="**/TestPauselessRejoinEndToEnd" />
+                <exclude name="**/TestPauselessRejoinFuzz" />
                 <exclude name="**/TestPrimary.class" />
                 <exclude name="**/TestSecondaryRejoin.class" />
                 <exclude name="**/TestInvocationBufferServer.class" />
