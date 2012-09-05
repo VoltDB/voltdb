@@ -548,19 +548,23 @@ SnapshotCompletionInterest
             if (VoltDB.instance().isIV2Enabled()) {
                 final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
                 final Map<Integer, Long> snapmap = info.partitionToTxnId;
-                if (cmdlogmap == null || snapmap == null || cmdlogmap.size() != snapmap.size()) {
-                    info = null;
-                }
-                else {
-                    for (Integer cmdpart : cmdlogmap.keySet()) {
-                        Long snaptxnId = snapmap.get(cmdpart);
-                        if (snaptxnId == null) {
-                            info = null;
-                            break;
-                        }
-                        else if (snaptxnId < cmdlogmap.get(cmdpart)) {
-                            info = null;
-                            break;
+                // If cmdlogmap is null, there were no command log segments, so all snapshots are potentially valid,
+                // don't do any TXN ID consistency checking between command log and snapshot
+                if (cmdlogmap != null) {
+                    if (snapmap == null || cmdlogmap.size() != snapmap.size()) {
+                        info = null;
+                    }
+                    else {
+                        for (Integer cmdpart : cmdlogmap.keySet()) {
+                            Long snaptxnId = snapmap.get(cmdpart);
+                            if (snaptxnId == null) {
+                                info = null;
+                                break;
+                            }
+                            else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                                info = null;
+                                break;
+                            }
                         }
                     }
                 }
