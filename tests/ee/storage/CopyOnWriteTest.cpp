@@ -21,6 +21,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <vector>
+#include <string>
+#include <stdint.h>
+#include <boost/scoped_ptr.hpp>
+#include <boost/foreach.hpp>
+
 #include "harness.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
@@ -36,10 +42,6 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
-#include <vector>
-#include <string>
-#include <stdint.h>
-#include "boost/scoped_ptr.hpp"
 
 using namespace voltdb;
 
@@ -141,12 +143,16 @@ public:
                                                                         m_primaryKeyIndexSchemaTypes,
                                                                         true, false, m_tableSchema);
         indexScheme.keySchema = m_primaryKeyIndexSchema;
-        std::vector<voltdb::TableIndexScheme> indexes;
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
                                                          (0, m_engine->getExecutorContext(), "Foo",
-                                                          m_tableSchema, &m_columnNames[0], indexScheme, indexes, 0,
+                                                          m_tableSchema, &m_columnNames[0], 0,
                                                           false, false));
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        assert(pkeyIndex);
+        m_table->addIndex(pkeyIndex);
+        m_table->setPrimaryKeyIndex(pkeyIndex);
     }
 
     void addRandomUniqueTuples(Table *table, int numTuples) {

@@ -49,6 +49,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <boost/foreach.hpp>
+
 #include "harness.h"
 #include "common/common.h"
 #include "common/NValue.hpp"
@@ -164,14 +166,11 @@ public:
         pkey_column_indices.push_back(39);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
 
 
-        TableIndexScheme pkey(name,
-                              BALANCED_TREE_INDEX,
-                              pkey_column_indices,
-                              pkey_column_types,
-                              true, true, schema);
-
-        vector<TableIndexScheme> indexes;
-        indexes.push_back(pkey);
+        TableIndexScheme pkeyScheme(name,
+                                    BALANCED_TREE_INDEX,
+                                    pkey_column_indices,
+                                    pkey_column_types,
+                                    true, true, schema);
 
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
@@ -181,9 +180,13 @@ public:
           dynamic_cast<PersistentTable*>
           (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_wide_table", schema,
-                                            columnNames, pkey, indexes, -1, false, false));
-
+                                            columnNames, -1, false, false));
         delete[] columnNames;
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
+        assert(pkeyIndex);
+        table->addIndex(pkeyIndex);
+        table->setPrimaryKeyIndex(pkeyIndex);
 
         for (int64_t row = 1; row <= NUM_OF_WIDE_TUPLES; ++row)
         {
@@ -293,11 +296,11 @@ public:
         pkey_column_indices.push_back(1);
         pkey_column_types.push_back(VALUE_TYPE_BIGINT);
         pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        TableIndexScheme pkey("idx_pkey",
-                              BALANCED_TREE_INDEX,
-                              pkey_column_indices,
-                              pkey_column_types,
-                              true, true, schema);
+        TableIndexScheme pkeyScheme("idx_pkey",
+                                    BALANCED_TREE_INDEX,
+                                    pkey_column_indices,
+                                    pkey_column_types,
+                                    true, true, schema);
 
         vector<TableIndexScheme> indexes;
         indexes.push_back(index);
@@ -309,9 +312,20 @@ public:
             dynamic_cast<PersistentTable*>
           (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_table", schema,
-                                            columnNames, pkey, indexes, -1, false, false));
-
+                                            columnNames, -1, false, false));
         delete[] columnNames;
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
+        assert(pkeyIndex);
+        table->addIndex(pkeyIndex);
+        table->setPrimaryKeyIndex(pkeyIndex);
+
+        // add other indexes
+        BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+            TableIndex *index = TableIndexFactory::getInstance(scheme);
+            assert(index);
+            table->addIndex(index);
+        }
 
         for (int64_t i = 1; i <= NUM_OF_TUPLES; ++i)
         {

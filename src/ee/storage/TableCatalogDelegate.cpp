@@ -15,8 +15,11 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "TableCatalogDelegate.hpp"
+#include <vector>
+#include <map>
+#include <boost/foreach.hpp>
 
+#include "TableCatalogDelegate.hpp"
 #include "catalog/catalog.h"
 #include "catalog/database.h"
 #include "catalog/table.h"
@@ -35,8 +38,7 @@
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 
-#include <vector>
-#include <map>
+
 
 using namespace std;
 namespace voltdb {
@@ -222,13 +224,13 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 
     // Build the index array
     vector<TableIndexScheme> indexes;
-    TableIndexScheme pkey_index;
+    TableIndexScheme pkey_index_scheme;
     map<string, TableIndexScheme>::const_iterator index_iterator;
     for (index_iterator = index_map.begin(); index_iterator != index_map.end();
          index_iterator++) {
         // Exclude the primary key
         if (index_iterator->first.compare(pkey_index_id) == 0) {
-            pkey_index = index_iterator->second;
+            pkey_index_scheme = index_iterator->second;
         // Just add it to the list
         } else {
             indexes.push_back(index_iterator->second);
@@ -242,24 +244,30 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         partitionColumnIndex = partitionColumn->index();
     }
 
-    if (pkey_index_id.size() == 0) {
-        int32_t databaseId = catalogDatabase.relativeIndex();
-        m_table = TableFactory::getPersistentTable(databaseId, executorContext,
+    m_exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
+
+    int32_t databaseId = catalogDatabase.relativeIndex();
+    m_table = TableFactory::getPersistentTable(databaseId, executorContext,
                                                  catalogTable.name(), schema, columnNames,
-                                                 indexes, partitionColumnIndex,
-                                                 isExportEnabledForTable(catalogDatabase, table_id),
+                                                 partitionColumnIndex, m_exportEnabled,
                                                  isTableExportOnly(catalogDatabase, table_id));
-    } else {
-        int32_t databaseId = catalogDatabase.relativeIndex();
-        m_table = TableFactory::getPersistentTable(databaseId, executorContext,
-                                                 catalogTable.name(), schema, columnNames,
-                                                 pkey_index, indexes, partitionColumnIndex,
-                                                 isExportEnabledForTable(catalogDatabase, table_id),
-                                                 isTableExportOnly(catalogDatabase, table_id));
-    }
     delete[] columnNames;
 
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
+    // add a pkey index if one exists
+    if (pkey_index_id.size() != 0) {
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(pkey_index_scheme);
+        assert(pkeyIndex);
+        m_table->addIndex(pkeyIndex);
+        m_table->setPrimaryKeyIndex(pkeyIndex);
+    }
+
+    // add other indexes
+    BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+        TableIndex *index = TableIndexFactory::getInstance(scheme);
+        assert(index);
+        m_table->addIndex(index);
+    }
+    
     m_table->incrementRefcount();
     return 0;
 }

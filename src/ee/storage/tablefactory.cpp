@@ -68,40 +68,6 @@ Table* TableFactory::getPersistentTable(
             bool exportEnabled,
             bool exportOnly)
 {
-    std::vector<TableIndexScheme> dummy;
-    return getPersistentTable(databaseId, ctx, name,
-                              schema, columnNames, dummy, partitionColumn,
-                              exportEnabled, exportOnly);
-}
-
-Table* TableFactory::getPersistentTable(
-            voltdb::CatalogId databaseId,
-            ExecutorContext *ctx,
-            const std::string &name,
-            TupleSchema* schema,
-            const std::string* columnNames,
-            const TableIndexScheme &pkey_index,
-            int partitionColumn,
-            bool exportEnabled,
-            bool exportOnly)
-{
-    std::vector<TableIndexScheme> dummy;
-    return getPersistentTable(databaseId, ctx, name, schema, columnNames,
-                              pkey_index, dummy, partitionColumn,
-                              exportEnabled, exportOnly);
-}
-
-Table* TableFactory::getPersistentTable(
-            voltdb::CatalogId databaseId,
-            ExecutorContext *ctx,
-            const std::string &name,
-            TupleSchema* schema,
-            const std::string* columnNames,
-            const std::vector<TableIndexScheme> &indexes,
-            int partitionColumn,
-            bool exportEnabled,
-            bool exportOnly)
-{
     Table *table = NULL;
 
     if (exportOnly) {
@@ -113,49 +79,6 @@ Table* TableFactory::getPersistentTable(
         PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
         TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
         pTable->m_partitionColumn = partitionColumn;
-
-        for (int i = 0; i < indexes.size(); ++i) {
-            pTable->addIndex(TableIndexFactory::getInstance(indexes[i]));
-        }
-    }
-
-    // initialize stats for the table
-    configureStats(databaseId, ctx, name, table);
-
-    return dynamic_cast<Table*>(table);
-}
-
-Table* TableFactory::getPersistentTable(
-            voltdb::CatalogId databaseId,
-            ExecutorContext *ctx,
-            const std::string &name,
-            TupleSchema* schema,
-            const std::string* columnNames,
-            const TableIndexScheme &pkeyIndex,
-            const std::vector<TableIndexScheme> &indexes,
-            int partitionColumn,
-            bool exportEnabled,
-            bool exportOnly)
-{
-    Table *table = NULL;
-
-    if (exportOnly) {
-        table = new StreamedTable(ctx, exportEnabled);
-        TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
-    }
-    else {
-        table = new PersistentTable(ctx, exportEnabled);
-        PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
-        pTable->m_pkeyIndex = TableIndexFactory::getInstance(pkeyIndex);
-        TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
-        pTable->m_partitionColumn = partitionColumn;
-
-        pTable->addIndex(pTable->m_pkeyIndex);
-        pTable->setPrimaryKeyIndex(pTable->m_pkeyIndex);
-
-        for (int i = 0; i < indexes.size(); ++i) {
-            pTable->addIndex(TableIndexFactory::getInstance(indexes[i]));
-        }
     }
 
     // initialize stats for the table

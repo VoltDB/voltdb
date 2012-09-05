@@ -629,9 +629,15 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
             map<string, CatalogDelegate*>::iterator pos;
             if ((pos = m_catalogDelegates.find(t->path())) != m_catalogDelegates.end()) {
                 TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
-                if (tcd && tcd->exportEnabled()) {
+                if (tcd) {
                     Table *table = tcd->getTable();
-                    table->setSignatureAndGeneration( t->signature(), txnId);
+                    if (tcd->exportEnabled()) {
+                        table->setSignatureAndGeneration(t->signature(), txnId);
+                    }
+                    map<string, catalog::Index*>::const_iterator indexIter;
+                    for (indexIter = t->indexes().begin(); indexIter != t->indexes().end(); indexIter++) {
+                        // this is where the code to diff indexes goes when it's ublocked in java
+                    }
                 }
             }
         }

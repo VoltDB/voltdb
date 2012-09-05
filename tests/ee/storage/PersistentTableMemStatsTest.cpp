@@ -21,6 +21,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <vector>
+#include <string>
+#include <stdint.h>
+#include <boost/foreach.hpp>
+
 #include "harness.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
@@ -31,9 +36,6 @@
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
-#include <vector>
-#include <string>
-#include <stdint.h>
 
 using namespace std;
 using namespace voltdb;
@@ -109,8 +111,19 @@ public:
             dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable
                                            (0, m_engine->getExecutorContext(),
                                             "Foo", m_tableSchema,
-                                            &m_columnNames[0], indexScheme,
-                                            indexes, 0, false, false));
+                                            &m_columnNames[0], 0, false, false));
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        assert(pkeyIndex);
+        m_table->addIndex(pkeyIndex);
+        m_table->setPrimaryKeyIndex(pkeyIndex);
+
+        // add other indexes
+        BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+            TableIndex *index = TableIndexFactory::getInstance(scheme);
+            assert(index);
+            m_table->addIndex(index);
+        }
     }
 
     VoltDBEngine *m_engine;
