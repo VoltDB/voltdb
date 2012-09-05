@@ -113,10 +113,10 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         if (catalog_index->expressionsjson().length() != 0) {
             // When this gets supported, column type validations below will have to be replaced with expression type validations,
             // and then the real work begins.
-            printf("WARNING: for now, ignoring expression-based index '%s' on table '%s' having JSON expression: %s\n",
-                      catalog_index->name().c_str(),
-                      catalogTable.name().c_str(),
-                      catalog_index->expressionsjson().c_str());
+            //printf("WARNING: for now, ignoring expression-based index '%s' on table '%s' having JSON expression: %s\n",
+            //          catalog_index->name().c_str(),
+            //          catalogTable.name().c_str(),
+            //          catalog_index->expressionsjson().c_str());
             continue;
         }
 
