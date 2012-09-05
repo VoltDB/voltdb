@@ -368,29 +368,27 @@ Get the statistics:
         args = command.split()
         if len(args) != 2:
             return self.help_updatecatalog()
-        else:
-            if(not os.path.isfile(args[0]) or not os.path.isfile(args[1])):
-                # args[0] is the catalog jar file
-                # args[1] is the deployment xml file
-                print >> sys.stderr, "Either file '%s' doesnot exist OR file '%s' doesnot exist!!" \
-                    (args[0],args[1])
-                exit(1)
-            else:
-#                print "File '%s' exists!! File '%s' exists!!" % (args[0], args[1])
-#                print "File '%s' exists!! File '%s' exists!!" % (args[0], args[1])
-                xmlf = open(args[1], "r")
-                xmlcntnts = xmlf.read()
-#                print "xmlcntnts = #%s#" % xmlcntnts
-                jarf = open(args[0], "r")
-                jarcntnts = jarf.read()
-                hexJarcntnts = jarcntnts.encode('hex_codec')
-#                print "hexJarcntnts = #%s#" % hexJarcntnts
 
-                self.safe_print("Updating the application catalog")
-                self.response = self.__safe_call(self.updatecatalog,
-                                         [hexJarcntnts, xmlcntnts],
-                                         timeout = self.__timeout)
-                self.safe_print(self.response)
+        if(not os.path.isfile(args[0]) or not os.path.isfile(args[1])):
+            # args[0] is the catalog jar file
+            # args[1] is the deployment xml file
+            print >> sys.stderr, "Either file '%s' doesnot exist OR file '%s' doesnot exist!!" \
+                    (args[0],args[1])
+            exit(1)
+
+        xmlf = open(args[1], "r")
+        xmlcntnts = xmlf.read()
+#       print "xmlcntnts = #%s#" % xmlcntnts
+        jarf = open(args[0], "r")
+        jarcntnts = jarf.read()
+        hexJarcntnts = jarcntnts.encode('hex_codec')
+#       print "hexJarcntnts = #%s#" % hexJarcntnts
+
+        self.safe_print("Updating the application catalog")
+        self.response = self.__safe_call(self.updatecatalog,
+                                 [hexJarcntnts, xmlcntnts],
+                                 timeout = self.__timeout)
+        self.safe_print(self.response)
 
     def help_updatecatalog(self):
         self.safe_print("Update the application catalog:")
