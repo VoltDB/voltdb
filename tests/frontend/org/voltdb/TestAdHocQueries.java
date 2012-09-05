@@ -521,6 +521,17 @@ public class TestAdHocQueries extends AdHocQueryTester {
             catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("not yet support self joins") > 0);
             }
+            adHocQuery = "SELECT PNAME \n" +
+                    "         FROM PROJ \n" +
+                    "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +
+                    "                           AND PNUM > 'P2';";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on static clause");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("does not yet support where clauses containing only constants") > 0);
+            }
         }
         finally {
             env.tearDown();
