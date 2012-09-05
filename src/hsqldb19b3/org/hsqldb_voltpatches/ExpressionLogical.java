@@ -1722,6 +1722,8 @@ public class ExpressionLogical extends Expression {
         case OpTypes.LIKE:              element = "like"; break;
         case OpTypes.EXISTS:
             throw new HSQLParseException("VoltDB does not yet support EXISTS clause, consider using views instead");
+        case OpTypes.VALUE :
+            throw new HSQLParseException("VoltDB does not yet support where clauses containing only constants");
         //TODO: Enable these as they are supported in VoltDB.
         // They appear to be a complete set as supported by the other methods in this module.
         case OpTypes.ALL_QUANTIFIED : unsupported = true; element = "allquantified"; break;
@@ -1737,7 +1739,6 @@ public class ExpressionLogical extends Expression {
         case OpTypes.OVERLAPS : unsupported = true; element = "overlaps"; break;
         case OpTypes.SIMPLE_COLUMN : unsupported = true; element = "simplecolumn"; break;
         case OpTypes.UNIQUE : unsupported = true; element = "unique"; break;
-        case OpTypes.VALUE : unsupported = true; element = "value"; break;
 
         // Handle some of the unsupported OpTypes with slightly more informative messages.
         default:
