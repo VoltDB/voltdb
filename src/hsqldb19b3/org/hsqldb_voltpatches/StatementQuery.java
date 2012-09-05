@@ -498,9 +498,7 @@ public class StatementQuery extends StatementDMQL {
 
         // having
         if (select.havingCondition != null) {
-            VoltXMLElement condition = new VoltXMLElement("havingcondition");
-            query.children.add(condition);
-            condition.children.add(select.havingCondition.voltGetXML(session));
+            throw new HSQLParseException("VoltDB does not yet support the HAVING clause");
         }
 
         // groupby
