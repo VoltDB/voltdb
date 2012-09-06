@@ -410,7 +410,9 @@ public class SQLCommand
 
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile("^(exec|execute) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    // Match queries that start with "explain" (case insensitive).  We'll convert them to @Explain invocations.
     private static final Pattern ExplainCall = Pattern.compile("^explain ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
     private static final Pattern ExplainProcCall = Pattern.compile("^explainProc ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern StripCRLF = Pattern.compile("[\r\n]+", Pattern.MULTILINE);
     private static final Pattern IsNull = Pattern.compile("null", Pattern.CASE_INSENSITIVE);
@@ -609,12 +611,16 @@ public class SQLCommand
         }
         else if (ExplainCall.matcher(query).find())
         {
+            // We've got a query that starts with "explain", pre-pend
+            // the @Explain sp invocatino ahead of the query (after stripping "explain").
             query = query.substring("explain ".length());
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@Explain", query));
         }
         else if (ExplainProcCall.matcher(query).find())
         {
+            // We've got a query that starts with "explainplan", pre-pend
+            // the @ExplainPlan sp invocation ahead of the query (after stripping "explainplan").
             query = query.substring("explainProc ".length());
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@ExplainProc", query));
