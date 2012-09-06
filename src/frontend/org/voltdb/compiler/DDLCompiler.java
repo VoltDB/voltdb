@@ -33,6 +33,8 @@ import java.util.regex.Pattern;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -952,8 +954,19 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
 
-        // this won't work for multi-column indices
-        // XXX not sure what 'this' is above, perhaps stale comment --izzy
+        // "parse" the expression trees for an expression-based index (vs. a simple column value index)
+        AbstractExpression[] exprs = null;
+        for (VoltXMLElement subNode : node.children) {
+            if (subNode.name.equals("exprs")) {
+                exprs = new AbstractExpression[subNode.children.size()];
+                int j = 0;
+                for (VoltXMLElement exprNode : subNode.children) {
+                    exprs[j] = AbstractParsedStmt.parseExpressionTree(null, exprNode);
+                    exprs[j].resolveForTable(table);
+                }
+            }
+        }
+
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
@@ -965,17 +978,33 @@ public class DDLCompiler {
             if (columns[i] == null) {
                 return;
             }
-            VoltType colType = VoltType.get((byte)columns[i].getType());
-            if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT ||
-                colType == VoltType.STRING)
-            {
-                has_nonint_col = true;
-                nonint_col_name = colNames[i];
+        }
+
+        if (exprs == null) {
+            for (int i = 0; i < colNames.length; i++) {
+                VoltType colType = VoltType.get((byte)columns[i].getType());
+                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
+                    has_nonint_col = true;
+                    nonint_col_name = colNames[i];
+                }
+                // disallow columns from VARBINARYs
+                if (colType == VoltType.VARBINARY) {
+                    String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw this.m_compiler.new VoltCompilerException(msg);
+                }
             }
-            // disallow columns from VARBINARYs
-            if (colType == VoltType.VARBINARY) {
-                String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
-                throw this.m_compiler.new VoltCompilerException(msg);
+        } else {
+            for (AbstractExpression expression : exprs) {
+                VoltType colType = expression.getValueType();
+                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
+                    has_nonint_col = true;
+                    nonint_col_name = "<expression>";
+                }
+                // disallow expressions of type VARBINARY
+                if (colType == VoltType.VARBINARY) {
+                    String msg = "VARBINARY expressions are not currently supported as index keys.";
+                    throw this.m_compiler.new VoltCompilerException(msg);
+                }
             }
         }
 
@@ -999,7 +1028,7 @@ public class DDLCompiler {
             else
             {
                 String msg = "Index " + name + " in table " + table.getTypeName() +
-                            " uses a non-hashable column" + nonint_col_name;
+                             " uses a non-hashable column " + nonint_col_name;
                 throw m_compiler.new VoltCompilerException(msg);
             }
         } else {
@@ -1014,10 +1043,21 @@ public class DDLCompiler {
 //        }
 
         // need to set other index data here (column, etc)
+        // For expression indexes, the columns listed in the catalog do not correspond to the values in the index,
+        // but they still represent the columns that will trigger an index update when their values change.
         for (int i = 0; i < columns.length; i++) {
             ColumnRef cref = index.getColumns().add(columns[i].getTypeName());
             cref.setColumn(columns[i]);
             cref.setIndex(i);
+        }
+
+        if (exprs != null) {
+            try {
+                index.setExpressionsjson(convertToJSONArray(exprs));
+            } catch (JSONException e) {
+                throw m_compiler.new VoltCompilerException("Unexpected error serializing non-column expressions for index '" +
+                                                           name + "' on type '" + table.getTypeName() + "': " + e.toString());
+            }
         }
 
         index.setUnique(unique);
@@ -1028,6 +1068,18 @@ public class DDLCompiler {
         m_compiler.addInfo(msg);
 
         indexMap.put(name, index);
+    }
+
+    private static String convertToJSONArray(AbstractExpression[] exprs) throws JSONException {
+        JSONStringer stringer = new JSONStringer();
+        stringer.array();
+        for (AbstractExpression abstractExpression : exprs) {
+            stringer.object();
+            abstractExpression.toJSONString(stringer);
+            stringer.endObject();
+        }
+        stringer.endArray();
+        return stringer.toString();
     }
 
     /**

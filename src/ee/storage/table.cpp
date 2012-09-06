@@ -390,7 +390,7 @@ bool Table::equals(voltdb::Table *other) {
     if ((!m_schema->equals(otherSchema))) return false;
 
     voltdb::TableIterator firstTI = iterator();
-    voltdb::TableIterator secondTI = iterator();
+    voltdb::TableIterator secondTI = other->iterator();
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
     while(firstTI.next(firstTuple)) {
