@@ -87,8 +87,7 @@ public class SQLCommand
         {
             for(int j = 0;j<keyword.length;j++)
             {
-                String p = "\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*";
-                Pattern r = Pattern.compile(p, Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+                Pattern r = Pattern.compile("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
                 query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
             }
         }
@@ -553,7 +552,7 @@ public class SQLCommand
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_TIMESTAMP;
                         else
-                            objectParams[i] = DateParser.parse(param);
+                            objectParams[i] = DateParser.parse(param.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));  // Remove any quotes around the timestamp value.  ENG-2623
                     }
                     else if (paramType.equals("statisticscomponent"))
                     {
