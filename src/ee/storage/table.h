@@ -224,25 +224,31 @@ class Table {
     virtual int indexCount() const {
         return static_cast<int>(m_indexes.size());
     }
-    
+
     virtual int uniqueIndexCount() const {
         return static_cast<int>(m_uniqueIndexes.size());
     }
-    
+
     virtual std::vector<TableIndex*> allIndexes() const {
         std::vector<TableIndex*> retval;
         retval.insert(retval.begin(), m_indexes.begin(), m_indexes.end());
         return retval;
     }
-    
+
     virtual TableIndex *index(std::string name);
-    
+
     virtual TableIndex *primaryKeyIndex() {
         return m_pkeyIndex;
     }
     virtual const TableIndex *primaryKeyIndex() const {
         return m_pkeyIndex;
     }
+
+    void configureIndexStats(CatalogId hostId,
+                             std::string hostname,
+                             int64_t siteId,
+                             CatalogId partitionId,
+                             CatalogId databaseId);
 
     // mutating indexes
     virtual void addIndex(TableIndex *index);

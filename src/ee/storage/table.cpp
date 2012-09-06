@@ -537,14 +537,36 @@ void Table::addIndex(TableIndex *index) {
         m_uniqueIndexes.push_back(index);
     }
     m_indexes.push_back(index);
+
+
 }
 
 void Table::setPrimaryKeyIndex(TableIndex *index) {
     // for now, no calling on non-empty tables
     assert(activeTupleCount() == 0);
     assert(isExistingTableIndex(m_indexes, index));
-    
+
     m_pkeyIndex = index;
 }
+
+void Table::configureIndexStats(CatalogId hostId,
+                                std::string hostname,
+                                int64_t siteId,
+                                CatalogId partitionId,
+                                CatalogId databaseId)
+{
+    // initialize stats for all the indexes for the table
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        index->getIndexStats()->configure(index->getName() + " stats",
+                                          name(),
+                                          hostId,
+                                          hostname,
+                                          siteId,
+                                          partitionId,
+                                          databaseId);
+    }
+
+}
+
 
 }

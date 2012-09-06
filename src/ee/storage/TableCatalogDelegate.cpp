@@ -267,7 +267,14 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         assert(index);
         m_table->addIndex(index);
     }
-    
+
+    // configure for stats tables
+    m_table->configureIndexStats(executorContext->m_hostId,
+                                 executorContext->m_hostname,
+                                 executorContext->m_siteId,
+                                 executorContext->m_partitionId,
+                                 databaseId);
+
     m_table->incrementRefcount();
     return 0;
 }
