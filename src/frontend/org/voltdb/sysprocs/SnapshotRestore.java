@@ -898,6 +898,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             digests = digestScanResult.digests;
             exportSequenceNumbers = digestScanResult.exportSequenceNumbers;
             perPartitionTxnIds = digestScanResult.perPartitionTxnIds;
+            if (perPartitionTxnIds.length == 0) {
+                perPartitionTxnIds = new long[] {ctx.getCurrentTxnId()};
+            }
         } catch (VoltAbortException e) {
             ColumnInfo[] result_columns = new ColumnInfo[2];
             int ii = 0;
