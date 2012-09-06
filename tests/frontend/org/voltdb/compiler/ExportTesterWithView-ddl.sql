@@ -7,8 +7,7 @@ create table table1r_el_only (
  column6_decimal     decimal,
  column8_varchar     varchar(100),
  column9_timestamp   timestamp,
- column10_bigint     bigint,
- primary key (column1_bigint)
+ column10_bigint     bigint
 );
 create view v_table1r_el_only (column2_integer, num_rows)
 as select column2_integer as column2_integer,
