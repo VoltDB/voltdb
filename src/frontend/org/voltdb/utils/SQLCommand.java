@@ -550,9 +550,14 @@ public class SQLCommand
                     else if (paramType.equals("timestamp"))
                     {
                         if (IsNull.matcher(param).matches())
+                        {
                             objectParams[i] = VoltType.NULL_TIMESTAMP;
+                        }
                         else
-                            objectParams[i] = DateParser.parse(param.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));  // Remove any quotes around the timestamp value.  ENG-2623
+                        {
+                            // Remove any quotes around the timestamp value.  ENG-2623
+                            objectParams[i] = DateParser.parse(param.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));
+                        }
                     }
                     else if (paramType.equals("statisticscomponent"))
                     {
