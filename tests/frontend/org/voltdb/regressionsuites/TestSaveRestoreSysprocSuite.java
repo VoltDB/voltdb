@@ -35,7 +35,9 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
@@ -61,8 +63,11 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
+import org.voltdb.utils.VoltFile;
 import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
 
@@ -421,6 +426,89 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             System.setOut(original);
         }
           return false;
+    }
+
+    /*
+     * Test that IV2 transaction ids for inactive partitions are propagated during snapshot restore. This
+     * test is sufficient to test restore as well because the transactions ids are published
+     * to ZK and retrieved by the snapshot daemon for each @SnapshotSave invocation.
+     */
+    public void testPropagateIV2TransactionIds()
+    throws Exception
+    {
+        if (!VoltDB.instance().isIV2Enabled()) return;
+
+
+        System.out.println("Starting testPropagateIV2TransactionIds");
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        Client client = getClient();
+        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+        // make a TPCC warehouse table
+        VoltTable partition_table =
+            createPartitionedTable(num_partitioned_items, 0);
+
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
+
+        saveTablesWithDefaultOptions(client);
+
+
+        /*
+         * It's really hard to derive/access these values, so I pulled them
+         * from the generated digest. They won't be changing often, but if they
+         * do you will have to update them from the generated digest unless
+         * it is a genuine failure where the values are missing or contain incorrect
+         * partition information.
+         */
+        Map<Integer, Long> expectedTransactionIds = new HashMap<Integer, Long>();
+        expectedTransactionIds.put(0, 3619631924068352L);
+        expectedTransactionIds.put(1, 3619631924068353L);
+        expectedTransactionIds.put(MpInitiator.MP_INIT_PID, 3619631923249151L);
+        expectedTransactionIds.put(2, 3619631924068354L);
+
+        JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"));
+        JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
+        assertEquals( expectedTransactionIds.size(), transactionIds.length());
+
+        for (Map.Entry<Integer, Long> expectedValues : expectedTransactionIds.entrySet()) {
+            final long foundTxnId = transactionIds.getLong(expectedValues.getKey().toString());
+            assertEquals(expectedValues.getValue().longValue(), foundTxnId);
+        }
+
+        m_config.shutDown();
+
+        CatalogChangeSingleProcessServer config =
+                (CatalogChangeSingleProcessServer) m_config;
+        config.recompile(1);
+        try {
+            m_config.startUp(false);
+            client = getClient();
+
+            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
+
+            saveTables(client, TMPDIR, TESTNONCE + 2, true, false);
+
+            digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"));
+            transactionIds = digest.getJSONObject("partitionTransactionIds");
+            assertEquals(expectedTransactionIds.size(), transactionIds.length());
+            for (Map.Entry<Integer, Long> expectedValues : expectedTransactionIds.entrySet()) {
+                final long txnid = transactionIds.getLong(expectedValues.getKey().toString());
+                final int partitionId = expectedValues.getKey();
+
+                //Because these are no longer part of the cluster they should be unchanged
+                if (partitionId == 2 || partitionId == 1) {
+                    assertEquals(txnid, expectedValues.getValue().longValue());
+                } else if (partitionId == MpInitiator.MP_INIT_PID || partitionId == 1) {
+                    //These should be > then the one from the other snapshot
+                    //because it picked up where it left off on restore and did more work
+                    assertTrue(txnid > expectedValues.getValue().longValue());
+                }
+            }
+        } finally {
+            config.revertCompile();
+        }
     }
 
     /*
