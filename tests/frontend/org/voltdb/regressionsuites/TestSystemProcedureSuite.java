@@ -41,6 +41,11 @@ import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
 
+    private static int sites = 2; //3;
+    private static int hosts = 1; //2;
+    private static int kfactor = 0; //1;
+    private static boolean hasLocalServer = true; //false;
+
     static final Class<?>[] PROCEDURES =
     {
      GoSleep.class
@@ -50,13 +55,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         super(name);
     }
 
-    public void testPing() throws IOException, ProcCallException {
+    public void ztestPing() throws IOException, ProcCallException {
         Client client = getClient();
         ClientResponse cr = client.callProcedure("@Ping");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void testInvalidProcedureName() throws IOException {
+    public void ztestInvalidProcedureName() throws IOException {
         Client client = getClient();
         try {
             client.callProcedure("@SomeInvalidSysProcName", "1", "2");
@@ -87,7 +92,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             "</root>" +
         "</log4j:configuration>";
 
-    public void testUpdateLogging() throws Exception {
+    public void ztestUpdateLogging() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
         results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
@@ -96,7 +101,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void testPromoteMaster() throws Exception {
+    public void ztestPromoteMaster() throws Exception {
         Client client = getClient();
         try {
             client.callProcedure("@Promote");
@@ -158,8 +163,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals( 1, results[0].getColumnCount());
         assertEquals( VoltType.INTEGER, results[0].getColumnType(0));
         assertTrue( results[0].advanceRow());
-        final int columnCount = (int)results[0].getLong(0);
-        assertTrue (columnCount == 3);
+        final int siteCount = (int)results[0].getLong(0);
+        assertTrue (siteCount == TestSystemProcedureSuite.sites);
 
         //
         // table
@@ -168,7 +173,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertTrue(results.length == 1);
         // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-        assertEquals(18, results[0].getRowCount());
+        assertEquals(TestSystemProcedureSuite.hosts * TestSystemProcedureSuite.sites * 3, results[0].getRowCount());
 
         System.out.println("Test statistics table: " + results[0].toString());
 
@@ -204,16 +209,37 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         VoltTable stats = results[0];
         stats.advanceRow();
-        // Check for overflow
+
+        // Retrieve all statistics
         long min_time = (Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT);
         long max_time = (Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT);
         long avg_time = (Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT);
+        long min_result_size = (Long)stats.get("MIN_RESULT_SIZE", VoltType.BIGINT);
+        long max_result_size = (Long)stats.get("MAX_RESULT_SIZE", VoltType.BIGINT);
+        long avg_result_size = (Long)stats.get("AVG_RESULT_SIZE", VoltType.BIGINT);
+        long min_parameter_set_size = (Long)stats.get("MIN_PARAMETER_SET_SIZE", VoltType.BIGINT);
+        long max_parameter_set_size = (Long)stats.get("MAX_PARAMETER_SET_SIZE", VoltType.BIGINT);
+        long avg_parameter_set_size = (Long)stats.get("AVG_PARAMETER_SET_SIZE", VoltType.BIGINT);
+
+        // Check for overflow
         assertTrue("Failed MIN_EXECUTION_TIME > 0, value was: " + min_time,
                    min_time > 0);
         assertTrue("Failed MAX_EXECUTION_TIME > 0, value was: " + max_time,
                    max_time > 0);
         assertTrue("Failed AVG_EXECUTION_TIME > 0, value was: " + avg_time,
                    avg_time > 0);
+        assertTrue("Failed MIN_RESULT_SIZE > 0, value was: " + min_result_size,
+                   min_result_size >= 0);
+        assertTrue("Failed MAX_RESULT_SIZE > 0, value was: " + max_result_size,
+                   max_result_size >= 0);
+        assertTrue("Failed AVG_RESULT_SIZE > 0, value was: " + avg_result_size,
+                   avg_result_size >= 0);
+        assertTrue("Failed MIN_PARAMETER_SET_SIZE > 0, value was: " + min_parameter_set_size,
+                   min_parameter_set_size >= 0);
+        assertTrue("Failed MAX_PARAMETER_SET_SIZE > 0, value was: " + max_parameter_set_size,
+                   max_parameter_set_size >= 0);
+        assertTrue("Failed AVG_PARAMETER_SET_SIZE > 0, value was: " + avg_parameter_set_size,
+                   avg_parameter_set_size >= 0);
 
         // check for reasonable values
         assertTrue("Failed MIN_EXECUTION_TIME > 2,400,000,000ns, value was: " +
@@ -225,6 +251,24 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertTrue("Failed AVG_EXECUTION_TIME > 2,400,000,000ns, value was: " +
                    avg_time,
                    avg_time > 2400000000L);
+        assertTrue("Failed MIN_RESULT_SIZE < 1,000,000, value was: " +
+                   min_result_size,
+                   min_result_size < 1000000L);
+        assertTrue("Failed MAX_RESULT_SIZE < 1,000,000, value was: " +
+                   max_result_size,
+                   max_result_size < 1000000L);
+        assertTrue("Failed AVG_RESULT_SIZE < 1,000,000, value was: " +
+                   avg_result_size,
+                   avg_result_size < 1000000L);
+        assertTrue("Failed MIN_PARAMETER_SET_SIZE < 1,000,000, value was: " +
+                   min_parameter_set_size,
+                   min_parameter_set_size < 1000000L);
+        assertTrue("Failed MAX_PARAMETER_SET_SIZE < 1,000,000, value was: " +
+                   max_parameter_set_size,
+                   max_parameter_set_size < 1000000L);
+        assertTrue("Failed AVG_PARAMETER_SET_SIZE < 1,000,000, value was: " +
+                   avg_parameter_set_size,
+                   avg_parameter_set_size < 1000000L);
 
         //
         // iostats
@@ -250,7 +294,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
     // Pretty lame test but at least invoke the procedure.
     // "@Quiesce" is used more meaningfully in TestExportSuite.
-    public void testQuiesce() throws IOException, ProcCallException {
+    public void ztestQuiesce() throws IOException, ProcCallException {
         Client client = getClient();
         VoltTable results[] = client.callProcedure("@Quiesce").getResults();
         assertEquals(1, results.length);
@@ -258,7 +302,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTable() throws IOException {
+    public void ztestLoadMultipartitionTable() throws IOException {
         Client client = getClient();
 
         // try the failure case first
@@ -343,7 +387,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     }
 
     // verify that these commands don't blow up
-    public void testProfCtl() throws Exception {
+    public void ztestProfCtl() throws Exception {
         Client client = getClient();
 
         //
@@ -453,9 +497,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("sysproc-cluster.jar", 3, 2, 1,
+        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.sites, TestSystemProcedureSuite.hosts, TestSystemProcedureSuite.kfactor,
                                   BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(false);
+        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

@@ -37,6 +37,7 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -45,6 +46,7 @@ import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.AsyncCompilerAgent;
 
@@ -269,8 +271,9 @@ public class Benchmark {
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Txns Completed %d ", stats.getInvocationsCompleted());
-        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %d/%dms, ", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
+        System.out.println("");
     }
 
     /**
@@ -304,8 +307,71 @@ public class Benchmark {
 
         System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
 
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" Planner Statistics");
+        System.out.println(HORIZONTAL_RULE);
+
+        printPlannerStatistics();
+
         // 3. Write stats to file if requested
         client.writeSummaryCSV(stats, cliConfig.statsfile);
+    }
+
+    /**
+     * Print planner and cache statistics.
+     * @throws IOException
+     * @throws NoConnectionsException
+     */
+    public void printPlannerStatistics() throws IOException, NoConnectionsException {
+        try {
+            VoltTable result = client.callProcedure("@Statistics", "PLANNER", 0).getResults()[0];
+            while(result.advanceRow()) {
+                String hostname  = result.getString("HOSTNAME");
+                long siteId      = result.getLong("SITE_ID");
+                long partitionId = result.getLong("PARTITION_ID");
+                long hits1       = result.getLong("CACHE1_HITS");
+                long hits2       = result.getLong("CACHE2_HITS");
+                long level1      = result.getLong("CACHE1_LEVEL");
+                long level2      = result.getLong("CACHE2_LEVEL");
+                long misses      = result.getLong("CACHE_MISSES");
+                long total       = hits1 + hits2 + misses;
+                double hitpc1    = (100.0 * hits1) / total;
+                double hitpc2    = (100.0 * hits2) / total;
+                long planTimeMin = (result.getLong("PLAN_TIME_MIN") + 500)/ 1000;
+                long planTimeMax = (result.getLong("PLAN_TIME_MAX") + 500)/ 1000;
+                long planTimeAvg = (result.getLong("PLAN_TIME_AVG") + 500)/ 1000;
+                long failures    = result.getLong("FAILURES");
+                // Global stats
+                System.out.printf("           HOSTNAME: %s\n", hostname);
+                if (siteId == -1) {
+                    System.out.printf(
+                                  "               SITE: (global)\n");
+                }
+                else {
+                    System.out.printf(
+                                  "               SITE: %d\n", siteId);
+                    System.out.printf(
+                                  "          PARTITION: %d\n", partitionId);
+                }
+                System.out.printf("        TOTAL PLANS: %d\n", total);
+                System.out.printf("       CACHE MISSES: %d\n", misses);
+                System.out.printf(" LEVEL 1 CACHE HITS: %d (%.1f%%)\n", hits1, hitpc1);
+                System.out.printf("LEVEL 1 CACHE LEVEL: %d\n", level1);
+                if (siteId == -1) {
+                    System.out.printf(
+                                  " LEVEL 2 CACHE HITS: %d (%.1f%%)\n", hits2, hitpc2);
+                    System.out.printf(
+                                  "LEVEL 2 CACHE LEVEL: %d\n", level2);
+                }
+                System.out.printf("      PLAN TIME MIN: %d\n", planTimeMin);
+                System.out.printf("      PLAN TIME MAX: %d\n", planTimeMax);
+                System.out.printf("      PLAN TIME AVG: %d\n", planTimeAvg);
+                System.out.printf("           FAILURES: %d\n\n", failures);
+            }
+        }
+        catch (ProcCallException e) {
+            e.printStackTrace();
+        }
     }
 
     /**

@@ -44,6 +44,8 @@ public class SysProcFragmentId
     public static final long PF_ioDataAggregator = 19;
     public static final long PF_liveClientData = 20;
     public static final long PF_liveClientDataAggregator = 21;
+    public static final long PF_plannerData = 22;
+    public static final long PF_plannerAggregator = 23;
 
     // @Shutdown
     public static final long PF_shutdownCommand = 28;

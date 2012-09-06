@@ -30,6 +30,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
+import org.voltdb.PlannerStatsCollector;
+import org.voltdb.PlannerStatsCollector.CacheUse;
+import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.VoltDB;
@@ -53,6 +56,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_SUCCESS = 0;
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
+
+    /** Partition ID */
+    protected final int m_partitionId;
+
+    /** Statistics collector (provided later) */
+    private final PlannerStatsCollector m_plannerStats;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -83,8 +92,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine() {
+    public ExecutionEngine(long siteId, int partitionId) {
+        m_partitionId = partitionId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        m_plannerStats = new PlannerStatsCollector(siteId);
+        final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
+        statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
+    }
+
+    /** Alternate constructor without planner statistics tracking. */
+    public ExecutionEngine() {
+        m_partitionId = 0;  // not used
+        m_plannerStats = null;
     }
 
     /*
@@ -183,6 +202,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotFound.name(),
                                new Object[] { dependencyId }, null);
                 VoltDB.crashLocalVoltDB("No additional info.", false, null);
+                // Prevent warnings.
+                return;
             }
             for (final Object dependency : dependencies) {
                 if (dependency == null) {
@@ -190,6 +211,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                    new Object[] { dependencyId },
                             null);
                     VoltDB.crashLocalVoltDB("No additional info.", false, null);
+                    // Prevent warnings.
+                    return;
                 }
                 if (log.isTraceEnabled()) {
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
@@ -645,4 +668,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Returns the RSS size in bytes or -1 on error (or wrong platform).
      */
     public native static long nativeGetRSS();
+
+    /**
+     * Start collecting planning statistics.
+     */
+    protected void startPlanning() {
+        if (m_plannerStats != null) {
+            m_plannerStats.startPlanning();
+        }
+    }
+
+    /**
+     * Start collecting planning statistics.
+     *
+     * @param cacheSize  size of cache
+     * @param cacheUse   where the plan came from
+     */
+    protected void endPlanning(long cacheSize, CacheUse cacheUse) {
+        if (m_plannerStats != null) {
+            m_plannerStats.endPlanning(cacheSize, 0, cacheUse, m_partitionId);
+        }
+    }
 }
