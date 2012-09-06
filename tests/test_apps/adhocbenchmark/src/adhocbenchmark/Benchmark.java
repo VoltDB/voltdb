@@ -363,9 +363,9 @@ public class Benchmark {
                     System.out.printf(
                                   "LEVEL 2 CACHE LEVEL: %d\n", level2);
                 }
-                System.out.printf("      PLAN TIME MIN: %d\n", planTimeMin);
-                System.out.printf("      PLAN TIME MAX: %d\n", planTimeMax);
-                System.out.printf("      PLAN TIME AVG: %d\n", planTimeAvg);
+                System.out.printf("      PLAN TIME MIN: %d ms\n", planTimeMin);
+                System.out.printf("      PLAN TIME MAX: %d ms\n", planTimeMax);
+                System.out.printf("      PLAN TIME AVG: %d ms\n", planTimeAvg);
                 System.out.printf("           FAILURES: %d\n\n", failures);
             }
         }
