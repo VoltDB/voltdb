@@ -138,9 +138,15 @@ public abstract class SubPlanAssembler {
         assert(index != null);
         assert(table != null);
 
-        // indexes are not useful if there are no filter expressions for this table
-        if (exprs == null)
+        // indexes on generalized expressions are not yet enabled.
+        if ( ! index.getExpressionsjson().equals("")) {
             return null;
+        }
+
+        // indexes are not useful if there are no filter expressions for this table
+        if (exprs == null) {
+            return null;
+        }
 
         AccessPath retval = new AccessPath();
         retval.use = IndexUseType.COVERING_UNIQUE_EQUALITY;

@@ -146,7 +146,6 @@ public class PlannerTool {
                 assert(plan != null);
             }
         } catch (Exception e) {
-            e.printStackTrace();
             throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
         }
 

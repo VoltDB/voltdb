@@ -1705,12 +1705,8 @@ public class ExpressionLogical extends Expression {
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
+        boolean unsupported = false;
         switch (opType) {
-        case OpTypes.LIMIT:             element = "limit"; break;
-        case OpTypes.ADD:               element = "add"; break;
-        case OpTypes.SUBTRACT:          element = "subtract"; break;
-        case OpTypes.MULTIPLY:          element = "multiply"; break;
-        case OpTypes.DIVIDE:            element = "divide"; break;
         case OpTypes.EQUAL:             element = "equal"; break;
         case OpTypes.NOT_EQUAL:         element = "notequal"; break;
         case OpTypes.GREATER:           element = "greaterthan"; break;
@@ -1720,19 +1716,37 @@ public class ExpressionLogical extends Expression {
         case OpTypes.AND:               element = "and"; break;
         case OpTypes.OR:                element = "or"; break;
         case OpTypes.IN:                element = "in"; break;
-        case OpTypes.COUNT:             element = "count"; break;
-        case OpTypes.SUM:               element = "sum"; break;
-        case OpTypes.MIN:               element = "min"; break;
-        case OpTypes.MAX:               element = "max"; break;
-        case OpTypes.AVG:               element = "avg"; break;
-        case OpTypes.SQL_FUNCTION:      element = "function"; break;
         case OpTypes.IS_NULL:           element = "is_null"; break;
         case OpTypes.NOT:               element = "not"; break;
+        // LIKE occurs in ExpressionLike which inherits this method from ExpressionLogical.
         case OpTypes.LIKE:              element = "like"; break;
+        case OpTypes.EXISTS:
+            throw new HSQLParseException("VoltDB does not yet support EXISTS clause, consider using views instead");
+        case OpTypes.VALUE :
+            throw new HSQLParseException("VoltDB does not yet support where clauses containing only constants");
+        //TODO: Enable these as they are supported in VoltDB.
+        // They appear to be a complete set as supported by the other methods in this module.
+        case OpTypes.ALL_QUANTIFIED : unsupported = true; element = "allquantified"; break;
+        case OpTypes.ANY_QUANTIFIED : unsupported = true; element = "anyquantified"; break;
+        case OpTypes.MATCH_FULL : unsupported = true; element = "matchfull"; break;
+        case OpTypes.MATCH_PARTIAL : unsupported = true; element = "matchpartial"; break;
+        case OpTypes.MATCH_SIMPLE : unsupported = true; element = "matchsimple"; break;
+        case OpTypes.MATCH_UNIQUE_FULL : unsupported = true; element = "matchuniquefull"; break;
+        case OpTypes.MATCH_UNIQUE_PARTIAL : unsupported = true; element = "matchuniquepartial"; break;
+        case OpTypes.MATCH_UNIQUE_SIMPLE : unsupported = true; element = "matchuniquesimple"; break;
+        case OpTypes.NEGATE : unsupported = true; element = "negate"; break;
+        case OpTypes.NOT_DISTINCT : unsupported = true; element = "notdistinct"; break;
+        case OpTypes.OVERLAPS : unsupported = true; element = "overlaps"; break;
+        case OpTypes.SIMPLE_COLUMN : unsupported = true; element = "simplecolumn"; break;
+        case OpTypes.UNIQUE : unsupported = true; element = "unique"; break;
+
         // Handle some of the unsupported OpTypes with slightly more informative messages.
         default:
             throw new HSQLParseException("Unsupported Logical Operation: #" +
                                          String.valueOf(opType));
+        }
+        if( unsupported) {
+            throw new HSQLParseException(element + " logical operator is not supported");
         }
 
         VoltXMLElement exp = new VoltXMLElement("operation");

@@ -17,6 +17,7 @@
 
 package org.voltdb.compiler;
 
+import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Timer;
@@ -38,7 +39,8 @@ import org.voltdb.planner.CorePlan;
  * plans need parameter values and sql literals in order to be
  * actually used.
  */
-public class AdHocCompilerCache {
+public class AdHocCompilerCache implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     //////////////////////////////////////////////////////////////////////////
     // STATIC CODE TO MANAGE CACHE LIFETIMES / GLOBALNESS

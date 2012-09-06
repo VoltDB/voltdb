@@ -33,6 +33,8 @@ import java.util.regex.Pattern;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -130,30 +132,30 @@ public class DDLCompiler {
      * \\s+ -- one or more spaces
      * ON -- token
      * \\s+ -- one or more spaces
-     * ' -- single quote
-     * \\s* -- 0 or more spaces
-     * (([\\w$]+)\\.([\\w$]+)\\s*:\\s*(\\d+)) -- [partition info capture group 2]
-     *     ([\\w$]+) -- [table name capture group 3]
-     *        [\\w$]+ -- one or more identifier character
-     *            (letters, numbers, dollar sign ($) or underscore (_))
-     *     \\. -- a period
-     *     ([\\w$]+) -- [column name capture group 4]
-     *        [\\w$]+ -- one or more identifier character
-     *            (letters, numbers, dollar sign ($) or underscore (_))
-     *     \\s* -- 0 or more spaces
-     *     : column
-     *     \\s* -- 0 or more spaces
-     *     \\d+ -- one ore more number digits [parameter index capture group 5]
-     * \\s* -- 0 or more spaces
-     * ' -- single quote
+     * TABLE -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$]+) -- [table name capture group 2]
+     *    [\\w$]+ -- one or more identifier character
+     *        (letters, numbers, dollar sign ($) or underscore (_))
+     * \\s+ -- one or more spaces
+     * COLUMN -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$]+) -- [column name capture group 3]
+     *    [\\w$]+ -- one or more identifier character
+     *        (letters, numbers, dollar sign ($) or underscore (_))
+     * (?:\\s+PARAMETER\\s+(\\d+))? 0 or 1 parameter clause [non-capturing]
+     *    \\s+ -- one or more spaces
+     *    PARAMETER -- token
+     *    \\s+ -- one or more spaces
+     *    \\d+ -- one ore more number digits [parameter index capture group 4]
      * \\s* -- 0 or more spaces
      * ; -- a semicolon
      * \\z -- end of string
      * </pre>
      */
     static final Pattern partitionProcedurePattern = Pattern.compile(
-            "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+" +
-            "'\\s*(([\\w$]+)\\.([\\w$]+)\\s*:\\s*(\\d+))\\s*'\\s*;\\z"
+            "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+TABLE\\s+" +
+            "([\\w$]+)\\s+COLUMN\\s+([\\w$]+)(?:\\s+PARAMETER\\s+(\\d+))?\\s*;\\z"
             );
     /**
      * NB supports only unquoted table and column names
@@ -467,27 +469,35 @@ public class DDLCompiler {
 
                 // matches if it is
                 //   PARTITION PROCEDURE <procedure>
-                //      ON '<table>.<column>: <parameter-index-no>'
+                //      ON  TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]
                 statementMatcher = partitionProcedurePattern.matcher(statement);
 
                 if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Bad PARTITION DDL statement: \"%s\", " +
                             "expected syntax: PARTITION PROCEDURE <procedure> ON "+
-                            "'<table>.<column>: <parameter-index-no>'",
+                            "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
 
                 // check the table portion of the partition info
-                checkIdentifierStart(statementMatcher.group(3), statement);
+                String tableName = checkIdentifierStart(statementMatcher.group(2), statement);
 
                 // check the column portion of the partition info
-                checkIdentifierStart(statementMatcher.group(4), statement);
+                String columnName = checkIdentifierStart(statementMatcher.group(3), statement);
+
+                // if not specified default parameter index to 0
+                String parameterNo = statementMatcher.group(4);
+                if( parameterNo == null) {
+                    parameterNo = "0";
+                }
+
+                String partitionInfo = String.format("%s.%s: %s", tableName, columnName, parameterNo);
 
                 // procedureName -> group(1), partitionInfo -> group(2)
                 m_partitionMap.addProcedurePartitionInfoTo(
                         checkIdentifierStart(statementMatcher.group(1), statement),
-                        statementMatcher.group(2)
+                        partitionInfo
                         );
 
                 return true;
@@ -516,7 +526,7 @@ public class DDLCompiler {
                     "Bad PARTITION DDL statement: \"%s\", " +
                     "expected syntax: \"PARTITION TABLE <table> ON COLUMN <column>\" or " +
                     "\"PARTITION PROCEDURE <procedure> ON " +
-                    "'<table>.<column>: <parameter-index-no>'\"",
+                    "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
@@ -944,8 +954,19 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
 
-        // this won't work for multi-column indices
-        // XXX not sure what 'this' is above, perhaps stale comment --izzy
+        // "parse" the expression trees for an expression-based index (vs. a simple column value index)
+        AbstractExpression[] exprs = null;
+        for (VoltXMLElement subNode : node.children) {
+            if (subNode.name.equals("exprs")) {
+                exprs = new AbstractExpression[subNode.children.size()];
+                int j = 0;
+                for (VoltXMLElement exprNode : subNode.children) {
+                    exprs[j] = AbstractParsedStmt.parseExpressionTree(null, exprNode);
+                    exprs[j].resolveForTable(table);
+                }
+            }
+        }
+
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
@@ -957,17 +978,33 @@ public class DDLCompiler {
             if (columns[i] == null) {
                 return;
             }
-            VoltType colType = VoltType.get((byte)columns[i].getType());
-            if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT ||
-                colType == VoltType.STRING)
-            {
-                has_nonint_col = true;
-                nonint_col_name = colNames[i];
+        }
+
+        if (exprs == null) {
+            for (int i = 0; i < colNames.length; i++) {
+                VoltType colType = VoltType.get((byte)columns[i].getType());
+                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
+                    has_nonint_col = true;
+                    nonint_col_name = colNames[i];
+                }
+                // disallow columns from VARBINARYs
+                if (colType == VoltType.VARBINARY) {
+                    String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw this.m_compiler.new VoltCompilerException(msg);
+                }
             }
-            // disallow columns from VARBINARYs
-            if (colType == VoltType.VARBINARY) {
-                String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
-                throw this.m_compiler.new VoltCompilerException(msg);
+        } else {
+            for (AbstractExpression expression : exprs) {
+                VoltType colType = expression.getValueType();
+                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
+                    has_nonint_col = true;
+                    nonint_col_name = "<expression>";
+                }
+                // disallow expressions of type VARBINARY
+                if (colType == VoltType.VARBINARY) {
+                    String msg = "VARBINARY expressions are not currently supported as index keys.";
+                    throw this.m_compiler.new VoltCompilerException(msg);
+                }
             }
         }
 
@@ -991,7 +1028,7 @@ public class DDLCompiler {
             else
             {
                 String msg = "Index " + name + " in table " + table.getTypeName() +
-                            " uses a non-hashable column" + nonint_col_name;
+                             " uses a non-hashable column " + nonint_col_name;
                 throw m_compiler.new VoltCompilerException(msg);
             }
         } else {
@@ -1006,10 +1043,21 @@ public class DDLCompiler {
 //        }
 
         // need to set other index data here (column, etc)
+        // For expression indexes, the columns listed in the catalog do not correspond to the values in the index,
+        // but they still represent the columns that will trigger an index update when their values change.
         for (int i = 0; i < columns.length; i++) {
             ColumnRef cref = index.getColumns().add(columns[i].getTypeName());
             cref.setColumn(columns[i]);
             cref.setIndex(i);
+        }
+
+        if (exprs != null) {
+            try {
+                index.setExpressionsjson(convertToJSONArray(exprs));
+            } catch (JSONException e) {
+                throw m_compiler.new VoltCompilerException("Unexpected error serializing non-column expressions for index '" +
+                                                           name + "' on type '" + table.getTypeName() + "': " + e.toString());
+            }
         }
 
         index.setUnique(unique);
@@ -1020,6 +1068,18 @@ public class DDLCompiler {
         m_compiler.addInfo(msg);
 
         indexMap.put(name, index);
+    }
+
+    private static String convertToJSONArray(AbstractExpression[] exprs) throws JSONException {
+        JSONStringer stringer = new JSONStringer();
+        stringer.array();
+        for (AbstractExpression abstractExpression : exprs) {
+            stringer.object();
+            abstractExpression.toJSONString(stringer);
+            stringer.endObject();
+        }
+        stringer.endArray();
+        return stringer.toString();
     }
 
     /**
