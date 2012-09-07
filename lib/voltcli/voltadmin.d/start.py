@@ -25,15 +25,21 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-class VerbCompile(ProjectVerb):
+import os
+
+java_ext_opts = (
+    '-server',
+    '-XX:+HeapDumpOnOutOfMemoryError',
+    '-XX:HeapDumpPath=/tmp',
+    '-XX:-ReduceInitialCardMarks'
+)
+
+class VerbStart(Verb):
     def __init__(self):
-        ProjectVerb.__init__(self, 'compile',
-                             description = 'Run the VoltDB compiler to build the catalog',
-                             usage       = '%prog compile CLASSPATH PROJECT JAR')
+        Verb.__init__(self, 'start',
+                      description = 'Start the VoltDB server.')
     def execute(self, runner):
-        # Run with the default Java options from vcli_env
-        runner.java('org.voltdb.compiler.VoltCompiler',
-                    None,
-                    runner.project_path,
-                    runner.project.get_config('catalog', required = True),
-                    *runner.args)
+        catalog = runner.config.get_required('volt', 'catalog')
+        if not os.path.exists(catalog):
+            runner.shell('volt', 'compile')
+        runner.java('org.voltdb.VoltDB', java_ext_opts, 'create', 'catalog', catalog, *runner.args)

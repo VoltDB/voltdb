@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -26,37 +25,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# The VoltDB master command script
-#
-# The main script's primary responsibility is to configure the system path so that
-# the voltcli library can take care of everything else. In the future this script
-# could be generated during installation. The interesting logic should live
-# elsewhere.
-#
-# Environment Variables
-#   JAVA_HOME          The java implementation to use.  Overrides JAVA_HOME.
-#   JAVA_HEAP_MAX      The maximum amount of heap to use, in MB. Default is 1024.
-#   VOLTDB_OPTS        Extra Java runtime options.
-#   LOG4J_CONFIG_PATH  Path to alternate log4j configuration
-
-__author__ = 'scooper'
-
-import sys
-import os
-
-version = "0.9"
-description = '''\
-This is the command line interface to VoltDB development functions.
-'''
-
-# Add ../lib to the module path based on the path of this file.
-#TODO: This needs to get smarter to handle all possible runtime environments.
-base_dir = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0])))
-sys.path.insert(0, os.path.join(base_dir, 'lib'))
-
-import voltcli.vcli_run
-
-#### Command line main
-
-if __name__ == '__main__':
-    voltcli.vcli_run.main(version, description)
+class VerbHelp(Verb):
+    def __init__(self):
+        Verb.__init__(self, 'help',
+                      description = 'Display command help',
+                      usage       = '[COMMAND ...]')
+    def execute(self, runner):
+        if runner.args:
+            for arg in runner.args:
+                runner.help(arg)
+        else:
+            runner.usage()

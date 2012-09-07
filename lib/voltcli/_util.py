@@ -36,6 +36,7 @@ import os
 import glob
 import copy
 import inspect
+import ConfigParser
 
 def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
     """
@@ -114,9 +115,11 @@ def find_and_load_subclasses(base_class, base_dirs, sub_dir, **kwargs):
     """
     Look for python modules in a named subdirectory of a set of base
     directories. Load any modules found and find all classes derived from the
-    specified base class. Return the classes found.
+    specified base class. Return the classes found. Classes should implement
+    a __cmp__() method to properly support duplicate detection.
     """
-    subclasses = []
+    # found holds (class, path) pairs
+    found = []
     processed_dirs = set()
     for base_dir in base_dirs:
         scan_dir = os.path.realpath(os.path.join(base_dir, sub_dir))
@@ -138,8 +141,19 @@ def find_and_load_subclasses(base_class, base_dirs, sub_dir, **kwargs):
                         if not name.startswith('_'):
                             o = syms[name]
                             if inspect.isclass(o) and issubclass(o, base_class):
-                                subclasses.append(o())
-    return subclasses
+                                subclass = o()
+                                for subclass2, modpath2 in found:
+                                    if subclass2 == subclass:
+                                        warning('Ignoring class "%s" in "%s"'
+                                                        % (o.__name__, modpath), [
+                                                    'It conflicts with "%s" in "%s".'
+                                                            % (subclass2.__class__.__name__,
+                                                               modpath2),
+                                                    'Check metadata for conflicting identifier.'])
+                                        break
+                                else:
+                                    found.append((subclass, modpath))
+    return [subclass for subclass, modpath in found]
 
 def normalize_list(items, width, filler = None):
     """

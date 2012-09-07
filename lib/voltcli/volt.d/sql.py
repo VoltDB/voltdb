@@ -1,5 +1,10 @@
 # This file is part of VoltDB.
+
 # Copyright (C) 2008-2012 VoltDB Inc.
+#
+# This file contains original code and/or modifications of original code.
+# Any modifications made by VoltDB Inc. are licensed under the following
+# terms and conditions:
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -11,7 +16,7 @@
 #
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-#
+
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -20,15 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import glob
-import vcli_util
-
-class VerbSrcCompile(ProjectVerb):
+class VerbCSVLoad(Verb):
     def __init__(self):
-        ProjectVerb.__init__(self, 'voter_compile',
-                             description = 'Build the Voter java classes.',
-                             usage       = '%prog voter_compile')
+        Verb.__init__(self, 'sql',
+                      description = 'Run SQL interpreter.')
     def execute(self, runner):
-        runner.run_cmd('mkdir', '-p', 'obj')
-        runner.java_compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
-        vcli_util.info('Java compilation succeeded.')
+        runner.java('org.voltdb.utils.SQLCommand', None, *runner.args)

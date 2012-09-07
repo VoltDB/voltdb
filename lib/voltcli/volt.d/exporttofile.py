@@ -25,22 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-java_ext_opts = (
-    '-server',
-    '-XX:+HeapDumpOnOutOfMemoryError',
-    '-XX:HeapDumpPath=/tmp',
-    '-XX:-ReduceInitialCardMarks'
-)
-
-class VerbStart(ProjectVerb):
+class VerbExportToFile(Verb):
     def __init__(self):
-        Verb.__init__(self, 'start',
-                      description = 'Start the VoltDB server',
-                      usage       = '%prog start')
+        Verb.__init__(self, 'exporttofile',
+                      description = 'Export to file. Run without arguments for usage.')
     def execute(self, runner):
-        catalog = runner.get_catalog()
-        runner.java('org.voltdb.VoltDB',
-                    java_ext_opts,
-                    runner.project_path,
-                    runner.project.get_config('catalog'),
-                    *runner.args)
+        runner.java('org.voltdb.exportclient.ExportToFileClient', None, *runner.args)

@@ -70,7 +70,7 @@ def run_cmd(cmd, *args):
     else:
         retcode = os.system(fullcmd)
         if retcode != 0:
-            abort('return code %d: %s' % (retcode, fullcmd))
+            abort('Command "%s ..." failed with return code %d.' % (cmd, retcode))
 
 def pipe_cmd(*args):
     """
@@ -128,3 +128,67 @@ def merge_java_options(*opts):
             else:
                 ret_opts.append(opt)
     return ret_opts
+
+class Config(ConfigParser.SafeConfigParser):
+    """Read access to configuration data."""
+
+    def __init__(self, *paths):
+        self.paths  = paths
+        self.loaded = False
+        ConfigParser.SafeConfigParser.__init__(self)
+
+    def load(self):
+        self.read(self.paths)
+        self.loaded = True
+
+    def get(self, section, option):
+        if not self.loaded:
+            self.load()
+        try:
+            return ConfigParser.SafeConfigParser.get(self, section, option)
+        except ConfigParser.NoSectionError:
+            return None
+        except ConfigParser.NoOptionError:
+            return None
+
+    def items(self, section):
+        if not self.loaded:
+            self.load()
+        try:
+            items = ConfigParser.SafeConfigParser.items(self, section)
+            items.sort(cmp = lambda x, y: cmp(x[0], y[0]))
+            return items
+        except ConfigParser.NoSectionError:
+            return []
+
+    def __enter__(self):
+        self.load()
+
+    def __exit__(self, type, value, traceback):
+        pass
+
+class PersistentConfig(Config):
+    """Persistent access to configuration data. One path is designated to
+    contain persistent state."""
+
+    def __init__(self, state_path, *paths):
+        Config.__init__(self, state_path, *paths)
+        self.state_path = state_path
+
+    def save(self):
+        with open(self.state_path, 'w') as f:
+            ConfigParser.SafeConfigParser.write(self, f)
+
+    def set(self, section, option, value):
+        if not self.loaded:
+            self.load()
+        if not self.has_section(section):
+            self.add_section(section)
+        ConfigParser.SafeConfigParser.set(self, section, option, value)
+        self.save()
+
+    def __enter__(self):
+        self.load()
+
+    def __exit__(self, type, value, traceback):
+        self.save()

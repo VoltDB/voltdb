@@ -4,8 +4,6 @@
         <name>Voter Example</name>
         <version>2.0</version>
         <description>Demonstrates call-in vote counting scheme.</description>
-        <classpath>obj</classpath>
-        <catalog>voter.jar</catalog>
     </info>
     <database>
         <schemas>

@@ -36,23 +36,25 @@ import os
 # guaranteed not to create a circular dependency.
 import _util
 
-version = "0.9"
-version_string = '%%prog version %s' % version
+# Gets set through vcli_run.main()
+version = "???"
 
 bin_dir, bin_name = os.path.split(os.path.realpath(sys.argv[0]))
 lib_dir = os.path.dirname(__file__)
-verbs_subdir = 'vcli.d'
+verbs_subdir = '%s.d' % bin_name
 
 # Add the voltcli directory to the Python module load path so that verb modules
 # can import anything from here.
 sys.path.insert(0, lib_dir)
 
-#### Metadata class
+#### CLI metadata class
 
 class CLISpec(object):
     def __init__(self, **kwargs):
-        if 'description' not in kwargs or 'usage' not in kwargs:
-            _util.abort('Metadata must have both "description" and "usage" members.')
+        if 'description' not in kwargs:
+            self.description = '(description missing)'
+        if 'usage' not in kwargs:
+            self.usage = ''
         self._kwargs = kwargs
     def __getattr__(self, name):
         return self._kwargs.get(name, None)
@@ -66,49 +68,40 @@ class CLIOption(object):
 
 #### Verbs
 
-class BaseVerb(object):
-    def __init__(self, name, project_needed, **kwargs):
-        self.name           = name
-        self.project_needed = project_needed
-        self.metadata       = CLISpec(**kwargs)
+class Verb(object):
+    """
+    Base class for verb implementations that provide the available sub-commands.
+    """
+    def __init__(self, name, **kwargs):
+        self.name     = name
+        self.metadata = CLISpec(**kwargs)
     def execute(self, env):
         _util.abort('%s "%s" object does not implement the required execute() method.'
                         % (self.__class__.__name__, self.name))
-
-class Verb(BaseVerb):
-    """
-    ProjectVerb should be used for verbs that run outside the context of a
-    project. They must not need information from project.xml files.
-    """
-    def __init__(self, name, **kwargs):
-        BaseVerb.__init__(self, name, False, **kwargs)
-
-class ProjectVerb(BaseVerb):
-    """
-    ProjectVerb should be used for verbs that run inside the context of a
-    project. They likely will need information from project.xml files.
-    """
-    def __init__(self, name, **kwargs):
-        BaseVerb.__init__(self, name, True, **kwargs)
+    def __cmp__(self, other):
+        return cmp(self.name, other.name)
 
 # Verbs support the possible actions.
 # Look for Verb subclasses in the .d subdirectory (relative to this file and to
-# the working directory). Also add ProjectVerb to the symbol table provided to
-# verb modules.
-verbs = _util.find_and_load_subclasses(BaseVerb, (lib_dir, '.'), verbs_subdir,
-                                       Verb = Verb,
-                                       ProjectVerb = ProjectVerb)
+# the working directory).
+verbs = _util.find_and_load_subclasses(Verb, (lib_dir, '.'), verbs_subdir, Verb = Verb)
 verbs.sort(cmp = lambda x, y: cmp(x.name, y.name))
 
 # Options define the CLI behavior modifiers.
 cli = CLISpec(
-    description = 'This serves as a comprehensive command line interface to VoltDB.',
-    usage       = '%prog [OPTIONS] COMMAND [ARGUMENTS ...]',
-    options     = (
+    description = '''\
+Specific actions are provided by subcommands.  Run "%prog help SUBCOMMAND" to
+display full usage for a subcommand, including its options and arguments.  Note
+that some subcommands are fully handled in Java.  For these subcommands help is
+usually available by running the subcommand with no additional arguments or
+followed by the -h option.
+''',
+    usage = '%prog [OPTIONS] COMMAND [ARGUMENTS ...]',
+    options = (
         CLIOption('-d', '--debug', action = 'store_true', dest = 'debug',
                   help = 'display debug messages'),
         CLIOption('-n', '--dry-run', action = 'store_true', dest = 'dryrun',
-                  help = 'perform dry run without executing actions'),
+                  help = 'dry run displays actions without executing them'),
         CLIOption('-p', '--pause', action = 'store_true', dest = 'pause',
                   help = 'pause before significant actions'),
         CLIOption('-v', '--verbose', action = 'store_true', dest = 'verbose',

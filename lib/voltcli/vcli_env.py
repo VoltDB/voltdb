@@ -66,50 +66,54 @@ def initialize():
     """Set the VOLTDB_HOME, VOLTDB_LIB and VOLTDB_VOLTDB environment variables
     based on the location of this script."""
 
-    dir = vcli_meta.bin_dir
+    dirs = [os.getcwd()]
+    if vcli_meta.bin_dir not in dirs:
+        dirs.append(vcli_meta.bin_dir)
 
-    required_var_set = set(['VOLTDB_HOME', 'VOLTDB_LIB', 'VOLTDB_VOLTDB'])
+    for dir in dirs:
 
-    # Return true if all needed VOLTDB_... environment variables are set.
-    def env_complete():
-        return set(os.environ.keys()).issuperset(required_var_set)
+        required_var_set = set(['VOLTDB_HOME', 'VOLTDB_LIB', 'VOLTDB_VOLTDB'])
 
-    # Crawl upward and look for the home, lib and voltdb directories.
-    # They may be the same directory when installed by a Linux installer.
-    # Set the VOLTDB_... environment variables accordingly.
-    # Also locate the voltdb jar file.
-    while (dir != '/' and not env_complete()):
+        # Return true if all needed VOLTDB_... environment variables are set.
+        def env_complete():
+            return set(os.environ.keys()).issuperset(required_var_set)
 
-        vcli_util.debug('Checking potential VoltDB root directory: %s' % dir)
+        # Crawl upward and look for the home, lib and voltdb directories.
+        # They may be the same directory when installed by a Linux installer.
+        # Set the VOLTDB_... environment variables accordingly.
+        # Also locate the voltdb jar file.
+        while (dir != '/' and not env_complete()):
 
-        # Try to set VOLTDB_HOME if not set.
-        if not os.environ.get('VOLTDB_HOME', ''):
-            for subdir in ('', os.path.join('share', 'voltdb')):
-                for chk in ('Click Here to Start.html', 'examples', 'third_party'):
-                    if not os.path.exists(os.path.join(dir, subdir, chk)):
-                        break
-                else:
-                    os.environ['VOLTDB_HOME'] = os.path.realpath(os.path.join(dir, subdir))
-                    vcli_util.debug('VOLTDB_HOME=>%s' % os.environ['VOLTDB_HOME'])
+            vcli_util.debug('Checking potential VoltDB root directory: %s' % dir)
 
-        # Try to set VOLTDB_LIB if not set.
-        if not os.environ.get('VOLTDB_LIB', ''):
-            for subdir in ('lib', os.path.join('lib', 'voltdb')):
-                if glob.glob(os.path.join(os.path.join(dir, subdir), 'zmq*.jar')):
-                    os.environ['VOLTDB_LIB'] = os.path.realpath(os.path.join(dir, subdir))
-                    vcli_util.debug('VOLTDB_LIB=>%s' % os.environ['VOLTDB_LIB'])
+            # Try to set VOLTDB_HOME if not set.
+            if not os.environ.get('VOLTDB_HOME', ''):
+                for subdir in ('', os.path.join('share', 'voltdb')):
+                    for chk in ('Click Here to Start.html', 'examples', 'third_party'):
+                        if not os.path.exists(os.path.join(dir, subdir, chk)):
+                            break
+                    else:
+                        os.environ['VOLTDB_HOME'] = os.path.realpath(os.path.join(dir, subdir))
+                        vcli_util.debug('VOLTDB_HOME=>%s' % os.environ['VOLTDB_HOME'])
 
-        # Try to set VOLTDB_VOLTDB if not set. Look for the voltdb jar file.
-        global voltdb_jar
-        if not os.environ.get('VOLTDB_VOLTDB', ''):
-            for subdir in ('voltdb', os.path.join('lib', 'voltdb')):
-                for voltdb_jar_chk in glob.glob(os.path.join(os.path.join(dir, subdir), 'voltdb*.jar')):
-                    if re_voltdb_jar.match(os.path.basename(voltdb_jar_chk)):
-                        voltdb_jar = os.path.realpath(voltdb_jar_chk)
-                        os.environ['VOLTDB_VOLTDB'] = os.path.dirname(voltdb_jar)
-                        vcli_util.debug('VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
+            # Try to set VOLTDB_LIB if not set.
+            if not os.environ.get('VOLTDB_LIB', ''):
+                for subdir in ('lib', os.path.join('lib', 'voltdb')):
+                    if glob.glob(os.path.join(os.path.join(dir, subdir), 'zmq*.jar')):
+                        os.environ['VOLTDB_LIB'] = os.path.realpath(os.path.join(dir, subdir))
+                        vcli_util.debug('VOLTDB_LIB=>%s' % os.environ['VOLTDB_LIB'])
 
-        dir = os.path.dirname(dir)
+            # Try to set VOLTDB_VOLTDB if not set. Look for the voltdb jar file.
+            global voltdb_jar
+            if not os.environ.get('VOLTDB_VOLTDB', ''):
+                for subdir in ('voltdb', os.path.join('lib', 'voltdb')):
+                    for voltdb_jar_chk in glob.glob(os.path.join(os.path.join(dir, subdir), 'voltdb*.jar')):
+                        if re_voltdb_jar.match(os.path.basename(voltdb_jar_chk)):
+                            voltdb_jar = os.path.realpath(voltdb_jar_chk)
+                            os.environ['VOLTDB_VOLTDB'] = os.path.dirname(voltdb_jar)
+                            vcli_util.debug('VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
+
+            dir = os.path.dirname(dir)
 
     missing = list(required_var_set.difference(os.environ.keys()))
     if missing:

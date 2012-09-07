@@ -46,7 +46,7 @@ import os
 
 version = "0.9"
 description = '''\
-This is the command line interface to VoltDB development functions.
+This is the command line interface to VoltDB administrative functions.
 '''
 
 # Add ../lib to the module path based on the path of this file.

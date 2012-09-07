@@ -1,10 +1,5 @@
 # This file is part of VoltDB.
-
 # Copyright (C) 2008-2012 VoltDB Inc.
-#
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -16,7 +11,7 @@
 #
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -25,14 +20,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-class VerbHelp(Verb):
+import vcli_util
+
+class VoterCompile(Verb):
     def __init__(self):
-        Verb.__init__(self, 'help',
-                      description = 'Display command help',
-                      usage       = '%prog help [COMMAND]')
+        Verb.__init__(self, 'voter.compile',
+                      description = 'Build the Voter application and catalog.')
     def execute(self, runner):
-        if runner.args:
-            for arg in runner.args:
-                runner.help(arg)
-        else:
-            runner.usage()
+        runner.shell('mkdir', '-p', 'obj')
+        vcli_util.info('Compiling application...')
+        runner.java_compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
+        vcli_util.info('Compiling catalog...')
+        runner.run('compile')
+        vcli_util.info('Voter compilation succeeded.')

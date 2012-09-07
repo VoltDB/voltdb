@@ -29,6 +29,7 @@ __author__ = 'scooper'
 
 import sys
 import optparse
+import shlex
 
 # Use the internal utility module that has no circular dependencies.
 import _util
@@ -36,23 +37,24 @@ import _util
 # Set during option processing
 debug = False
 
-# Volt CLI option parser
+# Volt CLI command processor
 
 # Individual option variables are added by the option parser. They are available
 # externally as module attributes.
 
-class VoltCLIOptionParser(optparse.OptionParser):
+class VoltCLICommandProcessor(optparse.OptionParser):
     '''
     Bi-level argument/option parsing and validation class. Handles both global
     and verb-specific arguments and options.
     '''
 
-    def __init__(self, verbs, options, usage, description, version):
+    def __init__(self, verbs, options, config, usage, description, version):
         self.verbs   = verbs
         self.options = options
+        self.config  = config
         full_usage = '%s\n' % usage
         for verb in verbs:
-            full_usage += '\n       %s' % verb.metadata.usage
+            full_usage += '\n       %%prog %s %s' % (verb.name, verb.metadata.usage)
         optparse.OptionParser.__init__(self,
             description = description,
             usage       = full_usage,
@@ -65,9 +67,14 @@ class VoltCLIOptionParser(optparse.OptionParser):
         # Separate the global options preceding the command from
         # command-specific options that follow it.
         iverb = 0
+        allow_no_command = False
         while iverb < len(cmdargs):
             # Skip options and any associated option arguments.
             if cmdargs[iverb].startswith('-'):
+                # Special detection of help and version options allows a command
+                # line with no arguments to pass for those options.
+                if cmdargs[iverb] in ('-h', '--help', '--version'):
+                    allow_no_command = True
                 for opt in self.options:
                     if cmdargs[iverb] in opt.args:
                         # Skip the argument of an option that takes one
@@ -77,6 +84,8 @@ class VoltCLIOptionParser(optparse.OptionParser):
                 # Found the command.
                 break
             iverb += 1
+        if iverb == len(cmdargs) and not allow_no_command:
+            self._abort('Missing command.')
 
         # Parse the global options. args should be empty
         opts, args = optparse.OptionParser.parse_args(self, list(cmdargs[:iverb]))
@@ -87,9 +96,22 @@ class VoltCLIOptionParser(optparse.OptionParser):
             name = option.kwargs['dest']
             setattr(sys.modules[__name__], name, getattr(opts, name))
 
-        if iverb == len(cmdargs):
-            self._abort('Missing command.')
+        # Resolve an alias (not recursive).
         verb_name = cmdargs[iverb].lower()
+        for alias_name, alias_value in self.config.items('aliases'):
+            if alias_name == verb_name:
+                # Use shell-style splitting to get mapped verb and arguments.
+                alias_tokens = shlex.split(alias_value)
+                if len(alias_tokens) == 0:
+                    self._abort('Missing alias definition for "%s"' % alias_name)
+                # The first token is the mapped verb
+                verb_name = alias_tokens[0]
+                # Prepend the remaing arguments to the command line arguments.
+                if len(alias_tokens) > 1:
+                    args = alias_tokens[1:] + args
+                break
+
+        # See if we know about the verb.
         verb = None
         for verb_chk in self.verbs:
             if verb_chk.name == verb_name:
@@ -99,18 +121,26 @@ class VoltCLIOptionParser(optparse.OptionParser):
             self._abort('Unknown command: %s' % verb_name)
 
         # Parse the command-specific options.
-        verb_parser = optparse.OptionParser(description = verb.metadata.description,
-                                            usage = verb.metadata.usage)
+        secondary = optparse.OptionParser(
+                description = verb.metadata.description,
+                usage = '%%prog %s %s' % (verb.name, verb.metadata.usage))
         if iverb < len(cmdargs):
             if verb.metadata.options:
                 for opt in verb.metadata.options:
-                    verb_parser.add_option(*opt.args, **opt.kwargs)
-            options, args = verb_parser.parse_args(list(cmdargs[iverb+1:]))
+                    secondary.add_option(*opt.args, **opt.kwargs)
+            if verb.metadata.passthrough:
+                # Provide all options and arguments without processing the options.
+                # E.g. Java programs want to handle all the options without interference.
+                args = tuple(['--'] + list(cmdargs[iverb+1:]))
+                options = None
+            else:
+                # Parse the secondary command line.
+                options, args = secondary.parse_args(list(cmdargs[iverb+1:]))
         else:
             options = None
             args = []
 
-        return verb, options, args, self, verb_parser
+        return verb, options, args, self, secondary
 
     def _abort(self, *msgs):
         _util.error(*msgs)
@@ -122,4 +152,4 @@ class VoltCLIOptionParser(optparse.OptionParser):
 
     def format_epilog(self, formatter):
         rows = ((verb.name, verb.metadata.description) for verb in self.verbs)
-        return '\n%s' % _util.format_table("Commands", None, rows)
+        return '\n%s' % _util.format_table("Subcommand Descriptions", None, rows)
