@@ -479,7 +479,8 @@ public class SnapshotSaveAPI
                                                   tables,
                                                   context.getHostId(),
                                                   SnapshotSiteProcessor.getExportSequenceNumbers(),
-                                                  partitionTransactionIds);
+                                                  partitionTransactionIds,
+                                                  VoltDB.instance().getHostMessenger().getInstanceId());
                     if (completionTask != null) {
                         SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
                     }
