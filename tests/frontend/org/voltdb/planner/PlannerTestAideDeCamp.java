@@ -41,6 +41,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.PartitionMap;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -80,7 +81,8 @@ public class PlannerTestAideDeCamp {
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
         //hsql.runDDLFile(schemaPath);
-        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql);
+        PartitionMap partitionMap = new PartitionMap(compiler);
+        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap);
         ddl_compiler.loadSchema(schemaPath);
         ddl_compiler.compileToCatalog(catalog, db);
     }
@@ -90,6 +92,10 @@ public class PlannerTestAideDeCamp {
 
     public Catalog getCatalog() {
         return catalog;
+    }
+
+    public Database getDatabase() {
+        return db;
     }
 
     /**
@@ -155,32 +161,23 @@ public class PlannerTestAideDeCamp {
         TrivialCostModel costModel = new TrivialCostModel();
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
         QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
-                             hsql, estimates, false);
+            new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
+                    catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),
+                    db, partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                    costModel, null, joinOrder);
 
         CompiledPlan plan = null;
-        plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
-
-        if (plan == null)
-        {
-            String msg = "planner.compilePlan returned null plan";
-            String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null)
-            {
-                msg += " with error: \"" + plannerMsg + "\"";
-            }
-            throw new NullPointerException(msg);
-        }
+        planner.parse();
+        plan = planner.plan();
+        assert(plan != null);
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
         // If this is an adhoc query then there won't be any parameters
-        for (ParameterInfo param : plan.parameters) {
-            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(param.index));
-            catalogParam.setJavatype(param.type.getValue());
-            catalogParam.setIndex(param.index);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
+            catalogParam.setJavatype(plan.parameters[i].getValue());
+            catalogParam.setIndex(i);
         }
 
         // Output Columns
@@ -197,15 +194,15 @@ public class PlannerTestAideDeCamp {
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
-        for (CompiledPlan.Fragment fragment : plan.fragments) {
-            PlanNodeList nodeList = new PlanNodeList(fragment.planGraph);
-            nodeLists.add(nodeList);
+        nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
+        if (plan.subPlanGraph != null) {
+            nodeLists.add(new PlanNodeList(plan.subPlanGraph));
         }
 
         //Store the list of parameters types and indexes in the plan node list.
         List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
-        for (ParameterInfo param : plan.parameters) {
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(param.index, param.type);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, plan.parameters[i]);
             parameters.add(parameter);
         }
 

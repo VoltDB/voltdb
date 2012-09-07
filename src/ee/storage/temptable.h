@@ -98,7 +98,9 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     void deleteAllTuples(bool freeAllocatedStrings);
     bool insertTuple(TableTuple &source);
-    bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
+    bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                        TableTuple &sourceTupleWithNewValues,
+                                        std::vector<TableIndex*> &indexesToUpdate);
 
     // deleting tuple from temp table is not supported. use deleteAllTuples instead
     bool deleteTuple(TableTuple &tuple, bool);
@@ -115,7 +117,7 @@ class TempTable : public Table {
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
     TableTuple insertTupleNonVirtual(TableTuple &source);
-    void updateTupleNonVirtual(TableTuple &source, TableTuple &target);
+    void updateTupleNonVirtual(TableTuple &target, TableTuple &source);
 
     // ------------------------------------------------------------------
     // INDEXES
@@ -194,9 +196,10 @@ inline TableTuple TempTable::insertTupleNonVirtual(TableTuple &source) {
     return m_tmpTarget1;
 }
 
-inline void TempTable::updateTupleNonVirtual(TableTuple &source, TableTuple &target) {
+inline void TempTable::updateTupleNonVirtual(TableTuple &targetTupleToUpdate,
+                                             TableTuple &sourceTupleWithNewValues) {
     // Copy the source tuple into the target
-    target.copy(source);
+    targetTupleToUpdate.copy(sourceTupleWithNewValues);
 }
 
 inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {

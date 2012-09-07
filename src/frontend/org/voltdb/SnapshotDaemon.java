@@ -202,7 +202,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
     }
 
-    public void init(DaemonInitiator initiator, ZooKeeper zk) {
+    public void init(DaemonInitiator initiator, ZooKeeper zk, Runnable threadLocalInit) {
         m_initiator = initiator;
         m_zk = zk;
 
@@ -212,6 +212,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
+
+        if (threadLocalInit != null) {
+            m_es.execute(threadLocalInit);
+        }
 
         // Really shouldn't leak this from a constructor, and twice to boot
         m_es.execute(new Runnable() {
@@ -528,7 +532,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 "Unexpected error deleting truncation snapshot request", true, e);
                     }
 
-                    SiteTracker st = VoltDB.instance().getSiteTracker();
+                    SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
                                                                       hostId, true)) {
@@ -795,31 +799,35 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                         false);
                             } else if (haveFailure) {
                                 hostLog.info("Queued user snapshot was attempted, but there was a failure.");
-                                ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                m_zk.create(
-                                        VoltZK.user_snapshot_response + requestId,
-                                        rimpl.flattenToBuffer(buf).array(),
-                                        Ids.OPEN_ACL_UNSAFE,
-                                        CreateMode.PERSISTENT);
+                                if (requestId != null) {
+                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                    m_zk.create(
+                                            VoltZK.user_snapshot_response + requestId,
+                                            rimpl.flattenToBuffer(buf).array(),
+                                            Ids.OPEN_ACL_UNSAFE,
+                                            CreateMode.PERSISTENT);
+                                }
                                 //Reset the watch, in case this is recoverable
                                 userSnapshotRequestExistenceCheck();
                                 //Log the details of the failure, after resetting the watch in case of some odd NPE
                                 result.resetRowPosition();
                                 hostLog.info(result);
                             } else {
-                                hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
-                                        VoltZK.user_snapshot_response + requestId);
-                                /*
-                                 * Snapshot was started no problem, reset the watch for new requests
-                                 */
-                                ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                m_zk.create(
-                                        VoltZK.user_snapshot_response + requestId,
-                                        rimpl.flattenToBuffer(buf).array(),
-                                        Ids.OPEN_ACL_UNSAFE,
-                                        CreateMode.PERSISTENT);
+                                if (requestId != null) {
+                                    hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
+                                            VoltZK.user_snapshot_response + requestId);
+                                    /*
+                                     * Snapshot was started no problem, reset the watch for new requests
+                                     */
+                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                    m_zk.create(
+                                            VoltZK.user_snapshot_response + requestId,
+                                            rimpl.flattenToBuffer(buf).array(),
+                                            Ids.OPEN_ACL_UNSAFE,
+                                            CreateMode.PERSISTENT);
+                                }
                                 userSnapshotRequestExistenceCheck();
                                 return;
                             }
@@ -1105,12 +1113,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @param response
      * @return
      */
-    public Future<Void> processClientResponse(final ClientResponse response, final long handle) {
+    public Future<Void> processClientResponse(final Callable<ClientResponseImpl> response) {
         return m_es.submit(new Callable<Void>() {
             @Override
             public Void call() throws Exception {
                 try {
-                    m_procedureCallbacks.remove(handle).clientCallback(response);
+                    ClientResponseImpl resp = response.call();
+                    long handle = resp.getClientHandle();
+                    m_procedureCallbacks.remove(handle).clientCallback(resp);
                 } catch (Exception e) {
                     hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
                     throw e;

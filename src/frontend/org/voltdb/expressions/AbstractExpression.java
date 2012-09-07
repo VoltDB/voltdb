@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -518,6 +519,160 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public boolean needsRightExpression() {
         return false;
+    }
+
+    /**
+     * Constant literals have a place-holder type of NUMERIC. These types
+     * need to be converted to DECIMAL or FLOAT when used in a binary operator,
+     * the choice based on the other operand's type
+     * -- DECIMAL goes with DECIMAL, FLOAT goes with anything else.
+     * This gets specialized as a NO-OP for leaf Expressions (AbstractValueExpression)
+     */
+    public void normalizeOperandTypes_recurse()
+    {
+        // Depth first search for NUMERIC children.
+        if (m_left != null) {
+            m_left.normalizeOperandTypes_recurse();
+        }
+        if (m_right != null) {
+            m_right.normalizeOperandTypes_recurse();
+
+            // XXX: There's no check here that the Numeric operands are actually constants.
+            // Can a sub-expression of type Numeric arise in any other case?
+            // Would that case always be amenable to having its valueType/valueSize redefined here?
+            if (m_left != null) {
+                if (m_left.m_valueType == VoltType.NUMERIC) {
+                    m_left.refineOperandType(m_right.m_valueType);
+                }
+                if (m_right.m_valueType == VoltType.NUMERIC) {
+                    m_right.refineOperandType(m_left.m_valueType);
+                }
+            }
+
+        }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.normalizeOperandTypes_recurse();
+            }
+        }
+    }
+
+    /**
+     * Helper function to patch up NUMERIC typed constant operands and
+     * the functions and operators that they parameterize.
+     */
+    void refineOperandType(VoltType valueType)
+    {
+        if (m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        if (valueType == VoltType.DECIMAL) {
+            m_valueType = VoltType.DECIMAL;
+            m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
+        } else {
+            m_valueType = VoltType.FLOAT;
+            m_valueSize = VoltType.FLOAT.getLengthInBytesForFixedTypes();
+        }
+    }
+
+    /**
+     * Helper function to patch up NUMERIC or untyped constants and parameters and
+     * the functions and operators that they parameterize,
+     * especially when they need to match an expected INSERT/UPDATE column
+     * or to match a parameterized function that HSQL or other planner
+     * processing has determined the return type for.
+     * This default implementation is currently a no-op which is fine for most purposes --
+     * 99% of the time, we are trying to refine a type to itself.
+     * TODO: we might want to enable asserts when we fall out of well-known non-no-op cases.
+     * We don't just go ahead and arbitrarily change any AbstractExpression's value type on the assumption
+     * that AbstractExpression classes usually either have immutable value types
+     * (hard-coded or easily determined up front by HSQL),
+     * OR they have their own specific restrictions or side effects -- and so their own refineValueType method.
+     */
+    public void refineValueType(VoltType columnType) {
+        if (columnType.equals(m_valueType)) {
+            return; // HSQL already initialized the expression to have the refined type.
+        }
+        //TODO: For added safety, we MAY want to (re)enable this general assert
+        // OR the one after we give a pass for the "generic types". See the comment below.
+        // assert(false);
+        if ((m_valueType != null) && (m_valueType != VoltType.NUMERIC)) {
+            // This code path leaves a generic type (null or NUMERIC) in the expression tree rather than assume that
+            // it's safe to change the value type of an arbitrary AbstractExpression.
+            // The EE MAY complain about it later.
+            // There may be special cases where we want to assert(false) rather than waiting for the EE to complain.
+            // or even special cases where we want to go ahead and switch the type (scary!).
+            return;
+        }
+        // A request to switch an arbitrary AbstractExpression from the specific value type that HSQL assigned to it
+        // to a different specific value type that SEEMS to be called for by the usage (target column) is a hard thing.
+        // It seems equally dangerous to ignore the HSQL type OR the target type.
+        // Maybe this will never occur because HSQL is so smart (and we keep it that way),
+        // or maybe the type difference won't really matter to the EE because it's so flexible.
+        // Or maybe some of each -- this no-op behavior assumes something like that.
+        // BUT maybe it's just always wrong to be trying any such thing, so we should assert(false).
+        // Or maybe there need to be special cases.
+        // The sad news is that when this assert first went live, it just caused quiet thread death and hanging rather
+        // than an identifiable assert, even when run in the debugger.
+        // assert(false);
+    }
+
+    /** Instead of recursing by default, allow derived classes to recurse as needed
+     * using finalizeChildValueTypes.
+     */
+    public abstract void finalizeValueTypes();
+
+    /** Do the recursive part of finalizeValueTypes as requested. */
+    protected final void finalizeChildValueTypes() {
+        if (m_left != null)
+            m_left.finalizeValueTypes();
+        if (m_right != null)
+            m_right.finalizeValueTypes();
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.finalizeValueTypes();
+            }
+        }
+    }
+
+    /** Associate underlying TupleValueExpressions with columns in the schema
+     * and propagate the type implications to parent expressions.
+     */
+    public void resolveForDB(Database db) {
+        resolveChildrenForDB(db);
+    }
+
+    /** Do the recursive part of resolveForDB as required for tree-structured expession types. */
+    protected final void resolveChildrenForDB(Database db) {
+        if (m_left != null)
+            m_left.resolveForDB(db);
+        if (m_right != null)
+            m_right.resolveForDB(db);
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.resolveForDB(db);
+            }
+        }
+    }
+
+    /** Associate underlying TupleValueExpressions with columns in the table
+     * and propagate the type implications to parent expressions.
+     */
+    public void resolveForTable(Table table) {
+        resolveChildrenForTable(table);
+    }
+
+    /** Do the recursive part of resolveForTable as required for tree-structured expression types. */
+    protected final void resolveChildrenForTable(Table table) {
+        if (m_left != null)
+            m_left.resolveForTable(table);
+        if (m_right != null)
+            m_right.resolveForTable(table);
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.resolveForTable(table);
+            }
+        }
     }
 
 }

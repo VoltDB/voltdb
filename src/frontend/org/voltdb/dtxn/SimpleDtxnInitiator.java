@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -58,7 +59,6 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -380,6 +380,20 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_mailbox.addPendingTxn(txn);
         increaseBackpressure(txn.messageSize);
 
+        /*
+         * Compose the set of non-coordinator sites and send it to the
+         * coordinator, so that the coordinator will send fragment work to all
+         * the sites that received the participant notice.
+         */
+        long[] nonCoordinatorSites = new long[txn.coordinatorReplicas.size() + txn.otherSiteIds.length];
+        int i = 0;
+        for (long hsId : txn.coordinatorReplicas) {
+            nonCoordinatorSites[i++] = hsId;
+        }
+        for (long hsId : txn.otherSiteIds) {
+            nonCoordinatorSites[i++] = hsId;
+        }
+
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
                 m_siteId, txn.firstCoordinatorId, txn.txnId, txn.isReadOnly);
         m_mailbox.send(txn.otherSiteIds, notice);
@@ -396,11 +410,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 txn.isReadOnly,
                 txn.isSinglePartition,
                 txn.invocation,
-                newestSafeTxnId); // this will allow all transactions to run for now
+                newestSafeTxnId, // this will allow all transactions to run for now
+                nonCoordinatorSites);
 
         /*
          * Send the transaction to the coordinator as well as his replicas
-         * so it is redudantly logged. The replicas that aren't listed
+         * so it is redundantly logged. The replicas that aren't listed
          * as the coordinator in the work request will treat it as
          * a participant notice
          */

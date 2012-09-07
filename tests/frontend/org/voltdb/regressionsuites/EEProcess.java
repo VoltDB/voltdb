@@ -58,7 +58,7 @@ public class EEProcess {
             .synchronizedList(new ArrayList<String>());
 
     EEProcess(final BackendTarget target, String logfile) {
-        if (!target.isIPC) {
+        if (target != BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             return;
         }
 

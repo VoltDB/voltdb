@@ -22,10 +22,14 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
+import org.voltdb.utils.LogKeys;
+import org.voltdb.VoltDB;
 
 /**
  * Message from a stored procedure coordinator to an execution site
@@ -35,6 +39,8 @@ import org.voltdb.ParameterSet;
  */
 public class FragmentTaskMessage extends TransactionInfoBaseMessage
 {
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
     public static final byte USER_PROC = 0;
     public static final byte SYS_PROC_PER_PARTITION = 1;
     public static final byte SYS_PROC_PER_SITE = 2;
@@ -45,7 +51,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         Integer m_outputDepId = null;
         ArrayList<Integer> m_inputDepIds = null;
         // For unplanned item
-        String m_fragmentPlan = null;
+        byte[] m_fragmentPlan = null;
 
         public FragmentData() {
         }
@@ -77,7 +83,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                     sb.append(id).append(", ");
                 sb.setLength(sb.lastIndexOf(", "));
             }
-            if (m_fragmentPlan != null && !m_fragmentPlan.isEmpty()) {
+            if ((m_fragmentPlan != null) && (m_fragmentPlan.length != 0)) {
                 sb.append("\n");
                 sb.append("  FRAGMENT_PLAN ");
                 sb.append(m_fragmentPlan);
@@ -119,6 +125,24 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(selfCheck());
     }
 
+    // The parameter sets are .duplicate()'d in flattenToBuffer,
+    // so we can make a shallow copy here and still be thread-safe
+    // when we serialize the copy.
+    public FragmentTaskMessage(long initiatorHSId,
+            long coordinatorHSId,
+            FragmentTaskMessage ftask)
+    {
+        super(initiatorHSId, coordinatorHSId, ftask);
+
+        m_spHandle = ftask.m_spHandle;
+        m_taskType = ftask.m_taskType;
+        m_isFinal = ftask.m_isFinal;
+        m_subject = ftask.m_subject;
+        m_inputDepCount = ftask.m_inputDepCount;
+        m_items = ftask.m_items;
+        assert(selfCheck());
+    }
+
     /**
      * Add a pre-planned fragment.
      *
@@ -142,7 +166,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * @param parameterSet
      * @param fragmentPlan
      */
-    public void addCustomFragment(int outputDepId, ByteBuffer parameterSet, String fragmentPlan) {
+    public void addCustomFragment(int outputDepId, ByteBuffer parameterSet, byte[] fragmentPlan) {
         FragmentData item = new FragmentData();
         item.m_outputDepId = outputDepId;
         item.m_parameterSet = parameterSet;
@@ -273,7 +297,27 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return item.m_parameterSet.asReadOnlyBuffer();
     }
 
-    public String getFragmentPlan(int index) {
+    public ParameterSet getParameterSetForFragment(int index) {
+        ParameterSet params = null;
+        final ByteBuffer paramData = m_items.get(index).m_parameterSet.asReadOnlyBuffer();
+        if (paramData != null) {
+            final FastDeserializer fds = new FastDeserializer(paramData);
+            try {
+                params = fds.readObject(ParameterSet.class);
+            }
+            catch (final IOException e) {
+                hostLog.l7dlog(Level.FATAL,
+                        LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+        }
+        else {
+            params = new ParameterSet();
+        }
+        return params;
+    }
+
+    public byte[] getFragmentPlan(int index) {
         assert(index >= 0 && index < m_items.size());
         FragmentData item = m_items.get(index);
         assert(item != null);
@@ -356,7 +400,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             // Each unplanned item gets an index (2) and a size (4) and buffer for
             // the fragment plan string.
             if (item.m_fragmentPlan != null) {
-                msgsize += 2 + 4 + item.m_fragmentPlan.length();
+                msgsize += 2 + 4 + item.m_fragmentPlan.length;
             }
         }
 
@@ -449,9 +493,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             FragmentData item = m_items.get(index);
             if (item.m_fragmentPlan != null) {
                 buf.putShort(index);
-                byte[] bytes = item.m_fragmentPlan.getBytes();
-                buf.putInt(bytes.length);
-                buf.put(bytes);
+                buf.putInt(item.m_fragmentPlan.length);
+                buf.put(item.m_fragmentPlan);
             }
         }
     }
@@ -531,9 +574,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             FragmentData item = m_items.get(index);
             int fragmentPlanLength = buf.getInt();
             if (fragmentPlanLength > 0) {
-                byte[] bytes = new byte[fragmentPlanLength];
-                buf.get(bytes);
-                item.m_fragmentPlan = new String(bytes);
+                item.m_fragmentPlan = new byte[fragmentPlanLength];
+                buf.get(item.m_fragmentPlan);
             }
         }
     }
@@ -546,7 +588,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
-
+        sb.append(", SP HANDLE: ").append(m_spHandle);
         sb.append("\n");
         if (m_isReadOnly)
             sb.append("  READ, COORD ");
@@ -555,9 +597,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
         for (FragmentData item : m_items) {
-            sb.append("\n");
-            sb.append("=====");
-            sb.append("\n");
+            sb.append("\n=====\n");
             sb.append(item.toString());
         }
 
@@ -566,7 +606,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         if (m_taskType == USER_PROC)
         {
-            sb.append("\n  THIS IS A SYSPROC TASK");
+            sb.append("\n  THIS IS A USER TASK");
         }
         else if (m_taskType == SYS_PROC_PER_PARTITION)
         {

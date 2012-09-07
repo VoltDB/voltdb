@@ -21,10 +21,14 @@ import java.util.List;
 import java.util.TreeMap;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.expressions.*;
-import org.voltdb.types.*;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanNodeType;
 
 public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
@@ -192,5 +196,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.JOIN_TYPE.name()).value(m_joinType.toString());
         stringer.key(Members.PREDICATE.name()).value(m_predicate);
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
+        this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
+        if( !jobj.isNull( Members.PREDICATE.name() )) {
+            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
+        }
     }
 }

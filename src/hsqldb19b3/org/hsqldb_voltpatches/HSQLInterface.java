@@ -158,16 +158,22 @@ public class HSQLInterface {
     public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
         Statement cs = null;
+        // clear the expression node id set for determinism
+        sessionProxy.resetVoltNodeIds();
 
         try {
             cs = sessionProxy.compileStatement(sql);
+        } catch( HsqlException hex) {
+            // a switch in case we want to give more error details on additional error codes
+            switch( hex.getErrorCode()) {
+            case -ErrorCode.X_42581:
+                throw new HSQLParseException("SQL Syntax error in \"" + sql + "\" " + hex.getMessage());
+            default:
+                throw new HSQLParseException(hex.getMessage());
+            }
         } catch (Throwable t) {
-            //t.printStackTrace();
             throw new HSQLParseException(t.getMessage());
         }
-
-        //ResultMetaData rmd = cs.getResultMetaData();
-        //ResultMetaData pmd = cs.getParametersMetaData();
 
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
@@ -177,11 +183,15 @@ public class HSQLInterface {
         VoltXMLElement xml = null;
         xml = cs.voltGetXML(sessionProxy);
 
-        VoltXMLElement statement = new VoltXMLElement("statement");
-        statement.children.add(xml);
+        // this releases some small memory hsql uses that builds up over time if not
+        // cleared
+        // if it's not called for every call of getXMLCompiledStatement, that's ok;
+        // it'll get called next time
+        sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
+
         assert(xml != null);
 
-        return statement;
+        return xml;
     }
 
     /**

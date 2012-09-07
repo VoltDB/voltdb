@@ -46,8 +46,6 @@
 #ifndef HSTOREUPDATEEXECUTOR_H
 #define HSTOREUPDATEEXECUTOR_H
 
-#include <boost/scoped_ptr.hpp>
-
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -97,7 +95,7 @@ protected:
     TableTuple m_targetTuple;
     int m_partitionColumn;
     bool m_partitionColumnIsString;
-    bool m_updatesIndexes;
+    std::vector<TableIndex*> m_indexesToUpdate;
 
     /** reference to the engine/context to store the number of modified tuples */
     VoltDBEngine* m_engine;

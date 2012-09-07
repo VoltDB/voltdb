@@ -25,6 +25,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -48,30 +51,40 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  * success code.).
  */
 public class CSVLoader {
+    public static String pathInvalidrowfile = "";
+    public static String pathReportfile = "csvloaderReport.log";
+    public static String pathLogfile = "csvloaderLog.log";
+
+    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
     private static final int reportEveryNRows = 10000;
     private static final int waitSeconds = 10;
-
     private static CSVConfig config = null;
-    private static long latency = -1;
+    private static long latency = 0;
+    private static long start = 0;
     private static boolean standin = false;
-
-    public static String pathInvalidrowfile = "";
-    public static String pathReportfile = "csvloaderReport.log";
-    public static String pathLogfile = "csvloaderLog.log";
-
     private static BufferedWriter out_invaliderowfile;
     private static BufferedWriter out_logfile;
     private static BufferedWriter out_reportfile;
-
     private static String insertProcedure = "";
     private static Map<Long, String[]> errorInfo = new TreeMap<Long, String[]>();
 
-    private static CSVReader csvReader;
-    private static Client csvClient;
-    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
+    private static Map <VoltType, String> blankValues = new HashMap<VoltType, String>();
+    static {
+        blankValues.put(VoltType.NUMERIC, "0");
+        blankValues.put(VoltType.TINYINT, "0");
+        blankValues.put(VoltType.SMALLINT, "0");
+        blankValues.put(VoltType.INTEGER, "0");
+        blankValues.put(VoltType.BIGINT, "0");
+        blankValues.put(VoltType.FLOAT, "0.0");
+        blankValues.put(VoltType.TIMESTAMP, "0");
+        blankValues.put(VoltType.STRING, "");
+        blankValues.put(VoltType.DECIMAL, "0");
+        blankValues.put(VoltType.VARBINARY, "");
+    }
+    private static List <VoltType> typeList = new ArrayList<VoltType>();
 
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;
@@ -95,6 +108,7 @@ public class CSVLoader {
                     }
                     if (errorInfo.size() >= m_config.maxerrors) {
                         m_log.error("The number of Failure row data exceeds " + m_config.maxerrors);
+                        produceFiles();
                         close_cleanup();
                         System.exit(-1);
                     }
@@ -125,6 +139,9 @@ public class CSVLoader {
 
         @Option(shortOpt = "m", desc = "maximum errors allowed")
         int maxerrors = 100;
+
+        @Option(desc = "different ways to handle blank items: {error|null|empty} (default: error)")
+        String blank = "error";
 
         @Option(desc = "delimiter to use for separating entries")
         char separator = CSVParser.DEFAULT_SEPARATOR;
@@ -174,6 +191,10 @@ public class CSVLoader {
                         + Integer.MAX_VALUE);
             if (port < 0)
                 exitWithMessageAndUsage("port number must be >= 0");
+            if ((blank.equalsIgnoreCase("error") ||
+                    blank.equalsIgnoreCase("null") ||
+                    blank.equalsIgnoreCase("empty")) == false)
+                exitWithMessageAndUsage("blank configuration specified must be one of {error|null|empty}");
         }
 
         @Override
@@ -188,7 +209,7 @@ public class CSVLoader {
 
     public static void main(String[] args) throws IOException,
             InterruptedException {
-        long start = System.currentTimeMillis();
+        start = System.currentTimeMillis();
         int waits = 0;
         int shortWaits = 0;
 
@@ -197,6 +218,7 @@ public class CSVLoader {
 
         config = cfg;
         configuration();
+        CSVReader csvReader = null;
         try {
             if (CSVLoader.standin)
                 csvReader = new CSVReader(new BufferedReader(
@@ -212,6 +234,7 @@ public class CSVLoader {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
         }
+        assert(csvReader != null);
         // Split server list
         String[] serverlist = config.servers.split(",");
 
@@ -219,13 +242,16 @@ public class CSVLoader {
         ClientConfig c_config = new ClientConfig(config.user, config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
                                              // timeout, see ENG-2670
+        Client csvClient = null;
         try {
             csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
         } catch (Exception e) {
             m_log.error("Error to connect to the servers:"
                     + config.servers);
+            close_cleanup();
             System.exit(-1);
         }
+        assert(csvClient != null);
 
         try {
             ProcedureCallback cb = null;
@@ -244,10 +270,13 @@ public class CSVLoader {
                             "PROCEDURE_NAME", VoltType.STRING))) {
                         columnCnt++;
                         isProcExist = true;
+                        String typeStr = (String)procInfo.get("TYPE_NAME", VoltType.STRING);
+                        typeList.add(VoltType.typeFromString(typeStr));
                     }
                 }
             } catch (Exception e) {
                 m_log.error(e.getMessage(), e);
+                close_cleanup();
                 System.exit(-1);
             }
             if (isProcExist == false) {
@@ -283,6 +312,7 @@ public class CSVLoader {
                             if (errorInfo.size() >= config.maxerrors) {
                                 m_log.error("The number of Failure row data exceeds "
                                         + config.maxerrors);
+                                produceFiles();
                                 close_cleanup();
                                 System.exit(-1);
                             }
@@ -319,11 +349,10 @@ public class CSVLoader {
             }
         }
 
-        latency = System.currentTimeMillis() - start;
-        m_log.info("CSVLoader elaspsed: " + latency / 1000F
-                + " seconds");
         produceFiles();
         close_cleanup();
+        csvReader.close();
+        csvClient.close();
     }
 
     private static String checkparams_trimspace(String[] slot,
@@ -342,6 +371,11 @@ public class CSVLoader {
             if ((slot[i]).equals("NULL") || slot[i].equals("\\N")
                     || !config.strictquotes && slot[i].equals("\"\\N\""))
                 slot[i] = null;
+            else if (slot[i].equals("")) {
+                if (config.blank.equalsIgnoreCase("null") ) slot[i] = null;
+                else if (config.blank.equalsIgnoreCase("empty"))
+                    slot[i] = blankValues.get(typeList.get(i));
+            }
         }
 
         return null;
@@ -397,6 +431,9 @@ public class CSVLoader {
     }
 
     private static void produceFiles() {
+        latency = System.currentTimeMillis() - start;
+        m_log.info("CSVLoader elapsed: " + latency / 1000F
+                + " seconds");
 
         int bulkflush = 300; // by default right now
         try {
@@ -405,7 +442,7 @@ public class CSVLoader {
                 String info[] = errorInfo.get(irow);
                 if (info.length != 2)
                     System.out
-                            .println("internal error, infomation is not enough");
+                            .println("internal error, information is not enough");
                 linect++;
                 out_invaliderowfile.write(info[0] + "\n");
                 String message = "Invalid input on line " + irow + ".\n  Contents:" + info[0];
@@ -452,8 +489,7 @@ public class CSVLoader {
         outCount.set(0);
         errorInfo.clear();
 
-        csvReader.close();
-        csvClient.close();
+        typeList.clear();
 
         out_invaliderowfile.close();
         out_logfile.close();

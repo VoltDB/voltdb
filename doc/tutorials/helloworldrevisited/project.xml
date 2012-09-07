@@ -9,8 +9,5 @@
             <procedure class='RegisterUser' />
            <procedure class='SignIn' />
        </procedures>
-       <partitions>
-           <partition table='USERACCOUNT' column='EMAIL' />
-       </partitions>
     </database>
 </project>

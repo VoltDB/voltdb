@@ -1,13 +1,32 @@
 #!/usr/bin/env bash
 
 APPNAME="auction"
-VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
-CLASSPATH="$VOLTJAR:`ls -x ../../../lib/*.jar | tr '[:space:]' ':'`"
-VOLTDB="../../../bin/voltdb"
-CSVLOADER="../../../bin/csvloader"
-EXPORTTOFILE="../../../bin/exporttofile"
-VOLTCOMPILER="../../../bin/voltcompiler"
-LICENSE="../../../voltdb/license.xml"
+
+# find voltdb binaries in either installation or distribution directory.
+if [ -n "$(which voltdb 2> /dev/null)" ]; then
+    VOLTDB_BIN=$(dirname "$(which voltdb)")
+else
+    VOLTDB_BIN="$(pwd)/../../../bin"
+fi
+# installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
+if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
+    VOLTDB_VOLTDB="$VOLTDB_LIB"
+# distribution layout has libraries in separate lib and voltdb directories
+else
+    VOLTDB_LIB="`pwd`/../../../lib"
+    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
+fi
+
+CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+VOLTDB="$VOLTDB_BIN/voltdb"
+VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
+LICENSE="$VOLTDB_VOLTDB/license.xml"
+CSVLOADER="$VOLTDB_BIN/csvloader"
+EXPORTTOFILE="$VOLTDB_BIN/exporttofile"
+VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
+
 DATAFILES="src/com/auctionexample/datafiles/"
 
 # remove build artifacts
@@ -19,7 +38,7 @@ function clean() {
 function srccompile() {
     mkdir -p obj/com/auctionexample/datafiles
     cp src/com/auctionexample/datafiles/*.txt obj/com/auctionexample/datafiles/
-    javac -target 1.6 -classpath $CLASSPATH -d obj \
+    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
         src/com/auctionexample/*.java \
         procedures/com/auctionexample/*.java \
         procedures/com/auctionexample/debug/*.java
@@ -41,7 +60,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader localhost 
+        license $LICENSE host localhost
 }
 
 # run the client that drives the example
@@ -50,7 +69,7 @@ function client() {
     $CSVLOADER -f $DATAFILES/items.txt \
 			-p InsertIntoItemAndBid \
          		--user program \
-         		--password pass 
+         		--password pass
     $CSVLOADER -f $DATAFILES/categories.txt \
                         -p InsertIntoCategory \
                         --user program \
@@ -58,7 +77,7 @@ function client() {
     $CSVLOADER -f $DATAFILES/users.txt \
                         -p InsertIntoUser \
                         --user program \
-                        --password pass 
+                        --password pass
     srccompile
     java -classpath obj:$CLASSPATH com.auctionexample.Client
 }

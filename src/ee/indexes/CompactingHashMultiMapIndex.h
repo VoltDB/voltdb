@@ -79,37 +79,28 @@ public:
         return deleteEntryPrivate(tuple, m_tmp1);
     }
 
-    bool replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue) {
-        // this can probably be optimized
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-        if (m_eq(m_tmp1, m_tmp2)) return true; // no update is needed for this index
-
-        // It looks like we're deleting the new value and inserting the new value
-        // The lookup is on the index keys, but the address of the current tuple
-        //  (which has the new key value) is needed for this non-unique index
-        //  to determine which of the tuples with a given key need to be deleted.
-        bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
-        bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
-        --m_deletes;
-        --m_inserts;
-        ++m_updates;
-        return (deleted && inserted);
-    }
-
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                                 const TableTuple *newTupleValue) {
-        assert(oldTupleValue->address() != newTupleValue->address());
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        typename MapType::iterator iter = m_entries.find(m_tmp1, oldTupleValue->address());
+    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+    {
+        assert(originalTuple.address() != destinationTuple.address());
+
+        // full delete and insert for certain key types
+        if (KeyType::keyDependsOnTupleAddress()) {
+            if (!deleteEntry(&originalTuple)) return false;
+            return addEntry(&destinationTuple);
+        }
+
+        m_tmp1.setFromTuple(&originalTuple, column_indices_, m_keySchema);
+        typename MapType::iterator iter = m_entries.find(m_tmp1, originalTuple.address());
         if (iter.isEnd()) return false;
-        iter.setValue(newTupleValue->address());
+        iter.setValue(destinationTuple.address());
         m_updates++;
         return true;
     }
+
+    bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
 
     bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
         m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
@@ -142,6 +133,11 @@ public:
         else
             m_match.move(const_cast<void*>(m_keyIter.value()));
         return retval;
+    }
+
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
     }
 
     size_t getSize() const { return m_entries.size(); }

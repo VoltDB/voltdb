@@ -25,6 +25,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.iv2.Site;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -53,13 +55,26 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
     protected final SiteTransactionConnection m_site;
-    protected boolean m_done = false;
+    volatile protected boolean m_done = false;
     protected long m_beginUndoToken;
-    protected boolean m_needsRollback = false;
+    volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
 
     // is this transaction run during a rejoin
     protected RejoinState m_rejoinState = RejoinState.NORMAL;
+
+    /** Iv2 constructor */
+    protected TransactionState(long txnId, Mailbox mbox,
+                               TransactionInfoBaseMessage notice)
+    {
+        super(txnId, notice.getInitiatorHSId());
+        m_mbox = mbox;
+        m_site = null;
+        m_notice = notice;
+        coordinatorSiteId = notice.getCoordinatorHSId();
+        m_isReadOnly = notice.isReadOnly();
+        m_beginUndoToken = Site.kInvalidUndoToken;
+    }
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -226,4 +241,20 @@ public abstract class TransactionState extends OrderableTransaction  {
      * @param failedSites list of execution and initiator sites that have failed
      */
     public abstract void handleSiteFaults(HashSet<Long> failedSites);
+
+    /**
+     * IV2 implementation: in iv2, recursable run is a function on the
+     * transaction state; we block in the transaction state recording
+     * until all dependencies / workunits are received.
+     * IV2's SiteProcedureConnection.recursableRun(TransactionState) delegates
+     * to this recursableRun method.
+     *
+     * The IV2 initiator mailbox knows how to offer() incoming fragment
+     * responses to the waiting transaction state.
+     * @return
+     */
+    public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
+    {
+        return null;
+    }
 }

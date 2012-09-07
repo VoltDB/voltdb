@@ -25,12 +25,18 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.voltdb.catalog.*;
-import org.voltdb.plannodes.*;
+import junit.framework.TestCase;
+
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Table;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.DistinctPlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
-
-import junit.framework.TestCase;
 
 public class TestPushDownAggregates extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -42,7 +48,7 @@ public class TestPushDownAggregates extends TestCase {
         try {
             pn = aide.compile(sql, paramCount, singlePartition);
         }
-        catch (NullPointerException ex) {
+        catch (PlanningErrorException ex) {
             throw ex;
         }
         catch (Exception ex) {
@@ -66,6 +72,11 @@ public class TestPushDownAggregates extends TestCase {
             if (!t.getTypeName().equalsIgnoreCase("d1")) {
                 t.setIsreplicated(false);
             }
+            // partition column PKEY for Table t2
+            if (!t.getTypeName().equalsIgnoreCase("t2")) {
+                t.setIsreplicated(false);
+                t.setPartitioncolumn(t.getColumns().get("PKEY"));
+            }
         }
     }
 
@@ -73,20 +84,6 @@ public class TestPushDownAggregates extends TestCase {
     protected void tearDown() throws Exception {
         super.tearDown();
         aide.tearDown();
-    }
-
-    public void testCountStarOnReplicatedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from D1", 0, true);
-        checkPushedDown(pn, false,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
-    }
-
-    public void testCountStarOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-        checkPushedDown(pn, true,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
     public void testCountOnPartitionedTable() {
@@ -175,7 +172,7 @@ public class TestPushDownAggregates extends TestCase {
     public void testGroupByNotInDisplayColumn() {
         try {
             compile("SELECT count(A1) FROM T1 GROUP BY A1", 0, false);
-        } catch (NullPointerException e) {
+        } catch (PlanningErrorException e) {
             // There shouldn't be any plan
             return;
         }
@@ -223,6 +220,48 @@ public class TestPushDownAggregates extends TestCase {
         System.out.println(pnl.toDOTString("FRAG0"));
         pnl = new PlanNodeList(pn.get(1));
         System.out.println(pnl.toDOTString("FRAG1"));
+    }
+
+    public void testMultiPartLimitPushdown() {
+        List<AbstractPlanNode> pn =
+                compile("select I, count(*) as tag from T2 group by I order by I limit 1", 0, false);
+
+        for ( AbstractPlanNode nd : pn) {
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
+        }
+    }
+
+    public void testMultiPartLimitPushdownByOne() {
+        List<AbstractPlanNode> pn =
+                compile("select I, count(*) as tag from T2 group by I order by 1 limit 1", 0, false);
+
+        for ( AbstractPlanNode nd : pn) {
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
+        }
+    }
+
+    public void testMultiPartNoLimitPushdown() {
+        List<AbstractPlanNode> pn =
+                compile("select I, count(*) as tag from T2 group by I order by tag, I limit 1", 0, false);
+
+        for ( AbstractPlanNode nd : pn) {
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        }
+        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
+    }
+
+    public void testMultiPartNoLimitPushdownByTwo() {
+        List<AbstractPlanNode> pn =
+                compile("select I, count(*) as tag from T2 group by I order by 2 limit 1", 0, false);
+
+        for ( AbstractPlanNode nd : pn) {
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        }
+        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
     }
 
     /**

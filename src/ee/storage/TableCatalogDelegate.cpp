@@ -110,6 +110,16 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
             return false;
         }
 
+        if (catalog_index->expressionsjson().length() != 0) {
+            // When this gets supported, column type validations below will have to be replaced with expression type validations,
+            // and then the real work begins.
+            //printf("WARNING: for now, ignoring expression-based index '%s' on table '%s' having JSON expression: %s\n",
+            //          catalog_index->name().c_str(),
+            //          catalogTable.name().c_str(),
+            //          catalog_index->expressionsjson().c_str());
+            continue;
+        }
+
         // Since the columns are not going to come back in the proper order from
         // the catalogs, we'll use the index attribute to make sure we put them
         // in the right order
@@ -145,6 +155,8 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                                       index_columns,
                                       column_types,
                                       catalog_index->unique(),
+                                      true,// Fix it as the next line when VoltDB can disable CountingIndex feature
+                                      //catalog_index->countable(),
                                       isIntsOnly,
                                       schema);
         index_map[catalog_index->name()] = index_scheme;

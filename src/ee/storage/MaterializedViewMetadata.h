@@ -18,6 +18,8 @@
 #ifndef MATERIALIZEDVIEWMETADATA_H_
 #define MATERIALIZEDVIEWMETADATA_H_
 
+#include <vector>
+
 #include "common/types.h"
 #include "common/tabletuple.h"
 #include "catalog/materializedviewinfo.h"
@@ -26,6 +28,7 @@ namespace voltdb {
 
 class AbstractExpression;
 class PersistentTable;
+class TableIndex;
 
 /**
  * Manage the inserts, deletes and updates for a materialized view table based on changes to
@@ -44,12 +47,6 @@ public:
      * destination table to reflect this change.
      */
     void processTupleInsert(TableTuple &newTuple);
-
-    /**
-     * Called when the source table is updating a tuple. This will update the materialized view
-     * destination table to reflect this change. For now, this just calls delete, then insert.
-     */
-    void processTupleUpdate(TableTuple &oldTuple, TableTuple &newTuple);
 
     /**
      * Called when the source table is deleting a tuple. This will update the materialized view
@@ -101,6 +98,9 @@ private:
     int32_t *m_outputColumnSrcTableIndexes;
     // what are the aggregates for each column in the view table
     ExpressionType *m_outputColumnAggTypes;
+
+    // empty vector to tell the target table not to update indexes
+    std::vector<TableIndex*> m_emptyIndexUpdateList;
 };
 
 } // namespace voltdb

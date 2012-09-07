@@ -22,6 +22,7 @@ import java.util.TreeSet;
 import java.util.Iterator;
 
 import org.voltdb.SnapshotFormat;
+import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
@@ -122,9 +123,9 @@ public class SnapshotRegistry {
             }
         }
 
-        public void removeTable(String name) {
+        public Table removeTable(String name) {
             synchronized (tables) {
-                assert(tables.remove(name) != null);
+                return tables.remove(name);
             }
         }
 

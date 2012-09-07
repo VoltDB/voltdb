@@ -37,10 +37,31 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable executePlanFragment(final long planFragmentId,
-            int inputDepIdfinal, ParameterSet parameterSet, final long txnId,
-            final long lastCommittedTxnId, final long undoToken) throws EEException
+    protected void throwExceptionForError(int errorCode) {
+        if (errorCode == ERRORCODE_ERROR) {
+            throw new SQLException("66666");
+        }
+    }
+
+    @Override
+    public long loadPlanFragment(byte[] plan) throws EEException {
+        return -1;
+    }
+
+    @Override
+    public VoltTable[] executePlanFragments(
+            final int numFragmentIds,
+            final long[] planFragmentIds,
+            final long[] inputDepIds,
+            final ParameterSet[] parameterSets,
+            final long txnId,
+            final long lastCommittedTxnId,
+            final long undoToken) throws EEException
     {
+        if (numFragmentIds != 1) {
+            return null;
+        }
+
         VoltTable vt;
         // TestExecutionSite uses this mock site.
         //
@@ -56,7 +77,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
         ArrayList<Object> params = new ArrayList<Object>();
 
-        for (Object param : parameterSet.toArray())
+        for (Object param : parameterSets[0].toArray())
         {
             params.add(param);
         }
@@ -89,30 +110,7 @@ public class MockExecutionEngine extends ExecutionEngine {
                   new VoltTable.ColumnInfo("foo", VoltType.INTEGER)
         });
         vt.addRow(Integer.valueOf(1));
-        return vt;
-    }
-
-    @Override
-    protected void throwExceptionForError(int errorCode) {
-        if (errorCode == ERRORCODE_ERROR) {
-            throw new SQLException("66666");
-        }
-    }
-
-    @Override
-    public VoltTable executeCustomPlanFragment(
-            final String plan,
-            int inputDepId, final long txnId,
-            final long lastCommittedTxnId, final long undoQuantumToken,
-            ParameterSet params)
-            throws EEException {
-        return null;
-    }
-
-    @Override
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(final long[] planFragmentIds, final int numFragmentIds, final ParameterSet[] parameterSets,
-            final int numParameterSets, final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException {
-        return null;
+        return new VoltTable[] { vt };
     }
 
     @Override
@@ -130,7 +128,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long lastCommittedTxnId, final long undoToken)
+        final long lastCommittedTxnId)
     throws EEException
     {
     }

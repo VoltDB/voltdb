@@ -116,6 +116,10 @@ public class PartitioningForStatement {
         m_inferSP = inferSP;
     }
 
+    public boolean shouldInferSP() {
+        return m_inferSP;
+    }
+
     /**
      * accessor
      */
@@ -178,8 +182,6 @@ public class PartitioningForStatement {
      * @param countOfPartitionedTables2
      */
     public void setPartitionedTables(Map<String,String> partitionColumnByTable, int countOfPartitionedTables) {
-        // Should only be set once, early on.
-        assert(m_countOfPartitionedTables == -1);
         m_partitionColumnByTable = partitionColumnByTable;
         m_countOfPartitionedTables = countOfPartitionedTables;
         m_countOfIndependentlyPartitionedTables = countOfPartitionedTables; // Initial guess -- as if no equality filters.
@@ -201,6 +203,33 @@ public class PartitioningForStatement {
     public int getCountOfIndependentlyPartitionedTables() {
         return m_countOfIndependentlyPartitionedTables;
 
+    }
+
+    /**
+     * Returns the discovered single partition expression (if exists), unless the
+     * user gave a partitioning a-priori, and then it will return null.
+     */
+    public AbstractExpression effectivePartitioningExpression() {
+        if (m_lockIn) {
+            return singlePartitioningExpression();
+        }
+        return null;
+    }
+
+    /**
+     * Returns true if the statement will require two fragments.
+     */
+    public boolean requiresTwoFragments() {
+        if (getCountOfPartitionedTables() == 0) {
+            return false;
+        }
+        if (effectivePartitioningValue() != null) {
+            return false;
+        }
+        if (effectivePartitioningExpression() != null) {
+            return false;
+        }
+        return true;
     }
 
     /**
