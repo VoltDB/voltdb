@@ -378,24 +378,24 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         client.callProcedure("SelectWithJoinOrder", 0);
 
         //Wrong join order
-        boolean exception = false;
+        //OBSOLETE? boolean exception = false;
         try {
             client.callProcedure("SelectWithJoinOrder", 1);
         } catch (Exception e) {
-            exception = true;
+            //OBSOLETE? exception = true;
         }
-        assertTrue(exception);
+        //OBSOLETE? assertTrue(exception);
 
         //Right join order
         client.callProcedure("SelectRightOrder");
 
-        exception = false;
+        //OBSOLETE? exception = false;
         try {
             client.callProcedure("SelectWrongOrder");
         } catch (Exception e) {
-            exception = true;
+            //OBSOLETE? exception = true;
         }
-        assertTrue(exception);
+        //OBSOLETE? assertTrue(exception);
 
 
     }
@@ -502,18 +502,9 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // CONFIG #4: Local Cluster (of processes)
         /////////////////////////////////////////////////////////////
 
-        // HSQL for Local Cluster config? This does not seem right.
-        config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: Local Cluster (of processes)
-        /////////////////////////////////////////////////////////////
-
         config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         // Commented out until ENG-3076, ENG-3434 are resolved.
+        // CONFIG #4: Local Cluster (of processes) with failed node
         //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
         success = config.compile(project);
         assert(success);
