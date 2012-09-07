@@ -19,9 +19,11 @@
 #define TABLECATALOGDELEGATE_HPP
 
 #include "common/CatalogDelegate.hpp"
+#include "indexes/tableindex.h"
+#include "catalog/table.h"
+#include "catalog/index.h"
 
 namespace catalog {
-class Table;
 class Database;
 }
 
@@ -47,6 +49,11 @@ class TableCatalogDelegate : public CatalogDelegate {
     int init(ExecutorContext *executorContext,
              catalog::Database &catalogDatabase,
              catalog::Table &catalogTable);
+
+    bool getIndexScheme(catalog::Table &catalogTable,
+                        catalog::Index &catalogIndex,
+                        TupleSchema *schema,
+                        TableIndexScheme *scheme);
 
     // ADXXX: should be const
     Table *getTable() {

@@ -634,9 +634,28 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                     if (tcd->exportEnabled()) {
                         table->setSignatureAndGeneration(t->signature(), txnId);
                     }
+
+                    vector<TableIndex*> currentIndexes = table->allIndexes();
+
                     map<string, catalog::Index*>::const_iterator indexIter;
                     for (indexIter = t->indexes().begin(); indexIter != t->indexes().end(); indexIter++) {
                         // this is where the code to diff indexes goes when it's ublocked in java
+
+                        std::string indexName = indexIter->first;
+
+                        bool found = false;
+                        for (int i = 0; i < currentIndexes.size(); i++) {
+                            std::string currentIndexName = currentIndexes[i]->getName();
+                            if (indexName.compare(currentIndexName) == 0) {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (!found) {
+                            // create and add the index
+                        }
+
                     }
                 }
             }
