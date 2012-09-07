@@ -118,11 +118,11 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     {
         node->setOutputTable(node->getTargetTable());
     }
-    //
+
     // Otherwise create a new temp table that mirrors the
     // output schema specified in the plan (which should mirror
     // the output schema for any inlined projection)
-    //
+
     else
     {
         TupleSchema* schema = node->generateTupleSchema(true);

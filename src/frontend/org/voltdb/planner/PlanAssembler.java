@@ -764,17 +764,21 @@ public class PlanAssembler {
         }
         projectionNode.setOutputSchema(proj_schema);
 
-        //@TODO pullexec prototype
+        //pullexec disable inline Projection
+        /*
         // if the projection can be done inline...
-        //if (rootNode instanceof AbstractScanPlanNode) {
-        //if (rootNode instanceof IndexScanPlanNode) {
-        //    rootNode.addInlinePlanNode(projectionNode);
-        //    return rootNode;
-        //} else {
+        if (rootNode instanceof AbstractScanPlanNode) {
+            rootNode.addInlinePlanNode(projectionNode);
+            return rootNode;
+        } else {
             projectionNode.addAndLinkChild(rootNode);
             projectionNode.generateOutputSchema(m_catalogDb);
             return projectionNode;
-        //}
+        }
+        */
+        projectionNode.addAndLinkChild(rootNode);
+        projectionNode.generateOutputSchema(m_catalogDb);
+        return projectionNode;
     }
 
     /**

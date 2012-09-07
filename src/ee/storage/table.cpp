@@ -318,6 +318,14 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
     if (!serializeColumnHeaderTo(serialize_io))
         return false;
 
+    // pullexec. Unfortunately, we can not always relay on m_tupleCount
+    // being alway accurate in the pullexec mode. In case of deletes,
+    // the m_tupleCount is adjusted to reflect the right count only
+    // at the end of the current transaction. If there are other statements
+    // in the same transaction following the delete, their send executor
+    // should count the actual tuples and not to use m_tupleCount.
+    //
+    /*
     // active tuple counts
     serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
@@ -328,6 +336,19 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
         ++written_count;
     }
     assert(written_count == m_tupleCount);
+    */
+
+    int64_t written_count = 0;
+    TableIterator titer = iterator();
+    TableTuple tuple(m_schema);
+    while (titer.next(tuple)) {
+        ++written_count;
+    }
+    serialize_io.writeInt(static_cast<int32_t>(written_count));
+    titer = iterator();
+    while (titer.next(tuple)) {
+        tuple.serializeTo(serialize_io);
+    }
 
     // length prefix is non-inclusive
     int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));

@@ -60,6 +60,10 @@ public class PushdownLimitsIntoScans implements MicroOptimization {
             plan.addAndLinkChild(child);
         }
 
+        return plan;
+
+        // pullexec- disable LIMIT inline for Scan Nodes
+        /*
         if ((plan instanceof LimitPlanNode) == false)
             return plan;
 
@@ -67,15 +71,15 @@ public class PushdownLimitsIntoScans implements MicroOptimization {
             return plan;
 
         AbstractPlanNode child = plan.getChild(0);
-        // @TODO pullexec- disable LIMIT inline for SeqScan Node
-        //if ((child instanceof AbstractScanPlanNode) == false || (child instanceof SeqScanPlanNode) == true)
-        return plan;
+        if ((child instanceof AbstractScanPlanNode) == false)
+          return plan;
 
-        //plan.clearChildren();
-        //child.clearParents();
-        //child.addInlinePlanNode(plan);
+        plan.clearChildren();
+        child.clearParents();
+        child.addInlinePlanNode(plan);
 
-        //return child;
+        return child;
+        */
     }
 
 }
