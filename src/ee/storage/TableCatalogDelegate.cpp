@@ -174,7 +174,7 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         TableIndexScheme index_scheme;
         if (getIndexScheme(catalogTable, *catalog_index, schema, &index_scheme)) {
             // some indexes return empty schemes (like function-based ones)
-            if (index_scheme.keySchema) {
+            if (index_scheme.tupleSchema) {
                 index_map[catalog_index->name()] = index_scheme;
             }
         }
