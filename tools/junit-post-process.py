@@ -113,7 +113,15 @@ if __name__ == "__main__":
     parser.add_option("-o", "--outputpath",
                       action="store", type="string", dest="outputpath",
                       help="path to JUnit results")
+    parser.add_option("-r", "--testresult",
+                      action="store", type="string", dest="testresult",
+                      help="did the test pass")
     (options, args) = parser.parse_args()
+
+    # if the test failed touch the magic file to indicate this
+    if options.testresult == "true":
+        magicpath = os.path.join(os.path.abspath(options.outputpath), "JUNITHADFAILURES");
+        os.system("touch %s" % (magicpath))
 
     # get the path to the xml output for this test
     resultPath = getPathToResultsFileForTest(options.testname, options.outputpath)

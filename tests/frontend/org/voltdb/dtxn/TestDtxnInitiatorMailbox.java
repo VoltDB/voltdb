@@ -125,7 +125,8 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       boolean isEveryPartition,
                                       int[] partitions, int numPartitions,
                                       Object clientData, int messageSize,
-                                      long now)
+                                      long now,
+                                      boolean allowMismatchedResults)
         {
             return true;
         }
@@ -143,7 +144,8 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now)
+                                      long now,
+                                      boolean allowMismatchedResults)
         {
             return true;
         }
@@ -217,7 +219,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         InFlightTxnState retval = new InFlightTxnState(
                 txnId, coordIds[0], null, new long[]{}, readOnly,
                 isSinglePart, new StoredProcedureInvocation(),
-                m_testConnect, MESSAGE_SIZE, now, 0, "", false);
+                m_testConnect, MESSAGE_SIZE, now, 0, "", false, false);
         if (coordIds.length > 1) {
             for (int i = 1; i < coordIds.length; i++)
                 retval.addCoordinator(coordIds[i]);
@@ -244,7 +246,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                              new StoredProcedureInvocation(),
                                              Long.MAX_VALUE);
         InitiateResponseMessage response = new InitiateResponseMessage(task);
-        response.setResults(new ClientResponseImpl((byte) 0, results, ""), task);
+        response.setResults(new ClientResponseImpl((byte) 0, results, ""));
         response.setRecovering(recovering);
         return response;
     }
@@ -420,6 +422,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setHSId(INITIATOR_SITE_ID);
 
         m_testStream.reset();
+
         // Single-partition read-only txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, false, createResultSet("dude")));
@@ -430,15 +433,13 @@ public class TestDtxnInitiatorMailbox extends TestCase
         {
             dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("sweet")));
         }
-        catch (RuntimeException e)
+        catch (AssertionError e)
         {
-            if (e.getMessage().contains("Mismatched"))
-            {
-                caught = true;
-            }
+            caught = true;
         }
         assertTrue(caught);
         m_testStream.reset();
+
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(2, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(2, 0, false, true, false, createResultSet("dude")));
@@ -448,12 +449,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
         {
             dim.deliver(createInitiateResponse(2, 1, true, true, false, createResultSet("sweet")));
         }
-        catch (RuntimeException e)
+        catch (AssertionError e)
         {
-            if (e.getMessage().contains("Mismatched"))
-            {
-                caught = true;
-            }
+            caught = true;
         }
         assertTrue(caught);
     }

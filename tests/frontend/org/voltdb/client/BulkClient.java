@@ -75,6 +75,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 
 /*
@@ -345,6 +346,7 @@ public abstract class BulkClient {
                     m_controlState.display, m_reason);
         }
 
+        @Override
         @SuppressWarnings("finally")
         public void run() {
             String command = "";
@@ -657,7 +659,7 @@ public abstract class BulkClient {
          * it will not have work distributed to it. If too many connections have pushback then no work
          * work will be generated.
          */
-        private Random r = new Random();
+        private final Random r = new Random();
         private void generateWork() {
             final long now = System.currentTimeMillis();
             final long delta = now - lastGeneratedWork;
@@ -941,7 +943,7 @@ public abstract class BulkClient {
         private int m_nextLength;
         /** messages read by this connection */
         private int m_sequenceId;
-        private AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
+        private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
         protected HashMap<Long, ProcedureCallback> m_callbacks = new HashMap<Long, ProcedureCallback>();
 
@@ -1065,7 +1067,7 @@ public abstract class BulkClient {
     /**
      * List of connections that have been created. Synchronized on before access or modification.
      */
-    private ArrayList<Connection> m_connections = new ArrayList<Connection>();
+    private final ArrayList<Connection> m_connections = new ArrayList<Connection>();
 
     /**
      * Manage input and output to the framework
@@ -1089,7 +1091,7 @@ public abstract class BulkClient {
     protected AtomicInteger m_counts[];
 
     private final ExecutorService m_executor = Executors
-        .newFixedThreadPool(Runtime.getRuntime().availableProcessors() - 1);
+        .newFixedThreadPool(CoreUtils.availableProcessors());
 
     private final Dispatcher m_dispatcher = new Dispatcher(m_executor);
 

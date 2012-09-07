@@ -5,3 +5,4 @@ CREATE TABLE store
 , PRIMARY KEY (key)
 );
 
+PARTITION TABLE store ON COLUMN key;

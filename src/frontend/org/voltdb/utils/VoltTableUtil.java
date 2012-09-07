@@ -19,12 +19,17 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
@@ -34,11 +39,14 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
  */
 public class VoltTableUtil {
 
+    // String used to indicate NULL value in the output CSV file
+    private static final String CSV_NULL = "\\N";
+
     private static final ThreadLocal<SimpleDateFormat> m_sdf = new ThreadLocal<SimpleDateFormat>() {
         @Override
         public SimpleDateFormat initialValue() {
             return new SimpleDateFormat(
-                    "yyyy.MM.dd HH:mm:ss:SSS:");
+                    "yyyy-MM-dd HH:mm:ss.SSS");
         }
     };
 
@@ -54,14 +62,14 @@ public class VoltTableUtil {
                         || type == VoltType.TINYINT) {
                     final long value = vt.getLong(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = "NULL";
+                        fields[ii] = CSV_NULL;
                     } else {
                         fields[ii] = Long.toString(value);
                     }
                 } else if (type == VoltType.FLOAT) {
                     final double value = vt.getDouble(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = "NULL";
+                        fields[ii] = CSV_NULL;
                     } else {
                         fields[ii] = Double.toString(value);
                     }
@@ -69,14 +77,14 @@ public class VoltTableUtil {
                     final BigDecimal bd = vt
                             .getDecimalAsBigDecimal(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = "NULL";
+                        fields[ii] = CSV_NULL;
                     } else {
                         fields[ii] = bd.toString();
                     }
                 } else if (type == VoltType.STRING) {
                     final String str = vt.getString(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = "NULL";
+                        fields[ii] = CSV_NULL;
                     } else {
                         fields[ii] = str;
                     }
@@ -84,7 +92,7 @@ public class VoltTableUtil {
                     final TimestampType timestamp = vt
                             .getTimestampAsTimestamp(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = "NULL";
+                        fields[ii] = CSV_NULL;
                     } else {
                         fields[ii] = sdf.format(timestamp
                                 .asApproximateJavaDate());
@@ -94,7 +102,7 @@ public class VoltTableUtil {
                 } else if (type == VoltType.VARBINARY) {
                    byte bytes[] = vt.getVarbinary(ii);
                    if (vt.wasNull()) {
-                       fields[ii] = "NULL";
+                       fields[ii] = CSV_NULL;
                    } else {
                        fields[ii] = Encoder.hexEncode(bytes);
                    }

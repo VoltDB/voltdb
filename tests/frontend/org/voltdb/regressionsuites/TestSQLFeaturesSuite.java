@@ -353,7 +353,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         }
         assert(caught);
     }
-/*
+
     public void testJoinOrder() throws Exception {
         if (isHSQL() || isValgrind()) return;
 
@@ -399,6 +399,36 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
 
     }
+
+    public void testSetOpsThatFail() throws Exception {
+        Client client = getClient();
+
+        boolean caught;
+
+        caught = false;
+        try {
+            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) UNION (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
+        } catch (ProcCallException e) {
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) INTERSECT (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
+        } catch (ProcCallException e) {
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) EXCEPT (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
+        } catch (ProcCallException e) {
+            caught = true;
+        }
+        assertTrue(caught);
+}
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
@@ -450,7 +480,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        config = new LocalSingleProcessServer("sqlfeatures-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqlfeatures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile (note the reuse of the TPCC project)
         success = config.compile(project);
@@ -463,7 +493,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // CONFIG #3: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
 
-        config = new LocalSingleProcessServer("sqlfeatures-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
@@ -479,10 +509,12 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #3: Local Cluster (of processes) with failed node
+        // CONFIG #3: Local Cluster (of processes)
         /////////////////////////////////////////////////////////////
 
-        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
+        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        // Commented out until ENG-3076, ENG-3434 are resolved.
+        //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);

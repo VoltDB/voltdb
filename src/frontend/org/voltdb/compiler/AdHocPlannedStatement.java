@@ -17,59 +17,174 @@
 
 package org.voltdb.compiler;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+import org.voltdb.ParameterSet;
+import org.voltdb.VoltDB;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.CorePlan;
+
 /**
  * Holds the plan and original SQL source for a single statement.
  *
  * Will typically be contained by AdHocPlannedStmtBatch. Both this class and the batch extend
  * AsyncCompilerResult to allow working at either the batch or the individual statement level.
  */
-public class AdHocPlannedStatement extends AsyncCompilerResult implements Cloneable {
-    private static final long serialVersionUID = 1144100816601598092L;
-    public String sql;
-    public String aggregatorFragment;
-    public String collectorFragment;
-    public boolean isReplicatedTableDML;
-    public Object partitionParam;
-    public int catalogVersion;
+public class AdHocPlannedStatement {
+    public final CorePlan core;
+    public final byte[] sql;
+    public final ParameterSet extractedParamValues;
+    public final Object partitionParam; // not serialized
+
+    AdHocPlannedStatement(CompiledPlan plan, int catalogVersion) {
+        sql = plan.sql.getBytes(VoltDB.UTF8ENCODING);
+        core = new CorePlan(plan, catalogVersion);
+        extractedParamValues = plan.extractedParamValues;
+        partitionParam = plan.getPartitioningKey();
+
+        validate();
+    }
 
     /***
      * Constructor
      *
-     * @param sql                       SQL statement source
-     * @param aggregatorFragment        planned aggregator fragment
-     * @param collectorFragment         planned collector fragment
-     * @param isReplicatedTableDML      replication flag
-     * @param partitionParam partition  parameter
-     * @param catalogVersion            catalog version
+     * @param sql                       bytes of sql string (utf-8)
+     * @param core                      core immutable plan
+     * @param extractedParamValues      params extracted from constant values
+     * @param partitionParam            value used for partitioning
      */
-    public AdHocPlannedStatement(String sql,
-                                 String aggregatorFragment,
-                                 String collectorFragment,
-                                 boolean isReplicatedTableDML,
-                                 Object partitionParam,
-                                 int catalogVersion) {
+    public AdHocPlannedStatement(byte[] sql,
+                                 CorePlan core,
+                                 ParameterSet extractedParamValues,
+                                 Object partitionParam) {
+
         this.sql = sql;
-        this.aggregatorFragment = aggregatorFragment;
-        this.collectorFragment = collectorFragment;
-        this.isReplicatedTableDML = isReplicatedTableDML;
+        this.core = core;
+        this.extractedParamValues = extractedParamValues;
         this.partitionParam = partitionParam;
-        this.catalogVersion = catalogVersion;
+
+        // as this constructor is used for deserializaton on the proc-running side,
+        // no partitioning param object is needed
+
+        validate();
+    }
+
+    private void validate() {
+        assert(core != null);
+        assert(core.aggregatorFragment != null);
+
+        // nondet => readonly
+        assert((core.isNonDeterministic == false) || (core.readOnly == true));
+
+        // dml => !readonly
+        assert((core.isReplicatedTableDML == false) || (core.readOnly == false));
+
+        // repdml => 2partplan
+        assert((core.isReplicatedTableDML == false) || (core.collectorFragment != null));
+
+        // zero param types => null extracted params
+        // nonzero param types => param types and extracted params have same size
+        assert(core.parameterTypes != null);
+        assert(extractedParamValues != null);
+        // any extracted params => extracted param size == param type array size
+        assert((extractedParamValues.size() == 0) ||
+                (extractedParamValues.size() == core.parameterTypes.length));
     }
 
     @Override
     public String toString() {
-        String retval = super.toString();
-        retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
-        retval += "\n  sql: " + ((sql != null) ? sql : "null");
-        return retval;
+        return core.toString();
     }
 
+    public int getSerializedSize() {
+        // plan
+        int size = core.getSerializedSize();
+
+        // sql bytes
+        size += 2;
+        size += sql.length;
+
+        // params
+        size += extractedParamValues.getSerializedSize();
+
+        return size;
+    }
+
+    void flattenToBuffer(ByteBuffer buf) throws IOException {
+        validate(); // assertions for extra safety
+
+        // plan
+        core.flattenToBuffer(buf);
+
+        // sql bytes
+        buf.putShort((short) sql.length);
+        buf.put(sql);
+
+        // params
+        extractedParamValues.flattenToBuffer(buf);
+    }
+
+    public static AdHocPlannedStatement fromBuffer(ByteBuffer buf) throws IOException {
+        // plan
+        CorePlan core = CorePlan.fromBuffer(buf);
+
+        // sql bytes
+        short sqlLength = buf.getShort();
+        byte[] sql = new byte[sqlLength];
+        buf.get(sql);
+
+        // params
+        ParameterSet parameterSet = new ParameterSet();
+        FastDeserializer fds = new FastDeserializer(buf);
+        parameterSet.readExternal(fds);
+
+        return new AdHocPlannedStatement(sql, core, parameterSet, null);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     * Mostly for debugging and testing.
+     * Not zippy for the fast path.
+     */
     @Override
-    public Object clone() {
-        try {
-            return super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
+    public boolean equals(Object obj) {
+        if (!(obj instanceof AdHocPlannedStatement)) {
+            return false;
         }
+        AdHocPlannedStatement other = (AdHocPlannedStatement) obj;
+
+        if (partitionParam != null) {
+            if (!partitionParam.equals(other.partitionParam)) {
+                return false;
+            }
+        }
+        else {
+            if (other.partitionParam != null) {
+                return false;
+            }
+        }
+        if (!Arrays.equals(sql, other.sql)) {
+            return false;
+        }
+        if (!core.equals(other.core)) {
+            return false;
+        }
+        if (!extractedParamValues.equals(other.extractedParamValues)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        assert false : "hashCode not designed";
+        return 42; // any arbitrary constant will do
     }
 }

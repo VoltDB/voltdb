@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -58,7 +59,6 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -101,6 +101,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final int m_hostId;
     private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
+    // Keeps track of site index for choosing sites via round robin discipline.
+    private int m_roundRobinSiteIndex = 0;
+
     public SimpleDtxnInitiator(DtxnInitiatorMailbox mailbox,
                                CatalogContext context,
                                HostMessenger messenger, int hostId,
@@ -134,14 +137,15 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final int numPartitions,
                                   final Object clientData,
                                   final int messageSize,
-                                  final long now)
+                                  final long now,
+                                  final boolean allowMismatchedResults)
     {
         long txnId;
         txnId = m_idManager.getNextUniqueTransactionId();
         boolean retval =
-            createTransaction(connectionId, connectionHostname, adminConnection, txnId,
-                              invocation, isReadOnly, isSinglePartition, isEveryPartition,
-                              partitions, numPartitions, clientData, messageSize, now);
+            createTransaction(connectionId, connectionHostname, adminConnection, txnId, invocation,
+                              isReadOnly, isSinglePartition, isEveryPartition, partitions,
+                              numPartitions, clientData, messageSize, now, allowMismatchedResults);
         return retval;
     }
 
@@ -159,7 +163,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final int numPartitions,
                                   final Object clientData,
                                   final int messageSize,
-                                  final long now)
+                                  final long now,
+                                  final boolean allowMismatchedResults)
     {
         assert(invocation != null);
         assert(partitions != null);
@@ -195,7 +200,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         {
             SiteTracker tracker = VoltDB.instance().getSiteTracker();
             List<Long> sitesOnThisHost = tracker.getSitesForHost(m_hostId);
-            long coordinatorId = sitesOnThisHost.get(0);
+            // Choose coordinator using round robin technique.
+            // Check for wrapping around before using the round robin index to
+            // innoculate against size changes, etc..
+            if (m_roundRobinSiteIndex >= sitesOnThisHost.size()) {
+                m_roundRobinSiteIndex = 0;
+            }
+            long coordinatorId = sitesOnThisHost.get(m_roundRobinSiteIndex);
+            m_roundRobinSiteIndex++;
             ArrayList<Long> replicaIds = new ArrayList<Long>();
             for (Long replica : tracker.getSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
                 if (replica != coordinatorId) {
@@ -237,7 +249,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         now,
                                                         connectionId,
                                                         connectionHostname,
-                                                        adminConnection);
+                                                        adminConnection,
+                                                        allowMismatchedResults);
             dispatchMultiPartitionTxn(txn);
             return true;
         }
@@ -341,7 +354,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                  now,
                                  connectionId,
                                  connectionHostname,
-                                 adminConnection);
+                                 adminConnection,
+                                 false);
 
         for (long siteId : siteIds) {
             state.addCoordinator(siteId);
@@ -366,6 +380,20 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_mailbox.addPendingTxn(txn);
         increaseBackpressure(txn.messageSize);
 
+        /*
+         * Compose the set of non-coordinator sites and send it to the
+         * coordinator, so that the coordinator will send fragment work to all
+         * the sites that received the participant notice.
+         */
+        long[] nonCoordinatorSites = new long[txn.coordinatorReplicas.size() + txn.otherSiteIds.length];
+        int i = 0;
+        for (long hsId : txn.coordinatorReplicas) {
+            nonCoordinatorSites[i++] = hsId;
+        }
+        for (long hsId : txn.otherSiteIds) {
+            nonCoordinatorSites[i++] = hsId;
+        }
+
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
                 m_siteId, txn.firstCoordinatorId, txn.txnId, txn.isReadOnly);
         m_mailbox.send(txn.otherSiteIds, notice);
@@ -382,11 +410,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 txn.isReadOnly,
                 txn.isSinglePartition,
                 txn.invocation,
-                newestSafeTxnId); // this will allow all transactions to run for now
+                newestSafeTxnId, // this will allow all transactions to run for now
+                nonCoordinatorSites);
 
         /*
          * Send the transaction to the coordinator as well as his replicas
-         * so it is redudantly logged. The replicas that aren't listed
+         * so it is redundantly logged. The replicas that aren't listed
          * as the coordinator in the work request will treat it as
          * a participant notice
          */

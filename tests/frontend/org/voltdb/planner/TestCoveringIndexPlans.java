@@ -194,6 +194,6 @@ public class TestCoveringIndexPlans extends TestCase {
             System.out.println(pn.toJSONString());
         }
         assertTrue(pn instanceof ProjectionPlanNode);
-        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof IndexScanPlanNode);
     }
 }

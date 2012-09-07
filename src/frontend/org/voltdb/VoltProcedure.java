@@ -126,6 +126,9 @@ public abstract class VoltProcedure {
          */
         public VoltAbortException(Throwable t) {
             super(t);
+            if (t.getMessage() != null) {
+                message = t.getMessage();
+            }
         }
 
         /**
@@ -177,6 +180,20 @@ public abstract class VoltProcedure {
 //    public void checkExpectation(Expectation expectation, VoltTable table) {
 //        Expectation.check(m_procedureName, "NO STMT", 0, expectation, table);
 //    }
+
+    /**
+     * Queue the adhoc SQL statement for execution. The adhoc SQL statement will have
+     * to be planned which is orders of magnitude slower then using a precompiled SQL statements.
+     *
+     * If the query is parameterized it is possible to pass in the parameters.
+     *
+     * This method is experimental and not intended for production use yet.
+     * @deprecated
+     */
+    @Deprecated
+    public void voltQueueSQLExperimental(String sql, Object... args) {
+        m_runner.voltQueueSQL(sql, args);
+    }
 
     /**
      * Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list,

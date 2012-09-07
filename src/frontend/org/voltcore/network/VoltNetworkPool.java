@@ -45,6 +45,9 @@ public class VoltNetworkPool {
     }
 
     public VoltNetworkPool(int numThreads, ScheduledExecutorService ses) {
+        if (numThreads < 1) {
+            throw new IllegalArgumentException("Must specify a postive number of threads");
+        }
         m_networks = new VoltNetwork[numThreads];
         for (int ii = 0; ii < numThreads; ii++) {
             m_networks[ii] = new VoltNetwork(ii, ses);
@@ -102,9 +105,9 @@ public class VoltNetworkPool {
             if (globalStats == null) {
                 globalStats = stats.get(-1L).getSecond();
             } else {
-                int ii = 0;
-                for (long stat : stats.get(-1L).getSecond()) {
-                    globalStats[ii] += stat;
+                final long localStats[] = stats.get(-1L).getSecond();
+                for (int ii = 0; ii < localStats.length; ii++) {
+                    globalStats[ii] += localStats[ii];
                 }
             }
             retval.putAll(stats);

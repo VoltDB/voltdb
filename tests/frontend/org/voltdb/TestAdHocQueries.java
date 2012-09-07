@@ -26,9 +26,15 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -38,13 +44,31 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
+@RunWith(value = Parameterized.class)
 public class TestAdHocQueries extends AdHocQueryTester {
 
-    Client m_client;
-    private final static boolean m_debug = true;
 
-    public void testSP() throws Exception {
-        VoltDB.Configuration config = setUpSPDB();
+    @Parameters
+    public static Collection<Object[]> useIv2() {
+        return Arrays.asList(new Object[][] {{false}, {true}});
+    }
+
+    Client m_client;
+    private final static boolean m_debug = false;
+
+    protected final boolean m_useIv2;
+    public TestAdHocQueries(boolean useIv2)
+    {
+        m_useIv2 = useIv2;
+    }
+
+    // IMPORTANT SAFETY TIP
+    // The use of junit parameters to toggle between iv2 and non-iv2 cases
+    // means that all test cases MUST BE annotated with @Test or THEY WILL NOT RUN.
+
+    @Test
+    public void testProcedureAdhoc() throws Exception {
+        VoltDB.Configuration config = setUpSPDB(m_useIv2);
         ServerThread localServer = new ServerThread(config);
 
         try {
@@ -53,7 +77,150 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             // do the test
             m_client = ClientFactory.createClient();
-            m_client.createConnection("localhost");
+            m_client.createConnection("localhost", config.m_port);
+
+            m_client.callProcedure("@AdHoc", "insert into PARTED1 values ( 23, 3 )");
+
+            /*
+             * Test that a basic multipartition select works as well as a parameterized
+             * query (it's in the procedure)
+             */
+            VoltTable results[] = m_client.callProcedure(
+                    "executeSQLSP",
+                    23,
+                    "select * from PARTED1").getResults();
+            assertTrue(
+                    results[0].advanceRow());
+            assertTrue(results[1].advanceRow());
+
+            results = m_client.callProcedure(
+                    "executeSQLMP",
+                    23,
+                    "       select * from PARTED1").getResults();
+            assertTrue(
+                    results[0].advanceRow());
+            assertTrue(results[1].advanceRow());
+
+            /*
+             * Validate that doing an insert from a RO procedure fails
+             */
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5)");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+            try {
+                m_client.callProcedure("executeSQLMP", 24, "insert into parted1 values (24,5)");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+            /*
+             * Validate one sql statement per
+             */
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5); select * from parted1;");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "drop table parted1");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+
+            /*
+             * Validate that an insert does work from a write procedure
+             */
+            m_client.callProcedure("executeSQLSPWRITE", 24, "insert into parted1 values (24, 4);");
+            m_client.callProcedure("executeSQLMPWRITE", 25, "insert into parted1 values (25, 5);");
+
+            /*
+             * Query the inserts and all the rest do it once for singe and once for multi
+             */
+            results = m_client.callProcedure("executeSQLMP", 24, "select * from parted1 order by partval").getResults();
+
+            assertEquals( 3, results[0].getRowCount());
+            for (int ii = 3; ii < 6; ii++) {
+                assertTrue(results[0].advanceRow());
+                assertEquals(20 + ii, results[0].getLong(0));
+                assertEquals(ii, results[0].getLong(1));
+            }
+
+            //Output from the first preplanned statement
+            assertEquals( 3, results[1].getRowCount());
+            assertTrue(results[1].advanceRow());
+            assertEquals( 23, results[1].getLong(0));
+            assertEquals( 3, results[1].getLong(1));
+
+            //Output from the second adhoc statement
+            assertEquals( 1, results[2].getRowCount());
+            assertTrue(results[2].advanceRow());
+            assertEquals( 24, results[2].getLong(0));
+            assertEquals( 4, results[2].getLong(1));
+
+            //Output from the second preplanned statement
+            assertEquals( 3, results[3].getRowCount());
+            assertTrue(results[3].advanceRow());
+            assertEquals( 23, results[3].getLong(0));
+            assertEquals( 3, results[3].getLong(1));
+
+
+            results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
+
+            assertEquals( 1, results[0].getRowCount());
+            assertTrue(results[0].advanceRow());
+            assertEquals(24, results[0].getLong(0));
+            assertEquals( 4, results[0].getLong(1));
+
+            //Output from the first preplanned statement
+            assertEquals( 1, results[1].getRowCount());
+            assertTrue(results[1].advanceRow());
+            assertEquals( 24, results[1].getLong(0));
+            assertEquals( 4, results[1].getLong(1));
+
+            //Output from the second adhoc statement
+            assertEquals( 1, results[2].getRowCount());
+            assertTrue(results[2].advanceRow());
+            assertEquals( 24, results[2].getLong(0));
+            assertEquals( 4, results[2].getLong(1));
+
+            //Output from the second preplanned statement
+            assertEquals( 1, results[3].getRowCount());
+            assertTrue(results[3].advanceRow());
+            assertEquals( 24, results[3].getLong(0));
+            assertEquals( 4, results[3].getLong(1));
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+        finally {
+            if (m_client != null) m_client.close();
+            m_client = null;
+
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+    }
+
+    @Test
+    public void testSP() throws Exception {
+        VoltDB.Configuration config = setUpSPDB(m_useIv2);
+        ServerThread localServer = new ServerThread(config);
+
+        try {
+            localServer.start();
+            localServer.waitForInitialization();
+
+            // do the test
+            m_client = ClientFactory.createClient();
+            m_client.createConnection("localhost", config.m_port);
 
             VoltTable modCount;
 
@@ -136,29 +303,22 @@ public class TestAdHocQueries extends AdHocQueryTester {
         assertEquals(expected, result.getRowCount());
 
         result = m_client.callProcedure("@AdHoc", query, hashable).getResults()[0];
-        int spResultImplicit = result.getRowCount();
+        int spResult = result.getRowCount();
         System.out.println(result.toString());
         if (validatingSPresult != 0) {
-            assertEquals(expected, spPartialSoFar + spResultImplicit);
+            assertEquals(expected, spPartialSoFar + spResult);
         }
 
-        result = m_client.callProcedure("@AdHocSP", query, hashable).getResults()[0];
-        int spResultExplicit = result.getRowCount();
-        System.out.println(result.toString());
-        if (validatingSPresult != 0) {
-            assertEquals(expected, spPartialSoFar + spResultExplicit);
-        }
-        assertEquals(spResultExplicit, spResultImplicit);
-
-        return spResultExplicit;
+        return spResult;
     }
 
     String m_catalogJar = "adhoc.jar";
     String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
     String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
+    @Test
     public void testSimple() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1, m_useIv2);
         try {
             env.setUp();
 
@@ -230,8 +390,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
     public void testAdHocBatches() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, m_useIv2);
         try {
             env.setUp();
             Batcher batcher = new Batcher(env);
@@ -294,6 +455,151 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // expect 1 row, not 2.
             batcher.add("SELECT * FROM BLAH", 1);
             batcher.run();
+        }
+        finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
+    public void testXopenSubSelectQueries() throws Exception {
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, m_useIv2);
+        String adHocQuery;
+        try {
+            env.setUp();
+
+            adHocQuery = "  UPDATE STAFF \n" +
+                    "          SET GRADE=10*STAFF.GRADE \n" +
+                    "          WHERE STAFF.EMPNUM NOT IN \n" +
+                    "                (SELECT WORKS.EMPNUM \n" +
+                    "                      FROM WORKS \n" +
+                    "                      WHERE STAFF.EMPNUM = WORKS.EMPNUM);";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on subquery");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("not yet support subqueries") > 0);
+            }
+            adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
+                    "           FROM STAFF \n" +
+                    "           WHERE NOT EXISTS (SELECT * FROM WORKS \n" +
+                    "                WHERE WORKS.EMPNUM = STAFF.EMPNUM) \n" +
+                    "                ORDER BY EMPNUM;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on exists clause");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("not yet support EXISTS clause") > 0);
+            }
+            adHocQuery = "   SELECT STAFF.EMPNAME \n" +
+                    "          FROM STAFF \n" +
+                    "          WHERE STAFF.EMPNUM IN \n" +
+                    "                  (SELECT WORKS.EMPNUM \n" +
+                    "                        FROM WORKS \n" +
+                    "                        WHERE WORKS.PNUM IN \n" +
+                    "                              (SELECT PROJ.PNUM \n" +
+                    "                                    FROM PROJ \n" +
+                    "                                    WHERE PROJ.CITY='Tampa')); \n" +
+                    "";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on subquery");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("not yet support subqueries") > 0);
+            }
+            adHocQuery = "SELECT FIRST1.EMPNUM, SECOND2.EMPNUM \n" +
+                    "          FROM STAFF FIRST1, STAFF SECOND2 \n" +
+                    "          WHERE FIRST1.CITY = SECOND2.CITY \n" +
+                    "          AND FIRST1.EMPNUM < SECOND2.EMPNUM;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on selfjoin");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("not yet support self joins") > 0);
+            }
+            adHocQuery = "SELECT PNAME \n" +
+                    "         FROM PROJ \n" +
+                    "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +
+                    "                           AND PNUM > 'P2';";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on static clause");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("does not yet support where clauses containing only constants") > 0);
+            }
+            adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on invalid ");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+            }
+            adHocQuery = "CREATE INDEX IDX_PROJ_PNAME ON PROJ(PNAME);";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on invalid SQL verb");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+            }
+            adHocQuery = "ROLLBACK;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on invalid SQL verb");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+            }
+            adHocQuery = "DROP TABLE PROJ;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on invalid SQL verb");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+            }
+            adHocQuery = "PARTITION TABLE PROJ ON COLUMN PNUM;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail with unexpected token");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("unexpected token: PARTITION") > 0);
+            }
+            adHocQuery = "CREATE PROCEDURE AS SELECT 1 FROM PROJ;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail with unexpected token");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("unexpected token: AS") > 0);
+            }
+            adHocQuery = "CREATE PROCEDURE FROM CLASS bar.Foo;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail with unexpected token");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("unexpected token: FROM") > 0);
+            }
+            adHocQuery = "SELECT PNUM \n" +
+                    "          FROM WORKS \n" +
+                    "          WHERE PNUM > 'P1' \n" +
+                    "          GROUP BY PNUM \n" +
+                    "          HAVING COUNT(*) > 1;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on having clause");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("not yet support the HAVING clause") > 0);
+            }
         }
         finally {
             env.tearDown();
@@ -379,17 +685,77 @@ public class TestAdHocQueries extends AdHocQueryTester {
         Client m_client = null;
 
         TestEnv(String pathToCatalog, String pathToDeployment,
-                     int siteCount, int hostCount, int kFactor) {
+                     int siteCount, int hostCount, int kFactor, boolean enableIv2) {
             m_builder = new VoltProjectBuilder();
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +
                                            "IVAL bigint default 0 not null, " +
                                            "TVAL timestamp default null," +
                                            "DVAL decimal default null," +
-                                           "PRIMARY KEY(IVAL));");
-                m_builder.addPartitionInfo("BLAH", "IVAL");
-                m_builder.addStmtProcedure("Insert", "INSERT into BLAH values (?, ?, ?);", null);
-                m_builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);");
+                                           "PRIMARY KEY(IVAL));\n" +
+                                           "PARTITION TABLE BLAH ON COLUMN IVAL;\n" +
+                                           "\n" +
+                                           "CREATE TABLE AAA (A1 VARCHAR(2), A2 VARCHAR(2), A3 VARCHAR(2));\n" +
+                                           "CREATE TABLE BBB (B1 VARCHAR(2), B2 VARCHAR(2), B3 VARCHAR(2) NOT NULL UNIQUE);\n" +
+                                           "CREATE TABLE CCC (C1 VARCHAR(2), C2 VARCHAR(2), C3 VARCHAR(2));\n" +
+                                           "\n" +
+                                           "CREATE TABLE CHAR_TEST (COL1 VARCHAR(254));\n" +
+                                           "CREATE TABLE INT_TEST (COL1 INTEGER);\n" +
+                                           "CREATE TABLE SMALL_TEST (COL1 SMALLINT);\n" +
+                                           "CREATE TABLE REAL_TEST (REF VARCHAR(1),COL1 REAL);\n" +
+                                           "CREATE TABLE REAL3_TEST (COL1 REAL,COL2 REAL,COL3 REAL);\n" +
+                                           "CREATE TABLE DOUB_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
+                                           "CREATE TABLE DOUB3_TEST (COL1 FLOAT,COL2 FLOAT\n" +
+                                           "   PRECISION,COL3 FLOAT);\n" +
+                                           "\n" +
+                                           "-- Users may provide an explicit precision for FLOAT_TEST.COL1\n" +
+                                           "\n" +
+                                           "CREATE TABLE FLOAT_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
+                                           "\n" +
+                                           "CREATE TABLE INDEXLIMIT(COL1 VARCHAR(2), COL2 VARCHAR(2),\n" +
+                                           "   COL3 VARCHAR(2), COL4 VARCHAR(2), COL5 VARCHAR(2),\n" +
+                                           "   COL6 VARCHAR(2), COL7 VARCHAR(2));\n" +
+                                           "\n" +
+                                           "CREATE TABLE WIDETABLE (WIDE VARCHAR(118));\n" +
+                                           "CREATE TABLE WIDETAB (WIDE1 VARCHAR(38), WIDE2 VARCHAR(38), WIDE3 VARCHAR(38));\n" +
+                                           "\n" +
+                                           "CREATE TABLE TEST_TRUNC (TEST_STRING VARCHAR (6));\n" +
+                                           "\n" +
+                                           "CREATE TABLE WARNING(TESTCHAR VARCHAR(6), TESTINT INTEGER);\n" +
+                                           "\n" +
+                                           "CREATE TABLE TV (dec3 DECIMAL(3), dec1514 DECIMAL(15,14),\n" +
+                                           "                 dec150 DECIMAL(15,0), dec1515 DECIMAL(15,15));\n" +
+                                           "\n" +
+                                           "CREATE TABLE TU (smint SMALLINT, dec1514 DECIMAL(15,14),\n" +
+                                           "                 integr INTEGER, dec1515 DECIMAL(15,15));\n" +
+                                           "\n" +
+                                           "CREATE TABLE STAFF\n" +
+                                           "  (EMPNUM   VARCHAR(3) NOT NULL UNIQUE,\n" +
+                                           "   EMPNAME  VARCHAR(20),\n" +
+                                           "   GRADE    DECIMAL(4),\n" +
+                                           "   CITY     VARCHAR(15));\n" +
+                                           "\n" +
+                                           "CREATE TABLE PROJ\n" +
+                                           "  (PNUM     VARCHAR(3) NOT NULL UNIQUE,\n" +
+                                           "   PNAME    VARCHAR(20),\n" +
+                                           "   PTYPE    VARCHAR(6),\n" +
+                                           "   BUDGET   DECIMAL(9),\n" +
+                                           "   CITY     VARCHAR(15));\n" +
+                                           "\n" +
+                                           "CREATE TABLE WORKS\n" +
+                                           "  (EMPNUM   VARCHAR(3) NOT NULL,\n" +
+                                           "   PNUM     VARCHAR(3) NOT NULL,\n" +
+                                           "   HOURS    DECIMAL(5),\n" +
+                                           "   UNIQUE(EMPNUM,PNUM));\n" +
+                                           "\n" +
+                                           "CREATE TABLE INTS\n" +
+                                           "  (INT1      SMALLINT NOT NULL,\n" +
+                                           "   INT2      SMALLINT NOT NULL);\n" +
+                                           "CREATE PROCEDURE TestProcedure AS INSERT INTO AAA VALUES(?,?,?);\n" +
+                                           "CREATE PROCEDURE Insert AS INSERT into BLAH values (?, ?, ?);\n" +
+                                           "CREATE PROCEDURE InsertWithDate AS \n" +
+                                           "  INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);\n" +
+                                           "");
 
                 // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
                 AdHocQueryTester.setUpSchema(m_builder, pathToCatalog, pathToDeployment);
@@ -402,7 +768,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
                                          BackendTarget.NATIVE_EE_JNI,
                                          LocalCluster.FailureState.ALL_RUNNING,
-                                         m_debug, false);
+                                         m_debug, false, enableIv2);
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

@@ -169,6 +169,7 @@ public class StatementDML extends StatementDMQL {
               null);
     }
 
+    @Override
     Result getResult(Session session) {
 
         Result result = null;
@@ -201,6 +202,7 @@ public class StatementDML extends StatementDMQL {
     }
 
     // this fk references -> other  :  other read lock
+    @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
         if (!baseTable.isTemp()) {
@@ -234,6 +236,7 @@ public class StatementDML extends StatementDMQL {
     }
 
     // other fk references this :  if constraint trigger action  : other write lock
+    @Override
     void getTableNamesForWrite(OrderedHashSet set) {
 
         if (baseTable.isTemp()) {
@@ -1293,7 +1296,7 @@ public class StatementDML extends StatementDMQL {
             parameterXML.children.add(parameter);
             parameter.attributes.put("index", String.valueOf(i));
             Expression param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId());
+            parameter.attributes.put("id", param.getUniqueId(session));
             parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
         }
     }
@@ -1353,7 +1356,8 @@ public class StatementDML extends StatementDMQL {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-     VoltXMLElement voltGetXML(Session session)
+     @Override
+    VoltXMLElement voltGetXML(Session session)
      throws HSQLParseException
      {
         VoltXMLElement xml = new VoltXMLElement("unknown");

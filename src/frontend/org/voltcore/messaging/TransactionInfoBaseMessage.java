@@ -33,6 +33,11 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected long m_initiatorHSId;
     protected long m_coordinatorHSId;
     protected long m_txnId;
+    // IV2: within a partition, the primary initiator and its replicas
+    // use this for intra-partition ordering/lookup
+    protected long m_spHandle;
+    // IV2: allow PI to signal RI repair log truncation with a new task.
+    private long m_truncationHandle;
     protected boolean m_isReadOnly;
 
     /** Empty constructor for de-serialization */
@@ -49,6 +54,20 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_txnId = txnId;
         m_isReadOnly = isReadOnly;
         m_subject = Subject.DEFAULT.getId();
+        m_spHandle = Long.MIN_VALUE;
+    }
+
+    protected TransactionInfoBaseMessage(long initiatorHSId,
+            long coordinatorHSId,
+            TransactionInfoBaseMessage rhs)
+    {
+        m_initiatorHSId = initiatorHSId;
+        m_coordinatorHSId = coordinatorHSId;
+        m_txnId = rhs.m_txnId;
+        m_isReadOnly = rhs.m_isReadOnly;
+        m_subject = rhs.m_subject;
+        m_spHandle = rhs.m_spHandle;
+        m_truncationHandle = rhs.m_truncationHandle;
     }
 
     public long getInitiatorHSId() {
@@ -59,8 +78,28 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_coordinatorHSId;
     }
 
+    public void setTxnId(long txnId) {
+        m_txnId = txnId;
+    }
+
     public long getTxnId() {
         return m_txnId;
+    }
+
+    public void setSpHandle(long spHandle) {
+        m_spHandle = spHandle;
+    }
+
+    public long getSpHandle() {
+        return m_spHandle;
+    }
+
+    public void setTruncationHandle(long handle) {
+        m_truncationHandle = handle;
+    }
+
+    public long getTruncationHandle() {
+        return m_truncationHandle;
     }
 
     public boolean isReadOnly() {
@@ -71,11 +110,15 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return false;
     }
 
-
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
-        msgsize += 8 + 8 + 8 + 1;
+        msgsize += 8   // m_initiatorHSId
+            + 8        // m_coordinatorHSId
+            + 8        // m_txnId
+            + 8        // m_spHandle
+            + 8        // m_truncationHandle
+            + 1;       // m_isReadOnly
         return msgsize;
     }
 
@@ -84,6 +127,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_initiatorHSId);
         buf.putLong(m_coordinatorHSId);
         buf.putLong(m_txnId);
+        buf.putLong(m_spHandle);
+        buf.putLong(m_truncationHandle);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
     }
 
@@ -92,6 +137,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
         m_txnId = buf.getLong();
+        m_spHandle = buf.getLong();
+        m_truncationHandle = buf.getLong();
         m_isReadOnly = buf.get() == 1;
     }
 }

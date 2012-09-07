@@ -31,18 +31,17 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
 public class CSVTableSaveFile {
     private final AtomicInteger m_availableBytes = new AtomicInteger(0);
     private final int m_maxAvailableBytes = 16777216;
     private final LinkedBlockingQueue<byte[]> m_available = new LinkedBlockingQueue<byte[]>();
-    private final Thread m_converterThreads[] = new Thread[Runtime.getRuntime()
-            .availableProcessors()];
+    private final Thread m_converterThreads[] = new Thread[CoreUtils.availableProcessors()];
     private final AtomicReference<IOException> m_exception = new AtomicReference<IOException>(
             null);
-    private final AtomicInteger m_activeConverters = new AtomicInteger(Runtime
-            .getRuntime().availableProcessors());
+    private final AtomicInteger m_activeConverters = new AtomicInteger(CoreUtils.availableProcessors());
     private final TableSaveFile m_saveFile;
     private final char m_delimiter;
 

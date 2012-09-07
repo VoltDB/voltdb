@@ -32,6 +32,7 @@ import org.voltdb.utils.LogKeys;
 public class LoadedProcedureSet {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     // user procedures.
     final HashMap<String, ProcedureRunner> procs =
         new HashMap<String, ProcedureRunner>(16, (float) .1);
@@ -46,7 +47,7 @@ public class LoadedProcedureSet {
     final int m_numberOfPartitions;
     final SiteProcedureConnection m_site;
 
-    public LoadedProcedureSet(ExecutionSite site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex, int numberOfPartitions) {
+    public LoadedProcedureSet(SiteProcedureConnection site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex, int numberOfPartitions) {
         m_runnerFactory = runnerFactory;
         m_siteId = siteId;
         m_siteIndex = siteIndex;
@@ -54,7 +55,7 @@ public class LoadedProcedureSet {
         m_site = site;
     }
 
-    public ProcedureRunner getSysproc(long fragmentId) {
+   public ProcedureRunner getSysproc(long fragmentId) {
         synchronized (m_registeredSysProcPlanFragments) {
             return m_registeredSysProcPlanFragments.get(fragmentId);
         }
@@ -67,14 +68,20 @@ public class LoadedProcedureSet {
         }
     }
 
-    void loadProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
+    public void loadProcedures(
+            CatalogContext catalogContext,
+            BackendTarget backendTarget,
+            CatalogSpecificPlanner csp) {
         procs.clear();
         m_registeredSysProcPlanFragments.clear();
-        loadProceduresFromCatalog(catalogContext, backendTarget);
-        loadSystemProcedures(catalogContext, backendTarget);
+        loadProceduresFromCatalog(catalogContext, backendTarget, csp);
+        loadSystemProcedures(catalogContext, backendTarget, csp);
     }
 
-    private void loadProceduresFromCatalog(CatalogContext catalogContext, BackendTarget backendTarget) {
+    private void loadProceduresFromCatalog(
+            CatalogContext catalogContext,
+            BackendTarget backendTarget,
+            CatalogSpecificPlanner csp) {
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = catalogContext.database.getProcedures();
         for (final Procedure proc : catalogProcedures) {
@@ -121,12 +128,15 @@ public class LoadedProcedureSet {
             }
 
             assert(procedure != null);
-            runner = m_runnerFactory.create(procedure, proc);
+            runner = m_runnerFactory.create(procedure, proc, csp);
             procs.put(proc.getTypeName(), runner);
         }
     }
 
-    private void loadSystemProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
+    private void loadSystemProcedures(
+            CatalogContext catalogContext,
+            BackendTarget backendTarget,
+            CatalogSpecificPlanner csp) {
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
@@ -164,10 +174,14 @@ public class LoadedProcedureSet {
                         new Object[] { m_siteId, m_siteIndex }, e);
             }
 
-            runner = m_runnerFactory.create(procedure, proc);
+            runner = m_runnerFactory.create(procedure, proc, csp);
             procedure.initSysProc(m_numberOfPartitions, m_site, this, proc, catalogContext.cluster);
             procs.put(entry.getKey(), runner);
         }
     }
 
+    public ProcedureRunner getProcByName(String procName)
+    {
+        return procs.get(procName);
+    }
 }

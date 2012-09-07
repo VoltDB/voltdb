@@ -17,25 +17,23 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.Pair;
 
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
-
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
 {
-    public boolean recovering();
+    public boolean rejoining();
 
     /*
      * Invoked from the command log once this node is marked unfaulted.
@@ -82,7 +80,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public MailboxPublisher getMailboxPublisher();
-
+    public SiteTracker getSiteTrackerForSnapshot();
 
     /**
      * Update the global logging context in the server.
@@ -102,7 +100,7 @@ public interface VoltDBInterface
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentCRC The CRC of the deployment file
      */
-    public CatalogContext catalogUpdate(String diffCommands, byte[] newCatalogBytes,
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands, byte[] newCatalogBytes,
            int expectedCatalogVersion, long currentTxnId, long deploymentCRC);
 
    /**
@@ -116,7 +114,7 @@ public interface VoltDBInterface
     /**
      * Notify RealVoltDB that recovery is complete
      */
-    void onExecutionSiteRecoveryCompletion(long transferred);
+    void onExecutionSiteRejoinCompletion(long transferred);
 
     /**
      * Set the operational mode this server should be in once it has finished
@@ -179,4 +177,6 @@ public interface VoltDBInterface
      * Return the license api. This may be null in community editions!
      */
      public LicenseApi getLicenseApi();
+
+     public boolean isIV2Enabled();
 }

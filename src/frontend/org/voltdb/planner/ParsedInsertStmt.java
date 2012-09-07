@@ -76,9 +76,8 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         AbstractExpression expr = null;
         for (VoltXMLElement node : columnNode.children) {
             expr = parseExpressionTree(node, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(expr,
-                    VoltType.get((byte)column.getType()));
-            ExpressionUtil.assignOutputValueTypesRecursively(expr);
+            expr.refineValueType(VoltType.get((byte)column.getType()));
+            ExpressionUtil.finalizeValueTypes(expr);
         }
 
         columns.put(column, expr);

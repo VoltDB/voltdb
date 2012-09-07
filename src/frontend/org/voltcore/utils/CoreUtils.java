@@ -30,11 +30,12 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -43,16 +44,18 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 public class CoreUtils {
     /**
      * Create a bounded single threaded executor that rejects requests if more than capacity
      * requests are outstanding.
      */
-    public static ExecutorService getBoundedSingleThreadExecutor(String name, int capacity) {
+    public static ListeningExecutorService getBoundedSingleThreadExecutor(String name, int capacity) {
         LinkedBlockingQueue<Runnable> lbq = new LinkedBlockingQueue<Runnable>(capacity);
         ThreadPoolExecutor tpe = new ThreadPoolExecutor(1, 1, Long.MAX_VALUE, TimeUnit.DAYS, lbq, CoreUtils.getThreadFactory(name));
-        return tpe;
+        return MoreExecutors.listeningDecorator(tpe);
     }
 
     /*
@@ -170,15 +173,21 @@ public class CoreUtils {
     }
 
     public static String hsIdCollectionToString(Collection<Long> ids) {
+        List<String> idstrings = new ArrayList<String>();
+        for (Long id : ids) {
+            idstrings.add(hsIdToString(id));
+        }
+        // Easy hack, sort hsIds lexically.
+        Collections.sort(idstrings);
         StringBuilder sb = new StringBuilder();
         boolean first = false;
-        for (Long id : ids) {
+        for (String id : idstrings) {
             if (!first) {
                 first = true;
             } else {
                 sb.append(", ");
             }
-            sb.append(id.intValue()).append(':').append((int)(id.longValue() >> 32));
+            sb.append(id);
         }
         return sb.toString();
     }
@@ -253,5 +262,9 @@ public class CoreUtils {
         }
         sb.append('}');
         return sb.toString();
+    }
+
+    public static int availableProcessors() {
+        return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 }

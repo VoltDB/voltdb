@@ -101,6 +101,15 @@ def run_once(name, command, statements_path, results_path):
                     "Failed to kill the server process %d" % (server.pid)
             break
         tables = None
+        if client.response == None:
+            print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
+                (statement["SQL"], sys.exc_info()[1])
+            killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+            killer.communicate()
+            if killer.returncode != 0:
+                print >> sys.stderr, \
+                    "Failed to kill the server process %d" % (server.pid)
+            break
         if client.response.tables != None:
             tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
         cPickle.dump({"Status": client.response.status,
@@ -119,7 +128,7 @@ def run_once(name, command, statements_path, results_path):
 
     return server.returncode
 
-def run_config(config, basedir, output_dir, random_seed, report_all, args):
+def run_config(config, basedir, output_dir, random_seed, report_all, generate_only, args):
     for key in config.iterkeys():
         if not os.path.isabs(config[key]):
             config[key] = os.path.abspath(os.path.join(basedir, config[key]))
@@ -151,6 +160,10 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
         cPickle.dump({"id": counter, "SQL": i}, statements_file)
         counter += 1
     statements_file.close()
+
+    if (generate_only):
+        # Claim success without running servers.
+        return [0,0]
 
     if run_once("jni", command, statements_path, jni_path) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
@@ -252,6 +265,9 @@ if __name__ == "__main__":
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
                       help="report all attempted SQL statements rather than mismatches")
+    parser.add_option("-g", "--generate-only", action="store_true",
+                      dest="generate_only", default=False,
+                      help="only generate and report SQL statements, do not start any database servers")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
@@ -289,7 +305,7 @@ if __name__ == "__main__":
         report_dir = output_dir + '/' + config_name
         config = config_list.get_config(config_name)
         result = run_config(config, basedir, report_dir, seed,
-                            options.report_all, args)
+                            options.report_all, options.generate_only, args)
         statistics[config_name] = result
         if result[1] != 0:
             success = False

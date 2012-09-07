@@ -95,34 +95,13 @@ public abstract class VoltTypeUtil {
         return (ret);
     }
 
-    /*
-     * Determine if a cast is allowable w/o loss of precision
-     * for index key comparison.
-     */
-    public static boolean isAllowableCastForKeyComparator(VoltType from, VoltType to) {
-        // self to self cast is obviously fine.
-        if (from == to)
-            return true;
-
-        // allow only float to float
-        // allow only decimal to decimal
-        // allow only string to string
-        if (to == VoltType.STRING    ||
-            from == VoltType.STRING  ||
-            to == VoltType.DECIMAL   ||
-            from == VoltType.DECIMAL ||
-            to == VoltType.FLOAT     ||
-            from == VoltType.FLOAT)
-        {
-            return from == to;
-        }
-
-        // disallow integers getting smaller
-        if (to.isInteger())
-            return from.isInteger();
-
-        return true;
-    }
+    private static final VoltType CAST_ORDER[] = {
+        VoltType.STRING,
+        VoltType.DECIMAL,
+        VoltType.FLOAT,
+        VoltType.TIMESTAMP,
+        VoltType.BIGINT,
+    };
 
     public static VoltType determineImplicitCasting(VoltType left, VoltType right) {
         //
@@ -169,12 +148,7 @@ public abstract class VoltTypeUtil {
         //        over the more general types
         //            Example: MONEY + FLOAT -> MONEY
         //            Example: TIMESTAMP + INTEGER -> TIMESTAMP
-        VoltType cast_order[] = { VoltType.STRING,
-                                  VoltType.DECIMAL,
-                                  VoltType.FLOAT,
-                                  VoltType.TIMESTAMP,
-                                  VoltType.BIGINT };
-        for (VoltType cast_type : cast_order) {
+        for (VoltType cast_type : CAST_ORDER) {
             //
             // If any one of the types is the current cast type, we'll use that
             //

@@ -35,7 +35,6 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -999,9 +998,9 @@ public class TestExportSuite extends RegressionSuite {
     }
 
     static final GroupInfo GROUPS[] = new GroupInfo[] {
-        new GroupInfo("export", false, false),
-        new GroupInfo("proc", true, true),
-        new GroupInfo("admin", true, true)
+        new GroupInfo("export", false, false, false),
+        new GroupInfo("proc", true, true, true),
+        new GroupInfo("admin", true, true, true)
     };
 
     static final UserInfo[] USERS = new UserInfo[] {

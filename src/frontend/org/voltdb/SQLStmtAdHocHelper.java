@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+
 /**
  * Provides access to some non-public SQLStmt methods needed for ad hoc queries.
  */
@@ -31,10 +32,11 @@ public class SQLStmtAdHocHelper {
      *
      * @return SQLStmt object with plan added
      */
-    public static SQLStmt createWithPlan(String sqlText,
-                                         String aggregatorFragment,
-                                         String collectorFragment,
-                                         boolean isReplicatedTableDML) {
-        return SQLStmt.createWithPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML);
+    public static SQLStmt createWithPlan(byte[] sqlText,
+                                         byte[] aggregatorFragment,
+                                         byte[] collectorFragment,
+                                         boolean isReplicatedTableDML,
+                                         VoltType[] params) {
+        return SQLStmt.createWithPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML, params);
     }
 }

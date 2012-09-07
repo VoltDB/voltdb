@@ -632,7 +632,8 @@ public:
         {
             VOLT_TRACE("no record. outputting a NULL row..");
             Agg** aggregates =
-                static_cast<Agg**>(m_memoryPool->allocate(sizeof(void*)));
+                static_cast<Agg**>(m_memoryPool->allocate(sizeof(void*) *
+                                                           m_colTypes->size()));
             for (int i = 0; i < m_colTypes->size(); i++)
             {
                 // It is necessary to look up the mapping between the
@@ -946,8 +947,10 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
     std::vector<ValueType> col_types(node->getAggregateInputExpressions().size());
     for (int i = 0; i < col_types.size(); i++)
     {
-        col_types[i] =
-            node->getAggregateInputExpressions()[i]->getValueType();
+        // substitue params here too
+        AbstractExpression *expr = node->getAggregateInputExpressions()[i];
+        expr->substitute(params);
+        col_types[i] = expr->getValueType();
     }
 
     TableIterator it = input_table->iterator();
@@ -956,6 +959,11 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
         node->getDistinctAggregates();
     std::vector<AbstractExpression*> groupByExpressions =
         node->getGroupByExpressions();
+    // substitute params
+    for (int i = 0; i < groupByExpressions.size(); i++) {
+        groupByExpressions[i]->substitute(params);
+    }
+
     TableTuple prev(input_table->schema());
 
     Aggregator<aggregateType> aggregator(&m_memoryPool, m_groupByKeySchema,

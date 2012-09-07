@@ -43,6 +43,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <vector>
+
 #include "temptable.h"
 #include "tableiterator.h"
 #include "common/tabletuple.h"
@@ -72,8 +74,10 @@ bool TempTable::insertTuple(TableTuple &source) {
     return true;
 }
 
-bool TempTable::updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes) {
-    updateTupleNonVirtual(source, target);
+bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                               TableTuple &sourceTupleWithNewValues,
+                                               std::vector<TableIndex*> &indexesToUpdate) {
+    updateTupleNonVirtual(targetTupleToUpdate, sourceTupleWithNewValues);
     return true;
 }
 

@@ -112,8 +112,8 @@ public enum ExpressionType {
     // ----------------------------
     //TODO: Should there be multiple classes for function expressions
     // maybe based on their support for optimization methods?
-    FUNCTION_ABS                  (FunctionExpression.class,  100),
-
+    //TODO: Should there be multiple FunctionExpression ExpressionTypes?
+    FUNCTION                      (FunctionExpression.class,  100),
     ;
 
     private final int val;

@@ -362,12 +362,17 @@ SnapshotCompletionInterest {
 
         @Override
         public long connectionId() {
-            return -1;
+            return Long.MIN_VALUE + 1;
         }
 
         @Override
         public Future<?> unregister() {
             return null;
+        }
+
+        @Override
+        public void queueTask(Runnable r) {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -543,7 +548,9 @@ SnapshotCompletionInterest {
     void enterRestore() {
         try {
             m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
+                                                "restore",
                                                 new byte[0], null);
+            m_leaderElector.start(true);
             m_isLeader = m_leaderElector.isLeader();
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -590,7 +597,7 @@ SnapshotCompletionInterest {
         }
 
         try {
-            m_leaderElector.done();
+            m_leaderElector.shutdown();
         } catch (Exception ignore) {}
 
         // Clean up the ZK snapshot ID node so that we're good for next time.
@@ -624,7 +631,7 @@ SnapshotCompletionInterest {
          * If the user wants to create a new database, don't scan the
          * snapshots.
          */
-        if (m_action != START_ACTION.CREATE) {
+        if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
             snapshots = getSnapshots();
         }
 
@@ -724,7 +731,7 @@ SnapshotCompletionInterest {
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
-        if (m_action != START_ACTION.CREATE) {
+        if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
             m_replayAgent.generateReplayPlan();
         }
 
@@ -1106,22 +1113,24 @@ SnapshotCompletionInterest {
         });
 
         if (txnId == null) {
-            m_initiator.createTransaction(-1, "CommandLog", true, spi,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
                                           m_allPartitions, m_allPartitions.length,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis());
+                                          EstTime.currentTimeMillis(),
+                                          false);
         } else {
-            m_initiator.createTransaction(-1, "CommandLog", true,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
                                           txnId, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
                                           m_allPartitions, m_allPartitions.length,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis());
+                                          EstTime.currentTimeMillis(),
+                                          false);
         }
     }
 

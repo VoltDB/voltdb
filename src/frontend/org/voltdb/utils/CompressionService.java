@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.utils.Base64;
@@ -57,7 +58,7 @@ public final class CompressionService {
      * The executor service is only used if the VoltDB computation service is not available.
      */
     private static final ExecutorService m_executor =
-            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), new ThreadFactory() {
+            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()), new ThreadFactory() {
                 private int threadIndex = 0;
                 @Override
                 public synchronized Thread  newThread(Runnable r) {

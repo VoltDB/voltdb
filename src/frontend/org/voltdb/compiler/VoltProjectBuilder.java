@@ -173,11 +173,13 @@ public class VoltProjectBuilder {
         private final String name;
         private final boolean adhoc;
         private final boolean sysproc;
+        private final boolean defaultproc;
 
-        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc){
+        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc){
             this.name = name;
             this.adhoc = adhoc;
             this.sysproc = sysproc;
+            this.defaultproc = defaultproc;
         }
 
         @Override
@@ -258,6 +260,8 @@ public class VoltProjectBuilder {
 
     private Integer m_maxTempTableMemory = 100;
 
+    private List<String> m_diagnostics;
+
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
             Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
         m_internalSnapshotPath = internalSnapshotPath;
@@ -333,22 +337,26 @@ public class VoltProjectBuilder {
         addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
     }
 
-    public void addSchema(String schemaPath) {
+    /**
+     * Add a schema based on a URL.
+     * @param schemaURL Schema file URL
+     */
+    public void addSchema(String schemaURL) {
         try {
-            schemaPath = URLDecoder.decode(schemaPath, "UTF-8");
+            schemaURL = URLDecoder.decode(schemaURL, "UTF-8");
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
             System.exit(-1);
         }
-        assert(m_schemas.contains(schemaPath) == false);
-        final File schemaFile = new File(schemaPath);
+        assert(m_schemas.contains(schemaURL) == false);
+        final File schemaFile = new File(schemaURL);
         assert(schemaFile != null);
         assert(schemaFile.isDirectory() == false);
         // this check below fails in some valid cases (like when the file is in a jar)
         //assert schemaFile.canRead()
         //    : "can't read file: " + schemaPath;
 
-        m_schemas.add(schemaPath);
+        m_schemas.add(schemaURL);
     }
 
     public void addStmtProcedure(String name, String sql) {
@@ -637,7 +645,11 @@ public class VoltProjectBuilder {
             writeStringToTempFile(result.getWriter().toString());
         final String projectPath = projectFile.getPath();
         compiler.setProcInfoOverrides(m_procInfoOverrides);
+        if (m_diagnostics != null) {
+            compiler.enableDetailedCapture();
+        }
         boolean success = compiler.compile(projectPath, jarPath);
+        m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
                 compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
@@ -711,6 +723,7 @@ public class VoltProjectBuilder {
             final Element group = doc.createElement("group");
             group.setAttribute("name", "default");
             group.setAttribute("sysproc", "true");
+            group.setAttribute("defaultproc", "true");
             group.setAttribute("adhoc", "true");
             groups.appendChild(group);
         }
@@ -719,6 +732,7 @@ public class VoltProjectBuilder {
                 final Element group = doc.createElement("group");
                 group.setAttribute("name", info.name);
                 group.setAttribute("sysproc", info.sysproc ? "true" : "false");
+                group.setAttribute("defaultproc", info.defaultproc ? "true" : "false");
                 group.setAttribute("adhoc", info.adhoc ? "true" : "false");
                 groups.appendChild(group);
             }
@@ -1051,6 +1065,20 @@ public class VoltProjectBuilder {
 
     public File getPathToVoltRoot() {
         return new File(m_voltRootPath);
+    }
+
+    /** Provide a feedback path to monitor the VoltCompiler's plan output via harvestDiagnostics */
+    public void enableDiagnostics() {
+        // This empty dummy value enables the feature and provides a default fallback return value,
+        // but gets replaced in the normal code path.
+        m_diagnostics = new ArrayList<String>();
+    }
+
+    /** Access the VoltCompiler's recent plan output, for diagnostic purposes */
+    public List<String> harvestDiagnostics() {
+        List<String> result = m_diagnostics;
+        m_diagnostics = null;
+        return result;
     }
 
 }

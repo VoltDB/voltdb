@@ -23,7 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.fixedsql;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo
 (
@@ -35,14 +38,14 @@ public class InsertBatch extends VoltProcedure {
     public final SQLStmt insert = new SQLStmt
       ("INSERT INTO ASSET VALUES (?, ?);");
 
-    public VoltTable[] run(int batchSize, int odi)
+    public VoltTable[] run(int batchSize, int odi, int offset)
     {
         for (int j = 0; j < batchSize / 1000; j++)
         {
             for (int i = 0; i < 1000; i++)
             {
                 int id = (j * 1000) + i;
-                voltQueueSQL(insert, id, odi);
+                voltQueueSQL(insert, id + offset, odi);
             }
             voltExecuteSQL();
         }

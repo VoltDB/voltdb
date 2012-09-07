@@ -24,6 +24,7 @@
 
 import decimal
 import re
+import math
 
 # lame, but it matches at least up to 6 ORDER BY columns
 __EXPR = re.compile(r"ORDER BY\s(\w+\.(?P<column_1>\w+)(\s+\w+)?)"
@@ -50,13 +51,21 @@ __NULL = {VOLTTYPE_TINYINT: -128,
           VOLTTYPE_BIGINT: -9223372036854775808,
           VOLTTYPE_FLOAT: -1.7E+308}
 
-def normalize_value(v, type):
+SIGNIFICANT_DIGITS = 13
+
+def normalize_value(v, vtype):
     global __NULL
-    if type in __NULL and v == __NULL[type]:
+    if vtype in __NULL and v == __NULL[vtype]:
         return None
-    elif type == VOLTTYPE_FLOAT:
-        return round(v, 12)
-    elif type == VOLTTYPE_DECIMAL:
+    elif vtype == VOLTTYPE_FLOAT:
+        # round to the desired number of decimal places -- accounting for significant digits before the decimal
+        decimal_places = SIGNIFICANT_DIGITS
+        abs_v = abs(float(v))
+        if abs_v >= 1.0:
+            # round to the total number of significant digits, including the integer part
+            decimal_places = SIGNIFICANT_DIGITS - 1 - int(math.floor(math.log10(abs_v)))
+        return round(v, decimal_places)
+    elif vtype == VOLTTYPE_DECIMAL:
         return decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN")
     else:
         return v

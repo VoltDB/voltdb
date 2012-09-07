@@ -36,7 +36,7 @@ public class ProcSPNoncandidate5 extends VoltProcedure {
     public static final SQLStmt query1 = new SQLStmt("select count(*) from blah where sval = ?");
 
     // Additional innocuous query against a replicated table should have no effect.
-    public static final SQLStmt query2 = new SQLStmt("select count(*) from blah where ival = ?");
+    public static final SQLStmt query2 = new SQLStmt("select count(*) from indexed_blah where ival = ?");
 
     public long run() {
         voltQueueSQL(query1, 1);

@@ -19,16 +19,17 @@ package org.voltdb.compiler;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.CatalogContext;
+import org.voltdb.ParameterSet;
+import org.voltdb.VoltDB;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.CompiledPlan.Fragment;
+import org.voltdb.planner.CorePlan;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.utils.Encoder;
 
 /**
@@ -39,37 +40,26 @@ public class PlannerTool {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final CatalogContext m_context;
+    final Database m_database;
+    final Cluster m_cluster;
     final HSQLInterface m_hsql;
+    final int m_catalogVersion;
+    final AdHocCompilerCache m_cache;
 
     public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
-    public static class Result {
-        String onePlan = null;
-        String allPlan = null;
-        boolean replicatedDML = false;
-        Object partitionParam;
+    public PlannerTool(final Cluster cluster, final Database database, int catalogVersion) {
+        assert(cluster != null);
+        assert(database != null);
 
-        @Override
-        public String toString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("RESULT {\n");
-            sb.append("  ONE: ").append(onePlan == null ? "null" : onePlan).append("\n");
-            sb.append("  ALL: ").append(allPlan == null ? "null" : allPlan).append("\n");
-            sb.append("  RTD: ").append(replicatedDML ? "true" : "false").append("\n");
-            sb.append("  PARAM: ").append(partitionParam == null ? "null" : partitionParam.toString()).append("\n");
-            sb.append("}");
-            return sb.toString();
-        }
-    }
-
-    public PlannerTool(final CatalogContext context) {
-        assert(context != null);
-        m_context = context;
+        m_database = database;
+        m_cluster = cluster;
+        m_catalogVersion = catalogVersion;
+        m_cache = AdHocCompilerCache.getCacheForCatalogVersion(catalogVersion);
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb();
-        String hexDDL = m_context.database.getSchema();
+        String hexDDL = m_database.getSchema();
         String ddl = Encoder.hexDecodeToString(hexDDL);
         String[] commands = ddl.split("\n");
         for (String command : commands) {
@@ -89,13 +79,7 @@ public class PlannerTool {
         hostLog.info("hsql loaded");
     }
 
-    // this is probably not super important, but is probably
-    // a performance win for tests that fire these up all the time
-    public void shutdown() {
-        m_hsql.close();
-    }
-
-    public Result planSql(String sqlIn, Object partitionParam, boolean inferSP) {
+    public AdHocPlannedStatement planSql(String sqlIn, Object partitionParam, boolean inferSP, boolean allowParameterization) {
         if ((sqlIn == null) || (sqlIn.length() == 0)) {
             throw new RuntimeException("Can't plan empty or null SQL.");
         }
@@ -104,6 +88,20 @@ public class PlannerTool {
 
         hostLog.debug("received sql stmt: " + sql);
 
+        // no caching for forced single or forced multi SQL
+        boolean cacheable = (partitionParam == null) && (inferSP);
+
+        // check the literal cache for a match
+        if (cacheable) {
+            AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
+            if (cachedPlan != null) {
+                return cachedPlan;
+            }
+        }
+
+        //Reset plan node id counter
+        AbstractPlanNode.resetPlanNodeIds();
+
         //////////////////////
         // PLAN THE STMT
         //////////////////////
@@ -111,23 +109,50 @@ public class PlannerTool {
         TrivialCostModel costModel = new TrivialCostModel();
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
         QueryPlanner planner = new QueryPlanner(
-                m_context.cluster, m_context.database, partitioning, m_hsql, new DatabaseEstimates(), false, true);
+                sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
+                partitioning, m_hsql, new DatabaseEstimates(), true,
+                AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null);
         CompiledPlan plan = null;
+        String parsedToken = null;
         try {
-            plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
+            planner.parse();
+            parsedToken = planner.parameterize();
+            if (parsedToken != null) {
+
+                // if cacheable, check the cache for a matching pre-parameterized plan
+                // if plan found, build the full plan using the parameter data in the
+                // QueryPlanner.
+                if (cacheable) {
+                    CorePlan core = m_cache.getWithParsedToken(parsedToken);
+                    if (core != null) {
+                        ParameterSet params = new ParameterSet();
+                        planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
+                                core.parameterTypes, params);
+                        Object partitionKey = null;
+                        if (core.partitioningParamIndex >= 0) {
+                            partitionKey = params.toArray()[core.partitioningParamIndex];
+                        }
+                        AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(VoltDB.UTF8ENCODING),
+                                                                               core,
+                                                                               params,
+                                                                               partitionKey);
+                        m_cache.put(sql, parsedToken, ahps);
+                        return ahps;
+                    }
+                }
+
+                // if not cacheable or no cach hit, do the expensive full planning
+                plan = planner.plan();
+                assert(plan != null);
+            }
         } catch (Exception e) {
             throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
         }
-        if (plan == null) {
-            String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null) {
-                throw new RuntimeException("ERROR: " + plannerMsg + "\n");
-            }
-            else {
-                throw new RuntimeException("ERROR: UNKNOWN PLANNING ERROR\n");
-            }
-        }
-        if (plan.parameters.size() > 0) {
+
+        if (!allowParameterization &&
+            (plan.extractedParamValues.size() == 0) &&
+            (plan.parameters.length > 0))
+        {
             throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
         }
 
@@ -139,34 +164,18 @@ public class PlannerTool {
             hostLog.warn(potentialErrMsg);
         }
 
-        //log("finished planning stmt:");
-        //log("SQL: " + plan.sql);
-        //log("COST: " + Double.toString(plan.cost));
-        //log("PLAN:\n");
-        //log(plan.explainedPlan);
-
-        assert(plan.fragments.size() <= 2);
-
         //////////////////////
         // OUTPUT THE RESULT
         //////////////////////
-        Result retval = new Result();
-        for (Fragment frag : plan.fragments) {
-            PlanNodeList planList = new PlanNodeList(frag.planGraph);
-            String serializedPlan = planList.toJSONString();
-            String encodedPlan = serializedPlan; //Encoder.compressAndBase64Encode(serializedPlan);
-            if (frag.multiPartition) {
-                assert(retval.allPlan == null);
-                retval.allPlan = encodedPlan;
-            }
-            else {
-                assert(retval.onePlan == null);
-                retval.onePlan = encodedPlan;
-            }
-        }
 
-        retval.replicatedDML = plan.replicatedTableDML;
-        retval.partitionParam = partitioning.effectivePartitioningValue();
-        return retval;
+        AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, m_catalogVersion);
+
+        if (cacheable && planner.compiledAsParameterizedPlan()) {
+            assert(parsedToken != null);
+            assert(((ahps.partitionParam == null) && (ahps.core.partitioningParamIndex == -1)) ||
+                   ((ahps.partitionParam != null) && (ahps.core.partitioningParamIndex >= 0)));
+            m_cache.put(sqlIn, parsedToken, ahps);
+        }
+        return ahps;
     }
 }

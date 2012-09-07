@@ -23,11 +23,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import org.mindrot.BCrypt;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
@@ -62,6 +63,11 @@ public class AuthSystem {
         private final boolean m_sysproc;
 
         /**
+         * Whether membership in this group grants permission to invoke default procedures
+         */
+        private final boolean m_defaultproc;
+
+        /**
          * Whether membership in this group grants permission to invoke adhoc queries
          */
         private final boolean m_adhoc;
@@ -70,11 +76,13 @@ public class AuthSystem {
          *
          * @param name Name of the group
          * @param sysproc Whether membership in this group grants permission to invoke system procedures
+         * @param defaultproc Whether membership in this group grants permission to invoke default procedures
          * @param adhoc Whether membership in this group grants permission to invoke adhoc queries
          */
-        private AuthGroup(String name, boolean sysproc, boolean adhoc) {
+        private AuthGroup(String name, boolean sysproc, boolean defaultproc, boolean adhoc) {
             m_name = name;
             m_sysproc = sysproc;
+            m_defaultproc = defaultproc;
             m_adhoc = adhoc;
         }
     }
@@ -88,7 +96,12 @@ public class AuthSystem {
         /**
          * SHA-1 double hashed copy of the users clear text password
          */
-        private final byte[] m_shadowPassword;
+        private final byte[] m_sha1ShadowPassword;
+
+        /**
+         * SHA-1 hashed and then bcrypted copy of the users clear text password
+         */
+        private final String m_bcryptShadowPassword;
 
         /**
          * Name of the user
@@ -99,6 +112,11 @@ public class AuthSystem {
          * Whether this user is granted permission to invoke system procedures (can also be granted by group membership)
          */
         private final boolean m_sysproc;
+
+        /**
+         * Whether this user is granted permission to invoke default procedures (can also be granted by group membership)
+         */
+        private final boolean m_defaultproc;
 
         /**
          * Whether this user is granted permission to invoke adhoc queries (can also be granted by group membership)
@@ -123,27 +141,38 @@ public class AuthSystem {
         private final HashSet<Connector> m_authorizedConnectors = new HashSet<Connector>();
 
         /**
-         *
+         * The constructor accepts the password as either sha1 or bcrypt. In practice
+         * there will be only one passed in depending on the format of the password in the catalog.
+         * The other will be null and that is used to determine how to hash the supplied password
+         * for auth
          * @param shadowPassword SHA-1 double hashed copy of the users clear text password
          * @param name Name of the user
          * @param sysproc Whether this user is granted permission to invoke system procedures (can also be granted by group membership)
+         * @param defaultproc Whether this user is granted permission to invoke default procedures (can also be granted by group membership)
          * @param adhoc Whether this user is granted permission to invoke adhoc queries (can also be granted by group membership)
          */
-        private AuthUser(byte[] shadowPassword, String name, boolean sysproc, boolean adhoc) {
-            m_shadowPassword = shadowPassword;
+        private AuthUser(byte[] sha1ShadowPassword, String bcryptShadowPassword, String name,
+                         boolean sysproc, boolean defaultproc, boolean adhoc) {
+            m_sha1ShadowPassword = sha1ShadowPassword;
+            m_bcryptShadowPassword = bcryptShadowPassword;
             m_name = name;
             m_sysproc = sysproc;
+            m_defaultproc = defaultproc;
             m_adhoc = adhoc;
         }
 
         /**
          * Check if a user has permission to invoke the specified stored procedure
+         * Handle both user-written procedures and default auto-generated ones.
          * @param proc Catalog entry for the stored procedure to check
          * @return true if the user has permission and false otherwise
          */
         public boolean hasPermission(Procedure proc) {
             if (proc == null) {
                 return false;
+            }
+            if (proc.getDefaultproc()) {
+                return hasDefaultProcPermission();
             }
             return m_authorizedProcedures.contains(proc);
         }
@@ -172,11 +201,19 @@ public class AuthSystem {
         }
 
         /**
-         * Check if a user has permission to invoke adhoc queries by virtue of a direct grant, or group membership,
+         * Check if a user has permission to invoke system procedures by virtue of a direct grant, or group membership,
          * @return true if the user has permission and false otherwise
          */
         public boolean hasSystemProcPermission() {
             return m_sysproc || hasGroupWithSysProcPermission();
+        }
+
+        /**
+         * Check if a user has permission to invoke default procedures by virtue of a direct grant, or group membership,
+         * @return true if the user has permission and false otherwise
+         */
+        public boolean hasDefaultProcPermission() {
+            return m_defaultproc || hasGroupWithDefaultProcPermission();
         }
 
         /**
@@ -187,6 +224,20 @@ public class AuthSystem {
         private boolean hasGroupWithSysProcPermission() {
             for (AuthGroup group : m_groups) {
                 if (group.m_sysproc) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Utility function to iterate through groups and check if any group the user is a member of
+         * grants defaultproc permission
+         * @return true if the user has permission and false otherwise
+         */
+        private boolean hasGroupWithDefaultProcPermission() {
+            for (AuthGroup group : m_groups) {
+                if (group.m_defaultproc) {
                     return true;
                 }
             }
@@ -231,14 +282,32 @@ public class AuthSystem {
          * First associate all users with groups and vice versa
          */
         for (org.voltdb.catalog.User catalogUser : db.getUsers()) {
-            final AuthUser user = new AuthUser( Encoder.hexDecode(catalogUser.getShadowpassword()),
-                    catalogUser.getTypeName(), catalogUser.getSysproc(), catalogUser.getAdhoc());
+            String shadowPassword = catalogUser.getShadowpassword();
+            byte sha1ShadowPassword[] = null;
+            if (shadowPassword.length() == 40) {
+                /*
+                 * This is an old catalog with a SHA-1 password
+                 * Need to hex decode it
+                 */
+                sha1ShadowPassword = Encoder.hexDecode(shadowPassword);
+            } else if (shadowPassword.length() != 60) {
+                /*
+                 * If not 40 should be 60 since it is bcrypt
+                 */
+                VoltDB.crashGlobalVoltDB(
+                        "Found a shadowPassword in the catalog that was in an unrecogized format", true, null);
+            }
+
+            final AuthUser user = new AuthUser( sha1ShadowPassword, shadowPassword,
+                    catalogUser.getTypeName(), catalogUser.getSysproc(),
+                    catalogUser.getDefaultproc(), catalogUser.getAdhoc());
             m_users.put(user.m_name.intern(), user);
             for (org.voltdb.catalog.GroupRef catalogGroupRef : catalogUser.getGroups()) {
                 final org.voltdb.catalog.Group  catalogGroup = catalogGroupRef.getGroup();
                 AuthGroup group = null;
                 if (!m_groups.containsKey(catalogGroup.getTypeName())) {
-                    group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(), catalogGroup.getAdhoc());
+                    group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(),
+                                          catalogGroup.getDefaultproc(), catalogGroup.getAdhoc());
                     m_groups.put(group.m_name, group);
                 } else {
                     group = m_groups.get(catalogGroup.getTypeName());
@@ -251,7 +320,8 @@ public class AuthSystem {
         for (org.voltdb.catalog.Group catalogGroup : db.getGroups()) {
             AuthGroup group = null;
             if (!m_groups.containsKey(catalogGroup.getTypeName())) {
-                group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(), catalogGroup.getAdhoc());
+                group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(),
+                                      catalogGroup. getDefaultproc(), catalogGroup.getAdhoc());
                 m_groups.put(group.m_name, group);
                 //A group not associated with any users? Weird stuff.
             } else {
@@ -335,14 +405,29 @@ public class AuthSystem {
             return false;
         }
 
-        MessageDigest md = null;
-        try {
-            md = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        boolean matched = true;
+        if (user.m_sha1ShadowPassword != null) {
+            MessageDigest md = null;
+            try {
+                md = MessageDigest.getInstance("SHA-1");
+            } catch (NoSuchAlgorithmException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+            byte passwordHash[] = md.digest(password);
+
+            /*
+             * A n00bs attempt at constant time comparison
+             */
+            for (int ii = 0; ii < passwordHash.length; ii++) {
+                if (passwordHash[ii] != user.m_sha1ShadowPassword[ii]){
+                    matched = false;
+                }
+            }
+        } else {
+            matched = BCrypt.checkpw(Encoder.hexEncode(password), user.m_bcryptShadowPassword);
         }
-        byte passwordHash[] = md.digest(password);
-        if (java.util.Arrays.equals(passwordHash, user.m_shadowPassword)) {
+
+        if (matched) {
             authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {username}, null);
             return true;
         } else {
@@ -351,29 +436,36 @@ public class AuthSystem {
         }
     }
 
+    private final AuthUser m_authDisabledUser = new AuthUser(null, null, null, false, false, false) {
+        @Override
+        public boolean hasPermission(Procedure proc) {
+            return true;
+        }
+
+        @Override
+        public boolean hasAdhocPermission() {
+            return true;
+        }
+
+        @Override
+        public boolean hasSystemProcPermission() {
+            return true;
+        }
+
+        @Override
+        public boolean hasDefaultProcPermission() {
+            return true;
+        }
+
+        @Override
+        public boolean authorizeConnector(String connectorName) {
+            return true;
+        }
+    };
+
     AuthUser getUser(String name) {
         if (!m_enabled) {
-            return new AuthUser(null, null, false, false) {
-                @Override
-                public boolean hasPermission(Procedure proc) {
-                    return true;
-                }
-
-                @Override
-                public boolean hasAdhocPermission() {
-                    return true;
-                }
-
-                @Override
-                public boolean hasSystemProcPermission() {
-                    return true;
-                }
-
-                @Override
-                public boolean authorizeConnector(String connectorName) {
-                    return true;
-                }
-            };
+            return m_authDisabledUser;
         }
         return m_users.get(name);
     }

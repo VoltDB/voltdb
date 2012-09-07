@@ -43,6 +43,10 @@ public class SnapshotTableTask
         m_name = tableName;
     }
 
+    public int getTableId() {
+        return m_tableId;
+    }
+
     @Override
     public String toString() {
         return ("SnapshotTableTask for " + m_name + " replicated " + m_isReplicated);

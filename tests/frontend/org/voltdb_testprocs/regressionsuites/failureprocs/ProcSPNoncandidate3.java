@@ -32,7 +32,7 @@ import org.voltdb.VoltProcedure;
 )
 public class ProcSPNoncandidate3 extends VoltProcedure {
 
-    // Meaningless where clause makes expected output easier to test for.
+    // Where clause on replicated table does not allow SP processing
     public static final SQLStmt query3 = new SQLStmt("select count(*) from indexed_blah where ival = ?");
 
     public long run() {
