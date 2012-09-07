@@ -101,7 +101,7 @@ UpdateExecutor::UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_
     m_node(NULL), m_inputTargetMap(), m_inputTargetMapSize(-1),
     m_inputTable(NULL), m_targetTable(NULL), m_inputTuple(),
     m_targetTuple(), m_partitionColumn(-1), m_partitionColumnIsString(),
-    m_updatesIndexes(), m_engine(engine), m_state()
+    m_engine(engine), m_state()
 {}
 
 bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
@@ -361,20 +361,20 @@ TableTuple UpdateExecutor::p_next_pull()
             // if it doesn't map to this site
             if (!isLocal) {
                 char message[128];
-                snprintf(message, 128, "Mispartitioned tuple in single-partition plan for"
-                               " table '%s'", m_targetTable->name().c_str());
+                snprintf(message, 128, "Mispartitioned tuple in single-partition plan for table '%s'",
+                         m_targetTable->name().c_str());
                 VOLT_INFO(message);
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
             }
         }
 
-        if (!m_targetTable->updateTuple(tempTuple, m_targetTuple,
-                                        m_updatesIndexes)) {
-                char message[128];
-                snprintf(message, 128, "Failed to update tuple from table '%s'",
-                      m_targetTable->name().c_str());
-                VOLT_INFO(message);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        if (!m_targetTable->updateTupleWithSpecificIndexes(m_targetTuple, tempTuple,
+                                                           m_indexesToUpdate)) {
+            char message[128];
+            snprintf(message, 128, "Failed to update tuple from table '%s'",
+                     m_targetTable->name().c_str());
+            VOLT_INFO(message);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
 
