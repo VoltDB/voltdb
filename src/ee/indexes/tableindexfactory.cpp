@@ -184,11 +184,11 @@ public:
         }
     }
 
-    TableIndexPicker(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
+    TableIndexPicker(const TupleSchema *keySchema, bool intsOnly, const TableIndexScheme &scheme) :
         m_scheme(scheme),
         m_keySchema(keySchema),
         m_keySize(keySchema->tupleLength()),
-        m_intsOnly(scheme.intsOnly),
+        m_intsOnly(intsOnly),
         m_type(scheme.type)
     {}
 
@@ -207,14 +207,23 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
     std::vector<bool> keyColumnAllowNull(colCount, true);
+    bool isIntsOnly = true;
     for (int i = 0; i < colCount; ++i) {
-        keyColumnTypes.push_back(tupleSchema->columnType(scheme.columnIndices[i]));
+        ValueType exprType = tupleSchema->columnType(scheme.columnIndices[i]);
+        // check if the column does not have an int type
+        if ((exprType != VALUE_TYPE_TINYINT) &&
+            (exprType != VALUE_TYPE_SMALLINT) &&
+            (exprType != VALUE_TYPE_INTEGER) &&
+            (exprType != VALUE_TYPE_BIGINT)) {
+            isIntsOnly = false;
+        }
+        keyColumnTypes.push_back(exprType);
         keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[i]));
     }
     TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
     assert(keySchema);
     VOLT_TRACE("Creating index for %s.\n%s", scheme.name.c_str(), keySchema->debug().c_str());
-    TableIndexPicker picker(keySchema, scheme);
+    TableIndexPicker picker(keySchema, isIntsOnly, scheme);
     TableIndex *retval = picker.getInstance();
     return retval;
 }

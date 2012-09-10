@@ -60,6 +60,8 @@
 
 namespace voltdb {
 
+class AbstractExpression;
+
 /**
  * Parameter for constructing TableIndex. TupleSchema, then key schema
  */
@@ -67,32 +69,27 @@ struct TableIndexScheme {
     TableIndexScheme() {
         tupleSchema = NULL;
     }
-    TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                         std::vector<ValueType> columnTypes, bool unique,
-                         bool intsOnly, TupleSchema *tupleSchema) {
-        this->name = name; this->type = type; this->columnIndices = columnIndices;
-        this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->countable = true;
-    }
-/* This constructor does not set countable field according what you value you pass in.
- * FIX it when VoltDB CompactingMap can pack memory together for TreeNode without allocating
- * memory for the 4 bytes countable field.
- * */
-    TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                     std::vector<ValueType> columnTypes, bool unique,  bool countable,
-                     bool intsOnly, TupleSchema *tupleSchema) {
-        this->name = name; this->type = type; this->columnIndices = columnIndices;
-        this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->countable = countable;
-    }
+
+    TableIndexScheme(std::string a_name, TableIndexType a_type,
+                     const std::vector<int32_t>& a_columnIndices,
+                     const std::vector<AbstractExpression*>& a_indexedExpressions,
+                     bool a_unique, bool a_countable,
+                     TupleSchema *a_tupleSchema) :
+      name(a_name),
+      type(a_type),
+      columnIndices(a_columnIndices),
+      indexedExpressions(a_indexedExpressions),
+      unique(a_unique),
+      countable(a_countable),
+      tupleSchema(a_tupleSchema)
+    {}
 
     std::string name;
     TableIndexType type;
     std::vector<int32_t> columnIndices;
-    std::vector<ValueType> columnTypes;
+    std::vector<AbstractExpression*> indexedExpressions;
     bool unique;
     bool countable;
-    bool intsOnly;
     TupleSchema *tupleSchema;
 };
 
@@ -337,6 +334,18 @@ public:
     {
         return m_scheme.columnIndices;
     }
+
+    // Provide an empty expressions vector to indicate a simple columns-only index.
+    static const std::vector<AbstractExpression*>& indexColumnsDirectly() {
+        static std::vector<AbstractExpression*> emptyExpressionVector;
+        return emptyExpressionVector;
+    }
+
+    const std::vector<AbstractExpression*>& getIndexedExpressions() const
+    {
+        return m_scheme.indexedExpressions;
+    }
+
 
     const std::string& getName() const
     {

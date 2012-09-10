@@ -192,10 +192,10 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
     }
 
     std::vector<int> pkey_column_indices;
-    std::vector<voltdb::ValueType> pkey_column_types;
     pkey_column_indices.push_back(0);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    TableIndexScheme pkey("idx_pkey", voltdb::BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, true, NULL);
+    TableIndexScheme pkey("idx_pkey", voltdb::BALANCED_TREE_INDEX,
+                          pkey_column_indices, TableIndex::indexColumnsDirectly(),
+                          true, true, NULL);
 
     setTable(pkey);
 
@@ -252,10 +252,10 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
     }
 
     std::vector<int> pkey_column_indices;
-    std::vector<voltdb::ValueType> pkey_column_types;
     pkey_column_indices.push_back(0);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    voltdb::TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, false, NULL);
+    voltdb::TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
+                                  pkey_column_indices, TableIndex::indexColumnsDirectly(),
+                                  true, true, NULL);
 
     setTable(pkey);
 
@@ -308,14 +308,12 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
     }
 
     std::vector<int> pkey_column_indices;
-    std::vector<voltdb::ValueType> pkey_column_types;
     pkey_column_indices.push_back(0);
     pkey_column_indices.push_back(2);
     pkey_column_indices.push_back(3);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, false, NULL);
+    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
+                          pkey_column_indices, TableIndex::indexColumnsDirectly(),
+                          true, true, NULL);
 
     setTable(pkey);
 
@@ -356,14 +354,12 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
     }
 
     std::vector<int> pkey_column_indices;
-    std::vector<voltdb::ValueType> pkey_column_types;
     pkey_column_indices.push_back(0);
     pkey_column_indices.push_back(2);
     pkey_column_indices.push_back(3);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX, pkey_column_indices, pkey_column_types, true, false, NULL);
+    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
+                          pkey_column_indices, TableIndex::indexColumnsDirectly(),
+                          true, true, NULL);
 
     setTable(pkey);
 

@@ -80,10 +80,10 @@ class TableAndIndexTest : public Test {
 
             districtIndex1ColumnIndices.push_back(1);
             districtIndex1ColumnIndices.push_back(0);
-            districtIndex1ColumnTypes.push_back(VALUE_TYPE_TINYINT);
-            districtIndex1ColumnTypes.push_back(VALUE_TYPE_TINYINT);
 
-            districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX, districtIndex1ColumnIndices, districtIndex1ColumnTypes, true, true, districtTupleSchema);
+            districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
+                                                    districtIndex1ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                    true, false, districtTupleSchema);
 
             vector<voltdb::ValueType> warehouseColumnTypes;
             vector<int32_t> warehouseColumnLengths;
@@ -103,9 +103,10 @@ class TableAndIndexTest : public Test {
             warehouseTupleSchema = TupleSchema::createTupleSchema(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull, true);
 
             warehouseIndex1ColumnIndices.push_back(0);
-            warehouseIndex1ColumnTypes.push_back(VALUE_TYPE_TINYINT);
 
-            warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", ARRAY_INDEX, warehouseIndex1ColumnIndices, warehouseIndex1ColumnTypes, true, true, warehouseTupleSchema);
+            warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", ARRAY_INDEX,
+                                                     warehouseIndex1ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                     true, true, warehouseTupleSchema);
 
             vector<voltdb::ValueType> customerColumnTypes;
             vector<int32_t> customerColumnLengths;
@@ -141,34 +142,28 @@ class TableAndIndexTest : public Test {
             customerIndex1ColumnIndices.push_back(2);
             customerIndex1ColumnIndices.push_back(1);
             customerIndex1ColumnIndices.push_back(0);
-            customerIndex1ColumnTypes.push_back(VALUE_TYPE_TINYINT);
-            customerIndex1ColumnTypes.push_back(VALUE_TYPE_TINYINT);
-            customerIndex1ColumnTypes.push_back(VALUE_TYPE_INTEGER);
 
-            customerIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX, customerIndex1ColumnIndices, customerIndex1ColumnTypes, true, true, customerTupleSchema);
+            customerIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
+                                                    customerIndex1ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                    true, true, customerTupleSchema);
 
             customerIndex2ColumnIndices.push_back(2);
             customerIndex2ColumnIndices.push_back(1);
             customerIndex2ColumnIndices.push_back(5);
             customerIndex2ColumnIndices.push_back(3);
-            customerIndex2ColumnTypes.push_back(VALUE_TYPE_TINYINT);
-            customerIndex2ColumnTypes.push_back(VALUE_TYPE_TINYINT);
-            customerIndex2ColumnTypes.push_back(VALUE_TYPE_VARCHAR);
-            customerIndex2ColumnTypes.push_back(VALUE_TYPE_VARCHAR);
 
-            customerIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX, customerIndex2ColumnIndices, customerIndex2ColumnTypes, true, false, customerTupleSchema);
+            customerIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
+                                                    customerIndex2ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                    true, true, customerTupleSchema);
             customerIndexes.push_back(customerIndex2Scheme);
 
             customerIndex3ColumnIndices.push_back(2);
             customerIndex3ColumnIndices.push_back(1);
             customerIndex3ColumnIndices.push_back(5);
-            customerIndex3ColumnTypes.push_back(VALUE_TYPE_TINYINT);
-            customerIndex3ColumnTypes.push_back(VALUE_TYPE_TINYINT);
-            customerIndex3ColumnTypes.push_back(VALUE_TYPE_VARCHAR);
 
             customerIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
-                                                     customerIndex3ColumnIndices, customerIndex3ColumnTypes,
-                                                     false, false, customerTupleSchema);
+                                                    customerIndex3ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                    false, false, customerTupleSchema);
             customerIndexes.push_back(customerIndex3Scheme);
 
 
@@ -229,7 +224,6 @@ class TableAndIndexTest : public Test {
         Table            *districtTable;
         TempTable        *districtTempTable;
         vector<int>       districtIndex1ColumnIndices;
-        vector<ValueType> districtIndex1ColumnTypes;
         TableIndexScheme  districtIndex1Scheme;
 
         TupleSchema      *warehouseTupleSchema;
@@ -237,7 +231,6 @@ class TableAndIndexTest : public Test {
         Table            *warehouseTable;
         TempTable        *warehouseTempTable;
         vector<int>       warehouseIndex1ColumnIndices;
-        vector<ValueType> warehouseIndex1ColumnTypes;
         TableIndexScheme  warehouseIndex1Scheme;
 
         TupleSchema      *customerTupleSchema;
@@ -245,13 +238,11 @@ class TableAndIndexTest : public Test {
         Table            *customerTable;
         TempTable        *customerTempTable;
         vector<int>       customerIndex1ColumnIndices;
-        vector<ValueType> customerIndex1ColumnTypes;
         TableIndexScheme  customerIndex1Scheme;
         vector<int>       customerIndex2ColumnIndices;
         vector<ValueType> customerIndex2ColumnTypes;
         TableIndexScheme  customerIndex2Scheme;
         vector<int>       customerIndex3ColumnIndices;
-        vector<ValueType> customerIndex3ColumnTypes;
         TableIndexScheme  customerIndex3Scheme;
 };
 

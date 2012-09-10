@@ -125,7 +125,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         // in the right order
         index_columns.resize(catalog_index->columns().size());
         column_types.resize(catalog_index->columns().size());
-        bool isIntsOnly = true;
         map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
         for (colref_iterator = catalog_index->columns().begin();
              colref_iterator != catalog_index->columns().end();
@@ -139,13 +138,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                 delete [] columnNames;
                 return false;
             }
-            // check if the column does not have an int type
-            if ((catalog_colref->column()->type() != VALUE_TYPE_TINYINT) &&
-                (catalog_colref->column()->type() != VALUE_TYPE_SMALLINT) &&
-                (catalog_colref->column()->type() != VALUE_TYPE_INTEGER) &&
-                (catalog_colref->column()->type() != VALUE_TYPE_BIGINT)) {
-                isIntsOnly = false;
-            }
             index_columns[catalog_colref->index()] = catalog_colref->column()->index();
             column_types[catalog_colref->index()] = (ValueType) catalog_colref->column()->type();
         }
@@ -153,11 +145,10 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         TableIndexScheme index_scheme(catalog_index->name(),
                                       (TableIndexType)catalog_index->type(),
                                       index_columns,
-                                      column_types,
+                                      TableIndex::indexColumnsDirectly(),
                                       catalog_index->unique(),
                                       true,// Fix it as the next line when VoltDB can disable CountingIndex feature
                                       //catalog_index->countable(),
-                                      isIntsOnly,
                                       schema);
         index_map[catalog_index->name()] = index_scheme;
     }
