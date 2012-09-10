@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,8 @@ public class SpScheduler extends Scheduler
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+
+    private int m_commandLogHackUgh = 100;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
@@ -106,6 +109,12 @@ public class SpScheduler extends Scheduler
     @Override
     public void deliver(VoltMessage message)
     {
+        if (m_commandLogHackUgh != 0) {
+            hostLog.fatal("SET COMMAND LOG, CHESTER!");
+            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
+                    advanceTxnEgo().getSequence());
+            m_commandLogHackUgh--;
+        }
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }
