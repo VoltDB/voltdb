@@ -94,13 +94,15 @@ public class ClientInterfaceHandleManager
         final long m_clientHandle;
         final int m_messageSize;
         final long m_creationTime;
+        final String m_procName;
         Iv2InFlight(long ciHandle, long clientHandle,
-                int messageSize, long creationTime)
+                int messageSize, long creationTime, String procName)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
             m_messageSize = messageSize;
             m_creationTime = creationTime;
+            m_procName = procName;
         }
     }
 
@@ -123,20 +125,25 @@ public class ClientInterfaceHandleManager
             boolean isAdmin, Connection connection, AdmissionControlGroup acg)
     {
         return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
+            @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
-                    long clientHandle, int messageSize, long creationTime) {
+                    long clientHandle, int messageSize, long creationTime, String procName) {
                 return super.getHandle(isSinglePartition, partitionId,
-                        clientHandle, messageSize, creationTime);
+                        clientHandle, messageSize, creationTime, procName);
             }
+            @Override
             synchronized boolean removeHandle(long ciHandle) {
                 return super.removeHandle(ciHandle);
             }
+            @Override
             synchronized Iv2InFlight findHandle(long ciHandle) {
                 return super.findHandle(ciHandle);
             }
+            @Override
             synchronized long getOutstandingTxns() {
                 return super.getOutstandingTxns();
             }
+            @Override
             synchronized void freeOutstandingTxns() {
                 super.freeOutstandingTxns();
             }
@@ -150,9 +157,13 @@ public class ClientInterfaceHandleManager
      * high-order non-sign bits (where the MP partition ID is the max value),
      * and a 53 bit sequence number in the low 53 bits.
      */
-    long getHandle(boolean isSinglePartition, int partitionId,
+    long getHandle(
+            boolean isSinglePartition,
+            int partitionId,
             long clientHandle,
-            int messageSize, long creationTime)
+            int messageSize,
+            long creationTime,
+            String procName)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
@@ -173,7 +184,7 @@ public class ClientInterfaceHandleManager
             perPartDeque = partitionStuff.getSecond();
         }
         long ciHandle = generator.getNextHandle();
-        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime);
+        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName);
         perPartDeque.addLast(inFlight);
         m_outstandingTxns++;
         m_acg.increaseBackpressure(messageSize);
