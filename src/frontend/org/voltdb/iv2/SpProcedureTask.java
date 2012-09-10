@@ -65,7 +65,7 @@ public class SpProcedureTask extends ProcedureTask
 
         // Log invocation to DR
         if (m_drGateway != null && !m_txn.needsRollback()) {
-            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.m_task.getSpHandle(),
+            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.timestamp,
                                                   txn.getInvocation(), response.getClientResponseData());
         }
     }

@@ -57,10 +57,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltdb.ExecutionSite.CheckTxnStateCompletionMessage;
-import org.voltdb.ExecutionSite.ExecutionSiteLocalSnapshotMessage;
-import org.voltdb.ExecutionSite.ExecutionSiteNodeFailureMessage;
-import org.voltdb.ExecutionSite.SystemProcedureContext;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -1484,7 +1480,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
             if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
-                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, txnState.txnId, invocation, txnState.getResults());
+                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, -1, invocation, txnState.getResults());
                 }
             }
 
