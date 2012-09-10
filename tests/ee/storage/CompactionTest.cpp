@@ -80,7 +80,6 @@ public:
         m_columnNames.push_back("9");
 
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
-        m_primaryKeyIndexSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
         //Filler columns
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
@@ -124,27 +123,27 @@ public:
         voltdb::TableIndexScheme indexScheme = voltdb::TableIndexScheme("BinaryTreeUniqueIndex",
                                                                         voltdb::BALANCED_TREE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        m_primaryKeyIndexSchemaTypes,
-                                                                        true, false, m_tableSchema);
+                                                                        TableIndex::indexColumnsDirectly(),
+                                                                        true, true, false, m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
         voltdb::TableIndexScheme indexScheme1 = voltdb::TableIndexScheme("BinaryTreeMultimapIndex",
                                                                         voltdb::BALANCED_TREE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        m_primaryKeyIndexSchemaTypes,
-                                                                        false, false, m_tableSchema);
+                                                                        TableIndex::indexColumnsDirectly(),
+                                                                        false, true, false, m_tableSchema);
         indexes.push_back(indexScheme1);
         voltdb::TableIndexScheme indexScheme2 = voltdb::TableIndexScheme("HashUniqueIndex",
                                                                         voltdb::HASH_TABLE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        m_primaryKeyIndexSchemaTypes,
-                                                                        true, false, m_tableSchema);
+                                                                        TableIndex::indexColumnsDirectly(),
+                                                                        true, false, false, m_tableSchema);
         indexes.push_back(indexScheme2);
         voltdb::TableIndexScheme indexScheme3 = voltdb::TableIndexScheme("HashMultimapIndex",
                                                                         voltdb::HASH_TABLE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        m_primaryKeyIndexSchemaTypes,
-                                                                        false, false, m_tableSchema);
+                                                                        TableIndex::indexColumnsDirectly(),
+                                                                        false, false, false, m_tableSchema);
         indexes.push_back(indexScheme3);
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
@@ -246,7 +245,6 @@ public:
     std::vector<voltdb::ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
-    std::vector<voltdb::ValueType> m_primaryKeyIndexSchemaTypes;
     std::vector<int> m_primaryKeyIndexColumns;
 
     int32_t m_tuplesInserted ;

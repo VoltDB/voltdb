@@ -203,35 +203,50 @@ void setNewCurrent(const char *testName,
         voltdb::TableIndex *index;
 
         if (strcmp(indexName, kMultiIntsHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, false, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            false, false, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiIntsTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, false, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            false, true, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, false, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            false, false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, false, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            false, true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, true, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            true, false, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, true, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::indexColumnsDirectly(), true, true, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, true, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            true, false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, true, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            true, true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else {
