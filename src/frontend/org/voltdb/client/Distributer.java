@@ -29,12 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
@@ -449,7 +449,7 @@ class Distributer {
         createConnectionWithHashedCredentials(host, program, hashedPassword, port);
     }
 
-    synchronized void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
+    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
     throws UnknownHostException, IOException
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
@@ -457,26 +457,29 @@ class Distributer {
         InetSocketAddress address = new InetSocketAddress(host, port);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
-        if (m_clusterInstanceId == null) {
-            long timestamp = instanceIdWhichIsTimestampAndLeaderIp[2];
-            int addr = (int)instanceIdWhichIsTimestampAndLeaderIp[3];
-            m_clusterInstanceId = new Object[] { timestamp, addr };
-        } else {
-            if (!(((Long)m_clusterInstanceId[0]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[2]) ||
-                    !(((Integer)m_clusterInstanceId[1]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[3])) {
-                aChannel.close();
-                throw new IOException(
-                        "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
-                                                                                                                         + " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
+        synchronized (this) {
+            if (m_clusterInstanceId == null) {
+                long timestamp = instanceIdWhichIsTimestampAndLeaderIp[2];
+                int addr = (int)instanceIdWhichIsTimestampAndLeaderIp[3];
+                m_clusterInstanceId = new Object[] { timestamp, addr };
+            } else {
+                if (!(((Long)m_clusterInstanceId[0]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[2]) ||
+                        !(((Integer)m_clusterInstanceId[1]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[3])) {
+                    aChannel.close();
+                    throw new IOException(
+                            "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
+                                                                                                                             + " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
+                }
             }
+            m_buildString = (String)socketChannelAndInstanceIdAndBuildString[2];
         }
-        m_buildString = (String)socketChannelAndInstanceIdAndBuildString[2];
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
-        m_connections.add(cxn);
+
         Connection c = m_network.registerChannel( aChannel, cxn);
         cxn.m_hostname = c.getHostnameOrIP();
         cxn.m_port = port;
         cxn.m_connection = c;
+        m_connections.add(cxn);
     }
 
     //    private HashMap<String, Long> reportedSizes = new HashMap<String, Long>();

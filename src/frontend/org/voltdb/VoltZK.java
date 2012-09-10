@@ -27,8 +27,8 @@ import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
@@ -49,6 +49,7 @@ public class VoltZK {
     public static final String deploymentBytes = "/db/deploymentBytes";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";
+    public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
 
     // configuration (ports, interfaces, ...)

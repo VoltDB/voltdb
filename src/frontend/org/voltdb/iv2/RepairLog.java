@@ -128,7 +128,10 @@ public class RepairLog
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
             truncate(m.getTruncationHandle(), Long.MIN_VALUE);
             m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
-            m_lastMpHandle = m.getTxnId();
+            //Restore will send a complete transaction message with a lower mp transaction id because
+            //the restore transaction precedes the loading of the right mp transaction id from the snapshot
+            //Hence Math.max
+            m_lastMpHandle = Math.max(m_lastMpHandle, m.getTxnId());
             m_lastSpHandle = m.getSpHandle();
         }
         else if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {

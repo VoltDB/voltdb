@@ -54,6 +54,7 @@ public class TestVoltMessageSerialization extends TestCase {
         buf1.rewind();
         buf2.rewind();
 
+        assertEquals(buf1.remaining(), buf2.remaining());
         assertTrue(buf1.compareTo(buf2) == 0);
 
         return msg2;
@@ -66,7 +67,6 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setParams(57, "gooniestoo", "dudemandude");
 
         InitiateTaskMessage itask = new InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
-
         InitiateTaskMessage itask2 = (InitiateTaskMessage) checkVoltMessage(itask);
 
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
@@ -202,6 +202,61 @@ public class TestVoltMessageSerialization extends TestCase {
             assertEquals(20, params.toArray()[0]);
             assertEquals(20.2, params.toArray()[1]);
         }
+    }
+
+    public void testFragmentTaskWithInitiateTask() throws IOException {
+        // The fragment task.
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
+        ft.addFragment(5, 12, ByteBuffer.allocate(0));
+        ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
+
+        // The initiate task.
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setClientHandle(25);
+        spi.setProcName("johnisgreat");
+        spi.setParams(57, "gooniestoo", "dudemandude");
+
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
+        itask.setSpHandle(31337);
+
+        // this is the important part.
+        ft.setInitiateTask(itask);
+        assertTrue(ft.getInitiateTask() != null);
+        assertTrue(ft.m_initiateTaskBuffer != null);
+        assertTrue(ft.m_initiateTaskBuffer.remaining() > 0);
+
+
+        FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
+
+        assertTrue(ft2.getInitiateTask() != null);
+        assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
+        assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
+        assertEquals(ft.getTxnId(), ft2.getTxnId());
+        assertEquals(ft.getTimestamp(), ft2.getTimestamp());
+        assertEquals(ft.isReadOnly(), ft2.isReadOnly());
+        assertEquals(ft.isForReplay(), ft2.isForReplay());
+
+        assertEquals(ft.getFragmentCount(), ft2.getFragmentCount());
+
+        assertEquals(ft.isFinalTask(), ft2.isFinalTask());
+        assertEquals(ft.isSysProcTask(), ft2.isSysProcTask());
+
+        Iv2InitiateTaskMessage itask2 = ft2.getInitiateTask();
+        assertEquals(10L, itask.getTruncationHandle());
+        assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
+        assertEquals(itask.getTruncationHandle(), itask2.getTruncationHandle());
+        assertEquals(itask.getTxnId(), itask2.getTxnId());
+        assertEquals(itask.getTimestamp(), itask2.getTimestamp());
+        assertEquals(itask.isReadOnly(), itask2.isReadOnly());
+        assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
+        assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
+        assertEquals(itask.getParameterCount(), itask2.getParameterCount());
+        assertEquals(itask.getClientInterfaceHandle(), itask2.getClientInterfaceHandle());
+        assertEquals(itask.getClientInterfaceHandle(), 2101);
+        assertEquals(itask.getConnectionId(), 3101);
+        assertEquals(itask.getSpHandle(), itask2.getSpHandle());
+        assertEquals(31337, itask.getSpHandle());
+        assertTrue(itask.isForReplay());
     }
 
 

@@ -133,6 +133,8 @@ public final class Constraint implements SchemaObject {
     // for temp constraints only
     OrderedHashSet mainColSet;
     OrderedHashSet refColSet;
+    // Is this for temp constraints only? What's a temp constraint?
+    Expression[] indexExprs; // A VoltDB extension to support indexed expressions
 
     //
     final public static Constraint[] emptyArray = new Constraint[]{};
@@ -216,6 +218,12 @@ public final class Constraint implements SchemaObject {
         mainColSet = mainCols;
     }
 
+    // A VoltDB extension to support indexed expressions
+    public Constraint(HsqlName name, OrderedHashSet baseCols, Expression[] exprs) {
+        this(name, baseCols, Constraint.UNIQUE);
+        indexExprs = exprs;
+    }
+
     void setColumnsIndexes(Table table) {
 
         if (constType == Constraint.FOREIGN_KEY) {
@@ -239,6 +247,7 @@ public final class Constraint implements SchemaObject {
 
     private Constraint() {}
 
+    @Override
     public int getType() {
         return SchemaObject.CONSTRAINT;
     }
@@ -246,22 +255,27 @@ public final class Constraint implements SchemaObject {
     /**
      * Returns the HsqlName.
      */
+    @Override
     public HsqlName getName() {
         return name;
     }
 
+    @Override
     public HsqlName getCatalogName() {
         return name.schema.schema;
     }
 
+    @Override
     public HsqlName getSchemaName() {
         return name.schema;
     }
 
+    @Override
     public Grantee getOwner() {
         return name.schema.owner;
     }
 
+    @Override
     public OrderedHashSet getReferences() {
 
         switch (constType) {
@@ -280,12 +294,15 @@ public final class Constraint implements SchemaObject {
         return null;
     }
 
+    @Override
     public OrderedHashSet getComponents() {
         return null;
     }
 
+    @Override
     public void compile(Session session) {}
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -316,6 +333,11 @@ public final class Constraint implements SchemaObject {
                 }
 
                 sb.append(Tokens.T_UNIQUE);
+
+                // A VoltDB extension to support indexed expressions
+                if (indexExprs != null) {
+                    return getExprList(sb);
+                }
 
                 int[] col = getMainColumns();
 
@@ -1080,4 +1102,29 @@ public final class Constraint implements SchemaObject {
 
         return constraint;
     }
+
+    // A VoltDB extension to support indexed expressions
+    public boolean isUniqueWithExprs(Expression[] indexExprs2) {
+        if (constType != UNIQUE || ! indexExprs.equals(indexExprs2)) {
+            return false;
+        }
+        return true;
+    }
+
+    // A VoltDB extension to support indexed expressions
+    // Is this for temp constraints only? What's a temp constraint?
+    public boolean hasExprs() {
+        return indexExprs != null;
+    }
+
+    // A VoltDB extension to support indexed expressions
+    public String getExprList(StringBuffer sb) {
+        String sep = "";
+        for(Expression ex : indexExprs) {
+            sb.append(sep).append(ex.getSQL());
+            sep = ", ";
+        }
+        return sb.toString();
+    }
+
 }

@@ -161,7 +161,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+        helpLoadFromJSONObject(jobj, db);
     }
 
     @Override

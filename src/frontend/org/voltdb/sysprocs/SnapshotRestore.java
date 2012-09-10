@@ -43,7 +43,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -57,6 +56,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.zk.ZKUtil.StringCallback;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
@@ -64,9 +64,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -900,6 +898,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             digests = digestScanResult.digests;
             exportSequenceNumbers = digestScanResult.exportSequenceNumbers;
             perPartitionTxnIds = digestScanResult.perPartitionTxnIds;
+            if (perPartitionTxnIds.length == 0) {
+                perPartitionTxnIds = new long[] {ctx.getCurrentTxnId()};
+            }
         } catch (VoltAbortException e) {
             ColumnInfo[] result_columns = new ColumnInfo[2];
             int ii = 0;
@@ -1012,6 +1013,29 @@ public class SnapshotRestore extends VoltSystemProcedure
         }
 
         /*
+         * This list stores all the partition transaction ids ever seen even if the partition
+         * is no longer present. The values from here are added to snapshot digests to propagate
+         * partitions that were remove/add several time by SnapshotSave.
+         *
+         * Only the partitions that are no longer part of the cluster will have their ids retrieved,
+         * those that are active will populate their current values manually because they change after startup
+         *
+         * This is necessary to make sure that sequence numbers never go backwards as a result of a partition
+         * being removed and then added back by save restore sequences.
+         *
+         * They will be retrieved from ZK by the snapshot daemon
+         * and passed to @SnapshotSave which will use it to fill in transaction ids for
+         * partitions that are no longer present
+         */
+        ByteBuffer buf = ByteBuffer.allocate(perPartitionTxnIds.length * 8 + 4);
+        buf.putInt(perPartitionTxnIds.length);
+        for (long txnid : perPartitionTxnIds) {
+            buf.putLong(txnid);
+        }
+        VoltDB.instance().getHostMessenger().
+                getZK().create(VoltZK.perPartitionTxnIds, buf.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        /*
          * Serialize all the export sequence numbers and then distribute them in a
          * plan fragment and each receiver will pull the relevant information for
          * itself
@@ -1023,6 +1047,12 @@ public class SnapshotRestore extends VoltSystemProcedure
             oos.flush();
             byte exportSequenceNumberBytes[] = baos.toByteArray();
             oos.close();
+
+            /*
+             * Also set the perPartitionTxnIds locally at the multi-part coordinator.
+             * The coord will have to forward this value to all the idle coordinators.
+             */
+            ctx.getSiteProcedureConnection().setPerPartitionTxnIds(perPartitionTxnIds);
 
             results =
                     performDistributeExportSequenceNumbers(

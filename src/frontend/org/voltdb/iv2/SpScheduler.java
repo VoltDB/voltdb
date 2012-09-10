@@ -236,7 +236,7 @@ public class SpScheduler extends Scheduler
                 timestamp = msg.getTimestamp();
             }
             if (!msg.isReadOnly()) {
-                m_cl.log(msg);
+                m_cl.log(msg, newSpHandle);
             }
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
@@ -412,7 +412,7 @@ public class SpScheduler extends Scheduler
             setMaxSeenTxnId(newSpHandle);
         }
         if (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly()) {
-            m_cl.log(msg.getInitiateTask());
+            m_cl.log(msg.getInitiateTask(), newSpHandle);
         }
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);

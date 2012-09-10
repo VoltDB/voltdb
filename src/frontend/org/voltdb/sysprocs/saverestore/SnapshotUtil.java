@@ -55,6 +55,7 @@ import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
@@ -90,7 +91,8 @@ public class SnapshotUtil {
         List<Table> tables,
         int hostId,
         Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers,
-        List<Long> partitionTransactionIds)
+        List<Long> partitionTransactionIds,
+        InstanceId instanceId)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -137,6 +139,10 @@ public class SnapshotUtil {
                 stringer.endObject();
             }
             stringer.key("catalogCRC").value(catalogCRC);
+            stringer.key("instanceId").object();
+            stringer.key("timestamp").value(instanceId.getTimestamp());
+            stringer.key("coordId").value(instanceId.getCoord());
+            stringer.endObject();
             stringer.endObject();
         } catch (JSONException e) {
             throw new IOException(e);

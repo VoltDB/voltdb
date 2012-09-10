@@ -526,27 +526,16 @@ public class ExpressionOp extends Expression {
         String element = null;
         switch (opType) {
         case OpTypes.LIMIT:             element = "limit"; break;
-        case OpTypes.ADD:               element = "add"; break;
-        case OpTypes.SUBTRACT:          element = "subtract"; break;
-        case OpTypes.MULTIPLY:          element = "multiply"; break;
-        case OpTypes.DIVIDE:            element = "divide"; break;
-        case OpTypes.EQUAL:             element = "equal"; break;
-        case OpTypes.NOT_EQUAL:         element = "notequal"; break;
-        case OpTypes.GREATER:           element = "greaterthan"; break;
-        case OpTypes.GREATER_EQUAL:     element = "greaterthanorequalto"; break;
-        case OpTypes.SMALLER:           element = "lessthan"; break;
-        case OpTypes.SMALLER_EQUAL:     element = "lessthanorequalto"; break;
-        case OpTypes.AND:               element = "and"; break;
-        case OpTypes.OR:                element = "or"; break;
-        case OpTypes.IN:                element = "in"; break;
-        case OpTypes.COUNT:             element = "count"; break;
-        case OpTypes.SUM:               element = "sum"; break;
-        case OpTypes.MIN:               element = "min"; break;
-        case OpTypes.MAX:               element = "max"; break;
-        case OpTypes.AVG:               element = "avg"; break;
-        case OpTypes.SQL_FUNCTION:      element = "function"; break;
-        case OpTypes.IS_NULL:           element = "is_null"; break;
-        case OpTypes.NOT:               element = "not"; break;
+        //TODO: Enable these as they are supported in VoltDB.
+        // They appear to be a complete set as supported by the other methods in this module.
+        case OpTypes.ALTERNATIVE :
+        case OpTypes.CASEWHEN :
+        case OpTypes.CAST :
+        case OpTypes.ORDER_BY :
+        case OpTypes.SIMPLE_COLUMN :
+        case OpTypes.TABLE :
+        case OpTypes.VALUE :
+        case OpTypes.ZONE_MODIFIER :
         default:
             throw new HSQLParseException("Unsupported Expression Operation: " +
                                          String.valueOf(opType));

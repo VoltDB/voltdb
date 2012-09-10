@@ -612,7 +612,7 @@ public class TestSnapshotDaemon {
         JSONObject jsObj = new JSONObject((String)m_initiator.params[0]);
         assertTrue(jsObj.getString("path").equals("/tmp"));
         assertTrue(jsObj.getString("nonce").startsWith("woobie_"));
-        assertTrue(jsObj.length() == 2);
+        assertTrue(jsObj.length() == 3);
 
         handle = m_initiator.clientData;
         m_initiator.clear();

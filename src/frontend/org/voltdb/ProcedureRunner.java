@@ -53,7 +53,6 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -92,7 +91,6 @@ public class ProcedureRunner {
     protected TransactionState m_txnState; // used for sysprocs only
     // Status code that can be set by stored procedure upon invocation that will be returned with the response.
     protected byte m_statusCode = Byte.MIN_VALUE;
-    protected boolean m_haveSentFirstFragment;//When sending first fragment, include the initiate task for write MP
     protected String m_statusString = null;
     // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
     // a given call don't re-seed and generate the same number over and over
@@ -317,7 +315,6 @@ public class ProcedureRunner {
             m_txnId = -1;
             m_txnState = null;
             m_statusCode = Byte.MIN_VALUE;
-            m_haveSentFirstFragment = false;
             m_statusString = null;
             m_cachedRNG = null;
             m_cachedSingleStmt.params = null;
@@ -392,10 +389,10 @@ public class ProcedureRunner {
             AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
                     plannedStatement.sql,
-                    plannedStatement.aggregatorFragment,
-                    plannedStatement.collectorFragment,
-                    plannedStatement.isReplicatedTableDML,
-                    plannedStatement.parameterTypes);
+                    plannedStatement.core.aggregatorFragment,
+                    plannedStatement.core.collectorFragment,
+                    plannedStatement.core.isReplicatedTableDML,
+                    plannedStatement.core.parameterTypes);
             if (plannedStatement.extractedParamValues.size() == 0) {
                 // case handles if there were parameters OR
                 // if there were no constants to pull out
@@ -971,19 +968,6 @@ public class ProcedureRunner {
                                                        finalTask,
                                                        txnState.isForReplay());
 
-           /*
-            * Only need to send the initiate task during actual execution for CL not during replay
-            * Don't penalize pre-IV2 code by forcing it to send the initiate task everywhere
-            * No need to send initiate tasks for readonly transactions, the CL doesn't care
-            * Only send the initiation with the first fragment.
-            */
-           if (!txnState.isForReplay() &&
-                   VoltDB.instance().isIV2Enabled() &&
-                   !m_txnState.isReadOnly() &&
-                   !runner.m_haveSentFirstFragment) {
-               runner.m_haveSentFirstFragment = true;
-               m_distributedTask.setInitiateTask((Iv2InitiateTaskMessage)m_txnState.getNotice());
-           }
        }
 
        /*

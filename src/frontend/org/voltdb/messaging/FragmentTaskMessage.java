@@ -399,6 +399,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Fragment ID block
         msgsize += 8 * m_items.size();
 
+        //nested initiate task message length prefix
+        msgsize += 4;
+        if (m_initiateTaskBuffer != null) {
+            msgsize += m_initiateTaskBuffer.remaining();
+        }
+
         // Make a pass through the fragment data items to account for the
         // optional output and input dependency blocks, plus the unplanned block.
         boolean foundOutputDepId = false;
@@ -430,11 +436,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             if (item.m_fragmentPlan != null) {
                 msgsize += 2 + 4 + item.m_fragmentPlan.length;
             }
-        }
-
-        msgsize += 4;//nested initiate task message length prefix
-        if (m_initiateTaskBuffer != null) {
-            msgsize += m_initiateTaskBuffer.remaining();
         }
 
         return msgsize;
@@ -519,6 +520,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        if (m_initiateTaskBuffer != null) {
+            ByteBuffer dup = m_initiateTaskBuffer.duplicate();
+            buf.putInt(dup.remaining());
+            buf.put(dup);
+        } else {
+            buf.putInt(0);
+        }
+
         // Unplanned item block
         for (short index = 0; index < m_items.size(); index++) {
             // Each unplanned item gets an index (2) and a size (4) and buffer for
@@ -529,14 +538,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.putInt(item.m_fragmentPlan.length);
                 buf.put(item.m_fragmentPlan);
             }
-        }
-
-        if (m_initiateTaskBuffer != null) {
-            ByteBuffer dup = m_initiateTaskBuffer.duplicate();
-            buf.putInt(dup.remaining());
-            buf.put(dup);
-        } else {
-            buf.putInt(0);
         }
     }
 
@@ -608,6 +609,37 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        int initiateTaskMessageLength = buf.getInt();
+        if (initiateTaskMessageLength > 0) {
+            int startPosition = buf.position();
+            Iv2InitiateTaskMessage message = new Iv2InitiateTaskMessage();
+            // EHGAWD: init task was serialized with flatten which added
+            // the message type byte. deserialization expects the message
+            // factory to have stripped that byte. but ... that's not the
+            // way we do it here. So read the message type byte...
+            byte messageType = buf.get();
+            assert(messageType == VoltDbMessageFactory.IV2_INITIATE_TASK_ID);
+            message.initFromBuffer(buf);
+            m_initiateTask = message;
+            if (m_initiateTask != null && m_initiateTaskBuffer == null) {
+                m_initiateTaskBuffer = ByteBuffer.allocate(m_initiateTask.getSerializedSize());
+                try {
+                    m_initiateTask.flattenToBuffer(m_initiateTaskBuffer);
+                    m_initiateTaskBuffer.flip();
+                } catch (IOException e) {
+                    //Executive decision, don't throw a checked exception. Let it burn.
+                    throw new RuntimeException(e);
+                }
+            }
+
+            /*
+             * There is an assertion that all bytes of the message are consumed.
+             * Initiate task lazily deserializes the parameter buffer and doesn't consume
+             * all the bytes so do it here so the assertion doesn't trip
+             */
+            buf.position(startPosition + initiateTaskMessageLength);
+        }
+
         // Unplanned block
         for (int iUnplanned = 0; iUnplanned < unplannedCount; iUnplanned++) {
             short index = buf.getShort();
@@ -620,21 +652,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
-        int initiateTaskMessageLength = buf.getInt();
-        if (initiateTaskMessageLength > 0) {
-            int startPosition = buf.position();
-            Iv2InitiateTaskMessage message = new Iv2InitiateTaskMessage();
-            message.initFromBuffer(buf);
-            m_initiateTask = message;
-
-            /*
-             * There is an assertion that all bytes of the message are consumed.
-             * Initiate task lazily deserializes the parameter buffer and doesn't consume
-             * all the bytes so do it here so the assertion doesn't trip
-             */
-            buf.position(startPosition + initiateTaskMessageLength);
-
-        }
     }
 
     @Override
