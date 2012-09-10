@@ -57,4 +57,9 @@ public class DummyCommandLog implements CommandLog {
 
     @Override
     public void log(Iv2InitiateTaskMessage message, long spHandle) {}
+
+    @Override
+    public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+            int partitionId, long spHandle) {
+    }
 }
