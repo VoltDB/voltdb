@@ -33,10 +33,12 @@ package org.hsqldb_voltpatches.types;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
+import org.apache.commons.lang3.time.DateFormatUtils;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
@@ -462,7 +464,9 @@ public final class DateTimeType extends DTIType {
             // BEGIN VOLTDB ADDED CODE
             case Types.SQL_INTEGER :
             case Types.SQL_BIGINT :
-                a = new Timestamp(new Date(Long.parseLong(a.toString())).getTime()).toString();
+                // Time provided is assumed to be UTC. Can't simply use Timestamp.toString() since
+                // it uses the local timezone.
+                a = DateFormatUtils.formatUTC(new Date(Long.parseLong(a.toString())), "yyyy-MM-dd HH:mm:ss.S");
                 //otherType = Type.SQL_TIMESTAMP;
             // END VOLTDB ADDED CODE
 
