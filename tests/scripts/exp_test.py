@@ -218,7 +218,7 @@ def startService(service, logS, logC):
     time.sleep(2)
     client = getClient()
     ret = call(service + " client > " + logC + " 2>&1", shell=True)
-    print "returning results from service execution: '%s'" % ret
+#    print "returning results from service execution: '%s'" % ret
     time.sleep(1)
     return (service_ps, client)
 
@@ -234,7 +234,7 @@ def execThisService(service, logS, logC):
     time.sleep(2)
     client = getClient()
     ret = call(service + " client > " + logC + " 2>&1", shell=True)
-    print "returning results from service execution: '%s'" % ret
+#    print "returning results from service execution: '%s'" % ret
     client.onecmd("shutdown")
     service_ps.communicate()
 
@@ -334,33 +334,35 @@ def startTest(testSuiteList):
         logFileC = "/tmp/" + e + "_client"
         msg1 = msg2 = None
 #        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
-        execThisService(service, logFileS, logFileC)
+#        execThisService(service, logFileS, logFileC)
         if(e == "helloworld"):
             # To make sure that we see the key string 'Hola, Mundo!'
             (result, msg1) = assertHelloWorld(e, logFileC)
             retCode[e]["status"] = result
             retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1
         elif(e == "voter"):
-            (result, msg1) = assertClient(e, logFileC)
-            if(result == False):
+#            (result, msg1) = assertClient(e, logFileC)
+#            if(result == False):
                 # Further assertion is required
                 # We want to make sure that logFileC contains this KEY string:
                 # The Winner is: Edwina Burnam
-                (result, msg2) = assertVoter(e, logFileC)
-                retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1 + "\n" + sepLineS + "\n" + msg2
-            else:
-                retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1
+            (result, msg2) = assertVoter(e, logFileC)
+#            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1 + "\n" + sepLineS + "\n" + msg2
+            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg2
+#            else:
+#                retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1
             retCode[e]["status"] = result
         elif(e == "voltkv" or e == "voltcache"):
-            (result, msg1) = assertClient(e, logFileC)
-            if(result == False):
-                # Further assertion is required
-                # We want to make sure that logFileC contains several key strings
-                # which is defined inside assertVotekv_Votecache:
-                (result, msg2) = assertVotekv_Votecache(e, logFileC)
-                retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1 + "\n" + sepLineS + "\n" + msg2
-            else:
-                retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1
+#            (result, msg1) = assertClient(e, logFileC)
+#            if(result == False):
+            # Further assertion is required
+            # We want to make sure that logFileC contains several key strings
+            # which is defined inside assertVotekv_Votecache:
+            (result, msg2) = assertVotekv_Votecache(e, logFileC)
+#            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1 + "\n" + sepLineS + "\n" + msg2
+            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg2
+#            else:
+#                retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1
             retCode[e]["status"] = result
         else:
             print "e = '%s' ==-->> to be implemented..." % e
@@ -373,7 +375,9 @@ def startTest(testSuiteList):
 # end of def startTest(testSuiteList):
 
 if __name__ == "__main__":
-    parser = OptionParser()
+    usage = "Usage: %prog [options]"
+#    parser = OptionParser()
+    parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro> <-s helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
     parser.add_option("-r", "--release", dest="release",
                       help="VoltDB release no. If ommitted, it will find it from version.txt.")
     parser.add_option("-p", "--pkg", dest="pkg",
@@ -415,11 +419,16 @@ if __name__ == "__main__":
 #        print "i = '%s', exec = '%s'" % (i, testSuiteList[i])
 
     success = startTest(testSuiteList)
+    status = True
     for module in success:
         if not success[module]["status"]:
-#            print >> sys.stderr, "Test '%s' Failed!!" % k
+#            print >> sys.stderr, "\n%s\n%s\nTest '%s' FAILED!!\n%s" \
+#                % (success[module]["msg"], sepLineS, module, sepLineD)
             print "\n%s\n%s\nTest '%s' FAILED!!\n%s" \
                 % (success[module]["msg"], sepLineS, module, sepLineD)
+            status = False
         else:
             print "\n%s\n%s\nTest '%s' PASSED!!\n%s" \
                 % (success[module]["msg"], sepLineS, module, sepLineD)
+    if(status == False):
+        print "\nAt lease one test suite is Failed!!\n"
