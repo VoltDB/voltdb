@@ -117,7 +117,7 @@ public class FunctionCustom extends FunctionSQL {
     private static final int FUNC_ROUNDMAGIC       = 121;
     private static final int FUNC_ASCII            = 122;
     private static final int FUNC_CHAR             = 123;
-    private static final int FUNC_CONCAT           = 124;
+    public  static final int FUNC_CONCAT           = 124;
     private static final int FUNC_DIFFERENCE       = 125;
     private static final int FUNC_HEXTORAW         = 126;
     private static final int FUNC_LEFT             = 128;
@@ -351,9 +351,10 @@ public class FunctionCustom extends FunctionSQL {
         switch (id) {
 
             case FUNC_CONCAT :
+                parseList = doubleParamList;
+                break;
             case FUNC_LEFT :
                 parseList = doubleParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_DATABASE :
@@ -472,9 +473,10 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_CHAR :
             case FUNC_HEXTORAW :
             case FUNC_RAWTOHEX :
-            case FUNC_SPACE :
                 parseList = singleParamList;
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+            case FUNC_SPACE :
+                parseList = singleParamList;
                 break;
 
             case FUNC_ROUND :
@@ -482,11 +484,13 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_BITOR :
             case FUNC_BITXOR :
             case FUNC_DIFFERENCE :
-            case FUNC_REPEAT :
             case FUNC_DATEDIFF :
-            case FUNC_RIGHT :
                 parseList = doubleParamList;
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                break;
+            case FUNC_REPEAT :
+            case FUNC_RIGHT :
+                parseList = doubleParamList;
                 break;
 
             case FUNC_LOCATE :
@@ -1545,6 +1549,10 @@ public class FunctionCustom extends FunctionSQL {
 
                 if (!isChar && !nodes[0].dataType.isBinaryType()) {
                     throw Error.error(ErrorCode.X_42561);
+                }
+                
+                if (nodes[1].dataType == null) {
+                    nodes[1].dataType = Type.SQL_INTEGER;
                 }
 
                 dataType = isChar ? Type.SQL_VARCHAR
