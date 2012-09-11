@@ -46,7 +46,6 @@
 #ifndef COMPACTINGTREEMULTIMAPINDEX_H_
 #define COMPACTINGTREEMULTIMAPINDEX_H_
 
-#include <map>
 #include <iostream>
 #include <cassert>
 #include "indexes/tableindex.h"
@@ -59,28 +58,30 @@ namespace voltdb {
  * Index implemented as a Binary Tree Multimap.
  * @see TableIndex
  */
-template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=true>
+template<typename KeyType, bool hasRank>
 class CompactingTreeMultiMapIndex : public TableIndex
 {
-    friend class TableIndexFactory;
-
+    typedef typename KeyType::KeyComparator KeyComparator;
     typedef CompactingMap<KeyType, const void*, KeyComparator, hasRank> MapType;
-    typedef typename MapType::iterator MMIter;
-
-public:
+    typedef typename MapType::iterator MapIterator;
+    typedef std::pair<MapIterator, MapIterator> MapRange;
 
     ~CompactingTreeMultiMapIndex() {};
 
     bool addEntry(const TableTuple *tuple)
     {
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
-        return addEntryPrivate(tuple, m_tmp1);
+        ++m_inserts;
+        return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
     bool deleteEntry(const TableTuple *tuple)
     {
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
-        return deleteEntryPrivate(tuple, m_tmp1);
+        ++m_deletes;
+        MapIterator iter = findTuple(*tuple);
+        if (iter.isEnd()) {
+            return false;
+        }
+        return m_entries.erase(iter);
     }
 
     /**
@@ -92,69 +93,61 @@ public:
 
         // full delete and insert for certain key types
         if (KeyType::keyDependsOnTupleAddress()) {
-            if (!deleteEntry(&originalTuple)) return false;
-            return addEntry(&destinationTuple);
+            if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
+                return false;
+            }
+            return CompactingTreeMultiMapIndex::addEntry(&destinationTuple);
         }
 
-        m_tmp1.setFromTuple(&originalTuple, column_indices_, m_keySchema);
-        std::pair<MMIter,MMIter> key_iter;
-        for (key_iter = m_entries.equalRange(m_tmp1);
-             !key_iter.first.equals(key_iter.second);
-             key_iter.first.moveNext())
-        {
-            if (key_iter.first.value() == originalTuple.address())
-            {
-                key_iter.first.setValue(destinationTuple.address());
-                m_updates++;
-                return true;
-            }
+        MapIterator mapiter = findTuple(originalTuple);
+        if (mapiter.isEnd()) {
+            return false;
         }
-        return false;
+        mapiter.setValue(destinationTuple.address());
+        m_updates++;
+        return true;
     }
 
     bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
 
     bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs)
     {
-        m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
-        return !(m_eq(m_tmp1, m_tmp2));
+        return 0 != m_cmp(setKeyFromTuple(lhs), setKeyFromTuple(rhs));
     }
 
-    bool exists(const TableTuple* values)
+    bool exists(const TableTuple *persistentTuple)
     {
         ++m_lookups;
-        m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
-        //m_keyIter = m_entries.lower_bound(m_tmp1);
-        return (!m_entries.find(m_tmp1).isEnd());
+        return ! findTuple(*persistentTuple).isEnd();
     }
 
     bool moveToKey(const TableTuple *searchKey)
     {
-        m_tmp1.setFromKey(searchKey);
-        return moveToKey(m_tmp1);
-    }
-
-    bool moveToTuple(const TableTuple *searchTuple)
-    {
-        m_tmp1.setFromTuple(searchTuple, column_indices_, m_keySchema);
-        return moveToKey(m_tmp1);
+        ++m_lookups;
+        m_begin = true;
+        MapRange iter_pair = m_entries.equalRange(KeyType(searchKey));
+        m_keyIter = iter_pair.first;
+        m_keyEndIter = iter_pair.second;
+        if (m_keyIter.equals(m_keyEndIter)) {
+            m_match.move(NULL);
+            return false;
+        }
+        m_match.move(const_cast<void*>(m_keyIter.value()));
+        return true;
     }
 
     void moveToKeyOrGreater(const TableTuple *searchKey)
     {
         ++m_lookups;
         m_begin = true;
-        m_tmp1.setFromKey(searchKey);
-        m_seqIter = m_entries.lowerBound(m_tmp1);
+        m_keyIter = m_entries.lowerBound(KeyType(searchKey));
     }
 
     void moveToGreaterThanKey(const TableTuple *searchKey)
     {
         ++m_lookups;
         m_begin = true;
-        m_tmp1.setFromKey(searchKey);
-        m_seqIter = m_entries.upperBound(m_tmp1);
+        m_keyIter = m_entries.upperBound(KeyType(searchKey));
     }
 
     void moveToEnd(bool begin)
@@ -162,25 +155,22 @@ public:
         ++m_lookups;
         m_begin = begin;
         if (begin)
-            m_seqIter = m_entries.begin();
+            m_keyIter = m_entries.begin();
         else
-            m_seqIter = m_entries.rbegin();
+            m_keyIter = m_entries.rbegin();
     }
 
     TableTuple nextValue()
     {
-        TableTuple retval(m_tupleSchema);
+        TableTuple retval(getTupleSchema());
 
-        if (m_begin) {
-            if (m_seqIter.isEnd())
-                return TableTuple();
-            retval.move(const_cast<void*>(m_seqIter.value()));
-            m_seqIter.moveNext();
-        } else {
-            if (m_seqIter.isEnd())
-                return TableTuple();
-            retval.move(const_cast<void*>(m_seqIter.value()));
-            m_seqIter.movePrev();
+        if (! m_keyIter.isEnd()) {
+            retval.move(const_cast<void*>(m_keyIter.value()));
+            if (m_begin) {
+                m_keyIter.moveNext();
+            } else {
+                m_keyIter.movePrev();
+            }
         }
 
         return retval;
@@ -188,45 +178,57 @@ public:
 
     TableTuple nextValueAtKey()
     {
-        if (m_match.isNullTuple()) return m_match;
+        if (m_match.isNullTuple()) {
+            return m_match;
+        }
         TableTuple retval = m_match;
-        m_keyIter.first.moveNext();
-        if (m_keyIter.first.equals(m_keyIter.second))
+        m_keyIter.moveNext();
+        if (m_keyIter.equals(m_keyEndIter)) {
             m_match.move(NULL);
-        else
-            m_match.move(const_cast<void*>(m_keyIter.first.value()));
+        } else {
+            m_match.move(const_cast<void*>(m_keyIter.value()));
+        }
         return retval;
     }
 
     bool advanceToNextKey()
     {
-        if (m_keyIter.second.isEnd())
+        if (m_keyEndIter.isEnd()) {
             return false;
-        return moveToKey(m_keyIter.second.key());
+        }
+        ++m_lookups;
+        m_begin = true;
+        MapRange iter_pair = m_entries.equalRange(m_keyEndIter.key());
+        m_keyEndIter = iter_pair.second;
+        m_keyIter = iter_pair.first;
+        if (m_keyIter.isEnd()) {
+            m_match.move(NULL);
+            return false;
+        }
+        m_match.move(const_cast<void*>(m_keyIter.value()));
+        return true;
     }
 
-    bool hasKey(const TableTuple *searchKey) {
-        m_tmp1.setFromKey(searchKey);
-        return (m_entries.find(m_tmp1).isEnd() == false);
+    bool hasKey(const TableTuple *searchKey)
+    {
+        return ! findKey(searchKey).isEnd();
     }
 
     /**
      * @See comments in parent class TableIndex
      */
     int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
-        if (!hasRank) return -1;
-
-        m_tmp1.setFromKey(searchKey);
-        m_seqIter = m_entries.lowerBound(m_tmp1);
-
-        if (m_seqIter.isEnd()) {
+        if (!hasRank) {
+            return -1;
+        }
+        CompactingTreeMultiMapIndex::moveToKeyOrGreater(searchKey);
+        if (m_keyIter.isEnd()) {
             return m_entries.size() + 1;
+        }
+        if (isUpper) {
+            return m_entries.rankUpper(m_keyIter.key());
         } else {
-            if (isUpper) {
-                return m_entries.rankUpper(m_seqIter.key());
-            } else {
-                return m_entries.rankAsc(m_seqIter.key());
-            }
+            return m_entries.rankAsc(m_keyIter.key());
         }
     }
 
@@ -234,28 +236,28 @@ public:
      * @See comments in parent class TableIndex
      */
     int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
-        if (!hasRank) return -1;
-
-        m_tmp1.setFromKey(searchKey);
-        m_seqIter = m_entries.lowerBound(m_tmp1);
-
-        if (m_seqIter.isEnd())
-            return m_entries.size();
-
-        int cmp = m_eq(m_tmp1, m_seqIter.key());
-        KeyType tmpKey = m_seqIter.key();
-        if (cmp == 0) {
-            m_seqIter.movePrev();
-            if (m_seqIter.isEnd() == false) {
-                if (isUpper) return m_entries.rankUpper(m_seqIter.key());
-                else return m_entries.rankAsc(m_seqIter.key());
-            } else
-                // we can not find a previous key return rank as 0.
-                return 0;
+        if (!hasRank) {
+           return -1;
         }
-        // return rank with the current key if equal
-        if (isUpper) return m_entries.rankUpper(tmpKey);
-        else return m_entries.rankAsc(tmpKey);
+        ++m_lookups;
+        const KeyType tmpKey(searchKey);
+        MapIterator mapIter = m_entries.lowerBound(tmpKey);
+        if (mapIter.isEnd()) {
+            return m_entries.size();
+        }
+        int cmp = m_cmp(tmpKey, mapIter.key());
+        if (cmp != 0) {
+            mapIter.movePrev();
+            if (mapIter.isEnd()) {
+                // we can not find a previous key
+                return 0;
+            }
+        }
+        if (isUpper) {
+            return m_entries.rankUpper(mapIter.key());
+        } else {
+            return m_entries.rankAsc(mapIter.key());
+        }
     }
 
     size_t getSize() const { return m_entries.size(); }
@@ -265,70 +267,65 @@ public:
         return m_entries.bytesAllocated();
     }
 
+    std::string debug() const
+    {
+        std::ostringstream buffer;
+        buffer << TableIndex::debug() << std::endl;
+        MapIterator iter = m_entries.begin();
+        while (!iter.isEnd()) {
+            TableTuple retval(getTupleSchema());
+            retval.move(const_cast<void*>(iter.value()));
+            buffer << retval.debugNoHeader() << std::endl;
+            iter.moveNext();
+        }
+        std::string ret(buffer.str());
+        return (ret);
+    }
+
     std::string getTypeName() const { return "CompactingTreeMultiMapIndex"; };
 
-protected:
-    CompactingTreeMultiMapIndex(const TableIndexScheme &scheme) :
-        TableIndex(scheme),
-        m_entries(false, KeyComparator(m_keySchema)),
-        m_begin(true),
-        m_eq(m_keySchema)
-    {
-        m_match = TableTuple(m_tupleSchema);
+    MapIterator findKey(const TableTuple *searchKey) {
+        m_keyEndIter = MapIterator();
+        return m_entries.find(KeyType(searchKey));
     }
 
-    inline bool addEntryPrivate(const TableTuple *tuple, const KeyType &key)
+    MapIterator findTuple(const TableTuple &originalTuple)
     {
-        ++m_inserts;
-        m_entries.insert(std::pair<KeyType, const void*>(key, tuple->address()));
-        return true;
-    }
-
-    inline bool deleteEntryPrivate(const TableTuple *tuple, const KeyType &key)
-    {
-        ++m_deletes;
-        MMIter iter;
-
-        iter = m_entries.find(key);
-
-        if (iter.isEnd()) return false;
-
-        do {
-            if (iter.value() == tuple->address()) {
-                return m_entries.erase(iter);
+        for (MapRange iter_pair = m_entries.equalRange(setKeyFromTuple(&originalTuple));
+             ! iter_pair.first.equals(iter_pair.second);
+             iter_pair.first.moveNext()) {
+            if (iter_pair.first.value() == originalTuple.address()) {
+                return iter_pair.first;
             }
-            iter.moveNext();
-        } while ((!iter.isEnd()) && (m_eq(iter.key(), key)));
-
-        return false;
+        }
+        return MapIterator();
     }
 
-    bool moveToKey(const KeyType &key)
+    const KeyType setKeyFromTuple(const TableTuple *tuple)
     {
-        ++m_lookups;
-        m_begin = true;
-        m_keyIter = m_entries.equalRange(key);
-        if (m_keyIter.first.equals(m_keyIter.second))
-        {
-            m_match.move(NULL);
-            return false;
-        }
-        m_match.move(const_cast<void*>(m_keyIter.first.value()));
-        return !m_match.isNullTuple();
+        KeyType result(tuple, m_scheme.columnIndices, m_keySchema);
+        return result;
     }
 
     MapType m_entries;
-    KeyType m_tmp1;
-    KeyType m_tmp2;
 
     // iteration stuff
     bool m_begin;
-    typename std::pair<MMIter, MMIter> m_keyIter;
-    MMIter m_seqIter;
+    MapIterator m_keyIter;
+    MapIterator m_keyEndIter;
     TableTuple m_match;
 
     // comparison stuff
-    KeyEqualityChecker m_eq;
+    KeyComparator m_cmp;
+
+public:
+    CompactingTreeMultiMapIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
+        TableIndex(keySchema, scheme),
+        m_entries(false, KeyComparator(keySchema)),
+        m_begin(true),
+        m_match(getTupleSchema()),
+        m_cmp(keySchema)
+    {}
 };
 
 }
