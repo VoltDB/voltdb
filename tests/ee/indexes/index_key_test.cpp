@@ -43,9 +43,9 @@ TEST_F(IndexKeyTest, Int64KeyTest) {
     std::vector<bool> columnAllowNull(1, true);
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsLessComparator<1> comparator(keySchema);
-    voltdb::IntsHasher<1> hasher(keySchema);
-    voltdb::IntsEqualityChecker<1> equality(keySchema);
+    voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
+    voltdb::IntsKey<1>::KeyHasher hasher(keySchema);
+    voltdb::IntsKey<1>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple keyTuple(keySchema);
     keyTuple.move(new char[keyTuple.tupleLength()]);
@@ -55,29 +55,28 @@ TEST_F(IndexKeyTest, Int64KeyTest) {
     otherTuple.move(new char[otherTuple.tupleLength()]);
     otherTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(25)));
 
-    voltdb::IntsKey<1> keyKey;
-    keyKey.setFromKey(&keyTuple);
+    voltdb::IntsKey<1> keyKey(&keyTuple);
 
-    voltdb::IntsKey<1> otherKey;
-    otherKey.setFromKey(&otherTuple);
+    voltdb::IntsKey<1> otherKey(&otherTuple);
 
-    EXPECT_FALSE(equality.operator ()(keyKey, otherKey));
-    EXPECT_FALSE(comparator.operator ()(keyKey, otherKey));
-    EXPECT_TRUE(comparator.operator ()(otherKey, keyKey));
+    EXPECT_FALSE(equality.operator()(keyKey, otherKey));
+    EXPECT_EQ( 1, comparator.operator()(keyKey, otherKey));
+    EXPECT_EQ( 0, comparator.operator()(keyKey,keyKey));
+    EXPECT_EQ( 0, comparator.operator()(otherKey, otherKey));
+    EXPECT_EQ(-1, comparator.operator()(otherKey, keyKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
     thirdTuple.move(new char[thirdTuple.tupleLength()]);
     thirdTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
-    voltdb::IntsKey<1> thirdKey;
-    thirdKey.setFromKey(&thirdTuple);
-    EXPECT_TRUE(equality.operator ()(keyKey, thirdKey));
+    voltdb::IntsKey<1> thirdKey(&thirdTuple);
+    EXPECT_TRUE(equality.operator()(keyKey, thirdKey));
 
     otherTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
-    otherKey.setFromKey(&otherTuple);
+    voltdb::IntsKey<1> anotherKey(&otherTuple);
 
-    EXPECT_TRUE(equality.operator ()(keyKey, otherKey));
+    EXPECT_TRUE(equality.operator()(keyKey, anotherKey));
 
-    EXPECT_FALSE(comparator.operator()(keyKey, otherKey));
+    EXPECT_EQ( 0, comparator.operator()(keyKey, anotherKey));
 
     delete [] keyTuple.address();
     delete [] otherTuple.address();
@@ -92,9 +91,9 @@ TEST_F(IndexKeyTest, TwoInt64KeyTest) {
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
 
-    voltdb::IntsLessComparator<2> comparator(keySchema);
-    voltdb::IntsHasher<2> hasher(keySchema);
-    voltdb::IntsEqualityChecker<2> equality(keySchema);
+    voltdb::IntsKey<2>::KeyComparator comparator(keySchema);
+    voltdb::IntsKey<2>::KeyHasher hasher(keySchema);
+    voltdb::IntsKey<2>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple keyTuple(keySchema);
     keyTuple.move(new char[keyTuple.tupleLength()]);
@@ -106,32 +105,31 @@ TEST_F(IndexKeyTest, TwoInt64KeyTest) {
     otherTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
     otherTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
 
-    voltdb::IntsKey<2> keyKey;
-    keyKey.setFromKey(&keyTuple);
+    voltdb::IntsKey<2> keyKey(&keyTuple);
 
-    voltdb::IntsKey<2> otherKey;
-    otherKey.setFromKey(&otherTuple);
+    voltdb::IntsKey<2> otherKey(&otherTuple);
 
-    EXPECT_FALSE(equality.operator ()(keyKey, otherKey));
-    EXPECT_FALSE(comparator.operator ()(keyKey, otherKey));
-    EXPECT_TRUE(comparator.operator ()(otherKey, keyKey));
+    EXPECT_FALSE(equality.operator()(keyKey, otherKey));
+    EXPECT_EQ( 1, comparator.operator()(keyKey, otherKey));
+    EXPECT_EQ( 0, comparator.operator()(keyKey,keyKey));
+    EXPECT_EQ( 0, comparator.operator()(otherKey, otherKey));
+    EXPECT_EQ(-1, comparator.operator()(otherKey, keyKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
     thirdTuple.move(new char[thirdTuple.tupleLength()]);
     thirdTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
     thirdTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(70)));
-    voltdb::IntsKey<2> thirdKey;
-    thirdKey.setFromKey(&thirdTuple);
-    EXPECT_TRUE(equality.operator ()(keyKey, thirdKey));
-    EXPECT_FALSE(comparator.operator()(keyKey, thirdKey));
+    voltdb::IntsKey<2> thirdKey(&thirdTuple);
+    EXPECT_TRUE(equality.operator()(keyKey, thirdKey));
+    EXPECT_EQ( 0, comparator.operator()(keyKey, thirdKey));
 
     otherTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
     otherTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(70)));
-    otherKey.setFromKey(&otherTuple);
+    voltdb::IntsKey<2> anotherKey(&otherTuple);
 
-    EXPECT_TRUE(equality.operator ()(keyKey, otherKey));
+    EXPECT_TRUE(equality.operator()(keyKey, anotherKey));
 
-    EXPECT_FALSE(comparator.operator()(keyKey, otherKey));
+    EXPECT_EQ( 0, comparator.operator()(keyKey, anotherKey));
 
     delete [] keyTuple.address();
     delete [] otherTuple.address();
@@ -146,9 +144,9 @@ TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
 
-    voltdb::IntsLessComparator<2> comparator(keySchema);
-    voltdb::IntsHasher<2> hasher(keySchema);
-    voltdb::IntsEqualityChecker<2> equality(keySchema);
+    voltdb::IntsKey<2>::KeyComparator comparator(keySchema);
+    voltdb::IntsKey<2>::KeyHasher hasher(keySchema);
+    voltdb::IntsKey<2>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
     firstTuple.move(new char[firstTuple.tupleLength()]);
@@ -160,25 +158,22 @@ TEST_F(IndexKeyTest, TwoInt64RegressionKeyTest) {
     secondTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
     secondTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(0)));
 
-    voltdb::IntsKey<2> firstKey;
-    firstKey.setFromKey(&firstTuple);
+    voltdb::IntsKey<2> firstKey(&firstTuple);
 
-    voltdb::IntsKey<2> secondKey;
-    secondKey.setFromKey(&secondTuple);
+    voltdb::IntsKey<2> secondKey(&secondTuple);
 
-    EXPECT_FALSE(equality.operator ()(firstKey, secondKey));
-    EXPECT_FALSE(comparator.operator ()(firstKey, secondKey));
-    EXPECT_TRUE(comparator.operator ()(secondKey, firstKey));
+    EXPECT_FALSE(equality.operator()(firstKey, secondKey));
+    EXPECT_EQ( 1, comparator.operator()(firstKey, secondKey));
+    EXPECT_EQ(-1, comparator.operator()(secondKey, firstKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
     thirdTuple.move(new char[thirdTuple.tupleLength()]);
     thirdTuple.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
     thirdTuple.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
-    voltdb::IntsKey<2> thirdKey;
-    thirdKey.setFromKey(&thirdTuple);
-    EXPECT_FALSE(equality.operator ()(firstKey, thirdKey));
-    EXPECT_FALSE(comparator.operator()(firstKey, thirdKey));
-    EXPECT_TRUE(comparator.operator()(thirdKey, firstKey));
+    voltdb::IntsKey<2> thirdKey(&thirdTuple);
+    EXPECT_FALSE(equality.operator()(firstKey, thirdKey));
+    EXPECT_EQ( 1, comparator.operator()(firstKey, thirdKey));
+    EXPECT_EQ(-1, comparator.operator()(thirdKey, firstKey));
 
     delete [] firstTuple.address();
     delete [] secondTuple.address();
@@ -201,9 +196,9 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsLessComparator<1> comparator(keySchema);
-    voltdb::IntsHasher<1> hasher(keySchema);
-    voltdb::IntsEqualityChecker<1> equality(keySchema);
+    voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
+    voltdb::IntsKey<1>::KeyHasher hasher(keySchema);
+    voltdb::IntsKey<1>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
     firstTuple.move(new char[firstTuple.tupleLength()]);
@@ -217,26 +212,23 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest) {
     secondTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     secondTuple.setNValue(2, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
 
-    voltdb::IntsKey<1> firstKey;
-    firstKey.setFromKey(&firstTuple);
+    voltdb::IntsKey<1> firstKey(&firstTuple);
 
-    voltdb::IntsKey<1> secondKey;
-    secondKey.setFromKey(&secondTuple);
+    voltdb::IntsKey<1> secondKey(&secondTuple);
 
-    EXPECT_FALSE(equality.operator ()(firstKey, secondKey));
-    EXPECT_FALSE(comparator.operator ()(firstKey, secondKey));
-    EXPECT_TRUE(comparator.operator ()(secondKey, firstKey));
+    EXPECT_FALSE(equality.operator()(firstKey, secondKey));
+    EXPECT_EQ( 1, comparator.operator()(firstKey, secondKey));
+    EXPECT_EQ(-1, comparator.operator()(secondKey, firstKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
     thirdTuple.move(new char[thirdTuple.tupleLength()]);
     thirdTuple.setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(3300)));
     thirdTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     thirdTuple.setNValue(2, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
-    voltdb::IntsKey<1> thirdKey;
-    thirdKey.setFromKey(&thirdTuple);
-    EXPECT_TRUE(equality.operator ()(firstKey, thirdKey));
-    EXPECT_FALSE(comparator.operator()(firstKey, thirdKey));
-    EXPECT_FALSE(comparator.operator()(thirdKey, firstKey));
+    voltdb::IntsKey<1> thirdKey(&thirdTuple);
+    EXPECT_TRUE(equality.operator()(firstKey, thirdKey));
+    EXPECT_EQ( 0, comparator.operator()(firstKey, thirdKey));
+    EXPECT_EQ( 0, comparator.operator()(thirdKey, firstKey));
 
     delete [] firstTuple.address();
     delete [] secondTuple.address();
@@ -262,9 +254,9 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsLessComparator<1> comparator(keySchema);
-    voltdb::IntsHasher<1> hasher(keySchema);
-    voltdb::IntsEqualityChecker<1> equality(keySchema);
+    voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
+    voltdb::IntsKey<1>::KeyHasher hasher(keySchema);
+    voltdb::IntsKey<1>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
     firstTuple.move(new char[firstTuple.tupleLength()]);
@@ -278,41 +270,37 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8KeyTest2) {
     secondTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(32)));
     secondTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(200)));
 
-    voltdb::IntsKey<1> firstKey;
-    firstKey.setFromKey(&firstTuple);
+    voltdb::IntsKey<1> firstKey(&firstTuple);
 
-    voltdb::IntsKey<1> secondKey;
-    secondKey.setFromKey(&secondTuple);
+    voltdb::IntsKey<1> secondKey(&secondTuple);
 
-    EXPECT_FALSE(equality.operator ()(firstKey, secondKey));
-    EXPECT_TRUE(comparator.operator ()(firstKey, secondKey));
-    EXPECT_FALSE(comparator.operator ()(secondKey, firstKey));
+    EXPECT_FALSE(equality.operator()(firstKey, secondKey));
+    EXPECT_EQ(-1, comparator.operator()(firstKey, secondKey));
+    EXPECT_EQ( 1, comparator.operator()(secondKey, firstKey));
 
     voltdb::TableTuple thirdTuple(keySchema);
     thirdTuple.move(new char[thirdTuple.tupleLength()]);
     thirdTuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     thirdTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     thirdTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(-1)));
-    voltdb::IntsKey<1> thirdKey;
-    thirdKey.setFromKey(&thirdTuple);
-    EXPECT_TRUE(equality.operator ()(firstKey, thirdKey));
-    EXPECT_FALSE(comparator.operator()(firstKey, thirdKey));
-    EXPECT_FALSE(comparator.operator()(thirdKey, firstKey));
+    voltdb::IntsKey<1> thirdKey(&thirdTuple);
+    EXPECT_TRUE(equality.operator()(firstKey, thirdKey));
+    EXPECT_EQ( 0, comparator.operator()(firstKey, thirdKey));
+    EXPECT_EQ( 0, comparator.operator()(thirdKey, firstKey));
 
     voltdb::TableTuple fourthTuple(keySchema);
     fourthTuple.move(new char[fourthTuple.tupleLength()]);
     fourthTuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(2)));
     fourthTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     fourthTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(-1)));
-    voltdb::IntsKey<1> fourthKey;
-    fourthKey.setFromKey(&fourthTuple);
+    voltdb::IntsKey<1> fourthKey(&fourthTuple);
 
     EXPECT_FALSE(equality.operator ()(fourthKey, firstKey));
     EXPECT_FALSE(equality.operator ()(fourthKey, secondKey));
     EXPECT_FALSE(equality.operator ()(fourthKey, thirdKey));
 
-    EXPECT_TRUE(comparator.operator()(firstKey, fourthKey));
-    EXPECT_FALSE(comparator.operator()(fourthKey, firstKey));
+    EXPECT_EQ(-1, comparator.operator()(firstKey, fourthKey));
+    EXPECT_EQ( 1, comparator.operator()(fourthKey, firstKey));
 
     delete [] firstTuple.address();
     delete [] secondTuple.address();
@@ -337,9 +325,9 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsLessComparator<1> comparator(keySchema);
-    voltdb::IntsHasher<1> hasher(keySchema);
-    voltdb::IntsEqualityChecker<1> equality(keySchema);
+    voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
+    voltdb::IntsKey<1>::KeyHasher hasher(keySchema);
+    voltdb::IntsKey<1>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
     firstTuple.move(new char[firstTuple.tupleLength()]);
@@ -353,15 +341,13 @@ TEST_F(IndexKeyTest, Int32AndTwoInt8RegressionTest) {
     secondTuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(1)));
     secondTuple.setNValue(2, ValueFactory::getIntegerValue(static_cast<int32_t>(3000)));
 
-    voltdb::IntsKey<1> firstKey;
-    firstKey.setFromKey(&firstTuple);
+    voltdb::IntsKey<1> firstKey(&firstTuple);
 
-    voltdb::IntsKey<1> secondKey;
-    secondKey.setFromKey(&secondTuple);
+    voltdb::IntsKey<1> secondKey(&secondTuple);
 
-    EXPECT_FALSE(equality.operator ()(firstKey, secondKey));
-    EXPECT_TRUE(comparator.operator ()(firstKey, secondKey));
-    EXPECT_FALSE(comparator.operator ()(secondKey, firstKey));
+    EXPECT_FALSE(equality.operator()(firstKey, secondKey));
+    EXPECT_EQ(-1, comparator.operator()(firstKey, secondKey));
+    EXPECT_EQ( 1, comparator.operator()(secondKey, firstKey));
 
     delete [] firstTuple.address();
     delete [] secondTuple.address();
@@ -378,9 +364,9 @@ TEST_F(IndexKeyTest, SingleVarChar30) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::GenericLessComparator<40> comparator(keySchema);
-    voltdb::GenericHasher<40> hasher(keySchema);
-    voltdb::GenericEqualityChecker<40> equality(keySchema);
+    voltdb::GenericKey<40>::KeyComparator comparator(keySchema);
+    voltdb::GenericKey<40>::KeyHasher hasher(keySchema);
+    voltdb::GenericKey<40>::KeyEqualityChecker equality(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
     firstTuple.move(new char[firstTuple.tupleLength()]);
@@ -397,18 +383,12 @@ TEST_F(IndexKeyTest, SingleVarChar30) {
     voltdb::NValue thirdValue = ValueFactory::getStringValue("value");
     thirdTuple.setNValue(0, thirdValue);
 
-    voltdb::GenericKey<40> firstKey;
-    firstKey.setFromKey(&firstTuple);
+    voltdb::GenericKey<40> firstKey(&firstTuple);
+    voltdb::GenericKey<40> secondKey(&secondTuple);
+    voltdb::GenericKey<40> thirdKey(&thirdTuple);
 
-    voltdb::GenericKey<40> secondKey;
-    secondKey.setFromKey(&secondTuple);
-
-    voltdb::GenericKey<40> thirdKey;
-    thirdKey.setFromKey(&thirdTuple);
-
-
-    EXPECT_FALSE(equality.operator ()(firstKey, secondKey));
-    EXPECT_TRUE(equality.operator ()(firstKey, thirdKey));
+    EXPECT_FALSE(equality.operator()(firstKey, secondKey));
+    EXPECT_TRUE(equality.operator()(firstKey, thirdKey));
 
     delete [] firstTuple.address();
     delete [] secondTuple.address();
@@ -431,7 +411,7 @@ TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
 
     voltdb::TupleSchema *keySchema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-    voltdb::IntsLessComparator<1> comparator(keySchema);
+    voltdb::IntsKey<1>::KeyComparator comparator(keySchema);
 
     voltdb::TableTuple firstTuple(keySchema);
     firstTuple.move(new char[firstTuple.tupleLength()]);
@@ -450,18 +430,12 @@ TEST_F(IndexKeyTest, Int64Packing2Int32sWithSecondNull) {
     thirdTuple.setNValue(0, ValueFactory::getIntegerValue(0));
     thirdTuple.setNValue(1, ValueFactory::getIntegerValue(1));
 
-    voltdb::IntsKey<1>  firstKey;
-    firstKey.setFromKey(&firstTuple);
+    voltdb::IntsKey<1>  firstKey(&firstTuple);
+    voltdb::IntsKey<1>  secondKey(&secondTuple);
+    voltdb::IntsKey<1>  thirdKey(&thirdTuple);
 
-    voltdb::IntsKey<1>  secondKey;
-    secondKey.setFromKey(&secondTuple);
-
-    voltdb::IntsKey<1>  thirdKey;
-    thirdKey.setFromKey(&thirdTuple);
-
-    EXPECT_TRUE(comparator.operator ()(firstKey, thirdKey));
-    EXPECT_TRUE(comparator.operator ()(firstKey, secondKey));
-
+    EXPECT_EQ(-1, comparator.operator()(firstKey, thirdKey));
+    EXPECT_EQ(-1, comparator.operator()(firstKey, secondKey));
 
     delete [] firstTuple.address();
     delete [] secondTuple.address();

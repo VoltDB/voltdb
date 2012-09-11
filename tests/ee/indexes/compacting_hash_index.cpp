@@ -106,15 +106,10 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
     TableTuple *tuple4 = newTuple(schema, 0, 10);
     EXPECT_TRUE(index->replaceEntryNoKeyChange(*tuple4, *tuple1));
 
+    EXPECT_FALSE(index->exists(tuple1));
     EXPECT_TRUE(index->exists(tuple2));
     EXPECT_TRUE(index->exists(tuple3));
     EXPECT_TRUE(index->exists(tuple4));
-
-    EXPECT_TRUE(index->moveToTuple(tuple4));
-    TableTuple tmp = TableTuple(schema);
-    while(!(tmp = index->nextValueAtKey()).isNullTuple()) {
-        EXPECT_EQ(tmp.address(), tuple4->address());
-    }
 
     delete index;
     TupleSchema::freeTupleSchema(schema);
