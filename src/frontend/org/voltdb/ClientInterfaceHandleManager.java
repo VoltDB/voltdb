@@ -60,8 +60,6 @@ public class ClientInterfaceHandleManager
         HandleGenerator(int partitionId)
         {
             m_partitionId = partitionId;
-            hostLog.info("Constructing HandleGenerator for partition: " +
-                    m_partitionId);
         }
 
         public long getNextHandle()
