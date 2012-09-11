@@ -33,6 +33,7 @@ public class ProcessData {
     private final Session m_ssh_session;
     private final Channel m_channel;
     private final StreamWatcher m_out;
+    private final StreamWatcher m_err;
     private Thread m_sshThread;
 
     private static VoltLogger log = new VoltLogger("SSH");
@@ -107,10 +108,10 @@ public class ProcessData {
 
         // Set up the i/o streams
         m_channel.setInputStream(null);
-        ((ChannelExec)m_channel).setErrStream(System.err);
-
         BufferedReader out = new BufferedReader(new InputStreamReader(m_channel.getInputStream()));
+        BufferedReader err = new BufferedReader(new InputStreamReader(((ChannelExec) m_channel).getErrStream()));
         m_out = new StreamWatcher(out, processName, Stream.STDOUT, handler);
+        m_err = new StreamWatcher(err, processName, Stream.STDERR, handler);
 
         /*
          * Execute the command non-blocking.
@@ -121,6 +122,7 @@ public class ProcessData {
                 try {
                     m_channel.connect();
                     m_out.start();
+                    m_err.start();
                 } catch (Exception e) {
                     e.printStackTrace();
                     log.error("Error attempting SSH command: " + command, e);
@@ -132,6 +134,7 @@ public class ProcessData {
 
     public int kill() {
         m_out.m_expectDeath.set(true);
+        m_err.m_expectDeath.set(true);
         int retval = -255;
         m_channel.disconnect();
         m_ssh_session.disconnect();

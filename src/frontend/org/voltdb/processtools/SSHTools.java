@@ -17,12 +17,15 @@
 
 package org.voltdb.processtools;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.Reader;
 
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
@@ -76,6 +79,7 @@ public class SSHTools {
             if (null != key)
                 jsch.addIdentity(key);
             Session session=jsch.getSession(user, host, 22);
+            session.setTimeout(5000);
 
             // To avoid the UnknownHostKey issue
             java.util.Properties config = new java.util.Properties();
@@ -84,30 +88,44 @@ public class SSHTools {
 
             session.connect();
 
-            Channel channel=session.openChannel("exec");
-            ((ChannelExec)channel).setCommand(command);
+            Channel channel = session.openChannel("exec");
+            ((ChannelExec) channel).setCommand(command);
 
-            // Set up the i/o streams, in, out, err
-            //channel.setInputStream(System.in);
-            channel.setInputStream(null);
-            ((ChannelExec)channel).setErrStream(System.err);
-            InputStream in=channel.getInputStream();
+            // Direct stderr output of command
+            InputStream err = ((ChannelExec) channel).getErrStream();
+            InputStreamReader errStrRdr = new InputStreamReader(err, "UTF8");
+            Reader errStrBufRdr = new BufferedReader(errStrRdr);
+
+            // Direct stdout output of command
+            InputStream out = channel.getInputStream();
+            InputStreamReader outStrRdr = new InputStreamReader(out, "UTF8");
+            Reader outStrBufRdr = new BufferedReader(outStrRdr);
 
             channel.connect();
-            byte[] tmp=new byte[1024];
-            while(true){
-                while(in.available()>0){
-                    int i=in.read(tmp, 0, 1024);
-                    if(i<0)break;
-                    String string_fragment = new String(tmp, 0, i);
-                    result += string_fragment;
-                }
-                if(channel.isClosed()){
-                    // System.out.println("exit-status: "+channel.getExitStatus());
+            while (true) {
+                if (channel.isClosed()) {
                     break;
                 }
-                try{Thread.sleep(100);}catch(Exception ee) {ee.printStackTrace();}
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ie) {
+                }
             }
+
+            // After the command is executed, gather the results (both stdin and stderr).
+            int ch;
+            StringBuffer stdout = new StringBuffer();
+            while ((ch = outStrBufRdr.read()) > -1) {
+                stdout.append((char) ch);
+            }
+            result = stdout.toString();
+            StringBuffer stderr = new StringBuffer();
+            while ((ch = errStrBufRdr.read()) > -1) {
+                stderr.append((char) ch);
+            }
+            result += stderr.toString();
+
+            // Shutdown the connection
             channel.disconnect();
             session.disconnect();
         }
@@ -184,7 +202,6 @@ public class SSHTools {
             channel.connect();
 
             if(checkAck(in)!=0){
-                System.out.println("checkAck did not equal zero.");
                 return false;
             }
 
@@ -197,7 +214,6 @@ public class SSHTools {
                 command+=(" "+(_lfile.lastModified()/1000)+" 0\n");
                 out.write(command.getBytes()); out.flush();
                 if(checkAck(in)!=0){
-                    System.out.println("checkAck did not equal zero.");
                     return false;
                 }
             }
@@ -214,7 +230,6 @@ public class SSHTools {
             command+="\n";
             out.write(command.getBytes()); out.flush();
             if(checkAck(in)!=0){
-                System.out.println("checkAck did not equal zero.");
                 return false;
             }
 
@@ -231,7 +246,6 @@ public class SSHTools {
             // send '\0'
             buf[0]=0; out.write(buf, 0, 1); out.flush();
             if(checkAck(in)!=0){
-                System.out.println("checkAck did not equal zero.");
                 return false;
             }
             out.close();
