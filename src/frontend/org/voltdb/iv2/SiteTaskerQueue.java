@@ -37,6 +37,8 @@ public class SiteTaskerQueue
         SiteTasker task = m_tasks.poll();
         if (task == null) {
             m_starvationTracker.beginStarvation();
+        } else {
+            return task;
         }
         try {
             return m_tasks.take();
