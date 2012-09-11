@@ -211,7 +211,8 @@ function isUpdateResult(table)
 }
 function applyFormat(val)
 {
-    if (null != val) 
+    // Formatting for explain proc.  Only format on objects that have a replace function
+    if (null != val && val.replace != null) 
     {
         val = val.replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
         val = val.replace(/ /g, '&nbsp;');
