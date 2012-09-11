@@ -17,6 +17,7 @@
 
 package org.voltdb.dtxn;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +27,10 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.iv2.Site;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.iv2.Site;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -59,6 +61,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
+    protected List<byte[]> m_adhocStmts = null;
 
     // is this transaction run during a rejoin
     protected RejoinState m_rejoinState = RejoinState.NORMAL;
@@ -256,5 +259,32 @@ public abstract class TransactionState extends OrderableTransaction  {
     public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
     {
         return null;
+    }
+
+    /**
+     * Add to the log of sql run for adhocs (for DR, usually)
+     */
+    public void appendAdHocSQL(byte[] sql) {
+        if (m_adhocStmts == null) {
+            m_adhocStmts = new ArrayList<byte[]>();
+        }
+        m_adhocStmts.add(sql);
+    }
+
+    /**
+     * Get a string that combines all of the adhoc SQL run
+     * combined by a semicolon (for DR, usually)
+     */
+    public String getBatchFormattedAdHocSQLString() {
+        if ((m_adhocStmts == null) || (m_adhocStmts.size() == 0)) {
+            return null;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (byte[] bytes : m_adhocStmts) {
+            sb.append(new String(bytes, VoltDB.UTF8ENCODING)).append(';');
+        }
+
+        return sb.toString();
     }
 }
