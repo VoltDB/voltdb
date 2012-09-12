@@ -96,7 +96,7 @@ public:
         int num_of_columns = 100;
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
-        string *columnNames = new string[num_of_columns];
+        vector<string> columnNames(num_of_columns);
 
         vector<ValueType> columnTypes(num_of_columns, VALUE_TYPE_BIGINT);
         vector<int32_t> columnLengths(num_of_columns, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
@@ -165,7 +165,7 @@ public:
 
         TableIndexScheme pkey(name,
                               BALANCED_TREE_INDEX,
-                              pkey_column_indices, TableIndex::indexColumnsDirectly(),
+                              pkey_column_indices,
                               true, true, schema);
 
         vector<TableIndexScheme> indexes;
@@ -179,9 +179,7 @@ public:
           dynamic_cast<PersistentTable*>
           (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_wide_table", schema,
-                                            columnNames, pkey, indexes, -1, false, false));
-
-        delete[] columnNames;
+                                            columnNames, &pkey, indexes, -1, false, false));
 
         for (int64_t row = 1; row <= NUM_OF_WIDE_TUPLES; ++row)
         {
@@ -266,13 +264,13 @@ public:
         bool countable = true;
         TupleSchema *initiallyNullTupleSchema = NULL;
         TableIndexScheme index(name, type,
-                               ix_columnIndices, TableIndex::indexColumnsDirectly(),
+                               ix_columnIndices,
                                unique, countable, initiallyNullTupleSchema);
 
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
 
-        string *columnNames = new string[NUM_OF_COLUMNS];
+        vector<string> columnNames(NUM_OF_COLUMNS);
 
         char buffer[32];
         vector<ValueType> columnTypes(NUM_OF_COLUMNS, VALUE_TYPE_BIGINT);
@@ -297,7 +295,7 @@ public:
         pkey_column_indices.push_back(0);
         pkey_column_indices.push_back(1);
         TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
-                              pkey_column_indices, TableIndex::indexColumnsDirectly(),
+                              pkey_column_indices,
                               true, true, schema);
 
         vector<TableIndexScheme> indexes;
@@ -310,9 +308,7 @@ public:
             dynamic_cast<PersistentTable*>
           (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_table", schema,
-                                            columnNames, pkey, indexes, -1, false, false));
-
-        delete[] columnNames;
+                                            columnNames, &pkey, indexes, -1, false, false));
 
         for (int64_t i = 1; i <= NUM_OF_TUPLES; ++i)
         {

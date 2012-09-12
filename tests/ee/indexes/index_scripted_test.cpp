@@ -204,49 +204,49 @@ void setNewCurrent(const char *testName,
 
         if (strcmp(indexName, kMultiIntsHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
-                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            columnIndices,
                                             false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiIntsTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
-                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            columnIndices,
                                             false, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
-                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            columnIndices,
                                             false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
-                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            columnIndices,
                                             false, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
-                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            columnIndices,
                                             true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
-                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            columnIndices,
                                             true, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
-                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            columnIndices,
                                             true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
-                                            columnIndices, TableIndex::indexColumnsDirectly(),
+                                            columnIndices,
                                             true, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }

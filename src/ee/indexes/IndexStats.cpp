@@ -107,7 +107,7 @@ IndexStats::generateEmptyIndexStatsTable()
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
                                                             name,
                                                             schema,
-                                                            &columnNames[0],
+                                                            columnNames,
                                                             NULL));
 }
 

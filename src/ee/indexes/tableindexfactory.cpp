@@ -200,22 +200,27 @@ private:
     TableIndexType m_type;
 };
 
+// check if any indexed expression does not have an int type
+static bool isNotIntType(ValueType exprType) {
+    return (exprType != VALUE_TYPE_TINYINT) &&
+           (exprType != VALUE_TYPE_SMALLINT) &&
+           (exprType != VALUE_TYPE_INTEGER) &&
+           (exprType != VALUE_TYPE_BIGINT);
+}
+
+
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     int colCount = (int)scheme.columnIndices.size();
     TupleSchema *tupleSchema = scheme.tupleSchema;
     assert(tupleSchema);
+    bool isIntsOnly = true;
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
     std::vector<bool> keyColumnAllowNull(colCount, true);
-    bool isIntsOnly = true;
     for (int i = 0; i < colCount; ++i) {
         ValueType exprType = tupleSchema->columnType(scheme.columnIndices[i]);
-        // check if the column does not have an int type
-        if ((exprType != VALUE_TYPE_TINYINT) &&
-            (exprType != VALUE_TYPE_SMALLINT) &&
-            (exprType != VALUE_TYPE_INTEGER) &&
-            (exprType != VALUE_TYPE_BIGINT)) {
-            isIntsOnly = false;
+        if (isNotIntType(exprType)) {
+                isIntsOnly = false;
         }
         keyColumnTypes.push_back(exprType);
         keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[i]));

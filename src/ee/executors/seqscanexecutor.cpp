@@ -88,19 +88,8 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     //
     else
     {
-        TupleSchema* schema = node->generateTupleSchema(true);
-        int column_count = static_cast<int>(node->getOutputSchema().size());
-        std::string* column_names = new std::string[column_count];
-        for (int ctr = 0; ctr < column_count; ctr++)
-        {
-            column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
-        }
-        node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                        node->getTargetTable()->name(),
-                                                        schema,
-                                                        column_names,
-                                                        limits));
-        delete[] column_names;
+        // Create output table based on output schema from the plan
+        setTempOutputTable(limits, node->getTargetTable()->name());
     }
     return true;
 }

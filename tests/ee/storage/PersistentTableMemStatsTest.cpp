@@ -82,7 +82,6 @@ public:
             TableIndexScheme("primaryKeyIndex",
                              BALANCED_TREE_INDEX,
                              m_primaryKeyIndexColumns,
-                             TableIndex::indexColumnsDirectly(),
                              true, true, m_tableSchema);
 
         vector<TableIndexScheme> indexes;
@@ -91,7 +90,7 @@ public:
             dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable
                                            (0, m_engine->getExecutorContext(),
                                             "Foo", m_tableSchema,
-                                            &m_columnNames[0], indexScheme,
+                                            m_columnNames, &indexScheme,
                                             indexes, 0, false, false));
     }
 

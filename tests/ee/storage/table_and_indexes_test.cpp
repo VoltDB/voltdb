@@ -40,18 +40,6 @@
 using namespace voltdb;
 using namespace std;
 
-string      districtColumnNames[11] = {
-        "D_ID", "D_W_ID", "D_NAME", "D_STREET_1", "D_STREET_2", "D_CITY",
-        "D_STATE", "D_ZIP", "D_TAX", "D_YTD", "D_NEXT_O_ID" };
-string      warehouseColumnNames[9] = {
-        "W_ID", "W_NAME", "W_STREET_1", "W_STREET_2", "W_CITY", "W_STATE",
-        "W_ZIP", "W_TAX", "W_YTD" };
-string      customerColumnNames[21] = {
-        "C_ID", "C_D_ID", "C_W_ID", "C_FIRST", "C_MIDDLE", "C_LAST",
-        "C_STREET_1", "C_STREET_2", "C_CITY", "C_STATE", "C_ZIP", "C_PHONE",
-        "C_SINCE_TIMESTAMP", "C_CREDIT", "C_CREDIT_LIM", "C_DISCOUNT",
-        "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
-
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
@@ -82,7 +70,7 @@ class TableAndIndexTest : public Test {
             districtIndex1ColumnIndices.push_back(0);
 
             districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
-                                                    districtIndex1ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                    districtIndex1ColumnIndices,
                                                     true, false, districtTupleSchema);
 
             vector<voltdb::ValueType> warehouseColumnTypes;
@@ -105,7 +93,7 @@ class TableAndIndexTest : public Test {
             warehouseIndex1ColumnIndices.push_back(0);
 
             warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", ARRAY_INDEX,
-                                                     warehouseIndex1ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                     warehouseIndex1ColumnIndices,
                                                      true, true, warehouseTupleSchema);
 
             vector<voltdb::ValueType> customerColumnTypes;
@@ -144,7 +132,7 @@ class TableAndIndexTest : public Test {
             customerIndex1ColumnIndices.push_back(0);
 
             customerIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
-                                                    customerIndex1ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                    customerIndex1ColumnIndices,
                                                     true, true, customerTupleSchema);
 
             customerIndex2ColumnIndices.push_back(2);
@@ -153,7 +141,7 @@ class TableAndIndexTest : public Test {
             customerIndex2ColumnIndices.push_back(3);
 
             customerIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
-                                                    customerIndex2ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                    customerIndex2ColumnIndices,
                                                     true, true, customerTupleSchema);
             customerIndexes.push_back(customerIndex2Scheme);
 
@@ -162,16 +150,32 @@ class TableAndIndexTest : public Test {
             customerIndex3ColumnIndices.push_back(5);
 
             customerIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
-                                                    customerIndex3ColumnIndices, TableIndex::indexColumnsDirectly(),
+                                                    customerIndex3ColumnIndices,
                                                     false, false, customerTupleSchema);
             customerIndexes.push_back(customerIndex3Scheme);
 
 
+            string districtColumnNamesArray[11] = {
+                "D_ID", "D_W_ID", "D_NAME", "D_STREET_1", "D_STREET_2", "D_CITY",
+                "D_STATE", "D_ZIP", "D_TAX", "D_YTD", "D_NEXT_O_ID" };
+            const vector<string> districtColumnNames(districtColumnNamesArray, districtColumnNamesArray + 11 );
+
+            string warehouseColumnNamesArray[9] = {
+                    "W_ID", "W_NAME", "W_STREET_1", "W_STREET_2", "W_CITY", "W_STATE",
+                    "W_ZIP", "W_TAX", "W_YTD" };
+            const vector<string> warehouseColumnNames(warehouseColumnNamesArray, warehouseColumnNamesArray + 9 );
+
+            string customerColumnNamesArray[21] = {
+                    "C_ID", "C_D_ID", "C_W_ID", "C_FIRST", "C_MIDDLE", "C_LAST",
+                    "C_STREET_1", "C_STREET_2", "C_CITY", "C_STATE", "C_ZIP", "C_PHONE",
+                    "C_SINCE_TIMESTAMP", "C_CREDIT", "C_CREDIT_LIM", "C_DISCOUNT",
+                    "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
+            const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
             districtTable = voltdb::TableFactory::getPersistentTable(0,engine, "DISTRICT",
                                                                      districtTupleSchema,
                                                                      districtColumnNames,
-                                                                     districtIndex1Scheme,
+                                                                     &districtIndex1Scheme,
                                                                      districtIndexes, 0,
                                                                      false, false);
 
@@ -182,7 +186,7 @@ class TableAndIndexTest : public Test {
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, engine, "WAREHOUSE",
                                                                       warehouseTupleSchema,
                                                                       warehouseColumnNames,
-                                                                      warehouseIndex1Scheme,
+                                                                      &warehouseIndex1Scheme,
                                                                       warehouseIndexes, 0,
                                                                       false, false);
 
@@ -193,7 +197,7 @@ class TableAndIndexTest : public Test {
             customerTable = voltdb::TableFactory::getPersistentTable(0,engine, "CUSTOMER",
                                                                      customerTupleSchema,
                                                                      customerColumnNames,
-                                                                     customerIndex1Scheme,
+                                                                     &customerIndex1Scheme,
                                                                      customerIndexes, 0,
                                                                      false, false);
 

@@ -190,8 +190,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // ------------------------------------------------------------------
     // INDEXES
     // ------------------------------------------------------------------
-    virtual int indexCount() const { return m_indexCount; }
-    virtual int uniqueIndexCount() const { return m_uniqueIndexCount; }
+    virtual int indexCount() const { return (int)m_indexes.size(); }
+    virtual int uniqueIndexCount() const { return (int)m_uniqueIndexes.size(); }
     virtual std::vector<TableIndex*> allIndexes() const;
     virtual TableIndex *index(std::string name);
     virtual TableIndex *primaryKeyIndex() { return m_pkeyIndex; }
@@ -328,13 +328,11 @@ protected:
     ExecutorContext *m_executorContext;
 
     // CONSTRAINTS
-    TableIndex** m_uniqueIndexes;
-    int m_uniqueIndexCount;
-    bool* m_allowNulls;
+    std::vector<TableIndex*> m_uniqueIndexes;
+    std::vector<bool> m_allowNulls;
 
     // INDEXES
-    TableIndex** m_indexes;
-    int m_indexCount;
+    std::vector<TableIndex*> m_indexes;
     TableIndex *m_pkeyIndex;
 
     // partition key

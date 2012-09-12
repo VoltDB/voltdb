@@ -123,32 +123,28 @@ public:
         voltdb::TableIndexScheme indexScheme = voltdb::TableIndexScheme("BinaryTreeUniqueIndex",
                                                                         voltdb::BALANCED_TREE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        TableIndex::indexColumnsDirectly(),
                                                                         true, true, m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
         voltdb::TableIndexScheme indexScheme1 = voltdb::TableIndexScheme("BinaryTreeMultimapIndex",
                                                                         voltdb::BALANCED_TREE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        TableIndex::indexColumnsDirectly(),
                                                                         false, true, m_tableSchema);
         indexes.push_back(indexScheme1);
         voltdb::TableIndexScheme indexScheme2 = voltdb::TableIndexScheme("HashUniqueIndex",
                                                                         voltdb::HASH_TABLE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        TableIndex::indexColumnsDirectly(),
                                                                         true, false, m_tableSchema);
         indexes.push_back(indexScheme2);
         voltdb::TableIndexScheme indexScheme3 = voltdb::TableIndexScheme("HashMultimapIndex",
                                                                         voltdb::HASH_TABLE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        TableIndex::indexColumnsDirectly(),
                                                                         false, false, m_tableSchema);
         indexes.push_back(indexScheme3);
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
                                                          (0, m_engine->getExecutorContext(), "Foo",
-                                                          m_tableSchema, &m_columnNames[0], indexScheme, indexes, 0,
+                                                          m_tableSchema, m_columnNames, &indexScheme, indexes, 0,
                                                           false, false));
     }
 

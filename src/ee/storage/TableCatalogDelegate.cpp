@@ -70,7 +70,7 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     vector<int32_t> columnLengths(numColumns);
     vector<bool> columnAllowNull(numColumns);
     map<string, catalog::Column*>::const_iterator col_iterator;
-    string *columnNames = new string[numColumns];
+    vector<string> columnNames(numColumns);
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
         const catalog::Column *catalog_column = col_iterator->second;
@@ -97,7 +97,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
          idx_iterator != catalogTable.indexes().end(); idx_iterator++) {
         catalog::Index *catalog_index = idx_iterator->second;
         vector<int> index_columns;
-        vector<ValueType> column_types;
 
         // The catalog::Index object now has a list of columns that are to be
         // used
@@ -106,25 +105,13 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                        " to use",
                        catalog_index->name().c_str(),
                        catalogTable.name().c_str());
-            delete [] columnNames;
             return false;
-        }
-
-        if (catalog_index->expressionsjson().length() != 0) {
-            // When this gets supported, column type validations below will have to be replaced with expression type validations,
-            // and then the real work begins.
-            //printf("WARNING: for now, ignoring expression-based index '%s' on table '%s' having JSON expression: %s\n",
-            //          catalog_index->name().c_str(),
-            //          catalogTable.name().c_str(),
-            //          catalog_index->expressionsjson().c_str());
-            continue;
         }
 
         // Since the columns are not going to come back in the proper order from
         // the catalogs, we'll use the index attribute to make sure we put them
         // in the right order
         index_columns.resize(catalog_index->columns().size());
-        column_types.resize(catalog_index->columns().size());
         map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
         for (colref_iterator = catalog_index->columns().begin();
              colref_iterator != catalog_index->columns().end();
@@ -135,20 +122,16 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                            catalog_colref->index(),
                            catalog_index->name().c_str(),
                            catalogTable.name().c_str());
-                delete [] columnNames;
                 return false;
             }
             index_columns[catalog_colref->index()] = catalog_colref->column()->index();
-            column_types[catalog_colref->index()] = (ValueType) catalog_colref->column()->type();
         }
 
         TableIndexScheme index_scheme(catalog_index->name(),
                                       (TableIndexType)catalog_index->type(),
                                       index_columns,
-                                      TableIndex::indexColumnsDirectly(),
                                       catalog_index->unique(),
-                                      true,// Fix it as the next line when VoltDB can disable CountingIndex feature
-                                      //catalog_index->countable(),
+                                      true,//catalog_index->countable(),// Fix to allow disabling CountingIndex feature
                                       schema);
         index_map[catalog_index->name()] = index_scheme;
     }
@@ -172,7 +155,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                                constraintutil::getTypeName(type).c_str(),
                                catalog_constraint->name().c_str(),
                                catalogTable.name().c_str());
-                    delete [] columnNames;
                     return false;
                 }
                 // Make sure they didn't declare more than one primary key index
@@ -183,7 +165,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                                catalogTable.name().c_str(),
                                catalog_constraint->index()->name().c_str(),
                                pkey_index_id.c_str());
-                    delete [] columnNames;
                     return false;
                 }
                 pkey_index_id = catalog_constraint->index()->name();
@@ -199,7 +180,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                                constraintutil::getTypeName(type).c_str(),
                                catalog_constraint->name().c_str(),
                                catalogTable.name().c_str());
-                    delete [] columnNames;
                     return false;
                 }
                 break;
@@ -216,7 +196,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                 VOLT_ERROR("Invalid constraint type '%s' for '%s'",
                            constraintutil::getTypeName(type).c_str(),
                            catalog_constraint->name().c_str());
-                delete [] columnNames;
                 return false;
         }
     }
@@ -243,22 +222,16 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         partitionColumnIndex = partitionColumn->index();
     }
 
-    if (pkey_index_id.size() == 0) {
-        int32_t databaseId = catalogDatabase.relativeIndex();
-        m_table = TableFactory::getPersistentTable(databaseId, executorContext,
-                                                 catalogTable.name(), schema, columnNames,
-                                                 indexes, partitionColumnIndex,
-                                                 isExportEnabledForTable(catalogDatabase, table_id),
-                                                 isTableExportOnly(catalogDatabase, table_id));
-    } else {
-        int32_t databaseId = catalogDatabase.relativeIndex();
-        m_table = TableFactory::getPersistentTable(databaseId, executorContext,
-                                                 catalogTable.name(), schema, columnNames,
-                                                 pkey_index, indexes, partitionColumnIndex,
-                                                 isExportEnabledForTable(catalogDatabase, table_id),
-                                                 isTableExportOnly(catalogDatabase, table_id));
+    int32_t databaseId = catalogDatabase.relativeIndex();
+    TableIndexScheme* p_pkey_index = NULL;
+    if (pkey_index_id.size() != 0) {
+        p_pkey_index = &pkey_index;
     }
-    delete[] columnNames;
+    m_table = TableFactory::getPersistentTable(databaseId, executorContext,
+                                               catalogTable.name(), schema, columnNames,
+                                               p_pkey_index, indexes, partitionColumnIndex,
+                                               isExportEnabledForTable(catalogDatabase, table_id),
+                                               isTableExportOnly(catalogDatabase, table_id));
 
     m_exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     m_table->incrementRefcount();

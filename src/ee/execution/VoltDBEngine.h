@@ -389,10 +389,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         size_t tableHashCode(int32_t tableId);
 
     protected:
-        /*
-         * Get the list of persistent table Ids by inspecting the catalog.
-         */
-        std::vector<int32_t> getPersistentTableIds();
         std::string getClusterNameFromTable(voltdb::Table *table);
         std::string getDatabaseNameFromTable(voltdb::Table *table);
 
