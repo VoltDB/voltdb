@@ -160,6 +160,7 @@ public class TestHSQLBackend extends TestCase {
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("hsqldbbin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("hsqldbbin.xml");
         config.m_backend = BackendTarget.HSQLDB_BACKEND;
+        config.m_noLoadLibVOLTDB = true;
         ServerThread localServer = new ServerThread(config);
         localServer.start();
         localServer.waitForInitialization();
