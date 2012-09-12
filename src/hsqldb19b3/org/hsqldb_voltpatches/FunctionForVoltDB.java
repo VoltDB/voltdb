@@ -94,7 +94,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         private static final FunctionId[] instances = {
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0, new Type[] { null, Type.SQL_VARCHAR }, new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("decode", null, FUNC_VOLT_DECODE, 2, new Type[] { null, null, null, null, null,null, null,null },
+            new FunctionId("decode", null, FUNC_VOLT_DECODE, 2, new Type[] { null, null },
 
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,

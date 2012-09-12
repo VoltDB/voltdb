@@ -521,6 +521,85 @@ public class TestAdHocQueries extends AdHocQueryTester {
             catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("not yet support self joins") > 0);
             }
+            adHocQuery = "SELECT PNAME \n" +
+                    "         FROM PROJ \n" +
+                    "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +
+                    "                           AND PNUM > 'P2';";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on static clause");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("does not yet support where clauses containing only constants") > 0);
+            }
+            adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on invalid ");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+            }
+            adHocQuery = "CREATE INDEX IDX_PROJ_PNAME ON PROJ(PNAME);";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on invalid SQL verb");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+            }
+            adHocQuery = "ROLLBACK;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on invalid SQL verb");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+            }
+            adHocQuery = "DROP TABLE PROJ;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on invalid SQL verb");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+            }
+            adHocQuery = "PARTITION TABLE PROJ ON COLUMN PNUM;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail with unexpected token");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("unexpected token: PARTITION") > 0);
+            }
+            adHocQuery = "CREATE PROCEDURE AS SELECT 1 FROM PROJ;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail with unexpected token");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("unexpected token: AS") > 0);
+            }
+            adHocQuery = "CREATE PROCEDURE FROM CLASS bar.Foo;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail with unexpected token");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("unexpected token: FROM") > 0);
+            }
+            adHocQuery = "SELECT PNUM \n" +
+                    "          FROM WORKS \n" +
+                    "          WHERE PNUM > 'P1' \n" +
+                    "          GROUP BY PNUM \n" +
+                    "          HAVING COUNT(*) > 1;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery);
+                fail("did not fail on having clause");
+            }
+            catch (ProcCallException pcex) {
+                assertTrue(pcex.getMessage().indexOf("not yet support the HAVING clause") > 0);
+            }
         }
         finally {
             env.tearDown();
