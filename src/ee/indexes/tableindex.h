@@ -84,6 +84,7 @@ struct TableIndexScheme {
       name(other.name),
       type(other.type),
       columnIndices(other.columnIndices),
+      indexedExpressions(other.indexedExpressions),
       unique(other.unique),
       countable(other.countable),
       tupleSchema(other.tupleSchema)
@@ -94,6 +95,7 @@ struct TableIndexScheme {
         name = other.name;
         type = other.type;
         columnIndices = other.columnIndices;
+        indexedExpressions = other.indexedExpressions;
         unique = other.unique;
         countable = other.countable;
         tupleSchema = other.tupleSchema;

@@ -210,21 +210,38 @@ static bool isNotIntType(ValueType exprType) {
 
 
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
-    int colCount = (int)scheme.columnIndices.size();
     TupleSchema *tupleSchema = scheme.tupleSchema;
     assert(tupleSchema);
     bool isIntsOnly = true;
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
-    std::vector<bool> keyColumnAllowNull(colCount, true);
-    for (int i = 0; i < colCount; ++i) {
-        ValueType exprType = tupleSchema->columnType(scheme.columnIndices[i]);
-        if (isNotIntType(exprType)) {
+    int valueCount = (int) scheme.indexedExpressions.size();
+    if (valueCount != 0) {
+        for (int ii = 0; ii < valueCount; ++ii) {
+            ValueType exprType = scheme.indexedExpressions[ii]->getValueType();
+            if (isNotIntType(exprType)) {
                 isIntsOnly = false;
+            }
+            keyColumnTypes.push_back(exprType);
+            if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
+                // Not enough information to reliably determine that the value is small enough to "inline".
+                keyColumnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH);
+            } else {
+                keyColumnLengths.push_back(NValue::getTupleStorageSize(exprType));
+            }
         }
-        keyColumnTypes.push_back(exprType);
-        keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[i]));
+    } else {
+        valueCount = (int)scheme.columnIndices.size();
+        for (int ii = 0; ii < valueCount; ++ii) {
+            ValueType exprType = tupleSchema->columnType(scheme.columnIndices[ii]);
+            if (isNotIntType(exprType)) {
+                    isIntsOnly = false;
+            }
+            keyColumnTypes.push_back(exprType);
+            keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[ii]));
+        }
     }
+    std::vector<bool> keyColumnAllowNull(valueCount, true);
     TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
     assert(keySchema);
     VOLT_TRACE("Creating index for %s.\n%s", scheme.name.c_str(), keySchema->debug().c_str());

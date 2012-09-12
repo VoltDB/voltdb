@@ -213,6 +213,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         // -- not bothering for now.
         Column column = table.getColumns().getIgnoreCase(m_columnName);
         assert(column != null);
+        m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());

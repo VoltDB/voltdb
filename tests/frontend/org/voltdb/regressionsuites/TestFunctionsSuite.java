@@ -288,6 +288,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         assertTrue(caught);
 
+        cr = client.callProcedure("@AdHoc", "insert into R1 values (1, null, null, null, null)");
+
+        caught = false;
+        try {
+            // This should violate the UNIQUE ABS constraint without violating the primary key constraint.
+            cr = client.callProcedure("@AdHoc", "insert into R1 values (-1, null, null, null, null)");
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("violation of constraint") != -1);
+            caught = true;
+        }
+        // If the insert succeeds on VoltDB, the constraint failed to trigger.
+        // If the insert fails on HSQL, the test is invalid -- HSQL should not detect the subtle constraint violation we are trying to trigger.
+        assertEquals( ! isHSQL(), caught);
     }
 
     public void testSubstring() throws Exception
@@ -802,10 +816,21 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "RATIO FLOAT, " +
                 "PAST TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
-                "CREATE INDEX P1_ABS_ID ON P1 ( ABS(ID) ); " + // Test generalized index on a function of an already indexed column.
-                "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " + // Test generalized index on a function of a non-indexed column.
-                "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " + // Test generalized index on an expression of multiple columns.
-                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " + // Test generalized index on a string function.
+                // Test generalized index on a function of a non-indexed column.
+                "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " +
+                // Test generalized index on an expression of multiple columns.
+                "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
+                // Test generalized index on a string function.
+                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE TABLE R1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                // Test unique generalized index on a function of an already indexed column.
+                "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -856,8 +881,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
-        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        // /* alternative for debug*/ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        config = new LocalCluster("fixedsql-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

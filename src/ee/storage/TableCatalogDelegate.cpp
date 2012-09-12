@@ -27,6 +27,7 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/CatalogUtil.h"
 #include "common/types.h"
+#include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
@@ -127,9 +128,15 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
             index_columns[catalog_colref->index()] = catalog_colref->column()->index();
         }
 
+        vector<AbstractExpression*> indexed_exprs;
+        if (catalog_index->expressionsjson().length() != 0) {
+            ExpressionUtil::loadIndexedExprsFromJson(indexed_exprs, catalog_index->expressionsjson());
+        }
+ 
         TableIndexScheme index_scheme(catalog_index->name(),
                                       (TableIndexType)catalog_index->type(),
                                       index_columns,
+                                      indexed_exprs,
                                       catalog_index->unique(),
                                       true,//catalog_index->countable(),// Fix to allow disabling CountingIndex feature
                                       schema);
