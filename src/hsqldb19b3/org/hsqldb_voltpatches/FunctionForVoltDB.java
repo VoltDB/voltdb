@@ -89,9 +89,16 @@ public class FunctionForVoltDB extends FunctionSQL {
         // Assume that 1-19999 are reserved for existing HSQL functions.
         // That leaves new VoltDB-specific functions free to use values in the 20000s.
         private static final int FUNC_VOLT_SQL_ERROR = 20000;
+        private static final int FUNC_VOLT_DECODE = 20001;
 
         private static final FunctionId[] instances = {
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0, new Type[] { null, Type.SQL_VARCHAR }, new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("decode", null, FUNC_VOLT_DECODE, 2, new Type[] { null, null },
+
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -177,6 +184,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
                 nodes[i].resolveTypes(session, this);
+                if (i >= paramTypes.length) {
+                 // TODO support type checking for variadic functions
+                    continue;
+                }
                 if (paramTypes[i] == null) {
                     continue; // accept all argument types
                 }
