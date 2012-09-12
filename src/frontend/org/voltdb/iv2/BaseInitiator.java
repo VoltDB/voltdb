@@ -78,6 +78,7 @@ public abstract class BaseInitiator implements Initiator
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
+        m_scheduler.setLock(m_initiatorMailbox);
         agent.registerStatsSource(SysProcSelector.STARVATION,
                                   getInitiatorHSId(),
                                   st);
