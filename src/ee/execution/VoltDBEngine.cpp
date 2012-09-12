@@ -637,10 +637,9 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 
                     vector<TableIndex*> currentIndexes = table->allIndexes();
 
+                    // find all of the indexes to add
                     map<string, catalog::Index*>::const_iterator indexIter;
                     for (indexIter = t->indexes().begin(); indexIter != t->indexes().end(); indexIter++) {
-                        // this is where the code to diff indexes goes when it's ublocked in java
-
                         std::string indexName = indexIter->first;
 
                         bool found = false;
@@ -654,8 +653,42 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 
                         if (!found) {
                             // create and add the index
+                            TableIndexScheme scheme;
+                            bool success = TableCatalogDelegate::getIndexScheme(*t,
+                                                                                *indexIter->second,
+                                                                                table->schema(),
+                                                                                &scheme);
+                            if (!success) {
+                                VOLT_ERROR("Failed to initialize index '%s' from catalog",
+                                           indexIter->second->name().c_str());
+                                return false;
+                            }
+
+                            TableIndex *index = TableIndexFactory::getInstance(scheme);
+                            assert(index);
+
+                            // all of the data should be added here
+                            table->addIndex(index);
+                        }
+                    }
+
+                    // now find all of the indexes to remove
+                    bool found = false;
+                    for (int i = 0; i < currentIndexes.size(); i++) {
+                        std::string indexName = currentIndexes[i]->getName();
+
+                        map<string, catalog::Index*>::const_iterator indexIter;
+                        for (indexIter = t->indexes().begin(); indexIter != t->indexes().end(); indexIter++) {
+                            std::string currentIndexName = indexIter->first;
+                            if (indexName.compare(currentIndexName) == 0) {
+                                found = true;
+                                break;
+                            }
                         }
 
+                        if (!found) {
+                            table->removeIndex(currentIndexes[i]);
+                        }
                     }
                 }
             }

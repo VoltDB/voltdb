@@ -537,8 +537,30 @@ void Table::addIndex(TableIndex *index) {
         m_uniqueIndexes.push_back(index);
     }
     m_indexes.push_back(index);
+}
 
+void Table::removeIndex(TableIndex *index) {
+    assert(isExistingTableIndex(m_indexes, index));
 
+    std::vector<TableIndex*>::iterator iter;
+    for (iter = m_indexes.begin(); *iter; iter++) {
+        if ((*iter) == index) {
+            m_indexes.erase(iter);
+            break;
+        }
+    }
+    for (iter = m_uniqueIndexes.begin(); *iter; iter++) {
+        if ((*iter) == index) {
+            m_indexes.erase(iter);
+            break;
+        }
+    }
+    if (m_pkeyIndex == index) {
+        m_pkeyIndex = NULL;
+    }
+
+    // this should free any memory used by the index
+    delete index;
 }
 
 void Table::setPrimaryKeyIndex(TableIndex *index) {

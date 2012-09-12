@@ -30,6 +30,8 @@ class Database;
 namespace voltdb {
 class Table;
 class ExecutorContext;
+class TupleSchema;
+class TableIndexScheme;
 
 /*
  * Implementation of CatalogDelgate for Table
@@ -50,10 +52,12 @@ class TableCatalogDelegate : public CatalogDelegate {
              catalog::Database &catalogDatabase,
              catalog::Table &catalogTable);
 
-    bool getIndexScheme(catalog::Table &catalogTable,
-                        catalog::Index &catalogIndex,
-                        TupleSchema *schema,
-                        TableIndexScheme *scheme);
+    static TupleSchema *createTupleSchema(catalog::Table &catalogTable);
+
+    static bool getIndexScheme(catalog::Table &catalogTable,
+                               catalog::Index &catalogIndex,
+                               const TupleSchema *schema,
+                               TableIndexScheme *scheme);
 
     // ADXXX: should be const
     Table *getTable() {

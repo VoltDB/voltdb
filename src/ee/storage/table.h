@@ -252,7 +252,7 @@ class Table {
 
     // mutating indexes
     virtual void addIndex(TableIndex *index);
-    //virtual void removeIndex(TableIndex *index); // coming soon
+    virtual void removeIndex(TableIndex *index);
     virtual void setPrimaryKeyIndex(TableIndex *index);
 
     // ------------------------------------------------------------------

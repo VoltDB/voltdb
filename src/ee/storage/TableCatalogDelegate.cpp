@@ -57,9 +57,37 @@ TableCatalogDelegate::~TableCatalogDelegate()
     }
 }
 
+TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table &catalogTable) {
+    // Columns:
+    // Column is stored as map<String, Column*> in Catalog. We have to
+    // sort it by Column index to preserve column order.
+    const int numColumns = static_cast<int>(catalogTable.columns().size());
+    vector<ValueType> columnTypes(numColumns);
+    vector<int32_t> columnLengths(numColumns);
+    vector<bool> columnAllowNull(numColumns);
+    map<string, catalog::Column*>::const_iterator col_iterator;
+    for (col_iterator = catalogTable.columns().begin();
+         col_iterator != catalogTable.columns().end(); col_iterator++) {
+        const catalog::Column *catalog_column = col_iterator->second;
+        const int columnIndex = catalog_column->index();
+        const ValueType type = static_cast<ValueType>(catalog_column->type());
+        columnTypes[columnIndex] = type;
+        const int32_t size = static_cast<int32_t>(catalog_column->size());
+        //Strings length is provided, other lengths are derived from type
+        bool varlength = (type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY);
+        const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
+        columnLengths[columnIndex] = length;
+        columnAllowNull[columnIndex] = catalog_column->nullable();
+    }
+
+    return TupleSchema::createTupleSchema(columnTypes,
+                                          columnLengths,
+                                          columnAllowNull, true);
+}
+
 bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
                                           catalog::Index &catalogIndex,
-                                          TupleSchema *schema,
+                                          const TupleSchema *schema,
                                           TableIndexScheme *scheme)
 {
     vector<int> index_columns;
@@ -120,10 +148,8 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
                                index_columns,
                                column_types,
                                catalogIndex.unique(),
-                               true,// Fix it as the next line when VoltDB can disable CountingIndex feature
-                               //catalog_index->countable(),
                                isIntsOnly,
-                               schema);
+                               const_cast<TupleSchema*>(schema));
     return true;
 }
 
@@ -135,33 +161,18 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
 
-    // Columns:
-    // Column is stored as map<String, Column*> in Catalog. We have to
-    // sort it by Column index to preserve column order.
+    // get an array of table column names
     const int numColumns = static_cast<int>(catalogTable.columns().size());
-    vector<ValueType> columnTypes(numColumns);
-    vector<int32_t> columnLengths(numColumns);
-    vector<bool> columnAllowNull(numColumns);
     map<string, catalog::Column*>::const_iterator col_iterator;
     boost::scoped_array<string> columnNames(new string[numColumns]);
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
         const catalog::Column *catalog_column = col_iterator->second;
-        const int columnIndex = catalog_column->index();
-        const ValueType type = static_cast<ValueType>(catalog_column->type());
-        columnTypes[columnIndex] = type;
-        const int32_t size = static_cast<int32_t>(catalog_column->size());
-        //Strings length is provided, other lengths are derived from type
-        bool varlength = (type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY);
-        const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
-        columnLengths[columnIndex] = length;
-        columnAllowNull[columnIndex] = catalog_column->nullable();
         columnNames[catalog_column->index()] = catalog_column->name();
     }
 
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
-                                                         columnLengths,
-                                                         columnAllowNull, true);
+    // get the schema for the table
+    TupleSchema *schema = createTupleSchema(catalogTable);
 
     // Indexes
     map<string, TableIndexScheme> index_map;
@@ -273,9 +284,9 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 
     int32_t databaseId = catalogDatabase.relativeIndex();
     m_table = TableFactory::getPersistentTable(databaseId, executorContext,
-                                                 catalogTable.name(), schema, columnNames.get(),
-                                                 partitionColumnIndex, m_exportEnabled,
-                                                 isTableExportOnly(catalogDatabase, table_id));
+                                               catalogTable.name(), schema, columnNames.get(),
+                                               partitionColumnIndex, m_exportEnabled,
+                                               isTableExportOnly(catalogDatabase, table_id));
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
