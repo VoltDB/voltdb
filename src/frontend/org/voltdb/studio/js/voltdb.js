@@ -217,6 +217,8 @@ var IVoltDB = (function(){
         }
         this.Procedures = {
                             '@AdHoc': { '1' : ['varchar'] }
+                          , '@Explain': { '1' : ['varchar'] }
+                          , '@ExplainProc': { '1' : ['varchar'] }
                           , '@Pause': { '0' : [] }
                           , '@Quiesce': { '0' : [] }
                           , '@Resume': { '0' : [] }
@@ -283,7 +285,9 @@ var IVoltDB = (function(){
                 connection.Metadata['views'] = views;
                 connection.Metadata['exports'] = exports;
                 connection.Metadata['sysprocs'] = {
-                                                    '@Pause': { '0' : ['Returns bit'] }
+                                                    '@Explain': { '1' : ['SQL (varchar)', 'Returns Table[]'] }
+                                                  , '@ExplainProc': { '1' : ['Stored Procedure Name (varchar)', 'Returns Table[]'] }
+                                                  , '@Pause': { '0' : ['Returns bit'] }
                                                   , '@Quiesce': { '0' : ['Returns bit'] }
                                                   , '@Resume': { '0' : ['Returns bit'] }
                                                   , '@Shutdown': { '0' : ['Returns bit'] }
@@ -326,7 +330,7 @@ var IVoltDB = (function(){
                             ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
                     }
                 }
-                 
+
                  // User Procedures
                  for (var i = 0; i < connection.Metadata['procedures'].data.length; ++i)
                  {
@@ -353,7 +357,7 @@ var IVoltDB = (function(){
                     connection.Procedures[procName] = {};
                     connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
                  }
-                 
+     
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);
                 childConnectionQueue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection, state); }, null);

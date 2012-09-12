@@ -114,7 +114,7 @@ public:
         void moveNext() { m_node = m_map->successor(m_node); }
         void movePrev() { m_node = m_map->predecessor(m_node); }
         bool isEnd() const { return ((!m_map) || (m_node == &(m_map->NIL))); }
-        bool equals(iterator &iter) {
+        bool equals(const iterator &iter) const {
             if (isEnd()) return iter.isEnd();
             return m_node == iter.m_node;
         }
@@ -124,6 +124,8 @@ public:
     ~CompactingMap();
 
     bool insert(std::pair<Key, Data> value);
+    // A syntactically convenient analog to CompactingHashTable's insert function
+    bool insert(const Key &key, const Data &data) { return insert(std::pair<Key, Data>(key, data)); }
     bool erase(const Key &key);
     bool erase(iterator &iter);
     iterator find(const Key &key) { return iterator(this, lookup(key)); }
