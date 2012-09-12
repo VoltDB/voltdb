@@ -32,11 +32,11 @@
 package org.hsqldb_voltpatches.types;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
+import org.apache.commons.lang3.time.DateFormatUtils;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.HsqlDateTime;
@@ -462,14 +462,23 @@ public final class DateTimeType extends DTIType {
             // BEGIN VOLTDB ADDED CODE
             case Types.SQL_INTEGER :
             case Types.SQL_BIGINT :
-                a = new Timestamp(new Date(Long.parseLong(a.toString())).getTime()).toString();
+                // Assuming time provided is UTC. Can't use Timestamp.toString() since
+                // it formats for the local timezone.
+                // DateFormatUtils.formatUTC() provides a UTC-formatted time string,
+                // but has a bug that fails to add leading zeros to the milliseconds.
+                // Work around the bug by splicing in correctly-formatted milliseconds.
+                long ts = Long.parseLong(a.toString());
+                Date d = new Date(ts);
+                String utc = DateFormatUtils.formatUTC(d, "yyyy-MM-dd HH:mm:ss");
+                a = String.format("%s.%03d", utc, ts % 1000);
                 //otherType = Type.SQL_TIMESTAMP;
             // END VOLTDB ADDED CODE
 
+            //$FALL-THROUGH$
             case Types.SQL_CLOB :
                 a = a.toString();
 
-            //fall through
+            //$FALL-THROUGH$
             case Types.SQL_CHAR :
             case Types.SQL_VARCHAR :
             case Types.VARCHAR_IGNORECASE :
@@ -705,7 +714,7 @@ public final class DateTimeType extends DTIType {
                 if (a instanceof java.util.Date) {
                     long seconds =
                         HsqlDateTime.getNormalisedTime(
-                            ((java.util.Date) a).getTime()) / 1000;;
+                            ((java.util.Date) a).getTime()) / 1000;
                     int zoneSeconds;
                     int nanos = 0;
 
@@ -718,7 +727,7 @@ public final class DateTimeType extends DTIType {
 
                     if (a instanceof java.sql.Timestamp) {
                         nanos = ((java.sql.Timestamp) a).getNanos();
-                        nanos = this.normaliseFraction(nanos, scale);
+                        nanos = normaliseFraction(nanos, scale);
                     }
 
                     return new TimeData((int) seconds, nanos, zoneSeconds);
@@ -760,7 +769,7 @@ public final class DateTimeType extends DTIType {
 
                     if (a instanceof java.sql.Timestamp) {
                         nanos = ((java.sql.Timestamp) a).getNanos();
-                        nanos = this.normaliseFraction(nanos, scale);
+                        nanos = normaliseFraction(nanos, scale);
                     }
 
                     return new TimestampData(seconds, nanos, zoneSeconds);
@@ -892,7 +901,7 @@ public final class DateTimeType extends DTIType {
             case Types.SQL_TIME_WITH_TIME_ZONE :
                 zone = true;
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_TIME : {
                 TimeData t       = (TimeData) a;
                 int      seconds = normaliseTime(t.getSeconds() + t.getZone());
@@ -914,7 +923,7 @@ public final class DateTimeType extends DTIType {
             case Types.SQL_TIMESTAMP_WITH_TIME_ZONE :
                 zone = true;
 
-            // fall through
+            // $FALL-THROUGH$
             case Types.SQL_TIMESTAMP : {
                 TimestampData ts = (TimestampData) a;
 
