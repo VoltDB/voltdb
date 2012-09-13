@@ -162,7 +162,7 @@ public class TestCommandLine
     public void testExtraJvmOptsAgentSpec() throws Exception
     {
         String agentSpec = "-javaagent:/path/to/jolokia-jvm-1.0.1-agent.jar=port=11159,agentContext=/,host=0.0.0.0";
-        setVoltDbOpts("-J" + agentSpec);
+        setVoltDbOpts(agentSpec);
 
         CommandLine cl = new CommandLine();
         String cmd = cl.toString();
@@ -180,14 +180,14 @@ public class TestCommandLine
         String maxHeap = "-Xmx4096m";
         String gcSpec  = "-XX:+UseConcMarkSweepGC";
         String agentSpec = "-javaagent:jolokia.jar=port=11159,desc=\"cool  loking\\ agent\"";
-        setVoltDbOpts("-J" + propOne
-                + " -J" + propTwo
-                + " -J" + agentSpec
-                + " -J" + minHeap
-                + " -J" + maxHeap
-                + " -J" + gcSpec
-                + " -J-cp one.jar:some/dir/*.jar:tooranda.jar:. -J-d32"
-                + " -J-Djava.library.path=/some/diryolanda.so:/tmp/hackme.so"
+        setVoltDbOpts(propOne
+                + " " + propTwo
+                + " " + agentSpec
+                + " " + minHeap
+                + " " + maxHeap
+                + " " + gcSpec
+                + " -cp one.jar:some/dir/*.jar:tooranda.jar:. -d32"
+                + " -Djava.library.path=/some/diryolanda.so:/tmp/hackme.so"
                 + " sgra rehto emos"); // reverse of 'some other args'
 
         CommandLine cl = new CommandLine();

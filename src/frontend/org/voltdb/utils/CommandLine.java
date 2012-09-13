@@ -631,8 +631,8 @@ public class CommandLine extends VoltDB.Configuration
     static class AdditionalJvmOptionsProcessor {
 
         static final String HEAP_SIZE_PREFIX = "-Xm";
-        static final String JVM_OPT_PREFIX = "-J-";
         static final String VOLTDB_OPTS_ENV = "VOLTDB_OPTS";
+        static final String DASH = "-";
 
         /**
          * Options which may not be specified in VOLTDB_OPTS
@@ -704,7 +704,7 @@ public class CommandLine extends VoltDB.Configuration
         }
 
         /**
-         * Look for jvm options that start with the -J prefix, ignore
+         * Look for jvm options and voltdb options prefixed with -V:, ignore
          * the ones that do conflict with VoltDB options, or the ones that
          * may be other wise specified through other voltDB options.
          *
@@ -730,12 +730,11 @@ public class CommandLine extends VoltDB.Configuration
                     continue;
                 }
 
-                if( ! option.startsWith(JVM_OPT_PREFIX)) {
+                if( ! option.startsWith(DASH)) {
                     nonJvmOptions.add(option);
                     continue;
                 }
 
-                option = option.substring(JVM_OPT_PREFIX.length()-1);
                 String truncated = truncateUptoDelimiter(option);
 
                 skipNext = requiresSkipNext.contains(truncated);
