@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
-
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSchException;
@@ -35,8 +33,6 @@ public class ProcessData {
     private final StreamWatcher m_out;
     private final StreamWatcher m_err;
     private Thread m_sshThread;
-
-    private static VoltLogger log = new VoltLogger("SSH");
 
     public enum Stream { STDERR, STDOUT; }
 
@@ -125,7 +121,6 @@ public class ProcessData {
                     m_err.start();
                 } catch (Exception e) {
                     e.printStackTrace();
-                    log.error("Error attempting SSH command: " + command, e);
                 }
             }
         };
