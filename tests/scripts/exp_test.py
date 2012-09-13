@@ -29,8 +29,11 @@ import fnmatch
 import subprocess
 import time
 import filecmp
+import socket
 from optparse import OptionParser
 from subprocess import call # invoke unix/linux cmds
+from xml.etree import ElementTree
+from xml.etree.ElementTree import Element, SubElement
 # add the path to the volt python client, just based on knowing
 # where we are now
 sys.path.append('../../src/py_client')
@@ -40,7 +43,9 @@ except ImportError:
     sys.path.append('./src/py_client')
     from voltdbclient import *
 from Query import VoltQueryClient
+from XMLUtils import prettify # To create a human readable xml file
 
+hostname = socket.gethostname()
 pkgName = {'comm': 'LINUX-voltdb', 'pro': 'LINUX-voltdb-ent'}
 tail = "tar.gz"
 sepLineD = "========================================================"
@@ -80,6 +85,7 @@ def findSectionInFile(srce, start, end):
     status = False
     ins = open(srce, "r" )
     str = None
+    msg = "The Winner is NOT Edwina Burnam"
     for line in ins:
         if(line.find(start) > -1):
             flag = 1
@@ -91,7 +97,8 @@ def findSectionInFile(srce, start, end):
         if(line.find(end) > -1):
             flag = 0
             status = True
-    return (status, str)
+            msg = "The Winner is Edwina Burnam"
+    return (status, msg)
 
 # To read the first line of a srouce file 'srce'
 def readFirstLine(srce):
@@ -126,9 +133,16 @@ def createAFreshDir(dir):
 
 # To get a VoltDB tar ball file and untar it in a designated place
 def installVoltDB(pkg, release):
+    info = {}
+    info["ok"] = False
     if(pkg not in pkgName):
-        print "Invalid pkg name!"
-        exit(1)
+        info["err"] = "Invalid pkg name: '%s'!" % pkg
+        info["err"] += "\nThe valid pkg names are:\n"
+        for k in pkgName:
+            info["err"] += k + ", "
+        info["err"] = info["err"].strip() # Trim the leading/trailing spaces
+        info["err"] = info["err"][:-1] # Trim the last char ','
+        return info
 
     pkgname = pkgName[pkg] + '-' + release + "." + tail
     srce = root + pkgname
@@ -136,22 +150,32 @@ def installVoltDB(pkg, release):
     cmd = "wget " + srce + " -O " + dest + " 2>/dev/null"
 
     ret = call(cmd, shell=True)
-    info = {}
-    info['ok'] = False
-    if ret == 0 and os.path.exists(dest):
-        fsize = os.path.getsize(dest)
-        if fsize > 0:
-            ret = createAFreshDir(workDir)
-            if ret == 0:
-                cmd = "tar zxf " + dest + " -C " + workDir + " 2>/dev/null"
-#                print "cmd = '%s'" % cmd
-                ret = call(cmd, shell=True)
-                if ret == 0:
-                    info['dest'] = dest
-                    info['srce'] = srce
-                    info['pkgname'] = pkgname
-                    info['workDir'] = workDir
-                    info['ok'] = True
+    if ret != 0 or not os.path.exists(dest):
+        info["err"] = "Cannot download '%s'" % srce
+        return info
+
+    fsize = os.path.getsize(dest)
+    if fsize == 0:
+        info["err"] = "The pkg '%s' is blank!" % dest
+        return info
+
+    ret = createAFreshDir(workDir)
+    if ret != 0:
+        info["err"] = "Cannot create the working directory: '%s'" % workDir
+        return info
+
+    cmd = "tar zxf " + dest + " -C " + workDir + " 2>/dev/null"
+#    print "cmd = '%s'" % cmd
+    ret = call(cmd, shell=True)
+    if ret == 0:
+#        info["dest"] = dest
+        info["srce"] = srce
+        info["pkgname"] = pkgname
+        info["workDir"] = workDir
+        info["ok"] = True
+    else:
+        info["err"] = "VoltDB pkg '%s' installation FAILED at location '%s'" \
+            % (dest, workDir) 
     return info
 # end of installVoltDB(pkg, release):
 
@@ -243,7 +267,7 @@ def execThisService(service, logS, logC):
 # which is defined in 'staticKeyStr'
 def assertVotekv_Votecache(mod, logC):
     staticKeyStr = {
-"Command Line Configuration":1,
+"Command iiiiLine Configuration":1,
 "Setup & Initialization":1,
 "Starting Benchmark":1,
 "KV Store Results":1,
@@ -264,19 +288,23 @@ def assertVotekv_Votecache(mod, logC):
 
     result = False
     msg = None
+    keys = {}
     if(cnt == len(staticKeyStr)):
-        msg = "The client output has all the expected key words:\n" + sepLineS + "\n"
-        for key in staticKeyStr:
-            msg += key + "\n"
+#        msg = "The client output has all the expected key words:\n" + sepLineS + "\n"
+        msg = "The client output has all the expected key words:"
+#        for key in staticKeyStr:
+#            msg += key + "\n"
+        keys = staticKeyStr
         result = True
     else:
         msg = "The client output does not have all the expected key words:\n"
-        msg += "The missing keys are:\n" + sepLineS + "\n"
+#        msg += "The missing keys are:\n" + sepLineS + "\n"
         for key in staticKeyStr:
             if key not in dynamicKeyStr.keys():
-                msg += key + "\n"
+                keys[key] = key
+#                msg += key + "\n"
 
-    return (result, msg)
+    return (result, msg, keys)
 
 # We want to make sure that logFileC contains this KEY string:
 # The Winner is: Edwina Burnam
@@ -289,7 +317,7 @@ def assertVoter(mod, logC):
 
 # To make sure that we see the key string 'Hola, Mundo!'
 def assertHelloWorld(modulename, logC):
-    expected = "Hola, Mundo!"
+    expected = "iHola, Mundo!"
     actual = readFirstLine(logC)
     if(expected == actual):
         msg = expected
@@ -323,56 +351,124 @@ def assertClient(e, logC):
     return (ret, msg)
 
 def startTest(testSuiteList):
-    retCode = {}
+    statusBySuite = {}
+    msgBySuite = {}
+    keyWordsBySuite = {}
     for e in testSuiteList:
-        retCode[e] = {}
         os.chdir(testSuiteList[e])
         currDir = os.getcwd()
         service = elem2Test[e]
-        msg = "===--->>> Start to test this suite: %s" % e
+        print "===--->>> Start to test this suite: %s" % e
+#        logFileS = workDir + "/" + e + "_server"
+#        logFileC = workDir + "/" + e + "_client"
         logFileS = "/tmp/" + e + "_server"
         logFileC = "/tmp/" + e + "_client"
         msg1 = msg2 = None
-#        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
+        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
 #        execThisService(service, logFileS, logFileC)
         if(e == "helloworld"):
-            # To make sure that we see the key string 'Hola, Mundo!'
             (result, msg1) = assertHelloWorld(e, logFileC)
-            retCode[e]["status"] = result
-            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1
+#            statusBySuite[e]["status1"] = result
+#            statusBySuite[e]["msg"] = msg1
+            statusBySuite[e] = result
+            msgBySuite[e] = msg1
+            keyWordsBySuite[e] = None
+            print "1 cyan e = '%s', result = '%s'" % (e, result)
         elif(e == "voter"):
-#            (result, msg1) = assertClient(e, logFileC)
-#            if(result == False):
-                # Further assertion is required
-                # We want to make sure that logFileC contains this KEY string:
-                # The Winner is: Edwina Burnam
-            (result, msg2) = assertVoter(e, logFileC)
-#            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1 + "\n" + sepLineS + "\n" + msg2
-            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg2
-#            else:
-#                retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1
-            retCode[e]["status"] = result
+            (result, msg1) = assertVoter(e, logFileC)
+#            statusBySuite[e]["msg"] = msg1
+#            statusBySuite[e]["status2"] = result
+            statusBySuite[e] = result
+            msgBySuite[e] = msg1
+            keyWordsBySuite[e] = None
+            print "2 cyan e = '%s', result = '%s'" % (e, result)
         elif(e == "voltkv" or e == "voltcache"):
-#            (result, msg1) = assertClient(e, logFileC)
-#            if(result == False):
-            # Further assertion is required
-            # We want to make sure that logFileC contains several key strings
-            # which is defined inside assertVotekv_Votecache:
-            (result, msg2) = assertVotekv_Votecache(e, logFileC)
-#            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1 + "\n" + sepLineS + "\n" + msg2
-            retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg2
-#            else:
-#                retCode[e]["msg"] = msg + "\n" + sepLineS + "\n" + msg1
-            retCode[e]["status"] = result
+            (result, msg1, keys) = assertVotekv_Votecache(e, logFileC)
+#            statusBySuite[e]["msg"] = msg1
+#            statusBySuite[e]["status3"] = result
+            statusBySuite[e] = result
+            msgBySuite[e] = msg1
+            keyWordsBySuite[e] = keys
+            print "3 cyan e = '%s', result = '%s'" \
+                % (e, result)
         else:
             print "e = '%s' ==-->> to be implemented..." % e
-            retCode[e]["status"] = False
-            retCode[e]["msg"] = "e = '%s' ==-->> to be implemented..." % e
+            statusBySuite[e] = False
+            msgBySuite[e] = "Unknown Suite:'%s'. To be implemented..." % e
+            keyWordsBySuite[e] = None
 
         os.chdir(origDir)
     # end of for e in testSuiteList:
-    return retCode
-# end of def startTest(testSuiteList):
+    for xx in statusBySuite:
+        print "===--->>>xx = '%s', vaL: '%s'" % (xx, statusBySuite[xx])
+    return (statusBySuite, msgBySuite, keyWordsBySuite)
+# end of startTest(testSuiteList):
+
+#<?xml version="1.0" encoding="UTF-8" ?>
+#<testsuites>
+#  <testsuite errors="0" failures="0" hostname="ip-10-143-131-25" id="0" name="TestHSQLDB" package="org.hsqldb_voltpatches" tests="1" time="0.455" timestamp="2012-09-10T17:55:18">
+#<testcase classname="Linux_community_build" name="helloworld"/>
+#<testcase classname="Linux_community_build" name="voter"/>
+#<testcase classname="Linux_community_build" name="voltkv">
+#<testcase classname="Linux_community_build" name="voltcache"/>
+#<failure nessage="This test experienced some sort of difficulties."> 
+#</failure>
+#</testcase>
+#  </testsuite>
+#</testsuites>
+#
+#    cluster = SubElement(deployment, 'cluster',
+#            {'kfactor':kfactor,'sitesperhost':sitesperhost,'hostcount':hostcount})
+def create_rpt(info, status, msg, keys):
+    proj = Element('project')
+    testsuites = SubElement(proj, 'testsuites',
+            {'package':info["pkgname"],'URL':info["srce"],
+             'hostname':hostname})
+    print "testname = '%s'" % testname
+    for i in status:
+        failureCnt = "0"
+        errCnt = "0"
+        if(status[i] == False):
+            failureCnt = "1"
+        else:
+            failureCnt = "0"
+
+        print "==-->>suite name: '%s', failureCnt: '%s', status = '%s'" \
+            % (i, failureCnt, status[i])
+        if(info["ok"] == False):
+            errCnt = "1"
+        else:
+            errCnt = "0"
+        testsuite = SubElement(testsuites, 'testsuite',
+            {'errors':errCnt,'failures':failureCnt, 'name':testname})
+        testcase = SubElement(testsuite, 'testcase', {'name':i})
+
+        if(failureCnt == "1"):
+            failure = SubElement(testcase, 'failure',
+                    {'Message':msg[i]})
+            misStr = None
+            if(keys[i] != None):
+                for j in keys[i]:
+                    if(misStr == None):
+                        misStr = j
+                    else:
+                        misStr += ", " + j
+                missing = SubElement(failure, 'Missing',
+                        {'MissingString':misStr})
+        else:
+            failure = SubElement(testcase, 'info',
+                    {'Message':msg[i]})
+        if(errCnt == "1"):
+            error = SubElement(testcase, 'error',
+                    {'Error':info["err"]})
+
+    rptf = "/tmp/exp_rpt.xml"
+    fo = open(rptf, "wb")
+    fo.write(prettify(proj))
+    fo.close()
+    if not os.path.exists(rptf):
+        rptf = None
+    return rptf
 
 if __name__ == "__main__":
     usage = "Usage: %prog [options]"
@@ -388,7 +484,8 @@ if __name__ == "__main__":
     parser.set_defaults(pkg="comm")
     parser.set_defaults(suite="all")
     (options, args) = parser.parse_args()
-    workDir = destDir + os.path.basename(os.path.abspath(__file__)).replace(".py", "")
+    testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
+    workDir = destDir + testname
     # e.g. workDir = '/tmp/exp_test'
 
     suite = options.suite
@@ -407,28 +504,35 @@ if __name__ == "__main__":
     print "############################################"
 
     ret = installVoltDB(options.pkg, releaseNum)
-
-    success = ret['ok']
-    if not success:
-        print "After installVoltDB() Test Failed!!"
-#        print >> sys.stderr, "Test Failed!!"
+    if not ret["ok"]:
+        print "Error!! %s" % ret["err"]
+#        print >> sys.stderr, "Error!! %s" % ret["err"]
         exit(1)
+    for k1 in ret:
+        print "key: '%s', Val: '%s'" % (k1, ret[k1])
 
-    testSuiteList = setTestSuite(ret['workDir'], suite)
+    testSuiteList = setTestSuite(ret["workDir"], suite)
 #    for i in testSuiteList:
 #        print "i = '%s', exec = '%s'" % (i, testSuiteList[i])
+#    exit(1)
 
-    success = startTest(testSuiteList)
+    (tf, msg, keys) = startTest(testSuiteList)
     status = True
-    for module in success:
-        if not success[module]["status"]:
+    reportXML = create_rpt(ret, tf, msg, keys)
+    print "===--->>>reportXML = '%s'" % reportXML
+#    for module in success:
+#        print "cyan Module: '%s'. Val: '%s'" \
+#            % (module, success[module])
+#        if not success[module]["status"]:
 #            print >> sys.stderr, "\n%s\n%s\nTest '%s' FAILED!!\n%s" \
 #                % (success[module]["msg"], sepLineS, module, sepLineD)
-            print "\n%s\n%s\nTest '%s' FAILED!!\n%s" \
-                % (success[module]["msg"], sepLineS, module, sepLineD)
-            status = False
-        else:
-            print "\n%s\n%s\nTest '%s' PASSED!!\n%s" \
-                % (success[module]["msg"], sepLineS, module, sepLineD)
+#            print "\n%s\n%s\nTest '%s' FAILED!!\n%s" \
+#                % (success[module]["msg"], sepLineS, module, sepLineD)
+#            status = False
+#        else:
+#            print "\n%s\n%s\nTest '%s' PASSED!!\n%s" \
+#                % (success[module]["msg"], sepLineS, module, sepLineD)
     if(status == False):
         print "\nAt lease one test suite is Failed!!\n"
+        exit(1)
+    exit(0)
