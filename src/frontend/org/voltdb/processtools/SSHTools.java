@@ -71,7 +71,7 @@ public class SSHTools {
      * library, these are the methods that need to be re-worked.
      */
     public String cmdSSH(String user, String key, String host, String command) {
-        String result = "";
+        StringBuilder result = new StringBuilder(2048);
         try{
             JSch jsch=new JSch();
 
@@ -118,12 +118,12 @@ public class SSHTools {
             while ((ch = outStrBufRdr.read()) > -1) {
                 stdout.append((char) ch);
             }
-            result = stdout.toString();
+            result.append(stdout.toString());
             StringBuffer stderr = new StringBuffer();
             while ((ch = errStrBufRdr.read()) > -1) {
                 stderr.append((char) ch);
             }
-            result += stderr.toString();
+            result.append(stderr.toString());
 
             // Shutdown the connection
             channel.disconnect();
@@ -134,7 +134,7 @@ public class SSHTools {
             // Return empty string if we can't connect.
         }
 
-        return result;
+        return result.toString();
     }
 
     public ProcessData long_running_command(String hostname, String command[], String processName, OutputHandler handler) {
@@ -399,13 +399,13 @@ public class SSHTools {
     }
 
     public static String stringify(String[] str_array) {
-        String result = "";
+        StringBuffer result = new StringBuffer(2048);
         if (str_array != null) {
             for (int i=0; i<str_array.length; i++) {
-                result += " " + str_array[i];
+                result.append(" ").append(str_array[i]);
             }
         }
-        return result;
+        return result.toString();
     }
 
     public static void main(String args[]) throws Exception {
