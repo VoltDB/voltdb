@@ -121,6 +121,8 @@ public class ProcessData {
                     m_err.start();
                 } catch (Exception e) {
                     e.printStackTrace();
+                    System.err.print("Err SSH long-running execution thread exiting.");
+                    System.err.flush();
                 }
             }
         };
