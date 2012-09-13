@@ -98,6 +98,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
         case FRAGMENT_TASK_LOG_ID:
             message = new FragmentTaskLogMessage();
             break;
+        case IV2_LOG_FAULT_ID:
+            message = new Iv2LogFaultMessage();
+            break;
         default:
             message = null;
         }
