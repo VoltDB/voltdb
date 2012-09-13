@@ -75,6 +75,10 @@ public class SnapshotSiteProcessor {
     public static final Object m_snapshotCreateLock = new Object();
     public static Semaphore m_snapshotCreateSetupPermit = null;
 
+    //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
+    public static ArrayList<Long> m_partitionLastSeenTransactionIds =
+            new ArrayList<Long>();
+
     /**
      * Only proceed once permits are available after setup completes
      */
@@ -234,6 +238,7 @@ public class SnapshotSiteProcessor {
         }
         m_snapshotBufferOrigins.clear();
         m_availableSnapshotBuffers.clear();
+        m_snapshotCreateSetupPermit = null;
     }
 
     void initializeBufferPool() {

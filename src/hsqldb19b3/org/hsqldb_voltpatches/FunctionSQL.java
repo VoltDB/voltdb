@@ -431,7 +431,6 @@ public class FunctionSQL extends Expression {
                 break;
              */
             case FUNC_TRIM_BINARY :
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
             case FUNC_TRIM_CHAR :
                 name      = Tokens.T_TRIM;
                 parseList = new short[] {
@@ -442,7 +441,7 @@ public class FunctionSQL extends Expression {
                     Tokens.X_OPTION, 1, Tokens.QUESTION,        //
                     Tokens.FROM, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
+                //voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             /*

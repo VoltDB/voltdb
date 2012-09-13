@@ -43,7 +43,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
-    private long m_maxSeenTxnId = 0;
+    private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -68,17 +68,17 @@ public class MpPromoteAlgo implements RepairAlgo
             m_receivedResponses++;
             m_expectedResponses = response.getOfTotal();
             // track the oldest MP not truncated from the log.
-            m_minHandleSeen = Math.min(m_minHandleSeen, response.getHandle());
+            m_minHandleSeen = Math.min(m_minHandleSeen, response.getTxnId());
             // track the newest MP that was completed.
             if (response.getPayload() != null &&
                 response.getPayload() instanceof CompleteTransactionMessage) {
                 // this is overly defensive: the replies should always arrive
                 // in increasing handle order.
                 if (m_maxHandleCompleted == Long.MAX_VALUE) {
-                    m_maxHandleCompleted = response.getHandle();
+                    m_maxHandleCompleted = response.getTxnId();
                 }
                 else {
-                    m_maxHandleCompleted = Math.max(m_maxHandleCompleted, response.getHandle());
+                    m_maxHandleCompleted = Math.max(m_maxHandleCompleted, response.getTxnId());
                 }
             }
             return logsComplete();
@@ -122,7 +122,7 @@ public class MpPromoteAlgo implements RepairAlgo
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
-            return (int)(o1.getHandle() - o2.getHandle());
+            return (int)(o1.getTxnId() - o2.getTxnId());
         }
     };
 
@@ -189,8 +189,8 @@ public class MpPromoteAlgo implements RepairAlgo
             }
 
             // Step 1: if the msg has a known (not MAX VALUE) handle, update m_maxSeen.
-            if (response.getHandle() != Long.MAX_VALUE) {
-                m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
+            if (response.getTxnId() != Long.MAX_VALUE) {
+                m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
             }
 
             // Step 2: offer to the union
@@ -243,11 +243,11 @@ public class MpPromoteAlgo implements RepairAlgo
             // survivors that require a repair message for log entry li.
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
-                if  (entry.getValue().needs(li.getHandle())) {
+                if  (entry.getValue().needs(li.getTxnId())) {
                     ++queued;
                     tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
                             entry.getValue().m_maxHandleCompleted + ". Repairing with " +
-                            li.getHandle());
+                            li.getTxnId());
                     needsRepair.add(entry.getKey());
                 }
             }
@@ -281,7 +281,7 @@ public class MpPromoteAlgo implements RepairAlgo
             return;
         }
         Iv2RepairLogResponseMessage prev = m_repairLogUnion.floor(msg);
-        if (prev != null && (prev.getHandle() != msg.getHandle())) {
+        if (prev != null && (prev.getTxnId() != msg.getTxnId())) {
             prev = null;
         }
 

@@ -57,13 +57,15 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long coordinatorHSId,
                         long truncationHandle,
                         long txnId,
+                        long timestamp,
                         boolean isReadOnly,
                         boolean isSinglePartition,
                         StoredProcedureInvocation invocation,
                         long clientInterfaceHandle,
-                        long connectionId)
+                        long connectionId,
+                        boolean isForReplay)
     {
-        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
+        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
         setTruncationHandle(truncationHandle);
 
         m_isSinglePartition = isSinglePartition;
@@ -178,9 +180,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
         sb.append(m_txnId).append("\n");
+        sb.append(" TIMESTAMP ").append(m_timestamp).append("\n");
         sb.append(") TRUNC HANDLE ");
         sb.append(getTruncationHandle()).append("\n");
-        sb.append("SP HANDLE: ").append(m_spHandle).append("\n");
+        sb.append("SP HANDLE: ").append(getSpHandle()).append("\n");
         sb.append("CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
         sb.append("\n");
         sb.append("CONNECTION ID: ").append(m_connectionId).append("\n");
@@ -192,6 +195,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             sb.append("SINGLE PARTITION, ");
         else
             sb.append("MULTI PARTITION, ");
+        if (isForReplay())
+            sb.append("FOR REPLAY, ");
+        else
+            sb.append("NOT REPLAY, ");
         sb.append("COORD ");
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
 
