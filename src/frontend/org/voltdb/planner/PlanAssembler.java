@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.Stack;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -399,11 +398,7 @@ public class PlanAssembler {
         root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
 
-        if ((subSelectRoot.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-            ((IndexScanPlanNode) subSelectRoot).getSortDirection() == SortDirectionType.INVALID) &&
-            m_parsedSelect.orderColumns.size() > 0) {
-            root = addOrderBy(root);
-        }
+        root = handleOrderBy(root);
 
         if ((root.getPlanNodeType() != PlanNodeType.AGGREGATE) &&
             (root.getPlanNodeType() != PlanNodeType.HASHAGGREGATE) &&
@@ -773,11 +768,27 @@ public class PlanAssembler {
     }
 
     /**
-     * Configure the sort columns for a new OrderByPlanNode
-     * @return new OrderByPlanNode
+     * Create an order by node as required by the statement and make it a parent of root.
+     * @param root
+     * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    OrderByPlanNode createOrderBy() {
+    AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
         assert (m_parsedSelect != null);
+
+        // Only sort when the statement has an ORDER BY.
+        if ( ! m_parsedSelect.hasOrderByColumns()) {
+            return root;
+        }
+
+        // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
+        // Note that even tree index scans that produce values in their own "key order" only report
+        // their sort direction != SortDirectionType.INVALID
+        // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
+        if (root.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+            if (((IndexScanPlanNode) root).getSortDirection() != SortDirectionType.INVALID) {
+                return root;
+            }
+        }
 
         OrderByPlanNode orderByNode = new OrderByPlanNode();
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderColumns) {
@@ -785,16 +796,6 @@ public class PlanAssembler {
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
         }
-        return orderByNode;
-    }
-
-    /**
-     * Create an order by node and add make it a parent of root.
-     * @param root
-     * @return new orderByNode (the new root)
-     */
-    AbstractPlanNode addOrderBy(AbstractPlanNode root) {
-        OrderByPlanNode orderByNode = createOrderBy();
         orderByNode.addAndLinkChild(root);
         orderByNode.generateOutputSchema(m_catalogDb);
         return orderByNode;
@@ -806,12 +807,6 @@ public class PlanAssembler {
      * @return new plan's root node
      */
     AbstractPlanNode handleLimitOperator(AbstractPlanNode root) {
-        // The nodes that need to be applied at the coordinator
-        Stack<AbstractPlanNode> coordGraph = new Stack<AbstractPlanNode>();
-
-        // The nodes that need to be applied at the distributed plan.
-        Stack<AbstractPlanNode> distGraph = new Stack<AbstractPlanNode>();
-
         int limitParamIndex = m_parsedSelect.getLimitParameterIndex();
         int offsetParamIndex = m_parsedSelect.getOffsetParameterIndex();
 
@@ -829,18 +824,22 @@ public class PlanAssembler {
          * TODO: allow push down limit with distinct (select distinct C from T limit 5)
          * or distinct in aggregates.
          */
+        AbstractPlanNode receiveNode = null;
         // Whether or not we can push the limit node down
-        boolean canPushDown = true;
-
-        if (m_parsedSelect.distinct || checkPushDownViability(root) == null) {
-            canPushDown = false;
-        }
-        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
-            AbstractExpression rootExpr = col.expression;
-            if (rootExpr instanceof AggregateExpression) {
-                if (((AggregateExpression)rootExpr).m_distinct) {
-                    canPushDown = false;
-                    break;
+        boolean canPushDown = ! m_parsedSelect.distinct;
+        if (canPushDown) {
+            receiveNode = checkPushDownViability(root);
+            if (receiveNode == null) {
+                canPushDown = false;
+            } else {
+                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
+                    AbstractExpression rootExpr = col.expression;
+                    if (rootExpr instanceof AggregateExpression) {
+                        if (((AggregateExpression)rootExpr).m_distinct) {
+                            canPushDown = false;
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -851,17 +850,12 @@ public class PlanAssembler {
          * there is no need to do the push down work, the limit plan node will
          * be run in the partition.
          */
-        if ((canPushDown == false) || (root.hasAnyNodeOfType(PlanNodeType.RECEIVE) == false)) {
-            // not for partitioned table or cannot push down
-            distGraph.push(topLimit);
-        } else {
+        if (canPushDown) {
             /*
              * For partitioned table, the pushed-down limit plan node has a limit based
              * on the combined limit and offset, which may require an expression if either of these was not a hard-coded constant.
              * The top level limit plan node remains the same, with the original limit and offset values.
              */
-            coordGraph.push(topLimit);
-
             LimitPlanNode distLimit = new LimitPlanNode();
             // Offset on a pushed-down limit node makes no sense, just defaults to 0
             // -- the original offset must be factored into the pushed-down limit as a pad on the limit.
@@ -882,10 +876,26 @@ public class PlanAssembler {
             }
             // else let the parameterized forms of offset/limit default to unused/invalid.
 
-            distGraph.push(distLimit);
+            // Disconnect the distributed parts of the plan below the SEND node
+            AbstractPlanNode sendNode = receiveNode.getChild(0);
+            AbstractPlanNode distributedPlan = sendNode.getChild(0);
+            distributedPlan.clearParents();
+            sendNode.clearChildren();
+
+            // If the distributed limit must be performed on ordered input,
+            // ensure the order of the data on each partition.
+            distributedPlan = handleOrderBy(distributedPlan);
+
+            // Apply the distributed limit.
+            distLimit.addAndLinkChild(distributedPlan);
+
+            // Add the distributed work back to the plan
+            receiveNode.getChild(0).addAndLinkChild(distLimit);
         }
 
-        return pushDownLimit(root, distGraph, coordGraph);
+        topLimit.addAndLinkChild(root);
+        topLimit.generateOutputSchema(m_catalogDb);
+        return topLimit;
     }
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
@@ -1194,79 +1204,6 @@ public class PlanAssembler {
             coordNode.generateOutputSchema(m_catalogDb);
             root = coordNode;
         }
-        return root;
-    }
-
-
-    /**
-     * Push the distributed node down if the plan is distributed, then add the
-     * coord. nodes at the top of the root plan. If the coord node is not given,
-     * nothing is pushed down - the distributed node is added on top of the
-     * send/receive pair directly.
-     *
-     * Note: this works in part because the push-down node is also an acceptable
-     * top level node if the plan is not distributed. This wouldn't be true
-     * if we started pushing down something like (sum, count) to calculate
-     * a distributed average.
-     *
-     * @param root
-     *            The root node
-     * @param distributedNode
-     *            The node to push down
-     * @param coordNodes
-     *            New coordinator node(s) to put on top of the plan.
-     *            If this is null, no push-down will be performed.
-     * @return The new root node.
-     */
-    AbstractPlanNode pushDownLimit(AbstractPlanNode root,
-                                  Stack<AbstractPlanNode> distNodes,
-                                  Stack<AbstractPlanNode> coordNodes) {
-
-        AbstractPlanNode receiveNode = checkPushDownViability(root);
-
-        // If there is work to distribute and a receive node was found,
-        // disconnect the coordinator and distributed parts of the plan
-        // below the SEND node
-        AbstractPlanNode distributedPlan = root;
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            distributedPlan = receiveNode.getChild(0).getChild(0);
-            distributedPlan.clearParents();
-            receiveNode.getChild(0).clearChildren();
-        }
-
-        // If there is work to distribute, determine if the distributed
-        // limit must be performed on ordered input. If so, produce that
-        // order if an explicit sort is necessary
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            if ((distributedPlan.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                ((IndexScanPlanNode) distributedPlan).getSortDirection() == SortDirectionType.INVALID) &&
-                m_parsedSelect.orderColumns.size() > 0) {
-                distNodes.push(createOrderBy());
-            }
-        }
-
-        // Add the distributed work to the plan
-        while (!distNodes.isEmpty()) {
-            AbstractPlanNode distributedNode = distNodes.pop();
-            distributedNode.addAndLinkChild(distributedPlan);
-            distributedPlan = distributedNode;
-        }
-
-        // Reconnect the plans and add the coordinator's work
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            receiveNode.getChild(0).addAndLinkChild(distributedPlan);
-
-            while (!coordNodes.isEmpty()) {
-                AbstractPlanNode coordNode = coordNodes.pop();
-                coordNode.addAndLinkChild(root);
-                root = coordNode;
-            }
-        }
-        else {
-            root = distributedPlan;
-        }
-
-        root.generateOutputSchema(m_catalogDb);
         return root;
     }
 
