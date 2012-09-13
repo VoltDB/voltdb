@@ -24,10 +24,14 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CommandLog;
+
+import org.voltdb.messaging.Iv2LogFaultMessage;
+import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
@@ -39,7 +43,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
-public class SpScheduler extends Scheduler
+public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     List<Long> m_sendToHSIds = new ArrayList<Long>();
@@ -52,11 +56,21 @@ public class SpScheduler extends Scheduler
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    private int m_commandLogHackUgh = 100;
-
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
+    }
+
+    public void setLeaderState(boolean isLeader)
+    {
+        super.setLeaderState(isLeader);
+        VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
+    }
+
+    public void setMaxSeenTxnId(long maxSeenTxnId)
+    {
+        super.setMaxSeenTxnId(maxSeenTxnId);
+        writeIv2ViableReplayEntry();
     }
 
     @Override
@@ -101,6 +115,7 @@ public class SpScheduler extends Scheduler
                         "had no responses.  This should be impossible?");
             }
         }
+        writeIv2ViableReplayEntry();
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -109,12 +124,6 @@ public class SpScheduler extends Scheduler
     @Override
     public void deliver(VoltMessage message)
     {
-        if (m_commandLogHackUgh != 0) {
-            hostLog.fatal("SET COMMAND LOG, CHESTER!");
-            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
-                    advanceTxnEgo().getSequence());
-            m_commandLogHackUgh--;
-        }
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }
@@ -132,8 +141,12 @@ public class SpScheduler extends Scheduler
         }
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
-        } else if (message instanceof MultiPartitionParticipantMessage) {
+        }
+        else if (message instanceof MultiPartitionParticipantMessage) {
             handleMultipartSentinel((MultiPartitionParticipantMessage)message);
+        }
+        else if (message instanceof Iv2LogFaultMessage) {
+            handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -483,8 +496,52 @@ public class SpScheduler extends Scheduler
         }
     }
 
+    public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
+    {
+        // Should only receive these messages at replicas, call the internal log write with
+        // the provided SP handle
+        writeIv2ViableReplayEntryInternal(message.getSpHandle());
+        setMaxSeenTxnId(message.getSpHandle());
+    }
+
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
+    }
+
+    /**
+     * If appropriate, cause the initiator to write the viable replay set to the command log
+     * Use when it's unclear whether the caller is the leader or a replica; the right thing will happen.
+     */
+    public void writeIv2ViableReplayEntry()
+    {
+        if (m_isLeader) {
+            // write the viable set locally
+            long faultSpHandle = advanceTxnEgo().getSequence();
+            writeIv2ViableReplayEntryInternal(faultSpHandle);
+            // Generate Iv2LogFault message and send it to replicas
+            Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                    faultMsg);
+        }
+    }
+
+    /**
+     * Write the viable replay set to the command log with the provided SP Handle
+     */
+    void writeIv2ViableReplayEntryInternal(long spHandle)
+    {
+        m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
+                spHandle);
+    }
+
+    @Override
+    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
+            long[] partitionTxnIds, boolean truncationSnapshot)
+    {
+        if (truncationSnapshot) {
+            writeIv2ViableReplayEntry();
+        }
+        return new CountDownLatch(0);
     }
 }

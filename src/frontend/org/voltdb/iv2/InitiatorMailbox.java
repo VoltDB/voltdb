@@ -76,6 +76,10 @@ public class InitiatorMailbox implements Mailbox
         m_scheduler.setMaxSeenTxnId(txnId);
     }
 
+    synchronized public void writeIv2ViableReplayEntry() {
+        m_scheduler.writeIv2ViableReplayEntry();
+    }
+
     public InitiatorMailbox(int partitionId,
             Scheduler scheduler,
             HostMessenger messenger, RepairLog repairLog,

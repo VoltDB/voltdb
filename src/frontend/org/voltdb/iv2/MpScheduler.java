@@ -315,4 +315,9 @@ public class MpScheduler extends Scheduler
     public void setCommandLog(CommandLog cl) {
         // the MPI currently doesn't do command logging.  Don't have a reference to one.
     }
+
+    @Override
+    public void writeIv2ViableReplayEntry() {
+        // This is currently a no-op for the MPI
+    }
 }

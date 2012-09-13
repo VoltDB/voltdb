@@ -167,4 +167,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
     {
         return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami, m_partitionId);
     }
+
+    @Override
+    public void writeIv2ViableReplayEntry() {
+        m_initiatorMailbox.writeIv2ViableReplayEntry();
+    }
 }

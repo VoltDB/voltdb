@@ -2035,7 +2035,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         /*
-         * Enable the initiator to send normal heartbeats and accept client
+         * IV2: After the command log is initialized, force the writing of the initial
+         * viable replay set.  Turns into a no-op with no command log, on the non-leader sites, and on the MPI.
+         */
+        for (Initiator initiator : m_iv2Initiators) {
+            initiator.writeIv2ViableReplayEntry();
+        }
+
+        /*
+         * LEGACY: Enable the initiator to send normal heartbeats and accept client
          * connections
          */
         for (SimpleDtxnInitiator dtxn : m_dtxns) {

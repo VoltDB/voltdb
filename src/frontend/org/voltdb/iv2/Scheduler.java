@@ -111,4 +111,5 @@ abstract public class Scheduler implements InitiatorMessageHandler
     @Override
     abstract public void deliver(VoltMessage message);
 
+    abstract public void writeIv2ViableReplayEntry();
 }

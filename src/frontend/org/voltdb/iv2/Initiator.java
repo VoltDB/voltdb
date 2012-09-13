@@ -59,6 +59,8 @@ public interface Initiator
     public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
             String whoami);
 
+    /** Write a viable replay set to the command log */
+    public void writeIv2ViableReplayEntry();
 
     public long getCurrentTxnId();
 }

@@ -154,4 +154,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
     {
         m_executionSite.updateCatalog(diffCmds, context, csp, true);
     }
+
+    @Override
+    public void writeIv2ViableReplayEntry() {
+        m_initiatorMailbox.writeIv2ViableReplayEntry();
+    }
 }
