@@ -31,6 +31,7 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.CommandLog;
 import org.voltdb.Promotable;
+import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -43,7 +44,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, long buddyHSId)
+    public MpInitiator(HostMessenger messenger, long buddyHSId, StatsAgent agent)
     {
         super(VoltZK.iv2mpi,
                 messenger,
@@ -52,7 +53,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     MP_INIT_PID,
                     buddyHSId,
                     new SiteTaskerQueue()),
-                "MP");
+                "MP",
+                agent);
     }
 
     @Override

@@ -68,77 +68,17 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.VoltFile;
+import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
 
 /**
  * Test the SnapshotSave and SnapshotRestore system procedures
  */
-public class TestSaveRestoreSysprocSuite extends RegressionSuite {
-
-    private static final String TMPDIR = "/tmp/" + System.getProperty("user.name");
-    private static final String TESTNONCE = "testnonce";
-    protected static final String JAR_NAME = "sysproc-threesites.jar";
+public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
-    }
-
-    @Override
-    public void setUp() throws Exception
-    {
-        File tempDir = new File(TMPDIR);
-        if (!tempDir.exists()) {
-            assertTrue(tempDir.mkdirs());
-        }
-        deleteTestFiles();
-        super.setUp();
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
-        org.voltdb.sysprocs.SnapshotRegistry.clear();
-    }
-
-    @Override
-    public void tearDown() throws Exception
-    {
-        deleteTestFiles();
-        super.tearDown();
-    }
-
-    private void deleteRecursively(File f) {
-        if (f.isDirectory()) {
-            for (File f2 : f.listFiles()) {
-                deleteRecursively(f2);
-            }
-            assertTrue(f.delete());
-        } else  {
-            assertTrue(f.delete());
-        }
-    }
-
-    private void deleteTestFiles()
-    {
-        FilenameFilter cleaner = new FilenameFilter()
-        {
-            @Override
-            public boolean accept(File dir, String file)
-            {
-                return file.startsWith(TESTNONCE) ||
-                file.endsWith(".vpt") ||
-                file.endsWith(".digest") ||
-                file.endsWith(".tsv") ||
-                file.endsWith(".csv") ||
-                file.endsWith(".incomplete") ||
-                new File(dir, file).isDirectory();
-            }
-        };
-
-        File tmp_dir = new File(TMPDIR);
-        File[] tmp_files = tmp_dir.listFiles(cleaner);
-        for (File tmp_file : tmp_files)
-        {
-            deleteRecursively(tmp_file);
-        }
     }
 
     private void corruptTestFiles(java.util.Random r) throws Exception

@@ -445,7 +445,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                    m_MPI = new MpInitiator(m_messenger, mpiBuddyHSId);
+                    m_MPI = new MpInitiator(m_messenger, mpiBuddyHSId, m_statsAgent);
                     m_iv2Initiators.add(m_MPI);
                 }
 
@@ -1027,7 +1027,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
-            Initiator initiator = new SpInitiator(m_messenger, partition);
+            Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent);
             initiators.add(initiator);
         }
         return initiators;

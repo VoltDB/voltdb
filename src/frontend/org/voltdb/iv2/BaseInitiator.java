@@ -31,6 +31,9 @@ import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.StarvationTracker;
+import org.voltdb.StatsAgent;
+import org.voltdb.SysProcSelector;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -56,7 +59,7 @@ public abstract class BaseInitiator implements Initiator
     protected final RepairLog m_repairLog = new RepairLog();
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
@@ -75,6 +78,11 @@ public abstract class BaseInitiator implements Initiator
         m_messenger.createMailbox(null, m_initiatorMailbox);
         rejoinProducer.setMailbox(m_initiatorMailbox);
         m_scheduler.setMailbox(m_initiatorMailbox);
+        StarvationTracker st = new StarvationTracker(getInitiatorHSId());
+        m_scheduler.setStarvationTracker(st);
+        agent.registerStatsSource(SysProcSelector.STARVATION,
+                                  getInitiatorHSId(),
+                                  st);
 
         String partitionString = " ";
         if (m_partitionId != -1) {

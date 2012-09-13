@@ -23,6 +23,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
 
 /**
@@ -106,6 +107,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
+    }
+
+    public void setStarvationTracker(StarvationTracker tracker) {
+        m_tasks.setStarvationTracker(tracker);
     }
 
     abstract public void shutdown();

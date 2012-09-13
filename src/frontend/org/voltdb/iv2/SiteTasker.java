@@ -32,23 +32,4 @@ public abstract class SiteTasker {
      */
     abstract public void runForRejoin(SiteProcedureConnection siteConnection);
 
-    /**
-     * Priority returns the relative task priority. 0 is the highest
-     * priority.
-     */
-    abstract public int priority();
-
-    // the scheduler guarntees equal priority tasks run in
-    // insertion order. m_seq disambiguates equal priority tasks.
-    private long m_seq;
-
-    void setSeq(long seq)
-    {
-        m_seq = seq;
-    }
-
-    long seq()
-    {
-        return m_seq;
-    }
 }

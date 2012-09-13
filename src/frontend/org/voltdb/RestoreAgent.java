@@ -900,6 +900,9 @@ SnapshotCompletionInterest
             int recover = m_action.ordinal();
             Long clStartTxnId = null;
             for (String node : children) {
+                //This might be created before we are done fetching the restore info
+                if (node.equals("snapshot_id")) continue;
+
                 byte[] data = null;
                 data = m_zk.getData(VoltZK.restore + "/" + node, false, null);
                 String jsonData = new String(data, "UTF8");
