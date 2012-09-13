@@ -527,7 +527,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_replayComplete) {
             if (m_isLeader) {
                 // write the viable set locally
-                long faultSpHandle = advanceTxnEgo().getSequence();
+                long faultSpHandle = advanceTxnEgo().getTxnId();
                 writeIv2ViableReplayEntryInternal(faultSpHandle);
                 // Generate Iv2LogFault message and send it to replicas
                 Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
