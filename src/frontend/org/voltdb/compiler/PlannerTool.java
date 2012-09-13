@@ -84,18 +84,23 @@ public class PlannerTool {
         hostLog.info("hsql loaded");
 
         // Create and register a singleton planner stats collector, if this is the first time.
+        // In mock test environments there may be no stats agent.
         synchronized (this) {
             if (m_plannerStats == null) {
-                m_plannerStats = new PlannerStatsCollector(-1);
                 final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
-                statsAgent.registerStatsSource(SysProcSelector.PLANNER, -1, m_plannerStats);
+                if (statsAgent != null) {
+                    m_plannerStats = new PlannerStatsCollector(-1);
+                    statsAgent.registerStatsSource(SysProcSelector.PLANNER, -1, m_plannerStats);
+                }
             }
         }
     }
 
     public AdHocPlannedStatement planSql(String sqlIn, Object partitionParam, boolean inferSP, boolean allowParameterization) {
         CacheUse cacheUse = CacheUse.FAIL;
-        m_plannerStats.startPlanning();
+        if (m_plannerStats != null) {
+            m_plannerStats.startPlanning();
+        }
         try {
             if ((sqlIn == null) || (sqlIn.length() == 0)) {
                 throw new RuntimeException("Can't plan empty or null SQL.");
@@ -205,7 +210,9 @@ public class PlannerTool {
             return ahps;
         }
         finally {
-            m_plannerStats.endPlanning(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
+            if (m_plannerStats != null) {
+                m_plannerStats.endPlanning(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
+            }
         }
     }
 }

@@ -61,7 +61,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected final int m_partitionId;
 
     /** Statistics collector (provided later) */
-    private final PlannerStatsCollector m_plannerStats;
+    private PlannerStatsCollector m_plannerStats = null;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -95,9 +95,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
-        m_plannerStats = new PlannerStatsCollector(siteId);
+        // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
-        statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
+        if (statsAgent != null) {
+            m_plannerStats = new PlannerStatsCollector(siteId);
+            statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
+        }
     }
 
     /** Alternate constructor without planner statistics tracking. */
