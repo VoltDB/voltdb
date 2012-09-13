@@ -30,14 +30,17 @@ import org.voltdb.VoltProcedure;
 @ProcInfo (
     singlePartition = false
 )
-public class ProcSPcandidate3 extends VoltProcedure {
+public class DeterministicRWProc1 extends VoltProcedure {
 
-    // Constant filtered WHERE clause enables SP processing, even when joining with replicated table.
-    public static final SQLStmt query3 =
-            new SQLStmt("select count(*) from blah, indexed_replicated_blah where indexed_replicated_blah.sval = blah.sval and blah.ival = 87654321");
+    // Meaningless where clause makes expected output easier to test for.
+    public static final SQLStmt queryUnambiguousRows = new SQLStmt("select * from blah where sval < 'NDC=false' order by ival, sval limit 2");
+    public static final SQLStmt updateUnambiguously = new SQLStmt("update blah set sval = ?");
 
     public long run() {
-        voltQueueSQL(query3);
+        voltQueueSQL(queryUnambiguousRows);
+        voltExecuteSQL();
+        String updateArg = "safe input as if based on deterministic query";
+        voltQueueSQL(updateUnambiguously, updateArg);
         voltExecuteSQL();
         // zero is a successful return
         return 0;
