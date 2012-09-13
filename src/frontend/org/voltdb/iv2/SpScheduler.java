@@ -62,7 +62,7 @@ public class SpScheduler extends Scheduler
             public void onDurability(ArrayDeque<Object> durableThings) {
                 synchronized (m_lock) {
                     for (Object o : durableThings) {
-                        taskQueue.offer((TransactionTask)o);
+                        m_pendingTasks.offer((TransactionTask)o);
                     }
                 }
             }
