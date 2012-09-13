@@ -46,7 +46,10 @@ from Query import VoltQueryClient
 from XMLUtils import prettify # To create a human readable xml file
 
 hostname = socket.gethostname()
-pkgName = {'comm': 'LINUX-voltdb', 'pro': 'LINUX-voltdb-ent'}
+pkgName = {'comm': 'LINUX-voltdb',
+           'voltkv': 'LINUX-voltdb-voltkv',
+           'voltcache': 'LINUX-voltdb-voltcache',
+           'pro': 'LINUX-voltdb-ent'}
 tail = "tar.gz"
 sepLineD = "========================================================"
 sepLineS = "--------------------------------------------"
@@ -473,11 +476,11 @@ def create_rpt(info, status, msg, keys):
 if __name__ == "__main__":
     usage = "Usage: %prog [options]"
 #    parser = OptionParser()
-    parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro> <-s helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
+    parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro|voltkv|voltcache> <-s helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
     parser.add_option("-r", "--release", dest="release",
                       help="VoltDB release no. If ommitted, it will find it from version.txt.")
     parser.add_option("-p", "--pkg", dest="pkg",
-                      help="VoltDB package type: Community or Pro. Defalut is Community.")
+                      help="VoltDB package type: Community, Pro, Voltkv or Voltcache. Defalut is Community.")
     parser.add_option("-s", "--suite", dest="suite",
                       help="Test suite name, if not set, then take all suites")
 
@@ -511,10 +514,11 @@ if __name__ == "__main__":
     for k1 in ret:
         print "key: '%s', Val: '%s'" % (k1, ret[k1])
 
+    print "suite = '%s'" % suite
+
     testSuiteList = setTestSuite(ret["workDir"], suite)
-#    for i in testSuiteList:
-#        print "i = '%s', exec = '%s'" % (i, testSuiteList[i])
-#    exit(1)
+    for i in testSuiteList:
+        print "i = '%s', exec = '%s'" % (i, testSuiteList[i])
 
     (tf, msg, keys) = startTest(testSuiteList)
     status = True
