@@ -41,9 +41,9 @@ public class ClientInterfaceHandleManager
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
-    static final int PART_ID_BITS = 10;
+    static final int PART_ID_BITS = 14;
     static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
-    static final int PART_ID_SHIFT = 54;
+    static final int PART_ID_SHIFT = 50;
     static final int SEQNUM_MAX = (1 << PART_ID_SHIFT) - 1;
 
     private long m_outstandingTxns;
@@ -60,8 +60,6 @@ public class ClientInterfaceHandleManager
         HandleGenerator(int partitionId)
         {
             m_partitionId = partitionId;
-            hostLog.info("Constructing HandleGenerator for partition: " +
-                    m_partitionId);
         }
 
         public long getNextHandle()
@@ -94,13 +92,15 @@ public class ClientInterfaceHandleManager
         final long m_clientHandle;
         final int m_messageSize;
         final long m_creationTime;
+        final String m_procName;
         Iv2InFlight(long ciHandle, long clientHandle,
-                int messageSize, long creationTime)
+                int messageSize, long creationTime, String procName)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
             m_messageSize = messageSize;
             m_creationTime = creationTime;
+            m_procName = procName;
         }
     }
 
@@ -115,15 +115,53 @@ public class ClientInterfaceHandleManager
     }
 
     /**
+     * Factory to make a threadsafe version of CIHM. This is used
+     * exclusively by some internal CI adapters that don't have
+     * the natural thread-safety protocol/design of VoltNetwork.
+     */
+    public static ClientInterfaceHandleManager makeThreadSafeCIHM(
+            boolean isAdmin, Connection connection, AdmissionControlGroup acg)
+    {
+        return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
+            @Override
+            synchronized long getHandle(boolean isSinglePartition, int partitionId,
+                    long clientHandle, int messageSize, long creationTime, String procName) {
+                return super.getHandle(isSinglePartition, partitionId,
+                        clientHandle, messageSize, creationTime, procName);
+            }
+            @Override
+            synchronized boolean removeHandle(long ciHandle) {
+                return super.removeHandle(ciHandle);
+            }
+            @Override
+            synchronized Iv2InFlight findHandle(long ciHandle) {
+                return super.findHandle(ciHandle);
+            }
+            @Override
+            synchronized long getOutstandingTxns() {
+                return super.getOutstandingTxns();
+            }
+            @Override
+            synchronized void freeOutstandingTxns() {
+                super.freeOutstandingTxns();
+            }
+        };
+    }
+
+    /**
      * Create a new handle for a transaction and store the client information
      * for that transaction in the internal structures.
      * ClientInterface handles have the partition ID encoded in them as the 10
      * high-order non-sign bits (where the MP partition ID is the max value),
      * and a 53 bit sequence number in the low 53 bits.
      */
-    long getHandle(boolean isSinglePartition, int partitionId,
+    long getHandle(
+            boolean isSinglePartition,
+            int partitionId,
             long clientHandle,
-            int messageSize, long creationTime)
+            int messageSize,
+            long creationTime,
+            String procName)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
@@ -144,7 +182,7 @@ public class ClientInterfaceHandleManager
             perPartDeque = partitionStuff.getSecond();
         }
         long ciHandle = generator.getNextHandle();
-        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime);
+        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName);
         perPartDeque.addLast(inFlight);
         m_outstandingTxns++;
         m_acg.increaseBackpressure(messageSize);

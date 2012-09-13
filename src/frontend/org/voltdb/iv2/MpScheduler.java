@@ -18,30 +18,24 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-
-import java.util.concurrent.atomic.AtomicLong;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-
-import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.ProcedureRunner;
+import org.voltdb.CommandLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.iv2.EveryPartitionTask;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpScheduler extends Scheduler
@@ -54,15 +48,15 @@ public class MpScheduler extends Scheduler
         new HashMap<Long, DuplicateCounter>();
 
     private final List<Long> m_iv2Masters;
-    private final AtomicLong m_txnId = new AtomicLong(1l << 40);
     private final long m_buddyHSId;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+    private CommandLog m_cl;
 
-    MpScheduler(long buddyHSId, SiteTaskerQueue taskQueue)
+    MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
     {
-        super(taskQueue);
+        super(partitionId, taskQueue);
         m_buddyHSId = buddyHSId;
         m_iv2Masters = new ArrayList<Long>();
     }
@@ -81,11 +75,6 @@ public class MpScheduler extends Scheduler
 
             @Override
             public void runForRejoin(SiteProcedureConnection siteConnection) {
-            }
-
-            @Override
-            public int priority() {
-                return 0;
             }
         };
         m_pendingTasks.repair(nullTask);
@@ -146,11 +135,6 @@ public class MpScheduler extends Scheduler
             {
                 throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
             }
-
-            @Override
-            public int priority() {
-                return 0;
-            }
         };
         m_pendingTasks.repair(repairTask);
     }
@@ -179,13 +163,30 @@ public class MpScheduler extends Scheduler
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
-        final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
 
-        final long mpTxnId = m_txnId.incrementAndGet();
+        /*
+         * If this is CL replay, use the txnid from the CL and use it to update the current txnid
+         */
+        long mpTxnId;
+        long timestamp;
+        if (message.isForReplay()) {
+            mpTxnId = message.getTxnId();
+            timestamp = message.getTimestamp();
+            setMaxSeenTxnId(mpTxnId);
+        } else {
+            TxnEgo ego = advanceTxnEgo();
+            mpTxnId = ego.getTxnId();
+            timestamp = ego.getWallClock();
+        }
+
+        // advanceTxnEgo();
+        // final long mpTxnId = currentTxnEgoSequence();
+
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
         // Handle every-site system procedures (at the MPI)
-        if (runner.isEverySite()) {
+        if (SystemProcedureCatalog.listing.get(procedureName) != null &&
+                SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
             // Send an SP initiate task to all remote sites
             final Long localId = m_mailbox.getHSId();
             Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
@@ -193,18 +194,20 @@ public class MpScheduler extends Scheduler
                     message.getCoordinatorHSId(),
                     m_repairLogTruncationHandle,
                     mpTxnId,
+                    timestamp,
                     message.isReadOnly(),
                     true, // isSinglePartition
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
-                    message.getConnectionId());
+                    message.getConnectionId(),
+                    message.isForReplay());
             DuplicateCounter counter = new DuplicateCounter(
                     message.getInitiatorHSId(),
                     mpTxnId,
                     m_iv2Masters);
             m_duplicateCounters.put(mpTxnId, counter);
             EveryPartitionTask eptask =
-                new EveryPartitionTask(m_mailbox, mpTxnId, m_pendingTasks, sp,
+                new EveryPartitionTask(m_mailbox, m_pendingTasks, sp,
                         m_iv2Masters);
             m_pendingTasks.offer(eptask);
             return;
@@ -217,15 +220,17 @@ public class MpScheduler extends Scheduler
                     message.getCoordinatorHSId(),
                     m_repairLogTruncationHandle,
                     mpTxnId,
+                    timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
-                    message.getConnectionId());
+                    message.getConnectionId(),
+                    message.isForReplay());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
-            new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
-                    mpTxnId, m_pendingTasks, mp, m_iv2Masters, m_buddyHSId);
+            new MpProcedureTask(m_mailbox, procedureName,
+                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);
     }
@@ -298,11 +303,7 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void setMaxSeenTxnId(long maxSeenTxnId) {
-        if (maxSeenTxnId == 0) {
-            maxSeenTxnId = (1l << 40);
-        }
-        assert(maxSeenTxnId >= (1l << 40));
-        m_txnId.set(maxSeenTxnId);
+    public void setCommandLog(CommandLog cl) {
+        m_cl = cl;
     }
 }
