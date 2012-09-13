@@ -63,8 +63,8 @@ public class InitiatorMailbox implements Mailbox
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
         m_repairLog.setLeaderState(true);
-        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
         m_scheduler.setLeaderState(true);
+        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
     }
 
     public synchronized void setMaxLastSeenMultipartTxnId(long txnId) {
