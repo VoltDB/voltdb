@@ -780,6 +780,11 @@ public class PlanAssembler {
             return root;
         }
 
+        // Ignore ORDER BY in cases where there can be at most one row.
+        if (m_parsedSelect.guaranteesUniqueRow()) {
+            return root;
+        }
+
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
