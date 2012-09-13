@@ -44,7 +44,9 @@
  */
 
 #include <cassert>
-#include "boost/scoped_ptr.hpp"
+#include <boost/scoped_ptr.hpp>
+#include <boost/foreach.hpp>
+
 #include "updateexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -95,9 +97,6 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
                                                       limits));
     delete[] column_names;
 
-    // record if a full index update is needed, or if these checks can be skipped
-    m_updatesIndexes = m_node->doesUpdateIndexes();
-
     AbstractPlanNode *child = m_node->getChildren()[0];
     ProjectionPlanNode *proj_node = NULL;
     if (NULL == child) {
@@ -140,6 +139,26 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     if (m_partitionColumn != -1) {
         if (m_targetTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
             m_partitionColumnIsString = true;
+        }
+    }
+
+    // determine which indices are updated by this executor
+    // iterate through all target table indices and see if they contain
+    //  tables mutated by this executor
+    BOOST_FOREACH(TableIndex *index, m_targetTable->allIndexes()) {
+        bool indexKeyUpdated = false;
+        BOOST_FOREACH(int colIndex, index->getColumnIndices()) {
+            std::pair<int, int> updateColInfo; // needs to be here because of macro failure
+            BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
+                if (updateColInfo.second == colIndex) {
+                    indexKeyUpdated = true;
+                    break;
+                }
+            }
+            if (indexKeyUpdated) break;
+        }
+        if (indexKeyUpdated) {
+            m_indexesToUpdate.push_back(index);
         }
     }
 
@@ -195,8 +214,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             }
         }
 
-        if (!m_targetTable->updateTuple(tempTuple, m_targetTuple,
-                                        m_updatesIndexes)) {
+        if (!m_targetTable->updateTupleWithSpecificIndexes(m_targetTuple, tempTuple,
+                                                           m_indexesToUpdate)) {
             VOLT_INFO("Failed to update tuple from table '%s'",
                       m_targetTable->name().c_str());
             return false;

@@ -67,13 +67,13 @@ import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 /**
-* The query planner accepts catalog data, SQL statements from the catalog, then
-* outputs a set of complete and correct query plans. It will output MANY plans
-* and some of them will be stupid. The best plan will be selected by computing
-* resource usage statistics for the plans, then using those statistics to
-* compute the cost of a specific plan. The plan with the lowest cost wins.
-*
-*/
+ * The query planner accepts catalog data, SQL statements from the catalog, then
+ * outputs a set of complete and correct query plans. It will output MANY plans
+ * and some of them will be stupid. The best plan will be selected by computing
+ * resource usage statistics for the plans, then using those statistics to
+ * compute the cost of a specific plan. The plan with the lowest cost wins.
+ *
+ */
 public class PlanAssembler {
 
     /** convenience pointer to the cluster object in the catalog */
@@ -94,31 +94,31 @@ public class PlanAssembler {
     private final PartitioningForStatement m_partitioning;
 
     /**
-* Used to generate the table-touching parts of a plan. All join-order and
-* access path selection stuff is done by the SelectSubPlanAssember.
-*/
+     * Used to generate the table-touching parts of a plan. All join-order and
+     * access path selection stuff is done by the SelectSubPlanAssember.
+     */
     SubPlanAssembler subAssembler = null;
 
     /**
-* Counter for the number of plans generated to date for a single statement.
-*/
+     * Counter for the number of plans generated to date for a single statement.
+     */
     boolean m_insertPlanWasGenerated = false;
 
     /**
-* Whenever a parameter has its type changed during compilation, the new type is stored
-* here, indexed by parameter index.
-*/
+     * Whenever a parameter has its type changed during compilation, the new type is stored
+     * here, indexed by parameter index.
+     */
     Map<Integer, VoltType> m_paramTypeOverrideMap = new HashMap<Integer, VoltType>();
 
     /**
-*
-* @param catalogCluster
-* Catalog info about the physical layout of the cluster.
-* @param catalogDb
-* Catalog info about schema, metadata and procedures.
-* @param partitioning
-* Describes the specified and inferred partition context.
-*/
+     *
+     * @param catalogCluster
+     *            Catalog info about the physical layout of the cluster.
+     * @param catalogDb
+     *            Catalog info about schema, metadata and procedures.
+     * @param partitioning
+     *            Describes the specified and inferred partition context.
+     */
     PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
@@ -143,8 +143,8 @@ public class PlanAssembler {
     }
 
     /**
-* Return true if tableList includes at least one matview.
-*/
+     * Return true if tableList includes at least one matview.
+     */
     private boolean tableListIncludesView(List<Table> tableList) {
         for (Table table : tableList) {
             if (table.getMaterializer() != null) {
@@ -155,8 +155,8 @@ public class PlanAssembler {
     }
 
     /**
-* Return true if tableList includes at least one export table.
-*/
+     * Return true if tableList includes at least one export table.
+     */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
         // the single well-known connector
         Connector connector = m_catalogDb.getConnectors().get("0");
@@ -191,6 +191,7 @@ public class PlanAssembler {
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt)
     {
+        m_insertPlanWasGenerated = false;
         int countOfPartitionedTables = 0;
         Map<String, String> partitionColumnByTable = new HashMap<String, String>();
         // Do we have a need for a distributed scan at all?
@@ -283,13 +284,13 @@ public class PlanAssembler {
     }
 
     /**
-* Generate a unique and correct plan for the current SQL statement context.
-* This method gets called repeatedly until it returns null, meaning there
-* are no more plans.
-*
-* @return A not-previously returned query plan or null if no more
-* computable plans.
-*/
+     * Generate a unique and correct plan for the current SQL statement context.
+     * This method gets called repeatedly until it returns null, meaning there
+     * are no more plans.
+     *
+     * @return A not-previously returned query plan or null if no more
+     *         computable plans.
+     */
     CompiledPlan getNextPlan() {
         // reset the plan column guids and pool
         //PlanColumn.resetAll();
@@ -394,8 +395,8 @@ public class PlanAssembler {
         AbstractPlanNode root = subSelectRoot;
 
         /*
-* Establish the output columns for the sub select plan.
-*/
+         * Establish the output columns for the sub select plan.
+         */
         root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
 
@@ -516,7 +517,7 @@ public class PlanAssembler {
         // Right now, the EE is going to use the original column names
         // and compare these to the persistent table column names in the
         // update executor in order to figure out which table columns get
-        // updated. We'll associate the actual values with VOLT_TEMP_TABLE
+        // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
 
@@ -571,11 +572,11 @@ public class PlanAssembler {
     }
 
     /**
-* Get the next (only) plan for a SQL insertion. Inserts are pretty simple
-* and this will only generate a single plan.
-*
-* @return The next plan for a given insert statement.
-*/
+     * Get the next (only) plan for a SQL insertion. Inserts are pretty simple
+     * and this will only generate a single plan.
+     *
+     * @return The next plan for a given insert statement.
+     */
     private AbstractPlanNode getNextInsertPlan() {
         // there's really only one way to do an insert, so just
         // do it the right way once, then return null after that
@@ -704,7 +705,7 @@ public class PlanAssembler {
 
         // The output column. Not really based on a TVE (it is really the
         // count expression represented by the count configured above). But
-        // this is sufficient for now. This looks identical to the above
+        // this is sufficient for now.  This looks identical to the above
         // TVE but it's logically different so we'll create a fresh one.
         // And yes, oh, oh, it's magic</elo>
         TupleValueExpression tve = new TupleValueExpression();
@@ -732,15 +733,15 @@ public class PlanAssembler {
     }
 
     /**
-* Given a relatively complete plan-sub-graph, apply a trivial projection
-* (filter) to it. If the root node can embed the projection do so. If not,
-* add a new projection node.
-*
-* @param rootNode
-* The root of the plan-sub-graph to add the projection to.
-* @return The new root of the plan-sub-graph (might be the same as the
-* input).
-*/
+     * Given a relatively complete plan-sub-graph, apply a trivial projection
+     * (filter) to it. If the root node can embed the projection do so. If not,
+     * add a new projection node.
+     *
+     * @param rootNode
+     *            The root of the plan-sub-graph to add the projection to.
+     * @return The new root of the plan-sub-graph (might be the same as the
+     *         input).
+     */
     AbstractPlanNode addProjection(AbstractPlanNode rootNode) {
         assert (m_parsedSelect != null);
         assert (m_parsedSelect.displayColumns != null);
@@ -773,9 +774,9 @@ public class PlanAssembler {
     }
 
     /**
-* Configure the sort columns for a new OrderByPlanNode
-* @return new OrderByPlanNode
-*/
+     * Configure the sort columns for a new OrderByPlanNode
+     * @return new OrderByPlanNode
+     */
     OrderByPlanNode createOrderBy() {
         assert (m_parsedSelect != null);
 
@@ -789,10 +790,10 @@ public class PlanAssembler {
     }
 
     /**
-* Create an order by node and add make it a parent of root.
-* @param root
-* @return new orderByNode (the new root)
-*/
+     * Create an order by node and add make it a parent of root.
+     * @param root
+     * @return new orderByNode (the new root)
+     */
     AbstractPlanNode addOrderBy(AbstractPlanNode root) {
         OrderByPlanNode orderByNode = createOrderBy();
         orderByNode.addAndLinkChild(root);
@@ -801,10 +802,10 @@ public class PlanAssembler {
     }
 
     /**
-* Add a limit, pushed-down if possible, and return the new root.
-* @param root top of the original plan
-* @return new plan's root node
-*/
+     * Add a limit, pushed-down if possible, and return the new root.
+     * @param root top of the original plan
+     * @return new plan's root node
+     */
     AbstractPlanNode handleLimitOperator(AbstractPlanNode root) {
         // The nodes that need to be applied at the coordinator
         Stack<AbstractPlanNode> coordGraph = new Stack<AbstractPlanNode>();
@@ -826,9 +827,9 @@ public class PlanAssembler {
         topLimit.setOffsetParameterIndex(offsetParamIndex);
 
         /*
-* TODO: allow push down limit with distinct (select distinct C from T limit 5)
-* or distinct in aggregates.
-*/
+         * TODO: allow push down limit with distinct (select distinct C from T limit 5)
+         * or distinct in aggregates.
+         */
         // Whether or not we can push the limit node down
         boolean canPushDown = true;
 
@@ -846,20 +847,20 @@ public class PlanAssembler {
         }
 
         /*
-* Push down the limit plan node when possible even if offset is set. If
-* the plan is for a partitioned table, do the push down. Otherwise,
-* there is no need to do the push down work, the limit plan node will
-* be run in the partition.
-*/
+         * Push down the limit plan node when possible even if offset is set. If
+         * the plan is for a partitioned table, do the push down. Otherwise,
+         * there is no need to do the push down work, the limit plan node will
+         * be run in the partition.
+         */
         if ((canPushDown == false) || (root.hasAnyNodeOfType(PlanNodeType.RECEIVE) == false)) {
             // not for partitioned table or cannot push down
             distGraph.push(topLimit);
         } else {
             /*
-* For partitioned table, the pushed-down limit plan node has a limit based
-* on the combined limit and offset, which may require an expression if either of these was not a hard-coded constant.
-* The top level limit plan node remains the same, with the original limit and offset values.
-*/
+             * For partitioned table, the pushed-down limit plan node has a limit based
+             * on the combined limit and offset, which may require an expression if either of these was not a hard-coded constant.
+             * The top level limit plan node remains the same, with the original limit and offset values.
+             */
             coordGraph.push(topLimit);
 
             LimitPlanNode distLimit = new LimitPlanNode();
@@ -901,9 +902,9 @@ public class PlanAssembler {
         }
 
         /*
-* "Select A from T group by A" is grouped but has no aggregate operator
-* expressions. Catch that case by checking the grouped flag
-*/
+         * "Select A from T group by A" is grouped but has no aggregate operator
+         * expressions. Catch that case by checking the grouped flag
+         */
         if (containsAggregateExpression || m_parsedSelect.grouped) {
             AggregatePlanNode topAggNode;
             if (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
@@ -940,7 +941,7 @@ public class PlanAssembler {
                     agg_input_expr = rootExpr.getLeft();
                     hasAggregates = true;
 
-                    // count(*) hack. we're not getting AGGREGATE_COUNT_STAR
+                    // count(*) hack.  we're not getting AGGREGATE_COUNT_STAR
                     // expression types from the parsing, so we have
                     // to detect the null inner expression case and do the
                     // switcharoo ourselves.
@@ -991,30 +992,30 @@ public class PlanAssembler {
                                                   tve);
 
                     /*
-* Special case count(*), count(), sum(), min() and max() to
-* push them down to each partition. It will do the
-* push-down if the select columns only contains the listed
-* aggregate operators and other group-by columns. If the
-* select columns includes any other aggregates, it will not
-* do the push-down. - nshi
-*/
+                     * Special case count(*), count(), sum(), min() and max() to
+                     * push them down to each partition. It will do the
+                     * push-down if the select columns only contains the listed
+                     * aggregate operators and other group-by columns. If the
+                     * select columns includes any other aggregates, it will not
+                     * do the push-down. - nshi
+                     */
                     if (!is_distinct &&
                         (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                          agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
                          agg_expression_type == ExpressionType.AGGREGATE_SUM))
                     {
                         /*
-* For count(*), count() and sum(), the pushed-down
-* aggregate node doesn't change. An extra sum()
-* aggregate node is added to the coordinator to sum up
-* the numbers from all the partitions. The input schema
-* and the output schema of the sum() aggregate node is
-* the same as the output schema of the push-down
-* aggregate node.
-*
-* If DISTINCT is specified, don't do push-down for
-* count() and sum()
-*/
+                         * For count(*), count() and sum(), the pushed-down
+                         * aggregate node doesn't change. An extra sum()
+                         * aggregate node is added to the coordinator to sum up
+                         * the numbers from all the partitions. The input schema
+                         * and the output schema of the sum() aggregate node is
+                         * the same as the output schema of the push-down
+                         * aggregate node.
+                         *
+                         * If DISTINCT is specified, don't do push-down for
+                         * count() and sum()
+                         */
 
                         // Output column for the sum() aggregate node
                         TupleValueExpression topOutputExpr = new TupleValueExpression();
@@ -1026,9 +1027,9 @@ public class PlanAssembler {
                         topOutputExpr.setTableName("VOLT_TEMP_TABLE");
 
                         /*
-* Input column of the sum() aggregate node is the
-* output column of the push-down aggregate node
-*/
+                         * Input column of the sum() aggregate node is the
+                         * output column of the push-down aggregate node
+                         */
                         topAggNode.addAggregate(ExpressionType.AGGREGATE_SUM,
                                                 false,
                                                 outputColumnIndex,
@@ -1042,13 +1043,13 @@ public class PlanAssembler {
                              agg_expression_type == ExpressionType.AGGREGATE_MAX)
                     {
                         /*
-* For min() and max(), the pushed-down aggregate node
-* doesn't change. An extra aggregate node of the same
-* type is added to the coordinator. The input schema
-* and the output schema of the top aggregate node is
-* the same as the output schema of the pushed-down
-* aggregate node.
-*/
+                         * For min() and max(), the pushed-down aggregate node
+                         * doesn't change. An extra aggregate node of the same
+                         * type is added to the coordinator. The input schema
+                         * and the output schema of the top aggregate node is
+                         * the same as the output schema of the pushed-down
+                         * aggregate node.
+                         */
                         topAggNode.addAggregate(agg_expression_type,
                                                 is_distinct,
                                                 outputColumnIndex,
@@ -1058,20 +1059,20 @@ public class PlanAssembler {
                     else
                     {
                         /*
-* Unsupported aggregate (AVG for example)
-* or some expression of aggregates.
-*/
+                         * Unsupported aggregate (AVG for example)
+                         * or some expression of aggregates.
+                         */
                         isPushDownAgg = false;
                     }
                 }
                 else
                 {
                     /*
-* These columns are the pass through columns that are not being
-* aggregated on. These are the ones from the SELECT list. They
-* MUST already exist in the child node's output. Find them and
-* add them to the aggregate's output.
-*/
+                     * These columns are the pass through columns that are not being
+                     * aggregated on. These are the ones from the SELECT list. They
+                     * MUST already exist in the child node's output. Find them and
+                     * add them to the aggregate's output.
+                     */
                     schema_col = new SchemaColumn(col.tableName,
                                                   col.columnName,
                                                   col.alias,
@@ -1081,10 +1082,10 @@ public class PlanAssembler {
                 if (topSchemaCol == null)
                 {
                     /*
-* If we didn't set the column schema for the top node, it
-* means either it's not a count(*) aggregate or it's a
-* pass-through column. So just copy it.
-*/
+                     * If we didn't set the column schema for the top node, it
+                     * means either it's not a count(*) aggregate or it's a
+                     * pass-through column. So just copy it.
+                     */
                     topSchemaCol = new SchemaColumn(schema_col.getTableName(),
                                                     schema_col.getColumnName(),
                                                     schema_col.getColumnAlias(),
@@ -1114,8 +1115,8 @@ public class PlanAssembler {
             aggNode.setOutputSchema(agg_schema);
             topAggNode.setOutputSchema(agg_schema);
             /*
-* Is there a necessary coordinator-aggregate node...
-*/
+             * Is there a necessary coordinator-aggregate node...
+             */
             if (!hasAggregates || !isPushDownAgg)
             {
                 topAggNode = null;
@@ -1125,9 +1126,9 @@ public class PlanAssembler {
         else
         {
             /*
-* Handle DISTINCT only when there is no aggregate operator
-* expression
-*/
+             * Handle DISTINCT only when there is no aggregate operator
+             * expression
+             */
             root = handleDistinct(root);
         }
 
@@ -1135,25 +1136,25 @@ public class PlanAssembler {
     }
 
     /**
-* Push the given aggregate if the plan is distributed, then add the
-* coordinator node on top of the send/receive pair. If the plan
-* is not distributed, or coordNode is not provided, the distNode
-* is added at the top of the plan.
-*
-* Note: this works in part because the push-down node is also an acceptable
-* top level node if the plan is not distributed. This wouldn't be true
-* if we started pushing down something like (sum, count) to calculate
-* a distributed average.
-*
-* @param root
-* The root node
-* @param distNode
-* The node to push down
-* @param coordNode
-* The top node to put on top of the send/receive pair after
-* push-down. If this is null, no push-down will be performed.
-* @return The new root node.
-*/
+     * Push the given aggregate if the plan is distributed, then add the
+     * coordinator node on top of the send/receive pair. If the plan
+     * is not distributed, or coordNode is not provided, the distNode
+     * is added at the top of the plan.
+     *
+     * Note: this works in part because the push-down node is also an acceptable
+     * top level node if the plan is not distributed. This wouldn't be true
+     * if we started pushing down something like (sum, count) to calculate
+     * a distributed average.
+     *
+     * @param root
+     *            The root node
+     * @param distNode
+     *            The node to push down
+     * @param coordNode
+     *            The top node to put on top of the send/receive pair after
+     *            push-down. If this is null, no push-down will be performed.
+     * @return The new root node.
+     */
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
                                        AggregatePlanNode coordNode) {
@@ -1166,11 +1167,11 @@ public class PlanAssembler {
         }
 
         /*
-* Push this node down to partition if it's distributed. First remove
-* the send/receive pair, add the node, then put the send/receive pair
-* back on top of the node, followed by another top node at the
-* coordinator.
-*/
+         * Push this node down to partition if it's distributed. First remove
+         * the send/receive pair, add the node, then put the send/receive pair
+         * back on top of the node, followed by another top node at the
+         * coordinator.
+         */
         AbstractPlanNode accessPlanTemp = root;
         if (coordNode != null && root instanceof ReceivePlanNode) {
             root = root.getChild(0).getChild(0);
@@ -1199,25 +1200,25 @@ public class PlanAssembler {
 
 
     /**
-* Push the distributed node down if the plan is distributed, then add the
-* coord. nodes at the top of the root plan. If the coord node is not given,
-* nothing is pushed down - the distributed node is added on top of the
-* send/receive pair directly.
-*
-* Note: this works in part because the push-down node is also an acceptable
-* top level node if the plan is not distributed. This wouldn't be true
-* if we started pushing down something like (sum, count) to calculate
-* a distributed average.
-*
-* @param root
-* The root node
-* @param distributedNode
-* The node to push down
-* @param coordNodes
-* New coordinator node(s) to put on top of the plan.
-* If this is null, no push-down will be performed.
-* @return The new root node.
-*/
+     * Push the distributed node down if the plan is distributed, then add the
+     * coord. nodes at the top of the root plan. If the coord node is not given,
+     * nothing is pushed down - the distributed node is added on top of the
+     * send/receive pair directly.
+     *
+     * Note: this works in part because the push-down node is also an acceptable
+     * top level node if the plan is not distributed. This wouldn't be true
+     * if we started pushing down something like (sum, count) to calculate
+     * a distributed average.
+     *
+     * @param root
+     *            The root node
+     * @param distributedNode
+     *            The node to push down
+     * @param coordNodes
+     *            New coordinator node(s) to put on top of the plan.
+     *            If this is null, no push-down will be performed.
+     * @return The new root node.
+     */
     AbstractPlanNode pushDownLimit(AbstractPlanNode root,
                                   Stack<AbstractPlanNode> distNodes,
                                   Stack<AbstractPlanNode> coordNodes) {
@@ -1271,12 +1272,12 @@ public class PlanAssembler {
     }
 
     /**
-* Check if we can push the limit node down.
-*
-* @param root
-* @return If we can push it down, the receive node is returned. Otherwise,
-* it returns null.
-*/
+     * Check if we can push the limit node down.
+     *
+     * @param root
+     * @return If we can push it down, the receive node is returned. Otherwise,
+     *         it returns null.
+     */
     protected AbstractPlanNode checkPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
 
@@ -1285,19 +1286,19 @@ public class PlanAssembler {
         // a node that can't be pushed down past is found.
         //
         // Can only push past:
-        // * coordinatingAggregator: a distributed aggregator has
-        // has already been pushed down. Distributed LIMIT of that
-        // aggregation is correct.
+        //   * coordinatingAggregator: a distributed aggregator has
+        //     has already been pushed down. Distributed LIMIT of that
+        //     aggregation is correct.
         //
-        // * order by: if the plan requires a sort, getNextSelectPlan()
-        // will have already added an ORDER BY. LIMIT will be added
-        // above that sort. However, if LIMIT can be successfully
-        // pushed down, it may be necessary to create and push down
-        // a distributed sort as well. That work is done here.
+        //   * order by: if the plan requires a sort, getNextSelectPlan()
+        //     will have already added an ORDER BY. LIMIT will be added
+        //     above that sort. However, if LIMIT can be successfully
+        //     pushed down, it may be necessary to create and push down
+        //     a distributed sort as well. That work is done here.
         //
-        // * projection: we only LIMIT on constant value expressions.
-        // whether the LIMIT happens pre-or-post projection is
-        // is irrelevant.
+        //   * projection: we only LIMIT on constant value expressions.
+        //     whether the LIMIT happens pre-or-post projection is
+        //     is irrelevant.
         //
         // Set receiveNode to null if the plan is not distributed or if
         // the distributed plan does not allow push-down of a limit.
@@ -1343,11 +1344,11 @@ public class PlanAssembler {
     }
 
     /**
-* Handle select distinct a from t
-*
-* @param root
-* @return
-*/
+     * Handle select distinct a from t
+     *
+     * @param root
+     * @return
+     */
     AbstractPlanNode handleDistinct(AbstractPlanNode root) {
         if (m_parsedSelect.distinct) {
             List<AbstractExpression> distinctExprList = new ArrayList<AbstractExpression>();
@@ -1365,7 +1366,7 @@ public class PlanAssembler {
                     throw new PlanningErrorException("DISTINCT of an expression currently unsupported");
                 }
             }
-            // Add distinct node(s) to the plan
+            // Add distinct node to the plan
             root = addDistinctNodes(root, distinctExprList);
             // aggregate handlers are expected to produce the required projection.
             // the other aggregates do this inherently but distinct may need a
@@ -1378,13 +1379,13 @@ public class PlanAssembler {
     }
 
     /**
-* If plan is distributed than add distinct nodes to each partition and the coordinator.
-* Otherwise simply add the distinct node on top of the current root
-*
-* @param root The root node
-* @param expr The distinct expression
-* @return The new root node.
-*/
+     * If plan is distributed than add distinct nodes to each partition and the coordinator.
+     * Otherwise simply add the distinct node on top of the current root
+     *
+     * @param root The root node
+     * @param exprList The list of distinct expressions
+     * @return The new root node.
+     */
     AbstractPlanNode addDistinctNodes(AbstractPlanNode root, List<AbstractExpression> exprList)
     {
         assert(root != null);
@@ -1407,12 +1408,12 @@ public class PlanAssembler {
     }
 
     /**
-* Build new distinct node and put it on top of the current root
-*
-* @param root The root node
-* @param expr The distinct expression
-* @return The new root node.
-*/
+     * Build new distinct node and put it on top of the current root
+     *
+     * @param root The root node
+     * @param exprList The list of distinct expressions
+     * @return The new root node.
+     */
     AbstractPlanNode addDistinctNode(AbstractPlanNode root, List<AbstractExpression> exprList)
     {
         DistinctPlanNode distinctNode = new DistinctPlanNode();
@@ -1423,14 +1424,14 @@ public class PlanAssembler {
     }
 
     /**
-* Get the unique set of names of all columns that are part of an index on
-* the given table.
-*
-* @param table
-* The table to build the list of index-affected columns with.
-* @return The set of column names affected by indexes with duplicates
-* removed.
-*/
+     * Get the unique set of names of all columns that are part of an index on
+     * the given table.
+     *
+     * @param table
+     *            The table to build the list of index-affected columns with.
+     * @return The set of column names affected by indexes with duplicates
+     *         removed.
+     */
     public Set<String> getIndexedColumnSetForTable(Table table) {
         HashSet<String> columns = new HashSet<String>();
 

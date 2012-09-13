@@ -116,14 +116,23 @@ inline uint64_t convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(
     return retval;
 }
 
+template <std::size_t keySize> struct IntsEqualityChecker;
+template <std::size_t keySize> struct IntsComparator;
+template <std::size_t keySize> struct IntsHasher;
+
 /**
  *  Integer key that will pack all key data into keySize number of uint64_t.
  *  The minimum number of uint64_ts necessary to pack all the integers is used.
  */
 template <std::size_t keySize>
-class IntsKey {
-public:
+struct IntsKey
+{
+    typedef IntsEqualityChecker<keySize> KeyEqualityChecker;
+    typedef IntsComparator<keySize> KeyComparator;
+    typedef IntsHasher<keySize> KeyHasher;
 
+    static inline bool keyDependsOnTupleAddress() { return false; }
+    static inline bool keyUsesNonInlinedMemory() { return false; }
 
     /*
      * Take a value that is part of the key (already converted to a uint64_t) and inserts it into the
@@ -209,14 +218,17 @@ public:
                 break;
             }
             default:
-                throwFatalException("We currently only support a specific set of column index sizes...")
+                throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys [%s]",
+                                    getTypeName(keySchema->columnType(ii)).c_str());
                 break;
             }
         }
         return std::string(buffer.str());
     }
 
-    inline void setFromKey(const TableTuple *tuple) {
+    IntsKey() {}
+
+    IntsKey(const TableTuple *tuple) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         assert(tuple);
         const TupleSchema *keySchema = tuple->getSchema();
@@ -250,13 +262,13 @@ public:
                 break;
             }
             default:
-                throwFatalException("We currently only support a specific set of column index sizes...");
+                throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys (%s)", getTypeName(keySchema->columnType(ii)).c_str());
                 break;
             }
         }
     }
 
-    inline void setFromTuple(const TableTuple *tuple, const int *indices, const TupleSchema *keySchema) {
+    IntsKey(const TableTuple *tuple, const std::vector<int> &indices, const TupleSchema *keySchema) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
@@ -288,55 +300,24 @@ public:
                 break;
             }
             default:
-                throwFatalException( "We currently only support a specific set of column index sizes..." );
+                throwFatalException("We currently only support a specific set of column index types/sizes for IntsKeys {%s} at column (%d) (%d of %d)",
+                                    getTypeName(keySchema->columnType(ii)).c_str(), indices[ii], ii+1, columnCount);
                 break;
             }
         }
     }
 
-    size_t getKeySize() const
-    {
-        return keySize * sizeof(uint64_t);
-    }
-
     // actual location of data
     uint64_t data[keySize];
-
-private:
-
 };
 
-/** comparator for Int specialized indexes. */
+/** comparator for Int specialized indexes.
+ * Required by CompactingMap keyed by IntsKey<>
+ */
 template <std::size_t keySize>
-class IntsLessComparator {
-public:
-    TupleSchema *m_keySchema;
-    IntsLessComparator(TupleSchema *keySchema) : m_keySchema(keySchema) {}
-
-    inline bool operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
-        // lexographical compare could be faster for fixed N
-        /*
-         * Hopefully the compiler can unroll this loop
-         */
-        for (unsigned int ii = 0; ii < keySize; ii++) {
-            const uint64_t *lvalue = &lhs.data[ii];
-            const uint64_t *rvalue = &rhs.data[ii];
-            if (*lvalue < *rvalue) {
-                return true;
-            } else if (*lvalue > *rvalue) {
-                return false;
-            }
-        }
-        return false;
-    }
-};
-
-/** comparator for Int specialized indexes. */
-template <std::size_t keySize>
-class IntsComparator {
-public:
-    TupleSchema *m_keySchema;
-    IntsComparator(TupleSchema *keySchema) : m_keySchema(keySchema) {}
+struct IntsComparator
+{
+    IntsComparator(const TupleSchema *unused_keySchema) {}
 
     inline int operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
         // lexographical compare could be faster for fixed N
@@ -354,15 +335,12 @@ public:
 };
 
 /**
- *
+ * Required by CompactingHashTable keyed by IntsKey<>
  */
 template <std::size_t keySize>
-class IntsEqualityChecker {
-public:
-
-    voltdb::TupleSchema *m_keySchema;
-
-    IntsEqualityChecker(TupleSchema *keySchema) : m_keySchema(keySchema) {}
+struct IntsEqualityChecker
+{
+    IntsEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     inline bool operator()(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
         for (unsigned int ii = 0; ii < keySize; ii++) {
@@ -375,15 +353,17 @@ public:
         }
         return true;
     }
+private:
+    const TupleSchema *m_keySchema;
 };
 
 /**
- *
+ * Required by CompactingHashTable keyed by IntsKey<>
  */
 template <std::size_t keySize>
-struct IntsHasher : std::unary_function<IntsKey<keySize>, std::size_t>
+struct IntsHasher
 {
-    IntsHasher(TupleSchema *keySchema) {}
+    IntsHasher(const TupleSchema *unused_keySchema) {}
 
     inline size_t operator()(IntsKey<keySize> const& p) const
     {
@@ -395,19 +375,33 @@ struct IntsHasher : std::unary_function<IntsKey<keySize>, std::size_t>
     }
 };
 
+template <std::size_t keySize> struct GenericEqualityChecker;
+template <std::size_t keySize> struct GenericComparator;
+template <std::size_t keySize> struct GenericHasher;
+
 /**
  * Key object for indexes of mixed types.
  * Using TableTuple to store columns.
  */
 template <std::size_t keySize>
-class GenericKey {
-public:
-    inline void setFromKey(const TableTuple *tuple) {
+struct GenericKey
+{
+    typedef GenericEqualityChecker<keySize> KeyEqualityChecker;
+    typedef GenericComparator<keySize> KeyComparator;
+    typedef GenericHasher<keySize> KeyHasher;
+
+    static inline bool keyDependsOnTupleAddress() { return false; }
+    static inline bool keyUsesNonInlinedMemory() { return true; } // maybe
+
+    GenericKey() {}
+
+    GenericKey(const TableTuple *tuple) {
         assert(tuple);
         ::memcpy(data, tuple->m_data + TUPLE_HEADER_SIZE, tuple->getSchema()->tupleLength());
     }
 
-    inline void setFromTuple(const TableTuple *tuple, const int *indices, const TupleSchema *keySchema) {
+    GenericKey(const TableTuple *tuple, const std::vector<int> &indices, const TupleSchema *keySchema) {
+        assert(tuple);
         TableTuple keyTuple(keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(data));
         for (int i = 0; i < keySchema->columnCount(); i++) {
@@ -415,94 +409,72 @@ public:
         }
     }
 
-    size_t getKeySize() const
-    {
-        return keySize + sizeof(char);
-    }
-
     // actual location of data, extends past the end.
     char data[keySize];
-
-private:
-
 };
 
 /**
- * Function object returns true if lhs < rhs, used for trees
+ * Function object returns -1/0/1 if lhs </==/> rhs.
+ * Required by CompactingMap keyed by GenericKey<>
  */
 template <std::size_t keySize>
-class GenericLessComparator {
-public:
+struct GenericComparator
+{
     /** Type information passed to the constuctor as it's not in the key itself */
-    GenericLessComparator(TupleSchema *keySchema) : m_schema(keySchema) {}
-
-    inline bool operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_schema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_schema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
-        // lexographical compare could be faster for fixed N
-        int diff = lhTuple.compare(rhTuple);
-        return diff < 0;
-    }
-
-    TupleSchema *m_schema;
-};
-
-/**
- * Function object returns true if lhs < rhs, used for trees
- */
-template <std::size_t keySize>
-class GenericComparator {
-public:
-    /** Type information passed to the constuctor as it's not in the key itself */
-    GenericComparator(TupleSchema *keySchema) : m_schema(keySchema) {}
+    GenericComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     inline int operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_schema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_schema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
+        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
+        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
         // lexographical compare could be faster for fixed N
         return lhTuple.compare(rhTuple);
     }
-
-    TupleSchema *m_schema;
+private:
+    const TupleSchema *m_keySchema;
 };
 
 /**
  * Equality-checking function object
+ * Required by CompactingHashTable keyed by GenericKey<>
  */
 template <std::size_t keySize>
-class GenericEqualityChecker {
-public:
+struct GenericEqualityChecker
+{
     /** Type information passed to the constuctor as it's not in the key itself */
-    GenericEqualityChecker(TupleSchema *keySchema) : m_schema(keySchema) {}
+    GenericEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     inline bool operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_schema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_schema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
+        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
+        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
         return lhTuple.equalsNoSchemaCheck(rhTuple);
     }
-
-    TupleSchema *m_schema;
+private:
+    const TupleSchema *m_keySchema;
 };
 
 /**
- * Hash function object for an array of SlimValues
+ * Hash function object for Generic Keys in tuple data format.
+ * Required by CompactingHashTable keyed by GenericKey<>
  */
 template <std::size_t keySize>
-struct GenericHasher : std::unary_function<GenericKey<keySize>, std::size_t>
+struct GenericHasher
 {
     /** Type information passed to the constuctor as it's not in the key itself */
-    GenericHasher(TupleSchema *keySchema) : m_schema(keySchema) {}
+    GenericHasher(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     /** Generate a 64-bit number for the key value */
     inline size_t operator()(GenericKey<keySize> const &p) const
     {
-        TableTuple pTuple(m_schema); pTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&p));
+        TableTuple pTuple(m_keySchema); pTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&p));
         return pTuple.hashCode();
     }
-
-    TupleSchema *m_schema;
+private:
+    const TupleSchema *m_keySchema;
 };
 
+
+struct TupleKeyEqualityChecker;
+struct TupleKeyComparator;
 
 /*
  * TupleKey is the all-purpose fallback key for indexes that can't be
@@ -526,16 +498,23 @@ struct GenericHasher : std::unary_function<GenericKey<keySize>, std::size_t>
  * probably very wide keys one column at a time by initializing and
  * comparing nvalues.
  */
-class TupleKey {
-  public:
+struct TupleKey
+{
+    typedef TupleKeyEqualityChecker KeyEqualityChecker;
+    typedef TupleKeyComparator KeyComparator;
+    // typedef TupleKeyHasher KeyHasher; // Future?
+
     inline TupleKey() {
         m_columnIndices = NULL;
         m_keyTuple = NULL;
         m_keyTupleSchema = NULL;
     }
 
+    static inline bool keyDependsOnTupleAddress() { return true; }
+    static inline bool keyUsesNonInlinedMemory() { return true; } // maybe
+
     // Set a key from a key-schema tuple.
-    inline void setFromKey(const TableTuple *tuple) {
+    TupleKey(const TableTuple *tuple) {
         assert(tuple);
         m_columnIndices = NULL;
         m_keyTuple = tuple->address();
@@ -543,10 +522,10 @@ class TupleKey {
     }
 
     // Set a key from a table-schema tuple.
-    inline void setFromTuple(const TableTuple *tuple, const int *indices, const TupleSchema *keySchema) {
+    TupleKey(const TableTuple *tuple, const std::vector<int> &indices, const TupleSchema *unused_keySchema) {
         assert(tuple);
-        assert(indices);
-        m_columnIndices = indices;
+        assert(indices.size() > 0);
+        m_columnIndices = &indices;
         m_keyTuple = tuple->address();
         m_keyTupleSchema = tuple->getSchema();
     }
@@ -566,65 +545,32 @@ class TupleKey {
         if (isKeySchema())
             return indexColumn;
         else
-            return m_columnIndices[indexColumn];
+            return (*m_columnIndices)[indexColumn];
     }
 
-    size_t getKeySize() const
-    {
-        return sizeof(int*) + sizeof(char*) + sizeof(TupleSchema*);
-    }
-
-  private:
+private:
     // TableIndex owns this array - NULL if an ephemeral key
-    const int* m_columnIndices;
+    const std::vector<int> *m_columnIndices;
 
     // Pointer a persistent tuple in non-ephemeral case.
     char *m_keyTuple;
     const TupleSchema *m_keyTupleSchema;
 };
 
-class TupleKeyLessComparator {
-  public:
-    TupleKeyLessComparator(TupleSchema *keySchema) : m_schema(keySchema) {
-    }
+/**
+ * Required by CompactingMap keyed by TupleKey
+ */
+struct TupleKeyComparator
+{
+    TupleKeyComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
-    // return true if lhs < rhs
-    inline bool operator()(const TupleKey &lhs, const TupleKey &rhs) const {
-        TableTuple lhTuple = lhs.getTupleForComparison();
-        TableTuple rhTuple = rhs.getTupleForComparison();
-        NValue lhValue, rhValue;
-
-        for (int ii=0; ii < m_schema->columnCount(); ++ii) {
-            lhValue = lhTuple.getNValue(lhs.columnForIndexColumn(ii));
-            rhValue = rhTuple.getNValue(rhs.columnForIndexColumn(ii));
-
-            int comparison = lhValue.compare(rhValue);
-
-            if (comparison == VALUE_COMPARE_LESSTHAN) {
-                return true;
-            }
-            else if (comparison == VALUE_COMPARE_GREATERTHAN) {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    TupleSchema *m_schema;
-};
-
-class TupleKeyComparator {
-  public:
-    TupleKeyComparator(TupleSchema *keySchema) : m_schema(keySchema) {
-    }
-
-    // return true if lhs < rhs
+    // return -1/0/1 if lhs </==/> rhs
     inline int operator()(const TupleKey &lhs, const TupleKey &rhs) const {
         TableTuple lhTuple = lhs.getTupleForComparison();
         TableTuple rhTuple = rhs.getTupleForComparison();
         NValue lhValue, rhValue;
 
-        for (int ii=0; ii < m_schema->columnCount(); ++ii) {
+        for (int ii=0; ii < m_keySchema->columnCount(); ++ii) {
             lhValue = lhTuple.getNValue(lhs.columnForIndexColumn(ii));
             rhValue = rhTuple.getNValue(rhs.columnForIndexColumn(ii));
 
@@ -635,38 +581,8 @@ class TupleKeyComparator {
         }
         return 0;
     }
-
-    TupleSchema *m_schema;
-};
-
-class TupleKeyEqualityChecker {
-public:
-    TupleKeyEqualityChecker(TupleSchema *keySchema) : m_schema(keySchema) {
-    }
-
-    // return true if lhs == rhs
-    inline bool operator()(const TupleKey &lhs, const TupleKey &rhs) const {
-        TableTuple lhTuple = lhs.getTupleForComparison();
-        TableTuple rhTuple = rhs.getTupleForComparison();
-        NValue lhValue, rhValue;
-
-//         std::cout << std::endl << "TupleKeyEqualityChecker: " <<
-//         std::endl << lhTuple.debugNoHeader() <<
-//         std::endl << rhTuple.debugNoHeader() <<
-//         std::endl;
-
-        for (int ii=0; ii < m_schema->columnCount(); ++ii) {
-            lhValue = lhTuple.getNValue(lhs.columnForIndexColumn(ii));
-            rhValue = rhTuple.getNValue(rhs.columnForIndexColumn(ii));
-
-            if (lhValue.compare(rhValue) != VALUE_COMPARE_EQUAL) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    TupleSchema *m_schema;
+private:
+    const TupleSchema *m_keySchema;
 };
 
 }

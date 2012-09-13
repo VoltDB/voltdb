@@ -30,6 +30,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt.TablePair;
@@ -137,9 +138,15 @@ public abstract class SubPlanAssembler {
         assert(index != null);
         assert(table != null);
 
-        // indexes are not useful if there are no filter expressions for this table
-        if (exprs == null)
+        // indexes on generalized expressions are not yet enabled.
+        if ( ! index.getExpressionsjson().equals("")) {
             return null;
+        }
+
+        // indexes are not useful if there are no filter expressions for this table
+        if (exprs == null) {
+            return null;
+        }
 
         AccessPath retval = new AccessPath();
         retval.use = IndexUseType.COVERING_UNIQUE_EQUALITY;
@@ -155,46 +162,43 @@ public abstract class SubPlanAssembler {
         HashMap<Column, ArrayList<AbstractExpression>> eqColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
         HashMap<Column, ArrayList<AbstractExpression>> gtColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
         HashMap<Column, ArrayList<AbstractExpression>> ltColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
-        for (AbstractExpression expr : exprs)
+        for (AbstractExpression ae : exprs)
         {
-            Column col = null;
-            AbstractExpression indexable = getIndexableExpressionForFilter(table, expr);
-            if (indexable != null && indexable.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+            AbstractExpression expr = getIndexableExpressionForFilter(table, ae);
+            if (expr != null) {
+                AbstractExpression indexable = expr.getLeft();
+                assert(indexable.getExpressionType() == ExpressionType.VALUE_TUPLE);
+
                 TupleValueExpression tve = (TupleValueExpression)indexable;
-                col = getTableColumn(table, tve.getColumnName());
-            }
-            // Cop out for now on indexable complex expressions (that aren't just column references).
-            if (col != null)
-            {
+                Column col = getTableColumn(table, tve.getColumnName());
+                assert(col != null);
+
                 if (expr.getExpressionType() == ExpressionType.COMPARE_EQUAL)
                 {
                     if (eqColumns.containsKey(col) == false)
                         eqColumns.put(col, new ArrayList<AbstractExpression>());
                     eqColumns.get(col).add(expr);
+                    continue;
                 }
-                else if ((expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) ||
+                if ((expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) ||
                         (expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO))
                 {
                     if (gtColumns.containsKey(col) == false)
                         gtColumns.put(col, new ArrayList<AbstractExpression>());
                     gtColumns.get(col).add(expr);
+                    continue;
                 }
-                else if ((expr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) ||
+                if ((expr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) ||
                         (expr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO))
                 {
                     if (ltColumns.containsKey(col) == false)
                         ltColumns.put(col, new ArrayList<AbstractExpression>());
                     ltColumns.get(col).add(expr);
+                    continue;
                 }
-                else
-                {
-                    retval.otherExprs.add(expr);
-                }
+
             }
-            else
-            {
-                retval.otherExprs.add(expr);
-            }
+            retval.otherExprs.add(ae);
         }
 
         // See if we can use index scan for ORDER BY.
@@ -279,6 +283,10 @@ public abstract class SubPlanAssembler {
                 if (ltColumns.containsKey(col) && (ltColumns.get(col).size() >= 0)) {
                     AbstractExpression expr = ltColumns.get(col).remove(0);
                     retval.endExprs.add(expr);
+                    if (retval.indexExprs.size() == 0) {
+                        // SearchKey is null,but has end key
+                        retval.lookupType = IndexLookupType.GTE;
+                    }
                 }
 
                 // if we didn't find an equality match, we can stop looking
@@ -288,7 +296,8 @@ public abstract class SubPlanAssembler {
         }
 
         // index not relevant to expression
-        if (retval.indexExprs.size() == 0 && retval.sortDirection == SortDirectionType.INVALID)
+        if (retval.indexExprs.size() == 0 && retval.endExprs.size() == 0
+                && retval.sortDirection == SortDirectionType.INVALID)
             return null;
 
         // If IndexUseType is the default of COVERING_UNIQUE_EQUALITY, and not
@@ -385,6 +394,7 @@ public abstract class SubPlanAssembler {
         // EE index key comparator should not lose precision when casting keys to indexed type.
         // Do not choose an index that requires such a cast.
         VoltType otherType = null;
+        ComparisonExpression normalizedExpr = (ComparisonExpression) expr;
         if (indexableOnLeft) {
             if (isOperandDependentOnTable(table, expr.getRight())) {
                 // Left and right operands must not be from the same table,
@@ -400,6 +410,8 @@ public abstract class SubPlanAssembler {
                 return null;
             }
             indexableExpr = expr.getRight();
+            normalizedExpr = normalizedExpr.reverseOperator();
+
             otherType = expr.getLeft().getValueType();
         }
 
@@ -409,7 +421,7 @@ public abstract class SubPlanAssembler {
             return null;
         }
 
-        return indexableExpr;
+        return normalizedExpr;
     }
 
     private boolean isOperandDependentOnTable(Table table, AbstractExpression expr) {

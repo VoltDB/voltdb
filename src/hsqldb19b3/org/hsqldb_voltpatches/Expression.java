@@ -1128,8 +1128,6 @@ public class Expression {
     void insertValuesIntoSubqueryTable(Session session,
                                        PersistentStore store) {
 
-        TableDerived table = subQuery.getTable();
-
         for (int i = 0; i < nodes.length; i++) {
             Object[] data = nodes[i].getRowValue(session);
 
@@ -1351,6 +1349,14 @@ public class Expression {
                                          Expression.emptyExpressionSet);
     }
 
+    // A VoltDB extension to support indexed expressions
+    public void collectAllColumnExpressions(HsqlList set) {
+
+        Expression.collectAllExpressions(set, this,
+                                         Expression.columnExpressionSet,
+                                         Expression.emptyExpressionSet);
+    }
+
     /**
      * collect all extrassions of a set of expression types appearing anywhere
      * in a select statement and its subselects, etc.
@@ -1471,8 +1477,13 @@ public class Expression {
             assert(asterisk != null);
         }
         // catch unexpected types
-        // XXX Should this throw HSQLParseException instead?
         else {
+            switch( getType()) {
+            case OpTypes.ROW_SUBQUERY:
+            case OpTypes.SCALAR_SUBQUERY:
+            case OpTypes.TABLE_SUBQUERY:
+                throw new HSQLParseException("VoltDB does not yet support subqueries, consider using views instead");
+            }
             System.err.println("UNSUPPORTED EXPR TYPE: " + String.valueOf(getType()));
             VoltXMLElement unknown = new VoltXMLElement("unknown");
             exp.children.add(unknown);
@@ -1537,5 +1548,26 @@ public class Expression {
         long id = session.getNodeIdForExpression(hashCode);
         cached_id = Long.toString(id);
         return cached_id;
+    }
+
+    // A VoltDB extension to support indexed expressions
+    public VoltXMLElement voltGetExpressionXML(Session session, Table table) throws HSQLParseException {
+        // TODO Auto-generated method stub
+        resolveTableColumns(table);
+        Expression parent = null; // As far as I can tell, this argument just gets passed around but never used !?
+        resolveTypes(session, parent);
+        return voltGetXML(session);
+    }
+
+    // A VoltDB extension to support indexed expressions
+    private void resolveTableColumns(Table table) {
+        HsqlList set = new HsqlArrayList();
+        collectAllColumnExpressions(set);
+        for (int i = 0; i < set.size(); i++) {
+            ExpressionColumn array_element = (ExpressionColumn)set.get(i);
+            ColumnSchema column = table.getColumn(table.getColumnIndex(array_element.getAlias()));
+            array_element.setAttributesAsColumn(column, false);
+
+        }
     }
 }

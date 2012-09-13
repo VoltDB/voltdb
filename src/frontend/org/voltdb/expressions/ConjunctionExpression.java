@@ -47,4 +47,20 @@ public class ConjunctionExpression extends AbstractExpression {
         return true;
     }
 
+    @Override
+    public void finalizeValueTypes()
+    {
+        finalizeChildValueTypes();
+        //
+        // IMPORTANT:
+        // We are not handling the case where one of types is NULL. That is because we
+        // are only dealing with what the *output* type should be, not what the actual
+        // value is at execution time. There will need to be special handling code
+        // over on the ExecutionEngine to handle special cases for conjunctions with NULLs
+        // Therefore, it is safe to assume that the output is always going to be an
+        // integer (for booleans)
+        //
+        m_valueType = VoltType.BIGINT;
+        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+    }
 }

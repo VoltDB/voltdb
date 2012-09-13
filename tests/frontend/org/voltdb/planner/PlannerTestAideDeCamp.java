@@ -41,8 +41,8 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.PartitionMap;
 import org.voltdb.compiler.StatementCompiler;
-import org.voltdb.compiler.TablePartitionMap;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
@@ -81,7 +81,7 @@ public class PlannerTestAideDeCamp {
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
         //hsql.runDDLFile(schemaPath);
-        TablePartitionMap partitionMap = new TablePartitionMap(compiler);
+        PartitionMap partitionMap = new PartitionMap(compiler);
         DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap);
         ddl_compiler.loadSchema(schemaPath);
         ddl_compiler.compileToCatalog(catalog, db);
@@ -92,6 +92,10 @@ public class PlannerTestAideDeCamp {
 
     public Catalog getCatalog() {
         return catalog;
+    }
+
+    public Database getDatabase() {
+        return db;
     }
 
     /**
@@ -157,24 +161,15 @@ public class PlannerTestAideDeCamp {
         TrivialCostModel costModel = new TrivialCostModel();
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
         QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
-                             hsql, estimates, false);
+            new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
+                    catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),
+                    db, partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                    costModel, null, joinOrder);
 
         CompiledPlan plan = null;
-        plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null, false);
-
-        if (plan == null)
-        {
-            String msg = "planner.compilePlan returned null plan";
-            String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null)
-            {
-                msg += " with error: \"" + plannerMsg + "\"";
-            }
-            throw new NullPointerException(msg);
-        }
+        planner.parse();
+        plan = planner.plan();
+        assert(plan != null);
 
         // Input Parameters
         // We will need to update the system catalogs with this new information

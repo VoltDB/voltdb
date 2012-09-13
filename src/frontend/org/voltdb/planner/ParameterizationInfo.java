@@ -36,45 +36,61 @@ import org.voltdb.VoltType;
  * null to Java null though.
  *
  */
-class Parameterizer {
+class ParameterizationInfo {
 
-    final VoltXMLElement m_root;
-    VoltXMLElement m_paramsNode = null;
-    Map<Long, Integer> m_idToParamIndexMap;
-    List<Object> m_paramValues;
+    final VoltXMLElement originalXmlSQL;
+    final VoltXMLElement parameterizedXmlSQL;
+    final String[] paramLiteralValues;
 
-    public Parameterizer(VoltXMLElement xmlSQL) {
-        m_root = xmlSQL;
-        assert(m_root != null);
+    public ParameterizationInfo(VoltXMLElement originalXmlSQL,
+                                VoltXMLElement parameterizedXmlSQL,
+                                String[] paramLiteralValues)
+    {
+        assert(parameterizedXmlSQL != null);
+        assert(originalXmlSQL != null);
+        assert(paramLiteralValues != null);
+
+        this.originalXmlSQL = originalXmlSQL;
+        this.parameterizedXmlSQL = parameterizedXmlSQL;
+        this.paramLiteralValues = paramLiteralValues;
+    }
+
+    public static ParameterizationInfo parameterize(VoltXMLElement xmlSQL) {
+        assert(xmlSQL != null);
+
+        VoltXMLElement parameterizedXmlSQL = xmlSQL.duplicate();
 
         // find the parameters xml node
-        for (VoltXMLElement child : m_root.children) {
+        VoltXMLElement paramsNode = null;
+        for (VoltXMLElement child : parameterizedXmlSQL.children) {
             if (child.name.equals("parameters")) {
-                m_paramsNode = child;
+                paramsNode = child;
             }
         }
-        assert(m_paramsNode != null);
-    }
+        assert(paramsNode != null);
 
-    public int countParams() {
-        return m_paramsNode.children.size();
-    }
-
-    public Object[] parameterize() {
         // don't optimize plans with params yet
-        if (m_paramsNode.children.size() > 0) {
+        if (paramsNode.children.size() > 0) {
             return null;
         }
 
-        m_idToParamIndexMap = new HashMap<Long, Integer>();
-        m_paramValues = new ArrayList<Object>();
+        Map<Long, Integer> idToParamIndexMap = new HashMap<Long, Integer>();
+        List<String> paramValues = new ArrayList<String>();
 
-        parameterizeRecursively(m_root);
+        parameterizeRecursively(parameterizedXmlSQL, paramsNode,
+                idToParamIndexMap, paramValues);
 
-        return m_paramValues.toArray();
+        ParameterizationInfo info = new ParameterizationInfo(
+                xmlSQL, parameterizedXmlSQL,
+                paramValues.toArray(new String[paramValues.size()]));
+
+        return info;
     }
 
-    void parameterizeRecursively(VoltXMLElement node) {
+    static void parameterizeRecursively(VoltXMLElement node,
+                                        VoltXMLElement paramsNode,
+                                        Map<Long, Integer> idToParamIndexMap,
+                                        List<String> paramValues) {
         if (node.name.equals("value")) {
             String idStr = node.attributes.get("id");
             assert(idStr != null);
@@ -83,24 +99,24 @@ class Parameterizer {
             String typeStr = node.attributes.get("type");
             VoltType type = VoltType.typeFromString(typeStr);
 
-            Integer paramIndex = m_idToParamIndexMap.get(id);
+            Integer paramIndex = idToParamIndexMap.get(id);
             if (paramIndex == null) {
-                paramIndex = m_paramValues.size();
+                paramIndex = paramValues.size();
 
                 VoltXMLElement paramIndexNode = new VoltXMLElement("parameter");
                 paramIndexNode.attributes.put("index", String.valueOf(paramIndex));
                 paramIndexNode.attributes.put("type", typeStr);
                 paramIndexNode.attributes.put("id", idStr);
-                m_paramsNode.children.add(paramIndexNode);
+                paramsNode.children.add(paramIndexNode);
 
-                m_idToParamIndexMap.put(id, paramIndex);
+                idToParamIndexMap.put(id, paramIndex);
 
                 String value = node.attributes.get("value");
                 if (type == VoltType.NULL) {
                     value = null;
                 }
 
-                m_paramValues.add(value);
+                paramValues.add(value);
             }
 
             node.attributes.put("isparam", "true");
@@ -108,7 +124,7 @@ class Parameterizer {
         }
 
         for (VoltXMLElement child : node.children) {
-            parameterizeRecursively(child);
+            parameterizeRecursively(child, paramsNode, idToParamIndexMap, paramValues);
         }
     }
 

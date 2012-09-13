@@ -74,6 +74,7 @@ import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.planner.CorePlan;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -247,6 +248,18 @@ public class TestClientInterface {
     }
 
     @Test
+    public void testExplain() throws IOException {
+        ByteBuffer msg = createMsg("@Explain", "select * from a");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNull(resp);
+        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
+        verify(m_messenger).send(eq(32L), captor.capture());
+        assertTrue(captor.getValue().payload instanceof AdHocPlannerWork );
+        System.out.println( captor.getValue().payload.toString() );
+        assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
+    }
+
+    @Test
     public void testAdHoc() throws IOException {
         ByteBuffer msg = createMsg("@AdHoc", "select * from a");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
@@ -281,9 +294,16 @@ public class TestClientInterface {
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, "localhost", false, null);
-        AdHocPlannedStatement s = new AdHocPlannedStatement(
-                "select * from a".getBytes(VoltDB.UTF8ENCODING),
-                new byte[0], new byte[0], false, false, true, new VoltType[0], new ParameterSet(), 0);
+        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(VoltDB.UTF8ENCODING),
+                                                            new CorePlan(new byte[0],
+                                                                         new byte[0],
+                                                                         false,
+                                                                         false,
+                                                                         true,
+                                                                         new VoltType[0],
+                                                                         0),
+                                                            new ParameterSet(),
+                                                            null);
         plannedStmtBatch.addStatement(s);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 

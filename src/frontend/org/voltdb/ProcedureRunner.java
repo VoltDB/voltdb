@@ -350,8 +350,7 @@ public class ProcedureRunner {
     }
 
     public Date getTransactionTime() {
-        long ts = TransactionIdManager.getTimestampFromTransactionId(getTransactionId());
-        return new Date(ts);
+        return new Date(m_txnState.timestamp);
     }
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
@@ -390,10 +389,10 @@ public class ProcedureRunner {
             AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
                     plannedStatement.sql,
-                    plannedStatement.aggregatorFragment,
-                    plannedStatement.collectorFragment,
-                    plannedStatement.isReplicatedTableDML,
-                    plannedStatement.parameterTypes);
+                    plannedStatement.core.aggregatorFragment,
+                    plannedStatement.core.collectorFragment,
+                    plannedStatement.core.isReplicatedTableDML,
+                    plannedStatement.core.parameterTypes);
             if (plannedStatement.extractedParamValues.size() == 0) {
                 // case handles if there were parameters OR
                 // if there were no constants to pull out
@@ -943,7 +942,7 @@ public class ProcedureRunner {
        // holds query results
        final VoltTable[] m_results;
 
-       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
+       BatchState(ProcedureRunner runner, int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -955,15 +954,20 @@ public class ProcedureRunner {
            m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                  siteId,
                                                  m_txnState.txnId,
+                                                 m_txnState.timestamp,
                                                  m_txnState.isReadOnly(),
-                                                 false);
+                                                 false,
+                                                 txnState.isForReplay());
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        siteId,
                                                        m_txnState.txnId,
+                                                       m_txnState.timestamp,
                                                        m_txnState.isReadOnly(),
-                                                       finalTask);
+                                                       finalTask,
+                                                       txnState.isForReplay());
+
        }
 
        /*
@@ -1053,7 +1057,7 @@ public class ProcedureRunner {
     */
    VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
 
-       BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
+       BatchState state = new BatchState(this, batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {

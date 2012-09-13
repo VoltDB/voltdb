@@ -35,6 +35,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private int m_sequence = 0;
     private int m_ofTotal = 0;
     private long m_handle = Long.MIN_VALUE;
+    private long m_txnId;
 
     // The original task that is must be replicated for
     // repair. Note: if the destination repair log is
@@ -50,13 +51,14 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     }
 
     public Iv2RepairLogResponseMessage(long requestId, int sequence,
-            int ofTotal, long spHandle, VoltMessage payload)
+            int ofTotal, long spHandle, long txnId, VoltMessage payload)
     {
         super();
         m_requestId = requestId;
         m_sequence = sequence;
         m_ofTotal = ofTotal;
         m_handle = spHandle;
+        m_txnId = txnId;
         m_payload = payload;
     }
 
@@ -80,6 +82,10 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         return m_handle;
     }
 
+    public long getTxnId() {
+        return m_txnId;
+    }
+
     public VoltMessage getPayload()
     {
         return m_payload;
@@ -93,6 +99,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // sequence
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
+        msgsize += 8; // txnId
         if (m_payload != null) {
             msgsize += m_payload.getSerializedSize();
         }
@@ -107,6 +114,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putInt(m_sequence);
         buf.putInt(m_ofTotal);
         buf.putLong(m_handle);
+        buf.putLong(m_txnId);
 
         if (m_payload != null) {
             ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
@@ -127,6 +135,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_sequence = buf.getInt();
         m_ofTotal = buf.getInt();
         m_handle = buf.getLong();
+        m_txnId = buf.getLong();
 
         // going inception.
         // The first message in the repair log response stream is always a null
@@ -143,7 +152,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("IV2 REPAIR_LOG_REQUEST (FROM ");
+        sb.append("IV2 REPAIR_LOG_RESPONSE (FROM ");
         sb.append(CoreUtils.hsIdToString(m_sourceHSId));
         sb.append(" REQID: ");
         sb.append(m_requestId);
@@ -153,6 +162,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         sb.append(m_ofTotal);
         sb.append(" SP HANDLE: ");
         sb.append(m_handle);
+        sb.append(" TXNID: ");
+        sb.append(m_txnId);
         sb.append(" PAYLOAD: ");
         if (m_payload == null) {
             sb.append("null");

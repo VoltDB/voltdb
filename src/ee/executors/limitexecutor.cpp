@@ -104,6 +104,16 @@ LimitExecutor::p_execute(const NValueArray &params)
     int limit = 0, offset = 0;
     node->getLimitAndOffsetByReference(params, limit, offset);
 
+    // handle whacky limits and offsets
+    if (limit <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                           "Limit values must be greater than zero.");
+    }
+    if (offset < 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                           "Offset values must not be less than zero.");
+    }
+
     bool start = (offset == 0);
     while (iterator.next(tuple) && (tuple_ctr < limit))
     {

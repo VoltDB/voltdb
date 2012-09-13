@@ -20,19 +20,20 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.TupleValueExpression.Members;
 import org.voltdb.types.PlanNodeType;
 
 public class DistinctPlanNode extends AbstractPlanNode {
 
     public enum Members {
-        DISTINCT_EXPRESSION,
-        DISTINCT_EXPRESSION_CNT
+        DISTINCT_EXPRESSIONS,
     }
 
     //
@@ -123,13 +124,22 @@ public class DistinctPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.DISTINCT_EXPRESSION_CNT.name()).value(m_distinctExpressions.size());
-        int count = 0;
+        stringer.key(Members.DISTINCT_EXPRESSIONS.name()).array();
         for (AbstractExpression expr : m_distinctExpressions) {
-            stringer.key(Members.DISTINCT_EXPRESSION.name() + Integer.toString(count++));
             stringer.object();
             expr.toJSONString(stringer);
             stringer.endObject();
+        }
+        stringer.endArray(); //end inlineNodes
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
+        JSONArray jarray = jobj.getJSONArray(Members.DISTINCT_EXPRESSIONS.name());
+        for( int i = 0; i < jarray.length(); i++ ) {
+            JSONObject tempObj = jarray.getJSONObject(i);
+            m_distinctExpressions.add(AbstractExpression.fromJSONObject(tempObj, db));
         }
     }
 

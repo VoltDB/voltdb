@@ -25,9 +25,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -39,8 +40,6 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpTransactionState extends TransactionState
 {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     /**
      *  This is thrown by the TransactionState instance when something
      *  goes wrong mid-fragment, and execution needs to back all the way
@@ -63,12 +62,13 @@ public class MpTransactionState extends TransactionState
     long m_buddyHSId;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
+    boolean m_haveDistributedInitTask = false;
 
-    MpTransactionState(Mailbox mailbox, long txnId,
+    MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
                        List<Long> useHSIds, long buddyHSId)
     {
-        super(txnId, mailbox, notice);
+        super(mailbox, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
         m_useHSIds = useHSIds;
         m_buddyHSId = buddyHSId;
@@ -108,7 +108,7 @@ public class MpTransactionState extends TransactionState
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        return null;
+        return m_task.getStoredProcedureInvocation();
     }
 
     @Override
@@ -148,6 +148,15 @@ public class MpTransactionState extends TransactionState
         // there are no fragments to be done in this message
         // At some point maybe ProcedureRunner.slowPath() can get smarter
         if (task.getFragmentCount() > 0) {
+            /*
+             * Only need to send the initiate task during actual execution for CL not during replay
+             * No need to send initiate tasks for readonly transactions, the CL doesn't care
+             * Only send the initiation once.
+             */
+            if (!isForReplay() && !isReadOnly() && !m_haveDistributedInitTask) {
+                m_haveDistributedInitTask = true;
+                task.setInitiateTask((Iv2InitiateTaskMessage)getNotice());
+            }
             m_remoteWork = task;
             m_remoteWork.setTruncationHandle(m_task.getTruncationHandle());
             // Distribute fragments to remote destinations.

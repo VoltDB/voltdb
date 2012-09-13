@@ -49,23 +49,26 @@ public class TestSqlAggregateSuite extends RegressionSuite {
     public void testDistinct() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1"};
+        String query;
+        VoltTable[] results;
         for (String table : tables)
         {
             Client client = getClient();
             for (int i = 0; i < ROWS; ++i)
             {
-                client.callProcedure("Insert", table, i, "desc",
-                                     new BigDecimal(10.0), i / 2, 14.5);
+                client.callProcedure("Insert", table, i, "desc", new BigDecimal(10.0), i / 2, 14.5);
             }
-            String query = String.format("select distinct %s.NUM from %s",
-                                         table, table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+            query = String.format("select distinct NUM from %s", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
             // lazy check that we get 5 rows back, put off checking contents
             assertEquals(5, results[0].getRowCount());
-            query = String.format("select distinct %s.DESC, %s.RATIO  from %s",
-                    table, table, table);
+            query = String.format("select distinct DESC, NUM, RATIO from %s", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            // lazy check that we get ` rows back, put off checking contents
+            // lazy check that we get 5 rows back, put off checking contents
+            assertEquals(5, results[0].getRowCount());
+            query = String.format("select distinct DESC, RATIO from %s", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            // lazy check that we get 5 rows back, put off checking contents
             assertEquals(1, results[0].getRowCount());
         }
     }
@@ -441,6 +444,7 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         project.addProcedures(PROCEDURES);
 
         config = new LocalCluster("sqlaggregate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        // enable to debug the EE*/ config = new LocalCluster("sqlaggregate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 

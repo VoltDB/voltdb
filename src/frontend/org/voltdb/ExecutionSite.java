@@ -24,7 +24,6 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -58,6 +57,10 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltdb.ExecutionSite.CheckTxnStateCompletionMessage;
+import org.voltdb.ExecutionSite.ExecutionSiteLocalSnapshotMessage;
+import org.voltdb.ExecutionSite.ExecutionSiteNodeFailureMessage;
+import org.voltdb.ExecutionSite.SystemProcedureContext;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -220,6 +223,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public CountDownLatch snapshotCompleted(String nonce,
                                                 long txnId,
+                                                long partitionTxnIds[],
                                                 boolean truncationSnapshot) {
             if (m_rejoinSnapshotTxnId != -1) {
                 if (m_rejoinSnapshotTxnId == txnId) {
@@ -732,8 +736,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public Database getDatabase()                           { return m_context.database; }
         @Override
         public Cluster getCluster()                             { return m_context.cluster; }
+
+        /*
+         * Pre-iv2 the transaction id and sp handle are absolutely always the same.
+         * This is because there is a global order. In IV2 there is no global order
+         * so there is a per partition order/txn-id called SpHandle which may/may not
+         * be the same as the txn-id for a given transaction. If the transaction
+         * is multi-part then the txnid and SpHandle will not be the same.
+         */
         @Override
-        public long getLastCommittedTxnId()                     { return lastCommittedTxnId; }
+        public long getLastCommittedSpHandle()                     { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
@@ -1271,11 +1283,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         m_recoveryStartTime = System.currentTimeMillis();
 
         // Construct a snapshot stream receiver
-        m_rejoinSnapshotProcessor = new StreamSnapshotSink(getSiteId());
+        m_rejoinSnapshotProcessor = new StreamSnapshotSink();
 
-        Pair<List<byte[]>, Integer> endPoints = m_rejoinSnapshotProcessor.initialize();
-        List<byte[]> addresses = endPoints.getFirst();
-        int port = endPoints.getSecond();
+        long hsId = m_rejoinSnapshotProcessor.initialize();
 
         // Construct task log and start logging task messages
         int partition = getCorrespondingPartitionId();
@@ -1298,16 +1308,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         m_rejoinLog.info("Initiating rejoin for site " +
                 CoreUtils.hsIdToString(getSiteId()));
-        initiateRejoinSnapshot(addresses, port);
+        initiateRejoinSnapshot(hsId);
     }
 
     /**
      * Try to request a stream snapshot.
      *
-     * @param addresses The addresses other replica can connect to.
-     * @param port The port number other replica can connect to.
+     * @param hsId The HSId of the stream snapshot destination
      */
-    private RejoinMessage initiateRejoinSnapshot(List<byte[]> addresses, int port) {
+    private RejoinMessage initiateRejoinSnapshot(long hsId) {
         // Pick a replica of the same partition to send us data
         int partition = getCorrespondingPartitionId();
         long sourceSite = 0;
@@ -1330,13 +1339,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-            jsStringer.key("addresses").array();
-            for (byte[] addr : addresses) {
-                InetAddress inetAddress = InetAddress.getByAddress(addr);
-                jsStringer.value(inetAddress.getHostAddress());
-            }
-            jsStringer.endArray();
-            jsStringer.key("port").value(port);
+            jsStringer.key("hsId").value(hsId);
             // make this snapshot only contain data from this site
             m_rejoinLog.info("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
                                " is " + CoreUtils.hsIdToString(sourceSite));
@@ -1419,7 +1422,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (m_rejoinTaskLog != null) {
                 m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
             }
-            m_rejoinSnapshotProcessor.startCountDown();
             VoltDB.instance().getSnapshotCompletionMonitor()
                   .addInterest(m_snapshotCompletionHandler);
         } else {
@@ -1770,6 +1772,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       SnapshotFormat.NATIVE,
                                       (byte) 0x1,
                                       snapshotMsg.m_roadblockTransactionId,
+                                      Long.MIN_VALUE,
+                                      new long[0],//this param not used pre-iv2
                                       null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress());
@@ -2832,7 +2836,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId) {
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 
@@ -2902,5 +2906,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     @Override
     public void setRejoinComplete() {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
+    }
+
+    @Override
+    public ProcedureRunner getProcedureRunner(String procedureName) {
+        throw new RuntimeException("getProcedureRunner is an IV2-only interface.");
+    }
+
+    @Override
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
+        //A noop pre-IV2
     }
 }

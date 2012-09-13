@@ -21,7 +21,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
@@ -363,6 +365,32 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             stringer.value(ae);
         }
         stringer.endArray();
+    }
+
+    //all members loaded
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        super.loadFromJSONObject(jobj, db);
+        m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
+        m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
+        m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
+        m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
+        m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
+        JSONObject tempjobj = null;
+        //load end_expression
+        if( !jobj.isNull( Members.END_EXPRESSION.name() ) ) {
+            tempjobj = jobj.getJSONObject( Members.END_EXPRESSION.name() );
+            m_endExpression = AbstractExpression.fromJSONObject( tempjobj, db);
+        }
+        //load searchkey_expressions
+        if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
+            JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
+            int size = jarray.length();
+            for( int i = 0 ; i < size; i++ ) {
+                tempjobj = jarray.getJSONObject( i );
+                m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
+            }
+        }
     }
 
     @Override

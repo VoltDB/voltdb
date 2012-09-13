@@ -299,6 +299,12 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_INDEXSCAN: {
         return "INDEXSCAN";
     }
+    case PLAN_NODE_TYPE_INDEXCOUNT: {
+        return "INDEXCOUNT";
+    }
+    case PLAN_NODE_TYPE_TABLECOUNT: {
+        return "TABLECOUNT";
+    }
     case PLAN_NODE_TYPE_NESTLOOP: {
         return "NESTLOOP";
     }
@@ -359,6 +365,10 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_SEQSCAN;
     } else if (str == "INDEXSCAN") {
         return PLAN_NODE_TYPE_INDEXSCAN;
+    } else if (str == "INDEXCOUNT") {
+        return PLAN_NODE_TYPE_INDEXCOUNT;
+    } else if (str == "TABLECOUNT") {
+        return PLAN_NODE_TYPE_TABLECOUNT;
     } else if (str == "NESTLOOP") {
         return PLAN_NODE_TYPE_NESTLOOP;
     } else if (str == "NESTLOOPINDEX") {
@@ -488,14 +498,8 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_AGGREGATE_AVG: {
         return "AGGREGATE_AVG";
     }
-    case EXPRESSION_TYPE_FUNCTION_ABS: {
-        return "FUNCTION_ABS";
-    }
-    case EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM: {
-        return "FUNCTION_SUBSTRING_FROM";
-    }
-    case EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR: {
-        return "FUNCTION_SUBSTRING_FROM_FOR";
+    case EXPRESSION_TYPE_FUNCTION: {
+        return "FUNCTION";
     }
     }
     return "INVALID";
@@ -563,12 +567,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_MAX;
     } else if (str == "AGGREGATE_AVG") {
         return EXPRESSION_TYPE_AGGREGATE_AVG;
-    } else if (str == "FUNCTION_ABS") {
-        return EXPRESSION_TYPE_FUNCTION_ABS;
-    } else if (str == "FUNCTION_SUBSTRING_FROM") {
-        return EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM;
-    } else if (str == "FUNCTION_SUBSTRING_FROM_FOR") {
-        return EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR;
+    } else if (str == "FUNCTION") {
+        return EXPRESSION_TYPE_FUNCTION;
     }
 
     return EXPRESSION_TYPE_INVALID;
@@ -650,6 +650,21 @@ int32_t hexCharToInt(char c) {
         retval = c - '0';
     assert(retval >=0 && retval < 16);
     return retval;
+}
+
+int64_t getMaxTypeValue (ValueType type) {
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+        return static_cast<int64_t>(INT8_MAX);
+    case VALUE_TYPE_SMALLINT:
+        return static_cast<int64_t>(INT16_MAX);
+    case VALUE_TYPE_INTEGER:
+        return static_cast<int64_t>(INT32_MAX);
+    case VALUE_TYPE_BIGINT:
+        return static_cast<int64_t>(INT64_MAX);
+    default:
+        return static_cast<int64_t>(-1);
+    }
 }
 
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString) {

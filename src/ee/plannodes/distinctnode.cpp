@@ -50,6 +50,7 @@
 #include <sstream>
 #include <stdexcept>
 
+using namespace json_spirit;
 using namespace voltdb;
 using namespace std;
 
@@ -70,8 +71,7 @@ DistinctPlanNode::~DistinctPlanNode()
     }
     std::vector<AbstractExpression*>::iterator it = m_distinctExpressions.begin();
     while (it != m_distinctExpressions.end()) {
-       AbstractExpression* expr = *it;
-       it = m_distinctExpressions.erase(it);
+       AbstractExpression* expr = *(it++);
        delete expr;
     }
 }
@@ -104,31 +104,18 @@ DistinctPlanNode::debugInfo(const string &spacer) const
 void
 DistinctPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
-    json_spirit::Value expressionCountValue = find_value(obj, "DISTINCT_EXPRESSION_CNT");
-    if (expressionCountValue == json_spirit::Value::null) {
+    Value distinctExpressionsValue = find_value(obj, "DISTINCT_EXPRESSIONS");
+    if (distinctExpressionsValue == Value::null)
+    {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "DistinctPlanNode::loadFromJSONObject:"
-                                      " can't find DISTINCT_EXPRESSION_CNT value");
+                                      " Can't find DISTINCT_EXPRESSIONS value");
     }
-    int expressionCount = expressionCountValue.get_int();
-    m_distinctExpressions.reserve(expressionCount);
-
-    for (int i = 0; i < expressionCount; ++i) {
-        ostringstream buffer;
-        buffer << "DISTINCT_EXPRESSION" << i;
-        string expressionId = buffer.str();
-        json_spirit::Value distinctExpressionValue = find_value(obj, expressionId);
-        if (distinctExpressionValue == json_spirit::Value::null)
-        {
-            char message[256];
-            snprintf(message, 256, "DistinctPlanNode::loadFromJSONObject: "
-                                   "Can't find %s value", expressionId.c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
-
-        json_spirit::Object distinctExpressionObject =
-            distinctExpressionValue.get_obj();
-        m_distinctExpressions.push_back(
-            AbstractExpression::buildExpressionTree(distinctExpressionObject));
+    Array distinctExpressionsArray = distinctExpressionsValue.get_array();
+    m_distinctExpressions.reserve(distinctExpressionsArray.size());
+    for (int ii = 0; ii < distinctExpressionsArray.size(); ii++)
+    {
+        json_spirit::Object distinctExpressionObject = distinctExpressionsArray[ii].get_obj();
+        m_distinctExpressions.push_back(AbstractExpression::buildExpressionTree(distinctExpressionObject));
     }
 }

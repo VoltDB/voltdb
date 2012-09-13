@@ -89,7 +89,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
         int currentCatalogVersion = ctx.getCatalogVersion();
 
         for (AdHocPlannedStatement statement : statements) {
-            if (currentCatalogVersion != statement.catalogVersion) {
+            if (currentCatalogVersion != statement.core.catalogVersion) {
                 String msg = String.format("AdHoc transaction %d wasn't planned " +
                         "against the current catalog version. Statement: %s",
                         ctx.getCurrentTxnId(),
@@ -99,10 +99,10 @@ public abstract class AdHocBase extends VoltSystemProcedure {
 
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,
-                    statement.aggregatorFragment,
-                    statement.collectorFragment,
-                    statement.isReplicatedTableDML,
-                    statement.parameterTypes);
+                    statement.core.aggregatorFragment,
+                    statement.core.collectorFragment,
+                    statement.core.isReplicatedTableDML,
+                    statement.core.parameterTypes);
 
             voltQueueSQL(stmt, statement.extractedParamValues.toArray());
         }

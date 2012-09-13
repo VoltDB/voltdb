@@ -191,18 +191,6 @@ public class StatementQuery extends StatementDMQL {
 
         QuerySpecification select = (QuerySpecification) queryExpression;
 
-        try {
-            getResult(session);
-        }
-        catch (HsqlException e)
-        {
-            throw new HSQLParseException(e.getMessage());
-        }
-        catch (Exception e)
-        {
-            // XXX coward.
-        }
-
         // select
         VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
@@ -510,9 +498,7 @@ public class StatementQuery extends StatementDMQL {
 
         // having
         if (select.havingCondition != null) {
-            VoltXMLElement condition = new VoltXMLElement("havingcondition");
-            query.children.add(condition);
-            condition.children.add(select.havingCondition.voltGetXML(session));
+            throw new HSQLParseException("VoltDB does not yet support the HAVING clause");
         }
 
         // groupby
