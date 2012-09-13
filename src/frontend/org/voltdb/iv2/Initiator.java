@@ -60,7 +60,7 @@ public interface Initiator
             String whoami);
 
     /** Write a viable replay set to the command log */
-    public void writeIv2ViableReplayEntry();
+    public void enableWritingIv2FaultLog();
 
     public long getCurrentTxnId();
 }

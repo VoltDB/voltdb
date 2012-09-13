@@ -2039,7 +2039,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
          * viable replay set.  Turns into a no-op with no command log, on the non-leader sites, and on the MPI.
          */
         for (Initiator initiator : m_iv2Initiators) {
-            initiator.writeIv2ViableReplayEntry();
+            initiator.enableWritingIv2FaultLog();
         }
 
         /*

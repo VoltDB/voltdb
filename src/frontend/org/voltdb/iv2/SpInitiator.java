@@ -169,7 +169,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public void writeIv2ViableReplayEntry() {
-        m_initiatorMailbox.writeIv2ViableReplayEntry();
+    public void enableWritingIv2FaultLog() {
+        m_initiatorMailbox.enableWritingIv2FaultLog();
     }
 }

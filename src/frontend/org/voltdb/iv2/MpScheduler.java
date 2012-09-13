@@ -317,7 +317,7 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void writeIv2ViableReplayEntry() {
+    public void enableWritingIv2FaultLog() {
         // This is currently a no-op for the MPI
     }
 }

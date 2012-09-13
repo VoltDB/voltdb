@@ -52,6 +52,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
     private CommandLog m_cl;
+    // Need to track when command log replay is complete (even if not performed) so that
+    // we know when we can start writing viable replay sets to the fault log.
+    boolean m_replayComplete = false;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -509,20 +512,28 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_cl = cl;
     }
 
+    public void enableWritingIv2FaultLog()
+    {
+        m_replayComplete = true;
+        writeIv2ViableReplayEntry();
+    }
+
     /**
      * If appropriate, cause the initiator to write the viable replay set to the command log
      * Use when it's unclear whether the caller is the leader or a replica; the right thing will happen.
      */
-    public void writeIv2ViableReplayEntry()
+    void writeIv2ViableReplayEntry()
     {
-        if (m_isLeader) {
-            // write the viable set locally
-            long faultSpHandle = advanceTxnEgo().getSequence();
-            writeIv2ViableReplayEntryInternal(faultSpHandle);
-            // Generate Iv2LogFault message and send it to replicas
-            Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
-                    faultMsg);
+        if (m_replayComplete) {
+            if (m_isLeader) {
+                // write the viable set locally
+                long faultSpHandle = advanceTxnEgo().getSequence();
+                writeIv2ViableReplayEntryInternal(faultSpHandle);
+                // Generate Iv2LogFault message and send it to replicas
+                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                        faultMsg);
+            }
         }
     }
 
@@ -531,8 +542,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     void writeIv2ViableReplayEntryInternal(long spHandle)
     {
-        m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
-                spHandle);
+        if (m_replayComplete) {
+            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
+                    spHandle);
+        }
     }
 
     @Override
