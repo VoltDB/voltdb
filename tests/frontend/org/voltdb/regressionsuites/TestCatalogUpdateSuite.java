@@ -46,11 +46,9 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -134,297 +132,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
-    /**
-     * Start with snapshots disabled. Enable them to one directory, check that the snapshot files are created
-     * with the correct prefix. Update the catalog to do the snapshots in a different directory with a
-     * different prefix and check to make sure they start going to the right place. Update the catalog
-     * to disable them and then make sure no snapshots appear.
-     * @throws Exception
-     */
-    public void testEnableModifyDisableSnapshot() throws Exception {
-        m_config.deleteDirectory(new File("/tmp/snapshotdir1"));
-        m_config.deleteDirectory(new File("/tmp/snapshotdir2"));
-        try {
-            m_config.createDirectory(new File("/tmp/snapshotdir1"));
-            m_config.createDirectory(new File("/tmp/snapshotdir2"));
-            Client client = getClient();
-
-            /*
-             * Test that we can enable snapshots
-             */
-            String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
-            String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
-            VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-            assertTrue(results.length == 1);
-            Thread.sleep(5000);
-
-            /*
-             * Make sure snapshot files are generated
-             */
-            for (File f : m_config.listFiles(new File("/tmp/snapshotdir1"))) {
-                assertTrue(f.getName().startsWith("foo1"));
-            }
-
-            /*
-             * Test that we can change settings like the path
-             */
-            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.jar");
-            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml");
-            results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-            assertTrue(results.length == 1);
-            Thread.sleep(5000);
-
-            /*
-             * Check that files are made in the new path
-             */
-            for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
-                assertTrue(f.getName().startsWith("foo2"));
-            }
-
-            /*
-             * Change the snapshot path to something that doesn't exist, no crashes
-             */
-            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.jar");
-            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml");
-            results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-            assertTrue(results.length == 1);
-
-            System.out.println("Waiting for failed snapshots");
-            Thread.sleep(5000);
-
-            /*
-             * Change it back
-             */
-            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
-            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
-            results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-            assertTrue(results.length == 1);
-            Thread.sleep(5000);
-
-            /*
-             * Make sure snapshots resume
-             */
-            for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
-                assertTrue(f.getName().startsWith("foo2"));
-            }
-
-            /*
-             * Make sure you can disable snapshots
-             */
-            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
-            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
-            results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-            assertTrue(results.length == 1);
-            for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
-                f.delete();
-            }
-
-            Thread.sleep(5000);
-
-            /*
-             * Make sure you can reenable snapshot files
-             */
-            assertEquals( 0, m_config.listFiles(new File("/tmp/snapshotdir2")).size());
-
-            /*
-             * Test that we can enable snapshots
-             */
-            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
-            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
-            results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-            assertTrue(results.length == 1);
-            Thread.sleep(5000);
-
-            /*
-             * Make sure snapshot files are generated
-             */
-            for (File f : m_config.listFiles(new File("/tmp/snapshotdir1"))) {
-                assertTrue(f.getName().startsWith("foo1"));
-            }
-
-            /*
-             * Turn snapshots off so that we can clean up
-             */
-            newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
-            deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
-            results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-            assertTrue(results.length == 1);
-            Thread.sleep(1000);
-
-            m_config.deleteDirectory(new File("/tmp/snapshotdir1"));
-            m_config.deleteDirectory(new File("/tmp/snapshotdir2"));
-            m_config.createDirectory(new File("/tmp/snapshotdir1"));
-            m_config.createDirectory(new File("/tmp/snapshotdir2"));
-            Thread.sleep(5000);
-            assertTrue(m_config.listFiles(new File("/tmp/snapshotdir1")).isEmpty());
-            assertTrue(m_config.listFiles(new File("/tmp/snapshotdir2")).isEmpty());
-        } finally {
-            deleteDirectory(new File("/tmp/snapshotdir1"));
-            deleteDirectory(new File("/tmp/snapshotdir2"));
-        }
-    }
-
-    public void testUpdate() throws Exception {
-        Client client = getClient();
-        String newCatalogURL;
-        String deploymentURL;
-        VoltTable[] results;
-        CatTestCallback callback;
-
-        loadSomeData(client, 0, 25);
-        client.drain();
-        assertTrue(callbackSuccess);
-
-        negativeTests(client);
-        assertTrue(callbackSuccess);
-
-        // asynchronously call some random inserts
-        loadSomeData(client, 25, 25);
-        assertTrue(callbackSuccess);
-
-        // add a procedure "InsertOrderLineBatched"
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
-        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml");
-        callback = new CatTestCallback(ClientResponse.SUCCESS);
-        client.updateApplicationCatalog(callback, new File(newCatalogURL), new File(deploymentURL));
-
-        // don't care if this succeeds or fails.
-        // calling the new proc before the cat change returns is not guaranteed to work
-        // we just hope it doesn't crash anything
-        int x = 3;
-        SyncCallback cb = new SyncCallback();
-        client.callProcedure(cb,
-                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, x, new long[] {x},
-                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
-                new double[] {x}, new String[] {"a"});
-        cb.waitForResponse();
-
-        // make sure the previous catalog change has completed
-        client.drain();
-        assertTrue(callbackSuccess);
-
-        // now calling the new proc better work
-        x = 2;
-        client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
-                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
-                new double[] {x}, new String[] {"a"});
-
-        loadSomeData(client, 50, 5);
-        assertTrue(callbackSuccess);
-
-        // this is a do nothing change... shouldn't affect anything
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
-        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml");
-        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-        assertTrue(results.length == 1);
-        client.drain();
-        assertTrue(callbackSuccess);
-
-        // now calling the new proc better work
-        x = 4;
-        client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
-                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
-                new double[] {x}, new String[] {"a"});
-
-        loadSomeData(client, 55, 5);
-
-        // remove the procedure we just added async
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
-        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
-        callback = new CatTestCallback(ClientResponse.SUCCESS);
-        client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
-
-        // don't care if this works now
-        x = 4;
-        cb = new SyncCallback();
-        client.callProcedure(cb,
-                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
-                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
-                new double[] {x}, new String[] {"a"});
-        cb.waitForResponse();
-
-        // make sure the previous catalog change has completed
-        client.drain();
-        assertTrue(callbackSuccess);
-
-        // now calling the new proc better fail
-        x = 5;
-        cb = new SyncCallback();
-        client.callProcedure(cb,
-                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
-                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
-                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
-                new double[] {x}, new String[] {"a"});
-        cb.waitForResponse();
-        assertNotSame(cb.getResponse().getStatus(), ClientResponse.SUCCESS);
-
-        loadSomeData(client, 60, 5);
-
-        // change the insert new order procedure
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.jar");
-        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml");
-        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-        assertTrue(results.length == 1);
-
-        // call the new proc and make sure the one we want gets run
-        results = client.callProcedure(InsertNewOrder.class.getSimpleName(), 100, 100, 100, 100, (short)100, 100, 1.0, "a").getResults();
-        assertEquals(1, results.length);
-        assertEquals(1776, results[0].asScalarLong());
-
-        // load a big catalog change just to make sure nothing fails horribly
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.jar");
-        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml");
-        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-        assertTrue(results.length == 1);
-
-        loadSomeData(client, 65, 5);
-
-        client.drain();
-        assertTrue(callbackSuccess);
-        assertTrue(true);
-    }
-
-    public void testEnableSecurity() throws IOException, ProcCallException, InterruptedException
-    {
-        System.out.println("\n\n-----\n testEnabledSecurity \n-----\n\n");
-        Client client = getClient();
-        loadSomeData(client, 0, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
-
-        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.jar");
-        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml");
-        VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
-        assertTrue(results.length == 1);
-
-        // a new client should need a username/password other than the regression suite default.
-        boolean caught = false;
-        try {
-            getClient();
-        } catch (IOException e) {
-            caught = true;
-        }
-        assertTrue(caught);
-
-        // create a valid client and call some procedures
-        this.m_username = "user1";
-        this.m_password = "userpass1";
-        Client client3 = getClient();
-        loadSomeData(client3, 50, 10);
-        client3.drain();
-        assertTrue(callbackSuccess);
-
-        // the old client should not work because the user has been removed.
-        loadSomeData(client, 100, 10);
-        client.drain();
-        assertFalse(callbackSuccess);
-        callbackSuccess = true;
-    }
-
     public void loadSomeData(Client client, int start, int count) throws IOException, ProcCallException {
         for (int i = start; i < (start + count); i++) {
             CatTestCallback callback = new CatTestCallback(ClientResponse.SUCCESS);
@@ -445,6 +152,53 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         catch (Exception e) {
             assertTrue(e.getMessage().startsWith("Database catalog not found"));
         }
+    }
+
+    public void testAddDropIndex() throws Exception
+    {
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // add tables O1, O2, O3
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.jar");
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml");
+        VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        // verify that the new table(s) support an insert
+        ClientResponse callProcedure = client.callProcedure("@AdHoc", "insert into NEW_ORDER values (-1, -1, -1);");
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        // do a call that uses the index
+        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where NO_O_ID = 5;");
+        VoltTable result = callProcedure.getResults()[0];
+        result.advanceRow();
+        assertEquals(5, result.getLong("NO_O_ID"));
+
+        // tables can still be accessed
+        loadSomeData(client, 20, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // revert to the original schema
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        // do a call that uses the index
+        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where NO_O_ID = 5;");
+        result = callProcedure.getResults()[0];
+        result.advanceRow();
+        assertEquals(5, result.getLong("NO_O_ID"));
+
+        // and loading still succeeds
+        loadSomeData(client, 30, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
     }
 
     public void testAddDropTable() throws IOException, ProcCallException, InterruptedException
@@ -662,13 +416,17 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCatalogUpdateSuite.class);
 
+        final int sitesPerHost = 2;
+        final int hosts = 2;
+        final int k = 1;
+
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        //VoltServerConfig config = new LocalSingleProcessServer("catalogupdate-local-base.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
+        ((LocalCluster) config).setHasLocalServer(true);
 
         // build up a project builder for the workload
         TPCCProjectBuilder project = new TPCCProjectBuilder();
@@ -692,7 +450,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
         ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
 
-        config = new LocalCluster("catalogupdate-cluster-base-secure.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);        project = new TPCCProjectBuilder();
+        config = new LocalCluster("catalogupdate-cluster-base-secure.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addUsers(users);
@@ -704,7 +463,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-addtables.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-addtables.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
@@ -717,7 +476,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // as above but also with a materialized view added to O1
         try {
-            config = new LocalCluster("catalogupdate-cluster-addtableswithmatview.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+            config = new LocalCluster("catalogupdate-cluster-addtableswithmatview.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
             project = new TPCCProjectBuilder();
             project.addDefaultSchema();
             project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
@@ -732,8 +491,18 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             fail();
         }
 
+        config = new LocalCluster("catalogupdate-cluster-addindex.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addLiteralSchema("CREATE INDEX NEWINDEX ON NEW_ORDER (NO_O_ID);");
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml"));
+
         //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-expanded.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-expanded.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -743,7 +512,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-conflict.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-conflict.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -753,7 +522,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-many.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-many.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -764,7 +533,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
 
         // A catalog change that enables snapshots
-        config = new LocalCluster("catalogupdate-cluster-enable_snapshot.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-enable_snapshot.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -776,7 +545,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml"));
 
         //Another catalog change to modify the schedule
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-change_snapshot.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -788,7 +557,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml"));
 
         //Another catalog change to modify the schedule
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -800,7 +569,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
 
         //A huge catalog update to test size limits
-        config = new LocalCluster("catalogupdate-cluster-huge.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-huge.jar", sitesPerHost, hosts, k, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         long t = System.currentTimeMillis();
         String hugeSchemaURL = generateRandomDDL("catalogupdate-cluster-huge",

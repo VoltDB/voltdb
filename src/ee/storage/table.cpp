@@ -526,7 +526,7 @@ void Table::addIndex(TableIndex *index) {
     }
 
     // fill the index with tuples... potentially the slow bit
-    TableTuple tuple;
+    TableTuple tuple(m_schema);
     TableIterator iter = iterator();
     while (iter.next(tuple)) {
         index->addEntry(&tuple);

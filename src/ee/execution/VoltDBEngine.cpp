@@ -669,6 +669,15 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 
                             // all of the data should be added here
                             table->addIndex(index);
+
+                            // add the index to the stats source
+                            index->getIndexStats()->configure(index->getName() + " stats",
+                                                              table->name(),
+                                                              m_executorContext->m_hostId,
+                                                              m_executorContext->m_hostname,
+                                                              m_executorContext->m_siteId,
+                                                              m_executorContext->m_partitionId,
+                                                              indexIter->second->relativeIndex());
                         }
                     }
 
