@@ -115,6 +115,10 @@ public class TestPartitionDDL extends TestCase {
                 ");");
         }
 
+        Tester(DDL schemaItemIn) {
+            schemaItem = schemaItemIn;
+        }
+
         String writeDDL(final Item... items) {
             StringBuilder sb = new StringBuilder();
             sb.append(schemaItem.toDDL());
@@ -175,7 +179,10 @@ public class TestPartitionDDL extends TestCase {
         }
 
         // Must provide a failRegex if failure is expected.
-        void test(final boolean partitioned, final String failRegex, final Item... items) {
+        void test(final boolean partitioned,
+                  final String failRegex,
+                  final int additionalTables,
+                  final Item... items) {
             // Generate DDL and XML files.
             String ddlPath = writeDDL(items);
             String xmlPath = writeXML(partitioned, ddlPath, items);
@@ -197,7 +204,7 @@ public class TestPartitionDDL extends TestCase {
                 // Check that the catalog table is appropriately configured.
                 Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
                 assertNotNull(db);
-                assertEquals(1, db.getTables().size());
+                assertEquals(1 + additionalTables, db.getTables().size());
                 Table t = db.getTables().getIgnoreCase("books");
                 assertNotNull(t);
                 Column c = t.getPartitioncolumn();
@@ -215,7 +222,7 @@ public class TestPartitionDDL extends TestCase {
          * @param items
          */
         void partitioned(final Item... items) {
-            test(true, null, items);
+            test(true, null, 0, items);
         }
 
         /**
@@ -223,7 +230,7 @@ public class TestPartitionDDL extends TestCase {
          * @param items
          */
         void replicated(final Item... items) {
-            test(false, null, items);
+            test(false, null, 0, items);
         }
 
         /**
@@ -233,7 +240,23 @@ public class TestPartitionDDL extends TestCase {
          * @param items
          */
         void bad(final String failRegex, final Item... items) {
-            test(false, failRegex, items);
+            test(false, failRegex, 0, items);
+        }
+
+        /**
+         * Call when DDL has a view and it should pass.
+         * @param items
+         */
+        void view_good(final boolean partitioned, final Item... items) {
+            test(partitioned, null, 1, items);
+        }
+
+        /**
+         * Call when DDL has a view and it should fail.
+         * @param items
+         */
+        void view_bad(final String failRegex, final boolean partitioned, final Item... items) {
+            test(partitioned, failRegex, 1, items);
         }
     }
 
@@ -340,5 +363,26 @@ public class TestPartitionDDL extends TestCase {
         tester.bad(".*Partitioning already specified for table.*",
                 new PartitionDDL("books", "cash"),
                 new PartitionDDL("books", "cash"));
+    }
+
+    // ENG-3359: Error out on "CREATE VIEW ..." DDL whenever the table in the FROM
+    // clause is partitioned unless the GROUP BY columns in the view include the
+    // table's partitioning column.
+    public void testErrorOnPartitionedTableInMaterializedView() {
+        Tester tester = new Tester();
+
+        // Good: GROUP BY includes the partitioning column.
+        tester.view_good(true,
+                new PartitionDDL("books", "cash"),
+                new DDL("create view v1 (cash, num_rows) as " +
+                        "select cash, count(*) from books group by cash;")
+                );
+
+        // Good: GROUP BY does not include the partitioning column.
+        tester.view_bad(".*view .* must have partition column .* in the GROUP BY clause.*", true,
+                new PartitionDDL("books", "cash"),
+                new DDL("create view v2 (title, num_rows) as " +
+                        "select title, count(*) from books group by title;")
+                );
     }
 }
