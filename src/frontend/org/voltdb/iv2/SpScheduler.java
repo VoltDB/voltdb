@@ -26,14 +26,13 @@ import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.CommandLog;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -199,12 +198,7 @@ public class SpScheduler extends Scheduler
                 // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
                 if (SystemProcedureCatalog.listing.get(procedureName) == null ||
                     !SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
-                    StoredProcedureInvocation invocation = msg.getStoredProcedureInvocation();
-                    if (invocation.getType() == ProcedureInvocationType.REPLICATED) {
-                        msg.setTxnId(invocation.getOriginalTxnId());
-                    } else {
-                        msg.setTxnId(newSpHandle);
-                    }
+                    msg.setTxnId(newSpHandle);
                     msg.setTimestamp(timestamp);
                 }
                 if (m_sendToHSIds.size() > 0) {

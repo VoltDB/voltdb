@@ -174,7 +174,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
         if (type == ProcedureInvocationType.REPLICATED)
         {
-            size += 8; // original TXN ID for WAN replication procedures
+            size += 8 + // original TXN ID for WAN replication procedures
+                    8; // original timestamp for WAN replication procedures
         }
 
         if (serializedParams != null)

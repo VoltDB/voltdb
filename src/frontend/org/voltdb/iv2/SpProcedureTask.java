@@ -64,7 +64,7 @@ public class SpProcedureTask extends ProcedureTask
         hostLog.debug("COMPLETE: " + this);
 
         // Log invocation to DR
-        if (m_drGateway != null && !m_txn.needsRollback()) {
+        if (m_drGateway != null && !m_txn.isReadOnly() && !m_txn.needsRollback()) {
             m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.timestamp,
                                                   txn.getInvocation(), response.getClientResponseData());
         }

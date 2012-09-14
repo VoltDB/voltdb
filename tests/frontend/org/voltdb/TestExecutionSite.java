@@ -561,7 +561,7 @@ public class TestExecutionSite extends TestCase {
 
         @Override
         public
-        ClientResponseImpl call(long txnId, Object... paramList) {
+        ClientResponseImpl call(Object... paramList) {
             m_site.simulateExecutePlanFragments(m_txnState.txnId, m_procedure.testReadOnly());
 
             final ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS,
@@ -673,7 +673,7 @@ public class TestExecutionSite extends TestCase {
 
         @Override
         public
-        ClientResponseImpl call(long txnId, Object... paramList)
+        ClientResponseImpl call(Object... paramList)
         {
             try {
                 parseParamList(paramList);

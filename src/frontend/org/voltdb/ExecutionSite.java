@@ -66,7 +66,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
@@ -2714,20 +2713,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 if (callerParams != null) {
                     ClientResponseImpl cr = null;
 
-                    // find the txn id visible to the proc
-                    long txnId = txnState.txnId;
-                    StoredProcedureInvocation invocation = txnState.getInvocation();
-                    // this can't be null, initiate task must have an invocation
-                    if (invocation == null) {
-                        VoltDB.crashLocalVoltDB("Initiate task " + txnId + " missing invocation", false, null);
-                    }
-                    if ((invocation.getType() == ProcedureInvocationType.REPLICATED)) {
-                        txnId = invocation.getOriginalTxnId();
-                    }
-
                     // call the proc
                     runner.setupTransaction(txnState);
-                    cr = runner.call(txnId, itask.getParameters());
+                    cr = runner.call(itask.getParameters());
                     response.setResults(cr);
 
                     // record the results of write transactions to the transaction state
