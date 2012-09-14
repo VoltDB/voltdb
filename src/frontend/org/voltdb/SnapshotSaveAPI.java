@@ -51,11 +51,13 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
+
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
@@ -91,7 +93,8 @@ public class SnapshotSaveAPI
      */
     public VoltTable startSnapshotting(
             String file_path, String file_nonce, SnapshotFormat format, byte block,
-            long txnId, String data, SystemProcedureExecutionContext context, String hostname)
+            long multiPartTxnId, long partitionTxnId, long legacyPerPartitionTxnIds[],
+            String data, SystemProcedureExecutionContext context, String hostname)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
@@ -113,6 +116,9 @@ public class SnapshotSaveAPI
                 //so that the info can be put in the digest.
                 SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.acquire();
+                if (VoltDB.instance().isIV2Enabled()) {
+                    SnapshotSiteProcessor.m_partitionLastSeenTransactionIds.add(partitionTxnId);
+                }
             } catch (InterruptedException e) {
                 result.addRow(
                         context.getHostId(),
@@ -124,7 +130,45 @@ public class SnapshotSaveAPI
             }
 
             if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                createSetup(file_path, file_nonce, format, txnId, data, context, hostname, result);
+                List<Long>  partitionTransactionIds = new ArrayList<Long>();
+                if (VoltDB.instance().isIV2Enabled()) {
+                    partitionTransactionIds = SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
+                    SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new ArrayList<Long>();
+                    partitionTransactionIds.add(multiPartTxnId);
+
+                    /*
+                     * Do a quick sanity check that the provided IDs
+                     * don't conflict with currently active partitions. If they do
+                     * it isn't fatal we can just skip it.
+                     */
+                    for (long txnId : legacyPerPartitionTxnIds) {
+                        final int legacyPartition = (int)TxnEgo.getPartitionId(txnId);
+                        boolean isDup = false;
+                        for (long existingId : partitionTransactionIds) {
+                            final int existingPartition = (int)TxnEgo.getPartitionId(existingId);
+                            if (existingPartition == legacyPartition) {
+                                HOST_LOG.warn("While saving a snapshot and propagating legacy " +
+                                        "transaction ids found an id that matches currently active partition" +
+                                        existingPartition);
+                                isDup = true;
+                            }
+                        }
+                        if (!isDup) {
+                            partitionTransactionIds.add(txnId);
+                        }
+                    }
+                }
+
+                createSetup(
+                        file_path,
+                        file_nonce,
+                        format,
+                        multiPartTxnId,
+                        partitionTransactionIds,
+                        data,
+                        context,
+                        hostname,
+                        result);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -144,7 +188,7 @@ public class SnapshotSaveAPI
                 assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
                 context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
-                        txnId,
+                        multiPartTxnId,
                         context.getSiteTrackerForSnapshot().getAllHosts().size());
             }
         }
@@ -363,7 +407,8 @@ public class SnapshotSaveAPI
 
     private void createSetup(
             String file_path, String file_nonce, SnapshotFormat format,
-            long txnId, String data, SystemProcedureExecutionContext context,
+            long txnId, List<Long> partitionTransactionIds,
+            String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
             SiteTracker tracker = context.getSiteTrackerForSnapshot();
@@ -433,7 +478,9 @@ public class SnapshotSaveAPI
                                                   file_nonce,
                                                   tables,
                                                   context.getHostId(),
-                                                  SnapshotSiteProcessor.getExportSequenceNumbers());
+                                                  SnapshotSiteProcessor.getExportSequenceNumbers(),
+                                                  partitionTransactionIds,
+                                                  VoltDB.instance().getHostMessenger().getInstanceId());
                     if (completionTask != null) {
                         SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
                     }
@@ -667,6 +714,12 @@ public class SnapshotSaveAPI
                         }
                     }
                     if (!aborted) {
+                        /*
+                         * Inform the SnapshotCompletionMonitor of what the partition specific txnids for
+                         * this snapshot were so it can forward that to completion interests.
+                         */
+                        VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
+                                txnId, partitionTransactionIds);
                         logSnapshotStartToZK( txnId, context, file_nonce);
                     }
                 }

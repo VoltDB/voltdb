@@ -27,6 +27,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -84,6 +85,7 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
@@ -96,6 +98,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
@@ -184,6 +187,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     };
 
     /*
+     * This list of ACGs is iterated to retrieve initiator statistics in IV2.
+     * They are thread local, and the ACG happens to be thread local, and if you squint
+     * right admission control seems like a reasonable place to store stats about
+     * what has been admitted.
+     */
+    private final CopyOnWriteArrayList<AdmissionControlGroup> m_allACGs =
+            new CopyOnWriteArrayList<AdmissionControlGroup>();
+
+    /*
      * A thread local is a convenient way to keep the ACG out of volt core. The lookup is paired
      * with the CIHM in m_connectionSpecificStuff in fast path code.
      *
@@ -193,7 +205,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ThreadLocal<AdmissionControlGroup> m_acg = new ThreadLocal<AdmissionControlGroup>() {
         @Override
         public AdmissionControlGroup initialValue() {
-            return new AdmissionControlGroup( 1024 * 1024 * 8, 1000);
+            AdmissionControlGroup acg = new AdmissionControlGroup( 1024 * 1024 * 8, 1000);
+            m_allACGs.add(acg);
+            return acg;
         }
     };
 
@@ -752,6 +766,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
+                m_connections.add(c);
             }
         }
 
@@ -919,7 +934,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    public  boolean createTransaction(
+    public boolean createTransaction(
             final long connectionId,
             final String connectionHostname,
             final boolean adminConnection,
@@ -934,13 +949,51 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final long now,
             final boolean allowMismatchedResults)
     {
+        return createTransaction(
+                connectionId,
+                connectionHostname,
+                adminConnection,
+                Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                0, //unused timestammp
+                invocation,
+                isReadOnly,
+                isSinglePartition,
+                isEveryPartition,
+                partitions,
+                numPartitions,
+                clientData,
+                messageSize,
+                now,
+                allowMismatchedResults,
+                false);  // is for replay.
+    }
+
+    // Wrap API to SimpleDtxnInitiator - mostly for the future
+    public  boolean createTransaction(
+            final long connectionId,
+            final String connectionHostname,
+            final boolean adminConnection,
+            final long txnId,
+            final long timestamp,
+            final StoredProcedureInvocation invocation,
+            final boolean isReadOnly,
+            final boolean isSinglePartition,
+            final boolean isEveryPartition,
+            final int partitions[],
+            final int numPartitions,
+            final Object clientData,
+            final int messageSize,
+            final long now,
+            final boolean allowMismatchedResults,
+            final boolean isForReplay)
+    {
         if (VoltDB.instance().isIV2Enabled()) {
             final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    messageSize, now);
+                    messageSize, now, invocation.getProcName());
             Long initiatorHSId;
-            if (isSinglePartition) {
+            if (isSinglePartition && !isEveryPartition) {
                 initiatorHSId = m_iv2Masters.get(partitions[0]);
                 if (initiatorHSId == null) {
                     hostLog.error("Failed to find master initiator for partition: "
@@ -956,12 +1009,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new Iv2InitiateTaskMessage(m_siteId,
                         initiatorHSId,
                         Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-                        Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                        txnId,
+                        timestamp,
                         isReadOnly,
                         isSinglePartition,
                         invocation,
                         handle,
-                        connectionId);
+                        connectionId,
+                        isForReplay);
 
             Iv2Trace.logCreateTransaction(workRequest);
             m_mailbox.send(initiatorHSId, workRequest);
@@ -1053,18 +1108,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         @Override
                                         public ByteBuffer[] serialize()
                                                 throws IOException {
+                                            ClientResponseImpl clientResponse = response.getClientResponseData();
                                             ClientInterfaceHandleManager.Iv2InFlight clientData =
                                                     cihm.findHandle(response.getClientInterfaceHandle());
-                                            response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
                                             final long now = System.currentTimeMillis();
                                             final int delta = (int)(now - clientData.m_creationTime);
-                                            response.getClientResponseData().setClusterRoundtrip(delta);
+
+                                            /*
+                                             * Log initiator stats
+                                             */
+                                            cihm.m_acg.logTransactionCompleted(
+                                                    cihm.connection.connectionId(),
+                                                    cihm.connection.getHostnameOrIP(),
+                                                    clientData.m_procName,
+                                                    delta,
+                                                    clientResponse.getStatus());
+
+                                            clientResponse.setClientHandle(clientData.m_clientHandle);
+                                            clientResponse.setClusterRoundtrip(delta);
 
                                             ByteBuffer results =
                                                     ByteBuffer.allocate(
-                                                            response.getClientResponseData().getSerializedSize() + 4);
+                                                            clientResponse.getSerializedSize() + 4);
                                             results.putInt(results.capacity() - 4);
-                                            response.getClientResponseData().flattenToBuffer(results);
+                                            clientResponse.flattenToBuffer(results);
                                             return new ByteBuffer[] { results };
                                         }
 
@@ -1184,15 +1251,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_snapshotDaemon.init(this, zk, new Runnable() {
             @Override
             public void run() {
-                /*
-                 * For the snapshot daemon create a noop ACG because it is privileged
-                 */
-                m_cihm.put(
-                        m_snapshotDaemonAdapter.connectionId(),
-                        new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter,
-                                AdmissionControlGroup.getDummy()));
+                bindAdapter(m_snapshotDaemonAdapter);
             }
         });
+    }
+
+    /**
+     * Tell the clientInterface about a connection adapter.
+     */
+    public void bindAdapter(final Connection adapter) {
+        m_cihm.put(adapter.connectionId(),
+                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter,
+                    AdmissionControlGroup.getDummy()));
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID
@@ -1891,7 +1961,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         createTransaction(changeResult.connectionId, changeResult.hostname,
                                 changeResult.adminConnection,
                                 task, false, true, true, m_allPartitions,
-                                m_allPartitions.length, changeResult.clientData, 0,
+                                m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
                                 EstTime.currentTimeMillis(), false);
                     }
                     else {
@@ -2278,5 +2348,28 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public SnapshotDaemon getSnapshotDaemon() {
         return m_snapshotDaemon;
+    }
+
+    public void sendSentinel(long txnId, int partitionId) {
+        assert(VoltDB.instance().isIV2Enabled());
+        final long initiatorHSId = m_iv2Masters.get(partitionId);
+
+        //The only field that is relevant is txnid
+        MultiPartitionParticipantMessage mppm =
+                new MultiPartitionParticipantMessage(
+                        initiatorHSId,
+                        m_cartographer.getHSIdForMultiPartitionInitiator(),
+                        txnId,
+                        false);
+        m_mailbox.send(initiatorHSId, mppm);
+    }
+
+    public List<Iterator<Map.Entry<String, InvocationInfo>>> getIV2InitiatorStats() {
+        ArrayList<Iterator<Map.Entry<String, InvocationInfo>>> statsIterators =
+                new ArrayList<Iterator<Map.Entry<String, InvocationInfo>>>();
+        for (AdmissionControlGroup acg : m_allACGs) {
+            statsIterators.add(acg.getInitiationStatsIterator());
+        }
+        return statsIterators;
     }
 }

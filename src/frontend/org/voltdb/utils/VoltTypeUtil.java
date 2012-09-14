@@ -222,8 +222,16 @@ public abstract class VoltTypeUtil {
             // TIMESTAMP
             // --------------------------------
             case TIMESTAMP: {
-                Date date = new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy").parse(value);
-                ret = new TimestampType(date.getTime() * 1000);
+                // Support either long values (microseconds since epoch) or timestamp strings.
+                try {
+                    // Try to parse it as a long first.
+                    ret = new TimestampType(Long.parseLong(value));
+                }
+                catch (NumberFormatException e) {
+                    // It failed to parse as a long - parse it as a timestamp string.
+                    Date date = new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy").parse(value);
+                    ret = new TimestampType(date.getTime() * 1000);
+                }
                 break;
             }
             // --------------------------------

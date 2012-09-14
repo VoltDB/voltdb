@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
@@ -71,7 +72,12 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
                                StoredProcedureInvocation invocation,
                                long lastSafeTxnID,
                                long[] nonCoordinatorSites) {
-        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
+        super(initiatorHSId,
+                coordinatorHSId,
+                txnId,
+                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                isReadOnly,
+                false);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_lastSafeTxnID = lastSafeTxnID;
@@ -85,7 +91,12 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
                         boolean isSinglePartition,
                         StoredProcedureInvocation invocation,
                         long lastSafeTxnID) {
-        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
+        super(initiatorHSId,
+                coordinatorHSId,
+                txnId,
+                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                isReadOnly,
+                false);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_lastSafeTxnID = lastSafeTxnID;

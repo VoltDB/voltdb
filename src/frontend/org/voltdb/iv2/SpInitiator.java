@@ -17,23 +17,20 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.ExecutionException;
-
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltcore.utils.Pair;
-
 import org.voltcore.zk.LeaderElector;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CommandLog;
 import org.voltdb.Promotable;
+import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -66,11 +63,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
     };
 
-    public SpInitiator(HostMessenger messenger, Integer partition)
+    public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(new SiteTaskerQueue()),
-                "SP");
+                new SpScheduler(partition, new SiteTaskerQueue()),
+                "SP", agent);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
     }
 
@@ -79,7 +76,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          CommandLog cl)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -89,7 +87,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable());
+                createForRejoin && isRejoinable(),
+                cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -164,6 +163,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
             String whoami)
     {
-        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
+        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami, m_partitionId);
     }
 }

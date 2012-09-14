@@ -23,20 +23,21 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import static org.mockito.Mockito.*;
+import junit.framework.TestCase;
 
+import org.junit.Test;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
-import junit.framework.TestCase;
-import org.junit.Test;
 
 public class TestRepairLog extends TestCase
 {
@@ -164,9 +165,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(3, rl.contents(1L, false).size());
         assertEquals(m2, rl.contents(1L, false).get(1).getPayload());
-        assertEquals(2L, rl.contents(1L, false).get(1).getHandle());
+        assertEquals(2L, rl.contents(1L, false).get(1).getTxnId());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
-        assertEquals(3L, rl.contents(1L, false).get(2).getHandle());
+        assertEquals(3L, rl.contents(1L, false).get(2).getTxnId());
     }
 
     @Test
@@ -188,9 +189,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(3, rl.contents(1L, false).size());
         assertEquals(m2, rl.contents(1L, false).get(1).getPayload());
-        assertEquals(2L, rl.contents(1L, false).get(1).getHandle());
+        assertEquals(2L, rl.contents(1L, false).get(1).getTxnId());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
-        assertEquals(3L, rl.contents(1L, false).get(2).getHandle());
+        assertEquals(3L, rl.contents(1L, false).get(2).getTxnId());
     }
 
 
