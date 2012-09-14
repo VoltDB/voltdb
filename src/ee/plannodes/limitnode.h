@@ -79,34 +79,9 @@ class LimitPlanNode : public AbstractPlanNode {
         // evaluate possibly parameterized limit and offsets.
         void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
 
-        void setLimit(int limit);
-        int getLimit() const;
-
-        void setOffset(int offset);
-        int getOffset() const;
-
-        void setLimitParamIdx(int paramIdx) {
-            limitParamIdx = paramIdx;
-        }
-
-        int getLimitParamIdx() const {
-            return limitParamIdx;
-        }
-
-        void setOffsetParamIdx(int paramIdx) {
-            offsetParamIdx = paramIdx;
-        }
-
-        int getOffsetParamIdx() const {
-            return offsetParamIdx;
-        }
-
-        AbstractExpression* getLimitExpression() const;
-        void setLimitExpression(AbstractExpression* expression);
-
         std::string debugInfo(const std::string &spacer) const;
 
-    protected:
+    private:
         virtual void loadFromJSONObject(json_spirit::Object &obj);
         int limit;
         int offset;

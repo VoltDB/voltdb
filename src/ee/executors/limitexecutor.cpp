@@ -99,38 +99,30 @@ LimitExecutor::p_execute(const NValueArray &params)
     //
     TableTuple tuple(input_table->schema());
     TableIterator iterator = input_table->iterator();
+    
     int tuple_ctr = 0;
-
-    int limit = 0, offset = 0;
+    int tuples_skipped = 0;
+    int limit = -1;
+    int offset = -1;
     node->getLimitAndOffsetByReference(params, limit, offset);
 
-    // handle whacky limits and offsets
-    if (limit <= 0) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                           "Limit values must be greater than zero.");
-    }
-    if (offset < 0) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                           "Offset values must not be less than zero.");
-    }
-
-    bool start = (offset == 0);
-    while (iterator.next(tuple) && (tuple_ctr < limit))
+    while ((tuple_ctr < limit) && iterator.next(tuple))
     {
         // TODO: need a way to skip / iterate N items.
-        if (start) {
-            if (!output_table->insertTuple(tuple))
-            {
-                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                           " output table '%s'",
-                           input_table->name().c_str(),
-                           output_table->name().c_str());
-                return false;
-            }
-            tuple_ctr++;
-        } else
+        if (tuples_skipped < offset)
         {
-            start = (iterator.getLocation() >= offset);
+            tuples_skipped++;
+            continue;
+        }
+        tuple_ctr++;
+
+        if (!output_table->insertTuple(tuple))
+        {
+            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                       " output table '%s'",
+                       input_table->name().c_str(),
+                       output_table->name().c_str());
+            return false;
         }
     }
 
