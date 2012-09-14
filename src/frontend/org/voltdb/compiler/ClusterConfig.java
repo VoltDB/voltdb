@@ -474,9 +474,9 @@ public class ClusterConfig
         stringer.endArray();
         stringer.endObject();
 
-        for (Node n : nodes) {
-            System.out.println(n);
-        }
+//        for (Node n : nodes) {
+//            System.out.println(n);
+//        }
         JSONObject topo = new JSONObject(stringer.toString());
         return topo;
     }
