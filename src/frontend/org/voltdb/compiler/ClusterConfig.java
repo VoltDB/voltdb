@@ -494,7 +494,11 @@ public class ClusterConfig
         }
 
         boolean useFallbackStrategy = Boolean.valueOf(System.getenv("VOLT_REPLICA_FALLBACK"));
-
+        if (sitesPerHost * hostCount % partitionCount > 0) {
+            hostLog.warn("Unable to use to new replica placement strategy with this configuration. " +
+                    " falling back to old strategy");
+            useFallbackStrategy = true;
+        }
         JSONObject topo = null;
         if (useFallbackStrategy) {
             topo = fallbackPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
@@ -518,6 +522,6 @@ public class ClusterConfig
     private String m_errorMsg;
 
     public static void main(String args[]) throws Exception {
-        System.out.println(new ClusterConfig(10, 4, 4).getTopology(Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)).toString(4));
+        System.out.println(new ClusterConfig(3, 3, 1).getTopology(Arrays.asList(0, 1, 2)).toString(4));
     }
 }
