@@ -47,6 +47,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -227,13 +228,14 @@ SnapshotCompletionInterest
         public final Map<Integer, Long> partitionToTxnId = new TreeMap<Integer, Long>();
         // This is not serialized, the name of the ZK node already has the host ID embedded.
         public final int hostId;
+        public final InstanceId instanceId;
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
             partitionToTxnId.putAll(map);
         }
 
         public SnapshotInfo(long txnId, String path, String nonce, int partitions,
-                            long catalogCrc, int hostId)
+                            long catalogCrc, int hostId, InstanceId instanceId)
         {
             this.txnId = txnId;
             this.path = path;
@@ -241,6 +243,7 @@ SnapshotCompletionInterest
             this.partitionCount = partitions;
             this.catalogCrc = catalogCrc;
             this.hostId = hostId;
+            this.instanceId = instanceId;
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
@@ -251,6 +254,7 @@ SnapshotCompletionInterest
             partitionCount = jo.getInt("partitionCount");
             catalogCrc = jo.getLong("catalogCrc");
             hostId = jo.getInt("hostId");
+            instanceId = new InstanceId(jo.getJSONObject("instanceId"));
 
             JSONArray tables = jo.getJSONArray("tables");
             int cnt = tables.length();
@@ -304,6 +308,7 @@ SnapshotCompletionInterest
                     stringer.key(e.getKey().toString()).value(e.getValue());
                 }
                 stringer.endObject(); // partitionToTxnId
+                stringer.key("instanceId").value(instanceId);
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
@@ -621,6 +626,8 @@ SnapshotCompletionInterest
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
+        // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
+        InstanceId instanceId = new InstanceId(0, 0);
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
@@ -635,6 +642,10 @@ SnapshotCompletionInterest
                     Long txnidval = pidToTxnId.getLong(pidkey);
                     pidToTxnMap.put(Integer.valueOf(pidkey), txnidval);
                 }
+            }
+
+            if (digest_detail.has("instanceId")) {
+                instanceId = new InstanceId(digest_detail.getJSONObject("instanceId"));
             }
         }
         catch (IOException ioe)
@@ -653,7 +664,7 @@ SnapshotCompletionInterest
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     parseDigestFilename(digest.getName()),
-                    partitionCount, catalog_crc, m_hostId);
+                    partitionCount, catalog_crc, m_hostId, instanceId);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();

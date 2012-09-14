@@ -139,10 +139,7 @@ public class SnapshotUtil {
                 stringer.endObject();
             }
             stringer.key("catalogCRC").value(catalogCRC);
-            stringer.key("instanceId").object();
-            stringer.key("timestamp").value(instanceId.getTimestamp());
-            stringer.key("coordId").value(instanceId.getCoord());
-            stringer.endObject();
+            stringer.key("instanceId").value(instanceId.serializeToJSONObject());
             stringer.endObject();
         } catch (JSONException e) {
             throw new IOException(e);
