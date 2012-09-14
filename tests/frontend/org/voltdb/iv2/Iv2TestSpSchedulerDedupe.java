@@ -23,51 +23,57 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
-import org.json_voltpatches.JSONException;
-
-import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.*;
-
-import org.voltcore.messaging.VoltMessage;
-
-import org.voltcore.zk.MapCache;
-
-import org.voltdb.ClientResponseImpl;
-
-import org.voltdb.messaging.FragmentResponseMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
-
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcedureRunner;
 
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
-import org.voltdb.LoadedProcedureSet;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.zk.MapCache;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.CommandLog;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcedureRunner;
+import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.HashMap;
-import org.json_voltpatches.JSONObject;
 
 public class Iv2TestSpSchedulerDedupe extends TestCase
 {
     Mailbox mbox;
     MapCache iv2masters;
-    LoadedProcedureSet procs;
     VoltDBInterface vdbi;
     ProcedureRunner runner;
     Scheduler dut;
 
     static final String MockSPName = "MOCKSP";
     static final long dut_hsid = 11223344l;
+
+    private static SiteTaskerQueue getSiteTaskerQueue() {
+        SiteTaskerQueue queue = new SiteTaskerQueue();
+        queue.setStarvationTracker(new StarvationTracker(0));
+        return queue;
+    }
 
     public void createObjs() throws JSONException
     {
@@ -80,16 +86,9 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
-        // Mock a procedure set that always returns a proc with name MockSPName
-        // that is never a system procedure.
-        procs = mock(LoadedProcedureSet.class);
-        runner = mock(ProcedureRunner.class);
-        when(runner.isSystemProcedure()).thenReturn(false);
-        when(procs.getProcByName(MockSPName)).thenReturn(runner);
-
-        dut = new SpScheduler(new SiteTaskerQueue());
+        dut = new SpScheduler(0, getSiteTaskerQueue());
         dut.setMailbox(mbox);
-        dut.setProcedureSet(procs);
+        dut.setCommandLog(mock(CommandLog.class));
     }
 
     private Iv2InitiateTaskMessage createMsg(long txnId, boolean readOnly,
@@ -101,15 +100,19 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         ParameterSet bleh = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(bleh);
         Iv2InitiateTaskMessage task =
-            new Iv2InitiateTaskMessage(destHSId, // don't care?
-                                       Long.MIN_VALUE, // don't care
+            new Iv2InitiateTaskMessage(destHSId, // initHSID
+                                       Long.MIN_VALUE, // coordHSID
                                        txnId - 1, // truncationHandle
-                                       txnId,
+                                       txnId,     // txnId
+                                       System.currentTimeMillis(), // timestamp
                                        readOnly, // readonly
                                        singlePart, // single-part
                                        spi, // invocation
                                        Long.MAX_VALUE, // client interface handle
-                                       Long.MAX_VALUE); // client connection id
+                                       Long.MAX_VALUE, // connectionId
+                                       false); // isForReplay
+        // sp: sphandle == txnid
+        task.setTxnId(txnId);
         return task;
     }
 
@@ -119,19 +122,23 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
             new FragmentTaskMessage(destHSId, // don't care
                                     destHSId, // don't care
                                     txnId,
+                                    System.currentTimeMillis(),
                                     readOnly,
+                                    false,
                                     false);
+        frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
         return frag;
     }
 
     @Test
     public void testReplicaInitiateTaskResponse() throws Exception
     {
-        long txnid = 1234l;
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
+        sptask.setSpHandle(txnid);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -144,7 +151,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testReplicaFragmentTaskResponse() throws Exception
     {
-        long txnid = 1234l;
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();
@@ -161,7 +168,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testPrimaryInitiateTaskResponseNoReplicas() throws Exception
     {
-        long txnid = 1234l;
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();
@@ -180,7 +187,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testPrimaryFragmentTaskResponseNoReplicas() throws Exception
     {
-        long txnid = 1234l;
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();
@@ -199,7 +206,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testPrimaryInitiateTaskResponseReplicas() throws Exception
     {
-        long txnid = 1234l;
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();
@@ -228,7 +235,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testPrimaryFragmentTaskResponseReplicas() throws Exception
     {
-        long txnid = 1234l;
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();

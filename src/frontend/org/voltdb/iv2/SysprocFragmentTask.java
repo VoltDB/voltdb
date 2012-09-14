@@ -23,16 +23,15 @@ import java.util.Map;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
-
 import org.voltdb.DependencyPair;
+import org.voltdb.ParameterSet;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.ParameterSet;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.VoltTable;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -120,11 +119,5 @@ public class SysprocFragmentTask extends TransactionTask
             }
         }
         return currentFragResponse;
-    }
-
-    @Override
-    public long getMpTxnId()
-    {
-        return m_task.getTxnId();
     }
 }

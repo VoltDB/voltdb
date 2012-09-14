@@ -48,7 +48,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
                                       long txnId, boolean isReadOnly,
                                       boolean isRollback, boolean requiresAck)
     {
-        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
+        super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, false);
         m_isRollback = isRollback;
         m_requiresAck = requiresAck;
     }
