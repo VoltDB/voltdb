@@ -638,6 +638,7 @@ public class CommandLine extends VoltDB.Configuration
 
         static final String HEAP_SIZE_PREFIX = "-Xm";
         static final String VOLTDB_OPTS_ENV = "VOLTDB_OPTS";
+        static final String VOLTDB_OPTION = "-voltdb:";
         static final String DASH = "-";
 
         /**
@@ -733,6 +734,12 @@ public class CommandLine extends VoltDB.Configuration
             for( String option: CommandLineTokenizer.tokenize(voltDbOpts)) {
                 if( skipNext) {
                     skipNext = false;
+                    continue;
+                }
+
+                if( option.startsWith(VOLTDB_OPTION)) {
+                    option = option.substring(VOLTDB_OPTION.length());
+                    nonJvmOptions.add(option);
                     continue;
                 }
 
