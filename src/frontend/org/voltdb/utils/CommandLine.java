@@ -561,7 +561,7 @@ public class CommandLine extends VoltDB.Configuration
          * argument array.
          * @param buf the StringBuilder storing the current argument.
          */
-        private static void appendToBuffer(
+        private static void moveToBuffer(
             List<String> resultBuffer,
             StringBuilder buf) {
             if (buf.length() > 0) {
@@ -585,15 +585,21 @@ public class CommandLine extends VoltDB.Configuration
 
             if (commandLine != null) {
                 int z = commandLine.length();
-                boolean insideQuotes = false;
+                Character openingQuote = null;
                 StringBuilder buf = new StringBuilder();
 
                 for (int i = 0; i < z; ++i) {
                     char c = commandLine.charAt(i);
-                    if (c == '"') {
+                    if (c == '"' || c == '\'') {
                         buf.append(c);
-                        insideQuotes = !insideQuotes;
-                    } else if (c == '\\') {
+                        if (openingQuote == null) {
+                            openingQuote = c;
+                        }
+                        else if (openingQuote == c ) {
+                            openingQuote = null;
+                        }
+                    }
+                    else if (c == '\\') {
                         if ((z > i + 1)
                             && ((commandLine.charAt(i + 1) == '"')
                                 || (commandLine.charAt(i + 1) == '\\'))) {
@@ -603,18 +609,18 @@ public class CommandLine extends VoltDB.Configuration
                             buf.append("\\");
                         }
                     } else {
-                        if (insideQuotes) {
+                        if (openingQuote != null) {
                             buf.append(c);
                         } else {
                             if (Character.isWhitespace(c)) {
-                                appendToBuffer(resultBuffer, buf);
+                                moveToBuffer(resultBuffer, buf);
                             } else {
                                 buf.append(c);
                             }
                         }
                     }
                 }
-                appendToBuffer(resultBuffer, buf);
+                moveToBuffer(resultBuffer, buf);
             }
 
             String[] result = new String[resultBuffer.size()];

@@ -176,12 +176,14 @@ public class TestCommandLine
     {
         String propOne = "-Done.prop=\"yolanda is a nice gal:\"";
         String propTwo = "-Dtwo.prop=\"yobo is: a nice guy\"";
+        String propThree = "-Dsingle.quote='In single quote \"bliss\"'";
         String minHeap = "-Xms1024m";
         String maxHeap = "-Xmx4096m";
         String gcSpec  = "-XX:+UseConcMarkSweepGC";
         String agentSpec = "-javaagent:jolokia.jar=port=11159,desc=\"cool  loking\\ agent\"";
         setVoltDbOpts(propOne
                 + " " + propTwo
+                + " " + propThree
                 + " " + agentSpec
                 + " " + minHeap
                 + " " + maxHeap
@@ -195,6 +197,7 @@ public class TestCommandLine
 
         assertTrue(cmd.contains(" " + propOne + " "));
         assertTrue(cmd.contains(" " + propTwo+ " "));
+        assertTrue(cmd.contains(" " + propThree+ " "));
         assertTrue(cmd.contains(" " + agentSpec + " "));
         assertTrue(cmd.contains(" " + gcSpec + " "));
         assertTrue(cmd.contains(" sgra rehto emos"));
@@ -208,6 +211,7 @@ public class TestCommandLine
 
         assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propOne));
         assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propTwo));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propThree));
         assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(agentSpec));
         assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(gcSpec));
         assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf("sgra rehto emos"));
