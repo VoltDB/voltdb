@@ -174,63 +174,78 @@ def fixTrailingWhitespace(f, content):
     print "Fix: Removing trailing whitespace."
     return writeRepairedContent(f, "\n".join(cleanlines),  content)
 
+FIX_LICENSES_LEVEL = 2
 
 def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython): 
     for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py'):
         if f.endswith(suffix):
             break
     else:
-        return 0
+        return (0, 0)
+ 
     content = readFile(f)
     if fix:
         rmBakFile(f)
-    result = 0
+    (fixed, found) = (0, 0)
 
     retval = verifyLicense(f, content,  approvedLicensesJavaC, approvedLicensesPython)
     if retval != 0:
-        if fix:
+        if fix > FIX_LICENSES_LEVEL:
+            fixed += retval
             if f.endswith('.py'):
                 content = fixLicensePython(f, content, approvedLicensesPython)
             else:
                 content = fixLicenseJavaC(f, content, approvedLicensesJavaC)
-        result += retval
+        found += retval
 
     retval = verifyTabs(f, content)
     if retval != 0:
         if fix:
+            fixed += retval
             content = fixTabs(f, content)
-        result += retval
+        found += retval
 
     retval = verifyTrailingWhitespace(f, content)
     if (retval != 0):
         if fix:
+            fixed += retval
             content = fixTrailingWhitespace(f, content)
-        result += retval
+        found += retval
 
     retval = verifySprintf(f, content)
-    result += retval
+    found += retval
 
     retval = verifyGetStringChars(f, content)
-    result += retval
+    found += retval
 
-    return result
+    return (fixed, found)
 
 def processAllFiles(d, fix, approvedLicensesJavaC, approvedLicensesPython):
     files = os.listdir(d)
-    errcount = 0
+    (fixcount, errcount) = (0, 0)
     for f in [f for f in files if not f.startswith('.') and f not in prunelist]:
         fullpath = os.path.join(d,f)
         if os.path.isdir(fullpath):
-            errcount += processAllFiles(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
+            (fixinc, errinc) = processAllFiles(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
         else:
-            errcount += processFile(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
-    return errcount
+            (fixinc, errinc) = processFile(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
+        fixcount += fixinc
+        errcount += errinc
+    return (fixcount, errcount)
 
+fix = 0
+parsing_options = True
 
-fix = False
 for arg in sys.argv[1:]:
-    if arg == "--fix":
-        fix = True
+    if parsing_options and arg[0:2] == "--":
+        if arg == "--":
+            parsing_options = False
+        elif arg == "--fixws":
+            fix = 1
+        elif arg == "--fixall":
+            fix = FIX_LICENSES_LEVEL + 1
+        else:
+            print 'IGNORING INVALID OPTION: "%s". It must be "--fixws" or "--fixall" or if "%s" is an additional code repo directory, it must follow a standalone "--" option.' % (arg, arg)
 
 testLicenses =   [basepath + 'tools/approved_licenses/mit_x11_hstore_and_voltdb.txt',
                   basepath + 'tools/approved_licenses/mit_x11_evanjones_and_voltdb.txt',
@@ -247,23 +262,27 @@ testLicensesPy = [basepath + 'tools/approved_licenses/mit_x11_voltdb_python.txt'
 srcLicensesPy =  [basepath + 'tools/approved_licenses/gpl3_voltdb_python.txt']
 
 
-errcount = 0
-errcount += processAllFiles(basepath + "src", fix,
-                            tuple([readFile(f) for f in srcLicenses]),
-                            tuple([readFile(f) for f in srcLicensesPy]))
-
-errcount += processAllFiles(basepath + "tests", fix,
-                            tuple([readFile(f) for f in testLicenses]),
-                            tuple([readFile(f) for f in testLicensesPy]))
-
-errcount += processAllFiles(basepath + "examples", fix,
-                            tuple([readFile(f) for f in testLicenses]),
-                            tuple([readFile(f) for f in testLicensesPy]))
+(fixcount, errcount) = (0, 0)
+(fixinc, errinc) = processAllFiles(basepath + "src", fix,
+    tuple([readFile(f) for f in srcLicenses]),
+    tuple([readFile(f) for f in srcLicensesPy]))
+fixcount += fixinc
+errcount += errinc
+(fixinc, errinc) = processAllFiles(basepath + "tests", fix,
+    tuple([readFile(f) for f in testLicenses]),
+    tuple([readFile(f) for f in testLicensesPy]))
+fixcount += fixinc
+errcount += errinc
+(fixinc, errinc) = processAllFiles(basepath + "examples", fix,
+    tuple([readFile(f) for f in testLicenses]),
+    tuple([readFile(f) for f in testLicensesPy]))
+fixcount += fixinc
+errcount += errinc
 
 if errcount == 0:
     print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
 elif fix:
-    print "PROGRESS? Found and tried to fix %d license text or whitespace errors. Re-run licensescheck to validate. Consult .lcbak files to recover if something went wrong." % errcount
+    print "PROGRESS? Tried to fix %d of the %d found license text or whitespace errors. Re-run licensescheck to validate. Consult .lcbak files to recover if something went wrong." % (fixcount, errcount)
 else:
     print "FAILURE. Found %d license text or whitespace errors." % errcount
 
@@ -273,20 +292,26 @@ else:
 # property is not set.
 if not ascommithook:
     for arg in sys.argv[1:]:
-        if arg == "--fix":
-            fix = True
+        if parsing_options and arg[0:2] == "--":
+            if arg == "--":
+                parsing_options = False
+            
         elif arg != "${voltpro}":
             print "Checking additional repository: " + arg;
             proLicenses = ["../" + arg + '/tools/approved_licenses/license.txt']
             proLicensesPy = ["../" + arg + '/tools/approved_licenses/license_python.txt']
-            errcount = 0
-            errcount += processAllFiles("../" + arg + "/src/", fix,
-                                        tuple([readFile(f) for f in proLicenses]),
-                                        tuple([readFile(f) for f in proLicensesPy]))
+            (fixcount, errcount) = (0, 0)
+            (fixinc, errinc) = processAllFiles("../" + arg + "/src/", fix,
+                tuple([readFile(f) for f in proLicenses]),
+                tuple([readFile(f) for f in proLicensesPy]))
+            fixcount += fixinc
+            errcount += errinc
 
-            errcount += processAllFiles("../" + arg + "/tests/", fix,
-                                        tuple([readFile(f) for f in proLicenses]),
-                                        tuple([readFile(f) for f in proLicensesPy]))
+            (fixinc, errinc) = processAllFiles("../" + arg + "/tests/", fix,
+                tuple([readFile(f) for f in proLicenses]),
+                tuple([readFile(f) for f in proLicensesPy]))
+            fixcount += fixinc
+            errcount += errinc
 
             if errcount == 0:
                 print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
