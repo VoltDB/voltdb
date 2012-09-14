@@ -308,7 +308,7 @@ SnapshotCompletionInterest
                     stringer.key(e.getKey().toString()).value(e.getValue());
                 }
                 stringer.endObject(); // partitionToTxnId
-                stringer.key("instanceId").value(instanceId);
+                stringer.key("instanceId").value(instanceId.serializeToJSONObject());
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
@@ -550,6 +550,11 @@ SnapshotCompletionInterest
             }
 
             SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
+            // if the cluster instance IDs in the snapshot and command log don't match, just move along
+            if (!(m_replayAgent.getInstanceId().equals(info.instanceId)))
+            {
+                continue;
+            }
             if (VoltDB.instance().isIV2Enabled()) {
                 final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
                 final Map<Integer, Long> snapmap = info.partitionToTxnId;

@@ -82,4 +82,20 @@ public class InstanceId
         stringer.endObject();
         return new JSONObject(stringer.toString());
     }
+
+    @Override
+    public boolean equals(Object rhs)
+    {
+        if (rhs == this) {
+            return true;
+        }
+        if (!(rhs instanceof InstanceId)) {
+            return false;
+        }
+        InstanceId other = (InstanceId)rhs;
+        if (m_coord == other.m_coord && m_timestamp == other.m_timestamp) {
+            return true;
+        }
+        return false;
+    }
 }
