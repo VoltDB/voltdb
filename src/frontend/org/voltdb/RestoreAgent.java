@@ -551,8 +551,8 @@ SnapshotCompletionInterest
 
             SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
-            if (!(m_replayAgent.getInstanceId().equals(info.instanceId)))
-            {
+            if (m_replayAgent.getInstanceId() != null &&
+                !m_replayAgent.getInstanceId().equals(info.instanceId)) {
                 continue;
             }
             if (VoltDB.instance().isIV2Enabled()) {

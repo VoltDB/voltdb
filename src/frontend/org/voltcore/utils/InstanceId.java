@@ -86,6 +86,9 @@ public class InstanceId
     @Override
     public boolean equals(Object rhs)
     {
+        if (rhs == null) {
+            return false;
+        }
         if (rhs == this) {
             return true;
         }
