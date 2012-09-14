@@ -229,6 +229,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new UnaryFunctionExpression<FUNC_OCTET_LENGTH>((*arguments)[0]);
         } else if (functionId == FUNC_CHAR_LENGTH) {
             ret = new UnaryFunctionExpression<FUNC_CHAR_LENGTH>((*arguments)[0]);
+        } else if (functionId == FUNC_SPACE) {
+            ret = new UnaryFunctionExpression<FUNC_SPACE>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_YEAR) {
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_YEAR>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_MONTH) {
@@ -266,6 +268,14 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
         } else if (functionId == FUNC_POSITION_CHAR) {
             ret = new GeneralFunctionExpression<FUNC_POSITION_CHAR>(*arguments);
+        } else if (functionId == FUNC_LEFT) {
+            ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
+        } else if (functionId == FUNC_RIGHT) {
+            ret = new GeneralFunctionExpression<FUNC_RIGHT>(*arguments);
+        } else if (functionId == FUNC_REPEAT) {
+            ret = new GeneralFunctionExpression<FUNC_REPEAT>(*arguments);
+        } else if (functionId == FUNC_CONCAT) {
+            ret = new GeneralFunctionExpression<FUNC_CONCAT>(*arguments);
         }
     }
     // May return null, leaving it to the caller (with more context) to generate an exception.

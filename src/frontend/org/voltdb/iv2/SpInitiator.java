@@ -23,16 +23,14 @@ import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.CatalogContext;
-import org.voltdb.CommandLog;
-
 import org.voltcore.utils.Pair;
-
 import org.voltcore.zk.LeaderElector;
-
 import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CommandLog;
 import org.voltdb.Promotable;
+import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -65,11 +63,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
     };
 
-    public SpInitiator(HostMessenger messenger, Integer partition)
+    public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue()),
-                "SP");
+                "SP", agent);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
     }
 

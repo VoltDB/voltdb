@@ -75,11 +75,6 @@ public class MpScheduler extends Scheduler
             @Override
             public void runForRejoin(SiteProcedureConnection siteConnection) {
             }
-
-            @Override
-            public int priority() {
-                return 0;
-            }
         };
         m_pendingTasks.repair(nullTask);
     }
@@ -138,11 +133,6 @@ public class MpScheduler extends Scheduler
             public void runForRejoin(SiteProcedureConnection siteConnection)
             {
                 throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
-            }
-
-            @Override
-            public int priority() {
-                return 0;
             }
         };
         m_pendingTasks.repair(repairTask);

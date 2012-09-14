@@ -38,12 +38,6 @@ public abstract class TransactionTask extends SiteTasker
     @Override
     abstract public void run(SiteProcedureConnection siteConnection);
 
-    @Override
-    final public int priority()
-    {
-        return 0;
-    }
-
     public TransactionState getTransactionState()
     {
         return m_txn;

@@ -48,6 +48,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -68,6 +69,12 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     static final String MockSPName = "MOCKSP";
     static final long dut_hsid = 11223344l;
 
+    private static SiteTaskerQueue getSiteTaskerQueue() {
+        SiteTaskerQueue queue = new SiteTaskerQueue();
+        queue.setStarvationTracker(new StarvationTracker(0));
+        return queue;
+    }
+
     public void createObjs() throws JSONException
     {
         mbox = mock(Mailbox.class);
@@ -79,7 +86,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
-        dut = new SpScheduler(0, new SiteTaskerQueue());
+        dut = new SpScheduler(0, getSiteTaskerQueue());
         dut.setMailbox(mbox);
         dut.setCommandLog(mock(CommandLog.class));
     }

@@ -32,6 +32,7 @@ import java.util.Deque;
 import junit.framework.TestCase;
 
 import org.junit.Test;
+import org.voltdb.StarvationTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -39,6 +40,12 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class Iv2TestTransactionTaskQueue extends TestCase
 {
+
+    private static SiteTaskerQueue getSiteTaskerQueue() {
+        SiteTaskerQueue queue = new SiteTaskerQueue();
+        queue.setStarvationTracker(new StarvationTracker(0));
+        return queue;
+    }
 
     // Cases to test:
     // several single part txns
@@ -120,7 +127,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
     {
         long localTxnId = 0;
         long mpTxnId = 0;
-        SiteTaskerQueue task_queue = new SiteTaskerQueue();
+        SiteTaskerQueue task_queue = getSiteTaskerQueue();
         TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
         Deque<TransactionTask> expected_order =
             new ArrayDeque<TransactionTask>();
@@ -195,7 +202,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
     {
         long localTxnId = 0;
         long mpTxnId = 0;
-        SiteTaskerQueue task_queue = new SiteTaskerQueue();
+        SiteTaskerQueue task_queue = getSiteTaskerQueue();
         TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
         Deque<TransactionTask> expected_order =
             new ArrayDeque<TransactionTask>();
@@ -249,7 +256,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
     {
         long localTxnId = 0;
         long mpTxnId = 0;
-        SiteTaskerQueue task_queue = new SiteTaskerQueue();
+        SiteTaskerQueue task_queue = getSiteTaskerQueue();
         TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
         Deque<TransactionTask> expected_order =
             new ArrayDeque<TransactionTask>();

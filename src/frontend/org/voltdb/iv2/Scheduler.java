@@ -22,6 +22,7 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
 
 /**
@@ -101,6 +102,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public SiteTaskerQueue getQueue()
     {
         return m_tasks;
+    }
+
+    public void setStarvationTracker(StarvationTracker tracker) {
+        m_tasks.setStarvationTracker(tracker);
     }
 
     abstract public void shutdown();

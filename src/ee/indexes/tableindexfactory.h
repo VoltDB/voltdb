@@ -58,6 +58,7 @@ namespace voltdb {
 class TableIndexFactory {
 public:
     static TableIndex *getInstance(const TableIndexScheme &scheme);
+    static TableIndex *cloneEmptyTreeIndex(const TableIndex& pkey_index);
 };
 
 }

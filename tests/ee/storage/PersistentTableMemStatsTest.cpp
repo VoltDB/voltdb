@@ -56,18 +56,12 @@ public:
         m_primaryKeyIndexSchemaTypes.push_back(VALUE_TYPE_VARCHAR);
 
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        m_primaryKeyIndexSchemaColumnSizes.push_back(VALUE_TYPE_TINYINT);
         m_tableSchemaColumnSizes.push_back(300);
-        m_primaryKeyIndexSchemaColumnSizes.push_back(300);
         m_tableSchemaColumnSizes.push_back(100);
-        m_primaryKeyIndexSchemaColumnSizes.push_back(100);
 
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
 
         m_primaryKeyIndexColumns.push_back(0);
         m_primaryKeyIndexColumns.push_back(1);
@@ -79,7 +73,6 @@ public:
     ~PersistentTableMemStatsTest() {
         delete m_engine;
         delete m_table;
-        TupleSchema::freeTupleSchema(m_primaryKeyIndexSchema);
     }
 
     void initTable(bool allowInlineStrings) {
@@ -88,20 +81,12 @@ public:
                                                        m_tableSchemaAllowNull,
                                                        allowInlineStrings);
 
-        m_primaryKeyIndexSchema =
-            TupleSchema::createTupleSchema(m_primaryKeyIndexSchemaTypes,
-                                           m_primaryKeyIndexSchemaColumnSizes,
-                                           m_primaryKeyIndexSchemaAllowNull,
-                                           allowInlineStrings);
-
         TableIndexScheme indexScheme =
             TableIndexScheme("primaryKeyIndex",
                              BALANCED_TREE_INDEX,
                              m_primaryKeyIndexColumns,
                              m_primaryKeyIndexSchemaTypes,
                              true, false, m_tableSchema);
-
-        indexScheme.keySchema = m_primaryKeyIndexSchema;
 
         vector<TableIndexScheme> indexes;
 
@@ -115,15 +100,12 @@ public:
 
     VoltDBEngine *m_engine;
     TupleSchema *m_tableSchema;
-    TupleSchema *m_primaryKeyIndexSchema;
     PersistentTable *m_table;
     vector<string> m_columnNames;
     vector<ValueType> m_tableSchemaTypes;
     vector<int32_t> m_tableSchemaColumnSizes;
     vector<bool> m_tableSchemaAllowNull;
     vector<ValueType> m_primaryKeyIndexSchemaTypes;
-    vector<int32_t> m_primaryKeyIndexSchemaColumnSizes;
-    vector<bool> m_primaryKeyIndexSchemaAllowNull;
     vector<int> m_primaryKeyIndexColumns;
 };
 
