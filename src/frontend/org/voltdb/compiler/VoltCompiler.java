@@ -731,13 +731,6 @@ public class VoltCompiler {
             }
             ++index;
         }
-
-        // ENG-3359: Error out on "CREATE VIEW ..." DDL whenever the table in the FROM
-        // clause is partitioned unless the GROUP BY columns in the view include the
-        // table's partitioning column. This is a temporary measure until fixed correctly.
-        throw new VoltCompilerException(String.format(
-                "Materialized view \"%s\" must have partition column \"%s\" in the GROUP BY clause.",
-                mvi.getTypeName(), partitionColName));
     }
 
     /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
