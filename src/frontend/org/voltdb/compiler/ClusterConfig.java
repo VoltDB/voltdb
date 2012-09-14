@@ -160,6 +160,13 @@ public class ClusterConfig
         }
 
         public boolean canUseAsReplica(Node n) {
+//            if (!needsReplicas()) {
+//                System.out.println("Partition " + m_partitionId + " doesn't need replicas");
+//            } else if (m_master == n) {
+//                System.out.println("Partition " + m_partitionId + " is already mastered by this node");
+//            } else if (m_replicas.contains(n)) {
+//                System.out.println("Partition " + m_partitionId + " is already replicated by this node");
+//            }
             return needsReplicas() && m_master != n && !m_replicas.contains(n);
         }
 
@@ -235,6 +242,9 @@ public class ClusterConfig
         }
     }
 
+    /*
+     * Are there any partitions that are not fully replicated
+     */
     private static boolean needReplication(List<Partition> partitions) {
         for (Partition p : partitions) {
             if (p.needsReplicas()) {
@@ -244,6 +254,12 @@ public class ClusterConfig
         return false;
     }
 
+    /*
+     * Find the node that can take more replicas,
+     * has the least number of replication connections,
+     * and where the number of replication connections are equal,
+     * where the number of replicated partitions is smallest
+     */
     Node nextNotFullNode(List<Node> nodes, int sitesPerNode) {
         ArrayList<Node> notFullList = new ArrayList<Node>();
         for (Node n : nodes) {
@@ -281,6 +297,9 @@ public class ClusterConfig
     }
 
 
+    /*
+     * Original placement strategy that doesn't get very good performance
+     */
     JSONObject fallbackPlacementStrategy(
             List<Integer> hostIds,
             int hostCount,
@@ -350,6 +369,10 @@ public class ClusterConfig
         return topo;
     }
 
+    /*
+     * Placement strategy that attempts to involve multiple nodes in replication
+     * so that the socket between nodes is not a bottleneck.
+     */
     JSONObject newPlacementStrategy(
             List<Integer> hostIds,
             int hostCount,
@@ -400,15 +423,25 @@ public class ClusterConfig
                         break;
                     }
                 }
-                if (partitionToUse == null) {
-                    System.out.println("Oops");
-                }
+                //In some odd configurations this will be null and the new placement strategy will fail
+//                if (partitionToUse == null) {
+//                    System.out.println("Failed on " + n.m_hostId);
+//                    System.out.println("Oops");
+//                    for (Node n2 : nodes) {
+//                        System.out.println(n2);
+//                        System.out.println("Replicates " + n2.partitionCount());
+//                    }
+//                    for (Partition p2 : partitions) {
+//                        System.out.println("Partition " + p2.m_partitionId + " has " + (1 + p2.m_replicas.size()) + " replicas");
+//                    }
+//                }
                 Set<Partition> replicatedPartitions = partitionToUse.m_master.m_replicationConnections.get(n);
                 replicatedPartitions.add(partitionToUse);
                 partitionToUse.m_replicas.add(n);
                 n.m_replicaPartitions.add(partitionToUse);
                 partitionToUse.decrementNeededReplicas();
             } else {
+                //Connect the partition, node, and master together
                 Set<Partition> replicatedPartitions = new HashSet<Partition>();
                 replicatedPartitions.add(partitionToUse);
                 partitionToUse.m_master.m_replicationConnections.put(n, replicatedPartitions);
@@ -466,7 +499,12 @@ public class ClusterConfig
         if (useFallbackStrategy) {
             topo = fallbackPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
         } else {
-            topo = newPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
+            try {
+                topo = newPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
+            } catch (Exception e) {
+                hostLog.error("Error using new replica placement strategy, falling back to old one", e);
+                topo = fallbackPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
+            }
         }
 
         hostLog.info("TOPO: " + topo.toString(2));
@@ -480,6 +518,6 @@ public class ClusterConfig
     private String m_errorMsg;
 
     public static void main(String args[]) throws Exception {
-        System.out.println(new ClusterConfig(6, 6, 1).getTopology(Arrays.asList(0, 1, 2, 3, 4, 5)).toString(4));
+        System.out.println(new ClusterConfig(10, 4, 4).getTopology(Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)).toString(4));
     }
 }
