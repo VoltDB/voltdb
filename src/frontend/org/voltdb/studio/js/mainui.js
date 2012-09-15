@@ -494,6 +494,13 @@ this.AddConnection = function(connection, success)
             {
                 paramType = connection.Metadata['procedurecolumns'].data[p][6];
                 paramName = connection.Metadata['procedurecolumns'].data[p][3];
+                if (connection.Metadata['procedurecolumns'].data[p][12] == "ARRAY_PARAMETER")
+                {
+                    if (paramType.toLowerCase() == "tinyint") // ENG-2040 and ENG-3101, identify it as an array (byte[])
+                        paramType = "byte[]";
+                    else
+                        paramType += "_array";
+                }
                 procParams[procParams.length] = {'name': paramName, 'type': paramType.toLowerCase()};
             }
         }

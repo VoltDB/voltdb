@@ -23,19 +23,24 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import junit.framework.TestCase;
+
+import org.junit.Test;
 import org.mockito.InOrder;
-import static org.mockito.Mockito.*;
-
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
-
-import junit.framework.TestCase;
-import org.junit.Test;
 
 public class TestSpPromoteAlgo extends TestCase
 {
@@ -61,7 +66,7 @@ public class TestSpPromoteAlgo extends TestCase
     @Test
     public void testUnion() throws Exception
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1);
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -83,7 +88,7 @@ public class TestSpPromoteAlgo extends TestCase
     @Test
     public void testStaleResponse() throws Exception
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1);
         term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
         assertEquals(0L, term.m_repairLogUnion.size());
     }
@@ -94,7 +99,7 @@ public class TestSpPromoteAlgo extends TestCase
     @Test
     public void testRepairLogsAreComplete()
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1);
         SpPromoteAlgo.ReplicaRepairStruct notDone1 = new SpPromoteAlgo.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
@@ -139,7 +144,7 @@ public class TestSpPromoteAlgo extends TestCase
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1);
 
         // missing 4, 5
         SpPromoteAlgo.ReplicaRepairStruct r1 = new SpPromoteAlgo.ReplicaRepairStruct();
@@ -192,7 +197,7 @@ public class TestSpPromoteAlgo extends TestCase
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1);
 
         // missing 3, 4, 5
         SpPromoteAlgo.ReplicaRepairStruct r3 = new SpPromoteAlgo.ReplicaRepairStruct();
@@ -232,7 +237,7 @@ public class TestSpPromoteAlgo extends TestCase
 
         // Stub some portions of a concrete Term instance - this is the
         // object being tested.
-        final SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test") {
+        final SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1) {
             // there aren't replicas to ask for repair logs
             @Override
             void prepareForFaultRecovery() {

@@ -22,12 +22,11 @@ import java.util.List;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-
+import org.voltdb.ProcedureRunner;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.ProcedureRunner;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -40,13 +39,12 @@ public class MpProcedureTask extends ProcedureTask
     final long[] m_initiatorHSIds;
     final Iv2InitiateTaskMessage m_msg;
 
-    MpProcedureTask(Mailbox mailbox, ProcedureRunner runner,
-                  long txnId, TransactionTaskQueue queue,
+    MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators,
                   long buddyHSId)
     {
-        super(mailbox, runner,
-              new MpTransactionState(mailbox, txnId, msg, pInitiators,
+        super(mailbox, procName,
+              new MpTransactionState(mailbox, msg, pInitiators,
                                      buddyHSId),
               queue);
         m_msg = msg;
@@ -63,7 +61,7 @@ public class MpProcedureTask extends ProcedureTask
         m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         // Exception path out of here for rollback is going to need to
         // call m_txn.setDone() somehow
-        final InitiateResponseMessage response = processInitiateTask(txn.m_task);
+        final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         if (!response.shouldCommit()) {
             txn.setNeedsRollback();
         }
@@ -98,18 +96,12 @@ public class MpProcedureTask extends ProcedureTask
     }
 
     @Override
-    public long getMpTxnId()
-    {
-        return m_txn.txnId;
-    }
-
-    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
         sb.append("MpProcedureTask:");
-        sb.append("  MP TXN ID: ").append(getMpTxnId());
-        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  TXN ID: ").append(getTxnId());
+        sb.append("  SP HANDLE ID: ").append(getSpHandle());
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }

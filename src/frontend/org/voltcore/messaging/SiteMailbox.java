@@ -26,14 +26,15 @@ import java.util.concurrent.Semaphore;
 import org.voltdb.CatalogContext;
 import org.voltdb.CommandLog;
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class SiteMailbox implements Mailbox {
 
     private CommandLog m_commandLog = new CommandLog() {
         @Override
-        public void init(CatalogContext context, long txnId) {}
+        public void init(CatalogContext context, long txnId, long perPartitionTxnId[]) {}
         @Override
-        public void initForRejoin(CatalogContext context, long txnId, boolean isRejoin) {}
+        public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin) {}
         @Override
         public boolean needsInitialization() {
             return false;
@@ -52,6 +53,8 @@ public class SiteMailbox implements Mailbox {
         public long getFaultSequenceNumber() {
             return 0;
         }
+        @Override
+        public void log(Iv2InitiateTaskMessage message, long spHandle) {}
         };
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();

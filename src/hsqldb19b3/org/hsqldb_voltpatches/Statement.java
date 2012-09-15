@@ -214,6 +214,6 @@ public abstract class Statement {
     VoltXMLElement voltGetXML(Session session)
     throws HSQLParseException
     {
-        throw new RuntimeException("Unsupported method in Statement base class.");
+        throw new RuntimeException("Unsupported SQL verb in statement: \""+sql+"\"");
     }
 }

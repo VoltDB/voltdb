@@ -96,8 +96,8 @@ public class SysProcFragmentId
     public static final long PF_restoreSendPartitionedTableResults = 70;
     public static final long PF_restoreDigestScan = 71;
     public static final long PF_restoreDigestScanResults = 72;
-    public static final long PF_restoreDistributeExportSequenceNumbers = 73;
-    public static final long PF_restoreDistributeExportSequenceNumbersResults = 74;
+    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbers = 73;
+    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbersResults = 74;
     public static final long PF_restoreAsyncRunLoop = 75;
     public static final long PF_restoreAsyncRunLoopResults = 76;
 

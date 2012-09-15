@@ -153,18 +153,12 @@ public class FragmentTask extends TransactionTask
     }
 
     @Override
-    public long getMpTxnId()
-    {
-        return m_task.getTxnId();
-    }
-
-    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
         sb.append("FragmentTask:");
-        sb.append("  MP TXN ID: ").append(getMpTxnId());
-        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  TXN ID: ").append(getTxnId());
+        sb.append("  SP HANDLE ID: ").append(getSpHandle());
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }

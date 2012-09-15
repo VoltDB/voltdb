@@ -18,37 +18,27 @@
 package org.voltdb.iv2;
 
 import java.nio.ByteBuffer;
-
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.Pair;
-
-import org.voltdb.client.ClientResponse;
-
 import org.voltdb.ClientResponseImpl;
-
-import org.voltdb.messaging.RejoinMessage;
-import org.voltdb.messaging.RejoinMessage.Type;
-
 import org.voltdb.PrivateVoltTableFactory;
-
-import org.voltdb.rejoin.RejoinSiteProcessor;
-import org.voltdb.rejoin.StreamSnapshotSink;
-
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
-
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
-
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.StreamSnapshotSink;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
@@ -264,10 +254,5 @@ public class RejoinProducer extends SiteTasker
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection) {
         run(siteConnection);
-    }
-
-    @Override
-    public int priority() {
-        return 0;
     }
 }

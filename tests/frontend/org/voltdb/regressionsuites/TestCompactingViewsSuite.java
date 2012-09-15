@@ -147,9 +147,9 @@ public class TestCompactingViewsSuite extends RegressionSuite {
                     "CREATE INDEX FOO ON PP (value, e1, e2, e3, e4, e5, e6, e7, e8);"
             );
             project.addLiteralSchema(
-                    "CREATE VIEW VP(value, e1, e2, e3, e4, e5, e6, e7, e8, c) " +
-                    "AS SELECT value, e1, e2, e3, e4, e5, e6, e7, e8, COUNT(*) " +
-                    "FROM PP GROUP BY value, e1, e2, e3, e4, e5, e6, e7, e8;"
+                    "CREATE VIEW VP(id, value, e1, e2, e3, e4, e5, e6, e7, e8, c) " +
+                    "AS SELECT id, value, e1, e2, e3, e4, e5, e6, e7, e8, COUNT(*) " +
+                    "FROM PP GROUP BY id, value, e1, e2, e3, e4, e5, e6, e7, e8;"
             );
             project.addPartitionInfo("pp", "id");
 

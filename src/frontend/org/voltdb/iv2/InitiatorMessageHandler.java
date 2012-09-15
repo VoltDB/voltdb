@@ -21,7 +21,7 @@ import java.util.List;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
-
+import org.voltdb.CommandLog;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
@@ -34,6 +34,7 @@ public interface InitiatorMessageHandler
 {
     void updateReplicas(List<Long> replicas);
 
+    void setCommandLog(CommandLog cl);
     void setMailbox(Mailbox mailbox);
         /*
            if (replica):

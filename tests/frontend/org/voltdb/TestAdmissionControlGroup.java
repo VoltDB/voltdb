@@ -41,6 +41,11 @@ public class TestAdmissionControlGroup extends TestCase {
             offBackpressure++;
         }
 
+        @Override
+        public long connectionId() {
+            return 32;
+        }
+
     }
 
     private AdmissionControlGroup acg;

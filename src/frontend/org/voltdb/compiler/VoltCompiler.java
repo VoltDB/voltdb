@@ -75,6 +75,7 @@ import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -706,7 +707,8 @@ public class VoltCompiler {
 
     }
 
-    static private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn) {
+    private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
+            throws VoltCompilerException {
         // A view of a replicated table is replicated.
         // A view of a partitioned table is partitioned -- regardless of whether it has a partition key
         // -- it certainly isn't replicated!
@@ -729,6 +731,13 @@ public class VoltCompiler {
             }
             ++index;
         }
+
+        // ENG-3359: Error out on "CREATE VIEW ..." DDL whenever the table in the FROM
+        // clause is partitioned unless the GROUP BY columns in the view include the
+        // table's partitioning column. This is a temporary measure until fixed correctly.
+        throw new VoltCompilerException(String.format(
+                "Materialized view \"%s\" must have partition column \"%s\" in the GROUP BY clause.",
+                mvi.getTypeName(), partitionColName));
     }
 
     /** Provide a feedback path to monitor plan output via harvestCapturedDetail */

@@ -556,7 +556,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         result = callProcedure.getResults()[0];
 
         System.out.println("MATVIEW:"); System.out.println(result);
-        assertTrue(result.getRowCount() == 2);
+        assertEquals(10, result.getRowCount());
     }
 
     public void testAddDropTableRepeat() throws Exception {
@@ -721,7 +721,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             project = new TPCCProjectBuilder();
             project.addDefaultSchema();
             project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
-            project.addLiteralSchema("CREATE VIEW MATVIEW_O1(C1,NUM) AS SELECT A_INT, COUNT(*) FROM O1 GROUP BY A_INT;");
+            project.addLiteralSchema("CREATE VIEW MATVIEW_O1(C1, C2, NUM) AS SELECT A_INT, PKEY, COUNT(*) FROM O1 GROUP BY A_INT, PKEY;");
             project.addDefaultPartitioning();
             project.addPartitionInfo("O1", "PKEY");
             project.addProcedures(BASEPROCS_OPROCS);
