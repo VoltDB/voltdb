@@ -33,11 +33,16 @@ import subprocess
 import cPickle
 import os.path
 import imp
+import re
 from voltdbclient import *
 from optparse import OptionParser
 from Query import VoltQueryClient
-from SQLCoverageReport import generate_html_reports, generate_summary
+from SQLCoverageReport import generate_summary
 from SQLGenerator import SQLGenerator
+from xml.etree import ElementTree
+from xml.etree.ElementTree import Element, SubElement
+from subprocess import call # invoke unix/linux cmds
+from XMLUtils import prettify # To create a human readable xml file
 
 class Config:
     def __init__(self, filename):
@@ -53,7 +58,7 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
-def run_once(name, command, statements_path, results_path):
+def run_once(name, command, statements_path, results_path, testConfigKit):
 
     print "Running \"run_once\":"
     print "  name: %s" % (name)
@@ -62,13 +67,22 @@ def run_once(name, command, statements_path, results_path):
     print "  results_path: %s" % (results_path)
     sys.stdout.flush()
 
-    global normalize
-    server = subprocess.Popen(command + " backend=" + name, shell = True)
-    client = None
+    host = defaultHost
+    port = defaultPort
+    if(name == "jni"):
+        akey = "hostname"
+        if akey in testConfigKit:
+            host = testConfigKit["hostname"]
+            port = testConfigKit["hostport"]
 
+    global normalize
+    if(host == defaultHost):
+        server = subprocess.Popen(command + " backend=" + name, shell = True)
+
+    client = None
     for i in xrange(10):
         try:
-            client = VoltQueryClient("localhost", 21212)
+            client = VoltQueryClient(host, port)
             client.set_quiet(True)
             client.set_timeout(5.0) # 5 seconds
             break
@@ -79,6 +93,13 @@ def run_once(name, command, statements_path, results_path):
         print >> sys.stderr, "Unable to connect/create client"
         sys.stderr.flush()
         return -1
+
+#    for key in testConfigKits:
+#        print "999 Key = '%s', Val = '%s'" % (key, testConfigKits[key])
+    if(host != defaultHost):
+        # Flush database
+        client.onecmd("updatecatalog " + testConfigKit["flushCatalog"] + " " + testConfigKit["deploymentFile"])
+        client.onecmd("updatecatalog " + testConfigKit["testCatalog"]  + " " + testConfigKit["deploymentFile"])
 
     statements_file = open(statements_path, "rb")
     results_file = open(results_path, "wb")
@@ -93,22 +114,24 @@ def run_once(name, command, statements_path, results_path):
         except:
             print >> sys.stderr, "Error occurred while executing '%s': %s" % \
                 (statement["SQL"], sys.exc_info()[1])
-            # Should kill the server now
-            killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
-            killer.communicate()
-            if killer.returncode != 0:
-                print >> sys.stderr, \
-                    "Failed to kill the server process %d" % (server.pid)
+            if(host == defaultHost):
+                # Should kill the server now
+                killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+                killer.communicate()
+                if killer.returncode != 0:
+                    print >> sys.stderr, \
+                        "Failed to kill the server process %d" % (server.pid)
             break
         tables = None
         if client.response == None:
             print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
                 (statement["SQL"], sys.exc_info()[1])
-            killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
-            killer.communicate()
-            if killer.returncode != 0:
-                print >> sys.stderr, \
-                    "Failed to kill the server process %d" % (server.pid)
+            if(host == defaultHost):
+                killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+                killer.communicate()
+                if killer.returncode != 0:
+                    print >> sys.stderr, \
+                        "Failed to kill the server process %d" % (server.pid)
             break
         if client.response.tables != None:
             tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
@@ -120,16 +143,23 @@ def run_once(name, command, statements_path, results_path):
     results_file.close()
     statements_file.close()
 
-    client.onecmd("shutdown")
-    server.communicate()
+    if(host == defaultHost):
+        client.onecmd("shutdown")
+        server.communicate()
+    else:
+        client.onecmd("disconnect")
 
     sys.stdout.flush()
     sys.stderr.flush()
 
-    return server.returncode
+    if(host == defaultHost):
+        return server.returncode
+    else:
+        return 0
 
-def run_config(config, basedir, output_dir, random_seed, report_all, generate_only, args):
+def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only, args, testConfigKit):
     for key in config.iterkeys():
+        print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if not os.path.isabs(config[key]):
             config[key] = os.path.abspath(os.path.join(basedir, config[key]))
     if not os.path.exists(output_dir):
@@ -165,7 +195,7 @@ def run_config(config, basedir, output_dir, random_seed, report_all, generate_on
         # Claim success without running servers.
         return [0,0]
 
-    if run_once("jni", command, statements_path, jni_path) != 0:
+    if run_once("jni", command, statements_path, jni_path, testConfigKit) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
         print >> sys.stderr, "  jni_path: %s" % (jni_path)
         sys.stderr.flush()
@@ -188,13 +218,118 @@ def run_config(config, basedir, output_dir, random_seed, report_all, generate_on
         counter += 1
     statements_file.close()
 
-    if run_once("hsqldb", command, statements_path, hsql_path) != 0:
+    if run_once("hsqldb", command, statements_path, hsql_path, testConfigKit) != 0:
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
         exit(1)
 
-    success = generate_html_reports(random_seed, statements_path, hsql_path,
-                                    jni_path, output_dir, report_all)
+    global compare_results
+    compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
+    success = compare_results(suite_name, random_seed, statements_path, hsql_path,
+                              jni_path, output_dir, report_all)
     return success
+
+def get_voltcompiler(basedir):
+    key = "voltdb"
+    (head, tail) = basedir.split(key)
+    voltcompiler = head + key + "/bin/voltcompiler"
+    if(os.access(voltcompiler, os.X_OK)):
+        return voltcompiler
+    else:
+        return None
+
+def get_hostinfo(options):
+    if options.hostname == None:
+        hostname = defaultHost
+    else:
+        hostname = options.hostname
+    if options.hostport == None:
+        hostport = defaultPort
+    else:
+        if(options.hostport.isdigit()):
+            hostport = int(options.hostport)
+        else:
+            print "Invalid value for port number: #%s#" % options.hostport
+            usage()
+            sys.exit(3)
+    return (hostname, hostport)
+
+def create_catalogFile(voltcompiler, flush4projectFile, catalogFilename):
+    catalogFile = "/tmp/" + catalogFilename + ".jar"
+    cmd = voltcompiler + " /tmp " + flush4projectFile + " " + catalogFile
+    call(cmd, shell=True)
+    if not os.path.exists(catalogFile):
+        catalogFile = None
+    return catalogFile
+
+def create_projectFile(ddl, projFilename):
+    proj = Element('project')
+    db = SubElement(proj, 'database')
+    schemas = SubElement(db, 'schemas')
+    schema = SubElement(schemas, 'schema', {'path':ddl})
+    thisProjectFile = "/tmp/" + projFilename + "4projectFile.xml"
+    fo = open(thisProjectFile, "wb")
+    fo.write(prettify(proj))
+    fo.close()
+    if not os.path.exists(thisProjectFile):
+        thisProjectFile = None
+    return thisProjectFile
+
+def create_deploymentFile(options):
+    kfactor = options.kfactor
+    sitesperhost = options.sitescount
+    hostcount = options.hostcount
+
+    deployment = Element('deployment')
+    cluster = SubElement(deployment, 'cluster',
+            {'kfactor':kfactor,'sitesperhost':sitesperhost,'hostcount':hostcount})
+    httpd = SubElement(deployment, 'httpd', {'port':"8080"})
+    jsonapi = SubElement(httpd, 'jsonapi', {'enabled':"true"})
+    deploymentFile = "/tmp/deploymentFile.xml"
+
+    fo = open(deploymentFile, "wb")
+    fo.write(prettify(deployment))
+    fo.close()
+    if not os.path.exists(deploymentFile):
+        deploymentFile = None
+    return deploymentFile
+
+# To store all necessary test config info in a dictionary variable
+def create_testConfigKits(options, basedir):
+    testConfigKits = {}
+
+    flushDDL = basedir + "/" + options.flush
+    if not os.path.exists(flushDDL):
+        print >> sys.stderr, "Cannot find the flush DDL file: '%s'!" % flushDDL
+        sys.exit(3)
+#    else:
+#        print "flushDDL = #%s#" % flushDDL
+
+    voltcompiler = get_voltcompiler(basedir)
+    if voltcompiler == None:
+        print >> sys.stderr, "Cannot find the executable voltcompiler!"
+        sys.exit(3)
+    else:
+        testConfigKits["voltcompiler"] = voltcompiler
+
+    flush4projectFile = create_projectFile(flushDDL, 'flush')
+    flushCatalog = create_catalogFile(voltcompiler, flush4projectFile, 'flush')
+    if flushCatalog == None:
+        print >> sys.stderr, "Cannot find the flush catalog jar file!"
+        sys.exit(3)
+    else:
+        testConfigKits["flushCatalog"] = flushCatalog
+
+    deploymentFile = create_deploymentFile(options)
+    if deploymentFile == None:
+        print >> sys.stderr, "Cannot find the deployment xml file!"
+        sys.exit(3)
+    else:
+        testConfigKits["deploymentFile"] = deploymentFile
+
+    (hostname, hostport) = get_hostinfo(options)
+    testConfigKits["hostname"] = hostname
+    testConfigKits["hostport"] = hostport
+    return testConfigKits
 
 def usage():
     print sys.argv[0], "config output_dir command"
@@ -258,6 +393,18 @@ The following place holders are supported,
 
 if __name__ == "__main__":
     parser = OptionParser()
+    parser.add_option("-l", "--leader", dest="hostname",
+                      help="the hostname of the leader")
+    parser.add_option("-n", "--number", dest="hostcount",
+                      help="the number of total hosts used in this test")
+    parser.add_option("-k", "--kfactor", dest="kfactor",
+                      help="the number of kfactor used in this test")
+    parser.add_option("-t", "--sitescount", dest="sitescount",
+                      help="the number of partitions used in this test")
+    parser.add_option("-p", "--port", dest="hostport",
+                      help="the port number of the leader")
+    parser.add_option("-f", "--flush", dest="flush",
+                      help="the temporary DDL file used to flush databases")
     parser.add_option("-s", "--seed", dest="seed",
                       help="seed for random number generator")
     parser.add_option("-c", "--config", dest="config", default=None,
@@ -287,6 +434,8 @@ if __name__ == "__main__":
     basedir = os.path.dirname(config_filename)
 
     config_list = Config(config_filename)
+#    print "config_list name = '" + config_list.__class__.__name__ + "'"
+
     configs_to_run = []
     if options.config != None:
         if options.config not in config_list.get_configs():
@@ -298,16 +447,35 @@ if __name__ == "__main__":
     else:
         configs_to_run = config_list.get_configs()
 
+    testConfigKits = {}
+    defaultHost = "localhost"
+    defaultPort = 21212
+    if(options.hostname != None and options.hostname != defaultHost):
+        # To set a dictionary with following 5 keys:
+        # testConfigKits["voltcompiler"]
+        # testConfigKits["flushCatalog"]
+        # testConfigKits["deploymentFile"]
+        # testConfigKits["hostname"]
+        # testConfigKits["hostport"]
+        testConfigKits = create_testConfigKits(options, basedir)
+
     success = True
     statistics = {}
     for config_name in configs_to_run:
         print >> sys.stderr, "SQLCOVERAGE: STARTING ON CONFIG: %s" % config_name
         report_dir = output_dir + '/' + config_name
         config = config_list.get_config(config_name)
-        result = run_config(config, basedir, report_dir, seed,
-                            options.report_all, options.generate_only, args)
-        statistics[config_name] = result
-        if result[1] != 0:
+        if(options.hostname != None and options.hostname != defaultHost):
+            testDDL = basedir + "/" + config['ddl']
+            testProjectFile = create_projectFile(testDDL, 'test')
+            testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
+            # To add one more key
+            testConfigKits["testCatalog"] = testCatalog
+        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all, \
+                            options.generate_only, args, testConfigKits)
+        statistics[config_name] = result["keyStats"]
+        statistics["seed"] = seed
+        if result["mis"] != 0:
             success = False
 
     # Write the summary
