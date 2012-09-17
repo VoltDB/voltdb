@@ -60,19 +60,9 @@ class Table;
  */
 class LimitPlanNode : public AbstractPlanNode {
     public:
-        LimitPlanNode(CatalogId id) : AbstractPlanNode(id) {
-            this->limit = -1;
-            this->offset = 0;
-            this->limitParamIdx = -1;
-            this->offsetParamIdx = -1;
-            this->limitExpression = NULL;
-        }
-        LimitPlanNode() : AbstractPlanNode() {
-            this->limit = -1;
-            this->offset = 0;
-            this->limitParamIdx = -1;
-            this->offsetParamIdx = -1;
-        }
+        LimitPlanNode() : AbstractPlanNode(),
+        limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
+        {}
         ~LimitPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
 

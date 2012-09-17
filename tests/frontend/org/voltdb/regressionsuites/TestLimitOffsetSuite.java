@@ -140,6 +140,16 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
     }
 
+    public void testENG1808() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        client.callProcedure("A.insert", 1, 1);
+
+        VoltTable result = client.callProcedure("@AdHoc", "select I from A limit 0").getResults()[0];
+
+        assertEquals(0, result.getRowCount());
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(

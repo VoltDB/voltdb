@@ -419,7 +419,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // We have to different nextValue() methods for different lookup types
     //
-    while (tuple_ctr < limit &&
+    while ((limit == -1 || tuple_ctr < limit) &&
            ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
              !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
