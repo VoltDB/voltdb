@@ -17,7 +17,6 @@
 package org.voltdb.compiler;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -494,11 +493,13 @@ public class ClusterConfig
         }
 
         boolean useFallbackStrategy = Boolean.valueOf(System.getenv("VOLT_REPLICA_FALLBACK"));
-        if (sitesPerHost * hostCount % partitionCount > 0) {
+        if (sitesPerHost * hostCount % partitionCount > 0 || partitionCount < hostCount) {
             hostLog.warn("Unable to use to new replica placement strategy with this configuration. " +
-                    " falling back to old strategy");
+                    " Falling back to old strategy. " +
+                    " Performance may be worse. Try using an even number of sites per host");
             useFallbackStrategy = true;
         }
+
         JSONObject topo = null;
         if (useFallbackStrategy) {
             topo = fallbackPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
@@ -522,6 +523,16 @@ public class ClusterConfig
     private String m_errorMsg;
 
     public static void main(String args[]) throws Exception {
-        System.out.println(new ClusterConfig(3, 3, 1).getTopology(Arrays.asList(0, 1, 2)).toString(4));
+        //int hostCount = 3;
+        for (int hostCount = 2; hostCount < 100; hostCount++) {
+            System.out.println("Host count " + hostCount);
+            List<Integer> hosts = new ArrayList<Integer>();
+            for (int ii = 0; ii < hostCount; ii++) {
+                hosts.add(ii);
+            }
+
+            new ClusterConfig(hostCount, 2, 1).getTopology(hosts).toString(4);
+            //System.out.println(new ClusterConfig(hostCount, 6, 1).getTopology(hosts).toString(4));
+        }
     }
 }
