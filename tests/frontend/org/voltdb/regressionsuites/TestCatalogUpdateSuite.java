@@ -59,6 +59,10 @@ import org.voltdb.utils.MiscUtils;
  */
 public class TestCatalogUpdateSuite extends RegressionSuite {
 
+    static final int sitesPerHost = 2;
+    static final int hosts = 2;
+    static final int k = 1;
+
     // procedures used by these tests
     static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                     org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
@@ -154,14 +158,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
-    public long indexEntryCountFromStats(Client client, String name) throws Exception {
+    public long indexEntryCountFromStats(Client client, String tableName, String indexName) throws Exception {
         ClientResponse callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
         assertTrue(callProcedure.getResults().length == 1);
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
         VoltTable result = callProcedure.getResults()[0];
         long tupleCount = 0;
         while (result.advanceRow()) {
-            if (result.getString("TABLE_NAME").equals("NEW_ORDER") && result.getString("INDEX_NAME").equals("NEWINDEX")) {
+            if (result.getString("TABLE_NAME").equals(tableName) && result.getString("INDEX_NAME").equals(indexName)) {
                 tupleCount += result.getLong("ENTRY_COUNT");
             }
         }
@@ -172,6 +176,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     {
         ClientResponse callProcedure;
         String explanation;
+        VoltTable result;
 
         Client client = getClient();
         loadSomeData(client, 0, 10);
@@ -190,16 +195,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(results.length == 1);
 
         // check the index for non-zero size
-        callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
-        assertTrue(callProcedure.getResults().length == 1);
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-        VoltTable result = callProcedure.getResults()[0];
-        long tupleCount = 0;
-        while (result.advanceRow()) {
-            if (result.getString("TABLE_NAME").equals("NEW_ORDER") && result.getString("INDEX_NAME").equals("NEWINDEX")) {
-                tupleCount += result.getLong("ENTRY_COUNT");
-            }
-        }
+
+        long tupleCount = indexEntryCountFromStats(client, "NEW_ORDER", "NEWINDEX");
         assertTrue(tupleCount > 0);
 
         // verify that the new table(s) support an insert
@@ -224,30 +221,13 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callbackSuccess);
 
         // check the index for even biggerer size from stats
-        callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
-        assertTrue(callProcedure.getResults().length == 1);
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-        result = callProcedure.getResults()[0];
-        long newTupleCount = 0;
-        while (result.advanceRow()) {
-            if (result.getString("TABLE_NAME").equals("NEW_ORDER") && result.getString("INDEX_NAME").equals("NEWINDEX")) {
-                newTupleCount += result.getLong("ENTRY_COUNT");
-            }
-        }
+        long newTupleCount = indexEntryCountFromStats(client, "NEW_ORDER", "NEWINDEX");
         assertTrue(newTupleCount > tupleCount);
 
-        // check another index for the same number of tuples
-        callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
-        assertTrue(callProcedure.getResults().length == 1);
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-        result = callProcedure.getResults()[0];
-        long newTupleCount = 0;
-        while (result.advanceRow()) {
-            if (result.getString("TABLE_NAME").equals("NEW_ORDER") && result.getString("INDEX_NAME").equals("NEWINDEX")) {
-                newTupleCount += result.getLong("ENTRY_COUNT");
-            }
-        }
-        assertTrue(newTupleCount > tupleCount);
+        // check table for the right number of tuples
+        callProcedure = client.callProcedure("@AdHoc", "select count(*) from NEW_ORDER;");
+        long rowCount = callProcedure.getResults()[0].asScalarLong();
+        assertEquals(newTupleCount, rowCount * (k + 1)); // index count is double for k=1
 
         // revert to the original schema
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
@@ -486,10 +466,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     static public Test suite() throws Exception {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCatalogUpdateSuite.class);
-
-        final int sitesPerHost = 2;
-        final int hosts = 2;
-        final int k = 1;
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
