@@ -71,6 +71,7 @@ public class CatalogDiffEngine {
             return true;
         }
 
+        // allow addition/deletion of non-unique indexes
         if (suspect instanceof Index) {
             Index index = (Index) suspect;
             if (index.m_unique) {
