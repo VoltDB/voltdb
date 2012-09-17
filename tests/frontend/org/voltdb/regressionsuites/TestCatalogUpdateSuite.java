@@ -154,34 +154,100 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
+    public long indexEntryCountFromStats(Client client, String name) throws Exception {
+        ClientResponse callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        VoltTable result = callProcedure.getResults()[0];
+        long tupleCount = 0;
+        while (result.advanceRow()) {
+            if (result.getString("TABLE_NAME").equals("NEW_ORDER") && result.getString("INDEX_NAME").equals("NEWINDEX")) {
+                tupleCount += result.getLong("ENTRY_COUNT");
+            }
+        }
+        return tupleCount;
+    }
+
     public void testAddDropIndex() throws Exception
     {
+        ClientResponse callProcedure;
+        String explanation;
+
         Client client = getClient();
         loadSomeData(client, 0, 10);
         client.drain();
         assertTrue(callbackSuccess);
 
-        // add tables O1, O2, O3
+        // check that no index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertFalse(explanation.contains("INDEX SCAN"));
+
+        // add index to NEW_ORDER
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.jar");
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml");
         VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
 
+        // check the index for non-zero size
+        callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        VoltTable result = callProcedure.getResults()[0];
+        long tupleCount = 0;
+        while (result.advanceRow()) {
+            if (result.getString("TABLE_NAME").equals("NEW_ORDER") && result.getString("INDEX_NAME").equals("NEWINDEX")) {
+                tupleCount += result.getLong("ENTRY_COUNT");
+            }
+        }
+        assertTrue(tupleCount > 0);
+
         // verify that the new table(s) support an insert
-        ClientResponse callProcedure = client.callProcedure("@AdHoc", "insert into NEW_ORDER values (-1, -1, -1);");
+        callProcedure = client.callProcedure("@AdHoc", "insert into NEW_ORDER values (-1, -1, -1);");
         assertTrue(callProcedure.getResults().length == 1);
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // do a call that uses the index
         callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where NO_O_ID = 5;");
-        VoltTable result = callProcedure.getResults()[0];
+        result = callProcedure.getResults()[0];
         result.advanceRow();
         assertEquals(5, result.getLong("NO_O_ID"));
+
+        // check that an index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertTrue(explanation.contains("INDEX SCAN"));
 
         // tables can still be accessed
         loadSomeData(client, 20, 10);
         client.drain();
         assertTrue(callbackSuccess);
+
+        // check the index for even biggerer size from stats
+        callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        result = callProcedure.getResults()[0];
+        long newTupleCount = 0;
+        while (result.advanceRow()) {
+            if (result.getString("TABLE_NAME").equals("NEW_ORDER") && result.getString("INDEX_NAME").equals("NEWINDEX")) {
+                newTupleCount += result.getLong("ENTRY_COUNT");
+            }
+        }
+        assertTrue(newTupleCount > tupleCount);
+
+        // check another index for the same number of tuples
+        callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        result = callProcedure.getResults()[0];
+        long newTupleCount = 0;
+        while (result.advanceRow()) {
+            if (result.getString("TABLE_NAME").equals("NEW_ORDER") && result.getString("INDEX_NAME").equals("NEWINDEX")) {
+                newTupleCount += result.getLong("ENTRY_COUNT");
+            }
+        }
+        assertTrue(newTupleCount > tupleCount);
 
         // revert to the original schema
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
@@ -194,6 +260,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         result = callProcedure.getResults()[0];
         result.advanceRow();
         assertEquals(5, result.getLong("NO_O_ID"));
+
+        // check that no index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertFalse(explanation.contains("INDEX SCAN"));
 
         // and loading still succeeds
         loadSomeData(client, 30, 10);
