@@ -176,6 +176,10 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
+        // HSQL for baseline
+        config = new LocalCluster("testlimitoffset-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
         return builder;
     }
 }

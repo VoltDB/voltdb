@@ -985,6 +985,8 @@ public class QuerySpecification extends QueryExpression {
                 (Integer) sortAndSlice.limitCondition.getRightNode().getValue(
                     session);
 
+            // Tweaked by VoltDB to support LIMIT 0
+            // WAS: (limit == null || limit.intValue() <= 0)
             if (limit == null || limit.intValue() < 0) {
                 throw Error.error(ErrorCode.X_2201W);
             }
@@ -1013,6 +1015,8 @@ public class QuerySpecification extends QueryExpression {
                 rowCount = limitCount;
             }
 
+            // Tweaked by VoltDB to support LIMIT 0
+            // WAS: (rowCount == 0 || ...) which had been testing for a never true case, anyway
             if (rowCount > Integer.MAX_VALUE - limitStart) {
                 rowCount = Integer.MAX_VALUE;
             } else {
@@ -1072,6 +1076,11 @@ public class QuerySpecification extends QueryExpression {
         result.metaData = resultMetaData;
 
         result.setDataResultConcurrency(isUpdatable);
+
+        // Test for early return case added by VoltDB to support LIMIT 0 in "HSQL backend".
+        if (limitcount == 0) {
+            return result;
+        }
 
         int fullJoinIndex = 0;
         RangeIterator[] rangeIterators =
