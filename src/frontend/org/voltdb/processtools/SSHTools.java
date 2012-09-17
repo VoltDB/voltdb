@@ -93,15 +93,15 @@ public class SSHTools {
 
             // Direct stderr output of command
             InputStream err = ((ChannelExec) channel).getErrStream();
-            InputStreamReader errStrRdr = new InputStreamReader(err, "UTF8");
+            InputStreamReader errStrRdr = new InputStreamReader(err, "UTF-8");
             Reader errStrBufRdr = new BufferedReader(errStrRdr);
 
             // Direct stdout output of command
             InputStream out = channel.getInputStream();
-            InputStreamReader outStrRdr = new InputStreamReader(out, "UTF8");
+            InputStreamReader outStrRdr = new InputStreamReader(out, "UTF-8");
             Reader outStrBufRdr = new BufferedReader(outStrRdr);
 
-            channel.connect();
+            channel.connect(5000);  // timeout after 5 seconds
             while (true) {
                 if (channel.isClosed()) {
                     break;
@@ -150,7 +150,7 @@ public class SSHTools {
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
 
-            session.connect();
+            session.connect(5000); // timeout after 5 seconds.
 
             return new ProcessData(processName, handler, session, stringify(command));
         }
@@ -189,7 +189,7 @@ public class SSHTools {
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
 
-            session.connect();
+            session.connect(5000); // timeout after 5 seconds
 
             // exec 'scp -t rfile' remotely
             Channel channel=session.openChannel("exec");

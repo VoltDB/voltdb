@@ -133,15 +133,17 @@ public class ProcessData {
         m_out.m_expectDeath.set(true);
         m_err.m_expectDeath.set(true);
         int retval = -255;
-        m_channel.disconnect();
-        m_ssh_session.disconnect();
+        synchronized(m_channel) {
+            m_channel.disconnect();
+            m_ssh_session.disconnect();
+        }
         m_sshThread.interrupt();
         return retval;
     }
 
     public boolean isAlive() {
-            synchronized(m_channel) {
-                return m_ssh_session.isConnected();
-            }
+        synchronized(m_channel) {
+            return m_ssh_session.isConnected();
+        }
     }
 }
