@@ -177,6 +177,9 @@ public class TestCommandLine
         String propOne = "-Done.prop=\"yolanda is a nice gal:\"";
         String propTwo = "-Dtwo.prop=\"yobo is: a nice guy\"";
         String propThree = "-Dsingle.quote='In single quote \"bliss\"'";
+        String voltOne   = "enableIv2";
+        String voltTwo   = "project";
+        String voltThree = "\"/a/file/with a space.xml\"";
         String minHeap = "-Xms1024m";
         String maxHeap = "-Xmx4096m";
         String gcSpec  = "-XX:+UseConcMarkSweepGC";
@@ -184,6 +187,9 @@ public class TestCommandLine
         setVoltDbOpts(propOne
                 + " " + propTwo
                 + " " + propThree
+                + " -voltdb:" + voltOne
+                + " -voltdb:" + voltTwo
+                + " -voltdb:" + voltThree
                 + " " + agentSpec
                 + " " + minHeap
                 + " " + maxHeap
@@ -198,12 +204,16 @@ public class TestCommandLine
         assertTrue(cmd.contains(" " + propOne + " "));
         assertTrue(cmd.contains(" " + propTwo+ " "));
         assertTrue(cmd.contains(" " + propThree+ " "));
+        assertTrue(cmd.contains(" " + voltOne + " "));
+        assertTrue(cmd.contains(" " + voltTwo + " "));
+        assertTrue(cmd.contains(" " + voltThree + " "));
         assertTrue(cmd.contains(" " + agentSpec + " "));
         assertTrue(cmd.contains(" " + gcSpec + " "));
         assertTrue(cmd.contains(" sgra rehto emos"));
 
         assertFalse(cmd.contains(" -cp" ));
         assertFalse(cmd.contains(" -d32" ));
+        assertFalse(cmd.contains(" -voltdb:" ));
         assertFalse(cmd.contains("/some/diryolanda.so:/tmp/hackme.so"));
         assertFalse(cmd.contains("tooranda.jar"));
         assertFalse(cmd.contains(" " + minHeap + " "));
@@ -215,5 +225,8 @@ public class TestCommandLine
         assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(agentSpec));
         assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(gcSpec));
         assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf("sgra rehto emos"));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltOne));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltTwo));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltThree));
     }
 }

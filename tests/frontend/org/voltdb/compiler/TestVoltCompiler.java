@@ -1163,7 +1163,7 @@ public class TestVoltCompiler extends TestCase {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
             "partition table books on column cash;\n" +
-            "create view matt (title, num, foo) as select title, count(*), sum(cash) from books group by title;";
+            "create view matt (title, cash, num, foo) as select title, cash, count(*), sum(cash) from books group by title, cash;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
