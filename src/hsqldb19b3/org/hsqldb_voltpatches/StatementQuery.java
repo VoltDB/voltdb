@@ -194,16 +194,44 @@ public class StatementQuery extends StatementDMQL {
         if (queryExpr.getUnionType() == QueryExpression.NOUNION) {
             return voltGetXMLSpecification(queryExpr, session);
         } else {
-            VoltXMLElement union = new VoltXMLElement("union");
-            union.attributes.put("uniontype", queryExpr.operatorName());
+            String unionType = queryExpr.operatorName();
+            if (!"UNION".equalsIgnoreCase(unionType) && !"UNION_ALL".equalsIgnoreCase(unionType)) {
+                throw new HSQLParseException(queryExpression.operatorName() + "  tuple set operator is not supported.");
+            }
+            VoltXMLElement unionExpr = new VoltXMLElement("union");
+            unionExpr.attributes.put("uniontype", unionType);
             VoltXMLElement leftExpr = voltGetXMLExpression(
                     queryExpr.getLeftQueryExpression(), session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
                     queryExpr.getRightQueryExpression(), session);
-            union.children.add(leftExpr);
-            union.children.add(rightExpr);
-            return union;
+            unionExpr = voltSimplifyUnionXMLExpression(unionExpr, leftExpr);
+            unionExpr = voltSimplifyUnionXMLExpression(unionExpr, rightExpr);
+            return unionExpr;
         }
+    }
+    
+    /**
+     * VoltDB added method to simplify VoltXMLElement representing tuple set expression.
+     * So far only expressions with a single distinct operation are supported. Such expressions
+     * can be flattened 
+     * @param unionExpr The parent UNION element
+     * @param childExpr The child expression
+     * @return VoltXMLElement representing UNION element having all of it's grand children
+     * as promoted to the immediate children.
+     * @throws HSQLParseException
+     */
+    VoltXMLElement voltSimplifyUnionXMLExpression(VoltXMLElement unionExpr, VoltXMLElement childExpr)
+    throws HSQLParseException
+    {
+        if ("union".equalsIgnoreCase(childExpr.name)) {
+            if (!unionExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
+                throw new HSQLParseException("Union expressions with distinct tuple set operations are not supported.");
+            }
+            unionExpr.children.addAll(childExpr.children);
+        } else {
+            unionExpr.children.add(childExpr);
+        }
+        return unionExpr;
     }
     
     VoltXMLElement voltGetXMLSpecification(QueryExpression queryExpr, Session session)

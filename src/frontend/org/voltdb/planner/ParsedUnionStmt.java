@@ -64,15 +64,21 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             if (nextSelectStmt.scanColumns != null)
             {
                 Set<String> tableNames = nextSelectStmt.scanColumns.keySet();
-                Iterator<Table> it = nextSelectStmt.tableList.iterator();
-
+                // need to remove duplicates in case of union of a same table
+                HashSet<Table> nextTableSet = new HashSet<Table>();
+                nextTableSet.addAll(nextSelectStmt.tableList);
+                Iterator<Table> it = nextTableSet.iterator();
+                // Filter out tables which are not from this statement
                 while (it.hasNext()) {
                     Table next = it.next();
                     if (!tableNames.contains(next.getTypeName())) {
                         it.remove();
                     }
                 }
-                tableSet.addAll(nextSelectStmt.tableList);
+                // Replace the original tables
+                nextSelectStmt.tableList.clear();
+                nextSelectStmt.tableList.addAll(nextTableSet);
+                tableSet.addAll(nextTableSet);
             } else {
                 throw new RuntimeException("Select * is not supported within the UNION statement");
             }
