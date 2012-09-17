@@ -364,25 +364,4 @@ public class TestPartitionDDL extends TestCase {
                 new PartitionDDL("books", "cash"),
                 new PartitionDDL("books", "cash"));
     }
-
-    // ENG-3359: Error out on "CREATE VIEW ..." DDL whenever the table in the FROM
-    // clause is partitioned unless the GROUP BY columns in the view include the
-    // table's partitioning column.
-    public void testErrorOnPartitionedTableInMaterializedView() {
-        Tester tester = new Tester();
-
-        // Good: GROUP BY includes the partitioning column.
-        tester.view_good(true,
-                new PartitionDDL("books", "cash"),
-                new DDL("create view v1 (cash, num_rows) as " +
-                        "select cash, count(*) from books group by cash;")
-                );
-
-        // Good: GROUP BY does not include the partitioning column.
-        tester.view_bad(".*view .* must have partition column .* in the GROUP BY clause.*", true,
-                new PartitionDDL("books", "cash"),
-                new DDL("create view v2 (title, num_rows) as " +
-                        "select title, count(*) from books group by title;")
-                );
-    }
 }
