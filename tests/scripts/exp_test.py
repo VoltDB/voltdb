@@ -270,7 +270,7 @@ def execThisService(service, logS, logC):
 # which is defined in 'staticKeyStr'
 def assertVotekv_Votecache(mod, logC):
     staticKeyStr = {
-"Command iiiiLine Configuration":1,
+"Command Line Configuration":1,
 "Setup & Initialization":1,
 "Starting Benchmark":1,
 "KV Store Results":1,
@@ -294,13 +294,13 @@ def assertVotekv_Votecache(mod, logC):
     keys = {}
     if(cnt == len(staticKeyStr)):
 #        msg = "The client output has all the expected key words:\n" + sepLineS + "\n"
-        msg = "The client output has all the expected key words:"
+        msg = "The client output has all the expected key words"
 #        for key in staticKeyStr:
 #            msg += key + "\n"
         keys = staticKeyStr
         result = True
     else:
-        msg = "The client output does not have all the expected key words:\n"
+        msg = "The client output does not have all the expected key words\n"
 #        msg += "The missing keys are:\n" + sepLineS + "\n"
         for key in staticKeyStr:
             if key not in dynamicKeyStr.keys():
@@ -320,7 +320,7 @@ def assertVoter(mod, logC):
 
 # To make sure that we see the key string 'Hola, Mundo!'
 def assertHelloWorld(modulename, logC):
-    expected = "iHola, Mundo!"
+    expected = "Hola, Mundo!"
     actual = readFirstLine(logC)
     if(expected == actual):
         msg = expected
