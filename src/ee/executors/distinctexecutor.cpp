@@ -55,7 +55,30 @@
 #include "storage/tablefactory.h"
 
 #include <set>
+#include <vector>
 #include <cassert>
+
+using namespace voltdb;
+
+namespace voltdb {
+namespace detail {
+
+    struct ltTuples {
+        bool operator () (const std::vector<NValue>& v1, const std::vector<NValue>& v2) const {
+            assert(v1.size() == v2.size());
+            std::vector<NValue>::const_iterator it1 = v1.begin();
+            std::vector<NValue>::const_iterator it2 = v2.begin();
+            for (; it1 != v1.end(); ++it1, ++it2) {
+                int comp = it1->compare(*it2);
+                if (comp != 0) {
+                    return comp < 0;
+                }
+            }
+            return false;
+        }
+    };
+}
+}
 
 using namespace voltdb;
 
@@ -63,7 +86,7 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
                               TempTableLimits* limits)
 {
     VOLT_DEBUG("init Distinct Executor");
-    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
+    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(getPlanNode());
     assert(node);
     //
     // Create a duplicate of input table
@@ -84,7 +107,7 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
 }
 
 bool DistinctExecutor::p_execute(const NValueArray &params) {
-    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
+    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -95,17 +118,25 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     TableTuple tuple(input_table->schema());
 
     // substitute params for distinct expression
-    AbstractExpression *distinctExpression = node->getDistinctExpression();
-    distinctExpression->substitute(params);
+    const std::vector<AbstractExpression*>& expressions = node->getDistinctExpressions();
+    for (std::vector<AbstractExpression*>::const_iterator it = expressions.begin(); it != expressions.end(); ++it) {
+        (*it)->substitute(params);
+    }
 
-    std::set<NValue, NValue::ltNValue> found_values;
+    std::set<std::vector<NValue>, detail::ltTuples> found_values;
     while (iterator.next(tuple)) {
         //
         // Check whether this value already exists in our list
         //
-        NValue tuple_value = distinctExpression->eval(&tuple, NULL);
-        if (found_values.find(tuple_value) == found_values.end()) {
-            found_values.insert(tuple_value);
+        std::vector<NValue> tupleValues;
+        for (std::vector<AbstractExpression*>::const_iterator it = expressions.begin();
+            it != expressions.end(); ++it) {
+            tupleValues.push_back((*it)->eval(&tuple, NULL));
+        }
+
+        if (found_values.find(tupleValues) == found_values.end()) {
+            found_values.insert(tupleValues);
+
             if (!output_table->insertTuple(tuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                            " output table '%s'",
@@ -121,3 +152,5 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
 
 DistinctExecutor::~DistinctExecutor() {
 }
+
+

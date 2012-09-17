@@ -17,6 +17,7 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -1350,12 +1351,7 @@ public class PlanAssembler {
      */
     AbstractPlanNode handleDistinct(AbstractPlanNode root) {
         if (m_parsedSelect.distinct) {
-            // We currently can't handle DISTINCT of multiple columns.
-            // Throw a planner error if this is attempted.
-            if (m_parsedSelect.displayColumns.size() > 1)
-            {
-                throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
-            }
+            List<AbstractExpression> distinctExprList = new ArrayList<AbstractExpression>();
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
                 // Distinct can in theory handle any expression now, but it's
                 // untested so we'll balk on anything other than a TVE here
@@ -1363,17 +1359,20 @@ public class PlanAssembler {
                 if (col.expression instanceof TupleValueExpression)
                 {
                     // Add distinct node(s) to the plan
-                    root = addDistinctNodes(root, col.expression);
-                    // aggregate handlers are expected to produce the required projection.
-                    // the other aggregates do this inherently but distinct may need a
-                    // projection node.
-                    root = addProjection(root);
+                    distinctExprList.add(col.expression);
                  }
                 else
                 {
                     throw new PlanningErrorException("DISTINCT of an expression currently unsupported");
                 }
             }
+            // Add distinct node to the plan
+            root = addDistinctNodes(root, distinctExprList);
+            // aggregate handlers are expected to produce the required projection.
+            // the other aggregates do this inherently but distinct may need a
+            // projection node.
+            root = addProjection(root);
+
         }
 
         return root;
@@ -1384,10 +1383,10 @@ public class PlanAssembler {
      * Otherwise simply add the distinct node on top of the current root
      *
      * @param root The root node
-     * @param expr The distinct expression
+     * @param exprList The list of distinct expressions
      * @return The new root node.
      */
-    AbstractPlanNode addDistinctNodes(AbstractPlanNode root, AbstractExpression expr)
+    AbstractPlanNode addDistinctNodes(AbstractPlanNode root, List<AbstractExpression> exprList)
     {
         assert(root != null);
         AbstractPlanNode accessPlanTemp = root;
@@ -1398,13 +1397,13 @@ public class PlanAssembler {
             root.getChild(0).unlinkChild(accessPlanTemp);
 
             // Add new distinct node to each partition
-            AbstractPlanNode distinctNode = addDistinctNode(accessPlanTemp, expr);
+            AbstractPlanNode distinctNode = addDistinctNode(accessPlanTemp, exprList);
             // Add send/receive pair back
             root.getChild(0).addAndLinkChild(distinctNode);
         }
 
         // Add new distinct node to the coordinator
-        root = addDistinctNode(root, expr);
+        root = addDistinctNode(root, exprList);
         return root;
     }
 
@@ -1412,13 +1411,13 @@ public class PlanAssembler {
      * Build new distinct node and put it on top of the current root
      *
      * @param root The root node
-     * @param expr The distinct expression
+     * @param exprList The list of distinct expressions
      * @return The new root node.
      */
-    AbstractPlanNode addDistinctNode(AbstractPlanNode root, AbstractExpression expr)
+    AbstractPlanNode addDistinctNode(AbstractPlanNode root, List<AbstractExpression> exprList)
     {
         DistinctPlanNode distinctNode = new DistinctPlanNode();
-        distinctNode.setDistinctExpression(expr);
+        distinctNode.setDistinctExpressions(exprList);
         distinctNode.addAndLinkChild(root);
         distinctNode.generateOutputSchema(m_catalogDb);
         return distinctNode;

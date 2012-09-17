@@ -66,13 +66,13 @@ public:
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    AbstractExpression* getDistinctExpression() const;
+    const std::vector<AbstractExpression*>& getDistinctExpressions() const;
 
     std::string debugInfo(const std::string& spacer) const;
 
 protected:
     virtual void loadFromJSONObject(json_spirit::Object& obj);
-    AbstractExpression* m_distinctExpression;
+    std::vector<AbstractExpression*> m_distinctExpressions;
 };
 
 }

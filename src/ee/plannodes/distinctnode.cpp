@@ -50,10 +50,12 @@
 #include <sstream>
 #include <stdexcept>
 
+using namespace json_spirit;
 using namespace voltdb;
 using namespace std;
 
-DistinctPlanNode::DistinctPlanNode(CatalogId id) : AbstractPlanNode(id)
+DistinctPlanNode::DistinctPlanNode(CatalogId id) :
+    AbstractPlanNode(id), m_distinctExpressions()
 {
 }
 
@@ -67,7 +69,11 @@ DistinctPlanNode::~DistinctPlanNode()
         delete getOutputTable();
         setOutputTable(NULL);
     }
-    delete m_distinctExpression;
+    std::vector<AbstractExpression*>::iterator it = m_distinctExpressions.begin();
+    while (it != m_distinctExpressions.end()) {
+       AbstractExpression* expr = *(it++);
+       delete expr;
+    }
 }
 
 PlanNodeType
@@ -76,35 +82,40 @@ DistinctPlanNode::getPlanNodeType() const
     return PLAN_NODE_TYPE_DISTINCT;
 }
 
-AbstractExpression*
-DistinctPlanNode::getDistinctExpression() const
+const vector<AbstractExpression*>&
+DistinctPlanNode::getDistinctExpressions() const
 {
-    return m_distinctExpression;
+    return m_distinctExpressions;
 }
 
 string
 DistinctPlanNode::debugInfo(const string &spacer) const
 {
     ostringstream buffer;
-    buffer << spacer << "DistinctExpression["
-           << this->m_distinctExpression->debug() << "]\n";
+    buffer << spacer << "DistinctExpressions[\n";
+    for (std::vector<AbstractExpression*>::const_iterator it = m_distinctExpressions.begin();
+        it != m_distinctExpressions.end(); ++it) {
+        buffer << (*it)->debug() << '\n';
+    }
+    buffer << "]\n";
     return buffer.str();
 }
 
 void
 DistinctPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
-    json_spirit::Value distinctExpressionValue =
-        find_value(obj, "DISTINCT_EXPRESSION");
-    if (distinctExpressionValue == json_spirit::Value::null)
+    Value distinctExpressionsValue = find_value(obj, "DISTINCT_EXPRESSIONS");
+    if (distinctExpressionsValue == Value::null)
     {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "DistinctPlanNode::loadFromJSONObject: "
-                                      "Can't find DISTINCT_EXPRESSION value");
+                                      "DistinctPlanNode::loadFromJSONObject:"
+                                      " Can't find DISTINCT_EXPRESSIONS value");
     }
-
-    json_spirit::Object distinctExpressionObject =
-        distinctExpressionValue.get_obj();
-    m_distinctExpression =
-        AbstractExpression::buildExpressionTree(distinctExpressionObject);
+    Array distinctExpressionsArray = distinctExpressionsValue.get_array();
+    m_distinctExpressions.reserve(distinctExpressionsArray.size());
+    for (int ii = 0; ii < distinctExpressionsArray.size(); ii++)
+    {
+        json_spirit::Object distinctExpressionObject = distinctExpressionsArray[ii].get_obj();
+        m_distinctExpressions.push_back(AbstractExpression::buildExpressionTree(distinctExpressionObject));
+    }
 }
