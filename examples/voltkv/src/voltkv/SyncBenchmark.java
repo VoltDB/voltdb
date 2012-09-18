@@ -133,7 +133,7 @@ public class SyncBenchmark {
         boolean usecompression= false;
 
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
-        int threads = 1;
+        int threads = 40;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
