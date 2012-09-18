@@ -80,6 +80,7 @@ public class AsyncBenchmark {
     final Random rand = new Random(0);
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
+    final ClientStatsContext fullStatsContext;
 
     // kv benchmark state
     final AtomicLong successfulGets = new AtomicLong(0);
@@ -202,7 +203,6 @@ public class AsyncBenchmark {
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
-        final ClientStatsContext fullStatsContext;
         fullStatsContext = client.createStatsContext();
 
         processor = new PayloadProcessor(config.keysize, config.minvaluesize,
@@ -302,7 +302,8 @@ public class AsyncBenchmark {
      *
      * @throws Exception if anything unexpected happens.
      */
-    public synchronized void printResults(ClientStats stats) throws Exception {
+    public synchronized void printResults() throws Exception {
+        ClientStats stats = fullStatsContext.fetch().getStats();
         // 1. Get/Put performance results
         String display = "\n" +
                          HORIZONTAL_RULE +
@@ -346,7 +347,7 @@ public class AsyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9f ms\n", stats.getAverageLatency());
+        System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
         System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
         System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
 
@@ -357,7 +358,7 @@ public class AsyncBenchmark {
         if (config.autotune) {
             System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
         }
-        System.out.printf("Reported Internal Avg Latency: %,9f ms\n", stats.getAverageInternalLatency());
+        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
         // 3. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
@@ -466,16 +467,12 @@ public class AsyncBenchmark {
         }
 
         // reset the stats after warmup
+        fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-
-        // Create the stats context here, so that we only capture the benchmark stats,
-        // and not the warm-up and pre-loading
-        ClientStatsContext fullStatsContext = client.createStatsContext();
-        fullStatsContext.fetchAndResetBaseline();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -501,7 +498,7 @@ public class AsyncBenchmark {
         client.drain();
 
         // print the summary results
-        printResults(fullStatsContext.fetch().getStats());
+        printResults();
 
         // close down the client connections
         client.close();

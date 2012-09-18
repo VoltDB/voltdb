@@ -77,6 +77,7 @@ public class JDBCBenchmark {
     AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
     // Statistics manager objects from the client
     ClientStatsContext periodicStatsContext;
+    ClientStatsContext fullStatsContext;
 
     // voter benchmark state
     AtomicLong acceptedVotes = new AtomicLong(0);
@@ -193,6 +194,7 @@ public class JDBCBenchmark {
 
         periodicStatsContext = ((IVoltDBConnection) client)
                 .createStatsContext();
+        fullStatsContext = ((IVoltDBConnection) client).createStatsContext();
     }
 
     /**
@@ -238,6 +240,7 @@ public class JDBCBenchmark {
      *             if anything unexpected happens.
      */
     public synchronized void printResults(ClientStats stats) throws Exception {
+        ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Voting Board statistics, Voting results and performance statistics
         String display = "\n" + HORIZONTAL_RULE + " Voting Results\n"
@@ -286,7 +289,7 @@ public class JDBCBenchmark {
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        System.out.printf("Reported Internal Avg Latency: %,9f ms\n",
+        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n",
         stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
@@ -388,16 +391,12 @@ public class JDBCBenchmark {
         warmupComplete.set(true);
 
         // reset the stats after warmup
+        fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-
-        // Create the stats context here, so that we only capture the benchmark stats,
-        // and not the warm-up and pre-loading
-        ClientStatsContext fullStatsContext = ((IVoltDBConnection) client).createStatsContext();
-        fullStatsContext.fetchAndResetBaseline();
 
         // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");
@@ -418,7 +417,7 @@ public class JDBCBenchmark {
         }
 
         // print the summary results
-        printResults(fullStatsContext.fetch().getStats());
+        printResults();
 
         // close down the client connections
         client.close();
