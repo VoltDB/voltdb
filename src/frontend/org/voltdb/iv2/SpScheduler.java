@@ -28,6 +28,8 @@ import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+
+import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
 
 import org.voltdb.messaging.Iv2LogFaultMessage;
@@ -50,8 +52,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     List<Long> m_sendToHSIds = new ArrayList<Long>();
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
-    private final Map<Long, DuplicateCounter> m_duplicateCounters =
-        new HashMap<Long, DuplicateCounter>();
+    private final Map<Pair<Long, Long>, DuplicateCounter> m_duplicateCounters =
+        new HashMap<Pair<Long, Long>, DuplicateCounter>();
     private CommandLog m_cl;
     private final SnapshotCompletionMonitor m_snapMonitor;
     // Need to track when command log replay is complete (even if not performed) so that
@@ -247,7 +249,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     DuplicateCounter counter = new DuplicateCounter(
                             msg.getInitiatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
-                    m_duplicateCounters.put(newSpHandle, counter);
+                    m_duplicateCounters.put(new Pair<Long, Long>(msg.getTxnId(), newSpHandle), counter);
                 }
             }
             else {
@@ -289,7 +291,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
                 message.getTxnId(), expectedHSIds);
-        m_duplicateCounters.put(message.getSpHandle(), counter);
+        m_duplicateCounters.put(new Pair<Long, Long>(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
@@ -317,7 +319,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         // Send the message to the duplicate counter, if any
         final long spHandle = message.getSpHandle();
-        DuplicateCounter counter = m_duplicateCounters.get(spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(new Pair<Long, Long>(message.getTxnId(), spHandle));
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
@@ -422,7 +424,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getCoordinatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
                 }
-                m_duplicateCounters.put(newSpHandle, counter);
+                m_duplicateCounters.put(new Pair<Long, Long>(msg.getTxnId(), newSpHandle), counter);
             }
         }
         else {
@@ -461,7 +463,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         // Send the message to the duplicate counter, if any
-        DuplicateCounter counter = m_duplicateCounters.get(message.getSpHandle());
+        DuplicateCounter counter =
+            m_duplicateCounters.get(new Pair<Long, Long>(message.getTxnId(), message.getSpHandle()));
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
