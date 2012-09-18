@@ -30,6 +30,7 @@ import subprocess
 import time
 import filecmp
 import socket
+from collections import defaultdict
 from optparse import OptionParser
 from subprocess import call # invoke unix/linux cmds
 from xml.etree import ElementTree
@@ -46,13 +47,16 @@ from Query import VoltQueryClient
 from XMLUtils import prettify # To create a human readable xml file
 
 hostname = socket.gethostname()
+allPkgs = {'all': "Community, Pro, Voltkv, Voltcache"}
 pkgName = {'comm': 'LINUX-voltdb',
            'voltkv': 'LINUX-voltdb-voltkv',
            'voltcache': 'LINUX-voltdb-voltcache',
            'pro': 'LINUX-voltdb-ent'}
+suiteName = {'comm': 'Community',
+             'pro': 'Enterprise',
+             'voltkv': 'Voltkv',
+             'voltcache': 'Voltcache'}
 tail = "tar.gz"
-sepLineD = "========================================================"
-sepLineS = "--------------------------------------------"
 # http://volt0/kits/candidate/LINUX-voltdb-2.8.1.tar.gz
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
 root = 'http://volt0/kits/candidate/'
@@ -168,7 +172,6 @@ def installVoltDB(pkg, release):
         return info
 
     cmd = "tar zxf " + dest + " -C " + workDir + " 2>/dev/null"
-#    print "cmd = '%s'" % cmd
     ret = call(cmd, shell=True)
     if ret == 0:
 #        info["dest"] = dest
@@ -293,19 +296,14 @@ def assertVotekv_Votecache(mod, logC):
     msg = None
     keys = {}
     if(cnt == len(staticKeyStr)):
-#        msg = "The client output has all the expected key words:\n" + sepLineS + "\n"
         msg = "The client output has all the expected key words"
-#        for key in staticKeyStr:
-#            msg += key + "\n"
         keys = staticKeyStr
         result = True
     else:
-        msg = "The client output does not have all the expected key words\n"
-#        msg += "The missing keys are:\n" + sepLineS + "\n"
+        msg = "The client output does not have all the expected key words"
         for key in staticKeyStr:
             if key not in dynamicKeyStr.keys():
                 keys[key] = key
-#                msg += key + "\n"
 
     return (result, msg, keys)
 
@@ -361,40 +359,29 @@ def startTest(testSuiteList):
         os.chdir(testSuiteList[e])
         currDir = os.getcwd()
         service = elem2Test[e]
-        print "===--->>> Start to test this suite: %s" % e
-#        logFileS = workDir + "/" + e + "_server"
-#        logFileC = workDir + "/" + e + "_client"
+#        print "===--->>> Start to test this suite: %s" % e
         logFileS = "/tmp/" + e + "_server"
         logFileC = "/tmp/" + e + "_client"
         msg1 = msg2 = None
-        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
-#        execThisService(service, logFileS, logFileC)
+#        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
+        execThisService(service, logFileS, logFileC)
         if(e == "helloworld"):
             (result, msg1) = assertHelloWorld(e, logFileC)
-#            statusBySuite[e]["status1"] = result
-#            statusBySuite[e]["msg"] = msg1
             statusBySuite[e] = result
             msgBySuite[e] = msg1
             keyWordsBySuite[e] = None
-            print "1 cyan e = '%s', result = '%s'" % (e, result)
         elif(e == "voter"):
             (result, msg1) = assertVoter(e, logFileC)
-#            statusBySuite[e]["msg"] = msg1
-#            statusBySuite[e]["status2"] = result
             statusBySuite[e] = result
             msgBySuite[e] = msg1
             keyWordsBySuite[e] = None
-            print "2 cyan e = '%s', result = '%s'" % (e, result)
         elif(e == "voltkv" or e == "voltcache"):
             (result, msg1, keys) = assertVotekv_Votecache(e, logFileC)
-#            statusBySuite[e]["msg"] = msg1
-#            statusBySuite[e]["status3"] = result
             statusBySuite[e] = result
             msgBySuite[e] = msg1
             keyWordsBySuite[e] = keys
-            print "3 cyan e = '%s', result = '%s'" \
-                % (e, result)
         else:
+            # Should never fall into this block
             print "e = '%s' ==-->> to be implemented..." % e
             statusBySuite[e] = False
             msgBySuite[e] = "Unknown Suite:'%s'. To be implemented..." % e
@@ -402,68 +389,53 @@ def startTest(testSuiteList):
 
         os.chdir(origDir)
     # end of for e in testSuiteList:
-    for xx in statusBySuite:
-        print "===--->>>xx = '%s', vaL: '%s'" % (xx, statusBySuite[xx])
     return (statusBySuite, msgBySuite, keyWordsBySuite)
 # end of startTest(testSuiteList):
 
-#<?xml version="1.0" encoding="UTF-8" ?>
-#<testsuites>
-#  <testsuite errors="0" failures="0" hostname="ip-10-143-131-25" id="0" name="TestHSQLDB" package="org.hsqldb_voltpatches" tests="1" time="0.455" timestamp="2012-09-10T17:55:18">
-#<testcase classname="Linux_community_build" name="helloworld"/>
-#<testcase classname="Linux_community_build" name="voter"/>
-#<testcase classname="Linux_community_build" name="voltkv">
-#<testcase classname="Linux_community_build" name="voltcache"/>
-#<failure nessage="This test experienced some sort of difficulties."> 
-#</failure>
-#</testcase>
-#  </testsuite>
-#</testsuites>
-#
-#    cluster = SubElement(deployment, 'cluster',
-#            {'kfactor':kfactor,'sitesperhost':sitesperhost,'hostcount':hostcount})
-def create_rpt(info, status, msg, keys):
+def create_rpt(info, status, msg, keys, elapsed):
+    testtime = "Total Time Consumed: %.2f" % elapsed
     proj = Element('project')
-    testsuites = SubElement(proj, 'testsuites',
-            {'package':info["pkgname"],'URL':info["srce"],
-             'hostname':hostname})
-    print "testname = '%s'" % testname
-    for i in status:
-        failureCnt = "0"
-        errCnt = "0"
-        if(status[i] == False):
-            failureCnt = "1"
-        else:
+    cpu = SubElement(proj, 'CPUTime', {'CPU':testtime})
+    for mod in status:
+        testsuites = SubElement(proj, 'testsuites',
+                {'package':info["pkgname"],'URL':info["srce"],
+                 'hostname':hostname, 'Module':mod})
+        for i in status[mod]:
             failureCnt = "0"
-
-        print "==-->>suite name: '%s', failureCnt: '%s', status = '%s'" \
-            % (i, failureCnt, status[i])
-        if(info["ok"] == False):
-            errCnt = "1"
-        else:
             errCnt = "0"
-        testsuite = SubElement(testsuites, 'testsuite',
-            {'errors':errCnt,'failures':failureCnt, 'name':testname})
-        testcase = SubElement(testsuite, 'testcase', {'name':i})
-
-        if(failureCnt == "1"):
-            failure = SubElement(testcase, 'failure',
-                    {'Message':msg[i]})
-            misStr = None
-            if(keys[i] != None):
-                for j in keys[i]:
-                    if(misStr == None):
-                        misStr = j
-                    else:
-                        misStr += ", " + j
-                missing = SubElement(failure, 'Missing',
-                        {'MissingString':misStr})
-        else:
-            failure = SubElement(testcase, 'info',
-                    {'Message':msg[i]})
-        if(errCnt == "1"):
-            error = SubElement(testcase, 'error',
-                    {'Error':info["err"]})
+            if(status[mod][i] == False):
+                failureCnt = "1"
+            else:
+                failureCnt = "0"
+    
+#            print "==-->>suite name: '%s', failureCnt: '%s', status = '%s'" \
+#                % (i, failureCnt, status[mod][i])
+            if(info["ok"] == False):
+                errCnt = "1"
+            else:
+                errCnt = "0"
+            testsuite = SubElement(testsuites, 'testsuite',
+                {'errors':errCnt,'failures':failureCnt, 'name':testname})
+            testcase = SubElement(testsuite, 'testcase', {'name':i})
+    
+            if(failureCnt == "1"):
+                failure = SubElement(testcase, 'failure',
+                        {'Message':msg[mod][i]})
+                misStr = None
+                if(keys[mod][i] != None):
+                    for j in keys[mod][i]:
+                        if(misStr == None):
+                            misStr = j
+                        else:
+                            misStr += ", " + j
+                    missing = SubElement(failure, 'Missing',
+                            {'MissingString':misStr})
+            else:
+                failure = SubElement(testcase, 'info',
+                        {'Message':msg[mod][i]})
+            if(errCnt == "1"):
+                error = SubElement(testcase, 'error',
+                        {'Error':info["err"]})
 
     rptf = "/tmp/exp_rpt.xml"
     fo = open(rptf, "wb")
@@ -474,6 +446,7 @@ def create_rpt(info, status, msg, keys):
     return rptf
 
 if __name__ == "__main__":
+    start = time.time()
     usage = "Usage: %prog [options]"
 #    parser = OptionParser()
     parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro|voltkv|voltcache> <-s helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
@@ -484,7 +457,7 @@ if __name__ == "__main__":
     parser.add_option("-s", "--suite", dest="suite",
                       help="Test suite name, if not set, then take all suites")
 
-    parser.set_defaults(pkg="comm")
+    parser.set_defaults(pkg="all")
     parser.set_defaults(suite="all")
     (options, args) = parser.parse_args()
     testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
@@ -493,6 +466,7 @@ if __name__ == "__main__":
 
     suite = options.suite
     if suite not in elem2Test.keys() and suite != "all":
+        suite = "all"
         print "Warning: unknown suite name - '%s'" % suite
         print "Info: So we're going to cover all test suites in this run"
 
@@ -504,39 +478,51 @@ if __name__ == "__main__":
 
     print "############################################"
     print "Tested Version in this RUN: %s" % releaseNum
+    if(options.pkg == "all"):
+        print "To test all packages in this RUN: %s" % allPkgs[options.pkg]
+    else:
+        print "Tested pkg in this RUN: %s" % options.pkg
     print "############################################"
 
-    ret = installVoltDB(options.pkg, releaseNum)
-    if not ret["ok"]:
-        print "Error!! %s" % ret["err"]
-#        print >> sys.stderr, "Error!! %s" % ret["err"]
-        exit(1)
-    for k1 in ret:
-        print "key: '%s', Val: '%s'" % (k1, ret[k1])
+    tf = msg = keys = None
+    tfD = defaultdict(dict)
+    msgD = defaultdict(dict)
+    keysD = defaultdict(dict)
 
-    print "suite = '%s'" % suite
+    list = None
+    if(options.pkg == "all"):
+        list = ["comm", "pro", 'voltkv', 'voltcache']
+    else:
+        list = [options.pkg]
 
-    testSuiteList = setTestSuite(ret["workDir"], suite)
-    for i in testSuiteList:
-        print "i = '%s', exec = '%s'" % (i, testSuiteList[i])
+    for p in list:
+        ret = installVoltDB(p, releaseNum)
+        if not ret["ok"]:
+            print "Error!! %s" % ret["err"]
+            exit(1)
 
-    (tf, msg, keys) = startTest(testSuiteList)
+        testSuiteList = setTestSuite(ret["workDir"], suite)
+
+        (tf, msg, keys) = startTest(testSuiteList)
+        tfD[p] = tf
+        msgD[p] = msg
+        keysD[p] = keys
+
+    sepLineD = "================================================="
     status = True
-    reportXML = create_rpt(ret, tf, msg, keys)
-    print "===--->>>reportXML = '%s'" % reportXML
-#    for module in success:
-#        print "cyan Module: '%s'. Val: '%s'" \
-#            % (module, success[module])
-#        if not success[module]["status"]:
-#            print >> sys.stderr, "\n%s\n%s\nTest '%s' FAILED!!\n%s" \
-#                % (success[module]["msg"], sepLineS, module, sepLineD)
-#            print "\n%s\n%s\nTest '%s' FAILED!!\n%s" \
-#                % (success[module]["msg"], sepLineS, module, sepLineD)
-#            status = False
-#        else:
-#            print "\n%s\n%s\nTest '%s' PASSED!!\n%s" \
-#                % (success[module]["msg"], sepLineS, module, sepLineD)
+    for module in tfD:
+        for suitename in tfD[module]:
+            if not tfD[module][suitename]:
+                status = False
+                print >> sys.stderr, "The test suite '%s' in '%s' package FAILED \
+                    \n'%s'\n%s" \
+                    % (suitename, module, msgD[module][suitename], sepLineD)
+    elapsed = (time.time() - start)
+    reportXML = create_rpt(ret, tfD, msgD, keysD, elapsed)
+    print "Refer to the final report '%s' for details." % reportXML
+    print "Total time consumed: '%.2f'" % elapsed
     if(status == False):
         print "\nAt lease one test suite is Failed!!\n"
         exit(1)
+    print "All tests are PASSED!!"
     exit(0)
