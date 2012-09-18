@@ -503,6 +503,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 new CompleteTransactionTask(txn, m_pendingTasks, message);
             m_pendingTasks.offer(task);
         }
+
+        if (message.isRollbackForFault()) {
+            // Log the TXN ID of this MP to the command log fault loog.
+            m_cl.logIv2MPFault(message.getTxnId());
+        }
     }
 
     public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
