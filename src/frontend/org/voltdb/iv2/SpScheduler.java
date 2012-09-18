@@ -32,6 +32,7 @@ import org.voltdb.CommandLog;
 
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.SnapshotCompletionInterest;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
@@ -52,6 +53,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
     private CommandLog m_cl;
+    private final SnapshotCompletionMonitor m_snapMonitor;
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
@@ -59,15 +61,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    SpScheduler(int partitionId, SiteTaskerQueue taskQueue)
+    SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
+        m_snapMonitor = snapMonitor;
     }
 
     public void setLeaderState(boolean isLeader)
     {
         super.setLeaderState(isLeader);
-        VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
+        m_snapMonitor.addInterest(this);
     }
 
     public void setMaxSeenTxnId(long maxSeenTxnId)
