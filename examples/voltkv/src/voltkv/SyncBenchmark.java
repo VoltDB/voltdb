@@ -462,11 +462,11 @@ public class SyncBenchmark {
         warmupComplete.set(true);
 
         // reset the stats after warmup
+        fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
-        fullStatsContext.fetchAndResetBaseline();
 
         schedulePeriodicStats();
 

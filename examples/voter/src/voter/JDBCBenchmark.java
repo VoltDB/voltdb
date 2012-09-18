@@ -239,7 +239,7 @@ public class JDBCBenchmark {
      * @throws Exception
      *             if anything unexpected happens.
      */
-    public synchronized void printResults(ClientStats stats) throws Exception {
+    public synchronized void printResults() throws Exception {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Voting Board statistics, Voting results and performance statistics
