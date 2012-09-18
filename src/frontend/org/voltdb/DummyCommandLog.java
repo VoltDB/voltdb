@@ -62,4 +62,7 @@ public class DummyCommandLog implements CommandLog {
     public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle) {
     }
+
+    @Override
+    public void logIv2MPFault(long txnId) {}
 }
