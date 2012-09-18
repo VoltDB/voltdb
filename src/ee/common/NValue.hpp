@@ -1672,63 +1672,33 @@ class NValue {
         return retval;
     }
 
-    static NValue getStringValue(std::string value) {
-        NValue retval(VALUE_TYPE_VARCHAR);
-        const size_t length = value.length();
-        return getStringValue(value.c_str(), length);
-    }
-
     static Pool* getTempStringPool();
 
     static NValue getTempStringValue(const char* value, size_t size) {
-        return getStringValue(value, size, getTempStringPool());
+        return getAllocatedValue(VALUE_TYPE_VARCHAR,value, size, getTempStringPool());
     }
 
-    static NValue getStringValue(const char* value, size_t size, Pool* stringPool=0) {
-        NValue retval(VALUE_TYPE_VARCHAR);
+    static NValue getTempBinaryValue(const char* value, size_t size) {
+        return getAllocatedValue(VALUE_TYPE_VARBINARY, value, size, getTempStringPool());
+    }
+
+    static NValue getAllocatedValue(ValueType type, const char* value, size_t size, Pool* stringPool) {
+        NValue retval(type);
         const int32_t length = static_cast<int32_t>(size);
+        retval.initAllocatedValue(value, length, stringPool);
+        return retval;
+    }
+
+    void initAllocatedValue(const char* value, const int32_t length, Pool* stringPool) {
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         const int32_t minLength = length + lengthLength;
         StringRef* sref = StringRef::create(minLength, stringPool);
         char* storage = sref->get();
         setObjectLengthToLocation(length, storage);
         ::memcpy( storage + lengthLength, value, length);
-        retval.setObjectValue(sref);
-        retval.setObjectLength(length);
-        retval.setObjectLengthLength(lengthLength);
-        return retval;
-    }
-
-    // assumes binary value in hex
-    static NValue getBinaryValue(const std::string value) {
-        NValue retval(VALUE_TYPE_VARBINARY);
-        const int32_t length = static_cast<int32_t>(value.length() / 2);
-        boost::scoped_array<unsigned char> buf(new unsigned char[length]);
-        hexDecodeToBinary(buf.get(), value.c_str());
-        const int8_t lengthLength = getAppropriateObjectLengthLength(length);
-        const int32_t minLength = length + lengthLength;
-        StringRef* sref = StringRef::create(minLength);
-        char* storage = sref->get();
-        setObjectLengthToLocation(length, storage);
-        ::memcpy( storage + lengthLength, buf.get(), length);
-        retval.setObjectValue(sref);
-        retval.setObjectLength(length);
-        retval.setObjectLengthLength(lengthLength);
-        return retval;
-    }
-
-    static NValue getBinaryValue(const unsigned char *value, const int32_t length) {
-        NValue retval(VALUE_TYPE_VARBINARY);
-        const int8_t lengthLength = getAppropriateObjectLengthLength(length);
-        const int32_t minLength = length + lengthLength;
-        StringRef* sref = StringRef::create(minLength);
-        char* storage = sref->get();
-        setObjectLengthToLocation(length, storage);
-        ::memcpy( storage + lengthLength, value, length);
-        retval.setObjectValue(sref);
-        retval.setObjectLength(length);
-        retval.setObjectLengthLength(lengthLength);
-        return retval;
+        setObjectValue(sref);
+        setObjectLength(length);
+        setObjectLengthLength(lengthLength);
     }
 
     static NValue getNullStringValue() {
@@ -2313,21 +2283,13 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
       case VALUE_TYPE_VARBINARY:
       {
           const int32_t length = input.readInt();
-          const int8_t lengthLength = getAppropriateObjectLengthLength(length);
           // the NULL SQL string is a NULL C pointer
           if (length == OBJECTLENGTH_NULL) {
               retval.setNull();
               break;
           }
-          const void *str = input.getRawPointer(length);
-          const int32_t minlength = lengthLength + length;
-          StringRef* sref = StringRef::create(minlength, dataPool);
-          char* copy = sref->get();
-          retval.setObjectLengthToLocation( length, copy);
-          ::memcpy(copy + lengthLength, str, length);
-          retval.setObjectValue(sref);
-          retval.setObjectLength(length);
-          retval.setObjectLengthLength(lengthLength);
+          const char *str = (const char*) input.getRawPointer(length);
+          retval.initAllocatedValue(str, length, dataPool);
           break;
       }
       case VALUE_TYPE_DECIMAL: {
@@ -2371,8 +2333,6 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
               const char * str = reinterpret_cast<const char*>(getObjectValue());
               if (str == NULL) {}
               output.writeBytes(getObjectValue(), length);
-          } else {
-              assert(getObjectValue() == NULL || length == OBJECTLENGTH_NULL);
           }
 
           break;
