@@ -93,7 +93,10 @@ public class PartitionDRGateway {
     protected void init(int partitionId,
                         boolean replicationActive,
                         File overflowDir) throws IOException {}
-    public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
+    public void onSuccessfulProcedureCall(long txnId,
+                                          StoredProcedureInvocation spi,
+                                          ClientResponseImpl response,
+                                          String adHocParam) {}
     public void tick(long txnId) {}
     public void start() {}
     public void setActive(boolean active) {}
