@@ -73,8 +73,8 @@ public abstract class AdHocQueryTester extends TestCase {
                 "create view V_PARTED1 (PARTVAL, num_rows, sum_bigint) as " +
                 "select PARTVAL, count(*), sum(NONPART) from PARTED1 group by PARTVAL;" +
 
-                "create view V_SCATTERED1 (NONPART, num_rows, sum_bigint) as " +
-                "select NONPART, count(*), sum(PARTVAL) from PARTED1 group by NONPART;" +
+                "create view V_SCATTERED1 (NONPART, PARTVAL, num_rows, sum_bigint) as " +
+                "select NONPART, PARTVAL, count(*), sum(PARTVAL) from PARTED1 group by NONPART, PARTVAL;" +
 
                 "create view V_REPPED1 (REPPEDVAL, num_rows, sum_bigint) as " +
                 "select REPPEDVAL, count(*), sum(NONPART) from REPPED1 group by REPPEDVAL;" +

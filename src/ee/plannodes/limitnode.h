@@ -60,53 +60,18 @@ class Table;
  */
 class LimitPlanNode : public AbstractPlanNode {
     public:
-        LimitPlanNode(CatalogId id) : AbstractPlanNode(id) {
-            this->limit = -1;
-            this->offset = 0;
-            this->limitParamIdx = -1;
-            this->offsetParamIdx = -1;
-            this->limitExpression = NULL;
-        }
-        LimitPlanNode() : AbstractPlanNode() {
-            this->limit = -1;
-            this->offset = 0;
-            this->limitParamIdx = -1;
-            this->offsetParamIdx = -1;
-        }
+        LimitPlanNode() : AbstractPlanNode(),
+        limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
+        {}
         ~LimitPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
 
         // evaluate possibly parameterized limit and offsets.
         void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
 
-        void setLimit(int limit);
-        int getLimit() const;
-
-        void setOffset(int offset);
-        int getOffset() const;
-
-        void setLimitParamIdx(int paramIdx) {
-            limitParamIdx = paramIdx;
-        }
-
-        int getLimitParamIdx() const {
-            return limitParamIdx;
-        }
-
-        void setOffsetParamIdx(int paramIdx) {
-            offsetParamIdx = paramIdx;
-        }
-
-        int getOffsetParamIdx() const {
-            return offsetParamIdx;
-        }
-
-        AbstractExpression* getLimitExpression() const;
-        void setLimitExpression(AbstractExpression* expression);
-
         std::string debugInfo(const std::string &spacer) const;
 
-    protected:
+    private:
         virtual void loadFromJSONObject(json_spirit::Object &obj);
         int limit;
         int offset;
