@@ -946,7 +946,7 @@ public class ProcedureRunner {
        // holds query results
        final VoltTable[] m_results;
 
-       BatchState(ProcedureRunner runner, int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
+       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -1061,7 +1061,7 @@ public class ProcedureRunner {
     */
    VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
 
-       BatchState state = new BatchState(this, batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
+       BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
