@@ -824,10 +824,7 @@ public class PlanAssembler {
                     Index index = ixnode.getCatalogIndex();
                     // Index must guarantee uniqueness
                     if (index.getUnique()) {
-                        // Indexes used for ordering do not ensure uniqueness unless the ORDER BY covers ALL of the indexed columns.
-                        if (index.getColumns().size() <= orderByNode.countOfSortExpressions()) {
-                            orderByNode.setOrderingByUniqueColumns();
-                        }
+                        orderByNode.setOrderingByUniqueColumns();
                     }
                 }
             }
@@ -858,12 +855,12 @@ public class PlanAssembler {
          * TODO: allow push down limit with distinct (select distinct C from T limit 5)
          * or distinct in aggregates.
          */
-        AbstractPlanNode receiveNode = null;
+        AbstractPlanNode sendNode = null;
         // Whether or not we can push the limit node down
         boolean canPushDown = ! m_parsedSelect.distinct;
         if (canPushDown) {
-            receiveNode = checkPushDownViability(root);
-            if (receiveNode == null) {
+            sendNode = checkPushDownViability(root);
+            if (sendNode == null) {
                 canPushDown = false;
             } else {
                 for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
@@ -911,7 +908,6 @@ public class PlanAssembler {
             // else let the parameterized forms of offset/limit default to unused/invalid.
 
             // Disconnect the distributed parts of the plan below the SEND node
-            AbstractPlanNode sendNode = receiveNode.getChild(0);
             AbstractPlanNode distributedPlan = sendNode.getChild(0);
             distributedPlan.clearParents();
             sendNode.clearChildren();
@@ -924,7 +920,7 @@ public class PlanAssembler {
             distLimit.addAndLinkChild(distributedPlan);
 
             // Add the distributed work back to the plan
-            receiveNode.getChild(0).addAndLinkChild(distLimit);
+            sendNode.addAndLinkChild(distLimit);
         }
 
         topLimit.addAndLinkChild(root);
@@ -1251,27 +1247,20 @@ public class PlanAssembler {
     protected AbstractPlanNode checkPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
 
-        // Find a receive node, if one exists. There is guaranteed to be at
-        // most a single receive. Abort the search if between root and receive
-        // a node that can't be pushed down past is found.
+        // Return a mid-plan send node, if one exists and can host a distributed limit node.
+        // There is guaranteed to be at most a single receive/send pair.
+        // Abort the search if a node that a "limit" can't be pushed past is found before its receive node.
         //
         // Can only push past:
-        //   * coordinatingAggregator: a distributed aggregator has
-        //     has already been pushed down. Distributed LIMIT of that
-        //     aggregation is correct.
+        //   * coordinatingAggregator: a distributed aggregator a copy of which  has already been pushed down.
+        //     Distributing a LIMIT to just above that aggregator is correct. (I've got some doubts that this is correct??? --paul)
         //
-        //   * order by: if the plan requires a sort, getNextSelectPlan()
-        //     will have already added an ORDER BY. LIMIT will be added
-        //     above that sort. However, if LIMIT can be successfully
-        //     pushed down, it may be necessary to create and push down
-        //     a distributed sort as well. That work is done here.
+        //   * order by: if the plan requires a sort, getNextSelectPlan()  will have already added an ORDER BY.
+        //     A distributed LIMIT will be added above a copy of that ORDER BY node.
         //
-        //   * projection: we only LIMIT on constant value expressions.
-        //     whether the LIMIT happens pre-or-post projection is
-        //     is irrelevant.
+        //   * projection: these have no effect on the application of limits.
         //
-        // Set receiveNode to null if the plan is not distributed or if
-        // the distributed plan does not allow push-down of a limit.
+        // Return null if the plan is single-partition or if its "coordinator" part contains a push-blocking node type.
 
         while (!(receiveNode instanceof ReceivePlanNode)) {
 
@@ -1279,16 +1268,16 @@ public class PlanAssembler {
             if (!(receiveNode instanceof AggregatePlanNode) &&
                 !(receiveNode instanceof OrderByPlanNode) &&
                 !(receiveNode instanceof ProjectionPlanNode)) {
-                receiveNode = null;
-                break;
+                return null;
             }
 
             // Limitation: can only push past coordinating aggregation nodes
             if (receiveNode instanceof AggregatePlanNode &&
                 !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
-                receiveNode = null;
-                break;
-            } else if (receiveNode instanceof OrderByPlanNode) {
+                return null;
+            }
+
+            if (receiveNode instanceof OrderByPlanNode) {
                 for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderByColumns()) {
                     AbstractExpression rootExpr = col.expression;
                     // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
@@ -1302,15 +1291,14 @@ public class PlanAssembler {
 
             // Traverse...
             if (receiveNode.getChildCount() == 0) {
-                receiveNode = null;
-                break;
+                return null;
             }
 
             // nothing that allows pushing past has multiple inputs
             assert(receiveNode.getChildCount() == 1);
             receiveNode = receiveNode.getChild(0);
         }
-        return receiveNode;
+        return receiveNode.getChild(0);
     }
 
     /**
