@@ -323,18 +323,19 @@ public class TestVoltMessageSerialization extends TestCase {
     {
         CompleteTransactionMessage ctm =
             new CompleteTransactionMessage(12345, 54321, 67890, false, false,
-                                           true);
+                                           true, false);
 
         CompleteTransactionMessage ctm2 = (CompleteTransactionMessage) checkVoltMessage(ctm);
         assertEquals(ctm.m_isRollback, ctm2.m_isRollback);
         assertEquals(ctm.m_requiresAck, ctm2.m_requiresAck);
+        assertEquals(ctm.m_rollbackForFault, ctm2.m_rollbackForFault);
     }
 
     public void testCompleteTransactionResponseMessage() throws IOException
     {
         CompleteTransactionMessage ctm =
             new CompleteTransactionMessage(12345, 54321, 67890, false, false,
-                                           true);
+                                           true, false);
 
         CompleteTransactionResponseMessage ctrm =
             new CompleteTransactionResponseMessage(ctm, Long.MAX_VALUE - 4);
