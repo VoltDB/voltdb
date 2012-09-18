@@ -553,6 +553,9 @@ SnapshotCompletionInterest
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
             if (m_replayAgent.getInstanceId() != null &&
                 !m_replayAgent.getInstanceId().equals(info.instanceId)) {
+                LOG.debug("Rejecting snapshot due to mismatching instance IDs.");
+                LOG.debug("Command log ID: " + m_replayAgent.getInstanceId().serializeToJSONObject().toString());
+                LOG.debug("Snapshot ID: " + info.instanceId.serializeToJSONObject().toString());
                 continue;
             }
             if (VoltDB.instance().isIV2Enabled()) {
@@ -562,6 +565,8 @@ SnapshotCompletionInterest
                 // don't do any TXN ID consistency checking between command log and snapshot
                 if (cmdlogmap != null) {
                     if (snapmap == null || cmdlogmap.size() != snapmap.size()) {
+                        LOG.debug("Rejecting snapshot due to mismatching partition count (THIS IS BOGUS)");
+                        LOG.debug("command log count: " + cmdlogmap.size() + ", snapshot count: " + snapmap.size());
                         info = null;
                     }
                     else {
@@ -569,9 +574,14 @@ SnapshotCompletionInterest
                             Long snaptxnId = snapmap.get(cmdpart);
                             if (snaptxnId == null) {
                                 info = null;
+                                LOG.debug("Rejecting snapshot due to missing partition: " + cmdpart);
                                 break;
                             }
                             else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                                LOG.debug("Rejecting snapshot because it does not overlap the command log");
+                                LOG.debug("for partition: " + cmdpart);
+                                LOG.debug("command log txn ID: " + cmdlogmap.get(cmdpart));
+                                LOG.debug("snapshot txn ID: " + snaptxnId);
                                 info = null;
                                 break;
                             }
@@ -614,6 +624,7 @@ SnapshotCompletionInterest
 
             for (boolean completed : tf.m_completed) {
                 if (!completed) {
+                    LOG.debug("Rejecting snapshot because it was not completed.");
                     return null;
                 }
             }
@@ -623,6 +634,7 @@ SnapshotCompletionInterest
                 if (partitionCount == -1) {
                     partitionCount = count;
                 } else if (count != partitionCount) {
+                    LOG.debug("Rejecting snapshot because it had the wrong partition count.");
                     return null;
                 }
             }
