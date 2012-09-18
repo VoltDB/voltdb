@@ -128,9 +128,6 @@ public class AsyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
-        @Option(desc = "Display procedure invocation statistics.")
-        boolean procstats = false;
-
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -320,42 +317,8 @@ public class AsyncBenchmark {
         }
         System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
 
-        if (config.procstats) {
-            System.out.print("\n" + HORIZONTAL_RULE);
-            System.out.println(" Procedure Statistics");
-            System.out.println(HORIZONTAL_RULE);
-            result = client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
-            while(result.advanceRow()) {
-                printStatistic(result, "HOSTNAME", false);
-                printStatistic(result, "SITE_ID", true);
-                printStatistic(result, "PARTITION_ID", true);
-                printStatistic(result, "PROCEDURE", false);
-                printStatistic(result, "INVOCATIONS", true);
-                printStatistic(result, "TIMED_INVOCATIONS", true);
-                printStatistic(result, "MIN_EXECUTION_TIME", true);
-                printStatistic(result, "MAX_EXECUTION_TIME", true);
-                printStatistic(result, "AVG_EXECUTION_TIME", true);
-                printStatistic(result, "MIN_RESULT_SIZE", true);
-                printStatistic(result, "MAX_RESULT_SIZE", true);
-                printStatistic(result, "AVG_RESULT_SIZE", true);
-                printStatistic(result, "MIN_PARAMETER_SET_SIZE", true);
-                printStatistic(result, "MAX_PARAMETER_SET_SIZE", true);
-                printStatistic(result, "AVG_PARAMETER_SET_SIZE", true);
-                System.out.println("");
-            }
-        }
-
         // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
-    }
-
-    void printStatistic(final VoltTable result, final String colname, boolean isNumber) {
-        if (isNumber) {
-            System.out.printf("%-17s: %d\n", colname, result.getLong(colname));
-        }
-        else {
-            System.out.printf("%-17s: %s\n", colname, result.getString(colname));
-        }
     }
 
     /**

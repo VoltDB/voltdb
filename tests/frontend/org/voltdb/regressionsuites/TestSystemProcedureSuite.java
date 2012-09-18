@@ -24,11 +24,12 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -41,10 +42,10 @@ import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
 
-    private static int sites = 2; //3;
-    private static int hosts = 1; //2;
-    private static int kfactor = 0; //1;
-    private static boolean hasLocalServer = true; //false;
+    private static int sites = 3;
+    private static int hosts = 2;
+    private static int kfactor = 1;
+    private static boolean hasLocalServer = false;
 
     static final Class<?>[] PROCEDURES =
     {
@@ -55,13 +56,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         super(name);
     }
 
-    public void ztestPing() throws IOException, ProcCallException {
+    public void testPing() throws IOException, ProcCallException {
         Client client = getClient();
         ClientResponse cr = client.callProcedure("@Ping");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void ztestInvalidProcedureName() throws IOException {
+    public void testInvalidProcedureName() throws IOException {
         Client client = getClient();
         try {
             client.callProcedure("@SomeInvalidSysProcName", "1", "2");
@@ -92,7 +93,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             "</root>" +
         "</log4j:configuration>";
 
-    public void ztestUpdateLogging() throws Exception {
+    public void testUpdateLogging() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
         results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
@@ -101,14 +102,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void ztestPromoteMaster() throws Exception {
+    public void testPromoteMaster() throws Exception {
         Client client = getClient();
         try {
             client.callProcedure("@Promote");
             fail();
         }
         catch (ProcCallException pce) {
-            assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
         }
     }
 
@@ -279,6 +280,86 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         System.out.println("Test iostats table: " + results[0].toString());
     }
 
+    //
+    // planner statistics
+    //
+    public void testPlannerStatistics() throws Exception {
+        Client client  = getClient();
+        // Clear the interval statistics
+        VoltTable[] results = client.callProcedure("@Statistics", "planner", 1).getResults();
+        assertEquals(1, results.length);
+
+        // Invoke a few select queries a few times to get some cache hits and misses,
+        // and to exceed the sampling frequency.
+        // This does not use level 2 cache (parameterization) or trigger failures.
+        for (String query : new String[] {
+                "select * from warehouse",
+                "select * from new_order",
+                "select * from item",
+                }) {
+            for (int i = 0; i < 10; i++) {
+                client.callProcedure("@AdHoc", query).getResults();
+                assertEquals(1, results.length);
+            }
+        }
+
+        // Get the final interval statistics
+        results = client.callProcedure("@Statistics", "planner", 1).getResults();
+        assertEquals(1, results.length);
+        System.out.println("Test planner table: " + results[0].toString());
+        VoltTable stats = results[0];
+
+        // Sample the statistics
+        List<Long> siteIds = new ArrayList<Long>();
+        int cache1_level = 0;
+        int cache2_level = 0;
+        int cache1_hits  = 0;
+        int cache2_hits  = 0;
+        int cache_misses = 0;
+        long plan_time_min_min = Long.MAX_VALUE;
+        long plan_time_max_max = Long.MIN_VALUE;
+        long plan_time_avg_tot = 0;
+        int failures = 0;
+        while (stats.advanceRow()) {
+            cache1_level += (Integer)stats.get("CACHE1_LEVEL", VoltType.INTEGER);
+            cache2_level += (Integer)stats.get("CACHE2_LEVEL", VoltType.INTEGER);
+            cache1_hits  += (Integer)stats.get("CACHE1_HITS", VoltType.INTEGER);
+            cache2_hits  += (Integer)stats.get("CACHE2_HITS", VoltType.INTEGER);
+            cache_misses += (Integer)stats.get("CACHE_MISSES", VoltType.INTEGER);
+            plan_time_min_min = Math.min(plan_time_min_min, (Long)stats.get("PLAN_TIME_MIN", VoltType.BIGINT));
+            plan_time_max_max = Math.max(plan_time_max_max, (Long)stats.get("PLAN_TIME_MAX", VoltType.BIGINT));
+            plan_time_avg_tot += (Long)stats.get("PLAN_TIME_AVG", VoltType.BIGINT);
+            failures += (Integer)stats.get("FAILURES", VoltType.INTEGER);
+            siteIds.add((Long)stats.get("SITE_ID", VoltType.BIGINT));
+        }
+
+        // Check for reasonable results
+        int globalPlanners = 0;
+        assertTrue("Failed siteIds count >= 2", siteIds.size() >= 2);
+        for (long siteId : siteIds) {
+            if (siteId == -1) {
+                globalPlanners++;
+            }
+        }
+        assertTrue("Global planner sites not 1, value was: " + globalPlanners, globalPlanners == 1);
+        assertTrue("Failed total CACHE1_LEVEL > 0, value was: " + cache1_level, cache1_level > 0);
+        assertTrue("Failed total CACHE1_LEVEL < 1,000,000, value was: " + cache1_level, cache1_level < 1000000);
+        assertTrue("Failed total CACHE2_LEVEL >= 0, value was: " + cache2_level, cache2_level >= 0);
+        assertTrue("Failed total CACHE2_LEVEL < 1,000,000, value was: " + cache2_level, cache2_level < 1000000);
+        assertTrue("Failed total CACHE1_HITS > 0, value was: " + cache1_hits, cache1_hits > 0);
+        assertTrue("Failed total CACHE1_HITS < 1,000,000, value was: " + cache1_hits, cache1_hits < 1000000);
+        assertTrue("Failed total CACHE2_HITS == 0, value was: " + cache2_hits, cache2_hits == 0);
+        assertTrue("Failed total CACHE2_HITS < 1,000,000, value was: " + cache2_hits, cache2_hits < 1000000);
+        assertTrue("Failed total CACHE_MISSES > 0, value was: " + cache_misses, cache_misses > 0);
+        assertTrue("Failed total CACHE_MISSES < 1,000,000, value was: " + cache_misses, cache_misses < 1000000);
+        assertTrue("Failed min PLAN_TIME_MIN > 0, value was: " + plan_time_min_min, plan_time_min_min > 0);
+        assertTrue("Failed total PLAN_TIME_MIN < 100,000,000,000, value was: " + plan_time_min_min, plan_time_min_min < 100000000000L);
+        assertTrue("Failed max PLAN_TIME_MAX > 0, value was: " + plan_time_max_max, plan_time_max_max > 0);
+        assertTrue("Failed total PLAN_TIME_MAX < 100,000,000,000, value was: " + plan_time_max_max, plan_time_max_max < 100000000000L);
+        assertTrue("Failed total PLAN_TIME_AVG > 0, value was: " + plan_time_avg_tot, plan_time_avg_tot > 0);
+        assertTrue("Failed total FAILURES == 0, value was: " + failures, failures == 0);
+    }
+
     //public void testShutdown() {
     //    running @shutdown kills the JVM.
     //    not sure how to test this.
@@ -294,7 +375,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
     // Pretty lame test but at least invoke the procedure.
     // "@Quiesce" is used more meaningfully in TestExportSuite.
-    public void ztestQuiesce() throws IOException, ProcCallException {
+    public void testQuiesce() throws IOException, ProcCallException {
         Client client = getClient();
         VoltTable results[] = client.callProcedure("@Quiesce").getResults();
         assertEquals(1, results.length);
@@ -302,7 +383,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void ztestLoadMultipartitionTable() throws IOException {
+    public void testLoadMultipartitionTable() throws IOException {
         Client client = getClient();
 
         // try the failure case first
@@ -387,7 +468,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     }
 
     // verify that these commands don't blow up
-    public void ztestProfCtl() throws Exception {
+    public void testProfCtl() throws Exception {
         Client client = getClient();
 
         //

@@ -673,23 +673,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public native static long nativeGetRSS();
 
     /**
-     * Start collecting planning statistics.
+     * Start collecting statistics (starts timer).
      */
-    protected void startPlanning() {
+    protected void startStatsCollection() {
         if (m_plannerStats != null) {
-            m_plannerStats.startPlanning();
+            m_plannerStats.startStatsCollection();
         }
     }
 
     /**
-     * Start collecting planning statistics.
+     * Finalize collected statistics (stops timer and supplies cache statistics).
      *
      * @param cacheSize  size of cache
      * @param cacheUse   where the plan came from
      */
-    protected void endPlanning(long cacheSize, CacheUse cacheUse) {
+    protected void endStatsCollection(long cacheSize, CacheUse cacheUse) {
         if (m_plannerStats != null) {
-            m_plannerStats.endPlanning(cacheSize, 0, cacheUse, m_partitionId);
+            m_plannerStats.endStatsCollection(cacheSize, 0, cacheUse, m_partitionId);
         }
     }
 }

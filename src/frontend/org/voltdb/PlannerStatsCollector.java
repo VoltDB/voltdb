@@ -161,7 +161,7 @@ public class PlannerStatsCollector extends StatsSource {
     /**
      * Called before doing planning. Starts timer.
      */
-    public void startPlanning() {
+    public void startStatsCollection() {
         if (getInvocations() % m_collectionFrequency == 0) {
             m_currentStartTime = System.nanoTime();
         }
@@ -175,19 +175,16 @@ public class PlannerStatsCollector extends StatsSource {
      * @param cacheUse     where the planned statement came from
      * @param partitionId  partition id
      */
-    public void endPlanning(long cache1Size, long cache2Size, CacheUse cacheUse, long partitionId) {
+    public void endStatsCollection(long cache1Size, long cache2Size, CacheUse cacheUse, long partitionId) {
         if (m_currentStartTime != null) {
             long delta = System.nanoTime() - m_currentStartTime;
-            if (delta < 0)
-            {
-                if (Math.abs(delta) > 1000000000)
-                {
+            if (delta < 0) {
+                if (Math.abs(delta) > 1000000000) {
                     log.info("Planner statistics recorded a negative planning time larger than one second: " +
                              delta);
                 }
             }
-            else
-            {
+            else {
                 m_totalPlanningTime += delta;
                 m_minPlanningTime = Math.min(delta, m_minPlanningTime);
                 m_maxPlanningTime = Math.max(delta, m_maxPlanningTime);

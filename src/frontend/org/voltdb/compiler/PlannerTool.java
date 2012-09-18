@@ -99,7 +99,7 @@ public class PlannerTool {
     public AdHocPlannedStatement planSql(String sqlIn, Object partitionParam, boolean inferSP, boolean allowParameterization) {
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
-            m_plannerStats.startPlanning();
+            m_plannerStats.startStatsCollection();
         }
         try {
             if ((sqlIn == null) || (sqlIn.length() == 0)) {
@@ -211,7 +211,7 @@ public class PlannerTool {
         }
         finally {
             if (m_plannerStats != null) {
-                m_plannerStats.endPlanning(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
+                m_plannerStats.endStatsCollection(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
             }
         }
     }

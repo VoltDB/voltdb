@@ -216,7 +216,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         CacheUse cacheUse = CacheUse.FAIL;
 
         // Start collecting statistics
-        startPlanning();
+        startStatsCollection();
 
         //C++ JSON deserializer is not thread safe, must synchronize
         int errorCode = 0;
@@ -246,7 +246,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         } finally {
             // Stop collecting statistics.
-            endPlanning(cacheSize, cacheUse);
+            endStatsCollection(cacheSize, cacheUse);
 
             fallbackBuffer = null;
         }

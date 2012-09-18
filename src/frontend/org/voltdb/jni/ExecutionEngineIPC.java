@@ -747,7 +747,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         PlannerStatsCollector.CacheUse cacheUse = PlannerStatsCollector.CacheUse.FAIL;
 
         // Start collecting statistics
-        startPlanning();
+        startStatsCollection();
 
         try {
             try {
@@ -770,7 +770,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
         finally {
             // Stop collecting statistics.
-            endPlanning(cacheSize, cacheUse);
+            endStatsCollection(cacheSize, cacheUse);
         }
         return planFragId;
     }

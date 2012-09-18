@@ -169,7 +169,6 @@ public class InitiatorStats extends SiteStatsSource {
         columns.add(new ColumnInfo("AVG_EXECUTION_TIME", VoltType.INTEGER));
         columns.add(new ColumnInfo("MIN_EXECUTION_TIME", VoltType.INTEGER));
         columns.add(new ColumnInfo("MAX_EXECUTION_TIME", VoltType.INTEGER));
-        columns.add(new ColumnInfo("MAX_EXECUTION_TIME", VoltType.INTEGER));
         columns.add(new ColumnInfo("ABORTS", VoltType.BIGINT));
         columns.add(new ColumnInfo("FAILURES", VoltType.BIGINT));
     }
