@@ -48,7 +48,6 @@ import org.voltdb.CLIConfig;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
-
 import org.voltdb.jdbc.IVoltDBConnection;
 
 public class JDBCBenchmark {
@@ -78,7 +77,6 @@ public class JDBCBenchmark {
     AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
     // Statistics manager objects from the client
     ClientStatsContext periodicStatsContext;
-    ClientStatsContext fullStatsContext;
 
     // voter benchmark state
     AtomicLong acceptedVotes = new AtomicLong(0);
@@ -195,8 +193,6 @@ public class JDBCBenchmark {
 
         periodicStatsContext = ((IVoltDBConnection) client)
                 .createStatsContext();
-        fullStatsContext = ((IVoltDBConnection) client).createStatsContext();
-
     }
 
     /**
@@ -230,7 +226,7 @@ public class JDBCBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %d/%dms\n",
+        System.out.printf("Avg/95%% Latency %f/%dms\n",
                 stats.getAverageLatency(), stats.kPercentileLatency(0.95));
     }
 
@@ -241,8 +237,7 @@ public class JDBCBenchmark {
      * @throws Exception
      *             if anything unexpected happens.
      */
-    public synchronized void printResults() throws Exception {
-        ClientStats stats = fullStatsContext.fetch().getStats();
+    public synchronized void printResults(ClientStats stats) throws Exception {
 
         // 1. Voting Board statistics, Voting results and performance statistics
         String display = "\n" + HORIZONTAL_RULE + " Voting Results\n"
@@ -280,7 +275,7 @@ public class JDBCBenchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n",
                 stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9d ms\n",
+        System.out.printf("Average latency:               %,9f ms\n",
                 stats.getAverageLatency());
         System.out.printf("95th percentile latency:       %,9d ms\n",
                 stats.kPercentileLatency(.95));
@@ -291,7 +286,7 @@ public class JDBCBenchmark {
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        System.out.printf("Reported Internal Avg Latency: %,9d ms\n",
+        System.out.printf("Reported Internal Avg Latency: %,9f ms\n",
         stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
@@ -393,12 +388,16 @@ public class JDBCBenchmark {
         warmupComplete.set(true);
 
         // reset the stats after warmup
-        fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
+
+        // Create the stats context here, so that we only capture the benchmark stats,
+        // and not the warm-up and pre-loading
+        ClientStatsContext fullStatsContext = ((IVoltDBConnection) client).createStatsContext();
+        fullStatsContext.fetchAndResetBaseline();
 
         // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");
@@ -419,7 +418,7 @@ public class JDBCBenchmark {
         }
 
         // print the summary results
-        printResults();
+        printResults(fullStatsContext.fetch().getStats());
 
         // close down the client connections
         client.close();

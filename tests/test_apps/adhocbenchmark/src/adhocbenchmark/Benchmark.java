@@ -269,7 +269,7 @@ public class Benchmark {
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Txns Completed %d ", stats.getInvocationsCompleted());
-        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %f/%dms\n", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
     }
 
@@ -294,7 +294,7 @@ public class Benchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9d ms\n", stats.getAverageLatency());
+        System.out.printf("Average latency:               %,9f ms\n", stats.getAverageLatency());
         System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
         System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
 
@@ -302,7 +302,7 @@ public class Benchmark {
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
+        System.out.printf("Reported Internal Avg Latency: %,9f ms\n", stats.getAverageInternalLatency());
 
         // 3. Write stats to file if requested
         client.writeSummaryCSV(stats, cliConfig.statsfile);

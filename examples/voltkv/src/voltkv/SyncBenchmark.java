@@ -77,7 +77,6 @@ public class SyncBenchmark {
     AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
-    final ClientStatsContext fullStatsContext;
 
     // kv benchmark state
     final AtomicLong successfulGets = new AtomicLong(0);
@@ -134,7 +133,7 @@ public class SyncBenchmark {
         boolean usecompression= false;
 
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
-        int threads = 40;
+        int threads = 1;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -186,7 +185,6 @@ public class SyncBenchmark {
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
-        fullStatsContext = client.createStatsContext();
 
         processor = new PayloadProcessor(config.keysize, config.minvaluesize,
                 config.maxvaluesize, config.entropy, config.poolsize, config.usecompression);
@@ -275,7 +273,7 @@ public class SyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %f/%dms\n", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
     }
 
@@ -285,8 +283,7 @@ public class SyncBenchmark {
      *
      * @throws Exception if anything unexpected happens.
      */
-    public synchronized void printResults() throws Exception {
-        ClientStats stats = fullStatsContext.fetch().getStats();
+    public synchronized void printResults(ClientStats stats) throws Exception {
 
         // 1. Get/Put performance results
         String display = "\n" +
@@ -331,7 +328,7 @@ public class SyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9d ms\n", stats.getAverageLatency());
+        System.out.printf("Average latency:               %,9f ms\n", stats.getAverageLatency());
         System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
         System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
 
@@ -339,7 +336,7 @@ public class SyncBenchmark {
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
+        System.out.printf("Reported Internal Avg Latency: %,9f ms\n", stats.getAverageInternalLatency());
 
         // 3. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
@@ -462,12 +459,17 @@ public class SyncBenchmark {
         warmupComplete.set(true);
 
         // reset the stats after warmup
-        fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
+
         schedulePeriodicStats();
+
+        // Create the stats context here, so that we only capture the benchmark stats,
+        // and not the warm-up and pre-loading
+        ClientStatsContext fullStatsContext = client.createStatsContext();
+        fullStatsContext.fetchAndResetBaseline();
 
         // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");
@@ -488,7 +490,7 @@ public class SyncBenchmark {
         }
 
         // print the summary results
-        printResults();
+        printResults(fullStatsContext.fetch().getStats());
 
         // close down the client connections
         client.close();
