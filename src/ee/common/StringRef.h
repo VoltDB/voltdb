@@ -47,8 +47,7 @@ namespace voltdb
         /// allocated, intended for temporary strings.  If no Pool
         /// object is provided, the StringRef and the string memory will be
         /// allocated out of the ThreadLocalPool.
-        static StringRef* create(std::size_t size,
-                                 Pool* dataPool = NULL);
+        static StringRef* create(std::size_t size, Pool* dataPool);
 
         /// Destroy the given StringRef object and free any memory, if
         /// any, allocated from pools to store the object.

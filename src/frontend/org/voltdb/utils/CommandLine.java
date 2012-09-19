@@ -362,6 +362,7 @@ public class CommandLine extends VoltDB.Configuration
             FileWriter out = new FileWriter(filename);
             List<String> lns = createCommandLine();
             for (String l : lns) {
+                assert(l != null);
                 out.write(l.toCharArray());
                 out.write('\n');
             }

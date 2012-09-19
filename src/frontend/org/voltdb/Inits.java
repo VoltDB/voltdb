@@ -47,6 +47,7 @@ import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
@@ -345,7 +346,7 @@ public class Inits {
             try {
                 long catalogTxnId;
                 if (m_rvdb.isIV2Enabled()) {
-                    catalogTxnId = TxnEgo.makeZero(0).getTxnId();
+                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
                 } else {
                     catalogTxnId =
                             org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
