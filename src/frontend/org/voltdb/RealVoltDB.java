@@ -766,7 +766,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     Class.forName("org.voltdb.management.JMXStatsManager");
                 m_statsManager = (StatsManager)statsManagerClass.newInstance();
                 m_statsManager.initialize(new ArrayList<Long>(m_localSites.keySet()));
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                int a = 0;
+            }
 
             try {
                 m_snapshotCompletionMonitor.init(m_messenger.getZK());
