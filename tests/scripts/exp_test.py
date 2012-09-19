@@ -148,7 +148,7 @@ def installVoltDB(pkg, release):
         for k in pkgName:
             info["err"] += k + ", "
         info["err"] = info["err"].strip() # Trim the leading/trailing spaces
-        info["err"] = info["err"][:-1] # Trim the last char ','
+        info["err"] = info["err"][:-1]    # Trim the last char ','
         return info
 
     pkgname = pkgName[pkg] + '-' + release + "." + tail
@@ -448,7 +448,6 @@ def create_rpt(info, status, msg, keys, elapsed):
 if __name__ == "__main__":
     start = time.time()
     usage = "Usage: %prog [options]"
-#    parser = OptionParser()
     parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro|voltkv|voltcache> <-s helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
     parser.add_option("-r", "--release", dest="release",
                       help="VoltDB release no. If ommitted, it will find it from version.txt.")
