@@ -45,6 +45,8 @@ public class OrderByPlanNode extends AbstractPlanNode {
      */
     protected List<SortDirectionType> m_sortDirections = new ArrayList<SortDirectionType>();
 
+    private boolean m_orderingByUniqueColumns = false;
+
     public OrderByPlanNode() {
         super();
     }
@@ -117,8 +119,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     private boolean orderingByUniqueColumns() {
-        // NodeSchema schema = getOutputSchema();
-        return false; // TODO: for real, figure out if child guarantees a unique column (or combo).
+        return m_orderingByUniqueColumns;
+    }
+
+    public void setOrderingByUniqueColumns() {
+        m_orderingByUniqueColumns = true;
     }
 
     /**
@@ -143,6 +148,10 @@ public class OrderByPlanNode extends AbstractPlanNode {
             throw new RuntimeException(e.getMessage());
         }
         m_sortDirections.add(sortDir);
+    }
+
+    public int countOfSortExpressions() {
+        return m_sortExpressions.size();
     }
 
     @Override

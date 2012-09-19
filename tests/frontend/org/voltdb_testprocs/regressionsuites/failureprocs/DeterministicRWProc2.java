@@ -30,10 +30,10 @@ import org.voltdb.VoltProcedure;
 @ProcInfo (
     singlePartition = false
 )
-public class DeterministicRWProc extends VoltProcedure {
+public class DeterministicRWProc2 extends VoltProcedure {
 
     // Meaningless where clause makes expected output easier to test for.
-    public static final SQLStmt queryUnambiguousRows = new SQLStmt("select * from blah where sval < 'NDC=false' order by ival, sval limit 2");
+    public static final SQLStmt queryUnambiguousRows = new SQLStmt("select * from indexed_partitioned_blah order by ival");
     public static final SQLStmt updateUnambiguously = new SQLStmt("update blah set sval = ?");
 
     public long run() {
