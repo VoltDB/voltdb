@@ -99,7 +99,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     //
     TableTuple tuple(input_table->schema());
     TableIterator iterator = input_table->iterator();
-    
+
     int tuple_ctr = 0;
     int tuples_skipped = 0;
     int limit = -1;
