@@ -57,13 +57,14 @@
 #include "common/Pool.hpp"
 
 namespace voltdb {
-
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
             ExecutorContext *ctx,
             const std::string &name,
             TupleSchema* schema,
-            const std::string* columnNames,
+            const std::vector<std::string> &columnNames,
+            const TableIndexScheme *pkeyIndex,
+            const std::vector<TableIndexScheme> &indexes,
             int partitionColumn,
             bool exportEnabled,
             bool exportOnly)
@@ -72,14 +73,28 @@ Table* TableFactory::getPersistentTable(
 
     if (exportOnly) {
         table = new StreamedTable(ctx, exportEnabled);
-        TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
     }
     else {
-        table = new PersistentTable(ctx, exportEnabled);
-        PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
-        TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
+        PersistentTable *pTable = new PersistentTable(ctx, exportEnabled);
+        table = pTable;
         pTable->m_partitionColumn = partitionColumn;
+
+        if (pkeyIndex) {
+            pTable->m_pkeyIndex = TableIndexFactory::getInstance(*pkeyIndex);
+            pTable->m_indexes.push_back(pTable->m_pkeyIndex);
+            pTable->m_uniqueIndexes.push_back(pTable->m_pkeyIndex);
+        }
+
+        for (int i = 0; i < indexes.size(); ++i) {
+            TableIndex *index = TableIndexFactory::getInstance(indexes[i]);
+            pTable->m_indexes.push_back(index);
+            if (index->isUniqueIndex()) {
+                pTable->m_uniqueIndexes.push_back(index);
+            }
+        }
     }
+
+    initCommon(databaseId, table, name, schema, columnNames, true);
 
     // initialize stats for the table
     configureStats(databaseId, ctx, name, table);
@@ -91,11 +106,11 @@ TempTable* TableFactory::getTempTable(
             const voltdb::CatalogId databaseId,
             const std::string &name,
             TupleSchema* schema,
-            const std::string* columnNames,
+            const std::vector<std::string> &columnNames,
             TempTableLimits* limits)
 {
     TempTable* table = new TempTable();
-    TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
+    initCommon(databaseId, table, name, schema, columnNames, true);
     table->m_limits = limits;
     return table;
 }
@@ -110,8 +125,7 @@ TempTable* TableFactory::getCopiedTempTable(
             TempTableLimits* limits)
 {
     TempTable* table = new TempTable();
-    TableFactory::initCommon(databaseId, table, name, template_table->m_schema,
-                             template_table->m_columnNames, false);
+    initCommon(databaseId, table, name, template_table->m_schema, template_table->m_columnNames, false);
     table->m_limits = limits;
     return table;
 }
@@ -121,12 +135,12 @@ void TableFactory::initCommon(
             Table *table,
             const std::string &name,
             TupleSchema *schema,
-            const std::string *columnNames,
+            const std::vector<std::string> &columnNames,
             const bool ownsTupleSchema) {
 
     assert(table != NULL);
     assert(schema != NULL);
-    assert(columnNames != NULL);
+    assert(columnNames.size() != 0);
 
     table->m_databaseId = databaseId;
     table->m_name = name;

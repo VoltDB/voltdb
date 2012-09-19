@@ -51,6 +51,7 @@
 #include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
+#include "indexes/tableindex.h"
 
 // Inline PlanNodes
 #include "plannodes/indexscannode.h"
@@ -59,7 +60,6 @@
 
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
@@ -77,19 +77,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node->getTargetTable());
 
     // Create output table based on output schema from the plan
-    TupleSchema* schema = m_node->generateTupleSchema(true);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      m_node->getTargetTable()->name(),
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
+    setTempOutputTable(limits, m_node->getTargetTable()->name());
 
     //
     // INLINE PROJECTION

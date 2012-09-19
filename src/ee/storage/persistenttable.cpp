@@ -85,7 +85,10 @@ PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
     m_executorContext(ctx),
-    m_allowNulls(NULL),
+    m_uniqueIndexes(),
+    m_allowNulls(),
+    m_indexes(),
+    m_pkeyIndex(NULL),
     stats_(this),
     m_COWContext(NULL),
     m_failedCompactionCount(0)
@@ -113,7 +116,13 @@ PersistentTable::~PersistentTable() {
         tuple.setActiveFalse();
     }
 
-    if (m_allowNulls) delete[] m_allowNulls;
+    for (int i = 0; i < m_indexes.size(); ++i) {
+        TableIndex *index = m_indexes[i];
+        if (index != m_pkeyIndex) {
+            delete index;
+        }
+    }
+    if (m_pkeyIndex) delete m_pkeyIndex;
 
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
@@ -672,9 +681,36 @@ std::string PersistentTable::debug() {
     return buffer.str();
 }
 
+// ------------------------------------------------------------------
+// Accessors
+// ------------------------------------------------------------------
+// Index
+TableIndex *PersistentTable::index(std::string name) {
+    for (int i = 0; i < m_indexes.size(); ++i) {
+        TableIndex *index = m_indexes[i];
+        if (index->getName().compare(name) == 0) {
+            return index;
+        }
+    }
+    std::stringstream errorString;
+    errorString << "Could not find Index with name " << name << std::endl;
+    for (int i = 0; i < m_indexes.size(); ++i) {
+        TableIndex *index = m_indexes[i];
+        errorString << index->getName() << std::endl;
+    }
+    throwFatalException( "%s", errorString.str().c_str());
+}
+
+std::vector<TableIndex*> PersistentTable::allIndexes() const {
+    std::vector<TableIndex*> retval;
+    for (int i = 0; i < m_indexes.size(); i++)
+        retval.push_back(m_indexes[i]);
+
+    return retval;
+}
+
 void PersistentTable::onSetColumns() {
-    if (m_allowNulls != NULL) delete[] m_allowNulls;
-    m_allowNulls = new bool[m_columnCount];
+    m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
         m_allowNulls[i] = m_schema->columnAllowNull(i);
     }

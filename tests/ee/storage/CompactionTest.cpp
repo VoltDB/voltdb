@@ -21,14 +21,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <vector>
-#include <string>
-#include <stdint.h>
-#include <boost/scoped_ptr.hpp>
-#include <boost/unordered_set.hpp>
-#include <boost/scoped_array.hpp>
-#include <boost/foreach.hpp>
-
 #include "harness.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
@@ -44,6 +36,12 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "common/DefaultTupleSerializer.h"
 #include "stx/btree_set.h"
+
+#include <vector>
+#include <string>
+#include <stdint.h>
+#include <boost/scoped_array.hpp>
+#include <boost/foreach.hpp>
 
 using namespace voltdb;
 
@@ -125,34 +123,34 @@ public:
         voltdb::TableIndexScheme indexScheme = voltdb::TableIndexScheme("BinaryTreeUniqueIndex",
                                                                         voltdb::BALANCED_TREE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        TableIndex::indexColumnsDirectly(),
-                                                                        true, true, false, m_tableSchema);
+                                                                        TableIndex::simplyIndexColumns(),
+                                                                        true, true, m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
         voltdb::TableIndexScheme indexScheme1 = voltdb::TableIndexScheme("BinaryTreeMultimapIndex",
                                                                         voltdb::BALANCED_TREE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        TableIndex::indexColumnsDirectly(),
-                                                                        false, true, false, m_tableSchema);
+                                                                        TableIndex::simplyIndexColumns(),
+                                                                        false, true, m_tableSchema);
         indexes.push_back(indexScheme1);
         voltdb::TableIndexScheme indexScheme2 = voltdb::TableIndexScheme("HashUniqueIndex",
                                                                         voltdb::HASH_TABLE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        TableIndex::indexColumnsDirectly(),
-                                                                        true, false, false, m_tableSchema);
+                                                                        TableIndex::simplyIndexColumns(),
+                                                                        true, false, m_tableSchema);
         indexes.push_back(indexScheme2);
         voltdb::TableIndexScheme indexScheme3 = voltdb::TableIndexScheme("HashMultimapIndex",
                                                                         voltdb::HASH_TABLE_INDEX,
                                                                         m_primaryKeyIndexColumns,
-                                                                        TableIndex::indexColumnsDirectly(),
-                                                                        false, false, false, m_tableSchema);
+                                                                        TableIndex::simplyIndexColumns(),
+                                                                        false, false, m_tableSchema);
         indexes.push_back(indexScheme3);
 
 
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
                                                          (0, m_engine->getExecutorContext(), "Foo",
-                                                          m_tableSchema, &m_columnNames[0], 0,
+                                                          m_tableSchema, m_columnNames, 0,
                                                           false, false));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);

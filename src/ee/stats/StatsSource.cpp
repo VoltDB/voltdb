@@ -82,8 +82,7 @@ void StatsSource::configure(
         m_columnName2Index[columnNames[ii]] = ii;
     }
 
-    m_statsTable.reset(TableFactory::getTempTable(databaseId, name, schema,
-                                                  &columnNames[0], NULL));
+    m_statsTable.reset(TableFactory::getTempTable(databaseId, name, schema, columnNames, NULL));
     m_statsTuple = m_statsTable->tempTuple();
 }
 

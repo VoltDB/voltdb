@@ -15,12 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <vector>
-#include <map>
-#include <boost/foreach.hpp>
-#include <boost/scoped_array.hpp>
-
 #include "TableCatalogDelegate.hpp"
+
 #include "catalog/catalog.h"
 #include "catalog/database.h"
 #include "catalog/table.h"
@@ -31,6 +27,7 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/CatalogUtil.h"
 #include "common/types.h"
+#include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
@@ -39,7 +36,8 @@
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 
-
+#include <vector>
+#include <map>
 
 using namespace std;
 namespace voltdb {
@@ -66,6 +64,7 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table &catalogTabl
     vector<int32_t> columnLengths(numColumns);
     vector<bool> columnAllowNull(numColumns);
     map<string, catalog::Column*>::const_iterator col_iterator;
+    vector<string> columnNames(numColumns);
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
         const catalog::Column *catalog_column = col_iterator->second;
@@ -179,7 +178,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     map<string, catalog::Index*>::const_iterator idx_iterator;
     for (idx_iterator = catalogTable.indexes().begin();
          idx_iterator != catalogTable.indexes().end(); idx_iterator++) {
-
         catalog::Index *catalog_index = idx_iterator->second;
 
         TableIndexScheme index_scheme;
@@ -278,7 +276,7 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
 
     int32_t databaseId = catalogDatabase.relativeIndex();
     m_table = TableFactory::getPersistentTable(databaseId, executorContext,
-                                               catalogTable.name(), schema, columnNames.get(),
+                                               catalogTable.name(), schema, columnNames,
                                                partitionColumnIndex, m_exportEnabled,
                                                isTableExportOnly(catalogDatabase, table_id));
 

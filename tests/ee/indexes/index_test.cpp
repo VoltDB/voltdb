@@ -98,7 +98,7 @@ public:
         int num_of_columns = 100;
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
-        string *columnNames = new string[num_of_columns];
+        vector<string> columnNames(num_of_columns);
 
         vector<ValueType> columnTypes(num_of_columns, VALUE_TYPE_BIGINT);
         vector<int32_t> columnLengths(num_of_columns, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
@@ -181,7 +181,6 @@ public:
           (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_wide_table", schema,
                                             columnNames, -1, false, false));
-        delete[] columnNames;
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -268,17 +267,16 @@ public:
     void init(std::string name, TableIndexType type, std::vector<int32_t> &ix_columnIndices,
               std::vector<ValueType> &ix_columnTypes, bool unique)
     {
-        bool intsOnly = true;
         bool countable = true;
         TupleSchema *initiallyNullTupleSchema = NULL;
         TableIndexScheme index(name, type,
                                ix_columnIndices, TableIndex::simplyIndexColumns(),
-                               unique, countable, intsOnly, initiallyNullTupleSchema);
+                               unique, countable, initiallyNullTupleSchema);
 
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
 
-        string *columnNames = new string[NUM_OF_COLUMNS];
+        vector<string> columnNames(NUM_OF_COLUMNS);
 
         char buffer[32];
         vector<ValueType> columnTypes(NUM_OF_COLUMNS, VALUE_TYPE_BIGINT);
@@ -305,7 +303,7 @@ public:
 
         TableIndexScheme pkeyScheme("idx_pkey", BALANCED_TREE_INDEX,
                                     pkey_column_indices, TableIndex::simplyIndexColumns(),
-                                    true, true, true, schema);
+                                    true, true, schema);
 
         vector<TableIndexScheme> indexes;
         indexes.push_back(index);
@@ -318,7 +316,6 @@ public:
           (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_table", schema,
                                             columnNames, -1, false, false));
-        delete[] columnNames;
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);

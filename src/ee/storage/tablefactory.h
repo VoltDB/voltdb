@@ -70,7 +70,7 @@ class ExecutorContext;
 class TableFactory {
 public:
     /**
-    * Creates an empty persistent table with given name and columns.
+    * Creates an empty persistent table with given name, columns, PK index, other indexes, partition column, etc.
     * Every PersistentTable must be instantiated via this method.
     * Also, columns can't be added/changed/removed after a PersistentTable
     * instance is made. TableColumn is immutable.
@@ -80,7 +80,7 @@ public:
         ExecutorContext *ctx,
         const std::string &name,
         TupleSchema* schema,
-        const std::string* columnNames,
+        const std::vector<std::string> &columnNames,
         int partitionColumn,
         bool exportEnabled,
         bool exportOnly);
@@ -95,7 +95,7 @@ public:
         voltdb::CatalogId databaseId,
         const std::string &name,
         TupleSchema* schema,
-        const std::string* columnNames,
+        const std::vector<std::string> &columnNames,
         TempTableLimits* limits);
 
     /**
@@ -113,7 +113,7 @@ private:
         Table *table,
         const std::string &name,
         TupleSchema *schema,
-        const std::string *columnNames,
+        const std::vector<std::string> &columnNames,
         const bool ownsTupleSchema);
 
     static void configureStats(

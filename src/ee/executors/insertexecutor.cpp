@@ -57,7 +57,6 @@
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
-#include "storage/tablefactory.h"
 #include "storage/temptable.h"
 
 #include <vector>
@@ -75,19 +74,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_node->getTargetTable());
     assert(m_node->getInputTables().size() == 1);
 
-    TupleSchema* schema = m_node->generateTupleSchema(false);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      "temp",
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
+    setDMLCountOutputTable(limits);
 
     m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);

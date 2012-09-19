@@ -103,30 +103,25 @@ protected:
         columnSizes.push_back(size);
         columnNullables.push_back(allow_null);
     };
+
     void setTable(voltdb::TableIndexScheme *pkey = NULL) {
         assert (columnNames.size() == columnTypes.size());
         assert (columnTypes.size() == columnSizes.size());
         assert (columnSizes.size() == columnNullables.size());
-        std::string *names = new std::string[columnNames.size()];
         TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnNullables, true);
-        for (std::size_t i = 0; i < columnTypes.size(); i++) {
-            names[i] = columnNames[i];
-        }
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
         table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
-                                                 "test_table", schema, names, -1, false, false);
+                                                 "test_table", schema, columnNames, -1, false, false);
         if (pkey) {
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
             assert(pkeyIndex);
             table->addIndex(pkeyIndex);
             table->setPrimaryKeyIndex(pkeyIndex);
         }
-
-        // clean up
-        delete[] names;
     };
+
     void setTable(voltdb::TableIndexScheme &pkey) {
         setTable(&pkey);
     };
@@ -194,8 +189,8 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
     std::vector<int> pkey_column_indices;
     pkey_column_indices.push_back(0);
     TableIndexScheme pkey("idx_pkey", voltdb::BALANCED_TREE_INDEX,
-                          pkey_column_indices, TableIndex::indexColumnsDirectly(),
-                          true, true, true, NULL);
+                          pkey_column_indices, TableIndex::simplyIndexColumns(),
+                          true, true, NULL);
 
     setTable(pkey);
 
@@ -254,8 +249,7 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
     std::vector<int> pkey_column_indices;
     pkey_column_indices.push_back(0);
     voltdb::TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
-                                  pkey_column_indices, TableIndex::indexColumnsDirectly(),
-                                  true, true, false, NULL);
+                                  pkey_column_indices, TableIndex::simplyIndexColumns(),
 
     setTable(pkey);
 
@@ -312,8 +306,8 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
     pkey_column_indices.push_back(2);
     pkey_column_indices.push_back(3);
     TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
-                          pkey_column_indices, TableIndex::indexColumnsDirectly(),
-                          true, true, false, NULL);
+                          pkey_column_indices, TableIndex::simplyIndexColumns(),
+                          true, true, NULL);
 
     setTable(pkey);
 
@@ -358,8 +352,8 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
     pkey_column_indices.push_back(2);
     pkey_column_indices.push_back(3);
     TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
-                          pkey_column_indices, TableIndex::indexColumnsDirectly(),
-                          true, true, false, NULL);
+                          pkey_column_indices, TableIndex::simplyIndexColumns(),
+                          true, true, NULL);
 
     setTable(pkey);
 

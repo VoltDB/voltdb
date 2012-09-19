@@ -516,8 +516,6 @@ private:
     const TupleSchema *m_keySchema;
 };
 
-
-struct TupleKeyEqualityChecker;
 struct TupleKeyComparator;
 
 /*
@@ -544,9 +542,9 @@ struct TupleKeyComparator;
  */
 struct TupleKey
 {
-    typedef TupleKeyEqualityChecker KeyEqualityChecker;
+    // typedef TupleKeyEqualityChecker KeyEqualityChecker; // Required by (future?) support for CompactingHash...
     typedef TupleKeyComparator KeyComparator;
-    // typedef TupleKeyHasher KeyHasher; // Future?
+    // typedef TupleKeyHasher KeyHasher; // Required by (future?) support for CompactingHash...
 
     inline TupleKey() {
         m_columnIndices = NULL;

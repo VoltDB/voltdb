@@ -318,7 +318,12 @@ protected:
     ExecutorContext *m_executorContext;
 
     // CONSTRAINTS
-    bool* m_allowNulls;
+    std::vector<TableIndex*> m_uniqueIndexes;
+    std::vector<bool> m_allowNulls;
+
+    // INDEXES
+    std::vector<TableIndex*> m_indexes;
+    TableIndex *m_pkeyIndex;
 
     // partition key
     int m_partitionColumn;

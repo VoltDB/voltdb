@@ -93,7 +93,7 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
                                                          true);
 
     TableIndexScheme scheme("test_index", HASH_TABLE_INDEX,
-                            columnIndices, TableIndex::indexColumnsDirectly(),
+                            columnIndices, TableIndex::simplyIndexColumns(),
                             false, false, true, schema);
     index = TableIndexFactory::getInstance(scheme);
 
