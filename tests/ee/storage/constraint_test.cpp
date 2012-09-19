@@ -115,13 +115,13 @@ protected:
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
+        table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
+                                                 "test_table", schema, names, -1, false, false);
         if (pkey) {
-            table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
-                                                     "test_table", schema, names, *pkey, -1, false, false);
-        }
-        else {
-            table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
-                                                     "test_table", schema, names, -1, false, false);
+            TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
+            assert(pkeyIndex);
+            table->addIndex(pkeyIndex);
+            table->setPrimaryKeyIndex(pkeyIndex);
         }
 
         // clean up

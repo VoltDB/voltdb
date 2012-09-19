@@ -96,7 +96,7 @@ class TableIndexPicker
         if (m_type == HASH_TABLE_INDEX) {
             VOLT_INFO("Producing a tree index for %s: "
                       "hash index not currently supported for this index key.\n",
-                      scheme.name.c_str());
+                      m_scheme.name.c_str());
             m_type = BALANCED_TREE_INDEX;
         }
         return getInstanceForKeyType<GenericKey<KeySize> >();
