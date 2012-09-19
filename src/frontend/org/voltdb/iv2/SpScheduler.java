@@ -167,6 +167,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void handleMultipartSentinel(
             MultiPartitionParticipantMessage message) {
+        Iv2Trace.logIv2MultipartSentinel(message, m_mailbox.getHSId(), message.getTxnId());
         m_pendingTasks.offerMPSentinel(message.getTxnId());
         if (m_sendToHSIds.size() > 0) {
             m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
