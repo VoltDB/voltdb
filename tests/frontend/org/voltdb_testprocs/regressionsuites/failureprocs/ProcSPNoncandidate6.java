@@ -35,7 +35,7 @@ public class ProcSPNoncandidate6 extends VoltProcedure {
     public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = ?");
     // But the additional statement with replicated table DML should discourage use of SP processing
     public static final SQLStmt spoiler =
-            new SQLStmt("select count(*) from blah, indexed_blah where blah.sval = indexed_blah.sval and indexed_blah.ival = ?");
+            new SQLStmt("select count(*) from blah, indexed_replicated_blah where blah.sval = indexed_replicated_blah.sval and indexed_replicated_blah.ival = ?");
 
     public long run(int i) {
         voltQueueSQL(query, i);
