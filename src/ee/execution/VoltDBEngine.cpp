@@ -563,7 +563,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
  * deletion isn't a top-level object .. and delegates should have a
  * deleteChildCommand() interface.
  *
- * Note, this only deletes tables, indexes are deleted in 
+ * Note, this only deletes tables, indexes are deleted in
  * processCatalogAdditions(..) for dumb reasons.
  */
 bool
@@ -613,7 +613,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
     {
         // get the catalog's table object
         catalog::Table *catalogTable = catTableIter->second;
-        
+
         if (addAll || catalogTable->wasAdded()) {
 
             //////////////////////////////////////////
@@ -642,7 +642,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 
             //////////////////////////////////////////////
             // update the export info for existing tables
-            // 
+            //
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
@@ -729,7 +729,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
             //////////////////////////////////////////
             // now find all of the indexes to remove
             //////////////////////////////////////////
-            
+
             bool found = false;
             // iterate through all of the existing indexes
             for (int i = 0; i < currentIndexes.size(); i++) {
