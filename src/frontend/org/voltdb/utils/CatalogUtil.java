@@ -656,7 +656,7 @@ public abstract class CatalogUtil {
         sb.append(" SECURITY ");
         SecurityType st = deployment.getSecurity();
         if (st != null) {
-            sb.append(st.isEnabled()).append(true);
+            sb.append(st.isEnabled());
         }
 
         sb.append(" ADMINMODE ");
