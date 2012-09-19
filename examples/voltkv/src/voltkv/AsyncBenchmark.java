@@ -292,7 +292,7 @@ public class AsyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %f/%dms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
     }
 

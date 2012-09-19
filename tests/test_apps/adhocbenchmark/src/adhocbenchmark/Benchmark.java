@@ -269,7 +269,7 @@ public class Benchmark {
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Txns Completed %d ", stats.getInvocationsCompleted());
-        System.out.printf("Avg/95%% Latency %f/%dms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
     }
 

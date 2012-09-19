@@ -73,8 +73,8 @@ public class ClientStatsContext {
 
     /**
      * Fetch current statistics from the client internals and set them to be the current baseline.
-     * Subsequent calls to get*Stats(..)</code> methods on this instance will return 0 values for
-     * all statistics until either <code>fetch()</code> or </code>fetchAndResetBaseline()</code> are called.
+     * Subsequent calls to <code>getStats(..)</code> methods on this instance will return 0 values for
+     * all statistics until either <code>fetch()</code> or <code>fetchAndResetBaseline()</code> are called.
      *
      * @return A new ClientStatsContext object that uses the newly fetched stats with the old baseline.
      */
