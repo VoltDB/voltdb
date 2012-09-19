@@ -337,36 +337,35 @@ public class Benchmark {
                 long total       = hits1 + hits2 + misses;
                 double hitpc1    = (100.0 * hits1) / total;
                 double hitpc2    = (100.0 * hits2) / total;
-                long planTimeMin = (result.getLong("PLAN_TIME_MIN") + 500)/ 1000;
-                long planTimeMax = (result.getLong("PLAN_TIME_MAX") + 500)/ 1000;
-                long planTimeAvg = (result.getLong("PLAN_TIME_AVG") + 500)/ 1000;
+                double planTimeMin = result.getLong("PLAN_TIME_MIN")/ 1000000.0;
+                double planTimeMax = result.getLong("PLAN_TIME_MAX")/ 1000000.0;
+                double planTimeAvg = result.getLong("PLAN_TIME_AVG")/ 1000000.0;
                 long failures    = result.getLong("FAILURES");
                 // Global stats
-                System.out.printf("           HOSTNAME: %s\n", hostname);
+                System.out.printf(    "          HOSTNAME: %s\n", hostname);
                 if (siteId == -1) {
-                    System.out.printf(
-                                  "               SITE: (global)\n");
+                    System.out.printf("              SITE: (global)\n");
                 }
                 else {
-                    System.out.printf(
-                                  "               SITE: %d\n", siteId);
-                    System.out.printf(
-                                  "          PARTITION: %d\n", partitionId);
+                    System.out.printf("              SITE: %d\n", siteId);
+                    System.out.printf("         PARTITION: %d\n", partitionId);
                 }
-                System.out.printf("        TOTAL PLANS: %d\n", total);
-                System.out.printf("       CACHE MISSES: %d\n", misses);
-                System.out.printf(" LEVEL 1 CACHE HITS: %d (%.1f%%)\n", hits1, hitpc1);
-                System.out.printf("LEVEL 1 CACHE LEVEL: %d\n", level1);
+                System.out.printf(    "       TOTAL PLANS: %d\n", total);
+                System.out.printf(    "      CACHE MISSES: %d\n", misses);
                 if (siteId == -1) {
-                    System.out.printf(
-                                  " LEVEL 2 CACHE HITS: %d (%.1f%%)\n", hits2, hitpc2);
-                    System.out.printf(
-                                  "LEVEL 2 CACHE LEVEL: %d\n", level2);
+                    System.out.printf("LEVEL 1 CACHE HITS: %d (%.1f%%)\n", hits1, hitpc1);
+                    System.out.printf("LEVEL 2 CACHE HITS: %d (%.1f%%)\n", hits2, hitpc2);
+                    System.out.printf("LEVEL 1 CACHE SIZE: %d\n", level1);
+                    System.out.printf("LEVEL 2 CACHE SIZE: %d\n", level2);
                 }
-                System.out.printf("      PLAN TIME MIN: %d ms\n", planTimeMin);
-                System.out.printf("      PLAN TIME MAX: %d ms\n", planTimeMax);
-                System.out.printf("      PLAN TIME AVG: %d ms\n", planTimeAvg);
-                System.out.printf("           FAILURES: %d\n\n", failures);
+                else {
+                    System.out.printf("   PLAN CACHE HITS: %d (%.1f%%)\n", hits1, hitpc1);
+                    System.out.printf("   PLAN CACHE SIZE: %d\n", level1);
+                }
+                System.out.printf(    "     PLAN TIME MIN: %6.2f ms\n", planTimeMin);
+                System.out.printf(    "     PLAN TIME MAX: %6.2f ms\n", planTimeMax);
+                System.out.printf(    "     PLAN TIME AVG: %6.2f ms\n", planTimeAvg);
+                System.out.printf(    "          FAILURES: %d\n\n", failures);
             }
         }
         catch (ProcCallException e) {
