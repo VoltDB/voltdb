@@ -28,7 +28,7 @@ public interface SystemProcedureExecutionContext {
 
     public Cluster getCluster();
 
-    public long getLastCommittedTxnId();
+    public long getLastCommittedSpHandle();
 
     public long getCurrentTxnId();
 

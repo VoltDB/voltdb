@@ -23,7 +23,13 @@
 
 package org.voltdb.utils;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.Test;
 import org.voltdb.VoltDB.START_ACTION;
@@ -126,5 +132,101 @@ public class TestCommandLine
         cl.externalInterface("192.168.0.123");
         assertTrue(cl.toString().contains("internalinterface 10.0.0.10"));
         assertTrue(cl.toString().contains("externalinterface 192.168.0.123"));
+    }
+
+    /**
+     * Hack to override mutability of the map returned by {@code System.getenv()}
+     * <p>
+     * See {@linkplain http://stackoverflow.com/questions/318239/how-do-i-set-environment-variables-from-java StackOverflow article}
+     * @param envValue new value for VOLTDB_OPTS
+     * @throws Exception
+     */
+    public static void setVoltDbOpts(String envValue) throws Exception
+    {
+        Map<String, String> newenv = new HashMap<String, String>(System.getenv());
+        newenv.put("VOLTDB_OPTS", envValue);
+        Map<String, String> env = System.getenv();
+        Class<?> cl = env.getClass();
+        if("java.util.Collections$UnmodifiableMap".equals(cl.getName())) {
+            Field field = cl.getDeclaredField("m");
+            field.setAccessible(true);
+            Object obj = field.get(env);
+            @SuppressWarnings("unchecked")
+            Map<String, String> map = (Map<String, String>) obj;
+            map.clear();
+            map.putAll(newenv);
+        }
+    }
+
+    @Test
+    public void testExtraJvmOptsAgentSpec() throws Exception
+    {
+        String agentSpec = "-javaagent:/path/to/jolokia-jvm-1.0.1-agent.jar=port=11159,agentContext=/,host=0.0.0.0";
+        setVoltDbOpts(agentSpec);
+
+        CommandLine cl = new CommandLine();
+        String cmd = cl.toString();
+
+        assertTrue(cmd.contains(" " + agentSpec + " "));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(agentSpec));
+    }
+
+    @Test
+    public void testExtraJvmOptsGcAndPropsSpec() throws Exception
+    {
+        String propOne = "-Done.prop=\"yolanda is a nice gal:\"";
+        String propTwo = "-Dtwo.prop=\"yobo is: a nice guy\"";
+        String propThree = "-Dsingle.quote='In single quote \"bliss\"'";
+        String voltOne   = "enableIv2";
+        String voltTwo   = "project";
+        String voltThree = "\"/a/file/with a space.xml\"";
+        String minHeap = "-Xms1024m";
+        String maxHeap = "-Xmx4096m";
+        String gcSpec  = "-XX:+UseConcMarkSweepGC";
+        String agentSpec = "-javaagent:jolokia.jar=port=11159,desc=\"cool  loking\\ agent\"";
+        setVoltDbOpts(propOne
+                + " " + propTwo
+                + " " + propThree
+                + " -voltdb:" + voltOne
+                + " -voltdb:" + voltTwo
+                + " -voltdb:" + voltThree
+                + " " + agentSpec
+                + " " + minHeap
+                + " " + maxHeap
+                + " " + gcSpec
+                + " -cp one.jar:some/dir/*.jar:tooranda.jar:. -d32"
+                + " -Djava.library.path=/some/diryolanda.so:/tmp/hackme.so"
+                + " sgra rehto emos"); // reverse of 'some other args'
+
+        CommandLine cl = new CommandLine();
+        String cmd = cl.toString();
+
+        assertTrue(cmd.contains(" " + propOne + " "));
+        assertTrue(cmd.contains(" " + propTwo+ " "));
+        assertTrue(cmd.contains(" " + propThree+ " "));
+        assertTrue(cmd.contains(" " + voltOne + " "));
+        assertTrue(cmd.contains(" " + voltTwo + " "));
+        assertTrue(cmd.contains(" " + voltThree + " "));
+        assertTrue(cmd.contains(" " + agentSpec + " "));
+        assertTrue(cmd.contains(" " + gcSpec + " "));
+        assertTrue(cmd.contains(" sgra rehto emos"));
+
+        assertFalse(cmd.contains(" -cp" ));
+        assertFalse(cmd.contains(" -d32" ));
+        assertFalse(cmd.contains(" -voltdb:" ));
+        assertFalse(cmd.contains("/some/diryolanda.so:/tmp/hackme.so"));
+        assertFalse(cmd.contains("tooranda.jar"));
+        assertFalse(cmd.contains(" " + minHeap + " "));
+        assertFalse(cmd.contains(" " + maxHeap + " "));
+
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propOne));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propTwo));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(propThree));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(agentSpec));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") > cmd.indexOf(gcSpec));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf("sgra rehto emos"));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltOne));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltTwo));
+        assertTrue(cmd.indexOf("org.voltdb.VoltDB") < cmd.indexOf(voltThree));
     }
 }

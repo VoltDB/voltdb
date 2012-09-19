@@ -23,10 +23,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -56,18 +54,24 @@ public class RepairLog
     {
         final VoltMessage m_msg;
         final long m_handle;
+        final long m_txnId;
         final boolean m_type;
 
-        Item(boolean type, VoltMessage msg, long handle)
+        Item(boolean type, VoltMessage msg, long handle, long txnId)
         {
             m_type = type;
             m_msg = msg;
             m_handle = handle;
+            m_txnId = txnId;
         }
 
         long getHandle()
         {
             return m_handle;
+        }
+
+        long getTxnId() {
+            return m_txnId;
         }
 
         VoltMessage getMessage()
@@ -115,21 +119,26 @@ public class RepairLog
             truncate(m.getTruncationHandle(), Long.MIN_VALUE);
             // only log the first fragment of a procedure (and handle 1st case)
             if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
-                m_log.add(new Item(IS_MP, m, m.getTxnId()));
+                m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
                 m_lastMpHandle = m.getTxnId();
+                m_lastSpHandle = m.getSpHandle();
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
             truncate(m.getTruncationHandle(), Long.MIN_VALUE);
-            m_log.add(new Item(IS_MP, m, m.getTxnId()));
-            m_lastMpHandle = m.getTxnId();
+            m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+            //Restore will send a complete transaction message with a lower mp transaction id because
+            //the restore transaction precedes the loading of the right mp transaction id from the snapshot
+            //Hence Math.max
+            m_lastMpHandle = Math.max(m_lastMpHandle, m.getTxnId());
+            m_lastSpHandle = m.getSpHandle();
         }
         else if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
             m_lastSpHandle = m.getSpHandle();
             truncate(Long.MIN_VALUE, m.getTruncationHandle());
-            m_log.add(new Item(IS_SP, m, m.getSpHandle()));
+            m_log.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
         }
     }
 
@@ -147,7 +156,7 @@ public class RepairLog
             if (item.isSP() && item.m_handle <= spHandle) {
                 it.remove();
             }
-            else if (item.isMP() && item.m_handle <= mpHandle) {
+            else if (item.isMP() && item.m_txnId <= mpHandle) {
                 it.remove();
             }
         }
@@ -182,7 +191,8 @@ public class RepairLog
                     requestId,
                     seq++,
                     ofTotal,
-                    forMPI ? m_lastMpHandle : m_lastSpHandle,
+                    m_lastSpHandle,
+                    m_lastMpHandle,
                     null); // no payload. just an ack.
         responses.add(header);
 
@@ -195,6 +205,7 @@ public class RepairLog
                         seq++,
                         ofTotal,
                         item.getHandle(),
+                        item.getTxnId(),
                         item.getMessage());
             responses.add(response);
         }

@@ -44,14 +44,14 @@ public class TestClientInterfaceHandleManager {
                         false,
                         mockConnection,
                         AdmissionControlGroup.getDummy());
-        long handle = dut.getHandle(true, 7, 31337, 10, 10l);
+        long handle = dut.getHandle(true, 7, 31337, 10, 10l, "foo");
         assertEquals(7, ClientInterfaceHandleManager.getPartIdFromHandle(handle));
         assertEquals(0, ClientInterfaceHandleManager.getSeqNumFromHandle(handle));
         ClientInterfaceHandleManager.Iv2InFlight inflight = dut.findHandle(handle);
         assertEquals(handle, inflight.m_ciHandle);
         assertEquals(31337, inflight.m_clientHandle);
 
-        handle = dut.getHandle(false, 12, 31338, 10, 10l);
+        handle = dut.getHandle(false, 12, 31338, 10, 10l, "yankees");
         assertEquals(ClientInterfaceHandleManager.MP_PART_ID,
                 ClientInterfaceHandleManager.getPartIdFromHandle(handle));
         assertEquals(0, ClientInterfaceHandleManager.getSeqNumFromHandle(handle));
@@ -71,7 +71,7 @@ public class TestClientInterfaceHandleManager {
                         AdmissionControlGroup.getDummy());
         List<Long> handles = new ArrayList<Long>();
         for (int i = 0; i < 10; i++) {
-            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l));
+            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l, "fooyankee"));
         }
         System.out.println("Removing handle: " + handles.get(5));
         dut.removeHandle(handles.get(5));
@@ -100,7 +100,7 @@ public class TestClientInterfaceHandleManager {
                         AdmissionControlGroup.getDummy());
         List<Long> handles = new ArrayList<Long>();
         for (int i = 0; i < 10; i++) {
-            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l));
+            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l, "yankeefoo"));
         }
         // pretend handles 0-4 were lost
         for (int i = 5; i < 10; i++) {

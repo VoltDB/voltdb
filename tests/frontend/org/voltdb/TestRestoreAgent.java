@@ -52,6 +52,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
@@ -120,7 +121,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                     LinkedList<SnapshotCompletionInterest> interests =
                                             new LinkedList<SnapshotCompletionInterest>(m_interests);
                                     for (SnapshotCompletionInterest i : interests) {
-                                        i.snapshotCompleted( "", 0, true);
+                                        i.snapshotCompleted( "", 0, new long[0], true);
                                     }
                                     break;
                                 }
@@ -188,7 +189,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       long now,
                                       boolean allowMismatchedResults) {
             createTransaction(connectionId, connectionHostname, adminConnection,
-                              0, invocation, isReadOnly, isSinglePartition,
+                              0, 0, invocation, isReadOnly, isSinglePartition,
                               isEverySite, partitions, numPartitions,
                               clientData, messageSize, now, allowMismatchedResults);
             return true;
@@ -199,6 +200,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       String connectionHostname,
                                       boolean adminConnection,
                                       long txnId,
+                                      long timestamp,
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
@@ -280,6 +282,9 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         public void removeConnectionStats(long connectionId) {
 
         }
+
+        @Override
+        public void sendSentinel(long txnId, int partitionId) {}
     }
 
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
@@ -735,7 +740,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         infos.add(info1);
         infos.add(info2);
-        SnapshotInfo pickedInfo = RestoreAgent.pickSnapshotInfo(infos);
+        SnapshotInfo pickedInfo = RestoreAgent.consolidateSnapshotInfos(infos);
         assertNotNull(pickedInfo);
         assertEquals(0, pickedInfo.hostId);
 
@@ -743,13 +748,13 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         infos.clear();
         infos.add(info2);
         infos.add(info1);
-        pickedInfo = RestoreAgent.pickSnapshotInfo(infos);
+        pickedInfo = RestoreAgent.consolidateSnapshotInfos(infos);
         assertNotNull(pickedInfo);
         assertEquals(0, pickedInfo.hostId);
     }
 
     @Override
-    public void onRestoreCompletion(long txnId) {
+    public void onRestoreCompletion(long txnId, long perPartitionTxnIds[]) {
         if (snapshotTxnId != null) {
             assertEquals(snapshotTxnId.longValue(), txnId);
         }
@@ -773,6 +778,18 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             si = new HashSet<SnapshotInfo>();
             frags.put(txnid, si);
         }
-        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc));
+        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc, -1));
+    }
+
+    @Test
+    public void testSnapshotInfoRoundTrip() throws JSONException
+    {
+        RestoreAgent.SnapshotInfo dut = new RestoreAgent.SnapshotInfo(1234L, "dummy", "stupid", 11, 4321L, 13);
+        dut.partitionToTxnId.put(1, 7000L);
+        dut.partitionToTxnId.put(7, 1000L);
+        byte[] serial = dut.toJSONObject().toString().getBytes(VoltDB.UTF8ENCODING);
+        SnapshotInfo rt = new SnapshotInfo(new JSONObject(new String(serial, VoltDB.UTF8ENCODING)));
+        System.out.println("Got: " + rt.toJSONObject().toString());
+        assertEquals(dut.partitionToTxnId.get(1), rt.partitionToTxnId.get(1));
     }
 }

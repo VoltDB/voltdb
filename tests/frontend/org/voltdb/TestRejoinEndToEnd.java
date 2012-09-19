@@ -24,17 +24,13 @@
 package org.voltdb;
 
 import java.net.InetSocketAddress;
-
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.runner.RunWith;
-
-import org.junit.runners.Parameterized;
-
-import org.junit.runners.Parameterized.Parameters;
-
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.client.Client;

@@ -17,23 +17,20 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.ExecutionException;
-
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltcore.utils.Pair;
-
 import org.voltcore.zk.LeaderElector;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CommandLog;
 import org.voltdb.Promotable;
+import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -44,17 +41,19 @@ import org.voltdb.VoltZK;
  */
 public class MpInitiator extends BaseInitiator implements Promotable
 {
-    private static final int MP_INIT_PID = -1;
+    public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, long buddyHSId)
+    public MpInitiator(HostMessenger messenger, long buddyHSId, StatsAgent agent)
     {
         super(VoltZK.iv2mpi,
                 messenger,
                 MP_INIT_PID,
                 new MpScheduler(
+                    MP_INIT_PID,
                     buddyHSId,
                     new SiteTaskerQueue()),
-                "MP");
+                "MP",
+                agent);
     }
 
     @Override
@@ -62,12 +61,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          CommandLog cl)
         throws KeeperException, InterruptedException, ExecutionException
     {
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable());
+                createForRejoin && isRejoinable(), cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -143,5 +143,17 @@ public class MpInitiator extends BaseInitiator implements Promotable
             String whoami)
     {
         return new MpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
+    }
+
+    /**
+     * Update the MPI's Site's catalog.  Unlike the SPI, this is not going to
+     * run from the same Site's thread; this is actually going to run from some
+     * other local SPI's Site thread.  Since the MPI's site thread is going to
+     * be blocked running the EveryPartitionTask for the catalog update, this
+     * is currently safe with no locking.  And yes, I'm a horrible person.
+     */
+    public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_executionSite.updateCatalog(diffCmds, context, csp, true);
     }
 }

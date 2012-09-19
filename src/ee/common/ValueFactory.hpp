@@ -48,25 +48,32 @@ public:
         return NValue::getDoubleValue(value);
     }
 
+    /// Constructs a value copied into long-lived pooled memory (or the heap)
+    /// that will require an explicit NValue::free.
     static inline NValue getStringValue(const char *value) {
-        return NValue::getStringValue(value, value ? strlen(value) : 0);
+        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value, value ? strlen(value) : 0, NULL);
     }
 
-    static inline NValue getStringValue(std::string value) {
-        return NValue::getStringValue(value);
+    /// Constructs a value copied into long-lived pooled memory (or the heap)
+    /// that will require an explicit NValue::free.
+    static inline NValue getStringValue(const std::string value) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NULL);
     }
 
     static inline NValue getNullStringValue() {
         return NValue::getNullStringValue();
     }
 
-    static inline NValue getBinaryValue(std::string value) {
-        // uses hex encoding
-        return NValue::getBinaryValue(value);
+    /// Constructs a value copied into long-lived pooled memory (or the heap)
+    /// that will require an explicit NValue::free.
+    static inline NValue getBinaryValue(const std::string value) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, value.c_str(), value.length(), NULL);
     }
 
-    static inline NValue getBinaryValue(unsigned char* value, int32_t len) {
-        return NValue::getBinaryValue(value, len);
+    /// Constructs a value copied into long-lived pooled memory (or the heap)
+    /// that will require an explicit NValue::free.
+    static inline NValue getBinaryValue(const unsigned char* value, int32_t len) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, (const char*)value, len, NULL);
     }
 
     static inline NValue getNullBinaryValue() {

@@ -20,15 +20,10 @@ package org.voltdb.iv2;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.client.ClientResponse;
-
 import org.voltdb.ClientInterfaceHandleManager;
-
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -187,7 +182,7 @@ public class Iv2Trace
     {
         if (iv2queuelog.isTraceEnabled()) {
             String logmsg = new String ("txnQOffer txnId %s spHandle %s type %s");
-            iv2queuelog.trace(String.format(logmsg, task.getMpTxnId(), task.getLocalTxnId(),
+            iv2queuelog.trace(String.format(logmsg, task.getTxnId(), task.getSpHandle(),
                     task.m_txn.isSinglePartition() ? "SP" : "MP"));
         }
     }
@@ -196,7 +191,7 @@ public class Iv2Trace
     {
         if (iv2queuelog.isTraceEnabled()) {
             String logmsg = new String ("tskQOffer txnId %s spHandle %s type %s");
-            iv2queuelog.trace(String.format(logmsg, task.getMpTxnId(), task.getLocalTxnId(),
+            iv2queuelog.trace(String.format(logmsg, task.getTxnId(), task.getSpHandle(),
                     task.m_txn.isSinglePartition() ? "SP" : "MP"));
         }
     }

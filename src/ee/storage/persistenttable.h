@@ -188,16 +188,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     voltdb::TableTuple lookupTuple(TableTuple tuple);
 
     // ------------------------------------------------------------------
-    // INDEXES
-    // ------------------------------------------------------------------
-    virtual int indexCount() const { return m_indexCount; }
-    virtual int uniqueIndexCount() const { return m_uniqueIndexCount; }
-    virtual std::vector<TableIndex*> allIndexes() const;
-    virtual TableIndex *index(std::string name);
-    virtual TableIndex *primaryKeyIndex() { return m_pkeyIndex; }
-    virtual const TableIndex *primaryKeyIndex() const { return m_pkeyIndex; }
-
-    // ------------------------------------------------------------------
     // UTILITY
     // ------------------------------------------------------------------
     std::string tableType() const;
@@ -328,14 +318,7 @@ protected:
     ExecutorContext *m_executorContext;
 
     // CONSTRAINTS
-    TableIndex** m_uniqueIndexes;
-    int m_uniqueIndexCount;
     bool* m_allowNulls;
-
-    // INDEXES
-    TableIndex** m_indexes;
-    int m_indexCount;
-    TableIndex *m_pkeyIndex;
 
     // partition key
     int m_partitionColumn;

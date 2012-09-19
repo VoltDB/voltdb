@@ -641,6 +641,7 @@ JAR BUILDING
             <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/apache/**" />
+            <include name="jsr166y/**"/>
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
@@ -1180,6 +1181,8 @@ TEST CASES
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestVoltLicense.class" />
+                <exclude name="**/TestPauselessRejoinEndToEnd" />
+                <exclude name="**/TestPauselessRejoinFuzz" />
                 <exclude name="**/TestPrimary.class" />
                 <exclude name="**/TestSecondaryRejoin.class" />
                 <exclude name="**/TestInvocationBufferServer.class" />
@@ -1188,21 +1191,21 @@ TEST CASES
                 <!-- community tests -->
 <!--                <exclude name="**/TestHSQLBackend.class" /> -->
 <!--                <exclude name="**/TestAdHocQueries.class" /> -->
-                <exclude name="**/TestJSONInterface.class" />
+<!--                <exclude name="**/TestJSONInterface.class" /> -->
 <!--                <exclude name="**/TestRejoinEndToEnd.class" /> -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestRejoinWithCatalogUpdates.class" />
+<!--                <exclude name="**/TestRejoinWithCatalogUpdates.class" /> -->
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
-                <exclude name="**/TestReplicatedInvocation.class" />
+<!--                <exclude name="**/TestReplicatedInvocation.class" /> -->
 <!--                <exclude name="**/TestRestoreAgent.class" -->
 <!--                <exclude name="**/TestSimpleCJK.class" /> -->
 <!--                <exclude name="**/TestClientTimeouts.class" /> -->
                 <exclude name="**/TestExportToFileClient.class" />
                 <exclude name="**/TestNonDetermisticSeppuku.class" />
 <!--                <exclude name="**/TestJDBCDriver.class" />-->
-                <exclude name="**/TestAdminMode.class" />
-                <exclude name="**/TestCatalogUpdateSuite.class" />
+<!--                <exclude name="**/TestAdminMode.class" />-->
+<!--                <exclude name="**/TestCatalogUpdateSuite.class" /> -->
 <!--                <exclude name="**/TestCRUDSuite.class" /> -->
 <!--                <exclude name="**/TestFailureDetectSuite.class" /> -->
                 <!-- ExecutionSite not relevant to Iv2. -->
@@ -1222,7 +1225,7 @@ TEST CASES
 <!--                <exclude name="**/TestOrderBySuite.class" /> -->
                 <exclude name="**/TestPartitionDetection.class" />
 <!--                <exclude name="**/TestPlansGroupBySuite.class" /> -->
-                <exclude name="**/TestReplicationSuite.class" />
+<!--                <exclude name="**/TestReplicationSuite.class" /> -->
 <!--                <exclude name="**/TestRollbackSuite.class" /> -->
 <!--                <exclude name="**/TestSQLFeaturesSuite.class" /> -->
 <!--                <exclude name="**/TestSQLTypesSuite.class" /> -->
@@ -1233,7 +1236,7 @@ TEST CASES
 <!--                <exclude name="**/TestSqlUpdateSuite.class" /> -->
 <!--                <exclude name="**/TestSystemCatalogSuite.class" /> -->
 <!--                <exclude name="**/TestSystemInformationSuite.class" /> -->
-                <exclude name="**/TestSystemProcedureSuite.class" />
+<!--                <exclude name="**/TestSystemProcedureSuite.class" /> -->
 <!--                <exclude name="**/TestTPCCSuite.class" /> -->
 <!--                <exclude name="**/TestBlobType.class" /> -->
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
@@ -1668,6 +1671,24 @@ TEST CASES
     <condition property="replicas" value="${sql_coverage_replicas}" else="0">
         <isset property="sql_coverage_replicas"/>
     </condition>
+    <condition property="hostname" value="-l ${sql_coverage_hostname}" else="">
+        <isset property="sql_coverage_hostname"/>
+    </condition>
+    <condition property="hostport" value="-p ${sql_coverage_hostport}" else="">
+        <isset property="sql_coverage_hostport"/>
+    </condition>
+    <condition property="hostcount" value="-n ${sql_coverage_hosts}" else="-n 1">
+        <isset property="sql_coverage_hosts"/>
+    </condition>
+    <condition property="kfactor" value="-k ${sql_coverage_replicas}" else="-k 0">
+        <isset property="sql_coverage_replicas"/>
+    </condition>
+    <condition property="sitescount" value="-t ${sql_coverage_sites}" else="-t 3">
+        <isset property="sql_coverage_sites"/>
+    </condition>
+    <condition property="flushddl" value="-f ${sql_coverage_flushddl}" else="-f flush-DDL.sql">
+        <isset property="sql_coverage_flushddl"/>
+    </condition>
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
@@ -1697,6 +1718,12 @@ TEST CASES
         <arg file="${meta_config}" />
         <arg file="${sqlcov.dir}" />
         <arg line='"${simpleserver.command}"' />
+        <arg line="${hostname}" />
+        <arg line="${hostport}" />
+        <arg line="${hostcount}" />
+        <arg line="${kfactor}" />
+        <arg line="${sitescount}" />
+        <arg line="${flushddl}" />
     </exec>
 </target>
 
