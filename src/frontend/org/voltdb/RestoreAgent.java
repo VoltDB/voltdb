@@ -21,7 +21,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.nio.ByteBuffer;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -42,22 +41,19 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
@@ -75,7 +71,8 @@ import org.voltdb.utils.MiscUtils;
  * to resume normal operation.
  */
 public class RestoreAgent implements CommandLogReinitiator.Callback,
-SnapshotCompletionInterest {
+SnapshotCompletionInterest
+{
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
         /**
@@ -85,32 +82,49 @@ SnapshotCompletionInterest {
          *            The txnId of the truncation snapshot at the end of the
          *            restore, or Long.MIN if there is none.
          */
-        public void onRestoreCompletion(long txnId);
+        public void onRestoreCompletion(long txnId, long perPartitionTxnIds[]);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
-
-    // ZK stuff (while converting bare strings to VoltZK, map these
-    // to the previously used symbols.)
-    private final static String RESTORE = VoltZK.restore;
-    private final static String RESTORE_BARRIER = VoltZK.restore_barrier;
-    private final static String RESTORE_BARRIER2 = VoltZK.restore_barrier + "2";
-    private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
-
     private String m_generatedRestoreBarrier2;
+
+    // Different states the restore process can be in
+    private enum State { RESTORE, REPLAY, TRUNCATE };
+
+    // Current state of the restore agent
+    private volatile State m_state = State.RESTORE;
 
     // Transaction ID of the restore sysproc
     private final static long RESTORE_TXNID = 1l;
 
-    private final Integer m_hostId;
+    // Restore adapter needs a completion functor.
+    // Runnable here preferable to exposing all of RestoreAgent to RestoreAdapater.
+    private final Runnable m_changeStateFunctor = new Runnable() {
+        @Override
+        public void run() {
+            changeState();
+        }
+    };
+
+    private final RestoreAdapter m_restoreAdapter = new RestoreAdapter(m_changeStateFunctor);
+
+    // RealVoltDB needs this to connect the ClientInterface and the Adapter.
+    RestoreAdapter getAdapter() {
+        return m_restoreAdapter;
+    }
+
+    private final ZooKeeper m_zk;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
+    private final Integer m_hostId;
     private final START_ACTION m_action;
-    private final Set<Integer> m_liveHosts;
     private final boolean m_clEnabled;
     private final String m_clPath;
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
+    private final int[] m_allPartitions;
+    private final Set<Integer> m_liveHosts;
+
     private boolean m_planned = false;
 
     /*
@@ -119,76 +133,21 @@ SnapshotCompletionInterest {
      * Use the memoized field m_isLeader.
      */
     private LeaderElector m_leaderElector = null;
+    private boolean m_isLeader = false;
 
-    private TransactionInitiator m_initiator;
+    private TransactionCreator m_initiator;
 
     // The snapshot to restore
     private SnapshotInfo m_snapshotToRestore = null;
+
     // The txnId of the truncation snapshot generated at the end.
     private long m_truncationSnapshot = Long.MIN_VALUE;
+    private long m_truncationSnapshotPerPartition[] = new long[0];
 
-    private final ZooKeeper m_zk;
-    private boolean m_isLeader = false;
-
-    private final int[] m_allPartitions;
-
-    // Different states the restore process can be in
-    private enum State { RESTORE, REPLAY, TRUNCATE };
-
-    // State of the restore agent
-    private volatile State m_state = State.RESTORE;
-    private final RestoreAdapter m_restoreAdapter = new RestoreAdapter();
     // Whether or not we have a snapshot to restore
     private boolean m_hasRestored = false;
 
-    private CommandLogReinitiator m_replayAgent = new CommandLogReinitiator() {
-        private Callback m_callback;
-        @Override
-        public void setCallback(Callback callback) {
-            m_callback = callback;
-        }
-        @Override
-        public void replay() {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    if (m_callback != null) {
-                        m_callback.onReplayCompletion();
-                    }
-                }
-            }).start();
-        }
-        @Override
-        public void join() throws InterruptedException {}
-        @Override
-        public boolean hasReplayedSegments() {
-            return false;
-        }
-        @Override
-        public Long getMaxLastSeenTxn() {
-            return null;
-        }
-        @Override
-        public boolean started() {
-            return true;
-        }
-        @Override
-        public void setSnapshotTxnId(long txnId) {}
-        @Override
-        public void returnAllSegments() {}
-        @Override
-        public boolean hasReplayedTxns() {
-            return false;
-        }
-        @Override
-        public void generateReplayPlan() {}
-        @Override
-        public void setCatalogContext(CatalogContext context) {}
-        @Override
-        public void setInitiator(TransactionInitiator initiator) {}
-        @Override
-        public void setSiteTracker(SiteTracker siteTracker) {}
-    };
+    private CommandLogReinitiator m_replayAgent = new DefaultCommandLogReinitiator();
 
     /*
      * A thread to keep on sending fake heartbeats until the restore is
@@ -210,177 +169,54 @@ SnapshotCompletionInterest {
         @Override
         public void run() {
             if (!m_planned) {
+                // TestRestoreAgent doesn't follow the same plan-making code as
+                // Inits and may require the runnable to initialize its own restore
+                // catalog plan.
                 findRestoreCatalog();
-//                VoltDB.crashLocalVoltDB("Restore planner should not be started " +
-//                        " without findRestoreCatalog already invoked",
-//                        false, null);
             }
 
-            boolean leader = false;
-
             try {
-                // Wait until either we're the leader or the snapshot TXNID node
-                // exists, then do the right thing.
-                while (!m_isLeader &&
-                        (m_zk.exists(SNAPSHOT_ID, null) == null))
-                {
-                    Thread.sleep(200);
-                }
-
-                /*
-                 * If this is the leader, initiate the snapshot restore
-                 */
-                if (m_zk.exists(SNAPSHOT_ID, null) == null)
-                {
-                    if (m_isLeader)
-                    {
-                        leader = true;
-                        long txnId = 0;
-                        if (m_snapshotToRestore != null) {
-                            txnId = m_snapshotToRestore.txnId;
-                        }
-                        sendSnapshotTxnId(txnId);
-
-                        if (m_snapshotToRestore != null) {
-                            LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
-                                      " in " + m_snapshotToRestore.path);
-                            Object[] params = new Object[] {m_snapshotToRestore.path,
-                                                            m_snapshotToRestore.nonce};
-                            initSnapshotWork(RESTORE_TXNID,
-                                             Pair.of("@SnapshotRestore", params));
-                        }
+                if (!m_isLeader) {
+                    // wait on the leader's barrier.
+                    while (m_zk.exists(VoltZK.restore_snapshot_id, null) == null) {
+                        Thread.sleep(200);
                     }
-                    else
-                    {
-                        throw new RuntimeException("The unpossible has happened");
+                    m_restoreHeartbeatThread.start();
+                    changeState();
+                }
+                else {
+                    // will release the non-leaders waiting on VoltZK.restore_snapshot_id.
+                    sendSnapshotTxnId(m_snapshotToRestore);
+
+                    if (m_snapshotToRestore != null) {
+                        LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
+                                " in " + m_snapshotToRestore.path);
+                        Object[] params = new Object[] {m_snapshotToRestore.path,
+                            m_snapshotToRestore.nonce};
+                        initSnapshotWork(RESTORE_TXNID,
+                                Pair.of("@SnapshotRestore", params));
+                    }
+                    m_restoreHeartbeatThread.start();
+
+                    // if no snapshot to restore, transition immediately.
+                    if (m_snapshotToRestore == null) {
+                        changeState();
                     }
                 }
             }
             catch (Exception e)
             {
                 VoltDB.crashGlobalVoltDB("Failed to safely enter recovery: " + e.getMessage(),
-                                         false, e);
-            }
-
-            m_restoreHeartbeatThread.start();
-
-            // Use our remembered leader state since the actual leader could have
-            // finished and abdicated before we get here.
-            if (!leader || m_snapshotToRestore == null) {
-                /*
-                 * Hosts that are not initiating the restore should change
-                 * state immediately
-                 */
-                changeState();
+                                         true, e);
             }
         }
     };
 
     /**
-     * A dummy connection to provide to the DTXN. It routes ClientResponses back
-     * to the restore agent.
-     */
-    private class RestoreAdapter implements Connection, WriteStream {
-        @Override
-        public boolean hadBackPressure() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void enqueue(DeferredSerialization ds) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void enqueue(ByteBuffer b) {
-            ClientResponseImpl resp = new ClientResponseImpl();
-            try
-            {
-                b.position(4);
-                resp.initFromBuffer(b);
-            }
-            catch (IOException ioe)
-            {
-                LOG.error("Unable to deserialize ClientResponse from snapshot",
-                          ioe);
-                return;
-            }
-            handleResponse(resp);
-        }
-
-        @Override
-        public void enqueue(ByteBuffer[] b) {
-            if (b.length == 1)
-            {
-                enqueue(b[0]);
-            }
-            else
-            {
-                throw new UnsupportedOperationException();
-            }
-        }
-
-        @Override
-        public int calculatePendingWriteDelta(long now) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean isEmpty() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int getOutstandingMessageCount() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public WriteStream writeStream() {
-            return this;
-        }
-
-        @Override
-        public NIOReadStream readStream() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void disableReadSelection() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void enableReadSelection() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getHostnameOrIP() {
-            return "";
-        }
-
-        @Override
-        public long connectionId() {
-            return Long.MIN_VALUE + 1;
-        }
-
-        @Override
-        public Future<?> unregister() {
-            return null;
-        }
-
-        @Override
-        public void queueTask(Runnable r) {
-            throw new UnsupportedOperationException();
-        }
-    }
-
-    /**
      * Information about the local files of a specific snapshot that will be
      * used to generate a restore plan
      */
-    static class SnapshotInfo {
+    public static class SnapshotInfo {
         public final long txnId;
         public final String path;
         public final String nonce;
@@ -388,13 +224,12 @@ SnapshotCompletionInterest {
         public final long catalogCrc;
         // All the partitions for partitioned tables in the local snapshot file
         public final Map<String, Set<Integer>> partitions = new TreeMap<String, Set<Integer>>();
+        public final Map<Integer, Long> partitionToTxnId = new TreeMap<Integer, Long>();
         // This is not serialized, the name of the ZK node already has the host ID embedded.
         public final int hostId;
 
-        public SnapshotInfo(long txnId, String path, String nonce, int partitions,
-                            long catalogCrc)
-        {
-            this(txnId, path, nonce, partitions, catalogCrc, -1);
+        public void setPidToTxnIdMap(Map<Integer,Long> map) {
+            partitionToTxnId.putAll(map);
         }
 
         public SnapshotInfo(long txnId, String path, String nonce, int partitions,
@@ -408,14 +243,73 @@ SnapshotCompletionInterest {
             this.hostId = hostId;
         }
 
-        public int size() {
-            // I can't make this add up --izzy
-            // txnId + pathLen + nonceLen + partCount + catalogCrc + path + nonce
-            int size = 8 + 4 + 4 + 8 + 8 + 4 + path.length() + nonce.length();
-            for (Entry<String, Set<Integer>> e : partitions.entrySet()) {
-                size += 4 + 4 + e.getKey().length() + 4 * e.getValue().size();
+        public SnapshotInfo(JSONObject jo) throws JSONException
+        {
+            txnId = jo.getLong("txnId");
+            path = jo.getString("path");
+            nonce = jo.getString("nonce");
+            partitionCount = jo.getInt("partitionCount");
+            catalogCrc = jo.getLong("catalogCrc");
+            hostId = jo.getInt("hostId");
+
+            JSONArray tables = jo.getJSONArray("tables");
+            int cnt = tables.length();
+            for (int i=0; i < cnt; i++) {
+                JSONObject tableEntry = tables.getJSONObject(i);
+                String name = tableEntry.getString("name");
+                JSONArray jsonPartitions = tableEntry.getJSONArray("partitions");
+                Set<Integer> partSet = new HashSet<Integer>();
+                int partCnt = jsonPartitions.length();
+                for (int j=0; j < partCnt; j++) {
+                    int p = jsonPartitions.getInt(j);
+                    partSet.add(p);
+                }
+                partitions.put(name, partSet);
             }
-            return size;
+            JSONObject jsonPtoTxnId = jo.getJSONObject("partitionToTxnId");
+            @SuppressWarnings("unchecked")
+            Iterator<String> it = jsonPtoTxnId.keys();
+            while (it.hasNext()) {
+                 String key = it.next();
+                 Long val = jsonPtoTxnId.getLong(key);
+                 partitionToTxnId.put(Integer.valueOf(key), val);
+            }
+        }
+
+        public JSONObject toJSONObject()
+        {
+            JSONStringer stringer = new JSONStringer();
+            try {
+                stringer.object();
+                stringer.key("txnId").value(txnId);
+                stringer.key("path").value(path);
+                stringer.key("nonce").value(nonce);
+                stringer.key("partitionCount").value(partitionCount);
+                stringer.key("catalogCrc").value(catalogCrc);
+                stringer.key("hostId").value(hostId);
+                stringer.key("tables").array();
+                for (Entry<String, Set<Integer>> p : partitions.entrySet()) {
+                    stringer.object();
+                    stringer.key("name").value(p.getKey());
+                    stringer.key("partitions").array();
+                    for (int pid : p.getValue()) {
+                        stringer.value(pid);
+                    }
+                    stringer.endArray();
+                    stringer.endObject();
+                }
+                stringer.endArray(); // tables
+                stringer.key("partitionToTxnId").object();
+                for (Entry<Integer,Long> e : partitionToTxnId.entrySet()) {
+                    stringer.key(e.getKey().toString()).value(e.getValue());
+                }
+                stringer.endObject(); // partitionToTxnId
+                stringer.endObject();
+                return new JSONObject(stringer.toString());
+            } catch (JSONException e) {
+                VoltDB.crashLocalVoltDB("Invalid JSON communicate snapshot info.", true, e);
+            }
+            throw new RuntimeException("impossible.");
         }
     }
 
@@ -491,7 +385,7 @@ SnapshotCompletionInterest {
             }
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
-                                     false, e);
+                                     false, e instanceof InvocationTargetException ? e.getCause() : e);
         }
         m_replayAgent.setCallback(this);
     }
@@ -505,10 +399,11 @@ SnapshotCompletionInterest {
         m_replayAgent.setSiteTracker(siteTracker);
     }
 
-    public void setInitiator(TransactionInitiator initiator) {
+    public void setInitiator(TransactionCreator initiator) {
         m_initiator = initiator;
-        if (m_replayAgent != null)
+        if (m_replayAgent != null) {
             m_replayAgent.setInitiator(initiator);
+        }
     }
 
     /**
@@ -519,9 +414,9 @@ SnapshotCompletionInterest {
      *         to restore.
      */
     public Pair<Integer, String> findRestoreCatalog() {
-        createZKDirectory(RESTORE);
-        createZKDirectory(RESTORE_BARRIER);
-        createZKDirectory(RESTORE_BARRIER2);
+        createZKDirectory(VoltZK.restore);
+        createZKDirectory(VoltZK.restore_barrier);
+        createZKDirectory(VoltZK.restore_barrier2);
 
         enterRestore();
 
@@ -557,7 +452,7 @@ SnapshotCompletionInterest {
                                      false, e);
         }
         try {
-            m_generatedRestoreBarrier2 = m_zk.create(RESTORE_BARRIER2 + "/counter", null,
+            m_generatedRestoreBarrier2 = m_zk.create(VoltZK.restore_barrier2 + "/counter", null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -580,7 +475,7 @@ SnapshotCompletionInterest {
         List<String> children = null;
         while (true) {
             try {
-                children = m_zk.getChildren(RESTORE_BARRIER2, false);
+                children = m_zk.getChildren(VoltZK.restore_barrier2, false);
             } catch (KeeperException e2) {
                 VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
             } catch (InterruptedException e2) {
@@ -603,7 +498,7 @@ SnapshotCompletionInterest {
         // Clean up the ZK snapshot ID node so that we're good for next time.
         try
         {
-            m_zk.delete(SNAPSHOT_ID, -1);
+            m_zk.delete(VoltZK.restore_snapshot_id, -1);
         }
         catch (Exception ignore) {}
     }
@@ -627,10 +522,8 @@ SnapshotCompletionInterest {
      */
     SnapshotInfo generatePlans() throws Exception {
         TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, SnapshotUtil.Snapshot>();
-        /*
-         * If the user wants to create a new database, don't scan the
-         * snapshots.
-         */
+
+        // Only scan if startup might require a snapshot restore.
         if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
             snapshots = getSnapshots();
         }
@@ -638,94 +531,56 @@ SnapshotCompletionInterest {
         final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
         Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
         for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
-            /*
-             * If the txn of the snapshot is before the latest txn
-             * among the last seen txns across all initiators when the
-             * log starts, there is a gap in between the snapshot was
-             * taken and the beginning of the log. So the snapshot is
-             * not viable for replay.
-             */
-            if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
-                continue;
-            }
-
-            Snapshot s = e.getValue();
-            File digest = s.m_digests.get(0);
-            int partitionCount = -1;
-            boolean skip = false;
-            for (TableFiles tf : s.m_tableFiles.values()) {
-                if (tf.m_isReplicated) {
+            if (!VoltDB.instance().isIV2Enabled()) {
+                /*
+                 * If the txn of the snapshot is before the latest txn
+                 * among the last seen txns across all initiators when the
+                 * log starts, there is a gap in between the snapshot was
+                 * taken and the beginning of the log. So the snapshot is
+                 * not viable for replay.
+                 */
+                if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
                     continue;
                 }
+            }
 
-                if (skip) {
-                    break;
-                }
-
-                for (boolean completed : tf.m_completed) {
-                    if (!completed) {
-                        skip = true;
-                        break;
+            SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
+            if (VoltDB.instance().isIV2Enabled() && info != null) {
+                final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
+                final Map<Integer, Long> snapmap = info.partitionToTxnId;
+                // If cmdlogmap is null, there were no command log segments, so all snapshots are potentially valid,
+                // don't do any TXN ID consistency checking between command log and snapshot
+                if (cmdlogmap != null) {
+                    if (snapmap == null || cmdlogmap.size() != snapmap.size()) {
+                        info = null;
+                    }
+                    else {
+                        for (Integer cmdpart : cmdlogmap.keySet()) {
+                            Long snaptxnId = snapmap.get(cmdpart);
+                            if (snaptxnId == null) {
+                                info = null;
+                                break;
+                            }
+                            else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                                info = null;
+                                break;
+                            }
+                        }
                     }
                 }
-
-                // Everyone has to agree on the total partition count
-                for (int count : tf.m_totalPartitionCounts) {
-                    if (partitionCount == -1) {
-                        partitionCount = count;
-                    } else if (count != partitionCount) {
-                        skip = true;
-                        break;
-                    }
-                }
             }
 
-            Long catalog_crc = null;
-            try
-            {
-                JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
-                catalog_crc = digest_detail.getLong("catalogCRC");
-            }
-            catch (IOException ioe)
-            {
-                LOG.info("Unable to read digest file: " +
-                         digest.getAbsolutePath() + " due to: " + ioe.getMessage());
-                skip = true;
-            }
-            catch (JSONException je)
-            {
-                LOG.info("Unable to extract catalog CRC from digest: " +
-                         digest.getAbsolutePath() + " due to: " + je.getMessage());
-                skip = true;
-            }
 
-            if (skip) {
-                continue;
+            if (info != null) {
+                snapshotInfos.add(info);
             }
-
-            SnapshotInfo info =
-                new SnapshotInfo(e.getKey(), digest.getParent(),
-                                 parseDigestFilename(digest.getName()),
-                                 partitionCount, catalog_crc);
-            for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
-                TableFiles tableFile = te.getValue();
-                HashSet<Integer> ids = new HashSet<Integer>();
-                for (Set<Integer> idSet : tableFile.m_validPartitionIds) {
-                    ids.addAll(idSet);
-                }
-                if (!tableFile.m_isReplicated) {
-                    info.partitions.put(te.getKey(), ids);
-                }
-            }
-            snapshotInfos.add(info);
         }
         LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
-
         sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
 
         // Negotiate with other hosts about which snapshot to restore
         Set<SnapshotInfo> lastSnapshot = getRestorePlan();
-        SnapshotInfo infoWithMinHostId = pickSnapshotInfo(lastSnapshot);
+        SnapshotInfo infoWithMinHostId = consolidateSnapshotInfos(lastSnapshot);
 
         /*
          * Generate the replay plan here so that we don't have to wait until the
@@ -739,30 +594,107 @@ SnapshotCompletionInterest {
         return infoWithMinHostId;
     }
 
+    private SnapshotInfo checkSnapshotIsComplete(Long key, Snapshot s)
+    {
+        int partitionCount = -1;
+        for (TableFiles tf : s.m_tableFiles.values()) {
+            if (tf.m_isReplicated) {
+                continue;
+            }
+
+            for (boolean completed : tf.m_completed) {
+                if (!completed) {
+                    return null;
+                }
+            }
+
+            // Everyone has to agree on the total partition count
+            for (int count : tf.m_totalPartitionCounts) {
+                if (partitionCount == -1) {
+                    partitionCount = count;
+                } else if (count != partitionCount) {
+                    return null;
+                }
+            }
+        }
+
+        File digest = s.m_digests.get(0);
+        Long catalog_crc = null;
+        Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
+        try
+        {
+            JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
+            catalog_crc = digest_detail.getLong("catalogCRC");
+
+            if (digest_detail.has("partitionTransactionIds")) {
+                JSONObject pidToTxnId = digest_detail.getJSONObject("partitionTransactionIds");
+                @SuppressWarnings("unchecked")
+                Iterator<String> it = pidToTxnId.keys();
+                while (it.hasNext()) {
+                    String pidkey = it.next();
+                    Long txnidval = pidToTxnId.getLong(pidkey);
+                    pidToTxnMap.put(Integer.valueOf(pidkey), txnidval);
+                }
+            }
+        }
+        catch (IOException ioe)
+        {
+            LOG.info("Unable to read digest file: " +
+                    digest.getAbsolutePath() + " due to: " + ioe.getMessage());
+            return null;
+        }
+        catch (JSONException je)
+        {
+            LOG.info("Unable to extract catalog CRC from digest: " +
+                    digest.getAbsolutePath() + " due to: " + je.getMessage());
+            return null;
+        }
+
+        SnapshotInfo info =
+            new SnapshotInfo(key, digest.getParent(),
+                    parseDigestFilename(digest.getName()),
+                    partitionCount, catalog_crc, m_hostId);
+        // populate table to partition map.
+        for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
+            TableFiles tableFile = te.getValue();
+            HashSet<Integer> ids = new HashSet<Integer>();
+            for (Set<Integer> idSet : tableFile.m_validPartitionIds) {
+                ids.addAll(idSet);
+            }
+            if (!tableFile.m_isReplicated) {
+                info.partitions.put(te.getKey(), ids);
+            }
+        }
+        info.setPidToTxnIdMap(pidToTxnMap);
+        return info;
+    }
+
     /**
      * Picks a snapshot info for restore. A single snapshot might have different
      * files scattered across multiple machines. All nodes must pick the same
-     * SnapshotInfo or different nodes will generate different plans.
-     *
-     * @param lastSnapshot The snapshot to restore from
-     * @return A single snapshot info
+     * SnapshotInfo or different nodes will pick different catalogs to restore.
+     * Pick one SnapshotInfo and consolidate the per-node state into it.
      */
-    static SnapshotInfo pickSnapshotInfo(Collection<SnapshotInfo> lastSnapshot) {
-        SnapshotInfo infoWithMinHostId = null;
+    static SnapshotInfo consolidateSnapshotInfos(Collection<SnapshotInfo> lastSnapshot)
+    {
+        SnapshotInfo chosen = null;
         if (lastSnapshot != null) {
             Iterator<SnapshotInfo> i = lastSnapshot.iterator();
             while (i.hasNext()) {
                 SnapshotInfo next = i.next();
-                if (infoWithMinHostId == null ||
-                    next.hostId < infoWithMinHostId.hostId) {
-                    infoWithMinHostId = next;
+                if (chosen == null) {
+                    chosen = next;
+                } else if (next.hostId < chosen.hostId) {
+                    next.partitionToTxnId.putAll(chosen.partitionToTxnId);
+                    chosen = next;
+                }
+                else {
+                    // create a full mapping of txn ids to partition ids.
+                    chosen.partitionToTxnId.putAll(next.partitionToTxnId);
                 }
             }
-            assert(infoWithMinHostId != null);
-            assert(infoWithMinHostId.hostId != -1);
-            LOG.debug("Snapshot to restore: " + infoWithMinHostId.txnId);
         }
-        return infoWithMinHostId;
+        return chosen;
     }
 
     /**
@@ -771,13 +703,12 @@ SnapshotCompletionInterest {
      *
      * @param txnId
      */
-    private void sendSnapshotTxnId(long txnId) {
-        ByteBuffer buf = ByteBuffer.allocate(8);
-        buf.putLong(txnId);
-
+    private void sendSnapshotTxnId(SnapshotInfo toRestore) {
+        long txnId = toRestore != null ? toRestore.txnId : 0;
+        String jsonData = toRestore != null ? toRestore.toJSONObject().toString() : "{}";
         LOG.debug("Sending snapshot ID " + txnId + " for restore to other nodes");
         try {
-            m_zk.create(SNAPSHOT_ID, buf.array(),
+            m_zk.create(VoltZK.restore_snapshot_id, jsonData.getBytes(VoltDB.UTF8ENCODING),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -789,24 +720,30 @@ SnapshotCompletionInterest {
      * Get the txnId of the snapshot the cluster is restoring from from ZK.
      * NOTE that the barrier for this is now completely contained
      * in run() in the restorePlanner thread; nobody gets out of there until
-     * someone wins the leader election and successfully writes the SNAPSHOT_ID
+     * someone wins the leader election and successfully writes the VoltZK.restore_snapshot_id
      * node, so we just need to read it here.
      */
     private void fetchSnapshotTxnId() {
-        long txnId = 0;
         try {
-            byte[] data = m_zk.getData(SNAPSHOT_ID, false, null);
-            txnId = ByteBuffer.wrap(data).getLong();
+            byte[] data = m_zk.getData(VoltZK.restore_snapshot_id, false, null);
+
+            String jsonData = new String(data, VoltDB.UTF8ENCODING);
+            if (!jsonData.equals("{}")) {
+                m_hasRestored = true;
+                JSONObject jo = new JSONObject(jsonData);
+                SnapshotInfo info = new SnapshotInfo(jo);
+                m_replayAgent.setSnapshotTxnId(info);
+            }
+            else {
+                m_hasRestored = false;
+                m_replayAgent.setSnapshotTxnId(null);
+            }
         } catch (KeeperException e2) {
             VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
-        } catch (InterruptedException e2) {}
-
-        // If the txnId is not 0, it means we restored a snapshot
-        if (txnId != 0) {
-            m_hasRestored = true;
+        } catch (InterruptedException e2) {
+        } catch (JSONException je) {
+            VoltDB.crashLocalVoltDB(je.getMessage(), true, je);
         }
-
-        m_replayAgent.setSnapshotTxnId(txnId);
     }
 
     /**
@@ -820,11 +757,10 @@ SnapshotCompletionInterest {
      *            The information of the local snapshot files.
      */
     private void sendLocalRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
-        ByteBuffer buf = serializeRestoreInformation(max, snapshots);
-
-        String zkNode = RESTORE + "/" + m_hostId;
+        String jsonData = serializeRestoreInformation(max, snapshots);
+        String zkNode = VoltZK.restore + "/" + m_hostId;
         try {
-            m_zk.create(zkNode, buf.array(),
+            m_zk.create(zkNode, jsonData.getBytes(VoltDB.UTF8ENCODING),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create Zookeeper node: " +
@@ -832,19 +768,13 @@ SnapshotCompletionInterest {
         }
     }
 
-    /**
-     * Pick the snapshot to restore from based on the global snapshot
-     * information.
-     *
-     * @return The snapshot to restore from, null if none.
-     * @throws Exception
-     */
-    private Set<SnapshotInfo> getRestorePlan() throws Exception {
+    private List<String> waitOnVoltZK_restore() throws KeeperException
+    {
         LOG.debug("Waiting for all hosts to send their snapshot information");
         List<String> children = null;
         while (true) {
             try {
-                children = m_zk.getChildren(RESTORE, false);
+                children = m_zk.getChildren(VoltZK.restore, false);
             } catch (KeeperException e2) {
                 throw e2;
             } catch (InterruptedException e2) {
@@ -859,34 +789,38 @@ SnapshotCompletionInterest {
                 break;
             }
         }
-
         if (children == null) {
             throw new RuntimeException("Unable to read agreement messages from" +
                                        " other hosts for restore plan");
+        }
+        return children;
+    }
+
+    /**
+     * Pick the snapshot to restore from based on the global snapshot
+     * information.
+     *
+     * @return The snapshot to restore from, null if none.
+     * @throws Exception
+     */
+    private Set<SnapshotInfo> getRestorePlan() throws Exception {
+        // Wait for ZK to publish the snapshot fragment/info structures.
+        List<String> children = waitOnVoltZK_restore();
+
+        // If not recovering, nothing to do.
+        if (m_action == START_ACTION.CREATE) {
+            return null;
         }
 
         TreeMap<Long, Set<SnapshotInfo>> snapshotFragments = new TreeMap<Long, Set<SnapshotInfo>>();
         Long clStartTxnId = deserializeRestoreInformation(children, snapshotFragments);
 
-        // If we're not recovering, skip the rest
-        if (m_action == START_ACTION.CREATE) {
-            return null;
-        }
-
+        // If command log has no snapshot requirement clear the fragment set directly
         if (clStartTxnId != null && clStartTxnId == Long.MIN_VALUE) {
-            // command log has no snapshot requirement.  Just clear out the
-            // fragment set directly
             snapshotFragments.clear();
         }
-        // If we have a command log and it requires a snapshot, then bail if
-        // there's no good snapshot
-        if ((clStartTxnId != null && clStartTxnId != Long.MIN_VALUE) &&
-            snapshotFragments.size() == 0)
-        {
-            throw new RuntimeException("No viable snapshots to restore");
-        }
-        LOG.debug("There are " + snapshotFragments.size() +
-                  " snapshots available in the cluster");
+
+        LOG.debug("There are " + snapshotFragments.size() + " restore candidate snapshots available in the cluster");
 
         // Find the last complete snapshot and use it
         HashMap<Long, Map<String, Set<Integer>>> snapshotTablePartitions =
@@ -939,6 +873,8 @@ SnapshotCompletionInterest {
             }
         }
 
+        // If we have a command log and it requires a snapshot but no snapshot
+        // fragments were found, simply bail.
         if (clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
             snapshotFragments.size() == 0) {
             throw new RuntimeException("No viable snapshots to restore");
@@ -952,93 +888,57 @@ SnapshotCompletionInterest {
     }
 
     /**
-     * @param children
-     * @param snapshotFragments
-     * @return null if there is no log to replay in the whole cluster
-     * @throws Exception
+     * This function, like all good functions, does three things.
+     * It produces the command log start transaction Id.
+     * It produces a map of SnapshotInfo objects.
+     * And, it errors if the remote start action does not match the local action.
      */
-    private Long
-    deserializeRestoreInformation(List<String> children,
-                                  Map<Long, Set<SnapshotInfo>> snapshotFragments)
-    throws Exception {
-        byte recover = (byte) m_action.ordinal();
-        Long clStartTxnId = null;
-        ByteBuffer buf;
-        for (String node : children) {
-            int hostId;
-            try {
-                hostId = Integer.parseInt(node);
-            } catch (NumberFormatException e) {
-                // If the node is not named using hostID, skip it
-                continue;
-            }
+    private Long deserializeRestoreInformation(List<String> children,
+            Map<Long, Set<SnapshotInfo>> snapshotFragments) throws Exception
+    {
+        try {
+            int recover = m_action.ordinal();
+            Long clStartTxnId = null;
+            for (String node : children) {
+                //This might be created before we are done fetching the restore info
+                if (node.equals("snapshot_id")) continue;
 
-            byte[] data = null;
-            try {
-                data = m_zk.getData(RESTORE + "/" + node, false, null);
-            } catch (Exception e) {
-                throw e;
-            }
+                byte[] data = null;
+                data = m_zk.getData(VoltZK.restore + "/" + node, false, null);
+                String jsonData = new String(data, "UTF8");
+                JSONObject json = new JSONObject(jsonData);
 
-            buf = ByteBuffer.wrap(data);
-            // Check if there is log to replay
-            boolean hasLog = buf.get() == 1;
-            if (hasLog) {
-                long maxTxnId = buf.getLong();
-                if (clStartTxnId == null || maxTxnId > clStartTxnId) {
-                    clStartTxnId = maxTxnId;
-                }
-            }
-
-            byte recoverByte = buf.get();
-            if (recoverByte != recover) {
-                String msg = "Database actions are not consistent, please enter " +
-                    "the same database action on the command-line.";
-                throw new RuntimeException(msg);
-            }
-
-            int count = buf.getInt();
-            for (int i = 0; i < count; i++) {
-                long txnId = buf.getLong();
-                Set<SnapshotInfo> fragments = snapshotFragments.get(txnId);
-                if (fragments == null) {
-                    fragments = new HashSet<SnapshotInfo>();
-                    snapshotFragments.put(txnId, fragments);
-                }
-                long catalogCrc = buf.getLong();
-
-                int len = buf.getInt();
-                byte[] nonceBytes = new byte[len];
-                buf.get(nonceBytes);
-
-                len = buf.getInt();
-                byte[] pathBytes = new byte[len];
-                buf.get(pathBytes);
-
-                int totalPartitionCount = buf.getInt();
-
-                SnapshotInfo info = new SnapshotInfo(txnId, new String(pathBytes),
-                                                     new String(nonceBytes),
-                                                     totalPartitionCount,
-                                                     catalogCrc, hostId);
-                fragments.add(info);
-
-                int tableCount = buf.getInt();
-                for (int j = 0; j < tableCount; j++) {
-                    len = buf.getInt();
-                    byte[] tableNameBytes = new byte[len];
-                    buf.get(tableNameBytes);
-
-                    int partitionCount = buf.getInt();
-                    HashSet<Integer> partitions = new HashSet<Integer>(partitionCount);
-                    info.partitions.put(new String(tableNameBytes), partitions);
-                    for (int k = 0; k < partitionCount; k++) {
-                        partitions.add(buf.getInt());
+                long maxTxnId = json.optLong("max", Long.MIN_VALUE);
+                if (maxTxnId != Long.MIN_VALUE) {
+                    if (clStartTxnId == null || maxTxnId > clStartTxnId) {
+                        clStartTxnId = maxTxnId;
                     }
                 }
+                int remoteRecover = json.getInt("action");
+                if (remoteRecover != recover) {
+                    String msg = "Database actions are not consistent, please enter " +
+                        "the same database action on the command-line.";
+                    throw new RuntimeException(msg);
+                }
+
+                JSONArray snapInfos = json.getJSONArray("snapInfos");
+                int snapInfoCnt = snapInfos.length();
+                for (int i=0; i < snapInfoCnt; i++) {
+                    JSONObject jsonInfo = snapInfos.getJSONObject(i);
+                    SnapshotInfo info = new SnapshotInfo(jsonInfo);
+                    Set<SnapshotInfo> fragments = snapshotFragments.get(info.txnId);
+                    if (fragments == null) {
+                        fragments = new HashSet<SnapshotInfo>();
+                        snapshotFragments.put(info.txnId, fragments);
+                    }
+                    fragments.add(info);
+                }
             }
+            return clStartTxnId;
+        } catch (JSONException je) {
+            VoltDB.crashLocalVoltDB("Error exchanging snapshot information", true, je);
         }
-        return clStartTxnId;
+        throw new RuntimeException("impossible");
     }
 
     /**
@@ -1046,57 +946,33 @@ SnapshotCompletionInterest {
      * @param snapshots
      * @return
      */
-    private ByteBuffer serializeRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
-        // hasLog + recover + snapshotCount
-        int size = 1 + 1 + 4;
-        if (max != null) {
-            // we need to add the size of the max number to the total size
-            size += 8;
-        }
-        for (SnapshotInfo i : snapshots) {
-            size += i.size();
-        }
-
-        ByteBuffer buf = ByteBuffer.allocate(size);
-        if (max == null) {
-            buf.put((byte) 0);
-        } else {
-            buf.put((byte) 1);
-            buf.putLong(max);
-        }
-        // 1 means recover, 0 means to create new DB
-        buf.put((byte) m_action.ordinal());
-
-        buf.putInt(snapshots.size());
-        for (SnapshotInfo snapshot : snapshots) {
-            buf.putLong(snapshot.txnId);
-            buf.putLong(snapshot.catalogCrc);
-            buf.putInt(snapshot.nonce.length());
-            buf.put(snapshot.nonce.getBytes());
-            buf.putInt(snapshot.path.length());
-            buf.put(snapshot.path.getBytes());
-            buf.putInt(snapshot.partitionCount);
-            buf.putInt(snapshot.partitions.size());
-            for (Entry<String, Set<Integer>> p : snapshot.partitions.entrySet()) {
-                buf.putInt(p.getKey().length());
-                buf.put(p.getKey().getBytes());
-                buf.putInt(p.getValue().size());
-                for (int id : p.getValue()) {
-                    buf.putInt(id);
-                }
+    private String serializeRestoreInformation(Long max, Set<SnapshotInfo> snapshots)
+    {
+        try {
+            JSONStringer stringer = new JSONStringer();
+            stringer.object();
+            // optional max value.
+            if (max != null) {
+                stringer.key("max").value(max);
             }
+            // 1 means recover, 0 means to create new DB
+            stringer.key("action").value(m_action.ordinal());
+            stringer.key("snapInfos").array();
+            for (SnapshotInfo snapshot : snapshots) {
+                stringer.value(snapshot.toJSONObject());
+            }
+            stringer.endArray();
+            stringer.endObject();
+            return stringer.toString();
+        } catch (JSONException je) {
+            VoltDB.crashLocalVoltDB("Error exchanging snapshot info", true, je);
         }
-        return buf;
+        throw new RuntimeException("impossible codepath.");
     }
 
     /**
-     * Initiate a snapshot action to truncate the logs. This should only be
-     * called by one initiator.
-     *
-     * @param txnId
-     *            The transaction ID of the SPI to generate
-     * @param invocation
-     *            The invocation used to create the SPI
+     * Restore a snapshot. An arbitrarily early transaction is provided if command
+     * log replay follows to maintain txnid sequence constraints (with simple dtxn).
      */
     private void initSnapshotWork(Long txnId, final Pair<String, Object[]> invocation) {
         Config restore = SystemProcedureCatalog.listing.get(invocation.getFirst());
@@ -1112,6 +988,16 @@ SnapshotCompletionInterest {
             }
         });
 
+        // txnId is hacked here for the SimpleDTXN case to maintain the constraint
+        // that it always precedes any txnid that might appear in the log. Basically,
+        // an invalid Id is used for the snapshot restore.
+        //
+        // Iv2 asserts/throws on invalid ids. And it doesn't have the same constraint,
+        // so only take the txnId hack path in the non-iv2 case.
+        if (VoltDB.instance().isIV2Enabled()) {
+            txnId = null;
+        }
+
         if (txnId == null) {
             m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true, spi,
                                           restoreProc.getReadonly(),
@@ -1123,7 +1009,7 @@ SnapshotCompletionInterest {
                                           false);
         } else {
             m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
-                                          txnId, spi,
+                                          txnId, System.currentTimeMillis(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
@@ -1131,31 +1017,6 @@ SnapshotCompletionInterest {
                                           m_restoreAdapter, 0,
                                           EstTime.currentTimeMillis(),
                                           false);
-        }
-    }
-
-    private void handleResponse(ClientResponse res) {
-        boolean failure = false;
-        if (res.getStatus() != ClientResponse.SUCCESS) {
-            failure = true;
-        }
-
-        VoltTable[] results = res.getResults();
-        if (results == null || results.length != 1) {
-            failure = true;
-        }
-        while (!failure && results[0].advanceRow()) {
-            String resultStatus = results[0].getString("RESULT");
-            if (!resultStatus.equalsIgnoreCase("success")) {
-                failure = true;
-            }
-        }
-
-        if (failure) {
-            VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
-                                     res.getStatusString(), false, null);
-        } else {
-            changeState();
         }
     }
 
@@ -1183,7 +1044,7 @@ SnapshotCompletionInterest {
         } else if (m_state == State.TRUNCATE) {
             m_snapshotMonitor.removeInterest(this);
             if (m_callback != null) {
-                m_callback.onRestoreCompletion(m_truncationSnapshot);
+                m_callback.onRestoreCompletion(m_truncationSnapshot, m_truncationSnapshotPerPartition);
             }
         }
     }
@@ -1286,13 +1147,14 @@ SnapshotCompletionInterest {
      * snapshot.
      */
     @Override
-    public CountDownLatch snapshotCompleted(final String nonce, long txnId,
+    public CountDownLatch snapshotCompleted(final String nonce, long txnId, long partitionTxnIds[],
                                             boolean truncationSnapshot) {
         if (!truncationSnapshot) {
             VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",
                                      false, null);
         } else {
             m_truncationSnapshot = txnId;
+            m_truncationSnapshotPerPartition = partitionTxnIds;
             m_replayAgent.returnAllSegments();
             changeState();
         }

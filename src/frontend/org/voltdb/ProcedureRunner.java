@@ -350,8 +350,7 @@ public class ProcedureRunner {
     }
 
     public Date getTransactionTime() {
-        long ts = TransactionIdManager.getTimestampFromTransactionId(getTransactionId());
-        return new Date(ts);
+        return new Date(m_txnState.timestamp);
     }
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
@@ -362,6 +361,10 @@ public class ProcedureRunner {
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, args);
         queuedSQL.stmt = stmt;
+        // log SQL run by all adhocs
+        if (stmt.plan != null) {
+            getTxnState().appendAdHocSQL(stmt.sqlText);
+        }
         m_batch.add(queuedSQL);
     }
 
@@ -955,15 +958,20 @@ public class ProcedureRunner {
            m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                  siteId,
                                                  m_txnState.txnId,
+                                                 m_txnState.timestamp,
                                                  m_txnState.isReadOnly(),
-                                                 false);
+                                                 false,
+                                                 txnState.isForReplay());
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        siteId,
                                                        m_txnState.txnId,
+                                                       m_txnState.timestamp,
                                                        m_txnState.isReadOnly(),
-                                                       finalTask);
+                                                       finalTask,
+                                                       txnState.isForReplay());
+
        }
 
        /*

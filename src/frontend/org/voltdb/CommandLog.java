@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public interface CommandLog {
     /**
@@ -29,7 +30,7 @@ public interface CommandLog {
      *            The txnId of the truncation snapshot at the end of restore, or
      *            Long.MIN if there was none.
      */
-    public abstract void init(CatalogContext context, long txnId);
+    public abstract void init(CatalogContext context, long txnId, long perPartitionTxnId[]);
 
     /**
     *
@@ -37,11 +38,13 @@ public interface CommandLog {
     *            The txnId of the truncation snapshot at the end of restore, or
     *            Long.MIN if there was none.
     */
-    public abstract void initForRejoin(CatalogContext context, long txnId, boolean isRejoin);
+    public abstract void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin);
 
     public abstract boolean needsInitialization();
 
     public abstract void log(InitiateTaskMessage message);
+
+    public abstract void log(Iv2InitiateTaskMessage message, long spHandle);
 
     public abstract void shutdown() throws InterruptedException;
 

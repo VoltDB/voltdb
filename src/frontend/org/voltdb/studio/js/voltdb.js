@@ -104,10 +104,11 @@ var IVoltDB = (function(){
         }
         var CallbackWrapper = function(userCallback)
         {
-            var CriticalErrorResponse = {"status":-1,"statusstring":"Timeout or critical execution error.","results":[]};
+            var CriticalErrorResponse = {"status":-1,"statusstring":"Query timeout.","results":[]};
             var UserCallback = userCallback;
-            var Timeout = setTimeout(function() {UserCallback(CriticalErrorResponse);}, 5000);
-            this.Callback = function(response) { clearTimeout(Timeout); UserCallback(response); }
+            var TimeoutOccurred = 0;
+            var Timeout = setTimeout(function() {TimeoutOccurred=1;UserCallback(CriticalErrorResponse);}, 5000);
+            this.Callback = function(response) { clearTimeout(Timeout); if (TimeoutOccurred == 0) UserCallback(response); }
             return this;
         }
         this.BeginExecute = function(procedure, parameters, callback)

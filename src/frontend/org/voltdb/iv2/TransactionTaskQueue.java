@@ -20,11 +20,12 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
-
+import org.voltdb.VoltDB;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
-
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -32,13 +33,55 @@ public class TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final private Deque<TransactionTask> m_backlog =
-        new ArrayDeque<TransactionTask>();
     final private SiteTaskerQueue m_taskQueue;
+
+    /*
+     * Task for a multi-part transaction that can't be executed because this is a replay
+     * transaction and the sentinel has not been received.
+     */
+    private TransactionTask m_multiPartPendingSentinelReceipt = null;
+
+    /*
+     * Multi-part transactions create a backlog of tasks behind them.
+     * A queue is created for each multi-part task to maintain the backlog until the next multi-part
+     * task.
+     */
+    TreeMap<Long, Deque<TransactionTask>> m_multipartBacklog = new TreeMap<Long, Deque<TransactionTask>>();
 
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
         m_taskQueue = queue;
+    }
+
+    synchronized void offerMPSentinel(long txnId) {
+        if (m_multiPartPendingSentinelReceipt != null) {
+            /*
+             * The fragment has arrived already, then this MUST be the correct
+             * sentinel for this fragment.
+             */
+            if (txnId != m_multiPartPendingSentinelReceipt.getTxnId()) {
+                VoltDB.crashLocalVoltDB("Mismatch between replay sentinel txnid " +
+                        txnId + " and next mutli-part fragment id " +
+                        m_multiPartPendingSentinelReceipt.getTxnId(), false, null);
+            }
+            /*
+             * Queue this in the back, you know nothing precedes it
+             * since the sentinel is part of the single part stream
+             */
+            TransactionTask ts = m_multiPartPendingSentinelReceipt;
+            m_multiPartPendingSentinelReceipt = null;
+            Deque<TransactionTask> deque = new ArrayDeque<TransactionTask>();
+            deque.addLast(ts);
+            m_multipartBacklog.put(txnId, deque);
+            taskQueueOffer(ts);
+        } else {
+            /*
+             * The sentinel has arrived, but not the fragment. Stash it away and wait for the fragment.
+             * The presence of this handle pairing indicates that execution of the single part stream must
+             * block until the multi-part is satisfied
+             */
+            m_multipartBacklog.put(txnId, new ArrayDeque<TransactionTask>());
+        }
     }
 
     /**
@@ -52,25 +95,120 @@ public class TransactionTaskQueue
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         boolean retval = false;
+
+        final TransactionState ts = task.getTransactionState();
+
         // Single partitions never queue if empty
         // Multipartitions always queue
         // Fragments queue if they're not part of the queue head TXN ID
         // offer to SiteTaskerQueue if:
         // the queue was empty
         // the queue wasn't empty but the txn IDs matched
-        if (!m_backlog.isEmpty()) {
-            if (task.getMpTxnId() != m_backlog.getFirst().getMpTxnId())
-            {
-                m_backlog.addLast(task);
+        if (ts.isForReplay() && (task instanceof FragmentTask)) {
+            /*
+             * If this is a multi-partition transaction for replay then it can't
+             * be inserted into the order for this partition until it's position is known
+             * via the sentinel value. That value may not be known at the is point.
+             */
+            if (!m_multipartBacklog.isEmpty() && ts.txnId == m_multipartBacklog.firstKey()) {
+                /*
+                 * This branch is for fragments that follow the first fragment during replay
+                 * or first fragments during replay that follow the sentinenl (hence the key exists)
+                 * It is executed immeidately either way, but it may need to be inserted into the backlog
+                 * if it is the first fragment
+                 */
+                Deque<TransactionTask> backlog = m_multipartBacklog.firstEntry().getValue();
+                TransactionTask first = backlog.peekFirst();
+                if (first != null) {
+                    if (first.m_txn.txnId != task.getTxnId()) {
+                        if (!first.m_txn.isSinglePartition()) {
+                            VoltDB.crashLocalVoltDB(
+                                    "If the first backlog task is multi-part, " +
+                                    "but has a different transaction id it is a bug", true, null);
+                        }
+                        backlog.addFirst(task);
+                    }
+                } else {
+                    // The txnids match, don't need to put the second fragment at head of queue
+                    //The first task is expected to be in the head of the queue
+                    backlog.offer(task);
+                }
+                taskQueueOffer(task);
+            }
+            else {
+                /*
+                 * This is the situation where the first fragment arrived before the sentinel.
+                 * Its position in the order is not known.
+                 * m_multiPartPendingSentinelReceipt should be null because the MP coordinator should only
+                 * run one transaction at a time.
+                 * It is not time to block single parts from executing because the order is not know,
+                 * the only thing to do is stash it away for when the order is known from the sentinel
+                 */
+                if (m_multiPartPendingSentinelReceipt != null) {
+                    hostLog.fatal("\tBacklog length: " + m_multipartBacklog.size());
+                    if (!m_multipartBacklog.isEmpty()) {
+                        hostLog.fatal("\tBacklog first item: " + m_multipartBacklog.firstEntry().getValue().peekFirst());
+                    }
+                    hostLog.fatal("\tHave this one SentinelReceipt: " + m_multiPartPendingSentinelReceipt);
+                    hostLog.fatal("\tAnd got this one, too: " + task);
+                    VoltDB.crashLocalVoltDB(
+                            "There should be only one multipart pending sentinel receipt at a time", true, null);
+                }
+                m_multiPartPendingSentinelReceipt = task;
                 retval = true;
+            }
+        } else if (!m_multipartBacklog.isEmpty()) {
+            /*
+             * This branch happens during regular execution when a multi-part is in progress.
+             * The first task for the multi-part is the head of the queue, and all the single parts
+             * are being queued behind it. The txnid check catches tasks that are part of the multi-part
+             * and immediately queues them for execution.
+             */
+            if (task.getTxnId() != m_multipartBacklog.firstKey())
+            {
+                if (!ts.isSinglePartition()) {
+                    /*
+                     * In this case it is a multi-part fragment for the next transaction
+                     * make sure it goes into the queue for that transaction
+                     */
+                    Deque<TransactionTask> d = m_multipartBacklog.get(task.getTxnId());
+                    if (d == null) {
+                        d = new ArrayDeque<TransactionTask>();
+                        m_multipartBacklog.put(task.getTxnId(), d);
+                    }
+                    d.offerLast(task);
+                } else {
+                    /*
+                     * Note the use of last entry here. Each multi-part sentinel generates a backlog queue
+                     * specific to the that multi-part. New single part transactions from the log go
+                     * into the queue following the last received multi-part sentinel.
+                     *
+                     * It's possible to receive several sentinels with single part tasks mixed in
+                     * before receiving the first fragment task from the MP coordinator for any of them
+                     * so the backlog has to correctly preserve the order.
+                     *
+                     * During regular execution and not replay there should be at most one element in the
+                     * multipart backlog, except for the kooky rollback corner case
+                     */
+                    m_multipartBacklog.lastEntry().getValue().addLast(task);
+                    retval = true;
+                }
             }
             else {
                 taskQueueOffer(task);
             }
         }
         else {
+            /*
+             * Base case nothing queued nothing in progress
+             * If the task is a multipart then put an entry in the backlog which
+             * will act as a barrier for single parts, queuing them for execution after the
+             * multipart
+             */
             if (!task.getTransactionState().isSinglePartition()) {
-                m_backlog.addLast(task);
+                Deque<TransactionTask> d = new ArrayDeque<TransactionTask>();
+                d.offer(task);
+                m_multipartBacklog.put(task.getTxnId(), d);
                 retval = true;
             }
             taskQueueOffer(task);
@@ -85,11 +223,12 @@ public class TransactionTaskQueue
     synchronized void repair(SiteTasker task)
     {
         m_taskQueue.offer(task);
-        if (!m_backlog.isEmpty()) {
+        if (!m_multipartBacklog.isEmpty()) {
             // get head
-            MpTransactionState txn = (MpTransactionState)m_backlog.getFirst().getTransactionState();
+            MpTransactionState txn =
+                    (MpTransactionState)m_multipartBacklog.firstEntry().getValue().getFirst().getTransactionState();
             // inject poison pill
-            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, false, false);
+            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
             FragmentResponseMessage poison =
                 new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
             // Provide a serializable exception so that the procedure runner sees
@@ -120,35 +259,64 @@ public class TransactionTaskQueue
         int offered = 0;
         // check to see if head is done
         // then offer until the next MP or FragTask
-        if (!m_backlog.isEmpty()) {
-            if (m_backlog.getFirst().getTransactionState().isDone()) {
+        if (!m_multipartBacklog.isEmpty()) {
+            Deque<TransactionTask> backlog = m_multipartBacklog.firstEntry().getValue();
+            if (backlog.peek().getTransactionState().isDone()) {
                 // remove the completed MP txn
-                m_backlog.removeFirst();
-                while (!m_backlog.isEmpty()) {
-                    TransactionTask next = m_backlog.getFirst();
-                    taskQueueOffer(next);
+                backlog.removeFirst();
+                m_multipartBacklog.remove(m_multipartBacklog.firstKey());
+
+                /*
+                 * Drain all the single parts in that backlog queue
+                 */
+                for (TransactionTask task : backlog) {
+                    taskQueueOffer(task);
                     ++offered;
-                    if (next.getTransactionState().isSinglePartition()) {
-                        m_backlog.removeFirst();
-                    }
-                    else {
-                        // Walk the queue and find any other task with the same
-                        // txn ID as the MP transaction we just offered and also
-                        // offer them.
-                        Iterator<TransactionTask> iter = m_backlog.iterator();
-                        // need to skip the head because that's the fragment we're looking
-                        // to match; don't want to add it twice and pull it out of the backlog
-                        iter.next();
-                        while (iter.hasNext()) {
-                            TransactionTask task = iter.next();
-                            if (task.getMpTxnId() == next.getMpTxnId())
-                            {
+                }
+
+                /*
+                 * Now check to see if there was another multi-part queued after the one we just finished.
+                 *
+                 * This is a kooky corner case where a multi-part transaction can actually have multiple outstanding
+                 * tasks. At first glance you would think that because the relationship is request response there
+                 * can be only one outstanding task for a given multi-part transaction.
+                 *
+                 * That isn't true because a rollback can cause there to be a fragment task as well as a rollback
+                 * task. The rollback is generated asynchronously by another partition.
+                 * If we don't capture all the tasks right now then flush won't be called again because it is waiting
+                 * for the complete transaction task that is languishing in the queue to do the flush post multi-part.
+                 * It can't be called eagerly because that would destructively flush single parts as well.
+                 *
+                 * Iterate the queue to extract all tasks for the multi-part. The only time it isn't necessary
+                 * to do this is when the first transaction in the queue is single part. This happens
+                 * during replay when a sentinel creates the queue, but the multi-part task hasn't arrived yet.
+                 */
+                if (!m_multipartBacklog.isEmpty() &&
+                        !m_multipartBacklog.firstEntry().getValue().isEmpty() &&
+                        !m_multipartBacklog.firstEntry().getValue().getFirst().getTransactionState().isSinglePartition()) {
+                    Deque<TransactionTask> nextBacklog = m_multipartBacklog.firstEntry().getValue();
+                    long txnId = m_multipartBacklog.firstKey();
+                    Iterator<TransactionTask> iter = nextBacklog.iterator();
+
+                    TransactionTask task = null;
+                    boolean firstTask = true;
+                    while (iter.hasNext()) {
+                        task = iter.next();
+                        if (task.getTxnId() == txnId) {
+                            /*
+                             * The old code always left the first fragment task
+                             * in the head of the queue. The new code can probably do without it
+                             * since the map contains the txnid, but I will
+                             * leave it in to minimize change.
+                             */
+                            if (firstTask) {
+                                firstTask = false;
+                            } else {
                                 iter.remove();
-                                taskQueueOffer(task);
-                                ++offered;
                             }
+                            taskQueueOffer(task);
+                            ++offered;
                         }
-                        break;
                     }
                 }
             }
@@ -162,7 +330,11 @@ public class TransactionTaskQueue
      */
     synchronized int size()
     {
-        return m_backlog.size();
+        int size = 0;
+        for (Deque<TransactionTask> d : m_multipartBacklog.values()) {
+            size += d.size();
+        }
+        return size;
     }
 
     @Override
@@ -171,7 +343,8 @@ public class TransactionTaskQueue
         StringBuilder sb = new StringBuilder();
         sb.append("TransactionTaskQueue:").append("\n");
         sb.append("\tSIZE: ").append(size());
-        sb.append("\tHEAD: ").append(m_backlog.getFirst());
+        sb.append("\tHEAD: ").append(
+                m_multipartBacklog.firstEntry() != null ? m_multipartBacklog.firstEntry().getValue().peekFirst() : null);
         return sb.toString();
     }
 }

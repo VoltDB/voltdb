@@ -17,12 +17,17 @@
 
 package org.voltdb.dtxn;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Queue;
 import java.util.Set;
 
+import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SysProcSelector;
@@ -43,8 +48,6 @@ public class InitiatorStats extends SiteStatsSource {
     private final HashMap<String, InvocationInfo> m_connectionStats =
                 new HashMap<String, InvocationInfo>();
 
-    private boolean m_interval = false;
-
     /**
      *
      * @param name
@@ -55,7 +58,7 @@ public class InitiatorStats extends SiteStatsSource {
         VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.INITIATOR, 0, this);
     }
 
-    private static class InvocationInfo {
+    public static class InvocationInfo {
 
         /**
          * Hostname of the host this connection is with
@@ -95,7 +98,7 @@ public class InitiatorStats extends SiteStatsSource {
             connectionHostname = hostname;
         }
 
-        private void processInvocation(int delta, byte status) {
+        public void processInvocation(int delta, byte status) {
             totalExecutionTime += delta;
             minExecutionTime = Math.min( delta, minExecutionTime);
             maxExecutionTime = Math.max(  delta, maxExecutionTime);
@@ -111,6 +114,7 @@ public class InitiatorStats extends SiteStatsSource {
             }
         }
     }
+
     /**
      * Called by the Initiator every time a transaction is completed
      * @param connectionId Id of the connection that the invocation orginated from
@@ -171,8 +175,11 @@ public class InitiatorStats extends SiteStatsSource {
 
     @Override
     protected void updateStatsRow(final Object rowKey, Object rowValues[]) {
-        InvocationInfo info = m_connectionStats.get(rowKey);
-        final String statsKey = (String)rowKey;
+        DummyIterator iterator = (DummyIterator)rowKey;
+        Map.Entry<String, InvocationInfo> entry = iterator.next;
+        iterator.next = null;
+        final InvocationInfo info = entry.getValue();
+        final String statsKey = entry.getKey();
         final String statsKeySplit[] = statsKey.split("\\$");
         final String procName = statsKeySplit[0];
         final String connectionId = statsKeySplit[1];
@@ -184,7 +191,7 @@ public class InitiatorStats extends SiteStatsSource {
         long abortCount = info.abortCount;
         long failureCount = info.failureCount;
 
-        if (m_interval) {
+        if (iterator.interval) {
             invocationCount = info.invocationCount - info.lastInvocationCount;
             info.lastInvocationCount = info.invocationCount;
 
@@ -221,27 +228,34 @@ public class InitiatorStats extends SiteStatsSource {
      *
      */
     private class DummyIterator implements Iterator<Object> {
-        private final Iterator<String> i;
-        String next = null;
-        private DummyIterator(Iterator<String> i) {
+        private final Iterator<Map.Entry<String, InvocationInfo>> i;
+        private Map.Entry<String, InvocationInfo> next = null;
+        private final boolean interval;
+        private DummyIterator(Iterator<Map.Entry<String, InvocationInfo>> i, boolean interval) {
             this.i = i;
+            this.interval = interval;
         }
 
         @Override
         public boolean hasNext() {
-            if (!m_interval) {
-                return i.hasNext();
+            if (!interval) {
+                if (i.hasNext()) {
+                    next = i.next();
+                    return true;
+                } else {
+                    return false;
+                }
             }
             if (!i.hasNext()) {
                 return false;
             } else {
                 while (next == null && i.hasNext()) {
-                    String potential = i.next();
-                    InvocationInfo info = m_connectionStats.get(potential);
+                    Map.Entry<String, InvocationInfo> entry = i.next();
+                    InvocationInfo info = entry.getValue();
                     if (info.invocationCount - info.lastInvocationCount == 0) {
                         continue;
                     } else {
-                        next = potential;
+                        next = entry;
                     }
                 }
                 if (next == null) {
@@ -253,26 +267,61 @@ public class InitiatorStats extends SiteStatsSource {
 
         @Override
         public Object next() {
-            if (!m_interval) {
-                return i.next();
-            } else {
-                String temp = next;
-                next = null;
-                return temp;
-            }
+            return this;
         }
 
         @Override
         public void remove() {
-            i.remove();
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private class AggregatingIterator implements Iterator<Map.Entry<String, InvocationInfo>> {
+
+        private final Queue<Iterator<Map.Entry<String, InvocationInfo>>> m_sources;
+        private AggregatingIterator(Queue<Iterator<Map.Entry<String, InvocationInfo>>> sources) {
+            m_sources = sources;
         }
 
+        @Override
+        public boolean hasNext() {
+            Iterator<Map.Entry<String, InvocationInfo>> i = null;
+            while ((i = m_sources.peek()) != null) {
+                if (i.hasNext()) return true;
+                m_sources.remove();
+            }
+            return false;
+        }
+
+        @Override
+        public Map.Entry<String, InvocationInfo> next() {
+            final Iterator<Map.Entry<String, InvocationInfo>> i = m_sources.peek();
+            if (i == null || !i.hasNext()) {
+                throw new NoSuchElementException();
+            }
+            return i.next();
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
 
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        m_interval = interval;
-        return new DummyIterator(m_connectionStats.keySet().iterator());
+        ArrayDeque<Iterator<Map.Entry<String, InvocationInfo>>> d =
+                new ArrayDeque<Iterator<Map.Entry<String, InvocationInfo>>>();
+        if (VoltDB.instance().isIV2Enabled()) {
+            for (ClientInterface ci : VoltDB.instance().getClientInterfaces()) {
+                d.addAll(ci.getIV2InitiatorStats());
+            }
+        } else {
+            d.offer(m_connectionStats.entrySet().iterator());
+        }
+        return new DummyIterator(
+                new AggregatingIterator(d),
+                interval);
     }
 }

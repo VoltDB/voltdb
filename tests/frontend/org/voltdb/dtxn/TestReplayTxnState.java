@@ -71,10 +71,10 @@ public class TestReplayTxnState extends TestCase {
     final static MockMailbox mbox = new MockMailbox();
     final static VoltTable result = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT));
     static MultiPartitionParticipantMessage participantNotice = new MultiPartitionParticipantMessage(0, 2, 1, true);
-    final static FragmentTaskMessage ftmR = new FragmentTaskMessage(0, 2, 1, true, true);
-    final static FragmentTaskMessage ftmW = new FragmentTaskMessage(0, 2, 1, false, false);
-    final static FragmentTaskMessage ftmCol = new FragmentTaskMessage(0, 1, 2, false, false);
-    final static FragmentTaskMessage ftmAgg = new FragmentTaskMessage(0, 1, 2, false, false);
+    final static FragmentTaskMessage ftmR = new FragmentTaskMessage(0, 2, 1, System.currentTimeMillis(), true, true, false);
+    final static FragmentTaskMessage ftmW = new FragmentTaskMessage(0, 2, 1, System.currentTimeMillis(), false, false, false);
+    final static FragmentTaskMessage ftmCol = new FragmentTaskMessage(0, 1, 2, System.currentTimeMillis(), false, false, false);
+    final static FragmentTaskMessage ftmAgg = new FragmentTaskMessage(0, 1, 2, System.currentTimeMillis(), false, false, false);
     final static ParameterSet params = new ParameterSet();
     static ByteBuffer paramsBuf;
     static FragmentResponseMessage frmR, frmW;

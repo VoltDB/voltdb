@@ -454,8 +454,8 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
 
             char fn_message[1024];
             snprintf(fn_message, sizeof(fn_message),
-                     "SQL function '%s'%s with ID (%d) is not implemented in VoltDB (or may have been incorrectly parsed)",
-                     nameString.c_str(), aliasBuffer, functionId);
+                     "SQL function '%s'%s with ID (%d) with (%d) parameters is not implemented in VoltDB (or may have been incorrectly parsed)",
+                     nameString.c_str(), aliasBuffer, functionId, (int)args->size());
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
         }
     }

@@ -38,16 +38,17 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -343,7 +344,13 @@ public class Inits {
             }
 
             try {
-                long catalogTxnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                long catalogTxnId;
+                if (m_rvdb.isIV2Enabled()) {
+                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+                } else {
+                    catalogTxnId =
+                            org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                }
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 zk.create(
                         VoltZK.initial_catalog_txnid,

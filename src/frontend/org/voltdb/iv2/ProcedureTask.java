@@ -39,25 +39,27 @@ import org.voltdb.utils.LogKeys;
 
 abstract public class ProcedureTask extends TransactionTask
 {
-    final ProcedureRunner m_runner;
     final Mailbox m_initiator;
+    final String m_procName;
 
-    ProcedureTask(Mailbox initiator, ProcedureRunner runner, TransactionState txn,
+    ProcedureTask(Mailbox initiator, String procName, TransactionState txn,
                   TransactionTaskQueue queue)
     {
         super(txn, queue);
         m_initiator = initiator;
-        m_runner = runner;
+        m_procName = procName;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
+    @Override
     abstract public void run(SiteProcedureConnection siteConnection);
 
     /** procedure tasks must complete their txnstates */
     abstract void completeInitiateTask(SiteProcedureConnection siteConnection);
 
     /** Mostly copy-paste of old ExecutionSite.processInitiateTask() */
-    protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage task)
+    protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage task,
+            SiteProcedureConnection siteConnection)
     {
         final InitiateResponseMessage response = new InitiateResponseMessage(task);
 
@@ -83,20 +85,15 @@ abstract public class ProcedureTask extends TransactionTask
                 ClientResponseImpl cr = null;
 
                 // find the txn id visible to the proc
-                long txnId;
-                if (getMpTxnId() != Iv2InitiateTaskMessage.UNUSED_MP_TXNID) {
-                    txnId = getMpTxnId();
-                }
-                else {
-                    txnId = m_txn.txnId;
-                }
+                long txnId = m_txn.txnId;
                 StoredProcedureInvocation invocation = m_txn.getInvocation();
                 if ((invocation != null) && (invocation.getType() == ProcedureInvocationType.REPLICATED)) {
                     txnId = invocation.getOriginalTxnId();
                 }
 
-                m_runner.setupTransaction(m_txn);
-                cr = m_runner.call(txnId, task.getParameters());
+                ProcedureRunner runner = siteConnection.getProcedureRunner(m_procName);
+                runner.setupTransaction(m_txn);
+                cr = runner.call(txnId, task.getParameters());
 
                 response.setResults(cr);
                 // record the results of write transactions to the transaction state
