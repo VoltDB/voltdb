@@ -40,10 +40,11 @@ public class ClientInterfaceHandleManager
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
+    static final long READ_BIT = 1L << 63;
     static final int PART_ID_BITS = 14;
     static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
     static final int PART_ID_SHIFT = 49;
-    static final int SEQNUM_MAX = (1 << PART_ID_SHIFT) - 1;
+    static final long SEQNUM_MAX = (1L << PART_ID_SHIFT) - 1L;
 
     private long m_outstandingTxns;
     public final boolean isAdmin;
@@ -193,7 +194,7 @@ public class ClientInterfaceHandleManager
             /*
              * Encode the read only-ness into the handle
              */
-            ciHandle |= 1L << 63;
+            ciHandle = setReadBit(ciHandle);
             partitionStuff.m_reads.offer(inFlight);
         } else {
             partitionStuff.m_writes.offer(inFlight);
@@ -203,6 +204,19 @@ public class ClientInterfaceHandleManager
         return ciHandle;
     }
 
+    private static boolean getReadBit(long handle) {
+        return (handle & READ_BIT) != 0;
+    }
+
+    private static long unsetReadBit(long handle) {
+        return handle & ~READ_BIT;
+    }
+
+    private static long setReadBit(long handle) {
+        return (handle |= READ_BIT);
+    }
+
+
     /**
      * Remove the specified handle from internal storage.  Used for the 'oops'
      * cases.  Returns true or false depending on whether the given handle was
@@ -210,9 +224,9 @@ public class ClientInterfaceHandleManager
      */
     boolean removeHandle(long ciHandle)
     {
-        boolean readOnly = (ciHandle & (1L << 63)) != 0;
+        final boolean readOnly = getReadBit(ciHandle);
         //Remove read only encoding so comparison works
-        ciHandle = ciHandle & ~(1L << 63);
+        ciHandle = unsetReadBit(ciHandle);
         assert(m_expectedThreadId == Thread.currentThread().getId());
         int partitionId = getPartIdFromHandle(ciHandle);
         PartitionData partitionStuff = m_partitionStuff.get(partitionId);
@@ -251,9 +265,9 @@ public class ClientInterfaceHandleManager
         }
 
         //Check read only encoded bit
-        final boolean readOnly = (ciHandle & (1L << 63)) != 0;
+        final boolean readOnly = getReadBit(ciHandle);
         //Remove read only encoding so comparison works
-        ciHandle = ciHandle & ~(1L << 63);
+        ciHandle = unsetReadBit(ciHandle);
 
         final Deque<Iv2InFlight> perPartDeque = readOnly ? partitionStuff.m_reads : partitionStuff.m_writes;
         while (perPartDeque.peekFirst() != null) {

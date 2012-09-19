@@ -56,7 +56,7 @@ public class TestClientInterfaceHandleManager {
                 ClientInterfaceHandleManager.getPartIdFromHandle(handle));
         assertEquals(0, ClientInterfaceHandleManager.getSeqNumFromHandle(handle));
         inflight = dut.findHandle(handle);
-        assertEquals(handle, inflight.m_ciHandle | (1L << 63));
+        assertEquals(handle, inflight.m_ciHandle | ClientInterfaceHandleManager.READ_BIT);
         assertEquals(31338, inflight.m_clientHandle);
     }
 
@@ -80,7 +80,9 @@ public class TestClientInterfaceHandleManager {
             ClientInterfaceHandleManager.Iv2InFlight inflight = dut.findHandle(handles.get(i));
             if (i != 5)
             {
-                assertEquals((long)handles.get(i), i % 2 == 0 ? inflight.m_ciHandle | (1L << 63) : inflight.m_ciHandle);
+                assertEquals(
+                        (long)handles.get(i),
+                        i % 2 == 0 ? inflight.m_ciHandle | ClientInterfaceHandleManager.READ_BIT : inflight.m_ciHandle);
             }
             else {
                 assertEquals(null, inflight);
@@ -105,7 +107,9 @@ public class TestClientInterfaceHandleManager {
         // pretend handles 0-4 were lost
         for (int i = 5; i < 10; i++) {
             ClientInterfaceHandleManager.Iv2InFlight inflight = dut.findHandle(handles.get(i));
-            assertEquals((long)handles.get(i), i % 2 == 0 ? inflight.m_ciHandle | (1L << 63) : inflight.m_ciHandle);
+            assertEquals(
+                    (long)handles.get(i),
+                    i % 2 == 0 ? inflight.m_ciHandle | ClientInterfaceHandleManager.READ_BIT : inflight.m_ciHandle);
             assertEquals(31337 + i, inflight.m_clientHandle);
         }
     }
