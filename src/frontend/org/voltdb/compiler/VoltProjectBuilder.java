@@ -65,6 +65,7 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
+import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
@@ -605,11 +606,6 @@ public class VoltProjectBuilder {
         final Element project = doc.createElement("project");
         doc.appendChild(project);
 
-        // <security>
-        final Element security = doc.createElement("security");
-        security.setAttribute("enabled", Boolean.valueOf(m_securityEnabled).toString());
-        project.appendChild(security);
-
         // <database>
         final Element database = doc.createElement("database");
         database.setAttribute("name", "database");
@@ -659,10 +655,7 @@ public class VoltProjectBuilder {
         }
         if (deployment != null) {
             try {
-                m_pathToDeployment = writeDeploymentFile(
-                        deployment.hostCount, deployment.sitesPerHost,
-                        deployment.replication, deploymentVoltRoot,
-                        deployment.useCustomAdmin, deployment.adminPort, deployment.adminOnStartup);
+                m_pathToDeployment = writeDeploymentFile(deploymentVoltRoot, deployment);
             } catch (Exception e) {
                 System.out.println("Failed to create deployment file in testcase.");
                 e.printStackTrace();
@@ -894,16 +887,15 @@ public class VoltProjectBuilder {
     /**
      * Writes deployment.xml file to a temporary file. It is constructed from the passed parameters and the m_users
      * field.
-     * @param hostCount Number of hosts.
-     * @param sitesPerHost Sites per host.
-     * @param kFactor Replication factor.
-     * @return Returns the path the temporary file was written to.
+     *
+     * @param voltRoot
+     * @param dinfo an instance {@link DeploymentInfo}
+     * @return deployment path
      * @throws IOException
      * @throws JAXBException
      */
     private String writeDeploymentFile(
-            int hostCount, int sitesPerHost, int kFactor, String voltRoot,
-            boolean useCustomAdmin, int adminPort, boolean adminOnStartup) throws IOException, JAXBException
+            String voltRoot, DeploymentInfo dinfo) throws IOException, JAXBException
             {
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
@@ -915,9 +907,9 @@ public class VoltProjectBuilder {
         // <cluster>
         ClusterType cluster = factory.createClusterType();
         deployment.setCluster(cluster);
-        cluster.setHostcount(hostCount);
-        cluster.setSitesperhost(sitesPerHost);
-        cluster.setKfactor(kFactor);
+        cluster.setHostcount(dinfo.hostCount);
+        cluster.setSitesperhost(dinfo.sitesPerHost);
+        cluster.setKfactor(dinfo.replication);
 
         // <paths>
         PathsType paths = factory.createPathsType();
@@ -951,6 +943,10 @@ public class VoltProjectBuilder {
             snapshot.setPrefix(m_snapshotPrefix);
             snapshot.setRetain(m_snapshotRetain);
         }
+
+        SecurityType security = factory.createSecurityType();
+        deployment.setSecurity(security);
+        security.setEnabled(m_securityEnabled);
 
         if (m_commandLogSync != null || m_commandLogEnabled != null ||
                 m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null ||
@@ -990,11 +986,11 @@ public class VoltProjectBuilder {
         // can't be disabled, but only write out the non-default config if
         // requested by a test. otherwise, take the implied defaults (or
         // whatever local cluster overrides on the command line).
-        if (useCustomAdmin) {
+        if (dinfo.useCustomAdmin) {
             AdminModeType admin = factory.createAdminModeType();
             deployment.setAdminMode(admin);
-            admin.setPort(adminPort);
-            admin.setAdminstartup(adminOnStartup);
+            admin.setPort(dinfo.adminPort);
+            admin.setAdminstartup(dinfo.adminOnStartup);
         }
 
         // <systemsettings>
