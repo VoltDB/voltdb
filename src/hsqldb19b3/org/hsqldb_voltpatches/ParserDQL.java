@@ -4190,6 +4190,13 @@ public class ParserDQL extends ParserBase {
                                 ex = caught;
                             }
                             if (ex != null) {
+                                // TODO: There is likely a more elegant pre-emptive way of handling
+                                // the inevitable close paren that properly terminates a repeating group.
+                                // This filtering probably masks/ignores some syntax errors such as
+                                // a trailing comma right before the paren.
+                                if (ex.getMessage().equalsIgnoreCase("unexpected token: )")) {
+                                    break;
+                                }
                                 return ex;
                             }
                         }

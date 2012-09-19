@@ -33,7 +33,7 @@ import org.voltdb.planner.CorePlan;
  * Will typically be contained by AdHocPlannedStmtBatch. Both this class and the batch extend
  * AsyncCompilerResult to allow working at either the batch or the individual statement level.
  */
-public class AdHocPlannedStatement implements Cloneable {
+public class AdHocPlannedStatement {
     public final CorePlan core;
     public final byte[] sql;
     public final ParameterSet extractedParamValues;
@@ -177,5 +177,14 @@ public class AdHocPlannedStatement implements Cloneable {
         }
 
         return true;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        assert false : "hashCode not designed";
+        return 42; // any arbitrary constant will do
     }
 }

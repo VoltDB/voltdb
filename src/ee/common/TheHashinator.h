@@ -67,17 +67,12 @@ class TheHashinator {
             return hashinate(ValuePeeker::peekAsRawInt64(value),
                              partitionCount);
         }
+        case VALUE_TYPE_VARBINARY:
         case VALUE_TYPE_VARCHAR:
         {
             return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
                              ValuePeeker::peekObjectLength(value),
                              partitionCount);
-        }
-        case VALUE_TYPE_VARBINARY:
-        {
-            return hashinate(reinterpret_cast<unsigned char*>(ValuePeeker::peekObjectValue(value)),
-                                                              ValuePeeker::peekObjectLength(value),
-                                                              partitionCount);
         }
         default:
             throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
@@ -113,7 +108,7 @@ class TheHashinator {
         int32_t hashCode = 0;
         int32_t offset = 0;
         if (length < 0) {
-            throwDynamicSQLException("Attempted to hashinate a string with length(%d) < 0", length);
+            throwDynamicSQLException("Attempted to hashinate a value with length(%d) < 0", length);
         }
         for (int32_t ii = 0; ii < length; ii++) {
            hashCode = 31 * hashCode + string[offset++];
@@ -121,22 +116,6 @@ class TheHashinator {
         return abs(hashCode % partitionCount);
     }
 
-    /**This method is for hashing VARBINARY
-     * Designed to mimic Java string hashing where the hash function is defined as
-     * s[0]*31^(n-1) + s[1]*31^(n-2) + ... + s[n-1]
-     *
-     */
-    static int32_t hashinate(const unsigned char *string, int32_t length, int32_t partitionCount) {
-        int32_t hashCode = 0;
-        int32_t offset = 0;
-        if (length < 0) {
-            throwDynamicSQLException("Attempted to hashinate a string with length(%d) < 0", length);
-        }
-        for (int32_t ii = 0; ii < length; ii++) {
-           hashCode = 31 * hashCode + string[offset++];
-        }
-        return abs(hashCode % partitionCount);
-    }
 };
 
 } // namespace voltdb

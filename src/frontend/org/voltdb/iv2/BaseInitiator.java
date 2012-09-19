@@ -20,11 +20,9 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.BackendTarget;
 
 import org.voltdb.catalog.Cluster;
@@ -32,10 +30,12 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-
-import org.voltdb.ProcedureRunnerFactory;
-import org.voltdb.iv2.Site;
+import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.ProcedureRunnerFactory;
+import org.voltdb.StarvationTracker;
+import org.voltdb.StatsAgent;
+import org.voltdb.SysProcSelector;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -62,7 +62,7 @@ public abstract class BaseInitiator implements Initiator
     private final TickProducer m_tickProducer;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
@@ -83,6 +83,11 @@ public abstract class BaseInitiator implements Initiator
         m_messenger.createMailbox(null, m_initiatorMailbox);
         rejoinProducer.setMailbox(m_initiatorMailbox);
         m_scheduler.setMailbox(m_initiatorMailbox);
+        StarvationTracker st = new StarvationTracker(getInitiatorHSId());
+        m_scheduler.setStarvationTracker(st);
+        agent.registerStatsSource(SysProcSelector.STARVATION,
+                                  getInitiatorHSId(),
+                                  st);
 
         String partitionString = " ";
         if (m_partitionId != -1) {
@@ -104,7 +109,8 @@ public abstract class BaseInitiator implements Initiator
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          CommandLog cl)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -121,7 +127,8 @@ public abstract class BaseInitiator implements Initiator
                                        m_partitionId,
                                        numberOfPartitions,
                                        createForRejoin,
-                                       snapshotPriority);
+                                       snapshotPriority,
+                                       m_initiatorMailbox);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -133,7 +140,7 @@ public abstract class BaseInitiator implements Initiator
                     numberOfPartitions);
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
-            m_scheduler.setProcedureSet(procSet);
+            m_scheduler.setCommandLog(cl);
 
             if (isExportEnabled(catalogContext)) {
                 m_tickProducer.start();
@@ -141,7 +148,6 @@ public abstract class BaseInitiator implements Initiator
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
-
     }
 
     @Override
@@ -180,5 +186,10 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
+    }
+
+    @Override
+    public long getCurrentTxnId() {
+        return m_scheduler.getCurrentTxnId();
     }
 }

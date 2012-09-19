@@ -19,27 +19,33 @@ package org.voltdb.sysprocs;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+
+import com.google.common.primitives.Longs;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotSave extends VoltSystemProcedure
@@ -131,16 +137,35 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[2] != null);
             assert(params.toArray()[3] != null);
             assert(params.toArray()[4] != null);
+            assert(params.toArray()[5] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
-            byte block = (Byte)params.toArray()[3];
+            long perPartitionTxnIds[] = (long[])params.toArray()[3];
+            byte block = (Byte)params.toArray()[4];
             SnapshotFormat format =
-                    SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[4]);
-            String data = (String) params.toArray()[5];
+                    SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[5]);
+
+            /*
+             * Filter out the partitions that are active in the cluster
+             * and include values for all partitions that aren't part of the current cluster.
+             * These transaction ids are used to track partitions that have come and gone
+             * so that the ids can resume without duplicates if the partitions are brought back.
+             */
+            List<Long> perPartitionTransactionIdsToKeep = new ArrayList<Long>();
+            for (long txnid : perPartitionTxnIds) {
+                int partitionId = (int)TxnEgo.getPartitionId(txnid);
+                if (partitionId >= context.getNumberOfPartitions() && partitionId != MpInitiator.MP_INIT_PID) {
+                    perPartitionTransactionIdsToKeep.add(txnid);
+                }
+            }
+
+            String data = (String) params.toArray()[6];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
+                                                         context.getLastCommittedSpHandle(),
+                                                         Longs.toArray(perPartitionTransactionIdsToKeep),
                                                          data, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
@@ -314,6 +339,24 @@ public class SnapshotSave extends VoltSystemProcedure
         final SnapshotFormat format = SnapshotFormat.getEnumIgnoreCase(formatStr);
         final String data = jsObj.optString("data");
 
+        JSONArray perPartitionTransactionIdsArray = jsObj.optJSONArray("perPartitionTxnIds");
+        if (perPartitionTransactionIdsArray == null) {
+            /*
+             * Not going to make this fatal because I don't want people to
+             * be blocked from getting their data out via snapshots.
+             */
+            HOST_LOG.error(
+                    "Failed to retrieve per partition transaction ids array from SnapshotDaemon." +
+                    "This shouldn't happen and it prevents the snapshot from including transaction ids " +
+                    "for partitions that are no longer active in the cluster. Those ids are necessary " +
+                    "to prevent those partitions from generating duplicate unique ids when they are brought back.");
+            perPartitionTransactionIdsArray = new JSONArray();
+        }
+        long perPartitionTxnIds[] = new long[perPartitionTransactionIdsArray.length()];
+        for (int ii = 0; ii < perPartitionTxnIds.length; ii++) {
+            perPartitionTxnIds[ii] = perPartitionTransactionIdsArray.getLong(ii);
+        }
+
         if (format == SnapshotFormat.STREAM) {
             HOST_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
         } else {
@@ -360,7 +403,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
         performQuiesce();
 
-        results = performSnapshotCreationWork(path, nonce, ctx.getCurrentTxnId(),
+        results = performSnapshotCreationWork(path, nonce, ctx.getCurrentTxnId(), perPartitionTxnIds,
                                               (byte)(block ? 1 : 0), format,
                                               data);
         try {
@@ -413,6 +456,7 @@ public class SnapshotSave extends VoltSystemProcedure
     private final VoltTable[] performSnapshotCreationWork(String filePath,
             String fileNonce,
             long txnId,
+            long perPartitionTxnIds[],
             byte block,
             SnapshotFormat format,
             String data)
@@ -427,7 +471,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, block, format.name(), data);
+        params.setParameters(filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data);
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files

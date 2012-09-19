@@ -20,15 +20,14 @@ package org.voltdb.iv2;
 import java.util.HashSet;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.dtxn.TransactionState;
-
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.dtxn.TransactionState;
 
 public class ParticipantTransactionState extends TransactionState
 {
     ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice)
     {
-        super(txnId, null, notice);
+        super(null, notice);
     }
 
     @Override

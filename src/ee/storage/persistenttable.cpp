@@ -577,12 +577,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
         return nullTuple;
     }
 
-    bool foundTuple = pkeyIndex->moveToTuple(&tuple);
-    if (!foundTuple) {
-        return nullTuple;
-    }
-
-    return pkeyIndex->nextValueAtKey();
+    return pkeyIndex->uniqueMatchingTuple(tuple);
 }
 
 void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
@@ -857,9 +852,7 @@ void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *po
  * the tuple data.
  */
 size_t PersistentTable::hashCode() {
-    TableIndexScheme sourceScheme = m_pkeyIndex->getScheme();
-    sourceScheme.setTree();
-    boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::getInstance(sourceScheme));
+    boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::cloneEmptyTreeIndex(*m_pkeyIndex));
     TableIterator iter(this, m_data.begin());
     TableTuple tuple(schema());
     while (iter.next(tuple)) {
@@ -899,7 +892,7 @@ void PersistentTable::swapTuples(TableTuple &originalTuple,
     /*
      * If the tuple is pending deletion then it isn't in any of the indexes.
      * However that contradicts the assertion above that the tuple is not
-     * pending deletion. In current Volt there is only on transaction executing
+     * pending deletion. In current Volt there is only one transaction executing
      * at any given time and the commit always releases the undo quantum
      * because there is no speculation. This situation should be impossible
      * as the assertion above implies. It looks like this is forward thinking

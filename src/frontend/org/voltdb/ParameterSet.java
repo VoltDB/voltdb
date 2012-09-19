@@ -812,4 +812,13 @@ import org.voltdb.types.VoltDecimalHelper;
         ParameterSet other = (ParameterSet) obj;
         return Arrays.deepEquals(m_params, other.m_params);
     }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        assert false : "hashCode not designed";
+        return 42; // any arbitrary constant will do
+    }
 }

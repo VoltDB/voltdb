@@ -42,7 +42,7 @@ public class CompleteTransactionTask extends TransactionTask
             // legacy interaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
-            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId);
+            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
         }
         m_txn.setDone();
         m_queue.flush();
@@ -58,18 +58,12 @@ public class CompleteTransactionTask extends TransactionTask
     }
 
     @Override
-    public long getMpTxnId()
-    {
-        return m_msg.getTxnId();
-    }
-
-    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
         sb.append("CompleteTransactionTask:");
-        sb.append("  MP TXN ID: ").append(getMpTxnId());
-        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  TXN ID: ").append(getTxnId());
+        sb.append("  SP HANDLE: ").append(getSpHandle());
         sb.append("  UNDO TOKEN: ").append(m_txn.getBeginUndoToken());
         sb.append("  MSG: ").append(m_msg.toString());
         return sb.toString();

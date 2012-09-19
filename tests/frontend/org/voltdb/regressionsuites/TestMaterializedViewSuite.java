@@ -103,9 +103,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(results[0].getRowCount(), 1);
         while (results[0].advanceRow()) {
             assertEquals(31L, results[0].getLong(0));
-            assertEquals(1L, results[0].getLong(1));
-            assertTrue(Math.abs(results[0].getDouble(2) - 28920.99) < .01);
-            assertEquals(3L, results[0].getLong(3));
+            assertEquals(1L, results[0].getLong(2));
+            assertTrue(Math.abs(results[0].getDouble(3) - 28920.99) < .01);
+            assertEquals(3L, results[0].getLong(4));
         }
         assert(results != null);
 
@@ -146,14 +146,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltTableRow r1 = results[0].fetchRow(0);
         VoltTableRow r2 = results[0].fetchRow(1);
         assertEquals(r1.getLong(0), 31L);
-        assertEquals(r1.getLong(1), 2L);
-        assertTrue(Math.abs(r1.getDouble(2) - 30000.0) < .01);
-        assertEquals(r1.getLong(3), 8L);
+        assertEquals(r1.getLong(2), 2L);
+        assertTrue(Math.abs(r1.getDouble(3) - 30000.0) < .01);
+        assertEquals(r1.getLong(4), 8L);
 
         assertEquals(r2.getLong(0), 33L);
-        assertEquals(r2.getLong(1), 1L);
-        assertTrue(Math.abs(r2.getDouble(2) - 28920.99) < .01);
-        assertEquals(r2.getLong(3), 3L);
+        assertEquals(r2.getLong(2), 1L);
+        assertTrue(Math.abs(r2.getDouble(3) - 28920.99) < .01);
+        assertEquals(r2.getLong(4), 3L);
     }
 
     public void testSinglePartitionWithPredicates() throws IOException, ProcCallException {

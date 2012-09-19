@@ -131,7 +131,7 @@ public class Cartographer extends StatsSource
     // This used to be the method to get this on SiteTracker
     public long getHSIdForMultiPartitionInitiator()
     {
-        return m_iv2Mpi.get(-1);
+        return m_iv2Mpi.get(MpInitiator.MP_INIT_PID);
     }
 
     public long getBuddySiteForMPI(long hsid)
@@ -141,7 +141,7 @@ public class Cartographer extends StatsSource
         // constructor, then go looking for a matching host ID.
         List<MailboxNodeContent> sitesList = getMailboxNodeContentList();
         for (MailboxNodeContent site : sitesList) {
-            if (site.partitionId != -1 && host == CoreUtils.getHostIdFromHSId(site.HSId)) {
+            if (site.partitionId != MpInitiator.MP_INIT_PID && host == CoreUtils.getHostIdFromHSId(site.HSId)) {
                 return site.HSId;
             }
         }

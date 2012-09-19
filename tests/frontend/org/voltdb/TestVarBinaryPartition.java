@@ -23,6 +23,8 @@
 
 package org.voltdb;
 
+import java.util.Random;
+
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
@@ -30,6 +32,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestVarBinaryPartition extends TestCase {
@@ -54,7 +57,7 @@ public class TestVarBinaryPartition extends TestCase {
     public void testPartitionAndInsert () throws Exception {
         String my_schema =
                 "create table BLAH (" +
-                "clm_varinary varbinary(100) default '00' not null," +
+                "clm_varinary varbinary(128) default '00' not null," +
                 "clm_smallint smallint default 0 not null, " +
                 ");";
 
@@ -82,5 +85,18 @@ public class TestVarBinaryPartition extends TestCase {
 
             ClientResponse resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('22',1);" );
             assert( resp.getResults().length == 1 );
+            resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('80',3);" );
+            assert( resp.getResults().length == 1 );
+            resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('8081828384858687888990',4);" );
+            assert( resp.getResults().length == 1 );
+
+            Random rand = new Random();
+            for( int i = 0; i < 1000; i++ ){
+                byte[] b = new byte[rand.nextInt(128)];
+                rand.nextBytes(b);
+                String hexString = Encoder.hexEncode(b);
+                resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ("+"'"+hexString+"'"+",5);" );
+                assert( resp.getResults().length == 1 );
+            }
     }
 }
