@@ -629,9 +629,76 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
             map<string, CatalogDelegate*>::iterator pos;
             if ((pos = m_catalogDelegates.find(t->path())) != m_catalogDelegates.end()) {
                 TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
-                if (tcd && tcd->exportEnabled()) {
+                if (tcd) {
                     Table *table = tcd->getTable();
-                    table->setSignatureAndGeneration( t->signature(), txnId);
+                    if (tcd->exportEnabled()) {
+                        table->setSignatureAndGeneration(t->signature(), txnId);
+                    }
+
+                    vector<TableIndex*> currentIndexes = table->allIndexes();
+
+                    // find all of the indexes to add
+                    map<string, catalog::Index*>::const_iterator indexIter;
+                    for (indexIter = t->indexes().begin(); indexIter != t->indexes().end(); indexIter++) {
+                        std::string indexName = indexIter->first;
+
+                        bool found = false;
+                        for (int i = 0; i < currentIndexes.size(); i++) {
+                            std::string currentIndexName = currentIndexes[i]->getName();
+                            if (indexName.compare(currentIndexName) == 0) {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (!found) {
+                            // create and add the index
+                            TableIndexScheme scheme;
+                            bool success = TableCatalogDelegate::getIndexScheme(*t,
+                                                                                *indexIter->second,
+                                                                                table->schema(),
+                                                                                &scheme);
+                            if (!success) {
+                                VOLT_ERROR("Failed to initialize index '%s' from catalog",
+                                           indexIter->second->name().c_str());
+                                return false;
+                            }
+
+                            TableIndex *index = TableIndexFactory::getInstance(scheme);
+                            assert(index);
+
+                            // all of the data should be added here
+                            table->addIndex(index);
+
+                            // add the index to the stats source
+                            index->getIndexStats()->configure(index->getName() + " stats",
+                                                              table->name(),
+                                                              m_executorContext->m_hostId,
+                                                              m_executorContext->m_hostname,
+                                                              m_executorContext->m_siteId,
+                                                              m_executorContext->m_partitionId,
+                                                              indexIter->second->relativeIndex());
+                        }
+                    }
+
+                    // now find all of the indexes to remove
+                    bool found = false;
+                    for (int i = 0; i < currentIndexes.size(); i++) {
+                        std::string indexName = currentIndexes[i]->getName();
+
+                        map<string, catalog::Index*>::const_iterator indexIter;
+                        for (indexIter = t->indexes().begin(); indexIter != t->indexes().end(); indexIter++) {
+                            std::string currentIndexName = indexIter->first;
+                            if (indexName.compare(currentIndexName) == 0) {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (!found) {
+                            table->removeIndex(currentIndexes[i]);
+                        }
+                    }
                 }
             }
         }
@@ -763,7 +830,6 @@ bool VoltDBEngine::rebuildTableCollections() {
                                                       catTable->relativeIndex(),
                                                       index->getIndexStats());
             }
-
 
             /*map<string, catalog::Index*>::const_iterator index_iterator;
             for (index_iterator = catTable->indexes().begin();

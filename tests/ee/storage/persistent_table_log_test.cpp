@@ -115,8 +115,13 @@ public:
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
                                                          (0, m_engine->getExecutorContext(), "Foo",
-                                                          m_tableSchema, &m_columnNames[0], indexScheme, indexes, 0,
+                                                          m_tableSchema, &m_columnNames[0], 0,
                                                           false, false));
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        assert(pkeyIndex);
+        m_table->addIndex(pkeyIndex);
+        m_table->setPrimaryKeyIndex(pkeyIndex);
     }
 
 

@@ -1231,6 +1231,11 @@ public class VoltCompiler {
                                                 "materialized view.  A view cannot be an export table.");
                     throw new VoltCompilerException("View configured as an export table");
                 }
+                if (tableref.getIndexes().size() > 0) {
+                    compilerLog.error("While configuring export, table " + tablename + " has indexes defined. " +
+                            "Export tables can't have indexes.");
+                    throw new VoltCompilerException("Table with indexes configured as an export table");
+                }
                 if (tableref.getIsreplicated()) {
                     // if you don't specify partition columns, make
                     // export tables partitioned, but on no specific column (iffy)
