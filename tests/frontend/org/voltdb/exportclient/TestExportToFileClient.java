@@ -82,8 +82,7 @@ public class TestExportToFileClient extends TestCase {
 
         String simpleSchema =
             "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "PRIMARY KEY(ival));";
+            "ival bigint default 0 not null);";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
