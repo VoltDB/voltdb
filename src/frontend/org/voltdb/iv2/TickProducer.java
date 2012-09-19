@@ -52,12 +52,6 @@ public class TickProducer extends SiteTasker implements Runnable
     }
 
     @Override
-    public int priority()
-    {
-        return 0;
-    }
-
-    @Override
     public void run(final SiteProcedureConnection siteConnection)
     {
         siteConnection.tick();
