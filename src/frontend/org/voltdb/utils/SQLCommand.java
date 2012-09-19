@@ -830,7 +830,7 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO");
+    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO", "PLANNER");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",

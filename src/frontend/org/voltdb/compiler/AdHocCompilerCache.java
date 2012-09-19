@@ -47,6 +47,7 @@ public class AdHocCompilerCache implements Serializable {
     //////////////////////////////////////////////////////////////////////////
 
     private static WeakHashMap<Integer, AdHocCompilerCache> m_catalogVersionMatch = new WeakHashMap<Integer, AdHocCompilerCache>();
+
     /**
      * Get the global cache for a given version of the catalog. Note that there can be only
      * one cache per catalogVersion at a time.
@@ -92,6 +93,7 @@ public class AdHocCompilerCache implements Serializable {
     private AdHocCompilerCache() {
         this(1000, 1000);
     }
+
 
     /**
      * Constructor with specific cache sizes is only called directly for testing.
@@ -197,11 +199,12 @@ public class AdHocCompilerCache implements Serializable {
      */
     public synchronized void put(String sql,
                                  String parsedToken,
-                                 AdHocPlannedStatement plan)
+                                 AdHocPlannedStatement planIn)
     {
         assert(sql != null);
         assert(parsedToken != null);
-        assert(plan != null);
+        assert(planIn != null);
+        AdHocPlannedStatement plan = planIn;
         assert(new String(plan.sql, VoltDB.UTF8ENCODING).equals(sql));
 
         // uncomment this to get some raw stdout cache performance stats every 5s
@@ -249,5 +252,21 @@ public class AdHocCompilerCache implements Serializable {
                 }
             }, 5000, 5000);
         }
+    }
+
+    /**
+     * Return the number of items in the literal cache.
+     * @return  literal cache size as a count
+     */
+    public int getLiteralCacheSize() {
+        return m_literalCache.size();
+    }
+
+    /**
+     * Return the number of items in the core (parameterized) cache.
+     * @return  core cache size as a count
+     */
+    public int getCoreCacheSize() {
+        return m_coreCache.size();
     }
 }

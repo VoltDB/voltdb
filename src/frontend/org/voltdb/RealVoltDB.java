@@ -155,7 +155,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.8.1";
+    private static final String m_defaultVersionString = "2.8.2";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -766,7 +766,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     Class.forName("org.voltdb.management.JMXStatsManager");
                 m_statsManager = (StatsManager)statsManagerClass.newInstance();
                 m_statsManager.initialize(new ArrayList<Long>(m_localSites.keySet()));
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                int a = 0;
+            }
 
             try {
                 m_snapshotCompletionMonitor.init(m_messenger.getZK());
