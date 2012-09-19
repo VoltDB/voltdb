@@ -44,9 +44,6 @@ public class TestVarBinaryPartition extends TestCase {
     private VoltProjectBuilder builder;
     private Client client;
 
-    private final String reportDir = "/tmp/";
-    String path_csv = reportDir + "/" + "test.csv";
-
     @Override
     protected void setUp() throws Exception
     {
