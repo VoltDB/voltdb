@@ -30,6 +30,7 @@ import subprocess
 import time
 import filecmp
 import socket
+import getpass
 from collections import defaultdict
 from optparse import OptionParser
 from subprocess import call # invoke unix/linux cmds
@@ -60,7 +61,7 @@ tail = "tar.gz"
 # http://volt0/kits/candidate/LINUX-voltdb-2.8.1.tar.gz
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
 root = 'http://volt0/kits/candidate/'
-destDir = "/tmp/"
+destDir = "/tmp/" + getpass.getuser() + "/"
 elem2Test = {'helloworld':'run.sh', 'voltcache':'run.sh', 'voltkv':'run.sh', 'voter':'run.sh'}
 defaultHost = "localhost"
 defaultPort = 21212
@@ -106,6 +107,15 @@ def findSectionInFile(srce, start, end):
             status = True
             msg = "The Winner is Edwina Burnam"
     return (status, msg)
+
+# To read a srouce file 'srce' into an array
+def readFileIntoArray(srce):
+    firstline = None
+    content = []
+    if(os.path.getsize(srce) > 0):
+        with open(srce) as f:
+            content = f.readlines()
+    return content
 
 # To read the first line of a srouce file 'srce'
 def readFirstLine(srce):
@@ -319,10 +329,12 @@ def assertVoter(mod, logC):
 # To make sure that we see the key string 'Hola, Mundo!'
 def assertHelloWorld(modulename, logC):
     expected = "Hola, Mundo!"
-    actual = readFirstLine(logC)
-    if(expected == actual):
-        msg = expected
-        result = True
+    buf = readFileIntoArray(logC)
+    for line in buf:
+        if(expected == line.rstrip()):
+            msg = expected
+            result = True
+            break
     else:
         msg = "Expected '%s' for module '%s'. Actually returned: '%s'" % (expected, modulename, actual)
         result = False
@@ -360,8 +372,8 @@ def startTest(testSuiteList):
         currDir = os.getcwd()
         service = elem2Test[e]
 #        print "===--->>> Start to test this suite: %s" % e
-        logFileS = "/tmp/" + e + "_server"
-        logFileC = "/tmp/" + e + "_client"
+        logFileS = destDir + e + "_server"
+        logFileC = destDir + e + "_client"
         msg1 = msg2 = None
 #        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
         execThisService(service, logFileS, logFileC)
@@ -462,6 +474,9 @@ if __name__ == "__main__":
     testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
     workDir = destDir + testname
     # e.g. workDir = '/tmp/exp_test'
+
+    if not os.path.exists(destDir):
+        os.makedirs(destDir)
 
     suite = options.suite
     if suite not in elem2Test.keys() and suite != "all":
