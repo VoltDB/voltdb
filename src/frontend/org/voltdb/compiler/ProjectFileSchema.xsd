@@ -33,7 +33,6 @@
   <xsd:complexType name="projectType">
     <xsd:all>
       <xsd:element name="info" minOccurs='0' maxOccurs='1' type="infoType"/>
-      <xsd:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xsd:element name="database" minOccurs="1" maxOccurs="1" type="databaseType"/>
     </xsd:all>
   </xsd:complexType>
@@ -45,11 +44,6 @@
       <xsd:element name="version" type="xsd:string"/>
       <xsd:element name="description" type="xsd:string"/>
     </xsd:all>
-  </xsd:complexType>
-
-  <!-- <security> -->
-  <xsd:complexType name="securityType">
-    <xsd:attribute name="enabled" type="xsd:boolean" default="false"/>
   </xsd:complexType>
 
   <!--  <database> -->

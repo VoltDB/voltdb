@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ParameterSet;
+import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -94,7 +95,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int totalPartitions)
     {
         // base class loads the volt shared library.
-        super();
+        super(siteId, partitionId);
 
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
@@ -211,6 +212,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     {
         deserializer.clear();
 
+        long cacheSize = 0;
+        CacheUse cacheUse = CacheUse.FAIL;
+
+        // Start collecting statistics
+        startStatsCollection();
+
         //C++ JSON deserializer is not thread safe, must synchronize
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
@@ -222,9 +229,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             try {
                 final long fragId = fds.readLong();
                 final boolean wasHit = fds.readBoolean();
-                final long cacheSize = fds.readLong();
+                cacheSize = fds.readLong();
                 if (fragId == 0) {
                     throw new EEException(ERRORCODE_ERROR);
+                }
+                if (wasHit) {
+                    cacheUse = CacheUse.HIT1;
+                }
+                else {
+                    cacheUse = CacheUse.MISS;
                 }
                 return fragId;
             } catch (final IOException ex) {
@@ -232,6 +245,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
             }
         } finally {
+            // Stop collecting statistics.
+            endStatsCollection(cacheSize, cacheUse);
+
             fallbackBuffer = null;
         }
     }

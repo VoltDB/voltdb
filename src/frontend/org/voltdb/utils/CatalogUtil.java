@@ -44,6 +44,9 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import org.mindrot.BCrypt;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -76,18 +79,15 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
-
-import org.mindrot.BCrypt;
 
 /**
  *
@@ -556,6 +556,9 @@ public abstract class CatalogUtil {
         //Set the snapshot schedule
         setSnapshotInfo( catalog, deployment.getSnapshot());
 
+        //Set enable security
+        setSecurityEnabled(catalog, deployment.getSecurity());
+
         //set path and path overrides
         // NOTE: this must be called *AFTER* setClusterInfo and setSnapshotInfo
         // because path locations for snapshots and partition detection don't
@@ -633,7 +636,7 @@ public abstract class CatalogUtil {
      * @return A positive CRC for the deployment contents
      */
     static long getDeploymentCRC(DeploymentType deployment) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(1024);
 
         sb.append(" CLUSTER ");
         ClusterType ct = deployment.getCluster();
@@ -648,6 +651,12 @@ public abstract class CatalogUtil {
             PartitionDetectionType.Snapshot st = pdt.getSnapshot();
             assert(st != null);
             sb.append(st.getPrefix()).append(",");
+        }
+
+        sb.append(" SECURITY ");
+        SecurityType st = deployment.getSecurity();
+        if (st != null) {
+            sb.append(st.isEnabled());
         }
 
         sb.append(" ADMINMODE ");
@@ -1011,6 +1020,20 @@ public abstract class CatalogUtil {
             hostLog.info("Export configuration is present and is " +
                "configured to be disabled. Export will be disabled.");
         }
+    }
+
+    /**
+     * Set the security setting in the catalog from the deployment file
+     * @param catalog the catalog to be updated
+     * @param securityEnabled security element of the deployment xml
+     */
+    private static void setSecurityEnabled( Catalog catalog, SecurityType securityEnabled) {
+        Cluster cluster = catalog.getClusters().get("cluster");
+        boolean enabled = false;
+        if (securityEnabled != null) {
+            enabled = securityEnabled.isEnabled();
+        }
+        cluster.setSecurityenabled(enabled);
     }
 
     /**
