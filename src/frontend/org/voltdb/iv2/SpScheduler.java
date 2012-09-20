@@ -26,8 +26,6 @@ import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.CommandLog;
@@ -473,7 +471,7 @@ public class SpScheduler extends Scheduler
         if (txn != null)
         {
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(txn, m_pendingTasks, message);
+                new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
             m_pendingTasks.offer(task);
         }
     }

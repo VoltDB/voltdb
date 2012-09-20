@@ -108,7 +108,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         CompleteTransactionTask task =
-            new CompleteTransactionTask(txn, queue, msg);
+            new CompleteTransactionTask(txn, queue, msg, null);
         return task;
     }
 

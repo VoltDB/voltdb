@@ -89,7 +89,11 @@ public class PartitionDRGateway {
     // empty methods for community edition
     protected void init(int partitionId,
                         NodeDRGateway gateway) throws IOException {}
-    public void onSuccessfulProcedureCall(long txnId, long spHandle,
+    public void onSuccessfulProcedureCall(long txnId, long timestamp,
+                                          StoredProcedureInvocation spi,
+                                          ClientResponseImpl response) {}
+    public void onSuccessfulProcedureCall(long txnId, long timestamp,
+                                          boolean isMultipart,
                                           StoredProcedureInvocation spi,
                                           ClientResponseImpl response) {}
     public void tick(long txnId) {}

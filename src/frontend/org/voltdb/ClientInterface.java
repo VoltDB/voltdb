@@ -78,6 +78,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -93,6 +94,7 @@ import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCacheReader;
+import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -1533,6 +1535,43 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
+    /**
+     * Send a multipart sentinel to all partitions. This is only used when the
+     * multipart didn't generate any sentinels for partitions, e.g. DR
+     * @LoadMultipartitionTable.
+     *
+     * @param txnId
+     */
+    void sendSentinelsToAllPartitions(long txnId)
+    {
+        for (int partition : m_allPartitions) {
+            sendSentinel(TransactionTaskQueue.GENERIC_MP_SENTINEL, partition);
+        }
+    }
+
+    /**
+     * Send a multipart sentinel to the specified partition. This comes from the
+     * DR agent in prepare of a multipart transaction.
+     *
+     * @param buf
+     * @param invocation
+     * @return
+     */
+    ClientResponseImpl dispatchSendSentinel(ByteBuffer buf,
+                                            StoredProcedureInvocation invocation)
+    {
+        // First parameter is the partition ID
+        sendSentinel(invocation.getOriginalTxnId(),
+                     (Integer) invocation.getParameterAtIndex(0));
+
+        ClientResponseImpl response =
+                new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                       new VoltTable[0],
+                                       ClientResponseImpl.DUPE_TRANSACTION,
+                                       invocation.clientHandle);
+        return response;
+    }
+
     ClientResponseImpl dispatchStatistics(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
@@ -1638,6 +1677,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if(task.procName.equals("@ExplainProc")) {
                 return dispatchExplainProcedure(task, handler, ccxn);
             }
+            else if (task.procName.equals("@SendSentinel")) {
+                return dispatchSendSentinel(buf, task);
+            }
         }
 
         if (user == null) {
@@ -1675,6 +1717,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
             } else if (task.procName.equals("@LoadSinglepartitionTable")) {
                 return dispatchLoadSinglepartitionTable(buf, task, handler, ccxn);
+            } else if (task.procName.equals("@LoadMultipartitionTable")) {
+                /*
+                 * For IV2 DR: This will generate a sentinel for each partition,
+                 * but doesn't initiate the invocation. It will fall through to
+                 * the shared dispatch of sysprocs.
+                 */
+                if (VoltDB.instance().isIV2Enabled() &&
+                        task.getType() == ProcedureInvocationType.REPLICATED) {
+                    sendSentinelsToAllPartitions(task.getOriginalTxnId());
+                }
             } else if (task.procName.equals("@SnapshotSave")) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;

@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
@@ -32,6 +33,13 @@ import org.voltdb.messaging.FragmentTaskMessage;
 public class TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    /*
+     * A generic multi-part sentinel txnId used by DR. It blocks the queue until
+     * the next multi-part fragment arrives. Since replica has to allow read
+     * transactions, DR cannot use the original txnIds for sentinels.
+     */
+    public static final long GENERIC_MP_SENTINEL = Long.MIN_VALUE;
 
     final private SiteTaskerQueue m_taskQueue;
 
@@ -48,6 +56,12 @@ public class TransactionTaskQueue
      */
     TreeMap<Long, Deque<TransactionTask>> m_multipartBacklog = new TreeMap<Long, Deque<TransactionTask>>();
 
+    /**
+     * Since DR uses GENERIC_MP_SENTINEL for all sentinels, they cannot
+     * be differentiated. We need to keep a backlog of sentinels.
+     */
+    private long m_drMPSentinelBacklog = 0;
+
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
         m_taskQueue = queue;
@@ -55,15 +69,23 @@ public class TransactionTaskQueue
 
     synchronized void offerMPSentinel(long txnId) {
         if (m_multiPartPendingSentinelReceipt != null) {
+            boolean mismatch = false;
+            if (txnId == GENERIC_MP_SENTINEL) {
+                // no-op
+            } else if (txnId != m_multiPartPendingSentinelReceipt.getTxnId()) {
+                mismatch = true;
+            }
+
             /*
              * The fragment has arrived already, then this MUST be the correct
              * sentinel for this fragment.
              */
-            if (txnId != m_multiPartPendingSentinelReceipt.getTxnId()) {
+            if (mismatch) {
                 VoltDB.crashLocalVoltDB("Mismatch between replay sentinel txnid " +
                         txnId + " and next mutli-part fragment id " +
                         m_multiPartPendingSentinelReceipt.getTxnId(), false, null);
             }
+
             /*
              * Queue this in the back, you know nothing precedes it
              * since the sentinel is part of the single part stream
@@ -75,12 +97,19 @@ public class TransactionTaskQueue
             m_multipartBacklog.put(txnId, deque);
             taskQueueOffer(ts);
         } else {
-            /*
-             * The sentinel has arrived, but not the fragment. Stash it away and wait for the fragment.
-             * The presence of this handle pairing indicates that execution of the single part stream must
-             * block until the multi-part is satisfied
-             */
-            m_multipartBacklog.put(txnId, new ArrayDeque<TransactionTask>());
+            if (!m_multipartBacklog.isEmpty() && m_multipartBacklog.firstKey() == txnId) {
+                // Put the DR sentinel into the backlog
+                assert(txnId == GENERIC_MP_SENTINEL);
+                m_drMPSentinelBacklog++;
+            } else {
+                /*
+                 * The sentinel has arrived, but not the fragment. Stash it away
+                 * and wait for the fragment. The presence of this handle
+                 * pairing indicates that execution of the single part stream
+                 * must block until the multi-part is satisfied
+                 */
+                m_multipartBacklog.put(txnId, new ArrayDeque<TransactionTask>());
+            }
         }
     }
 
@@ -97,6 +126,11 @@ public class TransactionTaskQueue
         boolean retval = false;
 
         final TransactionState ts = task.getTransactionState();
+        boolean isDRReplicated = false;
+        if (VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA && !ts.isReadOnly() &&
+                !(ts instanceof BorrowTransactionState)) {
+            isDRReplicated = true;
+        }
 
         // Single partitions never queue if empty
         // Multipartitions always queue
@@ -104,24 +138,38 @@ public class TransactionTaskQueue
         // offer to SiteTaskerQueue if:
         // the queue was empty
         // the queue wasn't empty but the txn IDs matched
-        if (ts.isForReplay() && (task instanceof FragmentTask)) {
+        if ((ts.isForReplay() || isDRReplicated) && (task instanceof FragmentTask)) {
+            boolean hasSentinel = false;
+            if (!m_multipartBacklog.isEmpty()) {
+                long txnId = m_multipartBacklog.firstKey();
+                if (ts.txnId == txnId) {
+                    hasSentinel = true;
+                } else if (txnId == GENERIC_MP_SENTINEL && isDRReplicated) {
+                    hasSentinel = true;
+                }
+            }
+
             /*
              * If this is a multi-partition transaction for replay then it can't
              * be inserted into the order for this partition until it's position is known
              * via the sentinel value. That value may not be known at the is point.
              */
-            if (!m_multipartBacklog.isEmpty() && ts.txnId == m_multipartBacklog.firstKey()) {
+            if (hasSentinel) {
                 /*
                  * This branch is for fragments that follow the first fragment during replay
-                 * or first fragments during replay that follow the sentinenl (hence the key exists)
-                 * It is executed immeidately either way, but it may need to be inserted into the backlog
+                 * or first fragments during replay that follow the sentinel (hence the key exists)
+                 * It is executed immediately either way, but it may need to be inserted into the backlog
                  * if it is the first fragment
                  */
                 Deque<TransactionTask> backlog = m_multipartBacklog.firstEntry().getValue();
+
                 TransactionTask first = backlog.peekFirst();
                 if (first != null) {
                     if (first.m_txn.txnId != task.getTxnId()) {
                         if (!first.m_txn.isSinglePartition()) {
+                            hostLog.fatal("Head of backlog is " + first.m_txn.txnId +
+                                          " but task is " + task.getClass().getCanonicalName() +
+                                          " " + task.getTxnId());
                             VoltDB.crashLocalVoltDB(
                                     "If the first backlog task is multi-part, " +
                                     "but has a different transaction id it is a bug", true, null);
@@ -159,13 +207,25 @@ public class TransactionTaskQueue
             }
         } else if (!m_multipartBacklog.isEmpty()) {
             /*
+             * For DR multipart, only BorrowTransactionTask and
+             * CompleteTransactionTask will enter this branch.
+             */
+            boolean isDRMPTask = false;
+            if (((ts instanceof BorrowTransactionState) || !ts.isSinglePartition()) &&
+                    !ts.isReadOnly() &&
+                    m_multipartBacklog.firstKey() == GENERIC_MP_SENTINEL) {
+                isDRMPTask = true;
+            }
+
+            /*
              * This branch happens during regular execution when a multi-part is in progress.
              * The first task for the multi-part is the head of the queue, and all the single parts
              * are being queued behind it. The txnid check catches tasks that are part of the multi-part
              * and immediately queues them for execution.
              */
-            if (task.getTxnId() != m_multipartBacklog.firstKey())
+            if (!isDRMPTask && task.getTxnId() != m_multipartBacklog.firstKey())
             {
+
                 if (!ts.isSinglePartition()) {
                     /*
                      * In this case it is a multi-part fragment for the next transaction
@@ -318,6 +378,14 @@ public class TransactionTaskQueue
                             ++offered;
                         }
                     }
+                }
+
+                /*
+                 * If there are any DR sentinels queued, release one.
+                 */
+                if (m_drMPSentinelBacklog > 0) {
+                    m_multipartBacklog.put(GENERIC_MP_SENTINEL, new ArrayDeque<TransactionTask>());
+                    m_drMPSentinelBacklog--;
                 }
             }
         }

@@ -35,11 +35,14 @@ import org.voltdb.utils.LogKeys;
  */
 public class SpProcedureTask extends ProcedureTask
 {
+    final private PartitionDRGateway m_drGateway;
+
     SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg,
                   PartitionDRGateway drGateway)
     {
-       super(initiator, procName, new SpTransactionState(msg), queue, drGateway);
+       super(initiator, procName, new SpTransactionState(msg), queue);
+       m_drGateway = drGateway;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */

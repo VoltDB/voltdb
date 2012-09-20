@@ -27,7 +27,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
@@ -36,7 +35,6 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpTransactionState extends TransactionState
 {
