@@ -268,7 +268,7 @@ def startService(service, logS, logC):
     client = getClient()
     cmd = service + " client > " + logC + " 2>&1"
     ret = call(cmd, shell=True)
-#    print "returning results from service execution: '%s'" % ret
+    print "returning results from service execution: '%s'" % ret
     time.sleep(1)
     return (service_ps, client)
 
@@ -280,11 +280,15 @@ def stopService(ps, serviceHandle):
 # To execute 'run.sh' and save the output in logS
 # To execute 'run.sh client' and save the output in logC
 def execThisService(service, logS, logC):
-    service_ps = subprocess.Popen(service + " > " + logS + " 2>&1", shell=True)
+    cmd = service + " > " + logS + " 2>&1"
+    print "Server - Exec CMD: '%s'" % cmd
+    service_ps = subprocess.Popen(cmd, shell=True)
     time.sleep(2)
     client = getClient()
-    ret = call(service + " client > " + logC + " 2>&1", shell=True)
-#    print "returning results from service execution: '%s'" % ret
+    cmd = service + " client > " + logC + " 2>&1"
+    print "Client - Exec CMD: '%s'" % cmd
+    ret = call(cmd, shell=True)
+    print "returning results from service execution: '%s'" % ret
     client.onecmd("shutdown")
     service_ps.communicate()
 
@@ -381,11 +385,11 @@ def startTest(testSuiteList):
         os.chdir(testSuiteList[e])
         currDir = os.getcwd()
         service = elem2Test[e]
-#        print "===--->>> Start to test this suite: %s" % e
+        print "===--->>> Start to test this suite: %s\nCurrent Dir: '%s'" % (e, currDir)
         logFileS = logDir + e + "_server"
         logFileC = logDir + e + "_client"
         msg1 = msg2 = None
-#        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
+        print "logFileS = '%s'\nlogFileC = '%s'" % (logFileS, logFileC)
         execThisService(service, logFileS, logFileC)
         if(e == "helloworld"):
             (result, msg1) = assertHelloWorld(e, logFileC)
@@ -430,8 +434,8 @@ def create_rpt(info, status, msg, keys, elapsed):
             else:
                 failureCnt = "0"
     
-#            print "==-->>suite name: '%s', failureCnt: '%s', status = '%s'" \
-#                % (i, failureCnt, status[mod][i])
+            print "==-->>suite name: '%s', failureCnt: '%s', status = '%s'" \
+                % (i, failureCnt, status[mod][i])
             if(info["ok"] == False):
                 errCnt = "1"
             else:
