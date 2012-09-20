@@ -48,21 +48,26 @@ from Query import VoltQueryClient
 from XMLUtils import prettify # To create a human readable xml file
 
 hostname = socket.gethostname()
-allPkgs = {'all': "Community, Pro, Voltkv, Voltcache"}
 pkgName = {'comm': 'LINUX-voltdb',
            'voltkv': 'LINUX-voltdb-voltkv',
            'voltcache': 'LINUX-voltdb-voltcache',
            'pro': 'LINUX-voltdb-ent'}
-suiteName = {'comm': 'Community',
-             'pro': 'Enterprise',
+pkgDict = {'comm': 'Community',
+           'pro': 'Enterprise',
+           'voltkv': 'Voltkv',
+           'voltcache': 'Voltcache',
+           'all': "Community, Pro, Voltkv, Voltcache"}
+suiteDict = {'helloworld': 'HelloWorld',
+             'voltcache': 'Voltcache',
              'voltkv': 'Voltkv',
-             'voltcache': 'Voltcache'}
+             'voter': 'Voter',
+             'all': 'HelloWorld, Voter, Voltcache, Voltkv'}
 tail = "tar.gz"
 # http://volt0/kits/candidate/LINUX-voltdb-2.8.1.tar.gz
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
 root = 'http://volt0/kits/candidate/'
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
-destDir = "./"
+destDir = "/tmp/"
 logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
 elem2Test = {'helloworld':'run.sh', 'voltcache':'run.sh', 'voltkv':'run.sh', 'voter':'run.sh'}
 defaultHost = "localhost"
@@ -163,11 +168,11 @@ def installVoltDB(pkg, release):
         info["err"] = info["err"][:-1]    # Trim the last char ','
         return info
 
-    pkgname = pkgName[pkg] + '-' + release + "." + tail
-    srce = root + pkgname
-    dest = logDir + pkgname
+    thispkg = pkgName[pkg] + '-' + release + "." + tail
+    srce = root + thispkg
+    dest = logDir + thispkg
     cmd = "wget " + srce + " -O " + dest + " 2>/dev/null"
-#    print "cmd: %s" % cmd
+    print "cmd: %s" % cmd
 
     ret = call(cmd, shell=True)
     if ret != 0 or not os.path.exists(dest):
@@ -189,7 +194,7 @@ def installVoltDB(pkg, release):
     if ret == 0:
 #        info["dest"] = dest
         info["srce"] = srce
-        info["pkgname"] = pkgname
+        info["pkgname"] = thispkg
         info["workDir"] = workDir
         info["ok"] = True
     else:
@@ -377,8 +382,8 @@ def startTest(testSuiteList):
         currDir = os.getcwd()
         service = elem2Test[e]
 #        print "===--->>> Start to test this suite: %s" % e
-        logFileS = origDir + "/" + logDir + e + "_server"
-        logFileC = origDir + "/" + logDir + e + "_client"
+        logFileS = logDir + e + "_server"
+        logFileC = logDir + e + "_client"
         msg1 = msg2 = None
 #        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
         execThisService(service, logFileS, logFileC)
@@ -477,16 +482,15 @@ if __name__ == "__main__":
     parser.set_defaults(suite="all")
     (options, args) = parser.parse_args()
     workDir = destDir + getpass.getuser() + "_" + testname
-    # e.g. workDir = './cyan_exp_test'
 
     if not os.path.exists(logDir):
         os.makedirs(logDir)
 
     suite = options.suite
     if suite not in elem2Test.keys() and suite != "all":
-        suite = "all"
         print "Warning: unknown suite name - '%s'" % suite
-        print "Info: So we're going to cover all test suites in this run"
+        suite = "all"
+        print "Info: So we're going to cover all test suites '%s' in this run" % suiteDict[suite]
 
     origDir = os.getcwd()
 
@@ -497,9 +501,9 @@ if __name__ == "__main__":
     print "############################################"
     print "Tested Version in this RUN: %s" % releaseNum
     if(options.pkg == "all"):
-        print "To test all packages in this RUN: %s" % allPkgs[options.pkg]
+        print "To test all packages in this RUN: %s" % pkgDict[options.pkg]
     else:
-        print "Tested pkg in this RUN: %s" % options.pkg
+        print "Tested pkg in this RUN: %s" % pkgDict[options.pkg]
     print "############################################"
 
     tf = msg = keys = None
