@@ -206,7 +206,7 @@ public class ProcedureRunner {
             }
 
             if (paramList.length != m_paramTypes.length) {
-                m_statsCollector.endProcedure( false, true);
+                m_statsCollector.endProcedure(false, true, null, null);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 status = ClientResponse.GRACEFUL_FAILURE;
@@ -223,7 +223,7 @@ public class ProcedureRunner {
                             m_paramTypeComponentType[i],
                             paramList[i]);
                 } catch (Exception e) {
-                    m_statsCollector.endProcedure( false, true);
+                    m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.getMessage();
                     status = ClientResponse.GRACEFUL_FAILURE;
@@ -258,7 +258,7 @@ public class ProcedureRunner {
                         error = true;
                     }
                     if (ex instanceof Error) {
-                        m_statsCollector.endProcedure( false, true);
+                        m_statsCollector.endProcedure(false, true, null, null);
                         throw (Error)ex;
                     }
 
@@ -291,7 +291,10 @@ public class ProcedureRunner {
                 }
             }
 
-            m_statsCollector.endProcedure( abort, error);
+            // Record statistics for procedure call.
+            StoredProcedureInvocation invoc = (m_txnState != null ? m_txnState.getInvocation() : null);
+            ParameterSet paramSet = (invoc != null ? invoc.getParams() : null);
+            m_statsCollector.endProcedure(abort, error, results, paramSet);
 
             // don't leave empty handed
             if (results == null)
@@ -361,6 +364,10 @@ public class ProcedureRunner {
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, args);
         queuedSQL.stmt = stmt;
+        // log SQL run by all adhocs
+        if (stmt.plan != null) {
+            getTxnState().appendAdHocSQL(stmt.sqlText);
+        }
         m_batch.add(queuedSQL);
     }
 
@@ -942,7 +949,7 @@ public class ProcedureRunner {
        // holds query results
        final VoltTable[] m_results;
 
-       BatchState(ProcedureRunner runner, int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
+       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -1057,7 +1064,7 @@ public class ProcedureRunner {
     */
    VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
 
-       BatchState state = new BatchState(this, batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
+       BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {

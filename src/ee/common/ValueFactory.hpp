@@ -48,25 +48,37 @@ public:
         return NValue::getDoubleValue(value);
     }
 
+    /// Constructs a value copied into long-lived pooled memory (or the heap)
+    /// that will require an explicit NValue::free.
     static inline NValue getStringValue(const char *value) {
-        return NValue::getStringValue(value, value ? strlen(value) : 0);
+        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value, (size_t)(value ? strlen(value) : 0), NULL);
     }
 
-    static inline NValue getStringValue(std::string value) {
-        return NValue::getStringValue(value);
+    /// Constructs a value copied into long-lived pooled memory (or the heap)
+    /// that will require an explicit NValue::free.
+    static inline NValue getStringValue(const std::string value) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NULL);
     }
 
     static inline NValue getNullStringValue() {
         return NValue::getNullStringValue();
     }
 
-    static inline NValue getBinaryValue(std::string value) {
-        // uses hex encoding
-        return NValue::getBinaryValue(value);
+    /// Constructs a value copied into long-lived pooled memory (or the heap)
+    /// that will require an explicit NValue::free.
+    /// Assumes hex-encoded input
+    static inline NValue getBinaryValue(const std::string& value) {
+        size_t rawLength = value.length() / 2;
+        unsigned char rawBuf[rawLength];
+        hexDecodeToBinary(rawBuf, value.c_str());
+        return getBinaryValue(rawBuf, (int32_t)rawLength);
     }
 
-    static inline NValue getBinaryValue(unsigned char* value, int32_t len) {
-        return NValue::getBinaryValue(value, len);
+    /// Constructs a value copied into long-lived pooled memory (or the heap)
+    /// that will require an explicit NValue::free.
+    /// Assumes raw byte input
+    static inline NValue getBinaryValue(const unsigned char* rawBuf, int32_t rawLength) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, reinterpret_cast<const char*>(rawBuf), (size_t)rawLength, NULL);
     }
 
     static inline NValue getNullBinaryValue() {

@@ -81,7 +81,10 @@ public class SimpleServer {
 
         builder.addDefaultSchema();
         builder.addDefaultProcedures();
-        builder.addDefaultPartitioning();
+        // 08/228/2012
+        // Table patitioning is defined in the corresponding DDL files.
+        // Therefore, no longer need to call builder.addDefaultPartitioning()
+        //builder.addDefaultPartitioning();
         builder.setCompilerDebugPrintStream(System.out);
 
         System.out.println("config path: " + config.m_pathToCatalog);
