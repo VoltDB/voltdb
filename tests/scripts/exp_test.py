@@ -61,7 +61,9 @@ tail = "tar.gz"
 # http://volt0/kits/candidate/LINUX-voltdb-2.8.1.tar.gz
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
 root = 'http://volt0/kits/candidate/'
-destDir = "/tmp/" + getpass.getuser() + "/"
+testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
+destDir = "./"
+logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
 elem2Test = {'helloworld':'run.sh', 'voltcache':'run.sh', 'voltkv':'run.sh', 'voter':'run.sh'}
 defaultHost = "localhost"
 defaultPort = 21212
@@ -163,8 +165,9 @@ def installVoltDB(pkg, release):
 
     pkgname = pkgName[pkg] + '-' + release + "." + tail
     srce = root + pkgname
-    dest = destDir + pkgname
+    dest = logDir + pkgname
     cmd = "wget " + srce + " -O " + dest + " 2>/dev/null"
+#    print "cmd: %s" % cmd
 
     ret = call(cmd, shell=True)
     if ret != 0 or not os.path.exists(dest):
@@ -254,10 +257,12 @@ def getClient():
 # shutdown VoltDB, we have to separate startService() and stopService(),
 # so that we can add more implementations in between.
 def startService(service, logS, logC):
-    service_ps = subprocess.Popen(service + " > " + logS + " 2>&1", shell=True)
+    cmd = service + " > " + logS + " 2>&1"
+    service_ps = subprocess.Popen(cmd, shell=True)
     time.sleep(2)
     client = getClient()
-    ret = call(service + " client > " + logC + " 2>&1", shell=True)
+    cmd = service + " client > " + logC + " 2>&1"
+    ret = call(cmd, shell=True)
 #    print "returning results from service execution: '%s'" % ret
     time.sleep(1)
     return (service_ps, client)
@@ -372,8 +377,8 @@ def startTest(testSuiteList):
         currDir = os.getcwd()
         service = elem2Test[e]
 #        print "===--->>> Start to test this suite: %s" % e
-        logFileS = destDir + e + "_server"
-        logFileC = destDir + e + "_client"
+        logFileS = origDir + "/" + logDir + e + "_server"
+        logFileC = origDir + "/" + logDir + e + "_client"
         msg1 = msg2 = None
 #        print "logFileS = '%s', logFileC = '%s'" % (logFileS, logFileC)
         execThisService(service, logFileS, logFileC)
@@ -471,12 +476,11 @@ if __name__ == "__main__":
     parser.set_defaults(pkg="all")
     parser.set_defaults(suite="all")
     (options, args) = parser.parse_args()
-    testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
-    workDir = destDir + testname
-    # e.g. workDir = '/tmp/exp_test'
+    workDir = destDir + getpass.getuser() + "_" + testname
+    # e.g. workDir = './cyan_exp_test'
 
-    if not os.path.exists(destDir):
-        os.makedirs(destDir)
+    if not os.path.exists(logDir):
+        os.makedirs(logDir)
 
     suite = options.suite
     if suite not in elem2Test.keys() and suite != "all":
