@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.6
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2012 VoltDB Inc.
@@ -551,4 +551,7 @@ if __name__ == "__main__":
         print "\nAt lease one test suite is Failed!!\n"
         exit(1)
     print "All tests are PASSED!!"
+    for p in msgD:
+        for suitename in msgD[module]:
+            print "%s - %s: %s" % (pkgDict[p], suiteDict[suitename], msgD[p][suitename])
     exit(0)
