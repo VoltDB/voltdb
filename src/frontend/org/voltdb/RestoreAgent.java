@@ -551,14 +551,14 @@ SnapshotCompletionInterest
 
             SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
-            if (m_replayAgent.getInstanceId() != null &&
+            if (m_replayAgent.getInstanceId() != null && info != null &&
                 !m_replayAgent.getInstanceId().equals(info.instanceId)) {
                 LOG.debug("Rejecting snapshot due to mismatching instance IDs.");
                 LOG.debug("Command log ID: " + m_replayAgent.getInstanceId().serializeToJSONObject().toString());
                 LOG.debug("Snapshot ID: " + info.instanceId.serializeToJSONObject().toString());
                 continue;
             }
-            if (VoltDB.instance().isIV2Enabled()) {
+            if (VoltDB.instance().isIV2Enabled() && info != null) {
                 final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
                 final Map<Integer, Long> snapmap = info.partitionToTxnId;
                 // If cmdlogmap is null, there were no command log segments, so all snapshots are potentially valid,

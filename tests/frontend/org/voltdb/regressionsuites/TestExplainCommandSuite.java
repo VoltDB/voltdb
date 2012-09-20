@@ -52,10 +52,10 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", (Object[]) strs ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            //String plan = (String) vt.get(0, VoltType.STRING );
             String plan = (String) vt.get("EXEcution_PlaN", VoltType.STRING);
             assertTrue( plan.contains( "RETURN RESULTS TO STORED PROCEDURE" ));
-            assertTrue( plan.contains( "ORDER BY (SORT)"));
+            // Validate bypass of no-op sort on single-row result.
+            assertFalse( plan.contains( "ORDER BY (SORT)"));
             assertTrue( plan.contains( "TABLE COUNT" ));
         }
 

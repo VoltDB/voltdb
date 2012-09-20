@@ -101,8 +101,9 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                 msg);
     }
-    if (count == 0)
-        return getStringValue("");
+    if (count == 0) {
+        return getTempStringValue("", 0);
+    }
 
     const int32_t valueUTF8Length = strValue.getObjectLength();
     char *repeatChars = reinterpret_cast<char*>(strValue.getObjectValue());
@@ -168,8 +169,9 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
             msg);
     }
-    if (count == 0)
-        return getStringValue("");
+    if (count == 0) {
+        return getTempStringValue("", 0);
+    }
 
     const int32_t valueUTF8Length = strValue.getObjectLength();
     char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
@@ -200,8 +202,9 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
             msg);
     }
-    if (count == 0)
-        return getStringValue("");
+    if (count == 0) {
+        return getTempStringValue("", 0);
+    }
 
     const int32_t valueUTF8Length = strValue.getObjectLength();
     char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());

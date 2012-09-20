@@ -21,8 +21,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "harness.h"
 #include <string>
+#include <boost/foreach.hpp>
+
+#include "harness.h"
 #include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
 #include "common/debuglog.h"
@@ -176,9 +178,18 @@ class TableAndIndexTest : public Test {
             districtTable = voltdb::TableFactory::getPersistentTable(0,engine, "DISTRICT",
                                                                      districtTupleSchema,
                                                                      districtColumnNames,
-                                                                     districtIndex1Scheme,
-                                                                     districtIndexes, 0,
-                                                                     false, false);
+                                                                     0, false, false);
+            TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
+            assert(pkeyIndex);
+            districtTable->addIndex(pkeyIndex);
+            districtTable->setPrimaryKeyIndex(pkeyIndex);
+
+            // add other indexes
+            BOOST_FOREACH(TableIndexScheme scheme, districtIndexes) {
+                TableIndex *index = TableIndexFactory::getInstance(scheme);
+                assert(index);
+                districtTable->addIndex(index);
+            }
 
             districtTempTable = dynamic_cast<TempTable*>(
                 TableFactory::getCopiedTempTable(0, "DISTRICT TEMP", districtTable,
@@ -187,9 +198,18 @@ class TableAndIndexTest : public Test {
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, engine, "WAREHOUSE",
                                                                       warehouseTupleSchema,
                                                                       warehouseColumnNames,
-                                                                      warehouseIndex1Scheme,
-                                                                      warehouseIndexes, 0,
-                                                                      false, false);
+                                                                      0, false, false);
+            pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(warehouseIndex1Scheme);
+            assert(pkeyIndex);
+            warehouseTable->addIndex(pkeyIndex);
+            warehouseTable->setPrimaryKeyIndex(pkeyIndex);
+
+            // add other indexes
+            BOOST_FOREACH(TableIndexScheme scheme, warehouseIndexes) {
+                TableIndex *index = TableIndexFactory::getInstance(scheme);
+                assert(index);
+                warehouseTable->addIndex(index);
+            }
 
             warehouseTempTable =  dynamic_cast<TempTable*>(
                 TableFactory::getCopiedTempTable(0, "WAREHOUSE TEMP", warehouseTable,
@@ -198,9 +218,18 @@ class TableAndIndexTest : public Test {
             customerTable = voltdb::TableFactory::getPersistentTable(0,engine, "CUSTOMER",
                                                                      customerTupleSchema,
                                                                      customerColumnNames,
-                                                                     customerIndex1Scheme,
-                                                                     customerIndexes, 0,
-                                                                     false, false);
+                                                                     0, false, false);
+            pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
+            assert(pkeyIndex);
+            customerTable->addIndex(pkeyIndex);
+            customerTable->setPrimaryKeyIndex(pkeyIndex);
+
+            // add other indexes
+            BOOST_FOREACH(TableIndexScheme scheme, customerIndexes) {
+                TableIndex *index = TableIndexFactory::getInstance(scheme);
+                assert(index);
+                customerTable->addIndex(index);
+            }
 
             customerTempTable =  dynamic_cast<TempTable*>(
                 TableFactory::getCopiedTempTable(0, "CUSTOMER TEMP", customerTable,

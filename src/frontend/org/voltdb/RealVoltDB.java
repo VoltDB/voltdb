@@ -82,6 +82,7 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.DtxnInitiatorMailbox;
 import org.voltdb.dtxn.ExecutorTxnIdSafetyState;
@@ -155,7 +156,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.8.1";
+    private static final String m_defaultVersionString = "2.8.2";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -766,7 +767,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     Class.forName("org.voltdb.management.JMXStatsManager");
                 m_statsManager = (StatsManager)statsManagerClass.newInstance();
                 m_statsManager.initialize(new ArrayList<Long>(m_localSites.keySet()));
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                int a = 0;
+            }
 
             try {
                 m_snapshotCompletionMonitor.init(m_messenger.getZK());
@@ -1156,7 +1159,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         + m_config.m_pathToDeployment, false, null);
             }
 
-            // note the heatbeats are specified in seconds in xml, but ms internally
+            // note the heart beats are specified in seconds in xml, but ms internally
             HeartbeatType hbt = m_deployment.getHeartbeat();
             if (hbt != null)
                 m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
@@ -1165,6 +1168,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             Catalog catalog = new Catalog();
             Cluster cluster = catalog.getClusters().add("cluster");
             Database db = cluster.getDatabases().add("database");
+
+            // enable security if set on the deployment file
+            SecurityType security = m_deployment.getSecurity();
+            if (security != null) {
+                cluster.setSecurityenabled(security.isEnabled());
+            }
+
 
             // create groups as needed for users
             if (m_deployment.getUsers() != null) {

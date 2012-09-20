@@ -18,6 +18,7 @@
 import sys
 import cmd
 import socket
+import os.path
 from datetime import datetime
 from voltdbclient import *
 
@@ -368,10 +369,25 @@ Get the statistics:
         if len(args) != 2:
             return self.help_updatecatalog()
 
+        if(not os.path.isfile(args[0]) or not os.path.isfile(args[1])):
+            # args[0] is the catalog jar file
+            # args[1] is the deployment xml file
+            print >> sys.stderr, "Either file '%s' doesnot exist OR file '%s' doesnot exist!!" \
+                    (args[0],args[1])
+            exit(1)
+
+        xmlf = open(args[1], "r")
+        xmlcntnts = xmlf.read()
+#       print "xmlcntnts = #%s#" % xmlcntnts
+        jarf = open(args[0], "r")
+        jarcntnts = jarf.read()
+        hexJarcntnts = jarcntnts.encode('hex_codec')
+#       print "hexJarcntnts = #%s#" % hexJarcntnts
+
         self.safe_print("Updating the application catalog")
         self.response = self.__safe_call(self.updatecatalog,
-                                         [args[0], args[1]],
-                                         timeout = self.__timeout)
+                                 [hexJarcntnts, xmlcntnts],
+                                 timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_updatecatalog(self):

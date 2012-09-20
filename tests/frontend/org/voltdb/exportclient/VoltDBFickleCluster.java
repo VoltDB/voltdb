@@ -69,8 +69,7 @@ public class VoltDBFickleCluster extends LocalCluster {
 
         String simpleSchema =
             "create table blah (" +
-            "ival bigint default 23 not null, " +
-            "PRIMARY KEY(ival));\n" +
+            "ival bigint default 23 not null);\n" +
             "create table blah2 (" +
             "ival bigint default 23 not null, " +
             "PRIMARY KEY(ival));";
@@ -91,8 +90,7 @@ public class VoltDBFickleCluster extends LocalCluster {
 
         simpleSchema =
             "create table blah2 (" +
-            "ival bigint default 23 not null, " +
-            "PRIMARY KEY(ival));";
+            "ival bigint default 23 not null);";
 
         schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         schemaPath = schemaFile.getPath();
