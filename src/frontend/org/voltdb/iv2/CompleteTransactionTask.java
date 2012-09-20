@@ -64,7 +64,7 @@ public class CompleteTransactionTask extends TransactionTask
             invocation.setOriginalTxnId(m_txn.txnId);
             invocation.setOriginalTimestamp(m_txn.timestamp);
             m_drGateway.onSuccessfulProcedureCall(m_txn.spHandle, m_txn.timestamp, true,
-                                                  invocation, m_txn.getResults());
+                                                  invocation, m_txn.getResults(), null);
         }
     }
 

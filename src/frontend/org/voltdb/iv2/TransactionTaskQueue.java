@@ -184,25 +184,37 @@ public class TransactionTaskQueue
                 taskQueueOffer(task);
             }
             else {
-                /*
-                 * This is the situation where the first fragment arrived before the sentinel.
-                 * Its position in the order is not known.
-                 * m_multiPartPendingSentinelReceipt should be null because the MP coordinator should only
-                 * run one transaction at a time.
-                 * It is not time to block single parts from executing because the order is not know,
-                 * the only thing to do is stash it away for when the order is known from the sentinel
-                 */
-                if (m_multiPartPendingSentinelReceipt != null) {
-                    hostLog.fatal("\tBacklog length: " + m_multipartBacklog.size());
-                    if (!m_multipartBacklog.isEmpty()) {
-                        hostLog.fatal("\tBacklog first item: " + m_multipartBacklog.firstEntry().getValue().peekFirst());
-                    }
-                    hostLog.fatal("\tHave this one SentinelReceipt: " + m_multiPartPendingSentinelReceipt);
-                    hostLog.fatal("\tAnd got this one, too: " + task);
-                    VoltDB.crashLocalVoltDB(
-                            "There should be only one multipart pending sentinel receipt at a time", true, null);
+                // We got an FragmentTask that didn't match the head of the the
+                // queue, but if we've received multiple sentinels, it may
+                // match one of the other deques.  Check to see.  This can
+                // happen if the CompleteTransactionTask has not yet been
+                // finished by the Site thread but we get the first fragment
+                // for the next MP transaction.
+                Deque<TransactionTask> backlog = m_multipartBacklog.get(task.getTxnId());
+                if (backlog != null) {
+                    backlog.addFirst(task);
                 }
-                m_multiPartPendingSentinelReceipt = task;
+                else {
+                    /*
+                     * This is the situation where the first fragment arrived before the sentinel.
+                     * Its position in the order is not known.
+                     * m_multiPartPendingSentinelReceipt should be null because the MP coordinator should only
+                     * run one transaction at a time.
+                     * It is not time to block single parts from executing because the order is not know,
+                     * the only thing to do is stash it away for when the order is known from the sentinel
+                     */
+                    if (m_multiPartPendingSentinelReceipt != null) {
+                        hostLog.fatal("\tBacklog length: " + m_multipartBacklog.size());
+                        if (!m_multipartBacklog.isEmpty()) {
+                            hostLog.fatal("\tBacklog first item: " + m_multipartBacklog.firstEntry().getValue().peekFirst());
+                        }
+                        hostLog.fatal("\tHave this one SentinelReceipt: " + m_multiPartPendingSentinelReceipt);
+                        hostLog.fatal("\tAnd got this one, too: " + task);
+                        VoltDB.crashLocalVoltDB(
+                                "There should be only one multipart pending sentinel receipt at a time", true, null);
+                    }
+                    m_multiPartPendingSentinelReceipt = task;
+                }
                 retval = true;
             }
         } else if (!m_multipartBacklog.isEmpty()) {

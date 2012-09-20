@@ -87,7 +87,8 @@ public class MpProcedureTask extends ProcedureTask
                 m_txn.txnId,
                 m_txn.isReadOnly(),
                 m_txn.needsRollback(),
-                false);  // really don't want to have ack the ack.
+                false,  // really don't want to have ack the ack.
+                false);
         complete.setTruncationHandle(m_msg.getTruncationHandle());
         m_initiator.send(m_initiatorHSIds, complete);
         m_txn.setDone();

@@ -45,7 +45,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
-import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -397,23 +396,10 @@ public class TestVoltCompiler extends TestCase {
     // that a disabled connector is really disabled and that auth data is correct.
     public void testExportSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
-
-        // note that Insert inherits from InsertBase (testing this feature too)
-        project.addProcedures(org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase.class);
-        project.addProcedures(org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert.class);
-
-        project.addPartitionInfo("NO_NULLS", "PKEY");
-        project.addPartitionInfo("ALLOW_NULLS", "PKEY");
-        project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
-        project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
-        project.addPartitionInfo("JUMBO_ROW", "PKEY");
+        project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor", false, null);
-        project.setTableAsExportOnly("ALLOW_NULLS");   // persistent table
-        project.setTableAsExportOnly("WITH_DEFAULTS");  // streamed table
+        project.setTableAsExportOnly("A");
+        project.setTableAsExportOnly("B");
         try {
             boolean success = project.compile("/tmp/exportsettingstest.jar");
             assertTrue(success);
@@ -521,7 +507,6 @@ public class TestVoltCompiler extends TestCase {
                 "<procedure class='proc'><sql>select * from T</sql></procedure>" +
                 "</procedures>" +
             "</database>" +
-            "<security enabled='true'/>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
         final String path = xmlFile.getPath();
@@ -531,6 +516,32 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
+    public void testXMLFileWithDeprecatedElements() {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
+        final String schemaPath = schemaFile.getPath();
+        final String project = "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database>" +
+                "<schemas>" +
+                "<schema path='" +  schemaPath  + "'/>" +
+                "</schemas>" +
+                "<procedures>" +
+                "<procedure class='proc'><sql>select * from T</sql></procedure>" +
+                "</procedures>" +
+            "</database>" +
+            "<security enabled='true'/>" +
+            "</project>";
+        final File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
+        final String path = xmlFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compile(path, nothing_jar);
+        assertFalse(success);
+        assertTrue(
+                isFeedbackPresent("Found deprecated XML element \"security\"",
+                compiler.m_errors)
+                );
+    }
 
     public void testXMLFileWithInvalidSchemaReference() {
         final String simpleXML =
@@ -943,7 +954,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testXMLFileWithELEnabled() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo');";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -1177,7 +1188,7 @@ public class TestVoltCompiler extends TestCase {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
             "partition table books on column cash;\n" +
-            "create view matt (title, num, foo) as select title, count(*), sum(cash) from books group by title;";
+            "create view matt (title, cash, num, foo) as select title, cash, count(*), sum(cash) from books group by title, cash;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();

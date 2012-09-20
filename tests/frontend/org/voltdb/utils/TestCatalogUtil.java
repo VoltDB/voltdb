@@ -173,28 +173,43 @@ public class TestCatalogUtil extends TestCase {
                             "   </httpd>" +
                             "</deployment>";
 
+        // security section actually impacts CRC, dupe above and add it
+        final String dep6 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                            "<deployment>" +
+                            "<security enabled=\"true\"/>" +
+                            "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+                            "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                            "<httpd port='0'>" +
+                            "<jsonapi enabled='true'/>" +
+                            "</httpd>" +
+                            "</deployment>";
+
         final File tmpDep1 = VoltProjectBuilder.writeStringToTempFile(dep1);
         final File tmpDep2 = VoltProjectBuilder.writeStringToTempFile(dep2);
         final File tmpDep3 = VoltProjectBuilder.writeStringToTempFile(dep3);
         final File tmpDep4 = VoltProjectBuilder.writeStringToTempFile(dep4);
         final File tmpDep5 = VoltProjectBuilder.writeStringToTempFile(dep5);
+        final File tmpDep6 = VoltProjectBuilder.writeStringToTempFile(dep6);
 
         final long crcDep1 = CatalogUtil.getDeploymentCRC(tmpDep1.getPath());
         final long crcDep2 = CatalogUtil.getDeploymentCRC(tmpDep2.getPath());
         final long crcDep3 = CatalogUtil.getDeploymentCRC(tmpDep3.getPath());
         final long crcDep4 = CatalogUtil.getDeploymentCRC(tmpDep4.getPath());
         final long crcDep5 = CatalogUtil.getDeploymentCRC(tmpDep5.getPath());
+        final long crcDep6 = CatalogUtil.getDeploymentCRC(tmpDep6.getPath());
 
         assertTrue(crcDep1 > 0);
         assertTrue(crcDep2 > 0);
         assertTrue(crcDep3 > 0);
         assertTrue(crcDep4 > 0);
         assertTrue(crcDep5 > 0);
+        assertTrue(crcDep6 > 0);
 
         assertTrue(crcDep1 != crcDep2);
         assertTrue(crcDep1 == crcDep3);
         assertTrue(crcDep3 != crcDep4);
         assertTrue(crcDep4 != crcDep5);
+        assertTrue(crcDep1 != crcDep6);
     }
 
     public void testDeploymentHeartbeatConfig()
@@ -266,6 +281,36 @@ public class TestCatalogUtil extends TestCase {
         assertFalse(db.getSnapshotschedule().isEmpty());
         assertTrue(db.getSnapshotschedule().get("default").getEnabled());
         assertEquals(10, db.getSnapshotschedule().get("default").getRetain());
+    }
+
+    public void testSecurityEnabledFlag() throws Exception
+    {
+        final String secOff =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"false\"/>" +
+            "</deployment>";
+
+        final String secOn =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"true\"/>" +
+            "</deployment>";
+
+        final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOff.getPath(), true);
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        assertFalse(cluster.getSecurityenabled());
+
+        setUp();
+        final File tmpSecOn = VoltProjectBuilder.writeStringToTempFile(secOn);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpSecOn.getPath(), true);
+        cluster =  catalog.getClusters().get("cluster");
+        assertTrue(cluster.getSecurityenabled());
     }
 
     public void testSystemSettingsMaxTempTableSize() throws Exception

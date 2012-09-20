@@ -19,6 +19,8 @@ package org.voltdb;
 
 import java.util.Map;
 
+import org.voltcore.utils.InstanceId;
+
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionCreator;
 
@@ -101,6 +103,11 @@ public interface CommandLogReinitiator {
      * Get the map of the max TXN ID seen for each partition in the command l0g
      */
     public Map<Integer, Long> getMaxLastSeenTxnByPartition();
+
+    /**
+     * Get the cluster InstanceId of the cluster that wrote the command log.
+     */
+    public InstanceId getInstanceId();
 
     /**
      * Returns all command log segments to the pool and closes the reader. This

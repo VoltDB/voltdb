@@ -52,7 +52,6 @@ public class MpScheduler extends Scheduler
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
-    private CommandLog m_cl;
 
     MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
     {
@@ -304,6 +303,11 @@ public class MpScheduler extends Scheduler
 
     @Override
     public void setCommandLog(CommandLog cl) {
-        m_cl = cl;
+        // the MPI currently doesn't do command logging.  Don't have a reference to one.
+    }
+
+    @Override
+    public void enableWritingIv2FaultLog() {
+        // This is currently a no-op for the MPI
     }
 }

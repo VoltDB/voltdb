@@ -46,15 +46,10 @@
 #ifndef HSTORELIMITEXECUTOR_H
 #define HSTORELIMITEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb
 {
-    class UndoLog;
-    class ReadWriteSet;
-
     /**
      *
      */
@@ -69,7 +64,7 @@ namespace voltdb
         ~LimitExecutor() {
         }
 
-    protected:
+    private:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);

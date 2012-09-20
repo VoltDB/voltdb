@@ -35,6 +35,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import org.voltdb.SnapshotCompletionMonitor;
+
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
@@ -61,6 +63,7 @@ import com.google.common.collect.ImmutableMap;
 public class Iv2TestSpSchedulerDedupe extends TestCase
 {
     Mailbox mbox;
+    SnapshotCompletionMonitor snapMonitor;
     MapCache iv2masters;
     VoltDBInterface vdbi;
     ProcedureRunner runner;
@@ -80,13 +83,14 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         mbox = mock(Mailbox.class);
         when(mbox.getHSId()).thenReturn(dut_hsid);
         iv2masters = mock(MapCache.class);
+        snapMonitor = mock(SnapshotCompletionMonitor.class);
 
         // make fake MapCache of iv2masters
         HashMap<String,JSONObject> fakecache = new HashMap<String, JSONObject>();
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
-        dut = new SpScheduler(0, getSiteTaskerQueue());
+        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
         dut.setMailbox(mbox);
         dut.setCommandLog(mock(CommandLog.class));
     }

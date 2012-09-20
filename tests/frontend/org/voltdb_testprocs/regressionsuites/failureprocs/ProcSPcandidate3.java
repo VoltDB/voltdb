@@ -34,7 +34,7 @@ public class ProcSPcandidate3 extends VoltProcedure {
 
     // Constant filtered WHERE clause enables SP processing, even when joining with replicated table.
     public static final SQLStmt query3 =
-            new SQLStmt("select count(*) from blah, indexed_blah where indexed_blah.sval = blah.sval and blah.ival = 87654321");
+            new SQLStmt("select count(*) from blah, indexed_replicated_blah where indexed_replicated_blah.sval = blah.sval and blah.ival = 87654321");
 
     public long run() {
         voltQueueSQL(query3);

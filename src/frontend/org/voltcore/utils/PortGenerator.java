@@ -29,6 +29,10 @@ public class PortGenerator {
     final int MIN_STATIC_PORT = 10000;
     final int MAX_STATIC_PORT = 49151;
 
+    public void setNext(int port) {
+        nextPort = port;
+    }
+
     /** Return the next bindable port */
     public synchronized int next() {
         while(nextPort <= MAX_STATIC_PORT) {

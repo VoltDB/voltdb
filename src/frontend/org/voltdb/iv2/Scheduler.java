@@ -58,11 +58,13 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected boolean m_isLeader = false;
     protected PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private TxnEgo m_txnEgo;
+    final protected int m_partitionId;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
+        m_partitionId = partitionId;
         m_txnEgo = TxnEgo.makeZero(partitionId);
     }
 
@@ -121,4 +123,5 @@ abstract public class Scheduler implements InitiatorMessageHandler
     @Override
     abstract public void deliver(VoltMessage message);
 
+    abstract public void enableWritingIv2FaultLog();
 }

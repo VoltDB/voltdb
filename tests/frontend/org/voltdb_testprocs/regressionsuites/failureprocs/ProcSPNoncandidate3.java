@@ -33,7 +33,7 @@ import org.voltdb.VoltProcedure;
 public class ProcSPNoncandidate3 extends VoltProcedure {
 
     // Where clause on replicated table does not allow SP processing
-    public static final SQLStmt query3 = new SQLStmt("select count(*) from indexed_blah where ival = ?");
+    public static final SQLStmt query3 = new SQLStmt("select count(*) from indexed_replicated_blah where ival = ?");
 
     public long run() {
         voltQueueSQL(query3, 1);

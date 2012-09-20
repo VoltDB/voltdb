@@ -30,6 +30,7 @@ import java.util.logging.Logger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
 import org.voltdb.ParameterSet;
+import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -91,6 +92,7 @@ import org.voltdb.messaging.FastSerializer;
  */
 
 public class ExecutionEngineIPC extends ExecutionEngine {
+
     /** Commands are serialized over the connection */
     private enum Commands {
         Initialize(0),
@@ -492,7 +494,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final int totalPartitions) {
-        super();
+        super(siteId, partitionId);
+
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
         m_siteId = siteId;
@@ -674,7 +677,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     private void sendPlanFragmentsInvocation(final Commands cmd,
             final int numFragmentIds,
             final long[] planFragmentIds,
-            long[] inputDepIds,
+            long[] inputDepIdsIn,
             final ParameterSet[] parameterSets,
             final long txnId,
             final long lastCommittedTxnId,
@@ -691,6 +694,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         // if inputDepIds is null, make a bunch of dummies
+        long[] inputDepIds = inputDepIdsIn;
         if (inputDepIds == null) {
             inputDepIds = new long[numFragmentIds];
             for (int i = 0; i < inputDepIds.length; i++) {
@@ -739,19 +743,34 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         int result = ExecutionEngine.ERRORCODE_ERROR;
         long planFragId = 0;
-        boolean cacheHit = false;
         long cacheSize = 0;
+        PlannerStatsCollector.CacheUse cacheUse = PlannerStatsCollector.CacheUse.FAIL;
+
+        // Start collecting statistics
+        startStatsCollection();
+
         try {
-            result = m_connection.readStatusByte();
-            planFragId = m_connection.readLong();
-            cacheHit = m_connection.readLong() != 0;
-            cacheSize = m_connection.readLong();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
+            try {
+                result = m_connection.readStatusByte();
+                planFragId = m_connection.readLong();
+                cacheSize = m_connection.readLong();
+                if (m_connection.readLong() != 0) {
+                    cacheUse = PlannerStatsCollector.CacheUse.HIT1;
+                }
+                else {
+                    cacheUse = PlannerStatsCollector.CacheUse.MISS;
+                }
+            } catch (final IOException e) {
+                System.out.println("Exception: " + e.getMessage());
+                throw new RuntimeException(e);
+            }
+            if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
+                throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
+            }
         }
-        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-            throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
+        finally {
+            // Stop collecting statistics.
+            endStatsCollection(cacheSize, cacheUse);
         }
         return planFragId;
     }

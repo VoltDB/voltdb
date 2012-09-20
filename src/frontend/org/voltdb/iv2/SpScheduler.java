@@ -20,15 +20,22 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.Pair;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.CommandLog;
+
+import org.voltdb.messaging.Iv2LogFaultMessage;
+import org.voltdb.SnapshotCompletionInterest;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
@@ -38,22 +45,39 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
-public class SpScheduler extends Scheduler
+public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     List<Long> m_sendToHSIds = new ArrayList<Long>();
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
-    private final Map<Long, DuplicateCounter> m_duplicateCounters =
-        new HashMap<Long, DuplicateCounter>();
+    private final Map<Pair<Long, Long>, DuplicateCounter> m_duplicateCounters =
+        new HashMap<Pair<Long, Long>, DuplicateCounter>();
     private CommandLog m_cl;
+    private final SnapshotCompletionMonitor m_snapMonitor;
+    // Need to track when command log replay is complete (even if not performed) so that
+    // we know when we can start writing viable replay sets to the fault log.
+    boolean m_replayComplete = false;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    SpScheduler(int partitionId, SiteTaskerQueue taskQueue)
+    SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
+        m_snapMonitor = snapMonitor;
+    }
+
+    public void setLeaderState(boolean isLeader)
+    {
+        super.setLeaderState(isLeader);
+        m_snapMonitor.addInterest(this);
+    }
+
+    public void setMaxSeenTxnId(long maxSeenTxnId)
+    {
+        super.setMaxSeenTxnId(maxSeenTxnId);
+        writeIv2ViableReplayEntry();
     }
 
     @Override
@@ -98,6 +122,7 @@ public class SpScheduler extends Scheduler
                         "had no responses.  This should be impossible?");
             }
         }
+        writeIv2ViableReplayEntry();
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -123,8 +148,12 @@ public class SpScheduler extends Scheduler
         }
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
-        } else if (message instanceof MultiPartitionParticipantMessage) {
+        }
+        else if (message instanceof MultiPartitionParticipantMessage) {
             handleMultipartSentinel((MultiPartitionParticipantMessage)message);
+        }
+        else if (message instanceof Iv2LogFaultMessage) {
+            handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -137,6 +166,7 @@ public class SpScheduler extends Scheduler
      */
     private void handleMultipartSentinel(
             MultiPartitionParticipantMessage message) {
+        Iv2Trace.logIv2MultipartSentinel(message, m_mailbox.getHSId(), message.getTxnId());
         m_pendingTasks.offerMPSentinel(message.getTxnId());
         if (m_sendToHSIds.size() > 0) {
             m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
@@ -219,7 +249,7 @@ public class SpScheduler extends Scheduler
                     DuplicateCounter counter = new DuplicateCounter(
                             msg.getInitiatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
-                    m_duplicateCounters.put(newSpHandle, counter);
+                    m_duplicateCounters.put(new Pair<Long, Long>(msg.getTxnId(), newSpHandle), counter);
                 }
             }
             else {
@@ -261,7 +291,7 @@ public class SpScheduler extends Scheduler
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
                 message.getTxnId(), expectedHSIds);
-        m_duplicateCounters.put(message.getSpHandle(), counter);
+        m_duplicateCounters.put(new Pair<Long, Long>(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
@@ -291,7 +321,7 @@ public class SpScheduler extends Scheduler
     {
         // Send the message to the duplicate counter, if any
         final long spHandle = message.getSpHandle();
-        DuplicateCounter counter = m_duplicateCounters.get(spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(new Pair<Long, Long>(message.getTxnId(), spHandle));
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
@@ -396,7 +426,7 @@ public class SpScheduler extends Scheduler
                             msg.getCoordinatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
                 }
-                m_duplicateCounters.put(newSpHandle, counter);
+                m_duplicateCounters.put(new Pair<Long, Long>(msg.getTxnId(), newSpHandle), counter);
             }
         }
         else {
@@ -435,7 +465,8 @@ public class SpScheduler extends Scheduler
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         // Send the message to the duplicate counter, if any
-        DuplicateCounter counter = m_duplicateCounters.get(message.getSpHandle());
+        DuplicateCounter counter =
+            m_duplicateCounters.get(new Pair<Long, Long>(message.getTxnId(), message.getSpHandle()));
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
@@ -474,10 +505,69 @@ public class SpScheduler extends Scheduler
                 new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
             m_pendingTasks.offer(task);
         }
+
+        if (message.isRollbackForFault()) {
+            // Log the TXN ID of this MP to the command log fault loog.
+            m_cl.logIv2MPFault(message.getTxnId());
+        }
+    }
+
+    public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
+    {
+        // Should only receive these messages at replicas, call the internal log write with
+        // the provided SP handle
+        writeIv2ViableReplayEntryInternal(message.getSpHandle());
+        setMaxSeenTxnId(message.getSpHandle());
     }
 
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
+    }
+
+    public void enableWritingIv2FaultLog()
+    {
+        m_replayComplete = true;
+        writeIv2ViableReplayEntry();
+    }
+
+    /**
+     * If appropriate, cause the initiator to write the viable replay set to the command log
+     * Use when it's unclear whether the caller is the leader or a replica; the right thing will happen.
+     */
+    void writeIv2ViableReplayEntry()
+    {
+        if (m_replayComplete) {
+            if (m_isLeader) {
+                // write the viable set locally
+                long faultSpHandle = advanceTxnEgo().getTxnId();
+                writeIv2ViableReplayEntryInternal(faultSpHandle);
+                // Generate Iv2LogFault message and send it to replicas
+                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                        faultMsg);
+            }
+        }
+    }
+
+    /**
+     * Write the viable replay set to the command log with the provided SP Handle
+     */
+    void writeIv2ViableReplayEntryInternal(long spHandle)
+    {
+        if (m_replayComplete) {
+            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
+                    spHandle);
+        }
+    }
+
+    @Override
+    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
+            long[] partitionTxnIds, boolean truncationSnapshot)
+    {
+        if (truncationSnapshot) {
+            writeIv2ViableReplayEntry();
+        }
+        return new CountDownLatch(0);
     }
 }

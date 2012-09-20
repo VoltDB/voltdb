@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -74,7 +76,6 @@ import org.voltdb.compiler.projectfile.GroupsType;
 import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
-import org.voltdb.compiler.projectfile.SecurityType;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -437,6 +438,18 @@ public class VoltCompiler {
                 compilerLog.error(e.getLinkedException().getMessage());
                 return null;
             }
+
+            DeprecatedProjectElement deprecated = DeprecatedProjectElement.valueOf(e);
+            if( deprecated != null) {
+                addErr("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file, "
+                        + deprecated.getSuggestion());
+                addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
+                compilerLog.error("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file");
+                compilerLog.error(e.getMessage());
+                compilerLog.error(projectFileURL);
+                return null;
+            }
+
             if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
                 addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
                 compilerLog.error("Error schema validating project.xml file: " + e.getLinkedException().getMessage());
@@ -444,6 +457,7 @@ public class VoltCompiler {
                 compilerLog.error(projectFileURL);
                 return null;
             }
+
             throw new RuntimeException(e);
         }
         catch (SAXException e) {
@@ -482,13 +496,6 @@ public class VoltCompiler {
     void compileXMLRootNode(ProjectType project) throws VoltCompilerException {
         m_catalog = new Catalog();
         temporaryCatalogInit();
-
-        SecurityType security = project.getSecurity();
-        if (security != null) {
-            m_catalog.getClusters().get("cluster").
-                setSecurityenabled(security.isEnabled());
-
-        }
 
         DatabaseType database = project.getDatabase();
         if (database != null) {
@@ -706,7 +713,8 @@ public class VoltCompiler {
 
     }
 
-    static private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn) {
+    private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
+            throws VoltCompilerException {
         // A view of a replicated table is replicated.
         // A view of a partitioned table is partitioned -- regardless of whether it has a partition key
         // -- it certainly isn't replicated!
@@ -1229,6 +1237,11 @@ public class VoltCompiler {
                                                 "materialized view.  A view cannot be an export table.");
                     throw new VoltCompilerException("View configured as an export table");
                 }
+                if (tableref.getIndexes().size() > 0) {
+                    compilerLog.error("While configuring export, table " + tablename + " has indexes defined. " +
+                            "Export tables can't have indexes.");
+                    throw new VoltCompilerException("Table with indexes configured as an export table");
+                }
                 if (tableref.getIsreplicated()) {
                     // if you don't specify partition columns, make
                     // export tables partitioned, but on no specific column (iffy)
@@ -1466,5 +1479,60 @@ public class VoltCompiler {
      */
     public void setProcInfoOverrides(Map<String, ProcInfoData> procInfoOverrides) {
         m_procInfoOverrides = procInfoOverrides;
+    }
+
+    /**
+     * Helper enum that scans sax exception messages for deprecated xml elements
+     *
+     * @author ssantoro
+     */
+    enum DeprecatedProjectElement {
+        security(
+                "(?i)\\Acvc-[^:]+:\\s+Invalid\\s+content\\s+.+?\\s+element\\s+'security'",
+                "security may be enabled in the deployment file only"
+                );
+
+        /**
+         * message regular expression that pertains to the deprecated element
+         */
+        private Pattern messagePattern;
+        /**
+         * a suggestion string to exaplain alternatives
+         */
+        private String suggestion;
+
+        DeprecatedProjectElement(String messageRegex, String suggestion) {
+            this.messagePattern = Pattern.compile(messageRegex);
+            this.suggestion = suggestion;
+        }
+
+        String getSuggestion() {
+            return suggestion;
+        }
+
+        /**
+         * Given a JAXBException it determines whether or not the linked
+         * exception is associated with a deprecated xml elements
+         *
+         * @param jxbex a {@link JAXBException}
+         * @return an enum of {@code DeprecatedProjectElement} if the
+         *    given exception corresponds to a deprecated xml element
+         */
+        static DeprecatedProjectElement valueOf( JAXBException jxbex) {
+            if(    jxbex == null
+                || jxbex.getLinkedException() == null
+                || ! (jxbex.getLinkedException() instanceof org.xml.sax.SAXParseException)
+            ) {
+                return null;
+            }
+            org.xml.sax.SAXParseException saxex =
+                    org.xml.sax.SAXParseException.class.cast(jxbex.getLinkedException());
+            for( DeprecatedProjectElement dpe: DeprecatedProjectElement.values()) {
+                Matcher mtc = dpe.messagePattern.matcher(saxex.getMessage());
+                if( mtc.find()) return dpe;
+            }
+
+            return null;
+        }
     }
 }
