@@ -119,8 +119,7 @@ protected:
         }
         TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
         if (xact) {
-            persistent_table = TableFactory::getPersistentTable(database_id, NULL, "test_table", schema, columnNames,
-                                                                NULL, TableIndexScheme::noOptionalIndices(), -1, false, false);
+            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
             table = persistent_table;
         } else {
             limits.setMemoryLimit(1024 * 1024);

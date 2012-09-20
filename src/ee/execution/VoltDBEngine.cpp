@@ -625,7 +625,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                                                                  catalogTable->signature());
 
             // use the delegate to init the table and create indexes n' stuff
-            if (tcd->init(m_executorContext, *m_database, *catalogTable) != 0) {
+            if (tcd->init(*m_database, *catalogTable) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            catTableIter->second->name().c_str());
                 return false;
@@ -717,10 +717,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                     // add the index to the stats source
                     index->getIndexStats()->configure(index->getName() + " stats",
                                                       table->name(),
-                                                      m_executorContext->m_hostId,
-                                                      m_executorContext->m_hostname,
-                                                      m_executorContext->m_siteId,
-                                                      m_executorContext->m_partitionId,
                                                       indexIter->second->relativeIndex());
                 }
             }
@@ -1268,11 +1264,19 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     }
 }
 
+
+void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
+{
+    m_currentUndoQuantum = undoQuantum;
+    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
+}
+
+
 /*
  * Exists to transition pre-existing unit test cases.
  */
 ExecutorContext * VoltDBEngine::getExecutorContext() {
-    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum());
+    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
     return m_executorContext;
 }
 

@@ -74,7 +74,7 @@ struct TableIndexScheme {
                      const std::vector<int32_t>& a_columnIndices,
                      const std::vector<AbstractExpression*>& a_indexedExpressions,
                      bool a_unique, bool a_countable,
-                     TupleSchema *a_tupleSchema) :
+                     const TupleSchema *a_tupleSchema) :
       name(a_name),
       type(a_type),
       columnIndices(a_columnIndices),
@@ -117,7 +117,7 @@ struct TableIndexScheme {
     std::vector<AbstractExpression*> indexedExpressions;
     bool unique;
     bool countable;
-    TupleSchema *tupleSchema;
+    const TupleSchema *tupleSchema;
 };
 
 /**

@@ -80,20 +80,16 @@ public:
                                                        m_tableSchemaAllowNull,
                                                        allowInlineStrings);
 
-        TableIndexScheme indexScheme =
-            TableIndexScheme("primaryKeyIndex",
-                             BALANCED_TREE_INDEX,
-                             m_primaryKeyIndexColumns,
-                             TableIndex::simplyIndexColumns(),
-                             true, true, m_tableSchema);
+        TableIndexScheme indexScheme("primaryKeyIndex",
+                                     BALANCED_TREE_INDEX,
+                                     m_primaryKeyIndexColumns,
+                                     TableIndex::simplyIndexColumns(),
+                                     true, true, m_tableSchema);
 
         vector<TableIndexScheme> indexes;
 
-        m_table =
-            dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable
-                                           (0, m_engine->getExecutorContext(),
-                                            "Foo", m_tableSchema,
-                                            m_columnNames, 0, false, false));
+        m_table = dynamic_cast<PersistentTable*>(
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -101,7 +97,7 @@ public:
         m_table->setPrimaryKeyIndex(pkeyIndex);
 
         // add other indexes
-        BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+        BOOST_FOREACH(TableIndexScheme &scheme, indexes) {
             TableIndex *index = TableIndexFactory::getInstance(scheme);
             assert(index);
             m_table->addIndex(index);

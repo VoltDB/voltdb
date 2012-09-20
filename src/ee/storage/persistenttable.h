@@ -73,7 +73,6 @@ class TupleSerializer;
 class SerializeInput;
 class Topend;
 class ReferenceSerializeOutput;
-class ExecutorContext;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class PersistentTableUndoDeleteAction;
@@ -252,7 +251,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         m_nonInlinedMemorySize -= bytes;
     }
 
-protected:
+  private:
 
     size_t allocatedBlockCount() const {
         return m_data.size();
@@ -289,7 +288,7 @@ protected:
 
     bool checkNulls(TableTuple &tuple) const;
 
-    PersistentTable(ExecutorContext *ctx, bool exportEnabled);
+    PersistentTable(int partitionColumn);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
@@ -312,21 +311,11 @@ protected:
 
     TBPtr allocateNextBlock();
 
-    // pointer to current transaction id and other "global" state.
-    // abstract this out of VoltDBEngine to avoid creating dependendencies
-    // between the engine and the storage layers - which complicate test.
-    ExecutorContext *m_executorContext;
-
     // CONSTRAINTS
-    std::vector<TableIndex*> m_uniqueIndexes;
     std::vector<bool> m_allowNulls;
 
-    // INDEXES
-    std::vector<TableIndex*> m_indexes;
-    TableIndex *m_pkeyIndex;
-
     // partition key
-    int m_partitionColumn;
+    const int m_partitionColumn;
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;

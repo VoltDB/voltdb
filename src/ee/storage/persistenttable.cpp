@@ -81,14 +81,11 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
+PersistentTable::PersistentTable(int partitionColumn) :
     Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
-    m_executorContext(ctx),
-    m_uniqueIndexes(),
     m_allowNulls(),
-    m_indexes(),
-    m_pkeyIndex(NULL),
+    m_partitionColumn(partitionColumn),
     stats_(this),
     m_COWContext(NULL),
     m_failedCompactionCount(0)
@@ -115,14 +112,6 @@ PersistentTable::~PersistentTable() {
         tuple.freeObjectColumns();
         tuple.setActiveFalse();
     }
-
-    for (int i = 0; i < m_indexes.size(); ++i) {
-        TableIndex *index = m_indexes[i];
-        if (index != m_pkeyIndex) {
-            delete index;
-        }
-    }
-    if (m_pkeyIndex) delete m_pkeyIndex;
 
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
@@ -275,7 +264,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     /*
      * Create and register an undo action.
      */
-    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
@@ -349,7 +338,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
      * Create and register an undo action and then use the copy of
      * the target (old value with no updates)
      */
-    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
@@ -503,7 +492,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     /*
      * Create and register an undo action.
      */
-    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
@@ -679,34 +668,6 @@ std::string PersistentTable::debug() {
     }
 
     return buffer.str();
-}
-
-// ------------------------------------------------------------------
-// Accessors
-// ------------------------------------------------------------------
-// Index
-TableIndex *PersistentTable::index(std::string name) {
-    for (int i = 0; i < m_indexes.size(); ++i) {
-        TableIndex *index = m_indexes[i];
-        if (index->getName().compare(name) == 0) {
-            return index;
-        }
-    }
-    std::stringstream errorString;
-    errorString << "Could not find Index with name " << name << std::endl;
-    for (int i = 0; i < m_indexes.size(); ++i) {
-        TableIndex *index = m_indexes[i];
-        errorString << index->getName() << std::endl;
-    }
-    throwFatalException( "%s", errorString.str().c_str());
-}
-
-std::vector<TableIndex*> PersistentTable::allIndexes() const {
-    std::vector<TableIndex*> retval;
-    for (int i = 0; i < m_indexes.size(); i++)
-        retval.push_back(m_indexes[i]);
-
-    return retval;
 }
 
 void PersistentTable::onSetColumns() {

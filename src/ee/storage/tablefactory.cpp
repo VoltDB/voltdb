@@ -59,12 +59,9 @@
 namespace voltdb {
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
-            ExecutorContext *ctx,
             const std::string &name,
             TupleSchema* schema,
             const std::vector<std::string> &columnNames,
-            const TableIndexScheme *pkeyIndex,
-            const std::vector<TableIndexScheme> &indexes,
             int partitionColumn,
             bool exportEnabled,
             bool exportOnly)
@@ -72,32 +69,16 @@ Table* TableFactory::getPersistentTable(
     Table *table = NULL;
 
     if (exportOnly) {
-        table = new StreamedTable(ctx, exportEnabled);
+        table = new StreamedTable(exportEnabled);
     }
     else {
-        PersistentTable *pTable = new PersistentTable(ctx, exportEnabled);
-        table = pTable;
-        pTable->m_partitionColumn = partitionColumn;
-
-        if (pkeyIndex) {
-            pTable->m_pkeyIndex = TableIndexFactory::getInstance(*pkeyIndex);
-            pTable->m_indexes.push_back(pTable->m_pkeyIndex);
-            pTable->m_uniqueIndexes.push_back(pTable->m_pkeyIndex);
-        }
-
-        for (int i = 0; i < indexes.size(); ++i) {
-            TableIndex *index = TableIndexFactory::getInstance(indexes[i]);
-            pTable->m_indexes.push_back(index);
-            if (index->isUniqueIndex()) {
-                pTable->m_uniqueIndexes.push_back(index);
-            }
-        }
+        table = new PersistentTable(partitionColumn);
     }
 
     initCommon(databaseId, table, name, schema, columnNames, true);
 
     // initialize stats for the table
-    configureStats(databaseId, ctx, name, table);
+    configureStats(databaseId, name, table);
 
     return dynamic_cast<Table*>(table);
 }
@@ -149,16 +130,10 @@ void TableFactory::initCommon(
 }
 
 void TableFactory::configureStats(voltdb::CatalogId databaseId,
-                                  ExecutorContext *ctx,
                                   std::string name,
                                   Table *table) {
-
     // initialize stats for the table
     table->getTableStats()->configure(name + " stats",
-                                      ctx->m_hostId,
-                                      ctx->m_hostname,
-                                      ctx->m_siteId,
-                                      ctx->m_partitionId,
                                       databaseId);
 }
 

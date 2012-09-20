@@ -243,11 +243,7 @@ class Table {
         return m_pkeyIndex;
     }
 
-    void configureIndexStats(CatalogId hostId,
-                             std::string hostname,
-                             int64_t siteId,
-                             CatalogId partitionId,
-                             CatalogId databaseId);
+    void configureIndexStats(CatalogId databaseId);
 
     // mutating indexes
     virtual void addIndex(TableIndex *index);

@@ -993,6 +993,18 @@ NATIVE EE STUFF
     </copy>
 </target>
 
+<target name='reee'
+    description="Build C++ JNI library and copy it to production folder.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="build.py ${build}" />
+    </exec>
+    <copy todir='voltdb'>
+        <fileset dir="${build.dir}/nativelibs">
+            <include name="libvoltdb-${dist.version}.*"/>
+        </fileset>
+    </copy>
+</target>
+
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>

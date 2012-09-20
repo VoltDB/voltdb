@@ -540,7 +540,7 @@ void Table::removeIndex(TableIndex *index) {
     }
     for (iter = m_uniqueIndexes.begin(); *iter; iter++) {
         if ((*iter) == index) {
-            m_indexes.erase(iter);
+            m_uniqueIndexes.erase(iter);
             break;
         }
     }
@@ -560,20 +560,12 @@ void Table::setPrimaryKeyIndex(TableIndex *index) {
     m_pkeyIndex = index;
 }
 
-void Table::configureIndexStats(CatalogId hostId,
-                                std::string hostname,
-                                int64_t siteId,
-                                CatalogId partitionId,
-                                CatalogId databaseId)
+void Table::configureIndexStats(CatalogId databaseId)
 {
     // initialize stats for all the indexes for the table
     BOOST_FOREACH(TableIndex *index, m_indexes) {
         index->getIndexStats()->configure(index->getName() + " stats",
                                           name(),
-                                          hostId,
-                                          hostname,
-                                          siteId,
-                                          partitionId,
                                           databaseId);
     }
 

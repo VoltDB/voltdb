@@ -106,17 +106,15 @@ public:
                                                                m_tableSchemaAllowNull,
                                                                allowInlineStrings);
 
-        voltdb::TableIndexScheme indexScheme = voltdb::TableIndexScheme("primaryKeyIndex",
-                                                                        voltdb::BALANCED_TREE_INDEX,
-                                                                        m_primaryKeyIndexColumns,
-                                                                        TableIndex::simplyIndexColumns(),
-                                                                        true, true, m_tableSchema);
+        voltdb::TableIndexScheme indexScheme("primaryKeyIndex",
+                                             voltdb::BALANCED_TREE_INDEX,
+                                             m_primaryKeyIndexColumns,
+                                             TableIndex::simplyIndexColumns(),
+                                             true, true, m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
-        m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
-                                                         (0, m_engine->getExecutorContext(), "Foo",
-                                                          m_tableSchema, m_columnNames, 0,
-                                                          false, false));
+        m_table = dynamic_cast<voltdb::PersistentTable*>(
+            voltdb::TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);

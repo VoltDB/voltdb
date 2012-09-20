@@ -94,9 +94,9 @@ class TableAndIndexTest : public Test {
 
             warehouseIndex1ColumnIndices.push_back(0);
 
-            warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", ARRAY_INDEX,
+            warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", HASH_TABLE_INDEX,
                                                      warehouseIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                     true, true, warehouseTupleSchema);
+                                                     true, false, warehouseTupleSchema);
 
             vector<voltdb::ValueType> customerColumnTypes;
             vector<int32_t> customerColumnLengths;
@@ -174,10 +174,7 @@ class TableAndIndexTest : public Test {
                     "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
             const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
-            districtTable = voltdb::TableFactory::getPersistentTable(0,engine, "DISTRICT",
-                                                                     districtTupleSchema,
-                                                                     districtColumnNames,
-                                                                     0, false, false);
+            districtTable = voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, 0);
 
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
             assert(pkeyIndex);
@@ -185,7 +182,7 @@ class TableAndIndexTest : public Test {
             districtTable->setPrimaryKeyIndex(pkeyIndex);
 
             // add other indexes
-            BOOST_FOREACH(TableIndexScheme scheme, districtIndexes) {
+            BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 districtTable->addIndex(index);
@@ -195,9 +192,8 @@ class TableAndIndexTest : public Test {
                 TableFactory::getCopiedTempTable(0, "DISTRICT TEMP", districtTable,
                                                  &limits));
 
-            warehouseTable = voltdb::TableFactory::getPersistentTable(0, engine, "WAREHOUSE",
-                                                                      warehouseTupleSchema,
-                                                                      warehouseColumnNames,
+            warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
+                                                                      warehouseTupleSchema, warehouseColumnNames,
                                                                       0, false, false);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(warehouseIndex1Scheme);
@@ -206,7 +202,7 @@ class TableAndIndexTest : public Test {
             warehouseTable->setPrimaryKeyIndex(pkeyIndex);
 
             // add other indexes
-            BOOST_FOREACH(TableIndexScheme scheme, warehouseIndexes) {
+            BOOST_FOREACH(TableIndexScheme &scheme, warehouseIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 warehouseTable->addIndex(index);
@@ -216,9 +212,8 @@ class TableAndIndexTest : public Test {
                 TableFactory::getCopiedTempTable(0, "WAREHOUSE TEMP", warehouseTable,
                                                  &limits));
 
-            customerTable = voltdb::TableFactory::getPersistentTable(0,engine, "CUSTOMER",
-                                                                     customerTupleSchema,
-                                                                     customerColumnNames,
+            customerTable = voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
+                                                                     customerTupleSchema, customerColumnNames,
                                                                      0, false, false);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
@@ -227,7 +222,7 @@ class TableAndIndexTest : public Test {
             customerTable->setPrimaryKeyIndex(pkeyIndex);
 
             // add other indexes
-            BOOST_FOREACH(TableIndexScheme scheme, customerIndexes) {
+            BOOST_FOREACH(TableIndexScheme &scheme, customerIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 customerTable->addIndex(index);

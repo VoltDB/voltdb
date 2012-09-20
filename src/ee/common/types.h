@@ -290,7 +290,6 @@ enum ExpressionType {
 enum TableIndexType {
     BALANCED_TREE_INDEX     = 1,
     HASH_TABLE_INDEX        = 2,
-    ARRAY_INDEX             = 3,
 };
 
 // ------------------------------------------------------------------

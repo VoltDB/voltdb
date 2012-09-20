@@ -112,8 +112,7 @@ protected:
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
-        table = TableFactory::getPersistentTable(this->database_id, m_engine.getExecutorContext(),
-                                                 "test_table", schema, columnNames, -1, false, false);
+        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames);
         if (pkey) {
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
             assert(pkeyIndex);
@@ -250,6 +249,7 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
     pkey_column_indices.push_back(0);
     voltdb::TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
                                   pkey_column_indices, TableIndex::simplyIndexColumns(),
+                                  true, true, NULL);
 
     setTable(pkey);
 

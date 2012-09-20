@@ -77,13 +77,12 @@ public:
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
         const std::string &name,
         TupleSchema* schema,
         const std::vector<std::string> &columnNames,
-        int partitionColumn,
-        bool exportEnabled,
-        bool exportOnly);
+        int partitionColumn = -1, // defaults provided for ease of testing.
+        bool exportEnabled = false,
+        bool exportOnly = false);
 
     /**
     * Creates an empty temp table with given name and columns.
@@ -118,7 +117,6 @@ private:
 
     static void configureStats(
         voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
         std::string name,
         Table *table);
 };

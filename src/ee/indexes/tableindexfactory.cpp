@@ -153,6 +153,7 @@ public:
 
         // no int specialization beyond this size (32 bytes == 4 'uint64_t's)
         m_intsOnly = false;
+        //TODO: short term, throw if scheme uses generalized indexed expressions (m_scheme.indexedExpressions.size() > 0)
 
         if ((result = getInstanceIfKeyFits<48>())) {
             return result;
@@ -210,14 +211,14 @@ static bool isNotIntType(ValueType exprType) {
 
 
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
-    TupleSchema *tupleSchema = scheme.tupleSchema;
+    const TupleSchema *tupleSchema = scheme.tupleSchema;
     assert(tupleSchema);
     bool isIntsOnly = true;
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
-    int valueCount = (int) scheme.indexedExpressions.size();
+    size_t valueCount = (int) scheme.indexedExpressions.size();
     if (valueCount != 0) {
-        for (int ii = 0; ii < valueCount; ++ii) {
+        for (size_t ii = 0; ii < valueCount; ++ii) {
             ValueType exprType = scheme.indexedExpressions[ii]->getValueType();
             if (isNotIntType(exprType)) {
                 isIntsOnly = false;
@@ -226,13 +227,14 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
                 // Not enough information to reliably determine that the value is small enough to "inline".
                 keyColumnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH);
+                //TODO: short term, throw here for all non-inline types
             } else {
                 keyColumnLengths.push_back(NValue::getTupleStorageSize(exprType));
             }
         }
     } else {
-        valueCount = (int)scheme.columnIndices.size();
-        for (int ii = 0; ii < valueCount; ++ii) {
+        valueCount = scheme.columnIndices.size();
+        for (size_t ii = 0; ii < valueCount; ++ii) {
             ValueType exprType = tupleSchema->columnType(scheme.columnIndices[ii]);
             if (isNotIntType(exprType)) {
                     isIntsOnly = false;

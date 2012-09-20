@@ -168,7 +168,7 @@ public:
         TableIndexScheme pkeyScheme(name,
                                     BALANCED_TREE_INDEX,
                                     pkey_column_indices, TableIndex::simplyIndexColumns(),
-                                    true, true, true, schema);
+                                    true, true, schema);
         vector<TableIndexScheme> indexes;
         indexes.push_back(pkeyScheme);
 
@@ -176,11 +176,10 @@ public:
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
-        table =
-          dynamic_cast<PersistentTable*>
-          (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
-                                            "test_wide_table", schema,
-                                            columnNames, -1, false, false));
+        table = dynamic_cast<PersistentTable*>(
+            TableFactory::getPersistentTable(database_id, "test_wide_table",
+                                             schema, columnNames,
+                                             -1, false, false));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -311,11 +310,7 @@ public:
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
-        table =
-            dynamic_cast<PersistentTable*>
-          (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
-                                            "test_table", schema,
-                                            columnNames, -1, false, false));
+        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -323,7 +318,7 @@ public:
         table->setPrimaryKeyIndex(pkeyIndex);
 
         // add other indexes
-        BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+        BOOST_FOREACH(TableIndexScheme &scheme, indexes) {
             TableIndex *index = TableIndexFactory::getInstance(scheme);
             assert(index);
             table->addIndex(index);
@@ -416,7 +411,7 @@ TEST_F(IndexTest, ArrayUnique) {
     iu_column_indices.push_back(0);
     iu_column_types.push_back(VALUE_TYPE_BIGINT);
     init("iu2",
-         ARRAY_INDEX,
+         HASH_TABLE_INDEX,
          iu_column_indices,
          iu_column_types,
          true);

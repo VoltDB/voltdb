@@ -318,7 +318,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                     return;
                 }
             }
-            m_currentUndoQuantum = m_undoLog.generateUndoQuantum(nextUndoToken);
+            setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
         inline void releaseUndoToken(int64_t undoToken) {
@@ -388,7 +388,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         size_t tableHashCode(int32_t tableId);
 
-    protected:
+    private:
+
+        void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);
+
         std::string getClusterNameFromTable(voltdb::Table *table);
         std::string getDatabaseNameFromTable(voltdb::Table *table);
 
