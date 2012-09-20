@@ -26,6 +26,8 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
+import org.voltcore.utils.InstanceId;
+
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -167,5 +169,10 @@ public class ServerThread extends Thread {
         // return the filesystem path
         File licxml = new File(resource.getFile());
         return licxml.getPath();
+    }
+
+    public InstanceId getInstanceId()
+    {
+        return VoltDB.instance().getHostMessenger().getInstanceId();
     }
 }
