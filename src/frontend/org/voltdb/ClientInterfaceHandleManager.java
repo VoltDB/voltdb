@@ -19,8 +19,10 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
@@ -93,14 +95,16 @@ public class ClientInterfaceHandleManager
         final int m_messageSize;
         final long m_creationTime;
         final String m_procName;
+        final long m_initiatorHSId;
         Iv2InFlight(long ciHandle, long clientHandle,
-                int messageSize, long creationTime, String procName)
+                int messageSize, long creationTime, String procName, long initiatorHSId)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
             m_messageSize = messageSize;
             m_creationTime = creationTime;
             m_procName = procName;
+            m_initiatorHSId = initiatorHSId;
         }
     }
 
@@ -125,9 +129,9 @@ public class ClientInterfaceHandleManager
         return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
             @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
-                    long clientHandle, int messageSize, long creationTime, String procName) {
+                    long clientHandle, int messageSize, long creationTime, String procName, long initiatorHSId) {
                 return super.getHandle(isSinglePartition, partitionId,
-                        clientHandle, messageSize, creationTime, procName);
+                        clientHandle, messageSize, creationTime, procName, initiatorHSId);
             }
             @Override
             synchronized boolean removeHandle(long ciHandle) {
@@ -145,6 +149,12 @@ public class ClientInterfaceHandleManager
             synchronized void freeOutstandingTxns() {
                 super.freeOutstandingTxns();
             }
+
+            @Override
+            synchronized List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
+                    Long initiatorHSId) {
+                return super.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
+            }
         };
     }
 
@@ -161,7 +171,8 @@ public class ClientInterfaceHandleManager
             long clientHandle,
             int messageSize,
             long creationTime,
-            String procName)
+            String procName,
+            long initiatorHSId)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
@@ -182,7 +193,7 @@ public class ClientInterfaceHandleManager
             perPartDeque = partitionStuff.getSecond();
         }
         long ciHandle = generator.getNextHandle();
-        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName);
+        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName, initiatorHSId);
         perPartDeque.addLast(inFlight);
         m_outstandingTxns++;
         m_acg.increaseBackpressure(messageSize);
@@ -291,5 +302,25 @@ public class ClientInterfaceHandleManager
                 m_acg.reduceBackpressure(inflight.m_messageSize);
             }
         }
+    }
+
+    List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
+            Long initiatorHSId) {
+        assert(m_expectedThreadId == Thread.currentThread().getId());
+        List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
+
+        if (!m_partitionStuff.containsKey(partitionId)) return retval;
+
+        Deque<Iv2InFlight> inFlight = m_partitionStuff.get(partitionId).getSecond();
+        Iterator<Iv2InFlight> i = inFlight.iterator();
+        while (i.hasNext()) {
+            Iv2InFlight entry = i.next();
+            if (entry.m_initiatorHSId != initiatorHSId) {
+                i.remove();
+                retval.add(entry);
+                m_acg.reduceBackpressure(entry.m_messageSize);
+            }
+        }
+        return retval;
     }
 }

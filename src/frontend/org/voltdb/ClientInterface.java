@@ -54,6 +54,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -69,6 +70,7 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
@@ -89,6 +91,7 @@ import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.LeaderCache;
@@ -162,8 +165,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * The CIHM is unique to the connection and the ACG is shared by all connections
      * serviced by the associated network thread. They are paired so as to only do a single
      * lookup.
-     *
-     * The ? extends ugliness is due to the SnapshotDaemon having an ACG that is a noop
      */
     private final COWMap<Long, ClientInterfaceHandleManager>
             m_cihm = new COWMap<Long, ClientInterfaceHandleManager>();
@@ -238,7 +239,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
 
                     m_hasGlobalClientBackPressure = true;
-                    for (final Connection c : m_connections) {
+                    for (Connection c : m_connections) {
                         c.disableReadSelection();
                     }
                 } else {
@@ -247,7 +248,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
 
                     if (m_hasGlobalClientBackPressure && !m_hasDTXNBackPressure) {
-                        for (final Connection c : m_connections) {
+                        for (Connection c : m_connections) {
                             if (!c.writeStream().hadBackPressure()) {
                                 /*
                                  * Also synchronize on the individual connection
@@ -990,21 +991,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (VoltDB.instance().isIV2Enabled()) {
             final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
-            long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    messageSize, now, invocation.getProcName());
             Long initiatorHSId;
             if (isSinglePartition && !isEveryPartition) {
                 initiatorHSId = m_iv2Masters.get(partitions[0]);
                 if (initiatorHSId == null) {
                     hostLog.error("Failed to find master initiator for partition: "
                             + Integer.toString(partitions[0]) + ". Transaction not initiated.");
-                    cihm.removeHandle(handle);
                     return false;
                 }
             }
             else {
                 initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
             }
+            long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
+                    messageSize, now, invocation.getProcName(), initiatorHSId);
+
             Iv2InitiateTaskMessage workRequest =
                 new Iv2InitiateTaskMessage(m_siteId,
                         initiatorHSId,
@@ -1088,7 +1089,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_adminAcceptor = new ClientAcceptor(adminPort, messenger.getNetwork(), true);
         registerPolicies(replicationRole);
 
-        m_mailbox = new LocalMailbox(VoltDB.instance().getHostMessenger()) {
+        m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
             @Override
             public void deliver(final VoltMessage message) {
@@ -1141,6 +1142,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                             });
                         }
+                    } else if (message instanceof BinaryPayloadMessage) {
+                        handlePartitionFailOver((BinaryPayloadMessage)message);
                     } else {
                         m_d.offer(message);
                     }
@@ -1148,18 +1151,67 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_d.offer(message);
                 }
             }
+
             @Override
             public VoltMessage recv() {
                 return m_d.poll();
             }
         };
-        messenger.createMailbox(null, m_mailbox);
+        messenger.createMailbox(m_mailbox.getHSId(), m_mailbox);
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         registerMailbox(messenger.getZK());
         m_siteId = m_mailbox.getHSId();
         m_iv2Masters = new LeaderCache(messenger.getZK(), VoltZK.iv2masters);
         m_iv2Masters.start(true);
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+    }
+
+    private void handlePartitionFailOver(BinaryPayloadMessage message) {
+        try {
+            JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
+            final int partitionId = jsObj.getInt(BaseInitiator.JSON_PARTITION_ID);
+            final long initiatorHSId = jsObj.getLong(BaseInitiator.JSON_INITIATOR_HSID);
+            for (final Connection c : m_connections) {
+                c.queueTask(new Runnable() {
+                    @Override
+                    public void run() {
+                        failOverConnection(partitionId, initiatorHSId, c);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
+        }
+    }
+
+    /*
+     * When partition mastership for a partition changes, check all outstanding
+     * requests for that partition and if they aren't for the current partition master,
+     * drop them and send an error response.
+     */
+    private void failOverConnection(Integer partitionId, Long initiatorHSId, Connection c) {
+        ClientInterfaceHandleManager cihm = m_cihm.get(c.connectionId());
+        if (cihm == null) return;
+
+        List<Iv2InFlight> transactions =
+                cihm.removeHandlesForPartitionAndInitiator( partitionId, initiatorHSId);
+
+        for (Iv2InFlight inFlight : transactions) {
+            ClientResponseImpl response =
+                    new ClientResponseImpl(
+                            ClientResponseImpl.GRACEFUL_FAILURE,
+                            Byte.MIN_VALUE,
+                            null,
+                            new VoltTable[0],
+                            "Transaction dropped due to change in mastership. " +
+                            "It is possible the transaction was committed");
+            response.setClientHandle( inFlight.m_clientHandle );
+            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            response.flattenToBuffer(buf);
+            buf.flip();
+            c.writeStream().enqueue(buf);
+        }
     }
 
     /**
@@ -1372,7 +1424,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientResponseImpl response =
                     new ClientResponseImpl(
                             ClientResponseImpl.SUCCESS,
-                            ClientResponse.SUCCESS,
+                            Byte.MIN_VALUE,
                             null,
                             vt,
                             null);
@@ -1421,7 +1473,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         ClientResponseImpl response =
                 new ClientResponseImpl(
                         ClientResponseImpl.SUCCESS,
-                        ClientResponse.SUCCESS,
+                        Byte.MIN_VALUE,
                         null,
                         vt,
                         null);
