@@ -58,7 +58,4 @@ public interface Initiator
     /** Create a Promotion implementation appropriate for the subclass */
     public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
             String whoami);
-
-
-    public long getCurrentTxnId();
 }
