@@ -69,7 +69,7 @@ root = 'http://volt0/kits/candidate/'
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
 destDir = "/tmp/"
 logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
-elem2Test = {'helloworld':'run.sh', 'voltcache':'run.sh', 'voltkv':'run.sh', 'voter':'run.sh'}
+elem2Test = {'helloworld':'./run.sh', 'voltcache':'./run.sh', 'voltkv':'./run.sh', 'voter':'./run.sh'}
 defaultHost = "localhost"
 defaultPort = 21212
 
