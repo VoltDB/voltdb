@@ -43,6 +43,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "boost/unordered_set.hpp"
+
 #include "unionexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -55,6 +57,108 @@
 #include "storage/tablefactory.h"
 
 namespace voltdb {
+
+namespace detail {
+
+
+    struct SetOperator {
+        SetOperator(std::vector<Table*>& input_tables, Table* output_table) :
+            m_input_tables(input_tables), m_output_table(output_table)
+            {}
+
+        virtual bool processTuples() = 0;
+
+        static boost::shared_ptr<SetOperator> getSetOperator(UnionPlanNode* node);
+
+        std::vector<Table*>& m_input_tables;
+        Table* m_output_table;
+    };
+
+    struct UnionAllSetOperator : public SetOperator {
+        UnionAllSetOperator(std::vector<Table*>& input_tables, Table* output_table) :
+           SetOperator(input_tables, output_table)
+           {}
+
+        bool processTuples() {
+            //
+            // For each input table, grab their TableIterator and then append all of its tuples
+            // to our ouput table
+            //
+            for (int ctr = 0, cnt = (int)m_input_tables.size(); ctr < cnt; ctr++) {
+                Table* input_table = m_input_tables[ctr];
+                assert(input_table);
+                TableIterator iterator = input_table->iterator();
+                TableTuple tuple(input_table->schema());
+                while (iterator.next(tuple)) {
+                    if (!m_output_table->insertTuple(tuple)) {
+                        VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                                   " output table '%s'",
+                                   input_table->name().c_str(),
+                                   m_output_table->name().c_str());
+                        return false;
+                    }
+                }
+            // FIXME: node->tables[ctr]->onTableRead(undo);
+            }
+            return true;
+        }
+    };
+
+    struct UnionSetOperator : public SetOperator {
+        UnionSetOperator(std::vector<Table*>& input_tables, Table* output_table) :
+           SetOperator(input_tables, output_table), m_tuples()
+           {}
+
+        bool processTuples() {
+            //
+            // For each input table, grab their TableIterator and then append all of its tuples
+            // to our ouput table
+            //
+            for (int ctr = 0, cnt = (int)m_input_tables.size(); ctr < cnt; ctr++) {
+                Table* input_table = m_input_tables[ctr];
+                assert(input_table);
+                TableIterator iterator = input_table->iterator();
+                TableTuple tuple(input_table->schema());
+                while (iterator.next(tuple)) {
+                    if (m_tuples.find(tuple) == m_tuples.end()) {
+                        // we got new tuple
+                        m_tuples.insert(tuple);
+                        if (!m_output_table->insertTuple(tuple)) {
+                            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                                       " output table '%s'",
+                                       input_table->name().c_str(),
+                                       m_output_table->name().c_str());
+                            return false;
+                        }
+                    }
+                }
+            // FIXME: node->tables[ctr]->onTableRead(undo);
+            }
+            return true;
+        }
+
+        boost::unordered_set<TableTuple, TableTupleHasher, TableTupleEqualityChecker> m_tuples;
+    };
+
+    boost::shared_ptr<SetOperator> SetOperator::getSetOperator(UnionPlanNode* node) {
+        UnionType unionType = node->getUnionType();
+        if (unionType == UNION_TYPE_UNION_ALL) {
+            return boost::shared_ptr<SetOperator>(
+                new UnionAllSetOperator(node->getInputTables(), node->getOutputTable()));
+        } else if (unionType == UNION_TYPE_UNION) {
+            return boost::shared_ptr<SetOperator>(
+                new UnionSetOperator(node->getInputTables(), node->getOutputTable()));
+        } else {
+            VOLT_ERROR("Unsupported tuple set operation '%d'.", unionType);
+            return boost::shared_ptr<SetOperator>();
+        }
+        return boost::shared_ptr<SetOperator>();
+    }
+}
+
+UnionExecutor::UnionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+    AbstractExecutor(engine, abstract_node), m_setOperator()
+{}
 
 bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
                            TempTableLimits* limits)
@@ -119,37 +223,13 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
                                                           node->getInputTables()[0]->name(),
                                                           node->getInputTables()[0],
                                                           limits));
+
+    m_setOperator = detail::SetOperator::getSetOperator(node);
     return true;
 }
 
 bool UnionExecutor::p_execute(const NValueArray &params) {
-    UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(m_abstractNode);
-    assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
-
-    //
-    // For each input table, grab their TableIterator and then append all of its tuples
-    // to our ouput table
-    //
-    for (int ctr = 0, cnt = (int)node->getInputTables().size(); ctr < cnt; ctr++) {
-        Table* input_table = node->getInputTables()[ctr];
-        assert(input_table);
-        TableIterator iterator = input_table->iterator();
-        TableTuple tuple(input_table->schema());
-        while (iterator.next(tuple)) {
-            if (!output_table->insertTuple(tuple)) {
-                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                           " output table '%s'",
-                           input_table->name().c_str(),
-                           output_table->name().c_str());
-                return false;
-            }
-        }
-        // FIXME: node->tables[ctr]->onTableRead(undo);
-    }
-
-    return (true);
+    return m_setOperator->processTuples();
 }
 
 }

@@ -48,6 +48,20 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 2, 3);
         VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION SELECT I FROM B UNION SELECT I FROM C;")
                                  .getResults()[0];
+        assertEquals(4, result.getRowCount());
+    }
+
+    public void testUnionAll() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertA", 0, 1);
+        client.callProcedure("InsertB", 1, 1);
+        client.callProcedure("InsertB", 2, 1);
+        client.callProcedure("InsertC", 1, 2);
+        client.callProcedure("InsertC", 2, 3);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C;")
+                                 .getResults()[0];
+        int c = result.getRowCount();
+        System.out.println("testUnionAll " + c);
         assertEquals(5, result.getRowCount());
     }
 
