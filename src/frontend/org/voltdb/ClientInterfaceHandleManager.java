@@ -318,6 +318,7 @@ public class ClientInterfaceHandleManager
             if (entry.m_initiatorHSId != initiatorHSId) {
                 i.remove();
                 retval.add(entry);
+                m_outstandingTxns--;
                 m_acg.reduceBackpressure(entry.m_messageSize);
             }
         }
