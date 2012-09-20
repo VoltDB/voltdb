@@ -106,13 +106,7 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
 
     vector<AbstractExpression*> indexedExpressions = TableIndex::simplyIndexColumns();
     if (catalogIndex.expressionsjson().length() != 0) {
-        // When this gets supported, column type validations below will have to be replaced with expression type validations,
-        // and then the real work begins.
-        //printf("WARNING: for now, ignoring expression-based index '%s' on table '%s' having JSON expression: %s\n",
-        //          catalog_index->name().c_str(),
-        //          catalogTable.name().c_str(),
-        //          catalog_index->expressionsjson().c_str());
-        return false;
+        ExpressionUtil::loadIndexedExprsFromJson(indexedExpressions, catalogIndex.expressionsjson());
     }
 
     // Since the columns are not going to come back in the proper order from

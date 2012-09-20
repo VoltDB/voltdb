@@ -57,10 +57,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltdb.ExecutionSite.CheckTxnStateCompletionMessage;
-import org.voltdb.ExecutionSite.ExecutionSiteLocalSnapshotMessage;
-import org.voltdb.ExecutionSite.ExecutionSiteNodeFailureMessage;
-import org.voltdb.ExecutionSite.SystemProcedureContext;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -1357,7 +1353,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
          * snapshot request, or it may fail.
          */
         SnapshotResponseHandler handler = new SnapshotResponseHandler() {
-            @SuppressWarnings("static-access")
             @Override
             public void handleResponse(ClientResponse resp) {
                 if (resp == null) {
