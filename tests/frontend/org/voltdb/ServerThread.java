@@ -47,6 +47,9 @@ public class ServerThread extends Thread {
             System.exit(-1);
         }
 
+        // Disable loading the EE if running against HSQL.
+        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+
         setName("ServerThread");
     }
 
@@ -56,6 +59,9 @@ public class ServerThread extends Thread {
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "";
+
+        // Disable loading the EE if running against HSQL.
+        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         setName("ServerThread");
     }
@@ -67,6 +73,9 @@ public class ServerThread extends Thread {
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "";
+
+        // Disable loading the EE if running against HSQL.
+        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         if (!m_config.validate()) {
             m_config.usage();
@@ -99,6 +108,9 @@ public class ServerThread extends Thread {
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
         m_config.m_internalPort = internalPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
+
+        // Disable loading the EE if running against HSQL.
+        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         if (!m_config.validate()) {
             m_config.usage();

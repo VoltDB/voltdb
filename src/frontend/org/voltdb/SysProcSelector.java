@@ -27,6 +27,7 @@ public enum SysProcSelector {
     IOSTATS,
     MEMORY,           // info about node's memory usage
     LIVECLIENTS,      // info about the currently connected clients
+    PLANNER,          // info about planner and EE performance and cache usage
     MANAGEMENT,       //Returns pretty much everything
 
     SNAPSHOTSTATUS,
@@ -38,5 +39,5 @@ public enum SysProcSelector {
     DRPARTITION,
     DRNODE,
 
-    TOPO;     // return leader and site info for iv2
+    TOPO            // return leader and site info for iv2
 }

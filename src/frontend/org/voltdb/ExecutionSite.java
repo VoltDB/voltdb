@@ -830,7 +830,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
-                  String serializedCatalog,
+                  String serializedCatalogIn,
                   RestrictedPriorityQueue transactionQueue,
                   ProcedureRunnerFactory runnerFactory,
                   boolean recovering,
@@ -871,6 +871,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             ee = new MockExecutionEngine();
         }
         else {
+            String serializedCatalog = serializedCatalogIn;
             if (serializedCatalog == null) {
                 serializedCatalog = voltdb.getCatalogContext().catalog.serialize();
             }
@@ -1356,11 +1357,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
          * snapshot request, or it may fail.
          */
         SnapshotResponseHandler handler = new SnapshotResponseHandler() {
+            @SuppressWarnings("static-access")
             @Override
             public void handleResponse(ClientResponse resp) {
                 if (resp == null) {
                     VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
                                             false, null);
+                    // Prevent potential null warnings below.
+                    return;
                 } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
                     VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: " +
                             resp.getStatusString(), false, null);
@@ -2080,12 +2084,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         + CoreUtils.hsIdCollectionToString(newFailedSiteIds));
                 return false;
             }
-
-            hostLog.info("Received failure message from " + CoreUtils.hsIdToString(fm.m_sourceHSId) +
-                    " for failed sites " +
-                    CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
-                    CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
-                    " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
+            // Won't be non-null here, but prevent Eclipse warnings by testing.
+            if (fm != null) {
+                hostLog.info("Received failure message from " + CoreUtils.hsIdToString(fm.m_sourceHSId) +
+                        " for failed sites " +
+                        CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
+                        CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
+                        " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
+            }
         } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false));
 
         return true;
@@ -2733,6 +2739,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     // this can't be null, initiate task must have an invocation
                     if (invocation == null) {
                         VoltDB.crashLocalVoltDB("Initiate task " + txnId + " missing invocation", false, null);
+                        // Prevent potential null warnings below.
+                        return null;
                     }
                     if ((invocation.getType() == ProcedureInvocationType.REPLICATED)) {
                         txnId = invocation.getOriginalTxnId();

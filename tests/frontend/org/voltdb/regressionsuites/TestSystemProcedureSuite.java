@@ -24,11 +24,12 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -40,6 +41,11 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
+
+    private static int sites = 3;
+    private static int hosts = 2;
+    private static int kfactor = 1;
+    private static boolean hasLocalServer = false;
 
     static final Class<?>[] PROCEDURES =
     {
@@ -103,7 +109,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             fail();
         }
         catch (ProcCallException pce) {
-            assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
         }
     }
 
@@ -158,8 +164,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals( 1, results[0].getColumnCount());
         assertEquals( VoltType.INTEGER, results[0].getColumnType(0));
         assertTrue( results[0].advanceRow());
-        final int columnCount = (int)results[0].getLong(0);
-        assertTrue (columnCount == 3);
+        final int siteCount = (int)results[0].getLong(0);
+        assertTrue (siteCount == TestSystemProcedureSuite.sites);
 
         //
         // table
@@ -168,7 +174,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertTrue(results.length == 1);
         // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-        assertEquals(18, results[0].getRowCount());
+        assertEquals(TestSystemProcedureSuite.hosts * TestSystemProcedureSuite.sites * 3, results[0].getRowCount());
 
         System.out.println("Test statistics table: " + results[0].toString());
 
@@ -204,16 +210,37 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         VoltTable stats = results[0];
         stats.advanceRow();
-        // Check for overflow
+
+        // Retrieve all statistics
         long min_time = (Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT);
         long max_time = (Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT);
         long avg_time = (Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT);
+        long min_result_size = (Long)stats.get("MIN_RESULT_SIZE", VoltType.BIGINT);
+        long max_result_size = (Long)stats.get("MAX_RESULT_SIZE", VoltType.BIGINT);
+        long avg_result_size = (Long)stats.get("AVG_RESULT_SIZE", VoltType.BIGINT);
+        long min_parameter_set_size = (Long)stats.get("MIN_PARAMETER_SET_SIZE", VoltType.BIGINT);
+        long max_parameter_set_size = (Long)stats.get("MAX_PARAMETER_SET_SIZE", VoltType.BIGINT);
+        long avg_parameter_set_size = (Long)stats.get("AVG_PARAMETER_SET_SIZE", VoltType.BIGINT);
+
+        // Check for overflow
         assertTrue("Failed MIN_EXECUTION_TIME > 0, value was: " + min_time,
                    min_time > 0);
         assertTrue("Failed MAX_EXECUTION_TIME > 0, value was: " + max_time,
                    max_time > 0);
         assertTrue("Failed AVG_EXECUTION_TIME > 0, value was: " + avg_time,
                    avg_time > 0);
+        assertTrue("Failed MIN_RESULT_SIZE > 0, value was: " + min_result_size,
+                   min_result_size >= 0);
+        assertTrue("Failed MAX_RESULT_SIZE > 0, value was: " + max_result_size,
+                   max_result_size >= 0);
+        assertTrue("Failed AVG_RESULT_SIZE > 0, value was: " + avg_result_size,
+                   avg_result_size >= 0);
+        assertTrue("Failed MIN_PARAMETER_SET_SIZE > 0, value was: " + min_parameter_set_size,
+                   min_parameter_set_size >= 0);
+        assertTrue("Failed MAX_PARAMETER_SET_SIZE > 0, value was: " + max_parameter_set_size,
+                   max_parameter_set_size >= 0);
+        assertTrue("Failed AVG_PARAMETER_SET_SIZE > 0, value was: " + avg_parameter_set_size,
+                   avg_parameter_set_size >= 0);
 
         // check for reasonable values
         assertTrue("Failed MIN_EXECUTION_TIME > 2,400,000,000ns, value was: " +
@@ -225,6 +252,24 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertTrue("Failed AVG_EXECUTION_TIME > 2,400,000,000ns, value was: " +
                    avg_time,
                    avg_time > 2400000000L);
+        assertTrue("Failed MIN_RESULT_SIZE < 1,000,000, value was: " +
+                   min_result_size,
+                   min_result_size < 1000000L);
+        assertTrue("Failed MAX_RESULT_SIZE < 1,000,000, value was: " +
+                   max_result_size,
+                   max_result_size < 1000000L);
+        assertTrue("Failed AVG_RESULT_SIZE < 1,000,000, value was: " +
+                   avg_result_size,
+                   avg_result_size < 1000000L);
+        assertTrue("Failed MIN_PARAMETER_SET_SIZE < 1,000,000, value was: " +
+                   min_parameter_set_size,
+                   min_parameter_set_size < 1000000L);
+        assertTrue("Failed MAX_PARAMETER_SET_SIZE < 1,000,000, value was: " +
+                   max_parameter_set_size,
+                   max_parameter_set_size < 1000000L);
+        assertTrue("Failed AVG_PARAMETER_SET_SIZE < 1,000,000, value was: " +
+                   avg_parameter_set_size,
+                   avg_parameter_set_size < 1000000L);
 
         //
         // iostats
@@ -233,6 +278,86 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertEquals(1, results.length);
         System.out.println("Test iostats table: " + results[0].toString());
+    }
+
+    //
+    // planner statistics
+    //
+    public void testPlannerStatistics() throws Exception {
+        Client client  = getClient();
+        // Clear the interval statistics
+        VoltTable[] results = client.callProcedure("@Statistics", "planner", 1).getResults();
+        assertEquals(1, results.length);
+
+        // Invoke a few select queries a few times to get some cache hits and misses,
+        // and to exceed the sampling frequency.
+        // This does not use level 2 cache (parameterization) or trigger failures.
+        for (String query : new String[] {
+                "select * from warehouse",
+                "select * from new_order",
+                "select * from item",
+                }) {
+            for (int i = 0; i < 10; i++) {
+                client.callProcedure("@AdHoc", query).getResults();
+                assertEquals(1, results.length);
+            }
+        }
+
+        // Get the final interval statistics
+        results = client.callProcedure("@Statistics", "planner", 1).getResults();
+        assertEquals(1, results.length);
+        System.out.println("Test planner table: " + results[0].toString());
+        VoltTable stats = results[0];
+
+        // Sample the statistics
+        List<Long> siteIds = new ArrayList<Long>();
+        int cache1_level = 0;
+        int cache2_level = 0;
+        int cache1_hits  = 0;
+        int cache2_hits  = 0;
+        int cache_misses = 0;
+        long plan_time_min_min = Long.MAX_VALUE;
+        long plan_time_max_max = Long.MIN_VALUE;
+        long plan_time_avg_tot = 0;
+        int failures = 0;
+        while (stats.advanceRow()) {
+            cache1_level += (Integer)stats.get("CACHE1_LEVEL", VoltType.INTEGER);
+            cache2_level += (Integer)stats.get("CACHE2_LEVEL", VoltType.INTEGER);
+            cache1_hits  += (Integer)stats.get("CACHE1_HITS", VoltType.INTEGER);
+            cache2_hits  += (Integer)stats.get("CACHE2_HITS", VoltType.INTEGER);
+            cache_misses += (Integer)stats.get("CACHE_MISSES", VoltType.INTEGER);
+            plan_time_min_min = Math.min(plan_time_min_min, (Long)stats.get("PLAN_TIME_MIN", VoltType.BIGINT));
+            plan_time_max_max = Math.max(plan_time_max_max, (Long)stats.get("PLAN_TIME_MAX", VoltType.BIGINT));
+            plan_time_avg_tot += (Long)stats.get("PLAN_TIME_AVG", VoltType.BIGINT);
+            failures += (Integer)stats.get("FAILURES", VoltType.INTEGER);
+            siteIds.add((Long)stats.get("SITE_ID", VoltType.BIGINT));
+        }
+
+        // Check for reasonable results
+        int globalPlanners = 0;
+        assertTrue("Failed siteIds count >= 2", siteIds.size() >= 2);
+        for (long siteId : siteIds) {
+            if (siteId == -1) {
+                globalPlanners++;
+            }
+        }
+        assertTrue("Global planner sites not 1, value was: " + globalPlanners, globalPlanners == 1);
+        assertTrue("Failed total CACHE1_LEVEL > 0, value was: " + cache1_level, cache1_level > 0);
+        assertTrue("Failed total CACHE1_LEVEL < 1,000,000, value was: " + cache1_level, cache1_level < 1000000);
+        assertTrue("Failed total CACHE2_LEVEL >= 0, value was: " + cache2_level, cache2_level >= 0);
+        assertTrue("Failed total CACHE2_LEVEL < 1,000,000, value was: " + cache2_level, cache2_level < 1000000);
+        assertTrue("Failed total CACHE1_HITS > 0, value was: " + cache1_hits, cache1_hits > 0);
+        assertTrue("Failed total CACHE1_HITS < 1,000,000, value was: " + cache1_hits, cache1_hits < 1000000);
+        assertTrue("Failed total CACHE2_HITS == 0, value was: " + cache2_hits, cache2_hits == 0);
+        assertTrue("Failed total CACHE2_HITS < 1,000,000, value was: " + cache2_hits, cache2_hits < 1000000);
+        assertTrue("Failed total CACHE_MISSES > 0, value was: " + cache_misses, cache_misses > 0);
+        assertTrue("Failed total CACHE_MISSES < 1,000,000, value was: " + cache_misses, cache_misses < 1000000);
+        assertTrue("Failed min PLAN_TIME_MIN > 0, value was: " + plan_time_min_min, plan_time_min_min > 0);
+        assertTrue("Failed total PLAN_TIME_MIN < 100,000,000,000, value was: " + plan_time_min_min, plan_time_min_min < 100000000000L);
+        assertTrue("Failed max PLAN_TIME_MAX > 0, value was: " + plan_time_max_max, plan_time_max_max > 0);
+        assertTrue("Failed total PLAN_TIME_MAX < 100,000,000,000, value was: " + plan_time_max_max, plan_time_max_max < 100000000000L);
+        assertTrue("Failed total PLAN_TIME_AVG > 0, value was: " + plan_time_avg_tot, plan_time_avg_tot > 0);
+        assertTrue("Failed total FAILURES == 0, value was: " + failures, failures == 0);
     }
 
     //public void testShutdown() {
@@ -453,9 +578,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("sysproc-cluster.jar", 3, 2, 1,
+        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.sites, TestSystemProcedureSuite.hosts, TestSystemProcedureSuite.kfactor,
                                   BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(false);
+        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
