@@ -821,4 +821,11 @@ import org.voltdb.types.VoltDecimalHelper;
         assert false : "hashCode not designed";
         return 42; // any arbitrary constant will do
     }
+
+    public Integer getHashinatedParam(int index) {
+        if (m_params.length > 0) {
+            return TheHashinator.hashToPartition(m_params[index]);
+        }
+        return null;
+    }
 }

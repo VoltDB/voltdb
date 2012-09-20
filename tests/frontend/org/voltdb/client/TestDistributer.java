@@ -318,7 +318,8 @@ public class TestDistributer extends TestCase {
 
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                    ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS);
+                    ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
+                    false);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
@@ -405,7 +406,8 @@ public class TestDistributer extends TestCase {
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                1000 /* One second connection timeout */);
+                1000 /* One second connection timeout */,
+                false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000);
 
@@ -460,7 +462,8 @@ public class TestDistributer extends TestCase {
         // create distributer and connect it to the client
         Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                CONNECTION_TIMEOUT /* six second connection timeout */);
+                CONNECTION_TIMEOUT /* six second connection timeout */,
+                false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
         dist.createConnection("localhost", "", "", 20000);
