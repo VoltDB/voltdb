@@ -269,7 +269,7 @@ public class AsyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
+        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
     }
 
@@ -296,7 +296,7 @@ public class AsyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9d ms\n", stats.getAverageLatency());
+        System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
         System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
         System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
 
@@ -307,7 +307,7 @@ public class AsyncBenchmark {
         if (config.autotune) {
             System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
         }
-        System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
+        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
