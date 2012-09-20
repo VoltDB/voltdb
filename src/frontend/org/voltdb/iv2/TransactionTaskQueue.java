@@ -333,7 +333,10 @@ public class TransactionTaskQueue
         // then offer until the next MP or FragTask
         if (!m_multipartBacklog.isEmpty()) {
             Deque<TransactionTask> backlog = m_multipartBacklog.firstEntry().getValue();
-            if (backlog.peek().getTransactionState().isDone()) {
+            // We could have received just the sentinel for the first MP, which would
+            // give us a non-empty multipartBacklog but an empty deque in the first key.
+            // Do the null check on peek and fall through if we don't actually have the fragment.
+            if (backlog.peek() != null && backlog.peek().getTransactionState().isDone()) {
                 // remove the completed MP txn
                 backlog.removeFirst();
                 m_multipartBacklog.remove(m_multipartBacklog.firstKey());
