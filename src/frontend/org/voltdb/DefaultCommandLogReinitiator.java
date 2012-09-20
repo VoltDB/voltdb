@@ -102,6 +102,8 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
 
     @Override
     public InstanceId getInstanceId() {
-        return new InstanceId(0, 0);
+        // When we don't have a command log, return null to cause the instance ID
+        // check to get skipped entirely in RestoreAgent.generatePlans()
+        return null;
     }
 };
