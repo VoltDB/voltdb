@@ -54,17 +54,33 @@ public class CatalogDiffEngine {
         return m_errors.toString();
     }
 
+    enum ChangeType {
+        ADDITION, DELETION
+    }
+
     /**
      * @return true if the CatalogType can be dynamically added and removed
      * from a running system.
      */
-    boolean checkAddDropWhitelist(CatalogType suspect) {
+    boolean checkAddDropWhitelist(CatalogType suspect, ChangeType changeType) {
         // should generate this from spec.txt
         CatalogType orig = suspect;
 
         // Support add/drop of only the top level object.
-        if (suspect instanceof Table)
+        if (suspect instanceof Table) {
             return true;
+        }
+
+        // allow addition/deletion of non-unique indexes
+        if (suspect instanceof Index) {
+            Index index = (Index) suspect;
+            if (index.m_unique) {
+                m_errors.append("May not dynamically add/drop unique indexes.\n");
+                m_supported = false;
+                return false;
+            }
+            return true;
+        }
 
         // Support add/drop anywhere in these sub-trees
         do {
@@ -130,7 +146,7 @@ public class CatalogDiffEngine {
      */
     private void writeDeletion(CatalogType prevType, String mapName, String name)
     {
-        checkAddDropWhitelist(prevType);
+        checkAddDropWhitelist(prevType, ChangeType.DELETION);
         m_sb.append("delete ").append(prevType.getParent().getPath()).append(" ");
         m_sb.append(mapName).append(" ").append(name).append("\n");
     }
@@ -139,7 +155,7 @@ public class CatalogDiffEngine {
      * Add an addition
      */
     private void writeAddition(CatalogType newType) {
-        checkAddDropWhitelist(newType);
+        checkAddDropWhitelist(newType, ChangeType.ADDITION);
         newType.writeCreationCommand(m_sb);
         newType.writeFieldCommands(m_sb);
         newType.writeChildCommands(m_sb);

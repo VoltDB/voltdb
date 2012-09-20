@@ -25,6 +25,7 @@
 import decimal
 import re
 import math
+from SQLCoverageReport import generate_html_reports
 
 # lame, but it matches at least up to 6 ORDER BY columns
 __EXPR = re.compile(r"ORDER BY\s(\w+\.(?P<column_1>\w+)(\s+\w+)?)"
@@ -161,3 +162,7 @@ def normalize(table, sql):
     sort(table.tuples, indices)
 
     return table
+
+def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all):
+    return generate_html_reports(suite, seed, statements_path, hsql_path,
+            jni_path, output_dir, report_all, cntonly = False)

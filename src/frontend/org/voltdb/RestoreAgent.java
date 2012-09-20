@@ -545,7 +545,7 @@ SnapshotCompletionInterest
             }
 
             SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
-            if (VoltDB.instance().isIV2Enabled()) {
+            if (VoltDB.instance().isIV2Enabled() && info != null) {
                 final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
                 final Map<Integer, Long> snapmap = info.partitionToTxnId;
                 // If cmdlogmap is null, there were no command log segments, so all snapshots are potentially valid,
