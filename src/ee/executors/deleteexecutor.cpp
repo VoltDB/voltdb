@@ -49,7 +49,6 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "storage/table.h"
-#include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "indexes/tableindex.h"
 #include "storage/tableutil.h"
@@ -73,19 +72,7 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
     assert(m_targetTable);
 
-    TupleSchema* schema = m_node->generateTupleSchema(false);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      "temp",
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
+    setDMLCountOutputTable(limits);
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {

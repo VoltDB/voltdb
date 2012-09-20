@@ -64,7 +64,7 @@ TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &sch
 
 TableIndex::~TableIndex()
 {
-    voltdb::TupleSchema::freeTupleSchema(const_cast<TupleSchema*>(m_keySchema));
+    TupleSchema::freeTupleSchema(const_cast<TupleSchema*>(m_keySchema));
     const std::vector<AbstractExpression*> &indexed_expressions = getIndexedExpressions();
     for (int ii = 0; ii < indexed_expressions.size(); ++ii) {
         delete indexed_expressions[ii];

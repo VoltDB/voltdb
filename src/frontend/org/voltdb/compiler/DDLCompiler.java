@@ -963,6 +963,7 @@ public class DDLCompiler {
                 for (VoltXMLElement exprNode : subNode.children) {
                     exprs[j] = AbstractParsedStmt.parseExpressionTree(null, exprNode);
                     exprs[j].resolveForTable(table);
+                    exprs[j].finalizeValueTypes();
                 }
             }
         }

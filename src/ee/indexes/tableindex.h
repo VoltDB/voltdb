@@ -73,17 +73,43 @@ struct TableIndexScheme {
     TableIndexScheme(std::string a_name, TableIndexType a_type,
                      const std::vector<int32_t>& a_columnIndices,
                      const std::vector<AbstractExpression*>& a_indexedExpressions,
-                     bool a_unique, bool a_countable, bool a_intsOnly,
-                     TupleSchema *a_tupleSchema) :
+                     bool a_unique, bool a_countable,
+                     const TupleSchema *a_tupleSchema) :
       name(a_name),
       type(a_type),
       columnIndices(a_columnIndices),
       indexedExpressions(a_indexedExpressions),
       unique(a_unique),
       countable(a_countable),
-      intsOnly(a_intsOnly),
       tupleSchema(a_tupleSchema)
     {}
+
+    TableIndexScheme(const TableIndexScheme& other) :
+      name(other.name),
+      type(other.type),
+      columnIndices(other.columnIndices),
+      indexedExpressions(other.indexedExpressions),
+      unique(other.unique),
+      countable(other.countable),
+      tupleSchema(other.tupleSchema)
+    {}
+
+    TableIndexScheme& operator=(const TableIndexScheme& other)
+    {
+        name = other.name;
+        type = other.type;
+        columnIndices = other.columnIndices;
+        indexedExpressions = other.indexedExpressions;
+        unique = other.unique;
+        countable = other.countable;
+        tupleSchema = other.tupleSchema;
+        return *this;
+    }
+
+    static const std::vector<TableIndexScheme> noOptionalIndices()
+    {
+        return std::vector<TableIndexScheme>();
+    }
 
     std::string name;
     TableIndexType type;
@@ -91,8 +117,7 @@ struct TableIndexScheme {
     std::vector<AbstractExpression*> indexedExpressions;
     bool unique;
     bool countable;
-    bool intsOnly;
-    TupleSchema *tupleSchema;
+    const TupleSchema *tupleSchema;
 };
 
 /**
@@ -338,7 +363,7 @@ public:
     }
 
     // Provide an empty expressions vector to indicate a simple columns-only index.
-    static const std::vector<AbstractExpression*>& indexColumnsDirectly() {
+    static const std::vector<AbstractExpression*>& simplyIndexColumns() {
         static std::vector<AbstractExpression*> emptyExpressionVector;
         return emptyExpressionVector;
     }

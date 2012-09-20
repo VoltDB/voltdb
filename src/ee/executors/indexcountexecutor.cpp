@@ -23,10 +23,10 @@
 #include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
+#include "indexes/tableindex.h"
 #include "plannodes/indexcountnode.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
@@ -43,19 +43,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node->getPredicate() == NULL);
 
     // Create output table based on output schema from the plan
-    TupleSchema* schema = m_node->generateTupleSchema(false);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    assert(column_count == 1);
-
-    std::string* column_names = new std::string[column_count];
-    column_names[0] = m_node->getOutputSchema()[0]->getColumnName();
-
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      m_node->getTargetTable()->name(),
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
+    setTempOutputTable(limits);
 
     //
     // Make sure that we have search keys and that they're not null

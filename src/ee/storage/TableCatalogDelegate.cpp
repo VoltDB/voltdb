@@ -15,12 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <vector>
-#include <map>
-#include <boost/foreach.hpp>
-#include <boost/scoped_array.hpp>
-
 #include "TableCatalogDelegate.hpp"
+
 #include "catalog/catalog.h"
 #include "catalog/database.h"
 #include "catalog/table.h"
@@ -31,6 +27,7 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/CatalogUtil.h"
 #include "common/types.h"
+#include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
@@ -39,7 +36,10 @@
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 
+#include <boost/foreach.hpp>
 
+#include <vector>
+#include <map>
 
 using namespace std;
 namespace voltdb {
@@ -66,6 +66,7 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table &catalogTabl
     vector<int32_t> columnLengths(numColumns);
     vector<bool> columnAllowNull(numColumns);
     map<string, catalog::Column*>::const_iterator col_iterator;
+    vector<string> columnNames(numColumns);
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
         const catalog::Column *catalog_column = col_iterator->second;
@@ -103,6 +104,7 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
         return false;
     }
 
+    vector<AbstractExpression*> indexedExpressions = TableIndex::simplyIndexColumns();
     if (catalogIndex.expressionsjson().length() != 0) {
         // When this gets supported, column type validations below will have to be replaced with expression type validations,
         // and then the real work begins.
@@ -110,16 +112,13 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
         //          catalog_index->name().c_str(),
         //          catalogTable.name().c_str(),
         //          catalog_index->expressionsjson().c_str());
-        *scheme = TableIndexScheme(); // return empty scheme
-        return true;
+        return false;
     }
 
     // Since the columns are not going to come back in the proper order from
     // the catalogs, we'll use the index attribute to make sure we put them
     // in the right order
     index_columns.resize(catalogIndex.columns().size());
-    column_types.resize(catalogIndex.columns().size());
-    bool isIntsOnly = true;
     map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
     for (colref_iterator = catalogIndex.columns().begin();
          colref_iterator != catalogIndex.columns().end();
@@ -132,32 +131,21 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
                        catalogTable.name().c_str());
             return false;
         }
-        // check if the column does not have an int type
-        if ((catalog_colref->column()->type() != VALUE_TYPE_TINYINT) &&
-            (catalog_colref->column()->type() != VALUE_TYPE_SMALLINT) &&
-            (catalog_colref->column()->type() != VALUE_TYPE_INTEGER) &&
-            (catalog_colref->column()->type() != VALUE_TYPE_BIGINT)) {
-            isIntsOnly = false;
-        }
         index_columns[catalog_colref->index()] = catalog_colref->column()->index();
-        column_types[catalog_colref->index()] = (ValueType) catalog_colref->column()->type();
     }
 
     *scheme = TableIndexScheme(catalogIndex.name(),
                                (TableIndexType)catalogIndex.type(),
                                index_columns,
-                               TableIndex::simplyIndexColumns(),
+                               indexedExpressions,
                                catalogIndex.unique(),
-                               true, // Fix it as the next line when VoltDB can disable CountingIndex feature
-                               //catalogIndex.countable(),
-                               isIntsOnly,
-                               const_cast<TupleSchema*>(schema));
+                               true, // support counting indexes (wherever supported)
+                               schema);
     return true;
 }
 
 int
-TableCatalogDelegate::init(ExecutorContext *executorContext,
-                           catalog::Database &catalogDatabase,
+TableCatalogDelegate::init(catalog::Database &catalogDatabase,
                            catalog::Table &catalogTable)
 {
     // Create a persistent table for this table in our catalog
@@ -166,7 +154,7 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     // get an array of table column names
     const int numColumns = static_cast<int>(catalogTable.columns().size());
     map<string, catalog::Column*>::const_iterator col_iterator;
-    boost::scoped_array<string> columnNames(new string[numColumns]);
+    vector<string> columnNames(numColumns);
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
         const catalog::Column *catalog_column = col_iterator->second;
@@ -181,18 +169,11 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     map<string, catalog::Index*>::const_iterator idx_iterator;
     for (idx_iterator = catalogTable.indexes().begin();
          idx_iterator != catalogTable.indexes().end(); idx_iterator++) {
-
         catalog::Index *catalog_index = idx_iterator->second;
 
         TableIndexScheme index_scheme;
         if (getIndexScheme(catalogTable, *catalog_index, schema, &index_scheme)) {
-            // some indexes return empty schemes (like function-based ones)
-            if (index_scheme.tupleSchema) {
-                index_map[catalog_index->name()] = index_scheme;
-            }
-        }
-        else {
-            return false;
+            index_map[catalog_index->name()] = index_scheme;
         }
     }
 
@@ -283,12 +264,13 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     }
 
     m_exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
-
+    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
-    m_table = TableFactory::getPersistentTable(databaseId, executorContext,
-                                               catalogTable.name(), schema, columnNames.get(),
+    m_table = TableFactory::getPersistentTable(databaseId, tableName,
+                                               schema, columnNames,
                                                partitionColumnIndex, m_exportEnabled,
-                                               isTableExportOnly(catalogDatabase, table_id));
+                                               tableIsExportOnly);
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
@@ -299,18 +281,14 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     }
 
     // add other indexes
-    BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+    BOOST_FOREACH(TableIndexScheme &scheme, indexes) {
         TableIndex *index = TableIndexFactory::getInstance(scheme);
         assert(index);
         m_table->addIndex(index);
     }
 
     // configure for stats tables
-    m_table->configureIndexStats(executorContext->m_hostId,
-                                 executorContext->m_hostname,
-                                 executorContext->m_siteId,
-                                 executorContext->m_partitionId,
-                                 databaseId);
+    m_table->configureIndexStats(databaseId);
 
     m_table->incrementRefcount();
     return 0;

@@ -153,6 +153,7 @@ public:
 
         // no int specialization beyond this size (32 bytes == 4 'uint64_t's)
         m_intsOnly = false;
+        //TODO: short term, throw if scheme uses generalized indexed expressions (m_scheme.indexedExpressions.size() > 0)
 
         if ((result = getInstanceIfKeyFits<48>())) {
             return result;
@@ -184,11 +185,11 @@ public:
         }
     }
 
-    TableIndexPicker(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
+    TableIndexPicker(const TupleSchema *keySchema, bool intsOnly, const TableIndexScheme &scheme) :
         m_scheme(scheme),
         m_keySchema(keySchema),
         m_keySize(keySchema->tupleLength()),
-        m_intsOnly(scheme.intsOnly),
+        m_intsOnly(intsOnly),
         m_type(scheme.type)
     {}
 
@@ -200,21 +201,53 @@ private:
     TableIndexType m_type;
 };
 
+// check if any indexed expression does not have an int type
+static bool isNotIntType(ValueType exprType) {
+    return (exprType != VALUE_TYPE_TINYINT) &&
+           (exprType != VALUE_TYPE_SMALLINT) &&
+           (exprType != VALUE_TYPE_INTEGER) &&
+           (exprType != VALUE_TYPE_BIGINT);
+}
+
+
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
-    int colCount = (int)scheme.columnIndices.size();
-    TupleSchema *tupleSchema = scheme.tupleSchema;
+    const TupleSchema *tupleSchema = scheme.tupleSchema;
     assert(tupleSchema);
+    bool isIntsOnly = true;
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
-    std::vector<bool> keyColumnAllowNull(colCount, true);
-    for (int i = 0; i < colCount; ++i) {
-        keyColumnTypes.push_back(tupleSchema->columnType(scheme.columnIndices[i]));
-        keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[i]));
+    size_t valueCount = (int) scheme.indexedExpressions.size();
+    if (valueCount != 0) {
+        for (size_t ii = 0; ii < valueCount; ++ii) {
+            ValueType exprType = scheme.indexedExpressions[ii]->getValueType();
+            if (isNotIntType(exprType)) {
+                isIntsOnly = false;
+            }
+            keyColumnTypes.push_back(exprType);
+            if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
+                // Not enough information to reliably determine that the value is small enough to "inline".
+                keyColumnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH);
+                //TODO: short term, throw here for all non-inline types
+            } else {
+                keyColumnLengths.push_back(NValue::getTupleStorageSize(exprType));
+            }
+        }
+    } else {
+        valueCount = scheme.columnIndices.size();
+        for (size_t ii = 0; ii < valueCount; ++ii) {
+            ValueType exprType = tupleSchema->columnType(scheme.columnIndices[ii]);
+            if (isNotIntType(exprType)) {
+                    isIntsOnly = false;
+            }
+            keyColumnTypes.push_back(exprType);
+            keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[ii]));
+        }
     }
+    std::vector<bool> keyColumnAllowNull(valueCount, true);
     TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
     assert(keySchema);
     VOLT_TRACE("Creating index for %s.\n%s", scheme.name.c_str(), keySchema->debug().c_str());
-    TableIndexPicker picker(keySchema, scheme);
+    TableIndexPicker picker(keySchema, isIntsOnly, scheme);
     TableIndex *retval = picker.getInstance();
     return retval;
 }

@@ -98,7 +98,7 @@ public:
         int num_of_columns = 100;
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
-        string *columnNames = new string[num_of_columns];
+        vector<string> columnNames(num_of_columns);
 
         vector<ValueType> columnTypes(num_of_columns, VALUE_TYPE_BIGINT);
         vector<int32_t> columnLengths(num_of_columns, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
@@ -167,20 +167,19 @@ public:
 
         TableIndexScheme pkeyScheme(name,
                                     BALANCED_TREE_INDEX,
-                                    pkey_column_indices,
-                                    TableIndex::simplyIndexColumns(),
-                                    true, true, true, schema);
+                                    pkey_column_indices, TableIndex::simplyIndexColumns(),
+                                    true, true, schema);
+        vector<TableIndexScheme> indexes;
+        indexes.push_back(pkeyScheme);
 
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
-        table =
-          dynamic_cast<PersistentTable*>
-          (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
-                                            "test_wide_table", schema,
-                                            columnNames, -1, false, false));
-        delete[] columnNames;
+        table = dynamic_cast<PersistentTable*>(
+            TableFactory::getPersistentTable(database_id, "test_wide_table",
+                                             schema, columnNames,
+                                             -1, false, false));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -267,17 +266,16 @@ public:
     void init(std::string name, TableIndexType type, std::vector<int32_t> &ix_columnIndices,
               std::vector<ValueType> &ix_columnTypes, bool unique)
     {
-        bool intsOnly = true;
         bool countable = true;
         TupleSchema *initiallyNullTupleSchema = NULL;
         TableIndexScheme index(name, type,
                                ix_columnIndices, TableIndex::simplyIndexColumns(),
-                               unique, countable, intsOnly, initiallyNullTupleSchema);
+                               unique, countable, initiallyNullTupleSchema);
 
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
 
-        string *columnNames = new string[NUM_OF_COLUMNS];
+        vector<string> columnNames(NUM_OF_COLUMNS);
 
         char buffer[32];
         vector<ValueType> columnTypes(NUM_OF_COLUMNS, VALUE_TYPE_BIGINT);
@@ -301,13 +299,10 @@ public:
         vector<ValueType> pkey_column_types;
         pkey_column_indices.push_back(0);
         pkey_column_indices.push_back(1);
-        pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        TableIndexScheme pkeyScheme("idx_pkey",
-                                    BALANCED_TREE_INDEX,
-                                    pkey_column_indices,
-                                    TableIndex::simplyIndexColumns(),
-                                    true, true, true, schema);
+
+        TableIndexScheme pkeyScheme("idx_pkey", BALANCED_TREE_INDEX,
+                                    pkey_column_indices, TableIndex::simplyIndexColumns(),
+                                    true, true, schema);
 
         vector<TableIndexScheme> indexes;
         indexes.push_back(index);
@@ -315,12 +310,7 @@ public:
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
-        table =
-            dynamic_cast<PersistentTable*>
-          (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
-                                            "test_table", schema,
-                                            columnNames, -1, false, false));
-        delete[] columnNames;
+        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -328,7 +318,7 @@ public:
         table->setPrimaryKeyIndex(pkeyIndex);
 
         // add other indexes
-        BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+        BOOST_FOREACH(TableIndexScheme &scheme, indexes) {
             TableIndex *index = TableIndexFactory::getInstance(scheme);
             assert(index);
             table->addIndex(index);
@@ -421,7 +411,7 @@ TEST_F(IndexTest, ArrayUnique) {
     iu_column_indices.push_back(0);
     iu_column_types.push_back(VALUE_TYPE_BIGINT);
     init("iu2",
-         ARRAY_INDEX,
+         HASH_TABLE_INDEX,
          iu_column_indices,
          iu_column_types,
          true);

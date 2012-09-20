@@ -106,7 +106,7 @@ protected:
         vector<boost::shared_ptr<const TableColumn> > columns;
         char buffer[32];
 
-        string *columnNames = new string[NUM_OF_COLUMNS];
+        vector<string> columnNames(NUM_OF_COLUMNS);
         vector<ValueType> columnTypes;
         vector<int32_t> columnLengths;
         vector<bool> columnAllowNull;
@@ -119,18 +119,14 @@ protected:
         }
         TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
         if (xact) {
-            persistent_table = TableFactory::getPersistentTable(database_id, NULL, "test_table", schema, columnNames, -1, false, false);
+            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
             table = persistent_table;
         } else {
             limits.setMemoryLimit(1024 * 1024);
-            temp_table = TableFactory::getTempTable(database_id, "test_table",
-                                                    schema, columnNames, &limits);
+            temp_table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, &limits);
             table = temp_table;
         }
         assert(tableutil::addRandomTuples(this->table, NUM_OF_TUPLES));
-
-        // clean up
-        delete[] columnNames;
     }
 
     Table* table;

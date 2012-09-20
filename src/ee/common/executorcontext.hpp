@@ -87,6 +87,10 @@ class ExecutorContext {
         return m_undoQuantum;
     }
 
+    static UndoQuantum *currentUndoQuantum() {
+        return getExecutorContext()->m_undoQuantum;
+    }
+
     Topend* getTopend() {
         return m_topEnd;
     }
