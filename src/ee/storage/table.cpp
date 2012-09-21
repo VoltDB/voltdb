@@ -543,13 +543,13 @@ void Table::removeIndex(TableIndex *index) {
     assert(isExistingTableIndex(m_indexes, index));
 
     std::vector<TableIndex*>::iterator iter;
-    for (iter = m_indexes.begin(); *iter; iter++) {
+    for (iter = m_indexes.begin(); iter != m_indexes.end(); iter++) {
         if ((*iter) == index) {
             m_indexes.erase(iter);
             break;
         }
     }
-    for (iter = m_uniqueIndexes.begin(); *iter; iter++) {
+    for (iter = m_uniqueIndexes.begin(); iter != m_uniqueIndexes.end(); iter++) {
         if ((*iter) == index) {
             m_indexes.erase(iter);
             break;
