@@ -77,12 +77,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             return (m_txnId == other.m_txnId && m_spHandle == other.m_spHandle);
         }
 
-        // Only care about comparing SPHandles for sorting in updateReplicas
+        // Only care about comparing TXN ID part for sorting in updateReplicas
         public int compareTo(DuplicateCounterKey o)
         {
-            if (m_spHandle < o.m_spHandle) {
+            if (m_txnId < o.m_txnId) {
                 return -1;
-            } else if (m_spHandle > o.m_spHandle) {
+            } else if (m_txnId > o.m_txnId) {
                 return 1;
             } else {
                 return 0;
