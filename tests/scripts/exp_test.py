@@ -419,13 +419,12 @@ def startTest(testSuiteList):
 # end of startTest(testSuiteList):
 
 def create_rpt(info, status, msg, keys, elapsed):
-    testtime = "Total Time Consumed: %.2f" % elapsed
-    proj = Element('project')
-    cpu = SubElement(proj, 'CPUTime', {'CPU':testtime})
+    testtime = "%.2f" % elapsed
+    testsuites = Element('testsuites', {'time':testtime})
     for mod in status:
-        testsuites = SubElement(proj, 'testsuites',
+        testsuite = SubElement(testsuites, 'testsuite',
                 {'package':info["pkgname"],'URL':info["srce"],
-                 'hostname':hostname, 'Module':mod})
+                 'hostname':hostname, 'name':pkgDict[mod]})
         for i in status[mod]:
             failureCnt = "0"
             errCnt = "0"
@@ -440,9 +439,8 @@ def create_rpt(info, status, msg, keys, elapsed):
                 errCnt = "1"
             else:
                 errCnt = "0"
-            testsuite = SubElement(testsuites, 'testsuite',
-                {'errors':errCnt,'failures':failureCnt, 'name':testname})
-            testcase = SubElement(testsuite, 'testcase', {'name':i})
+            testcase = SubElement(testsuite, 'testcase',
+                {'errors':errCnt,'failures':failureCnt, 'name':i})
     
             if(failureCnt == "1"):
                 failure = SubElement(testcase, 'failure',
@@ -465,7 +463,7 @@ def create_rpt(info, status, msg, keys, elapsed):
 
     rptf = "/tmp/exp_rpt.xml"
     fo = open(rptf, "wb")
-    fo.write(prettify(proj))
+    fo.write(prettify(testsuites))
     fo.close()
     if not os.path.exists(rptf):
         rptf = None
