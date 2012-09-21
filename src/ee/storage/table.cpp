@@ -517,6 +517,11 @@ TableIndex *Table::index(std::string name) {
 }
 
 void Table::addIndex(TableIndex *index) {
+    // silently ignore indexes if they've gotten this far
+    if (isExport()) {
+        return;
+    }
+
     assert(!isExistingTableIndex(m_indexes, index));
 
     // can't yet add a unique index to a non-emtpy table
@@ -540,6 +545,11 @@ void Table::addIndex(TableIndex *index) {
 }
 
 void Table::removeIndex(TableIndex *index) {
+    // silently ignore indexes if they've gotten this far
+    if (isExport()) {
+        return;
+    }
+
     assert(isExistingTableIndex(m_indexes, index));
 
     std::vector<TableIndex*>::iterator iter;
