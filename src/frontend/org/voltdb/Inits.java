@@ -38,15 +38,17 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
-import org.voltcore.utils.Pair;
-import org.voltcore.zk.ZKUtil;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.export.ExportManager;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
+import org.voltdb.VoltDB.START_ACTION;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -112,7 +114,12 @@ public class Inits {
         m_config = rvdb.m_config;
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        m_isRejoin = m_config.m_rejoinToHostAndPort != null;
+        if (m_config.m_startAction == START_ACTION.REJOIN ||
+                m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+            m_isRejoin = true;
+        } else {
+            m_isRejoin = false;
+        }
         m_threadCount = threadCount;
         m_deployment = rvdb.m_deployment;
 
@@ -312,7 +319,12 @@ public class Inits {
                 }
             } while (catalogBytes == null);
 
-            m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
+            try {
+                m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Unable to load catalog: " + e.getMessage(), false, null);
+            }
+
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
 
@@ -332,7 +344,13 @@ public class Inits {
             }
 
             try {
-                long catalogTxnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                long catalogTxnId;
+                if (m_rvdb.isIV2Enabled()) {
+                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+                } else {
+                    catalogTxnId =
+                            org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                }
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 zk.create(
                         VoltZK.initial_catalog_txnid,

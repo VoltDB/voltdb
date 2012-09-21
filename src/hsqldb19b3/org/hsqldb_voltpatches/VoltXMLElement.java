@@ -56,4 +56,40 @@ public class VoltXMLElement {
             e.append(sb, indent + "   ");
         }
     }
+
+    public VoltXMLElement duplicate() {
+        VoltXMLElement retval = new VoltXMLElement(name);
+        for (Entry<String, String> e : attributes.entrySet()) {
+            retval.attributes.put(e.getKey(), e.getValue());
+        }
+        for (VoltXMLElement child : children) {
+            retval.children.add(child.duplicate());
+        }
+        return retval;
+	}
+
+    /**
+     * Get a string representation that is designed to be as short as possible
+     * with as much certainty of uniqueness as possible.
+     * A SHA-1 hash would suffice, but here's hoping just dumping to a string is
+     * faster. Will measure later.
+     */
+    public String toMinString() {
+        StringBuilder sb = new StringBuilder();
+        toMinString(sb);
+        return sb.toString();
+    }
+
+    protected StringBuilder toMinString(StringBuilder sb) {
+        sb.append("\tE").append(name).append('\t');
+        for (Entry<String, String> e : attributes.entrySet()) {
+            sb.append('\t').append(e.getKey());
+            sb.append('\t').append(e.getValue());
+        }
+        sb.append("\t[");
+        for (VoltXMLElement e : children) {
+            e.toMinString(sb);
+        }
+        return sb;
+    }
 }

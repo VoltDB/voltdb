@@ -65,14 +65,25 @@ namespace voltdb {
  */
 struct TableIndexScheme {
     TableIndexScheme() {
-        tupleSchema = keySchema = NULL;
+        tupleSchema = NULL;
     }
     TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                     std::vector<ValueType> columnTypes, bool unique, bool intsOnly,
-                     TupleSchema *tupleSchema) {
+                         std::vector<ValueType> columnTypes, bool unique,
+                         bool intsOnly, TupleSchema *tupleSchema) {
         this->name = name; this->type = type; this->columnIndices = columnIndices;
         this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->keySchema = NULL;
+        this->tupleSchema = tupleSchema; this->countable = true;
+    }
+/* This constructor does not set countable field according what you value you pass in.
+ * FIX it when VoltDB CompactingMap can pack memory together for TreeNode without allocating
+ * memory for the 4 bytes countable field.
+ * */
+    TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
+                     std::vector<ValueType> columnTypes, bool unique,  bool countable,
+                     bool intsOnly, TupleSchema *tupleSchema) {
+        this->name = name; this->type = type; this->columnIndices = columnIndices;
+        this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
+        this->tupleSchema = tupleSchema; this->countable = countable;
     }
 
     std::string name;
@@ -80,17 +91,9 @@ struct TableIndexScheme {
     std::vector<int32_t> columnIndices;
     std::vector<ValueType> columnTypes;
     bool unique;
+    bool countable;
     bool intsOnly;
     TupleSchema *tupleSchema;
-    TupleSchema *keySchema;
-
-public:
-    void setTree() {
-        type = BALANCED_TREE_INDEX;
-    }
-    void setHash() {
-        type = HASH_TABLE_INDEX;
-    }
 };
 
 /**
@@ -139,18 +142,16 @@ public:
     virtual bool deleteEntry(const TableTuple *tuple) = 0;
 
     /**
-     * removes the index entry linked to old value and re-link it to new value.
-     * The address of the newTupleValue is used as the value in the index (and multimaps) as
-     * well as the key for the new entry.
-     */
-    virtual bool replaceEntry(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
-
-    /**
      * Update in place an index entry with a new tuple address
      */
-    virtual bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
+    virtual bool replaceEntryNoKeyChange(const TableTuple &destinationTuple,
+                                         const TableTuple &originalTuple) = 0;
+
+    /**
+     * Does the key out-of-line strings or binary data?
+     * Used for an optimization when key values are the same.
+     */
+    virtual bool keyUsesNonInlinedMemory() = 0;
 
     /**
      * just returns whether the value is already stored. no
@@ -181,39 +182,6 @@ public:
      * @return true if the value is found. false if not.
      */
     virtual bool moveToKey(const TableTuple *searchKey) = 0;
-
-    /**
-     * Find location of the specified tuple in the tuple
-     */
-    virtual bool moveToTuple(const TableTuple *searchTuple) = 0;
-
-    /**
-     * sets the tuple to point the entry found by moveToKey().  calls
-     * this repeatedly to get all entries with the search key (for
-     * non-unique index).
-     *
-     * @return true if any entry to return, false if not.
-     */
-    virtual TableTuple nextValueAtKey() = 0;
-
-    /**
-     * sets the tuple to point the entry next to the one found by
-     * moveToKey().  calls this repeatedly to get all entries
-     * following to the search key (for range query).
-     *
-     * HOWEVER, this can't be used for partial index search. You can
-     * use this only when you in advance know that there is at least
-     * one entry that perfectly matches with the search key. In other
-     * word, this method SHOULD NOT BE USED in future because there
-     * isn't such a case for range query except for cheating case
-     * (i.e. TPCC slev which assumes there is always "OID-20" entry).
-     *
-     * @return true if any entry to return, false if not.
-     */
-    virtual bool advanceToNextKey()
-    {
-        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
-    };
 
     /**
      * This method moves to the first tuple equal or greater than
@@ -268,6 +236,40 @@ public:
     };
 
     /**
+     * sets the tuple to point the entry found by moveToKey().  calls
+     * this repeatedly to get all entries with the search key (for
+     * non-unique index).
+     *
+     * @return true if any entry to return, false if not.
+     */
+    virtual TableTuple nextValueAtKey() = 0;
+
+    /**
+     * sets the tuple to point the entry next to the one found by
+     * moveToKey().  calls this repeatedly to get all entries
+     * following to the search key (for range query).
+     *
+     * HOWEVER, this can't be used for partial index search. You can
+     * use this only when you in advance know that there is at least
+     * one entry that perfectly matches with the search key. In other
+     * word, this method SHOULD NOT BE USED in future because there
+     * isn't such a case for range query except for cheating case
+     * (i.e. TPCC slev which assumes there is always "OID-20" entry).
+     *
+     * @return true if any entry to return, false if not.
+     */
+    virtual bool advanceToNextKey()
+    {
+        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
+    };
+
+    /** retrieves from a primary key index the persistent tuple matching the given temp tuple */
+    virtual TableTuple uniqueMatchingTuple(const TableTuple &searchTuple)
+    {
+        throwFatalException("Invoked TableIndex virtual method uniqueMatchingTuple which has no use on a non-unique index");
+    };
+
+    /**
      * @return true if lhs is different from rhs in this index, which
      * means replaceEntry has to follow.
      */
@@ -281,8 +283,49 @@ public:
      */
     inline bool isUniqueIndex() const
     {
-        return is_unique_index_;
+        return m_scheme.unique;
     }
+    /**
+     * Same as isUniqueIndex...
+     */
+    inline bool isCountableIndex() const
+    {
+        return m_scheme.countable;
+    }
+
+    virtual bool hasKey(const TableTuple *searchKey) = 0;
+
+    /**
+     * This function only supports countable tree index. It returns the counter value
+     * equal or greater than the serarchKey. It will return the rank with the searchKey
+     * in ascending order including itself.
+     *
+     * @parameter: isUpper means nothing to Unique index. For non-unique index, it will
+     * return the high or low rank according to this boolean flag as true or false,respectively.
+     *
+     * @Return great than rank value as "m_entries.size() + 1"  for given
+     * searchKey that is larger than all keys.
+     */
+    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper)
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
+    }
+    /**
+     * This function only supports countable tree index. It returns the counter value
+     * equal or less than the serarchKey. It will return the rank with the searchKey
+     * in ascending order including itself.
+     *
+     * @parameter: isUpper means nothing to Unique index. For non-unique index, it will
+     * return the high or low rank according to this boolean flag as true or false,respectively.
+     *
+     * @Return less than rank value as "m_entries.size()"  for given
+     * searchKey that is larger than all keys.
+     */
+    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper)
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
+    }
+
 
     virtual size_t getSize() const = 0;
 
@@ -292,25 +335,15 @@ public:
 
     const std::vector<int>& getColumnIndices() const
     {
-        return column_indices_vector_;
-    }
-
-    const std::vector<ValueType>& getColumnTypes() const
-    {
-        return column_types_vector_;
-    }
-
-    int getColumnCount() const
-    {
-        return colCount_;
+        return m_scheme.columnIndices;
     }
 
     const std::string& getName() const
     {
-        return name_;
+        return m_scheme.name;
     }
 
-    const TupleSchema * getKeySchema() const
+    const TupleSchema *getKeySchema() const
     {
         return m_keySchema;
     }
@@ -326,36 +359,35 @@ public:
     //TODO Useful implementation of == operator.
     virtual bool equals(const TableIndex *other) const;
 
-    TableIndexScheme getScheme() const {
-        return m_scheme;
-    }
-
     virtual voltdb::IndexStats* getIndexStats();
 
 protected:
-    TableIndex(const TableIndexScheme &scheme);
+    const TupleSchema *getTupleSchema() const
+    {
+        return m_scheme.tupleSchema;
+    }
+
+    TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme);
 
     const TableIndexScheme m_scheme;
-    TupleSchema* m_keySchema;
-    std::string name_;
-    std::vector<int> column_indices_vector_;
-    std::vector<ValueType> column_types_vector_;
-    ValueType* column_types_;
-    int colCount_;
-    bool is_unique_index_;
-    int* column_indices_;
+    const TupleSchema * const m_keySchema;
 
     // counters
     int m_lookups;
     int m_inserts;
     int m_deletes;
     int m_updates;
-    TupleSchema *m_tupleSchema;
 
     // stats
     IndexStats m_stats;
 
 private:
+
+    // This should always/only be required for unique key indexes used for primary keys.
+    virtual TableIndex *cloneEmptyNonCountingTreeIndex() const {
+        throwFatalException("Primary key index discovered to be non-unique or missing a cloneEmptyTreeIndex implementation.");
+    }
+
     ThreadLocalPool m_tlPool;
 };
 

@@ -147,7 +147,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         Table test_table = catalog_creator.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table);
+            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTracker());
         assertEquals(test_plan.length, number_of_sites + 1);
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
@@ -207,7 +207,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         Table test_table = catalog_creator.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table);
+            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTracker());
         assertEquals(test_plan.length, number_of_sites + 1);
         for (int i = 0; i < number_of_sites - 1; ++i)
         {

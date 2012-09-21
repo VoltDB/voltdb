@@ -36,7 +36,7 @@ public class ProcSPcandidate6 extends VoltProcedure {
     public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = 87654321");
 
     // Addition of arbitrary query against replicated data should have no ill effect on SP processing.
-    public static final SQLStmt nonspoiler = new SQLStmt("select count(*) from indexed_blah order by ival");
+    public static final SQLStmt nonspoiler = new SQLStmt("select count(*) from indexed_replicated_blah order by ival");
 
     public long run() {
         voltQueueSQL(query);

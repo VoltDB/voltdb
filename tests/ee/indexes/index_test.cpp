@@ -49,6 +49,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <boost/foreach.hpp>
+
 #include "harness.h"
 #include "common/common.h"
 #include "common/NValue.hpp"
@@ -164,14 +166,11 @@ public:
         pkey_column_indices.push_back(39);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
 
 
-        TableIndexScheme pkey(name,
-                              BALANCED_TREE_INDEX,
-                              pkey_column_indices,
-                              pkey_column_types,
-                              true, true, schema);
-
-        vector<TableIndexScheme> indexes;
-        indexes.push_back(pkey);
+        TableIndexScheme pkeyScheme(name,
+                                    BALANCED_TREE_INDEX,
+                                    pkey_column_indices,
+                                    pkey_column_types,
+                                    true, true, schema);
 
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
@@ -181,9 +180,13 @@ public:
           dynamic_cast<PersistentTable*>
           (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_wide_table", schema,
-                                            columnNames, pkey, indexes, -1, false, false));
-
+                                            columnNames, -1, false, false));
         delete[] columnNames;
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
+        assert(pkeyIndex);
+        table->addIndex(pkeyIndex);
+        table->setPrimaryKeyIndex(pkeyIndex);
 
         for (int64_t row = 1; row <= NUM_OF_WIDE_TUPLES; ++row)
         {
@@ -262,8 +265,13 @@ public:
         makeColsForRow_30(30, row, tuple);
     }
 
-    void init(TableIndexScheme index)
+    void init(std::string name, TableIndexType type, std::vector<int32_t> &ix_columnIndices,
+              std::vector<ValueType> &ix_columnTypes, bool unique)
     {
+        bool intsOnly = true;
+        TupleSchema *initiallyNullTupleSchema = NULL;
+        TableIndexScheme index(name, type, ix_columnIndices, ix_columnTypes, unique, intsOnly, initiallyNullTupleSchema);
+
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
 
@@ -293,11 +301,11 @@ public:
         pkey_column_indices.push_back(1);
         pkey_column_types.push_back(VALUE_TYPE_BIGINT);
         pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        TableIndexScheme pkey("idx_pkey",
-                              BALANCED_TREE_INDEX,
-                              pkey_column_indices,
-                              pkey_column_types,
-                              true, true, schema);
+        TableIndexScheme pkeyScheme("idx_pkey",
+                                    BALANCED_TREE_INDEX,
+                                    pkey_column_indices,
+                                    pkey_column_types,
+                                    true, true, schema);
 
         vector<TableIndexScheme> indexes;
         indexes.push_back(index);
@@ -309,9 +317,20 @@ public:
             dynamic_cast<PersistentTable*>
           (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
                                             "test_table", schema,
-                                            columnNames, pkey, indexes, -1, false, false));
-
+                                            columnNames, -1, false, false));
         delete[] columnNames;
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
+        assert(pkeyIndex);
+        table->addIndex(pkeyIndex);
+        table->setPrimaryKeyIndex(pkeyIndex);
+
+        // add other indexes
+        BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+            TableIndex *index = TableIndexFactory::getInstance(scheme);
+            assert(index);
+            table->addIndex(index);
+        }
 
         for (int64_t i = 1; i <= NUM_OF_TUPLES; ++i)
         {
@@ -381,11 +400,11 @@ TEST_F(IndexTest, IntUnique) {
     iu_column_indices.push_back(3);
     iu_column_types.push_back(VALUE_TYPE_BIGINT);
 
-    init(TableIndexScheme("iu",
-                          BALANCED_TREE_INDEX,
-                          iu_column_indices,
-                          iu_column_types,
-                          true, true, NULL));
+    init("iu",
+         BALANCED_TREE_INDEX,
+         iu_column_indices,
+         iu_column_types,
+         true);
     TableIndex* index = table->index("iu");
     EXPECT_EQ(true, index != NULL);
 
@@ -399,11 +418,11 @@ TEST_F(IndexTest, ArrayUnique) {
     vector<ValueType> iu_column_types;
     iu_column_indices.push_back(0);
     iu_column_types.push_back(VALUE_TYPE_BIGINT);
-    init(TableIndexScheme("iu2",
-                          ARRAY_INDEX,
-                          iu_column_indices,
-                          iu_column_types,
-                          true, true, NULL));
+    init("iu2",
+         ARRAY_INDEX,
+         iu_column_indices,
+         iu_column_types,
+         true);
     TableIndex* index = table->index("iu2");
     EXPECT_EQ(true, index != NULL);
 
@@ -419,36 +438,24 @@ TEST_F(IndexTest, ArrayUnique) {
                                        true);
     TableTuple searchkey(keySchema);
     searchkey.move(new char[searchkey.tupleLength()]);
-    searchkey.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
-    bool found = index->moveToKey(&searchkey);
-    EXPECT_EQ(found, true);
-    int count = 0;
-    while (!(tuple = index->nextValueAtKey()).isNullTuple())
-    {
-        ++count;
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50).
-                    op_equals(tuple.getNValue(0)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).
-                    op_equals(tuple.getNValue(1)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).
-                    op_equals(tuple.getNValue(2)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).
-                    op_equals(tuple.getNValue(3)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).
-                    op_equals(tuple.getNValue(4)).isTrue());
-    }
-    EXPECT_EQ(1, count);
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
+    EXPECT_TRUE(index->moveToKey(&searchkey));
+    tuple = index->nextValueAtKey();
+    EXPECT_FALSE(tuple.isNullTuple());
 
-    searchkey.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(1001)));
-    found = index->moveToKey(&searchkey);
-    count = 0;
-    while (!(tuple = index->nextValueAtKey()).isNullTuple())
-    {
-        ++count;
-    }
-    EXPECT_EQ(0, count);
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
+
+    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(tuple.isNullTuple());
+
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(1001)));
+    EXPECT_FALSE(index->moveToKey(&searchkey));
+    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(tuple.isNullTuple());
 
     TableTuple &tmptuple = table->tempTuple();
     tmptuple.
@@ -490,11 +497,11 @@ TEST_F(IndexTest, IntMulti) {
     vector<ValueType> im_column_types;
     im_column_indices.push_back(3);
     im_column_types.push_back(VALUE_TYPE_BIGINT);
-    init(TableIndexScheme("im",
-                          BALANCED_TREE_INDEX,
-                          im_column_indices,
-                          im_column_types,
-                          false, true, NULL));
+    init("im",
+         BALANCED_TREE_INDEX,
+         im_column_indices,
+         im_column_types,
+         false);
     TableIndex* index = table->index("im");
     EXPECT_EQ(true, index != NULL);
 
@@ -509,11 +516,11 @@ TEST_F(IndexTest, IntsUnique) {
     ixu_column_indices.push_back(2);
     ixu_column_types.push_back(VALUE_TYPE_BIGINT);
     ixu_column_types.push_back(VALUE_TYPE_BIGINT);
-    init(TableIndexScheme("ixu",
-                          BALANCED_TREE_INDEX,
-                          ixu_column_indices,
-                          ixu_column_types,
-                          true, true, NULL));
+    init("ixu",
+         BALANCED_TREE_INDEX,
+         ixu_column_indices,
+         ixu_column_types,
+         true);
 
     TableIndex* index = table->index("ixu");
     EXPECT_EQ(true, index != NULL);
@@ -532,39 +539,26 @@ TEST_F(IndexTest, IntsUnique) {
                                        true);
     TableTuple searchkey(keySchema);
     searchkey.move(new char[searchkey.tupleLength()]);
-    searchkey.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    searchkey.
-        setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
-    index->moveToKey(&searchkey);
-    int count = 0;
-    while (!(tuple = index->nextValueAtKey()).isNullTuple())
-    {
-        ++count;
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50).
-                    op_equals(tuple.getNValue(0)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).
-                    op_equals(tuple.getNValue(1)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).
-                    op_equals(tuple.getNValue(2)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).
-                    op_equals(tuple.getNValue(3)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).
-                    op_equals(tuple.getNValue(4)).isTrue());
-    }
-    EXPECT_EQ(1, count);
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
+    searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
+    EXPECT_TRUE(index->moveToKey(&searchkey));
 
-    searchkey.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    searchkey.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
-    index->moveToKey(&searchkey);
-    count = 0;
-    while (!(tuple = index->nextValueAtKey()).isNullTuple())
-    {
-        ++count;
-    }
-    EXPECT_EQ(0, count);
+    tuple = index->nextValueAtKey();
+    EXPECT_FALSE(tuple.isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
+
+    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(tuple.isNullTuple());
+
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
+    searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
+    EXPECT_FALSE(index->moveToKey(&searchkey));
+    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(tuple.isNullTuple());
 
     // partial index search test
     searchkey.
@@ -572,7 +566,7 @@ TEST_F(IndexTest, IntsUnique) {
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(-10000000)));
     index->moveToKeyOrGreater(&searchkey);
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
@@ -583,7 +577,7 @@ TEST_F(IndexTest, IntsUnique) {
                 op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
                 op_equals(tuple.getNValue(4)).isTrue());
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
@@ -600,7 +594,7 @@ TEST_F(IndexTest, IntsUnique) {
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(10000000)));
     index->moveToKeyOrGreater(&searchkey);
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
@@ -611,7 +605,7 @@ TEST_F(IndexTest, IntsUnique) {
                 op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
                 op_equals(tuple.getNValue(4)).isTrue());
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 2).
@@ -629,7 +623,7 @@ TEST_F(IndexTest, IntsUnique) {
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(30%3)));
     index->moveToGreaterThanKey(&searchkey);
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 2).
@@ -684,11 +678,11 @@ TEST_F(IndexTest, IntsMulti) {
     ixm_column_indices.push_back(2);
     ixm_column_types.push_back(VALUE_TYPE_BIGINT);
     ixm_column_types.push_back(VALUE_TYPE_BIGINT);
-    init(TableIndexScheme("ixm2",
-                          BALANCED_TREE_INDEX,
-                          ixm_column_indices,
-                          ixm_column_types,
-                          false, true, NULL));
+    init("ixm2",
+         BALANCED_TREE_INDEX,
+         ixm_column_indices,
+         ixm_column_types,
+         false);
 
     TableIndex* index = table->index("ixm2");
     EXPECT_EQ(true, index != NULL);
@@ -707,38 +701,26 @@ TEST_F(IndexTest, IntsMulti) {
                                        true);
     TableTuple searchkey(keySchema);
     searchkey.move(new char[searchkey.tupleLength()]);
-    searchkey.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    searchkey.
-        setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
-    index->moveToKey(&searchkey);
-    int count = 0;
-    while (!(tuple = index->nextValueAtKey()).isNullTuple())
-    {
-        ++count;
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50).
-                    op_equals(tuple.getNValue(0)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).
-                    op_equals(tuple.getNValue(1)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).
-                    op_equals(tuple.getNValue(2)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).
-                    op_equals(tuple.getNValue(3)).isTrue());
-        EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).
-                    op_equals(tuple.getNValue(4)).isTrue());
-    }
-    EXPECT_EQ(1, count);
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
+    searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
+    EXPECT_TRUE(index->moveToKey(&searchkey));
 
-    searchkey.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    searchkey.
-        setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
-    index->moveToKey(&searchkey);
-    count = 0;
-    while (!(tuple = index->nextValueAtKey()).isNullTuple())
-    {
-        ++count;
-    }
+    tuple = index->nextValueAtKey();
+    EXPECT_FALSE(tuple.isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
+
+    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(tuple.isNullTuple());
+
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
+    searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
+    EXPECT_FALSE(index->moveToKey(&searchkey));
+    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(tuple.isNullTuple());
 
     // partial index search test
     searchkey.
@@ -747,7 +729,7 @@ TEST_F(IndexTest, IntsMulti) {
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(-10000000)));
 
     index->moveToKeyOrGreater(&searchkey);
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
@@ -758,7 +740,7 @@ TEST_F(IndexTest, IntsMulti) {
                 op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
                 op_equals(tuple.getNValue(4)).isTrue());
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
@@ -775,7 +757,7 @@ TEST_F(IndexTest, IntsMulti) {
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(10000000)));
     index->moveToKeyOrGreater(&searchkey);
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
@@ -786,7 +768,7 @@ TEST_F(IndexTest, IntsMulti) {
                 op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
                 op_equals(tuple.getNValue(4)).isTrue());
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 2).
@@ -805,7 +787,7 @@ TEST_F(IndexTest, IntsMulti) {
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(30%3)));
 
     index->moveToGreaterThanKey(&searchkey);
-    tuple = index->nextValue();
+    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 2).
@@ -879,25 +861,25 @@ TEST_F(IndexTest, TupleKeyUnique) {
     EXPECT_FALSE(index->exists(&tuple));
 
     // TEST moveToKey and nextValueAtKey
-    int count = 0;
     int64_t row = 2;
     setWideIndexToRow(searchkey, row);
-    index->moveToKey(&searchkey);
-    for (count=0; !((tuple = index->nextValueAtKey()).isNullTuple()); count++) {
-        verifyWideRow(tuple, row + count);
-    }
-    EXPECT_TRUE(count == 1);
+    EXPECT_TRUE(index->moveToKey(&searchkey));
+    tuple = index->nextValueAtKey();
+    EXPECT_FALSE(tuple.isNullTuple());
+    verifyWideRow(tuple, row);
+    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(tuple.isNullTuple());
 
     // TEST remove tuple
     // remove the tuple found above from the table (which updates the index)
     setWideIndexToRow(searchkey, 2);  // DELETE row 2.
-    index->moveToKey(&searchkey);
+    EXPECT_TRUE(index->moveToKey(&searchkey));
     tuple = index->nextValueAtKey();
     bool deleted = table->deleteTuple(tuple, true);
     EXPECT_TRUE(deleted);
 
     // and now that tuple is gone
-    index->moveToKey(&searchkey);
+    EXPECT_FALSE(index->moveToKey(&searchkey));
     tuple = index->nextValueAtKey();
     EXPECT_TRUE(tuple.isNullTuple());
 

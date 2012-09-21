@@ -298,6 +298,10 @@ class VoltNetwork implements Runnable
                             readyKeys = m_selector.select();
                         }
 
+                        /*
+                         * Run the task queue immediately after selection to catch
+                         * any tasks that weren't a result of readiness selection
+                         */
                         Runnable task = null;
                         while ((task = m_tasks.poll()) != null) {
                             task.run();
@@ -305,6 +309,15 @@ class VoltNetwork implements Runnable
 
                         if (readyKeys > 0) {
                             invokeCallbacks();
+                        }
+
+                        /*
+                         * Poll the task queue again in case new tasks were created
+                         * by invoking callbacks.
+                         */
+                        task = null;
+                        while ((task = m_tasks.poll()) != null) {
+                            task.run();
                         }
 
                         if (m_networkId == 0) {
@@ -474,5 +487,10 @@ class VoltNetwork implements Runnable
 
     Long getThreadId() {
         return m_thread.getId();
+    }
+
+    void queueTask(Runnable r) {
+        m_tasks.offer(r);
+        m_selector.wakeup();
     }
 }

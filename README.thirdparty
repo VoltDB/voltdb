@@ -82,7 +82,7 @@ H-store
  */
 
 ================================================================================
-HyperSQL (HSQLDB) 1.9b3, but will be 2.0rc8 shortly.
+HyperSQL (HSQLDB) 1.9b3
 
 ORIGINAL LICENSE (a.k.a. "hypersonic_lic.txt")
 
@@ -575,6 +575,21 @@ jBCrypt
 // WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+================================================================================
+jsr166y - LinkedTransferQueue, ThreadLocalRandom, ConcurrentLinkedDeque, TransferQueue
+
+/*
+ * Written by Doug Lea with assistance from members of JCP JSR-166
+ * Expert Group and released to the public domain, as explained at
+ * http://creativecommons.org/publicdomain/zero/1.0/
+ */
+
+/*
+ * Written by Doug Lea and Martin Buchholz with assistance from members of
+ * JCP JSR-166 Expert Group and released to the public domain, as explained
+ * at http://creativecommons.org/publicdomain/zero/1.0/
+ */
 
 ================================================================================
 Linked with or Included in VoltDB example applications

@@ -18,11 +18,17 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.TupleValueExpression;
 
 /**
  * Represents the partitioning of the data underlying a statement.
@@ -80,6 +86,7 @@ public class PartitioningForStatement {
      * The actual number of partitioned table scans in the query (when supported, self-joins should count as multiple).
      */
     private int m_countOfPartitionedTables = -1;
+    private Map<String, String> m_partitionColumnByTable = null;
     /*
      * The number of independently partitioned table scans in the query. This is initially the same as
      * m_countOfPartitionedTables, but gets reduced by 1 each time a partitioned table (scan)'s partitioning column
@@ -109,6 +116,10 @@ public class PartitioningForStatement {
         m_inferSP = inferSP;
     }
 
+    public boolean shouldInferSP() {
+        return m_inferSP;
+    }
+
     /**
      * accessor
      */
@@ -120,7 +131,7 @@ public class PartitioningForStatement {
     /**
      * smart accessor that doesn't allow contradiction of an original non-null value setting.
      */
-    public void setEffectiveValue(Object best) {
+    public void setInferredValue(Object best) {
         if (m_specifiedValue != null) {
             // The only correct value is the one that was specified.
             // TODO: A later implementation may support gentler "validation" of a specified partitioning value
@@ -152,7 +163,7 @@ public class PartitioningForStatement {
             assert(m_inferredValue == null);
             return m_specifiedValue;
         }
-        if (m_inferSP) {
+        if (m_lockIn) {
             return m_inferredValue;
         }
         return null;
@@ -168,10 +179,10 @@ public class PartitioningForStatement {
 
     /**
      * @param countOfPartitionedTables actually, the number of table scans, if there are self-joins
+     * @param countOfPartitionedTables2
      */
-    public void setCountOfPartitionedTables(int countOfPartitionedTables) {
-        // Should only be set once, early on.
-        assert(m_countOfPartitionedTables == -1);
+    public void setPartitionedTables(Map<String,String> partitionColumnByTable, int countOfPartitionedTables) {
+        m_partitionColumnByTable = partitionColumnByTable;
         m_countOfPartitionedTables = countOfPartitionedTables;
         m_countOfIndependentlyPartitionedTables = countOfPartitionedTables; // Initial guess -- as if no equality filters.
 
@@ -188,18 +199,37 @@ public class PartitioningForStatement {
 
     /**
      * accessor
-     * @param countOfIndependentlyPartitionedTables
-     */
-    public void setCountOfIndependentlyPartitionedTables(int countOfIndependentlyPartitionedTables) {
-        m_countOfIndependentlyPartitionedTables = countOfIndependentlyPartitionedTables;
-    }
-
-    /**
-     * accessor
      */
     public int getCountOfIndependentlyPartitionedTables() {
         return m_countOfIndependentlyPartitionedTables;
 
+    }
+
+    /**
+     * Returns the discovered single partition expression (if exists), unless the
+     * user gave a partitioning a-priori, and then it will return null.
+     */
+    public AbstractExpression effectivePartitioningExpression() {
+        if (m_lockIn) {
+            return singlePartitioningExpression();
+        }
+        return null;
+    }
+
+    /**
+     * Returns true if the statement will require two fragments.
+     */
+    public boolean requiresTwoFragments() {
+        if (getCountOfPartitionedTables() == 0) {
+            return false;
+        }
+        if (effectivePartitioningValue() != null) {
+            return false;
+        }
+        if (effectivePartitioningExpression() != null) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -257,15 +287,75 @@ public class PartitioningForStatement {
      * @return
      */
     public Column getColumn() {
-        // TODO Auto-generated method stub
         return m_partitionCol;
     }
 
     /**
-     * accessor
-     * @return
+     * Given the query's list of tables and its collection(s) of equality-filtered columns and their equivalents,
+     * determine whether all joins involving partitioned tables can be executed locally on a single partition.
+     * This is only the case when they include equality comparisons between partition key columns.
+     * VoltDb will reject joins of multiple partitioned tables unless all their partition keys are
+     * constrained to be equal to each other.
+     * Example: select * from T1, T2 where T1.ID = T2.ID
+     * Additionally, in this case, there may be a constant equality filter on any of the columns,
+     * which we want to extract as our SP partitioning parameter.
+     *
+     * @param tableList The tables.
+     * @param valueEquivalence Their column equality filters
      */
-    public boolean isInferringSP() {
-        return m_inferSP;
+    public void analyzeForMultiPartitionAccess(ArrayList<Table> tableList, HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence) {
+        TupleValueExpression tokenPartitionKey = null;
+        Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
+        int unfilteredPartitionKeyCount = 0;
+
+        // Iterate over the tables to collect partition columns.
+        for (Table table : tableList) {
+            // Replicated tables don't need filter coverage.
+            if (table.getIsreplicated()) {
+                continue;
+            }
+
+            String partitionedTable = table.getTypeName();
+            String columnNeedingCoverage = m_partitionColumnByTable.get(partitionedTable);
+            boolean unfiltered = true;
+
+            for (AbstractExpression candidateColumn : valueEquivalence.keySet()) {
+                if ( ! (candidateColumn instanceof TupleValueExpression)) {
+                    continue;
+                }
+                TupleValueExpression candidatePartitionKey = (TupleValueExpression) candidateColumn;
+                if ( ! candidatePartitionKey.getTableName().equals(partitionedTable)) {
+                    continue;
+                }
+                if ( ! candidatePartitionKey.getColumnName().equals(columnNeedingCoverage)) {
+                    continue;
+                }
+                unfiltered = false;
+                if (tokenPartitionKey == null) {
+                    tokenPartitionKey = candidatePartitionKey;
+                }
+                eqSets.add(valueEquivalence.get(candidatePartitionKey));
+            }
+
+            if (unfiltered) {
+                ++unfilteredPartitionKeyCount;
+            }
+        }
+
+        m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
+        if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
+            for (Set<AbstractExpression> partitioningValues : eqSets) {
+                for (AbstractExpression constExpr : partitioningValues) {
+                    if (constExpr instanceof TupleValueExpression) {
+                        continue;
+                    }
+                    addPartitioningExpression(tokenPartitionKey.getTableName() + '.' + tokenPartitionKey.getColumnName(), constExpr);
+                    Object partitioningObject = ConstantValueExpression.extractPartitioningValue(tokenPartitionKey.getValueType(), constExpr);
+                    setInferredValue(partitioningObject);
+                    // Only need one constant value.
+                    break;
+                }
+            }
+        }
     }
 }

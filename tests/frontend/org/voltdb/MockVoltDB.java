@@ -23,7 +23,6 @@
 package org.voltdb;
 
 import java.io.File;
-
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -42,7 +41,6 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -54,6 +52,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -147,6 +146,7 @@ public class MockVoltDB implements VoltDBInterface
         retval.setClassname(name);
         retval.setHasjava(true);
         retval.setSystemproc(false);
+        retval.setDefaultproc(false);
         return retval;
     }
 
@@ -333,6 +333,7 @@ public class MockVoltDB implements VoltDBInterface
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
+        voltconfig = config;
     }
 
     @Override
@@ -476,6 +477,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public SiteTracker getSiteTrackerForSnapshot() {
+        return m_siteTracker;
+    }
+
+    @Override
     public MailboxPublisher getMailboxPublisher() {
         return m_mailboxPublisher;
     }
@@ -531,5 +537,14 @@ public class MockVoltDB implements VoltDBInterface
                 return true;
             }
         };
+    }
+
+    @Override
+    public boolean isIV2Enabled() {
+        if (voltconfig == null)
+        {
+            voltconfig = new VoltDB.Configuration();
+        }
+        return voltconfig.m_enableIV2;
     }
 }

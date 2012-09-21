@@ -42,6 +42,7 @@ import org.voltdb.VoltTable;
 public class executeSQLSPWRITE extends VoltProcedure {
     public static final SQLStmt marker = new SQLStmt("INSERT into PARTED1 values (?, ?)");
 
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(long partval, String sql) {
         voltQueueSQLExperimental(sql);
         voltQueueSQLExperimental("select * from PARTED1 where partval = ?", partval);

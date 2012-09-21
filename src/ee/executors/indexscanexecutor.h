@@ -46,15 +46,10 @@
 #ifndef HSTOREINDEXSCANEXECUTOR_H
 #define HSTOREINDEXSCANEXECUTOR_H
 
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
 
 #include "boost/shared_array.hpp"
-#include "boost/unordered_set.hpp"
-#include "boost/pool/pool_alloc.hpp"
-#include <set>
-#include <memory>
 
 namespace voltdb {
 
@@ -80,7 +75,7 @@ public:
     }
     ~IndexScanExecutor();
 
-protected:
+private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
@@ -108,11 +103,6 @@ protected:
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
-
-    // Inline Limit
-    LimitPlanNode* m_limitNode;
-    int m_limitSize;
-    int m_limitOffset;
 
     // IndexScan Information
     TempTable* m_outputTable;

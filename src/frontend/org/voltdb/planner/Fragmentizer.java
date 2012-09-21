@@ -23,6 +23,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.types.PlanNodeType;
 
 /**
  * Wrapper class for one static method that accepts a CompiledPlan
@@ -41,71 +42,26 @@ public class Fragmentizer {
      * @param plan The plan to chop up.
      * @return The chopped up plan.
      */
-    static CompiledPlan fragmentize(CompiledPlan plan, Database db) {
-        assert(plan != null);
-        assert(plan.fragments != null);
-        assert(plan.fragments.size() == 1);
+    static void fragmentize(CompiledPlan plan, Database db) {
+        List<AbstractPlanNode> receives = plan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
 
-        // there should be only one fragment in the plan at this point
-        CompiledPlan.Fragment rootFragment = plan.fragments.get(0);
+        if (receives.isEmpty()) return;
 
-        // chop up the plan and set all the proper dependencies recursively
-        recursiveFindFragment(rootFragment, rootFragment.planGraph, plan.fragments);
+        assert (receives.size() == 1);
 
-        return plan;
-    }
+        ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+        assert(recvNode.getChildCount() == 1);
+        AbstractPlanNode childNode = recvNode.getChild(0);
+        assert(childNode instanceof SendPlanNode);
+        SendPlanNode sendNode = (SendPlanNode) childNode;
 
-    /**
-     * Chop up the plan and set all the proper dependencies recursively
-     *
-     * @param currentFragment The fragment currently being examined recurively. This
-     * will likely contain the root of plan-subgraph currently being walked.
-     * @param currentNode The node in the plan graph currently being visited. This is
-     * the main unit of recursion here.
-     * @param fragments The list of fragments (initially one) that will be appended to
-     * as the method splits up the plan.
-     */
-    static void recursiveFindFragment(
-            CompiledPlan.Fragment currentFragment,
-            AbstractPlanNode currentNode,
-            List<CompiledPlan.Fragment> fragments) {
+        // disconnect the send and receive nodes
+        sendNode.clearParents();
+        recvNode.cacheDeterminism();
+        recvNode.clearChildren();
 
-        // the place to split is the send-recv node pairing
-        if (currentNode instanceof ReceivePlanNode) {
-            ReceivePlanNode recvNode = (ReceivePlanNode) currentNode;
-            assert(recvNode.getChildCount() == 1);
-            AbstractPlanNode childNode = recvNode.getChild(0);
-            assert(childNode instanceof SendPlanNode);
-            SendPlanNode sendNode = (SendPlanNode) childNode;
+        plan.subPlanGraph = sendNode;
 
-            // disconnect the send and receive nodes
-            sendNode.clearParents();
-            recvNode.cacheDeterminism();
-            recvNode.clearChildren();
-
-            // make a new plan fragment rooted at the send
-            CompiledPlan.Fragment subFrag = new CompiledPlan.Fragment();
-
-            // put the multipartition hint from planning in the metadata
-            // for the new planfragment
-            subFrag.multiPartition = sendNode.isMultiPartition;
-
-            subFrag.planGraph = sendNode;
-            currentFragment.hasDependencies = true;
-            fragments.add(subFrag);
-
-            // recursive call on the new fragment
-            recursiveFindFragment(subFrag, sendNode, fragments);
-
-            // stop here if we found a recv node
-            return;
-        }
-
-        // if not a recv node, just do a boring recursive call
-        // stopping condition is when there are no children
-        for (int i = 0; i < currentNode.getChildCount(); i++) {
-            AbstractPlanNode childNode = currentNode.getChild(i);
-            recursiveFindFragment(currentFragment, childNode, fragments);
-        }
+        return;
     }
 }

@@ -15,8 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "TableCatalogDelegate.hpp"
+#include <vector>
+#include <map>
+#include <boost/foreach.hpp>
+#include <boost/scoped_array.hpp>
 
+#include "TableCatalogDelegate.hpp"
 #include "catalog/catalog.h"
 #include "catalog/database.h"
 #include "catalog/table.h"
@@ -35,8 +39,7 @@
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 
-#include <vector>
-#include <map>
+
 
 using namespace std;
 namespace voltdb {
@@ -54,14 +57,7 @@ TableCatalogDelegate::~TableCatalogDelegate()
     }
 }
 
-int
-TableCatalogDelegate::init(ExecutorContext *executorContext,
-                           catalog::Database &catalogDatabase,
-                           catalog::Table &catalogTable)
-{
-    // Create a persistent table for this table in our catalog
-    int32_t table_id = catalogTable.relativeIndex();
-
+TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table &catalogTable) {
     // Columns:
     // Column is stored as map<String, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
@@ -70,7 +66,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     vector<int32_t> columnLengths(numColumns);
     vector<bool> columnAllowNull(numColumns);
     map<string, catalog::Column*>::const_iterator col_iterator;
-    string *columnNames = new string[numColumns];
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
         const catalog::Column *catalog_column = col_iterator->second;
@@ -83,71 +78,120 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
         columnLengths[columnIndex] = length;
         columnAllowNull[columnIndex] = catalog_column->nullable();
+    }
+
+    return TupleSchema::createTupleSchema(columnTypes,
+                                          columnLengths,
+                                          columnAllowNull, true);
+}
+
+bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
+                                          catalog::Index &catalogIndex,
+                                          const TupleSchema *schema,
+                                          TableIndexScheme *scheme)
+{
+    vector<int> index_columns;
+    vector<ValueType> column_types;
+
+    // The catalog::Index object now has a list of columns that are to be
+    // used
+    if (catalogIndex.columns().size() == (size_t)0) {
+        VOLT_ERROR("Index '%s' in table '%s' does not declare any columns"
+                   " to use",
+                   catalogIndex.name().c_str(),
+                   catalogTable.name().c_str());
+        return false;
+    }
+
+    if (catalogIndex.expressionsjson().length() != 0) {
+        // When this gets supported, column type validations below will have to be replaced with expression type validations,
+        // and then the real work begins.
+        //printf("WARNING: for now, ignoring expression-based index '%s' on table '%s' having JSON expression: %s\n",
+        //          catalog_index->name().c_str(),
+        //          catalogTable.name().c_str(),
+        //          catalog_index->expressionsjson().c_str());
+        *scheme = TableIndexScheme(); // return empty scheme
+        return true;
+    }
+
+    // Since the columns are not going to come back in the proper order from
+    // the catalogs, we'll use the index attribute to make sure we put them
+    // in the right order
+    index_columns.resize(catalogIndex.columns().size());
+    column_types.resize(catalogIndex.columns().size());
+    bool isIntsOnly = true;
+    map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
+    for (colref_iterator = catalogIndex.columns().begin();
+         colref_iterator != catalogIndex.columns().end();
+         colref_iterator++) {
+        catalog::ColumnRef *catalog_colref = colref_iterator->second;
+        if (catalog_colref->index() < 0) {
+            VOLT_ERROR("Invalid column '%d' for index '%s' in table '%s'",
+                       catalog_colref->index(),
+                       catalogIndex.name().c_str(),
+                       catalogTable.name().c_str());
+            return false;
+        }
+        // check if the column does not have an int type
+        if ((catalog_colref->column()->type() != VALUE_TYPE_TINYINT) &&
+            (catalog_colref->column()->type() != VALUE_TYPE_SMALLINT) &&
+            (catalog_colref->column()->type() != VALUE_TYPE_INTEGER) &&
+            (catalog_colref->column()->type() != VALUE_TYPE_BIGINT)) {
+            isIntsOnly = false;
+        }
+        index_columns[catalog_colref->index()] = catalog_colref->column()->index();
+        column_types[catalog_colref->index()] = (ValueType) catalog_colref->column()->type();
+    }
+
+    *scheme = TableIndexScheme(catalogIndex.name(),
+                               (TableIndexType)catalogIndex.type(),
+                               index_columns,
+                               column_types,
+                               catalogIndex.unique(),
+                               isIntsOnly,
+                               const_cast<TupleSchema*>(schema));
+    return true;
+}
+
+int
+TableCatalogDelegate::init(ExecutorContext *executorContext,
+                           catalog::Database &catalogDatabase,
+                           catalog::Table &catalogTable)
+{
+    // Create a persistent table for this table in our catalog
+    int32_t table_id = catalogTable.relativeIndex();
+
+    // get an array of table column names
+    const int numColumns = static_cast<int>(catalogTable.columns().size());
+    map<string, catalog::Column*>::const_iterator col_iterator;
+    boost::scoped_array<string> columnNames(new string[numColumns]);
+    for (col_iterator = catalogTable.columns().begin();
+         col_iterator != catalogTable.columns().end(); col_iterator++) {
+        const catalog::Column *catalog_column = col_iterator->second;
         columnNames[catalog_column->index()] = catalog_column->name();
     }
 
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
-                                                         columnLengths,
-                                                         columnAllowNull, true);
+    // get the schema for the table
+    TupleSchema *schema = createTupleSchema(catalogTable);
 
     // Indexes
     map<string, TableIndexScheme> index_map;
     map<string, catalog::Index*>::const_iterator idx_iterator;
     for (idx_iterator = catalogTable.indexes().begin();
          idx_iterator != catalogTable.indexes().end(); idx_iterator++) {
-        catalog::Index *catalog_index = idx_iterator->second;
-        vector<int> index_columns;
-        vector<ValueType> column_types;
 
-        // The catalog::Index object now has a list of columns that are to be
-        // used
-        if (catalog_index->columns().size() == (size_t)0) {
-            VOLT_ERROR("Index '%s' in table '%s' does not declare any columns"
-                       " to use",
-                       catalog_index->name().c_str(),
-                       catalogTable.name().c_str());
-            delete [] columnNames;
+        catalog::Index *catalog_index = idx_iterator->second;
+
+        TableIndexScheme index_scheme;
+        if (getIndexScheme(catalogTable, *catalog_index, schema, &index_scheme)) {
+            // some indexes return empty schemes (like function-based ones)
+            if (index_scheme.tupleSchema) {
+                index_map[catalog_index->name()] = index_scheme;
+            }
+        }
+        else {
             return false;
         }
-
-        // Since the columns are not going to come back in the proper order from
-        // the catalogs, we'll use the index attribute to make sure we put them
-        // in the right order
-        index_columns.resize(catalog_index->columns().size());
-        column_types.resize(catalog_index->columns().size());
-        bool isIntsOnly = true;
-        map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
-        for (colref_iterator = catalog_index->columns().begin();
-             colref_iterator != catalog_index->columns().end();
-             colref_iterator++) {
-            catalog::ColumnRef *catalog_colref = colref_iterator->second;
-            if (catalog_colref->index() < 0) {
-                VOLT_ERROR("Invalid column '%d' for index '%s' in table '%s'",
-                           catalog_colref->index(),
-                           catalog_index->name().c_str(),
-                           catalogTable.name().c_str());
-                delete [] columnNames;
-                return false;
-            }
-            // check if the column does not have an int type
-            if ((catalog_colref->column()->type() != VALUE_TYPE_TINYINT) &&
-                (catalog_colref->column()->type() != VALUE_TYPE_SMALLINT) &&
-                (catalog_colref->column()->type() != VALUE_TYPE_INTEGER) &&
-                (catalog_colref->column()->type() != VALUE_TYPE_BIGINT)) {
-                isIntsOnly = false;
-            }
-            index_columns[catalog_colref->index()] = catalog_colref->column()->index();
-            column_types[catalog_colref->index()] = (ValueType) catalog_colref->column()->type();
-        }
-
-        TableIndexScheme index_scheme(catalog_index->name(),
-                                      (TableIndexType)catalog_index->type(),
-                                      index_columns,
-                                      column_types,
-                                      catalog_index->unique(),
-                                      isIntsOnly,
-                                      schema);
-        index_map[catalog_index->name()] = index_scheme;
     }
 
     // Constraints
@@ -169,7 +213,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                                constraintutil::getTypeName(type).c_str(),
                                catalog_constraint->name().c_str(),
                                catalogTable.name().c_str());
-                    delete [] columnNames;
                     return false;
                 }
                 // Make sure they didn't declare more than one primary key index
@@ -180,7 +223,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                                catalogTable.name().c_str(),
                                catalog_constraint->index()->name().c_str(),
                                pkey_index_id.c_str());
-                    delete [] columnNames;
                     return false;
                 }
                 pkey_index_id = catalog_constraint->index()->name();
@@ -196,7 +238,6 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                                constraintutil::getTypeName(type).c_str(),
                                catalog_constraint->name().c_str(),
                                catalogTable.name().c_str());
-                    delete [] columnNames;
                     return false;
                 }
                 break;
@@ -213,20 +254,19 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                 VOLT_ERROR("Invalid constraint type '%s' for '%s'",
                            constraintutil::getTypeName(type).c_str(),
                            catalog_constraint->name().c_str());
-                delete [] columnNames;
                 return false;
         }
     }
 
     // Build the index array
     vector<TableIndexScheme> indexes;
-    TableIndexScheme pkey_index;
+    TableIndexScheme pkey_index_scheme;
     map<string, TableIndexScheme>::const_iterator index_iterator;
     for (index_iterator = index_map.begin(); index_iterator != index_map.end();
          index_iterator++) {
         // Exclude the primary key
         if (index_iterator->first.compare(pkey_index_id) == 0) {
-            pkey_index = index_iterator->second;
+            pkey_index_scheme = index_iterator->second;
         // Just add it to the list
         } else {
             indexes.push_back(index_iterator->second);
@@ -240,24 +280,36 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         partitionColumnIndex = partitionColumn->index();
     }
 
-    if (pkey_index_id.size() == 0) {
-        int32_t databaseId = catalogDatabase.relativeIndex();
-        m_table = TableFactory::getPersistentTable(databaseId, executorContext,
-                                                 catalogTable.name(), schema, columnNames,
-                                                 indexes, partitionColumnIndex,
-                                                 isExportEnabledForTable(catalogDatabase, table_id),
-                                                 isTableExportOnly(catalogDatabase, table_id));
-    } else {
-        int32_t databaseId = catalogDatabase.relativeIndex();
-        m_table = TableFactory::getPersistentTable(databaseId, executorContext,
-                                                 catalogTable.name(), schema, columnNames,
-                                                 pkey_index, indexes, partitionColumnIndex,
-                                                 isExportEnabledForTable(catalogDatabase, table_id),
-                                                 isTableExportOnly(catalogDatabase, table_id));
-    }
-    delete[] columnNames;
-
     m_exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
+
+    int32_t databaseId = catalogDatabase.relativeIndex();
+    m_table = TableFactory::getPersistentTable(databaseId, executorContext,
+                                               catalogTable.name(), schema, columnNames.get(),
+                                               partitionColumnIndex, m_exportEnabled,
+                                               isTableExportOnly(catalogDatabase, table_id));
+
+    // add a pkey index if one exists
+    if (pkey_index_id.size() != 0) {
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(pkey_index_scheme);
+        assert(pkeyIndex);
+        m_table->addIndex(pkeyIndex);
+        m_table->setPrimaryKeyIndex(pkeyIndex);
+    }
+
+    // add other indexes
+    BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+        TableIndex *index = TableIndexFactory::getInstance(scheme);
+        assert(index);
+        m_table->addIndex(index);
+    }
+
+    // configure for stats tables
+    m_table->configureIndexStats(executorContext->m_hostId,
+                                 executorContext->m_hostname,
+                                 executorContext->m_siteId,
+                                 executorContext->m_partitionId,
+                                 databaseId);
+
     m_table->incrementRefcount();
     return 0;
 }

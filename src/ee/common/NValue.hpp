@@ -263,25 +263,25 @@ class NValue {
      * SQL "column functions". They differ in how many arguments they accept:
      * 0 for callConstant, 1 ("this") for callUnary, and any number (packaged in a vector) for call.
      * The main benefit of these functions being (always explicit) template instantiations for each
-     * ExepressionType "EXPRESSION_TYPE_FUNCTION_*" value instead of a more normal named member function
+     * "FUNC_*" int value instead of a more normal named member function
      * of NValue is that it allows them to be invoked from the default eval method of the
      * correspondingly templated expression subclass
      * (ConstantFunctionExpression, UnaryFunctionExpression, or GeneralFunctionExpression).
      * The alternative would be to name each function (abs, substring, etc.)
      * and explicitly implement the eval method for every expression subclass template instantiation
-     * (UnaryFunctionExpression<EXPRESSION_TYPE_FUNCTION_ABS>::eval,
-     * GeneralFunctionExpression<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>::eval, etc.
+     * (UnaryFunctionExpression<FUNC_ABS>::eval,
+     * GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_FROM>::eval, etc.
      * to call the corresponding NValue member function.
      * So, these member function templates save a bit of boilerplate for each SQL function and allow
      * the function expression subclass templates to be implemented completely generically.
      */
-    template <ExpressionType E> // template for SQL functions returning constants (like pi)
+    template <int F> // template for SQL functions returning constants (like pi)
     static NValue callConstant();
 
-    template <ExpressionType E> // template for SQL functions of one NValue ("this")
+    template <int F> // template for SQL functions of one NValue ("this")
     NValue callUnary() const;
 
-    template <ExpressionType E> // template for SQL functions of multiple NValues
+    template <int F> // template for SQL functions of multiple NValues
     static NValue call(const std::vector<NValue>& arguments);
 
     /// Iterates over UTF8 strings one character "code point" at a time, being careful not to walk off the end.
@@ -870,7 +870,7 @@ class NValue {
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
           default:
-            throwCastSQLException(type, VALUE_TYPE_DOUBLE);
+            throwCastSQLException(type, VALUE_TYPE_DECIMAL);
             return 0; // NOT REACHED
         }
     }
@@ -1672,63 +1672,40 @@ class NValue {
         return retval;
     }
 
-    static NValue getStringValue(std::string value) {
-        NValue retval(VALUE_TYPE_VARCHAR);
-        const size_t length = value.length();
-        return getStringValue(value.c_str(), length);
-    }
-
     static Pool* getTempStringPool();
 
     static NValue getTempStringValue(const char* value, size_t size) {
-        return getStringValue(value, size, getTempStringPool());
+        return getAllocatedValue(VALUE_TYPE_VARCHAR, value, size, getTempStringPool());
     }
 
-    static NValue getStringValue(const char* value, size_t size, Pool* stringPool=0) {
-        NValue retval(VALUE_TYPE_VARCHAR);
-        const int32_t length = static_cast<int32_t>(size);
+    static NValue getTempBinaryValue(const unsigned char* value, size_t size) {
+        return getAllocatedValue(VALUE_TYPE_VARBINARY, reinterpret_cast<const char*>(value), size, getTempStringPool());
+    }
+
+    /// Assumes hex-encoded input
+    static inline NValue getTempBinaryValueFromHex(const std::string& value) {
+        size_t rawLength = value.length() / 2;
+        unsigned char rawBuf[rawLength];
+        hexDecodeToBinary(rawBuf, value.c_str());
+        return getTempBinaryValue(rawBuf, rawLength);
+    }
+
+    static NValue getAllocatedValue(ValueType type, const char* value, size_t size, Pool* stringPool) {
+        NValue retval(type);
+        retval.initAllocatedValue(value, (int32_t)size, stringPool);
+        return retval;
+    }
+
+    void initAllocatedValue(const char* value, int32_t length, Pool* stringPool) {
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         const int32_t minLength = length + lengthLength;
         StringRef* sref = StringRef::create(minLength, stringPool);
         char* storage = sref->get();
         setObjectLengthToLocation(length, storage);
         ::memcpy( storage + lengthLength, value, length);
-        retval.setObjectValue(sref);
-        retval.setObjectLength(length);
-        retval.setObjectLengthLength(lengthLength);
-        return retval;
-    }
-
-    // assumes binary value in hex
-    static NValue getBinaryValue(const std::string value) {
-        NValue retval(VALUE_TYPE_VARBINARY);
-        const int32_t length = static_cast<int32_t>(value.length() / 2);
-        boost::scoped_array<unsigned char> buf(new unsigned char[length]);
-        hexDecodeToBinary(buf.get(), value.c_str());
-        const int8_t lengthLength = getAppropriateObjectLengthLength(length);
-        const int32_t minLength = length + lengthLength;
-        StringRef* sref = StringRef::create(minLength);
-        char* storage = sref->get();
-        setObjectLengthToLocation(length, storage);
-        ::memcpy( storage + lengthLength, buf.get(), length);
-        retval.setObjectValue(sref);
-        retval.setObjectLength(length);
-        retval.setObjectLengthLength(lengthLength);
-        return retval;
-    }
-
-    static NValue getBinaryValue(const unsigned char *value, const int32_t length) {
-        NValue retval(VALUE_TYPE_VARBINARY);
-        const int8_t lengthLength = getAppropriateObjectLengthLength(length);
-        const int32_t minLength = length + lengthLength;
-        StringRef* sref = StringRef::create(minLength);
-        char* storage = sref->get();
-        setObjectLengthToLocation(length, storage);
-        ::memcpy( storage + lengthLength, value, length);
-        retval.setObjectValue(sref);
-        retval.setObjectLength(length);
-        retval.setObjectLengthLength(lengthLength);
-        return retval;
+        setObjectValue(sref);
+        setObjectLength(length);
+        setObjectLengthLength(lengthLength);
     }
 
     static NValue getNullStringValue() {
@@ -2313,21 +2290,13 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
       case VALUE_TYPE_VARBINARY:
       {
           const int32_t length = input.readInt();
-          const int8_t lengthLength = getAppropriateObjectLengthLength(length);
           // the NULL SQL string is a NULL C pointer
           if (length == OBJECTLENGTH_NULL) {
               retval.setNull();
               break;
           }
-          const void *str = input.getRawPointer(length);
-          const int32_t minlength = lengthLength + length;
-          StringRef* sref = StringRef::create(minlength, dataPool);
-          char* copy = sref->get();
-          retval.setObjectLengthToLocation( length, copy);
-          ::memcpy(copy + lengthLength, str, length);
-          retval.setObjectValue(sref);
-          retval.setObjectLength(length);
-          retval.setObjectLengthLength(lengthLength);
+          const char *str = (const char*) input.getRawPointer(length);
+          retval.initAllocatedValue(str, (size_t)length, dataPool);
           break;
       }
       case VALUE_TYPE_DECIMAL: {
@@ -2371,8 +2340,6 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
               const char * str = reinterpret_cast<const char*>(getObjectValue());
               if (str == NULL) {}
               output.writeBytes(getObjectValue(), length);
-          } else {
-              assert(getObjectValue() == NULL || length == OBJECTLENGTH_NULL);
           }
 
           break;
@@ -2979,91 +2946,6 @@ inline NValue NValue::like(const NValue rhs) const {
     Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
 
     return liker.like() ? getTrue() : getFalse();
-}
-
-/** implement the SQL ABS (absolute value) function for all numeric types */
-template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const {
-    const ValueType type = getValueType();
-    NValue retval(type);
-    switch(type) {
-    case VALUE_TYPE_TINYINT:
-        retval.getTinyInt() = static_cast<int8_t>(std::abs(getTinyInt())); break;
-    case VALUE_TYPE_SMALLINT:
-        retval.getSmallInt() = static_cast<int16_t>(std::abs(getSmallInt())); break;
-    case VALUE_TYPE_INTEGER:
-        retval.getInteger() = std::abs(getInteger()); break;
-    case VALUE_TYPE_BIGINT:
-        retval.getBigInt() = std::abs(getBigInt()); break;
-    case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = std::abs(getDouble()); break;
-    case VALUE_TYPE_TIMESTAMP:
-    default:
-        throwCastSQLException (type, VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
-        break;
-    }
-    return retval;
-}
-
-/** implement the 2-argument SQL SUBSTRING function */
-template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 2);
-    const NValue& strValue = arguments[0];
-    if (strValue.isNull()) {
-        return strValue;
-    }
-    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
-    }
-
-    const NValue& startArg = arguments[1];
-    if (startArg.isNull()) {
-        return getNullStringValue();
-    }
-
-    const int32_t valueUTF8Length = strValue.getObjectLength();
-    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
-    const char *valueEnd = valueChars+valueUTF8Length;
-
-    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
-
-    UTF8Iterator iter(valueChars, valueEnd);
-    const char* startChar = iter.skipCodePoints(start-1);
-    return getTempStringValue(startChar, (int32_t)(valueEnd - startChar));
-}
-
-/** implement the 3-argument SQL SUBSTRING function */
-template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(const std::vector<NValue>& arguments) {
-    assert(arguments.size() == 3);
-    const NValue& strValue = arguments[0];
-    if (strValue.isNull()) {
-        return strValue;
-    }
-    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
-    }
-
-    const NValue& startArg = arguments[1];
-    if (startArg.isNull()) {
-        return getNullStringValue();
-    }
-    const NValue& lengthArg = arguments[2];
-    if (lengthArg.isNull()) {
-        return getNullStringValue();
-    }
-    const int32_t valueUTF8Length = strValue.getObjectLength();
-    const char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
-    const char *valueEnd = valueChars+valueUTF8Length;
-    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
-    int64_t length = lengthArg.castAsBigIntAndGetValue();
-    if (length < 0) {
-        char message[128];
-        snprintf(message, 128, "data exception -- substring error, negative length argument %ld", (long)length);
-        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
-    }
-    UTF8Iterator iter(valueChars, valueEnd);
-    const char* startChar = iter.skipCodePoints(start-1);
-    const char* endChar = iter.skipCodePoints(length);
-    return getTempStringValue(startChar, endChar - startChar);
 }
 
 } // namespace voltdb

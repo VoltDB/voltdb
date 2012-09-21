@@ -58,94 +58,92 @@ namespace voltdb {
  * Index implemented as a Hash Table Unique Map.
  * @see TableIndex
  */
-template<typename KeyType, class KeyHasher, class KeyEqualityChecker>
-class CompactingHashUniqueIndex : public TableIndex {
-    friend class TableIndexFactory;
-
+template<typename KeyType>
+class CompactingHashUniqueIndex : public TableIndex
+{
+    typedef typename KeyType::KeyEqualityChecker KeyEqualityChecker;
+    typedef typename KeyType::KeyHasher KeyHasher;
     typedef CompactingHashTable<KeyType, const void*, KeyHasher, KeyEqualityChecker> MapType;
-
-public:
+    typedef typename MapType::iterator MapIterator;
 
     ~CompactingHashUniqueIndex() {};
 
     bool addEntry(const TableTuple *tuple) {
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
-        return addEntryPrivate(tuple, m_tmp1);
+        ++m_inserts;
+        return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
     bool deleteEntry(const TableTuple *tuple) {
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
-        return deleteEntryPrivate(m_tmp1);
-    }
-
-    bool replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue) {
-        // this can probably be optimized
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-
-        if (m_eq(m_tmp1, m_tmp2)) return true; // no update is needed for this index
-
-        bool deleted = deleteEntryPrivate(m_tmp1);
-        bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
-        --m_deletes;
-        --m_inserts;
-        ++m_updates;
-        return (deleted && inserted);
+        ++m_deletes;
+        return m_entries.erase(setKeyFromTuple(tuple));
     }
 
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) {
-        assert(oldTupleValue->address() != newTupleValue->address());
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        typename MapType::iterator mapiter = m_entries.find(m_tmp1);
-        assert(!mapiter.isEnd());
+    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+    {
+        assert(originalTuple.address() != destinationTuple.address());
+
+        // full delete and insert for certain key types
+        if (KeyType::keyDependsOnTupleAddress()) {
+            if ( ! CompactingHashUniqueIndex::deleteEntry(&originalTuple)) {
+                return false;
+            }
+            return CompactingHashUniqueIndex::addEntry(&destinationTuple);
+        }
+
+        MapIterator mapiter = findTuple(originalTuple);
         if (mapiter.isEnd()) {
             return false;
         }
-        mapiter.setValue(newTupleValue->address());
+        mapiter.setValue(destinationTuple.address());
         m_updates++;
         return true;
     }
 
+    bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
+
     bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
-        m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
-        return !(m_eq(m_tmp1, m_tmp2));
+        return !(m_eq(setKeyFromTuple(lhs), setKeyFromTuple(rhs)));
     }
-    bool exists(const TableTuple* values) {
+
+    bool exists(const TableTuple *persistentTuple)
+    {
         ++m_lookups;
-        m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
-        return (m_entries.find(m_tmp1).isEnd() == false);
+        return ! findTuple(*persistentTuple).isEnd();
     }
+
     bool moveToKey(const TableTuple *searchKey) {
         ++m_lookups;
-        m_tmp1.setFromKey(searchKey);
-        m_keyIter = m_entries.find(m_tmp1);
+        m_keyIter = findKey(searchKey);
         if (m_keyIter.isEnd()) {
             m_match.move(NULL);
             return false;
         }
         m_match.move(const_cast<void*>(m_keyIter.value()));
-        return m_match.address() != NULL;
+        return true;
     }
-    bool moveToTuple(const TableTuple *searchTuple) {
-        ++m_lookups;
-        m_tmp1.setFromTuple(searchTuple, column_indices_, m_keySchema);
-        m_keyIter = m_entries.find(m_tmp1);
-        if (m_keyIter.isEnd()) {
-            m_match.move(NULL);
-            return false;
-        }
-        m_match.move(const_cast<void*>(m_keyIter.value()));
-        return m_match.address() != NULL;
-    }
+
     TableTuple nextValueAtKey() {
         TableTuple retval = m_match;
         m_match.move(NULL);
         return retval;
+    }
+
+    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple)
+    {
+        ++m_lookups;
+        TableTuple retval(getTupleSchema());
+        const MapIterator keyIter = findTuple(searchTuple);
+        if ( ! keyIter.isEnd()) {
+            retval.move(const_cast<void*>(keyIter.value()));
+        }
+        return retval;
+    }
+
+    bool hasKey(const TableTuple *searchKey) {
+        return ! findKey(searchKey).isEnd();
     }
 
     size_t getSize() const { return m_entries.size(); }
@@ -157,36 +155,44 @@ public:
 
     std::string getTypeName() const { return "CompactingHashUniqueIndex"; };
 
-protected:
-    CompactingHashUniqueIndex(const TableIndexScheme &scheme) :
-        TableIndex(scheme),
-        m_entries(true, KeyHasher(m_keySchema), KeyEqualityChecker(m_keySchema)),
-        m_eq(m_keySchema)
+    TableIndex *cloneEmptyNonCountingTreeIndex() const
     {
-        m_match = TableTuple(m_tupleSchema);
+        return new CompactingTreeUniqueIndex<KeyType, false >(TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
     }
 
-    inline bool addEntryPrivate(const TableTuple *tuple, const KeyType &key) {
-        ++m_inserts;
-        bool success = m_entries.insert(key, tuple->address());
-        return success;
+    // Non-virtual (so "really-private") helper methods.
+    MapIterator findKey(const TableTuple *searchKey)
+    {
+        return m_entries.find(KeyType(searchKey));
     }
 
-    inline bool deleteEntryPrivate(const KeyType &key) {
-        ++m_deletes;
-        return m_entries.erase(key);
+    MapIterator findTuple(const TableTuple &originalTuple)
+    {
+        return m_entries.find(setKeyFromTuple(&originalTuple));
+    }
+
+    const KeyType setKeyFromTuple(const TableTuple *tuple)
+    {
+        KeyType result(tuple, m_scheme.columnIndices, m_keySchema);
+        return result;
     }
 
     MapType m_entries;
-    KeyType m_tmp1;
-    KeyType m_tmp2;
 
     // iteration stuff
-    typename MapType::iterator m_keyIter;
+    MapIterator m_keyIter;
     TableTuple m_match;
 
     // comparison stuff
-    typename MapType::KeyEqChecker m_eq;
+   KeyEqualityChecker m_eq;
+
+public:
+    CompactingHashUniqueIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
+        TableIndex(keySchema, scheme),
+        m_entries(true, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
+        m_match(getTupleSchema()),
+        m_eq(keySchema)
+    {}
 };
 
 }

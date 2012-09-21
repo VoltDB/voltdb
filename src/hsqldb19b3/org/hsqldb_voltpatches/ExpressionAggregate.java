@@ -64,10 +64,12 @@ public class ExpressionAggregate extends Expression {
         nodes               = e.nodes;
     }
 
+    @Override
     boolean isSelfAggregate() {
         return true;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb   = new StringBuffer(64);
@@ -137,6 +139,7 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -203,6 +206,7 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -215,6 +219,7 @@ public class ExpressionAggregate extends Expression {
         return unresolvedSet;
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -230,6 +235,7 @@ public class ExpressionAggregate extends Expression {
         dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
     }
 
+    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {
@@ -289,33 +295,27 @@ public class ExpressionAggregate extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
         switch (opType) {
-        case OpTypes.LIMIT:             element = "limit"; break;
-        case OpTypes.ADD:               element = "add"; break;
-        case OpTypes.SUBTRACT:          element = "subtract"; break;
-        case OpTypes.MULTIPLY:          element = "multiply"; break;
-        case OpTypes.DIVIDE:            element = "divide"; break;
-        case OpTypes.EQUAL:             element = "equal"; break;
-        case OpTypes.NOT_EQUAL:         element = "notequal"; break;
-        case OpTypes.GREATER:           element = "greaterthan"; break;
-        case OpTypes.GREATER_EQUAL:     element = "greaterthanorequalto"; break;
-        case OpTypes.SMALLER:           element = "lessthan"; break;
-        case OpTypes.SMALLER_EQUAL:     element = "lessthanorequalto"; break;
-        case OpTypes.AND:               element = "and"; break;
-        case OpTypes.OR:                element = "or"; break;
-        case OpTypes.IN:                element = "in"; break;
+        // Last minute simple column substitutions can blast a new opType into Expressions of any class
+        // as an optimization for duplicated expressions, so just go with it.
+        case OpTypes.SIMPLE_COLUMN:     element = "simplecolumn"; break;
+
         case OpTypes.COUNT:             element = "count"; break;
         case OpTypes.SUM:               element = "sum"; break;
         case OpTypes.MIN:               element = "min"; break;
         case OpTypes.MAX:               element = "max"; break;
         case OpTypes.AVG:               element = "avg"; break;
-        case OpTypes.SQL_FUNCTION:      element = "function"; break;
-        case OpTypes.SIMPLE_COLUMN:     element = "simplecolumn"; break;
-        case OpTypes.IS_NULL:           element = "is_null"; break;
-        case OpTypes.NOT:               element = "not"; break;
+        //TODO: enable these when VoltDB supports them -- EVERY and SOME would probably be the next lowest-hanging fruit
+        case OpTypes.EVERY :
+        case OpTypes.SOME :
+        case OpTypes.STDDEV_POP :
+        case OpTypes.STDDEV_SAMP :
+        case OpTypes.VAR_POP :
+        case OpTypes.VAR_SAMP :
         default:
             throw new HSQLParseException("Unsupported Aggregate Operation: " +
                                          String.valueOf(opType));
@@ -323,7 +323,7 @@ public class ExpressionAggregate extends Expression {
 
         VoltXMLElement exp = new VoltXMLElement("operation");
 
-        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("id", getUniqueId(session));
         exp.attributes.put("type", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
@@ -331,6 +331,8 @@ public class ExpressionAggregate extends Expression {
         if (this.isDistinctAggregate) {
             exp.attributes.put("distinct", "true");
         }
+        // Aggregates operate on one value (per input row) or no value in the case of COUNT(*).
+        assert(nodes.length <= 1);
         for (Expression expr : nodes) {
             VoltXMLElement vxmle = expr.voltGetXML(session);
             exp.children.add(vxmle);

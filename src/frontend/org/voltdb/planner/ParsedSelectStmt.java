@@ -89,7 +89,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (child.name.equalsIgnoreCase("columns"))
                 parseDisplayColumns(child, db);
             else if (child.name.equalsIgnoreCase("querycondition"))
-                parseQueryCondition(child, db);
+                parseConditions(child, db);
             else if (child.name.equalsIgnoreCase("ordercolumns"))
                 parseOrderColumns(child, db);
             else if (child.name.equalsIgnoreCase("groupcolumns")) {
@@ -102,8 +102,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (VoltXMLElement child : columnsNode.children) {
             ParsedColInfo col = new ParsedColInfo();
             col.expression = parseExpressionTree(child, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(col.expression);
-            ExpressionUtil.assignOutputValueTypesRecursively(col.expression);
+            if (col.expression instanceof ConstantValueExpression) {
+                assert(col.expression.getValueType() != VoltType.NUMERIC);
+            }
+            ExpressionUtil.finalizeValueTypes(col.expression);
             assert(col.expression != null);
             col.alias = child.attributes.get("alias");
 
@@ -126,16 +128,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.index = displayColumns.size();
             displayColumns.add(col);
         }
-    }
-
-    void parseQueryCondition(VoltXMLElement conditionNode, Database db) {
-        if (conditionNode.children.size() == 0)
-            return;
-
-        VoltXMLElement exprNode = conditionNode.children.get(0);
-        where = parseExpressionTree(exprNode, db);
-        ExpressionUtil.assignLiteralConstantTypesRecursively(where);
-        ExpressionUtil.assignOutputValueTypesRecursively(where);
     }
 
     void parseGroupByColumns(VoltXMLElement columnsNode, Database db) {
@@ -280,14 +272,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 tve.setTableName("VOLT_TEMP_TABLE");
                 tve.setValueSize(orig_col.expression.getValueSize());
                 tve.setValueType(orig_col.expression.getValueType());
+                if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    tve.setHasAggregate(true);
+                }
             }
         }
         else if (child.name.equals("function") == false)
         {
             throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
         }
-        ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
-        ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
+        if (order_exp instanceof ConstantValueExpression) {
+            assert(order_exp.getValueType() != VoltType.NUMERIC);
+        }
+        ExpressionUtil.finalizeValueTypes(order_exp);
         order_col.expression = order_exp;
         orderColumns.add(order_col);
     }
@@ -351,20 +348,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public int getLimitParameterIndex() {
-        return paramIndexById(limitParameterId);
+        return paramIndexById(m_paramsById, limitParameterId);
     }
 
     public int getOffsetParameterIndex() {
-        return paramIndexById(offsetParameterId);
+        return paramIndexById(m_paramsById, offsetParameterId);
     }
 
     private AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
         if (id != -1) {
             ParameterValueExpression parameter = new ParameterValueExpression();
-            ParameterInfo paramInfo = paramsById.get(id);
-            parameter.setParameterIndex(paramInfo.index);
-            parameter.setValueType(paramInfo.type);
-            parameter.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
+            assert(m_paramsById.containsKey(id));
+            int index = m_paramsById.get(id);
+            parameter.setParameterIndex(index);
+            parameter.setValueType(paramList[index]);
+            parameter.setValueSize(paramList[index].getLengthInBytesForFixedTypes());
             return parameter;
         }
         else {
@@ -527,7 +525,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return result;
     }
 
-    private boolean guaranteesUniqueRow() {
+    boolean guaranteesUniqueRow() {
         if (((grouped == false) || groupByColumns.isEmpty() ) && displaysAgg()) {
             return true;
         }

@@ -21,8 +21,11 @@ import java.util.Arrays;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
+import org.voltdb.compiler.AsyncCompilerResult;
+import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 
 /*
  * Wrapper around a planner tied to a specific catalog version. This planner
@@ -46,10 +49,20 @@ public class CatalogSpecificPlanner {
          * are fine for adhoc SQL planned outside a stored proc, but not when those
          * factors have already been determined by the proc.
          */
+        final SettableFuture<AdHocPlannedStmtBatch> retval = SettableFuture.create();
         AdHocPlannerWork work =
             new AdHocPlannerWork(
                     -1, false, 0, 0, "", false, null, //none of the params on this line are used
-                    sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true, !multipart);
-        return m_agent.compileAdHocPlanFuture(work);
+                    sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true, !multipart,
+                    new AsyncCompilerWorkCompletionHandler() {
+
+                        @Override
+                        public void onCompletion(AsyncCompilerResult result) {
+                            retval.set((AdHocPlannedStmtBatch)result);
+                        }
+
+                    });
+        m_agent.compileAdHocPlanForProcedure(work);
+        return retval;
     }
 }

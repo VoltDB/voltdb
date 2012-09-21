@@ -300,20 +300,20 @@ public class ClientStats {
     }
 
     /**
-     * Get the average latency in whole milliseconds for the time period
+     * Get the average latency in milliseconds for the time period
      * covered by this stats instance. This is computed by summing the client-measured
      * round trip times of all transactions and dividing by the competed
      * invocation count.
      *
      * @return Average latency in milliseconds.
      */
-    public long getAverageLatency() {
+    public double getAverageLatency() {
         if (m_invocationsCompleted == 0) return 0;
-        return m_roundTripTime / m_invocationsCompleted;
+        return (double)m_roundTripTime / (double)m_invocationsCompleted;
     }
 
     /**
-     * <p>Get the server-side average latency in whole milliseconds for the time period
+     * <p>Get the server-side average latency in milliseconds for the time period
      * covered by this stats instance. This is computed by summing the server-reported
      * latency times of all transactions and dividing by the competed invocation count.</p>
      *
@@ -324,9 +324,9 @@ public class ClientStats {
      *
      * @return Average latency in milliseconds.
      */
-    public long getAverageInternalLatency() {
+    public double getAverageInternalLatency() {
         if (m_invocationsCompleted == 0) return 0;
-        return m_clusterRoundTripTime / m_invocationsCompleted;
+        return (double)m_clusterRoundTripTime / (double)m_invocationsCompleted;
     }
 
     /**

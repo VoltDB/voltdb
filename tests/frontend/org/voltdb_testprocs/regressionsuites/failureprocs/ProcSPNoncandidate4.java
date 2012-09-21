@@ -33,9 +33,10 @@ import org.voltdb.VoltProcedure;
 public class ProcSPNoncandidate4 extends VoltProcedure {
 
     public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = ?");
-    // Additional query with parameterized where clause on replicated table only should discourage use of SP processing
+    // Additional query against partitioned table with parameterized where clause only on replicated table
+    // should discourage use of SP processing.
     public static final SQLStmt spoiler =
-            new SQLStmt("select count(*) from blah, indexed_blah where blah.sval = indexed_blah.sval and indexed_blah.ival = ?");
+            new SQLStmt("select count(*) from blah, indexed_replicated_blah where blah.sval = indexed_replicated_blah.sval and indexed_replicated_blah.ival = ?");
 
     public long run(int i) {
         voltQueueSQL(query, i);

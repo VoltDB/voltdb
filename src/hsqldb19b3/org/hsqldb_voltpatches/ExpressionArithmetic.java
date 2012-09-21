@@ -86,6 +86,7 @@ public class ExpressionArithmetic extends Expression {
         }
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(64);
@@ -150,6 +151,7 @@ public class ExpressionArithmetic extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -227,6 +229,7 @@ public class ExpressionArithmetic extends Expression {
         return sb.toString();
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -246,6 +249,7 @@ public class ExpressionArithmetic extends Expression {
         return unresolvedSet;
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -396,6 +400,7 @@ public class ExpressionArithmetic extends Expression {
         }
     }
 
+    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -450,12 +455,13 @@ public class ExpressionArithmetic extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         VoltXMLElement exp = new VoltXMLElement("unset");
 
         // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("id", getUniqueId(session));
 
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
@@ -499,6 +505,20 @@ public class ExpressionArithmetic extends Expression {
         case OpTypes.SQL_FUNCTION:      element = "function"; break;
         case OpTypes.IS_NULL:           element = "is_null"; break;
         case OpTypes.NOT:               element = "not"; break;
+        case OpTypes.CONCAT:   
+            VoltXMLElement expConcat = new VoltXMLElement("function");
+            expConcat.attributes.put("id", String.valueOf(FunctionCustom.FUNC_CONCAT));
+            expConcat.attributes.put("name", Tokens.T_CONCAT_WORD);
+            expConcat.attributes.put("type", Type.SQL_VARCHAR.getNameString());
+            
+            for (Expression expr : nodes) {
+                if (expr != null) {
+                    VoltXMLElement vxmle = expr.voltGetXML(session);
+                    expConcat.children.add(vxmle);
+                    assert(vxmle != null);
+                }
+            }
+            return expConcat;
         default:
             throw new HSQLParseException("Unsupported Expression Arithmetic Operation: " +
                                          String.valueOf(opType));

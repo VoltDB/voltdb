@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 
@@ -42,7 +43,7 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
                                      long destinationHSIds[],
                                      long lastSafeTxnIds[])
     {
-        super(initiatorHSId, -1, txnId, true);
+        super(initiatorHSId, -1, txnId, TransactionIdManager.getTimestampFromTransactionId(txnId), true, false);
         m_destinationHSIds = destinationHSIds;
         m_lastSafeTxnIds = lastSafeTxnIds;
     }

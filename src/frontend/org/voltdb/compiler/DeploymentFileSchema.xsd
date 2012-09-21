@@ -49,6 +49,7 @@
       <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
       <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
                   type="systemSettingsType" />
+      <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
     </xs:all>
   </xs:complexType>
 
@@ -100,12 +101,17 @@
     </xs:all>
   </xs:complexType>
 
+  <!-- <security> -->
+  <xs:complexType name="securityType">
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+  </xs:complexType>
+
   <!-- <admin-mode> (always enabled.) -->
   <xs:complexType name="adminModeType">
     <xs:attribute name="port" type="xs:int" default="21211"/>
     <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
-  
+
   <!-- <replication> -->
   <xs:complexType name="replicationType">
     <xs:attribute name="port" type="xs:int" default="5555"/>
@@ -158,7 +164,7 @@
       <xs:maxInclusive value="10"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- restriction on command log size in megabytes -->
   <xs:simpleType name="logSizeType">
     <xs:restriction base="xs:int">
@@ -166,7 +172,7 @@
       <xs:maxInclusive value="102400"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- restriction on command log fsync frequency -->
   <xs:simpleType name="logFrequencyTimeType">
     <xs:restriction base="xs:int">

@@ -32,8 +32,11 @@ import org.voltdb.ClientResponseImpl;
 public class InitiateResponseMessage extends VoltMessage {
 
     private long m_txnId;
+    private long m_spHandle;
     private long m_initiatorHSId;
     private long m_coordinatorHSId;
+    private long m_clientInterfaceHandle;
+    private long m_connectionId;
     private boolean m_commit;
     private boolean m_recovering;
     private ClientResponseImpl m_response;
@@ -47,6 +50,19 @@ public class InitiateResponseMessage extends VoltMessage {
     }
 
     /**
+     * IV2 constructor
+     */
+    public InitiateResponseMessage(Iv2InitiateTaskMessage task) {
+        m_txnId = task.getTxnId();
+        m_spHandle = task.getSpHandle();
+        m_initiatorHSId = task.getInitiatorHSId();
+        m_coordinatorHSId = task.getCoordinatorHSId();
+        m_subject = Subject.DEFAULT.getId();
+        m_clientInterfaceHandle = task.getClientInterfaceHandle();
+        m_connectionId = task.getConnectionId();
+    }
+
+    /**
      * Create a response from a request.
      * Note that some private request data is copied to the response.
      * @param task The initiation request object to collect the
@@ -54,9 +70,12 @@ public class InitiateResponseMessage extends VoltMessage {
      */
     public InitiateResponseMessage(InitiateTaskMessage task) {
         m_txnId = task.getTxnId();
+        m_spHandle = task.getSpHandle();
         m_initiatorHSId = task.getInitiatorHSId();
         m_coordinatorHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
+        m_clientInterfaceHandle = Long.MIN_VALUE;
+        m_connectionId = Long.MIN_VALUE;
     }
 
     public void setClientHandle(long clientHandle) {
@@ -67,12 +86,24 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_txnId;
     }
 
+    public long getSpHandle() {
+        return m_spHandle;
+    }
+
     public long getInitiatorHSId() {
         return m_initiatorHSId;
     }
 
     public long getCoordinatorHSId() {
         return m_coordinatorHSId;
+    }
+
+    public long getClientInterfaceHandle() {
+        return m_clientInterfaceHandle;
+    }
+
+    public long getClientConnectionId() {
+        return m_connectionId;
     }
 
     public boolean shouldCommit() {
@@ -92,10 +123,6 @@ public class InitiateResponseMessage extends VoltMessage {
     }
 
     public void setResults(ClientResponseImpl r) {
-        setResults( r, null);
-    }
-
-    public void setResults(ClientResponseImpl r, InitiateTaskMessage task) {
         m_commit = (r.getStatus() == ClientResponseImpl.SUCCESS);
         m_response = r;
     }
@@ -105,8 +132,11 @@ public class InitiateResponseMessage extends VoltMessage {
     {
         int msgsize = super.getSerializedSize();
         msgsize += 8 // txnId
+            + 8 // m_spHandle
             + 8 // initiator HSId
             + 8 // coordinator HSId
+            + 8 // client interface handle
+            + 8 // client connection id
             + 1; // node recovering indication
 
         msgsize += m_response.getSerializedSize();
@@ -119,8 +149,11 @@ public class InitiateResponseMessage extends VoltMessage {
     {
         buf.put(VoltDbMessageFactory.INITIATE_RESPONSE_ID);
         buf.putLong(m_txnId);
+        buf.putLong(m_spHandle);
         buf.putLong(m_initiatorHSId);
         buf.putLong(m_coordinatorHSId);
+        buf.putLong(m_clientInterfaceHandle);
+        buf.putLong(m_connectionId);
         buf.put((byte) (m_recovering == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
         assert(buf.capacity() == buf.position());
@@ -131,8 +164,11 @@ public class InitiateResponseMessage extends VoltMessage {
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         m_txnId = buf.getLong();
+        m_spHandle = buf.getLong();
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
+        m_clientInterfaceHandle = buf.getLong();
+        m_connectionId = buf.getLong();
         m_recovering = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
@@ -146,15 +182,15 @@ public class InitiateResponseMessage extends VoltMessage {
 
         sb.append("INITITATE_RESPONSE FOR TXN ");
         sb.append(m_txnId);
+        sb.append("\n SP HANDLE: " + m_spHandle);
         sb.append("\n INITIATOR HSID: " + CoreUtils.hsIdToString(m_initiatorHSId));
         sb.append("\n COORDINATOR HSID: " + CoreUtils.hsIdToString(m_coordinatorHSId));
-
+        sb.append("\n CLIENT INTERFACE HANDLE: " + m_clientInterfaceHandle);
+        sb.append("\n CLIENT CONNECTION ID: " + m_connectionId);
         if (m_commit)
             sb.append("\n  COMMIT");
         else
             sb.append("\n  ROLLBACK/ABORT, ");
-
-        // TODO More work here
 
         return sb.toString();
     }

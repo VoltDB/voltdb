@@ -91,7 +91,8 @@ PlanNodeFragment::~PlanNodeFragment() {
 PlanNodeFragment *
 PlanNodeFragment::createFromCatalog(const string value)
 {
-    //cout << "PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
+    //cout << "DEBUG PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
+    //cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
 
     json_spirit::Value jValue;
     json_spirit::read( value, jValue );

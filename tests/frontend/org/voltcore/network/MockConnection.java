@@ -61,4 +61,9 @@ public class MockConnection implements Connection {
         throw new UnsupportedOperationException();
     }
 
+    @Override
+    public void queueTask(Runnable r) {
+        throw new UnsupportedOperationException();
+    }
+
 }

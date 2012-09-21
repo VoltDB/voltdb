@@ -72,16 +72,16 @@ public class FunctionSQL extends Expression {
     private final static int   FUNC_CEILING                          = 17;
     private final static int   FUNC_WIDTH_BUCKET                     = 20;
     protected final static int FUNC_SUBSTRING_CHAR                   = 21;    // string
-    private final static int   FUNC_SUBSTRING_REG_EXPR               = 22;
+    //NEVER USED private final static int   FUNC_SUBSTRING_REG_EXPR               = 22;
     private final static int   FUNC_SUBSTRING_REGEX                  = 23;
     protected final static int FUNC_FOLD_LOWER                       = 24;
     protected final static int FUNC_FOLD_UPPER                       = 25;
-    private final static int   FUNC_TRANSCODING                      = 26;
-    private final static int   FUNC_TRANSLITERATION                  = 27;
-    private final static int   FUNC_REGEX_TRANSLITERATION            = 28;
+    //NEVER USED private final static int   FUNC_TRANSCODING                      = 26;
+    //NEVER USED private final static int   FUNC_TRANSLITERATION                  = 27;
+    //NEVER USED private final static int   FUNC_REGEX_TRANSLITERATION            = 28;
     protected final static int FUNC_TRIM_CHAR                        = 29;
     final static int           FUNC_OVERLAY_CHAR                     = 30;
-    private final static int   FUNC_CHAR_NORMALIZE                   = 31;
+    //NEVER USED private final static int   FUNC_CHAR_NORMALIZE                   = 31;
     private final static int   FUNC_SUBSTRING_BINARY                 = 32;
     private final static int   FUNC_TRIM_BINARY                      = 33;
     private final static int   FUNC_OVERLAY_BINARY                   = 40;
@@ -101,6 +101,15 @@ public class FunctionSQL extends Expression {
     private final static int   FUNC_SYSTEM_USER                      = 59;
     protected final static int FUNC_USER                             = 60;
     private final static int   FUNC_VALUE                            = 61;
+
+    // FunctionCustom adds a few values to this range that should probaby be kept unique.
+    // types.DTIType and Types add a few values to the range used by VoltDB for implementing EXTRACT variants.
+    // These are based on other ranges of constants that DO overlap with these FUNC_ constant, so they
+    // are dynamically adjusted with the following fixed offset.
+    private final static int   SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
+
+    // Assume that 10000-19999 are available for VoltDB-specific use in specialized implementations of existing HSQL functions.
+    private final static int   FUNC_VOLT_SUBSTRING_CHAR_FROM = 10000;
 
     //
     static final short[] noParamList              = new short[]{};
@@ -212,6 +221,9 @@ public class FunctionSQL extends Expression {
     short[] parseList;
     short[] parseListAlt;
     boolean isValueFunction;
+    protected int parameterArg = -1;
+    protected String voltDisabled;
+    private static String DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR = "SQL Function";
 
     public static FunctionSQL newSQLFunction(String token,
             CompileContext context) {
@@ -279,6 +291,7 @@ public class FunctionSQL extends Expression {
 
             case FUNC_OCCURENCES_REGEX :
             case FUNC_POSITION_REGEX :
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_EXTRACT :
@@ -307,6 +320,7 @@ public class FunctionSQL extends Expression {
             case FUNC_BIT_LENGTH :
                 name      = Tokens.T_BIT_LENGTH;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_OCTET_LENGTH :
@@ -316,6 +330,7 @@ public class FunctionSQL extends Expression {
 
             case FUNC_CARDINALITY :
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_ABS :
@@ -326,45 +341,54 @@ public class FunctionSQL extends Expression {
             case FUNC_MOD :
                 name      = Tokens.T_MOD;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_LN :
                 name      = Tokens.T_LN;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_EXP :
                 name      = Tokens.T_EXP;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_POWER :
                 name      = Tokens.T_POWER;
                 parseList = doubleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_SQRT :
                 name      = Tokens.T_SQRT;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_FLOOR :
                 name      = Tokens.T_FLOOR;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_CEILING :
                 name      = Tokens.T_CEILING;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_WIDTH_BUCKET :
                 name      = Tokens.T_WIDTH_BUCKET;
                 parseList = quadParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
-            case FUNC_SUBSTRING_CHAR :
             case FUNC_SUBSTRING_BINARY :
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
+            case FUNC_SUBSTRING_CHAR :
                 name      = Tokens.T_SUBSTRING;
                 parseList = new short[] {
                     Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.FROM,
@@ -389,11 +413,13 @@ public class FunctionSQL extends Expression {
             case FUNC_FOLD_LOWER :
                 name      = Tokens.T_LOWER;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_FOLD_UPPER :
                 name      = Tokens.T_UPPER;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             /*
@@ -404,8 +430,8 @@ public class FunctionSQL extends Expression {
             case FUNCTION_REGEX_TRANSLITERATION :
                 break;
              */
-            case FUNC_TRIM_CHAR :
             case FUNC_TRIM_BINARY :
+            case FUNC_TRIM_CHAR :
                 name      = Tokens.T_TRIM;
                 parseList = new short[] {
                     Tokens.OPENBRACKET, Tokens.X_OPTION, 11,    //
@@ -415,14 +441,16 @@ public class FunctionSQL extends Expression {
                     Tokens.X_OPTION, 1, Tokens.QUESTION,        //
                     Tokens.FROM, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                //voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             /*
             case FUNCTION_CHAR_NORMALIZE :
                 break;
             */
-            case FUNC_OVERLAY_CHAR :
             case FUNC_OVERLAY_BINARY :
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
+            case FUNC_OVERLAY_CHAR :
                 name      = Tokens.T_OVERLAY;
                 parseList = new short[] {
                     Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.PLACING,
@@ -431,12 +459,14 @@ public class FunctionSQL extends Expression {
                     Tokens.X_OPTION, 2, Tokens.USING, Tokens.CHARACTERS,
                     Tokens.CLOSEBRACKET
                 };
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_CURRENT_CATALOG :
                 name            = Tokens.T_CURRENT_CATALOG;
                 parseList       = noParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             /*
@@ -449,12 +479,14 @@ public class FunctionSQL extends Expression {
                 name            = Tokens.T_CURRENT_ROLE;
                 parseList       = noParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_CURRENT_SCHEMA :
                 name            = Tokens.T_CURRENT_SCHEMA;
                 parseList       = noParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             /*
@@ -465,60 +497,70 @@ public class FunctionSQL extends Expression {
                 name            = Tokens.T_CURRENT_USER;
                 parseList       = noParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_SESSION_USER :
                 name            = Tokens.T_SESSION_USER;
                 parseList       = noParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_SYSTEM_USER :
                 name            = Tokens.T_SYSTEM_USER;
                 parseList       = noParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_USER :
                 name            = Tokens.T_USER;
                 parseList       = optionalNoParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_VALUE :
                 name            = Tokens.T_VALUE;
                 parseList       = noParamList;
                 isValueFunction = false;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_CURRENT_DATE :
                 name            = Tokens.T_CURRENT_DATE;
                 parseList       = noParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_CURRENT_TIME :
                 name            = Tokens.T_CURRENT_TIME;
                 parseList       = optionalIntegerParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_CURRENT_TIMESTAMP :
                 name            = Tokens.T_CURRENT_TIMESTAMP;
                 parseList       = optionalIntegerParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_LOCALTIME :
                 name            = Tokens.T_LOCALTIME;
                 parseList       = optionalIntegerParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_LOCALTIMESTAMP :
                 name            = Tokens.T_LOCALTIMESTAMP;
                 parseList       = optionalIntegerParamList;
                 isValueFunction = true;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             default :
@@ -537,6 +579,7 @@ public class FunctionSQL extends Expression {
     /**
      * Evaluates and returns this Function in the context of the session.<p>
      */
+    @Override
     public Object getValue(Session session) {
 
         Object[] data = new Object[nodes.length];
@@ -1055,6 +1098,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -1192,7 +1236,7 @@ public class FunctionSQL extends Expression {
                 nodes[1].dataType =
                     ((NumberType) nodes[1].dataType).getIntegralType();
                 dataType = nodes[1].dataType;
-
+                parameterArg = 1;
                 break;
             }
             case FUNC_POWER : {
@@ -1239,7 +1283,7 @@ public class FunctionSQL extends Expression {
                 if (nodes[0].dataType != null
                         && nodes[0].dataType.isIntervalType()) {
                     dataType = nodes[0].dataType;
-
+                    parameterArg = 0;
                     break;
                 }
 
@@ -1255,6 +1299,7 @@ public class FunctionSQL extends Expression {
                 }
 
                 dataType = nodes[0].dataType;
+                parameterArg = 0;
 
                 break;
             }
@@ -1273,6 +1318,7 @@ public class FunctionSQL extends Expression {
                 }
 
                 dataType = nodes[3].dataType;
+                parameterArg = 3;
 
                 break;
             }
@@ -1306,6 +1352,7 @@ public class FunctionSQL extends Expression {
                 }
 
                 dataType = nodes[0].dataType;
+                parameterArg = 0;
 
                 if (dataType.isCharacterType()) {
                     funcType = FUNC_SUBSTRING_CHAR;
@@ -1341,6 +1388,7 @@ public class FunctionSQL extends Expression {
                 }
 
                 dataType = nodes[0].dataType;
+                parameterArg = 0;
 
                 if (!dataType.isCharacterType()) {
                     throw Error.error(ErrorCode.X_42565);
@@ -1368,6 +1416,7 @@ public class FunctionSQL extends Expression {
                 }
 
                 dataType = nodes[2].dataType;
+                parameterArg = 2;
 
                 if (dataType.isCharacterType()) {
                     funcType = FUNC_TRIM_CHAR;
@@ -1453,6 +1502,7 @@ public class FunctionSQL extends Expression {
                 } else {
                     throw Error.error(ErrorCode.X_42565);
                 }
+                parameterArg = 0;
 
                 if (nodes[2].dataType == null) {
                     nodes[2].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
@@ -1558,6 +1608,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -1839,6 +1890,7 @@ public class FunctionSQL extends Expression {
         return sb.toString();
     }
 
+    @Override
     public boolean equals(Object other) {
 
         if (other instanceof FunctionSQL
@@ -1849,6 +1901,7 @@ public class FunctionSQL extends Expression {
         return false;
     }
 
+    @Override
     public int hashCode() {
         return opType + funcType;
     }
@@ -1856,6 +1909,7 @@ public class FunctionSQL extends Expression {
     /**
      * Returns a String representation of this object. <p>
      */
+    @Override
     public String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();
@@ -1893,6 +1947,7 @@ public class FunctionSQL extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         // XXX Should this throw HSQLParseException instead?
@@ -1901,6 +1956,133 @@ public class FunctionSQL extends Expression {
         VoltXMLElement exp = new VoltXMLElement("function");
         exp.attributes.put("name", name);
         exp.attributes.put("type", dataType.getNameString());
+        if (parameterArg != -1) {
+            exp.attributes.put("parameter", String.valueOf(parameterArg));
+        }
+        int volt_funcType = funcType;
+
+        switch (funcType) {
+        case FUNC_SUBSTRING_CHAR :
+            // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
+            if (nodes[2] == null) {
+                exp.attributes.put("volt_alias", "substring_from");
+                volt_funcType = FUNC_VOLT_SUBSTRING_CHAR_FROM;
+            } else {
+                exp.attributes.put("volt_alias", "substring_from_for");
+            }
+            break;
+        case FUNC_EXTRACT :
+            // A little tweaking is needed here because VoltDB wants to define separate functions for each extract "field" (hard-coded node[1] value).
+            String volt_alias = null;
+            int keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            switch (keywordConstant) {
+            case Tokens.DAY_NAME :
+            // case DTIType.DAY_NAME :
+                volt_alias = "day_name";
+                break;
+            case Tokens.MONTH_NAME :
+            // case DTIType.MONTH_NAME :
+                volt_alias = "month_name";
+                break;
+            case Tokens.QUARTER :
+            // case DTIType.QUARTER :
+                volt_alias = "quarter";
+                break;
+            case Tokens.DAY_OF_MONTH :
+            // case DTIType.DAY_OF_MONTH :
+                volt_alias = "day_of_month";
+                break;
+            case Tokens.DAY_OF_YEAR :
+            // case DTIType.DAY_OF_YEAR :
+                volt_alias = "day_of_year";
+                break;
+            case Tokens.DAY_OF_WEEK :
+            // case DTIType.DAY_OF_WEEK :
+                volt_alias = "day_of_week";
+                break;
+            case Tokens.WEEK_OF_YEAR :
+            // case DTIType.WEEK_OF_YEAR :
+                volt_alias = "week_of_year";
+                break;
+            case Types.SQL_INTERVAL_YEAR :
+                volt_alias = "interval_year";
+                break;
+            case Types.SQL_INTERVAL_MONTH :
+                volt_alias = "interval_month";
+                break;
+            case Types.SQL_INTERVAL_DAY :
+                volt_alias = "interval_day";
+                break;
+            case Types.SQL_INTERVAL_HOUR :
+                volt_alias = "interval_hour";
+                break;
+            case Types.SQL_INTERVAL_MINUTE :
+                volt_alias = "interval_minute";
+                break;
+            case Types.SQL_INTERVAL_SECOND :
+                volt_alias = "interval_second";
+                break;
+            case Tokens.YEAR :
+                volt_alias = "year";
+                break;
+            case Tokens.MONTH :
+                volt_alias = "month";
+                break;
+            case Tokens.DAY :
+                volt_alias = "day";
+                break;
+            case Tokens.HOUR :
+                volt_alias = "hour";
+                break;
+            case Tokens.MINUTE :
+                volt_alias = "minute";
+                break;
+            case Tokens.SECOND :
+                volt_alias = "interval_second";
+                break;
+            case Tokens.SECONDS_MIDNIGHT :
+            // case DTIType.SECONDS_MIDNIGHT :
+                volt_alias = "seconds_midnight";
+                break;
+            case Tokens.TIMEZONE_HOUR :
+            // case DTIType.TIMEZONE_HOUR :
+                volt_alias = "timezone_hour";
+                break;
+            case Tokens.TIMEZONE_MINUTE :
+            // case DTIType.TIMEZONE_MINUTE :
+                volt_alias = "timezone_minute";
+                break;
+            default :
+                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+            }
+
+            exp.attributes.put("id", String.valueOf(keywordConstant + SQL_EXTRACT_VOLT_FUNC_OFFSET));
+            exp.attributes.put("volt_alias", volt_alias);
+            VoltXMLElement vxmle = nodes[1].voltGetXML(session);
+            exp.children.add(vxmle);
+            return exp;
+
+        default :
+            if (voltDisabled != null) {
+                exp.attributes.put("disabled", voltDisabled);
+            }
+            break;
+        }
+
+        exp.attributes.put("id", String.valueOf(volt_funcType));
+
+        switch (funcType) {
+        case FUNC_SUBSTRING_CHAR :
+            // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
+            if (nodes[2] == null) {
+                exp.attributes.put("volt_alias", "substring_from");
+            } else {
+                exp.attributes.put("volt_alias", "substring_from_for");
+            }
+            break;
+        default :
+            break;
+        }
 
         for (Expression expr : nodes) {
             if (expr != null) {
