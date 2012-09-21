@@ -94,7 +94,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
                 createForRejoin && isRejoinable(),
-                cl, nodeDRGateway);
+                cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -102,7 +102,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 Long.toString(getInitiatorHSId()), null);
 
         // configure DR
-        m_scheduler.setDRGateway(PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway));
+        ((SpScheduler) m_scheduler).setDRGateway(PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway));
     }
 
     @Override

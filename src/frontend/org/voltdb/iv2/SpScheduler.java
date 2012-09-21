@@ -34,6 +34,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.CommandLog;
 
 import org.voltdb.messaging.Iv2LogFaultMessage;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
@@ -54,6 +55,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<Pair<Long, Long>, DuplicateCounter> m_duplicateCounters =
         new HashMap<Pair<Long, Long>, DuplicateCounter>();
     private CommandLog m_cl;
+    private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
@@ -78,6 +80,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         super.setMaxSeenTxnId(maxSeenTxnId);
         writeIv2ViableReplayEntry();
+    }
+
+    public void setDRGateway(PartitionDRGateway gateway)
+    {
+        m_drGateway = gateway;
     }
 
     @Override

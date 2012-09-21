@@ -26,7 +26,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-import org.voltdb.NodeDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
 import org.voltdb.CommandLog;
@@ -97,8 +96,7 @@ public abstract class BaseInitiator implements Initiator
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin,
-                          CommandLog cl,
-                          NodeDRGateway nodeDRGateway)
+                          CommandLog cl)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;

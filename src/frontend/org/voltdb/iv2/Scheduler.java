@@ -22,7 +22,6 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
 
@@ -56,7 +55,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
-    protected PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
 
@@ -104,11 +102,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public SiteTaskerQueue getQueue()
     {
         return m_tasks;
-    }
-
-    public void setDRGateway(PartitionDRGateway gateway)
-    {
-        m_drGateway = gateway;
     }
 
     public void setStarvationTracker(StarvationTracker tracker) {
