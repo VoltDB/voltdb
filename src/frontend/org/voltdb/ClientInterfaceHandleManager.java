@@ -20,7 +20,8 @@ package org.voltdb;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.Iterator;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
@@ -41,16 +42,22 @@ public class ClientInterfaceHandleManager
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
-    static final int PART_ID_BITS = 14;
-    static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
-    static final int PART_ID_SHIFT = 50;
-    static final int SEQNUM_MAX = (1 << PART_ID_SHIFT) - 1;
+    static final int PART_ID_BITS = 15;
+    static final int MP_PART_ID = (1 << (PART_ID_BITS - 1)) - 1;
+    static final int SHORT_CIRCUIT_PART_ID = MP_PART_ID + 1;
+    static final long PART_ID_SHIFT = 49;
+    static final long SEQNUM_MAX = (1L << PART_ID_SHIFT) - 1L;
 
     private long m_outstandingTxns;
     public final boolean isAdmin;
     public final Connection connection;
     private final long m_expectedThreadId = Thread.currentThread().getId();
     final AdmissionControlGroup m_acg;
+
+
+    private HandleGenerator m_shortCircuitHG = new HandleGenerator(SHORT_CIRCUIT_PART_ID);
+
+    private final Map<Long, Iv2InFlight> m_shortCircuitReads = new HashMap<Long, Iv2InFlight>();
 
     private static class HandleGenerator
     {
@@ -125,13 +132,9 @@ public class ClientInterfaceHandleManager
         return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
             @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
-                    long clientHandle, int messageSize, long creationTime, String procName) {
+                    long clientHandle, int messageSize, long creationTime, String procName, boolean isShortCircuitRead) {
                 return super.getHandle(isSinglePartition, partitionId,
-                        clientHandle, messageSize, creationTime, procName);
-            }
-            @Override
-            synchronized boolean removeHandle(long ciHandle) {
-                return super.removeHandle(ciHandle);
+                        clientHandle, messageSize, creationTime, procName, isShortCircuitRead);
             }
             @Override
             synchronized Iv2InFlight findHandle(long ciHandle) {
@@ -161,12 +164,17 @@ public class ClientInterfaceHandleManager
             long clientHandle,
             int messageSize,
             long creationTime,
-            String procName)
+            String procName,
+            boolean isShortCircuitRead)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
         }
+        if (!isSinglePartition && isShortCircuitRead) {
+            throw new RuntimeException("Can't short circuit read a multi-part transaction");
+        }
+
         HandleGenerator generator;
         Deque<Iv2InFlight> perPartDeque;
         Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
@@ -181,42 +189,16 @@ public class ClientInterfaceHandleManager
             generator = partitionStuff.getFirst();
             perPartDeque = partitionStuff.getSecond();
         }
-        long ciHandle = generator.getNextHandle();
+        long ciHandle = isShortCircuitRead ? m_shortCircuitHG.getNextHandle() : generator.getNextHandle();
         Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName);
-        perPartDeque.addLast(inFlight);
+        if (isShortCircuitRead) {
+            m_shortCircuitReads.put(ciHandle, inFlight);
+        } else {
+            perPartDeque.addLast(inFlight);
+        }
         m_outstandingTxns++;
         m_acg.increaseBackpressure(messageSize);
         return ciHandle;
-    }
-
-    /**
-     * Remove the specified handle from internal storage.  Used for the 'oops'
-     * cases.  Returns true or false depending on whether the given handle was
-     * actually present and removed.
-     */
-    boolean removeHandle(long ciHandle)
-    {
-        assert(m_expectedThreadId == Thread.currentThread().getId());
-        int partitionId = getPartIdFromHandle(ciHandle);
-        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
-        if (partitionStuff == null) {
-            return false;
-        }
-
-        Deque<Iv2InFlight> perPartDeque = partitionStuff.getSecond();
-        Iterator<Iv2InFlight> iter = perPartDeque.iterator();
-        while (iter.hasNext())
-        {
-            Iv2InFlight inflight = iter.next();
-            if (inflight.m_ciHandle == ciHandle) {
-
-                iter.remove();
-                m_outstandingTxns--;
-                m_acg.reduceBackpressure(inflight.m_messageSize);
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -225,6 +207,17 @@ public class ClientInterfaceHandleManager
     Iv2InFlight findHandle(long ciHandle)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
+
+        /*
+         * Check for a short circuit read
+         */
+        Iv2InFlight inflight = m_shortCircuitReads.remove(ciHandle);
+        if (inflight != null) {
+            m_acg.reduceBackpressure(inflight.m_messageSize);
+            m_outstandingTxns--;
+            return inflight;
+        }
+
         int partitionId = getPartIdFromHandle(ciHandle);
         Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
@@ -288,8 +281,13 @@ public class ClientInterfaceHandleManager
         assert(m_expectedThreadId == Thread.currentThread().getId());
         for (Pair<HandleGenerator, Deque<Iv2InFlight>> p : m_partitionStuff.values()) {
             for (Iv2InFlight inflight : p.getSecond()) {
+                m_outstandingTxns--;
                 m_acg.reduceBackpressure(inflight.m_messageSize);
             }
+        }
+        for (Iv2InFlight inflight : m_shortCircuitReads.values()) {
+            m_outstandingTxns--;
+            m_acg.reduceBackpressure(inflight.m_messageSize);
         }
     }
 }

@@ -26,6 +26,7 @@ import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CommandLog;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
@@ -153,7 +154,18 @@ public class SpScheduler extends Scheduler
             long newSpHandle;
             long timestamp;
             Iv2InitiateTaskMessage msg = message;
-            if (m_isLeader) {
+            if (m_isLeader || message.isReadOnly()) {
+                /*
+                 * A short circuit read is a read where the client interface is local to
+                 * this node. The CI will let a replica perform a read in this case and
+                 * it does looser tracking of client handles since it can't be
+                 * partitioned from the local replica.
+                 */
+                if (!m_isLeader &&
+                        CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
+                        CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
+                    VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
+                }
 
                 /*
                  * If this is CL replay use the txnid from the CL and also
@@ -163,10 +175,20 @@ public class SpScheduler extends Scheduler
                     newSpHandle = message.getTxnId();
                     timestamp = message.getTimestamp();
                     setMaxSeenTxnId(newSpHandle);
-                } else {
+                } else if (m_isLeader) {
                     TxnEgo ego = advanceTxnEgo();
                     newSpHandle = ego.getTxnId();
                     timestamp = ego.getWallClock();
+                } else {
+                    /*
+                     * The short circuit read case. Since we are not a master
+                     * we can't create new transaction IDs, so reuse the last seen
+                     * txnid. For a timestamp, might as well give a reasonable one
+                     * for a read heavy workload so time isn't bursty
+                     */
+                    timestamp = System.currentTimeMillis();
+                    //Don't think it wise to make a new one for a short circuit read
+                    newSpHandle = getCurrentTxnId();
                 }
 
                 // Need to set the SP handle on the received message
@@ -187,10 +209,8 @@ public class SpScheduler extends Scheduler
                         message.getConnectionId(),
                         message.isForReplay());
 
-                // advanceTxnEgo();
-                // newSpHandle = currentTxnEgoSequence();
-
                 msg.setSpHandle(newSpHandle);
+
                 // Also, if this is a vanilla single-part procedure, make the TXNID
                 // be the SpHandle (for now)
                 // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
@@ -199,7 +219,7 @@ public class SpScheduler extends Scheduler
                     msg.setTxnId(newSpHandle);
                     msg.setTimestamp(timestamp);
                 }
-                if (m_sendToHSIds.size() > 0) {
+                if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.size() > 0) {
                     Iv2InitiateTaskMessage replmsg =
                         new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                 m_mailbox.getHSId(),

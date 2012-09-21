@@ -36,6 +36,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import jsr166y.ThreadLocalRandom;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
@@ -625,19 +627,33 @@ class Distributer {
                     Integer hashedPartition = invocation.getHashinatedParam(procedureInfo.partitionParameter);
 
                     /*
-                     * Short circuit reads of read only procs isn't implemented yet so
-                     * we still need to route reads to the master
+                     * If the procedure is read only, load balance across replicas
                      */
-//                    if (procedureInfo.readOnly) {
-//                        NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
-//                        if (partitionReplicas != null) {
-//                            cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
-//                            backpressure = false;
-//                        }
-//                    } else {
+                    if (procedureInfo.readOnly) {
+                        NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
+                        if (partitionReplicas != null) {
+                            cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
+                            if (cxn.hadBackPressure()) {
+                                //See if there is one without backpressure
+                                for (NodeConnection nc : partitionReplicas) {
+                                    if (!nc.hadBackPressure()) {
+                                        cxn = nc;
+                                    }
+                                }
+                            }
+                            if (!cxn.hadBackPressure() || ignoreBackpressure) {
+                                backpressure = false;
+                            }
+                        }
+                    } else {
+                        /*
+                         * Writes have to go to the master
+                         */
                         cxn = m_partitionMasters.get(hashedPartition);
-                        backpressure = false;
-//                    }
+                        if (!cxn.hadBackPressure() || ignoreBackpressure) {
+                            backpressure = false;
+                        }
+                    }
                 }
             }
 

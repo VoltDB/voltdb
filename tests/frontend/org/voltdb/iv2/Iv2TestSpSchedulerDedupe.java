@@ -137,7 +137,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         long primary_hsid = 1111l;
 
         createObjs();
-        Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
+        Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
         sptask.setSpHandle(txnid);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -146,6 +146,23 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
         dut.deliver(resp);
         verify(mbox, times(1)).send(eq(primary_hsid), eq(resp));
+    }
+
+    @Test
+    public void testReplicaInitiateTaskResponseShortCircuitRead() throws Exception
+    {
+        long txnid = TxnEgo.makeZero(0).getTxnId();
+
+        createObjs();
+        Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, dut_hsid);
+        sptask.setSpHandle(txnid);
+        dut.deliver(sptask);
+        // verify no response sent yet
+        verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
+        verify(mbox, times(0)).send(new long[] {anyLong()}, (VoltMessage)anyObject());
+        InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
+        dut.deliver(resp);
+        verify(mbox, times(1)).send(eq(dut_hsid), eq(resp));
     }
 
     @Test
@@ -214,7 +231,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
         dut.updateReplicas(replicas);
-        Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
+        Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
         dut.deliver(sptask);
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
         // Capture the InitiateTaskMessage that gets sent to the replica so we can test it,
