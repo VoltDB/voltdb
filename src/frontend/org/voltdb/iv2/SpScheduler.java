@@ -85,7 +85,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             } else if (m_txnId > o.m_txnId) {
                 return 1;
             } else {
-                return 0;
+                if (m_spHandle < o.m_spHandle) {
+                    return -1;
+                }
+                else if (m_spHandle > o.m_spHandle) {
+                    return 1;
+                }
+                else {
+                    return 0;
+                }
             }
         }
 
