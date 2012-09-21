@@ -9,6 +9,7 @@
 	<classpathentry kind="src" path="examples/voltcache/src"/>
 	<classpathentry kind="src" path="examples/voltkv/src"/>
 	<classpathentry kind="src" path="examples/voter/src"/>
+	<classpathentry kind="src" path="examples/eng2503/src"/>
 	<classpathentry kind="src" path="tests/test_apps/adhocbenchmark/src"/>
 	<classpathentry kind="src" path="src/hsqldb19b3"/>
 	<classpathentry kind="src" path="third_party/java/src"/>

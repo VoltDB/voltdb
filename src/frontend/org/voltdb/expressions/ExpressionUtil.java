@@ -131,6 +131,10 @@ public abstract class ExpressionUtil {
         if (input instanceof TupleValueExpression)
         {
             tves.add((TupleValueExpression) input);
+            if (input.m_right != null) {
+                // recursive call
+                tves.addAll(getTupleValueExpressions(input.m_right));
+            }
             return tves;
         }
 

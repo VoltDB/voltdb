@@ -1311,10 +1311,12 @@ public class PlanAssembler {
         if (m_parsedSelect.distinct) {
             // We currently can't handle DISTINCT of multiple columns.
             // Throw a planner error if this is attempted.
-            if (m_parsedSelect.displayColumns.size() > 1)
-            {
-                throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
-            }
+            //if (m_parsedSelect.displayColumns.size() > 1)
+            //{
+            //    throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
+            //}
+            AbstractExpression distinctExpr = null;
+            AbstractExpression nextExpr = null;
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
                 // Distinct can in theory handle any expression now, but it's
                 // untested so we'll balk on anything other than a TVE here
@@ -1322,17 +1324,26 @@ public class PlanAssembler {
                 if (col.expression instanceof TupleValueExpression)
                 {
                     // Add distinct node(s) to the plan
-                    root = addDistinctNodes(root, col.expression);
-                    // aggregate handlers are expected to produce the required projection.
-                    // the other aggregates do this inherently but distinct may need a
-                    // projection node.
-                    root = addProjection(root);
+                    if (distinctExpr == null) {
+                        distinctExpr = col.expression;
+                        nextExpr = distinctExpr;
+                    } else {
+                        nextExpr.setRight(col.expression);
+                        nextExpr = nextExpr.getRight();
+                    }
                  }
                 else
                 {
                     throw new PlanningErrorException("DISTINCT of an expression currently unsupported");
                 }
             }
+            // Add distinct node(s) to the plan
+            root = addDistinctNodes(root, distinctExpr);
+            // aggregate handlers are expected to produce the required projection.
+            // the other aggregates do this inherently but distinct may need a
+            // projection node.
+            root = addProjection(root);
+
         }
 
         return root;

@@ -55,6 +55,7 @@
 #include "storage/tablefactory.h"
 
 #include <set>
+#include <vector>
 #include <cassert>
 
 using namespace voltdb;
@@ -83,6 +84,25 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
     return (true);
 }
 
+namespace detail {
+    struct ltTuples {
+        bool operator () (const std::vector<NValue>& v1, const std::vector<NValue>& v2) const {
+            assert(v1.size() == v2.size());
+            std::vector<NValue>::const_iterator it1 = v1.begin();
+            std::vector<NValue>::const_iterator it2 = v2.begin();
+            for (; it1 != v1.end(); ++it1, ++it2) {
+                int comp = it1->compare(*it2);
+std::cout << "Comp " << it1->debug() << " and " << it2->debug() << " res=" << comp << '\n';
+                if (comp != 0) {
+                    return comp < 0;
+                }
+            }
+std::cout << "Equal\n";
+            return false;
+        } 
+    };
+}
+
 bool DistinctExecutor::p_execute(const NValueArray &params) {
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
@@ -98,14 +118,23 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     AbstractExpression *distinctExpression = node->getDistinctExpression();
     distinctExpression->substitute(params);
 
-    std::set<NValue, NValue::ltNValue> found_values;
+//    std::set<NValue, NValue::ltNValue> found_values;
+    std::set<std::vector<NValue>, detail::ltTuples> found_values;
     while (iterator.next(tuple)) {
         //
         // Check whether this value already exists in our list
         //
-        NValue tuple_value = distinctExpression->eval(&tuple, NULL);
-        if (found_values.find(tuple_value) == found_values.end()) {
-            found_values.insert(tuple_value);
+        std::vector<NValue> tuples;
+        const AbstractExpression* nextExpr = node->getDistinctExpression();
+std::cout << "expr=" << nextExpr->debug() << '\n';
+        while (nextExpr != NULL) {
+            tuples.push_back(nextExpr->eval(&tuple, NULL));
+            nextExpr = nextExpr->getRight();
+        }
+        
+        if (found_values.find(tuples) == found_values.end()) {
+std::cout<< tuple.debug("A") << "new\n"; 
+            found_values.insert(tuples);
             if (!output_table->insertTuple(tuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                            " output table '%s'",
@@ -114,6 +143,9 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
                 return false;
             }
         }
+    else
+std::cout<< tuple.debug("A") << "old\n"; 
+    
     }
 
     return true;
