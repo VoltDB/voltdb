@@ -1012,6 +1012,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
             else {
+                //Multi-part transactions go to the multi-part coordinator
                 initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
             }
 
@@ -2121,19 +2122,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public void startAcceptingConnections() throws IOException {
         if (m_isIV2Enabled) {
             /*
-             * Assemble a map of all local replicas that will be used to determine
-             * if single part reads can be delivered and executed at local replicas
+             * This does a ZK lookup which apparently is full of fail
+             * if you run TestRejoinEndToEnd. Kind of lame, but initializing this data
+             * immediately is not critical, request routing works without it.
+             *
+             * Populate the map in the background and it will be used to route
+             * requests to local replicas once the info is available
              */
-            final int thisHostId = CoreUtils.getHostIdFromHSId(m_mailbox.getHSId());
-            ImmutableMap.Builder<Integer, Long> localReplicas = ImmutableMap.builder();
-            for (int partition : m_allPartitions) {
-                for (Long replica : m_cartographer.getReplicasForPartition(partition)) {
-                    if (CoreUtils.getHostIdFromHSId(replica) == thisHostId) {
-                        localReplicas.put(partition, replica);
+            new Thread() {
+                @Override
+                public void run() {
+                    /*
+                     * Assemble a map of all local replicas that will be used to determine
+                     * if single part reads can be delivered and executed at local replicas
+                     */
+                    final int thisHostId = CoreUtils.getHostIdFromHSId(m_mailbox.getHSId());
+                    ImmutableMap.Builder<Integer, Long> localReplicas = ImmutableMap.builder();
+                    for (int partition : m_allPartitions) {
+                        for (Long replica : m_cartographer.getReplicasForPartition(partition)) {
+                            if (CoreUtils.getHostIdFromHSId(replica) == thisHostId) {
+                                localReplicas.put(partition, replica);
+                            }
+                        }
                     }
+                    m_localReplicas = localReplicas.build();
                 }
-            }
-            m_localReplicas = localReplicas.build();
+            }.start();
         }
 
         /*
