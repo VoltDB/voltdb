@@ -26,10 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
+import java.util.Map.Entry;
+
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 
-import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
 
 import org.voltdb.messaging.Iv2LogFaultMessage;
@@ -48,12 +49,63 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
+    static class DuplicateCounterKey implements Comparable<DuplicateCounterKey>
+    {
+        private long m_txnId;
+        private long m_spHandle;
+        transient final int m_hash;
+
+        DuplicateCounterKey(long txnId, long spHandle)
+        {
+            m_txnId = txnId;
+            m_spHandle = spHandle;
+            m_hash = (37 * (int)(m_txnId ^ (m_txnId >>> 32))) +
+                ((int)(m_spHandle ^ (m_spHandle >>> 32)));
+        }
+
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || !(getClass().isInstance(o))) {
+                return false;
+            }
+
+            DuplicateCounterKey other = (DuplicateCounterKey)o;
+
+            return (m_txnId == other.m_txnId && m_spHandle == other.m_spHandle);
+        }
+
+        // Only care about comparing SPHandles for sorting in updateReplicas
+        public int compareTo(DuplicateCounterKey o)
+        {
+            if (m_spHandle < o.m_spHandle) {
+                return -1;
+            } else if (m_spHandle > o.m_spHandle) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+
+        public int hashCode()
+        {
+            return m_hash;
+        }
+
+        public String toString()
+        {
+            return "<" + m_txnId + ", " + m_spHandle + ">";
+        }
+    };
+
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     List<Long> m_sendToHSIds = new ArrayList<Long>();
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
-    private final Map<Pair<Long, Long>, DuplicateCounter> m_duplicateCounters =
-        new HashMap<Pair<Long, Long>, DuplicateCounter>();
+    private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
+        new HashMap<DuplicateCounterKey, DuplicateCounter>();
     private CommandLog m_cl;
     private final SnapshotCompletionMonitor m_snapMonitor;
     // Need to track when command log replay is complete (even if not performed) so that
@@ -102,18 +154,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
-        List<Long> doneCounters = new LinkedList<Long>();
-        for (DuplicateCounter counter : m_duplicateCounters.values()) {
+        List<DuplicateCounterKey> doneCounters = new LinkedList<DuplicateCounterKey>();
+        for (Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
+            DuplicateCounter counter = entry.getValue();
             int result = counter.updateReplicas(m_replicaHSIds);
             if (result == DuplicateCounter.DONE) {
-                doneCounters.add(counter.getTxnId());
+                doneCounters.add(entry.getKey());
             }
         }
 
         // Maintain the CI invariant that responses arrive in txnid order.
         Collections.sort(doneCounters);
-        for (Long txnId : doneCounters) {
-            DuplicateCounter counter = m_duplicateCounters.remove(txnId);
+        for (DuplicateCounterKey key : doneCounters) {
+            DuplicateCounter counter = m_duplicateCounters.remove(key);
             VoltMessage resp = counter.getLastResponse();
             if (resp != null) {
                 m_mailbox.send(counter.m_destinationId, resp);
@@ -250,7 +303,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     DuplicateCounter counter = new DuplicateCounter(
                             msg.getInitiatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
-                    m_duplicateCounters.put(new Pair<Long, Long>(msg.getTxnId(), newSpHandle), counter);
+                    m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
                 }
             }
             else {
@@ -292,7 +345,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
                 message.getTxnId(), expectedHSIds);
-        m_duplicateCounters.put(new Pair<Long, Long>(message.getTxnId(), message.getSpHandle()), counter);
+        m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
@@ -320,7 +373,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         // Send the message to the duplicate counter, if any
         final long spHandle = message.getSpHandle();
-        DuplicateCounter counter = m_duplicateCounters.get(new Pair<Long, Long>(message.getTxnId(), spHandle));
+        DuplicateCounter counter = m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), spHandle));
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
@@ -425,7 +478,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getCoordinatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
                 }
-                m_duplicateCounters.put(new Pair<Long, Long>(msg.getTxnId(), newSpHandle), counter);
+                m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
         }
         else {
@@ -465,7 +518,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         // Send the message to the duplicate counter, if any
         DuplicateCounter counter =
-            m_duplicateCounters.get(new Pair<Long, Long>(message.getTxnId(), message.getSpHandle()));
+            m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
