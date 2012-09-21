@@ -50,9 +50,16 @@ public class TransactionTaskQueue
     private TransactionTask m_multiPartPendingSentinelReceipt = null;
 
     /*
-     * Multi-part transactions create a backlog of tasks behind them.
-     * A queue is created for each multi-part task to maintain the backlog until the next multi-part
-     * task.
+     * Multi-part transactions create a backlog of tasks behind them. A queue is
+     * created for each multi-part task to maintain the backlog until the next
+     * multi-part task.
+     *
+     * DR uses m_drMPSentinelBacklog to queue additional sentinels than the one
+     * currently in progress because DR uses GENERIC_MP_SENTINEL value for all
+     * sentinels. When a DR multipart completes, another sentinel will be polled
+     * from m_drMPSentinelBacklog and put in this map. It is impossible to have
+     * an empty m_multipartBacklog while m_drMPSentinelBacklog has more
+     * sentinels queued.
      */
     TreeMap<Long, Deque<TransactionTask>> m_multipartBacklog = new TreeMap<Long, Deque<TransactionTask>>();
 
@@ -60,7 +67,7 @@ public class TransactionTaskQueue
      * Since DR uses GENERIC_MP_SENTINEL for all sentinels, they cannot
      * be differentiated. We need to keep a backlog of sentinels.
      */
-    private long m_drMPSentinelBacklog = 0;
+    private Deque<Deque<TransactionTask>> m_drMPSentinelBacklog = new ArrayDeque<Deque<TransactionTask>>();
 
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -68,6 +75,26 @@ public class TransactionTaskQueue
     }
 
     synchronized void offerMPSentinel(long txnId) {
+        offerMPSentinelWithBacklog(txnId, null);
+    }
+
+    /**
+     * Offer a sentinel with a existing backlog. The backlog could have already
+     * queued single partition transactions in it.
+     *
+     * @param txnId
+     * @param backlog An empty one will be created if this is null.
+     */
+    private void offerMPSentinelWithBacklog(long txnId, Deque<TransactionTask> backlog) {
+        /*
+         * If a backlog is provided, use it. Otherwise, create an empty one. The
+         * provided backlog can only contain SP.
+         */
+        Deque<TransactionTask> deque = backlog;
+        if (deque == null) {
+            deque = new ArrayDeque<TransactionTask>();
+        }
+
         if (m_multiPartPendingSentinelReceipt != null) {
             boolean mismatch = false;
             if (txnId == GENERIC_MP_SENTINEL) {
@@ -92,15 +119,15 @@ public class TransactionTaskQueue
              */
             TransactionTask ts = m_multiPartPendingSentinelReceipt;
             m_multiPartPendingSentinelReceipt = null;
-            Deque<TransactionTask> deque = new ArrayDeque<TransactionTask>();
-            deque.addLast(ts);
+            // In case there are SP on the deque already. Add this MP to the front
+            deque.addFirst(ts);
             m_multipartBacklog.put(txnId, deque);
             taskQueueOffer(ts);
         } else {
             if (!m_multipartBacklog.isEmpty() && m_multipartBacklog.firstKey() == txnId) {
                 // Put the DR sentinel into the backlog
                 assert(txnId == GENERIC_MP_SENTINEL);
-                m_drMPSentinelBacklog++;
+                m_drMPSentinelBacklog.offer(new ArrayDeque<TransactionTask>());
             } else {
                 /*
                  * The sentinel has arrived, but not the fragment. Stash it away
@@ -108,7 +135,7 @@ public class TransactionTaskQueue
                  * pairing indicates that execution of the single part stream
                  * must block until the multi-part is satisfied
                  */
-                m_multipartBacklog.put(txnId, new ArrayDeque<TransactionTask>());
+                m_multipartBacklog.put(txnId, deque);
             }
         }
     }
@@ -145,7 +172,17 @@ public class TransactionTaskQueue
                 if (ts.txnId == txnId) {
                     hasSentinel = true;
                 } else if (txnId == GENERIC_MP_SENTINEL && isDRReplicated) {
-                    hasSentinel = true;
+                    /*
+                     * This branch is for DR. If the front of the deque is
+                     * another fragment with a different txnId, then this MP
+                     * doesn't have its sentinel yet. It needs to be queued
+                     * until its sentinel arrives.
+                     */
+                    TransactionTask first = m_multipartBacklog.firstEntry().getValue().peekFirst();
+                    if (first == null ||
+                        (first.m_txn.isSinglePartition() || first.m_txn.txnId == ts.txnId)) {
+                        hasSentinel = true;
+                    }
                 }
             }
 
@@ -184,12 +221,14 @@ public class TransactionTaskQueue
                 taskQueueOffer(task);
             }
             else {
-                // We got an FragmentTask that didn't match the head of the the
-                // queue, but if we've received multiple sentinels, it may
-                // match one of the other deques.  Check to see.  This can
-                // happen if the CompleteTransactionTask has not yet been
-                // finished by the Site thread but we get the first fragment
-                // for the next MP transaction.
+                /*
+                 * We got an FragmentTask that didn't match the head of the the
+                 * queue, but if we've received multiple sentinels, it may
+                 * match one of the other deques.  Check to see.  This can
+                 * happen if the CompleteTransactionTask has not yet been
+                 * finished by the Site thread but we get the first fragment
+                 * for the next MP transaction.
+                 */
                 Deque<TransactionTask> backlog = m_multipartBacklog.get(task.getTxnId());
                 if (backlog != null) {
                     backlog.addFirst(task);
@@ -251,18 +290,30 @@ public class TransactionTaskQueue
                     d.offerLast(task);
                 } else {
                     /*
-                     * Note the use of last entry here. Each multi-part sentinel generates a backlog queue
-                     * specific to the that multi-part. New single part transactions from the log go
-                     * into the queue following the last received multi-part sentinel.
+                     * Note the use of last entry here. Each multi-part sentinel
+                     * generates a backlog queue specific to the that
+                     * multi-part. New single part transactions from the log go
+                     * into the queue following the last received multi-part
+                     * sentinel.
                      *
-                     * It's possible to receive several sentinels with single part tasks mixed in
-                     * before receiving the first fragment task from the MP coordinator for any of them
-                     * so the backlog has to correctly preserve the order.
+                     * It's possible to receive several sentinels with single
+                     * part tasks mixed in before receiving the first fragment
+                     * task from the MP coordinator for any of them so the
+                     * backlog has to correctly preserve the order.
                      *
-                     * During regular execution and not replay there should be at most one element in the
-                     * multipart backlog, except for the kooky rollback corner case
+                     * During regular execution and not replay there should be
+                     * at most one element in the multipart backlog, except for
+                     * the kooky rollback corner case.
+                     *
+                     * For DR, if the m_drMPSentinelBacklog is not empty, it
+                     * means that there are sentinels queued. The DR SP tasks
+                     * should go in there instead of m_multipartBacklog.
                      */
-                    m_multipartBacklog.lastEntry().getValue().addLast(task);
+                    if (m_drMPSentinelBacklog.isEmpty()) {
+                        m_multipartBacklog.lastEntry().getValue().addLast(task);
+                    } else {
+                        m_drMPSentinelBacklog.getLast().addLast(task);
+                    }
                     retval = true;
                 }
             }
@@ -398,9 +449,8 @@ public class TransactionTaskQueue
                 /*
                  * If there are any DR sentinels queued, release one.
                  */
-                if (m_drMPSentinelBacklog > 0) {
-                    m_multipartBacklog.put(GENERIC_MP_SENTINEL, new ArrayDeque<TransactionTask>());
-                    m_drMPSentinelBacklog--;
+                if (!m_drMPSentinelBacklog.isEmpty()) {
+                    offerMPSentinelWithBacklog(GENERIC_MP_SENTINEL, m_drMPSentinelBacklog.poll());
                 }
             }
         }
