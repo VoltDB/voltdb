@@ -156,6 +156,7 @@ public class TestExportToFileClient extends TestCase {
         other.join();
 
         cluster.shutDown();
+        Thread.sleep(5000);
 
         // compare the output files
         File[] filesToCompare = tmpdir.listFiles(filter);
