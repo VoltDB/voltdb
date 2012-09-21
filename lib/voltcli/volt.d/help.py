@@ -25,11 +25,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-class VerbHelp(Verb):
+class VerbHelp(VOLT.Verb):
     def __init__(self):
-        Verb.__init__(self, 'help',
-                      description = 'Display command help',
-                      usage       = '[COMMAND ...]')
+        VOLT.Verb.__init__(self, 'help',
+                           description = 'Display command help',
+                           usage       = '[COMMAND ...]')
     def execute(self, runner):
         if runner.args:
             for arg in runner.args:

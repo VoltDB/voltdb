@@ -32,9 +32,10 @@ __author__ = 'scooper'
 import sys
 import os
 
-# IMPORTANT: Do not import other voltcli modules here. _util is the only one
-# guaranteed not to create a circular dependency.
+# IMPORTANT: Do not import vcli_* modules here. _util and _volt are internal
+# and are guaranteed not to create circular dependencies.
 import _util
+import _volt
 
 # Gets set through vcli_run.main()
 version = "???"
@@ -47,48 +48,17 @@ verbs_subdir = '%s.d' % bin_name
 # can import anything from here.
 sys.path.insert(0, lib_dir)
 
-#### CLI metadata class
-
-class CLISpec(object):
-    def __init__(self, **kwargs):
-        if 'description' not in kwargs:
-            self.description = '(description missing)'
-        if 'usage' not in kwargs:
-            self.usage = ''
-        self._kwargs = kwargs
-    def __getattr__(self, name):
-        return self._kwargs.get(name, None)
-
-#### Option class
-
-class CLIOption(object):
-    def __init__(self, *args, **kwargs):
-        self.args   = args
-        self.kwargs = kwargs
-
-#### Verbs
-
-class Verb(object):
-    """
-    Base class for verb implementations that provide the available sub-commands.
-    """
-    def __init__(self, name, **kwargs):
-        self.name     = name
-        self.metadata = CLISpec(**kwargs)
-    def execute(self, env):
-        _util.abort('%s "%s" object does not implement the required execute() method.'
-                        % (self.__class__.__name__, self.name))
-    def __cmp__(self, other):
-        return cmp(self.name, other.name)
-
 # Verbs support the possible actions.
 # Look for Verb subclasses in the .d subdirectory (relative to this file and to
 # the working directory).
-verbs = _util.find_and_load_subclasses(Verb, (lib_dir, '.'), verbs_subdir, Verb = Verb)
+verbs = _util.find_and_load_subclasses(_volt.Verb,
+                                       (lib_dir, '.'),
+                                       verbs_subdir,
+                                       VOLT = _volt)
 verbs.sort(cmp = lambda x, y: cmp(x.name, y.name))
 
 # Options define the CLI behavior modifiers.
-cli = CLISpec(
+cli = _volt.CLISpec(
     description = '''\
 Specific actions are provided by subcommands.  Run "%prog help SUBCOMMAND" to
 display full usage for a subcommand, including its options and arguments.  Note
@@ -98,13 +68,13 @@ followed by the -h option.
 ''',
     usage = '%prog [OPTIONS] COMMAND [ARGUMENTS ...]',
     options = (
-        CLIOption('-d', '--debug', action = 'store_true', dest = 'debug',
-                  help = 'display debug messages'),
-        CLIOption('-n', '--dry-run', action = 'store_true', dest = 'dryrun',
-                  help = 'dry run displays actions without executing them'),
-        CLIOption('-p', '--pause', action = 'store_true', dest = 'pause',
-                  help = 'pause before significant actions'),
-        CLIOption('-v', '--verbose', action = 'store_true', dest = 'verbose',
-                  help = 'display verbose messages, including external command lines'),
+        _volt.CLIOption('-d', '--debug', action = 'store_true', dest = 'debug',
+                        help = 'display debug messages'),
+        _volt.CLIOption('-n', '--dry-run', action = 'store_true', dest = 'dryrun',
+                        help = 'dry run displays actions without executing them'),
+        _volt.CLIOption('-p', '--pause', action = 'store_true', dest = 'pause',
+                        help = 'pause before significant actions'),
+        _volt.CLIOption('-v', '--verbose', action = 'store_true', dest = 'verbose',
+                        help = 'display verbose messages, including external command lines'),
     )
 )

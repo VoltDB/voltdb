@@ -25,9 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-class VerbExportToFile(Verb):
+class VerbExportToFile(VOLT.Verb):
     def __init__(self):
-        Verb.__init__(self, 'exporttofile',
-                      description = 'Export to file. Run without arguments for usage.')
+        VOLT.Verb.__init__(self, 'exporttofile',
+                           description = 'Export to file. Run without arguments for usage.')
     def execute(self, runner):
         runner.java('org.voltdb.exportclient.ExportToFileClient', None, *runner.args)

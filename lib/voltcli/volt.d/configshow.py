@@ -27,11 +27,11 @@
 
 import vcli_util
 
-class VerbShow(Verb):
+class VerbShow(VOLT.Verb):
     def __init__(self):
-        Verb.__init__(self, 'configshow',
-                      description = 'Show project settings.',
-                      usage       = '[NAME ...]')
+        VOLT.Verb.__init__(self, 'configshow',
+                           description = 'Show project settings.',
+                           usage       = '[NAME ...]')
     def execute(self, runner):
         if not runner.args:
             # All labels.

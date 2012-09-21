@@ -25,9 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-class VerbCSVLoad(Verb):
+class VerbCSVLoad(VOLT.Verb):
     def __init__(self):
-        Verb.__init__(self, 'sql',
-                      description = 'Run SQL interpreter.')
+        VOLT.Verb.__init__(self, 'sql',
+                           description = 'Run SQL interpreter.')
     def execute(self, runner):
         runner.java('org.voltdb.utils.SQLCommand', None, *runner.args)

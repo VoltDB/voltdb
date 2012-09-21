@@ -33,6 +33,15 @@
 # could be generated during installation. The interesting logic should live
 # elsewhere.
 #
+# Note that this script can be copied to other locations and file names to
+# support additional main commands that use their own <name>.d directories for
+# command modules and <name>*.cfg configuration files. The voltcli library
+# directory is located by searching up the directory hierarchy for one of the
+# following paths:
+#   <dir>/vcli_run.py
+#   <dir>/voltcli/vcli_run.py
+#   <dir>/lib/voltcli/vcli_run.py.
+#
 # Environment Variables
 #   JAVA_HOME          The java implementation to use.  Overrides JAVA_HOME.
 #   JAVA_HEAP_MAX      The maximum amount of heap to use, in MB. Default is 1024.
@@ -49,14 +58,34 @@ description = '''\
 This is the command line interface to VoltDB development functions.
 '''
 
-# Add ../lib to the module path based on the path of this file.
-#TODO: This needs to get smarter to handle all possible runtime environments.
-base_dir = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0])))
-sys.path.insert(0, os.path.join(base_dir, 'lib'))
+# Look for and add the voltcli library directory to the Python system path.
+base_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+test_dir = base_dir
+test_dirs = []
+lib_dir = None
+while test_dir != '/':
+    for sub_dir in ('', 'voltcli', 'lib/voltcli'):
+        test_lib_dir = os.path.join(test_dir, sub_dir)
+        test_dirs.append(test_lib_dir)
+        if os.path.exists(os.path.join(test_lib_dir, 'vcli_run.py')):
+            lib_dir = os.path.join(test_dir, sub_dir)
+            break
+    if lib_dir is None:
+        test_dir = os.path.dirname(test_dir)
+    else:
+        break
+else:
+    sys.stderr.write('''
+ERROR: Could not find voltcli libraries starting from "%s"
+       Checked the following locations:
+%s
+''' % (base_dir, '\n'.join(['         %s' % d for d in test_dirs])))
+    sys.exit(1)
+sys.path.insert(0, os.path.join(lib_dir))
 
-import voltcli.vcli_run
+import vcli_run
 
 #### Command line main
 
 if __name__ == '__main__':
-    voltcli.vcli_run.main(version, description)
+    vcli_run.main(version, description)

@@ -27,12 +27,12 @@
 
 import vcli_util
 
-class VerbConfig(Verb):
+class VerbConfig(VOLT.Verb):
 
     def __init__(self):
-        Verb.__init__(self, 'config',
-                      description = 'Configure project settings.',
-                      usage       = 'NAME=VALUE ...')
+        VOLT.Verb.__init__(self, 'config',
+                           description = 'Configure project settings.',
+                           usage       = 'NAME=VALUE ...')
 
     def execute(self, runner):
         if not runner.args:

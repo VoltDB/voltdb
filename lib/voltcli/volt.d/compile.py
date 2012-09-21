@@ -25,11 +25,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-class VerbCompile(Verb):
+class VerbCompile(VOLT.Verb):
     def __init__(self):
-        Verb.__init__(self, 'compile',
-                      description = 'Run the VoltDB compiler to build the catalog',
-                      usage       = 'CLASSPATH PROJECT JAR')
+        VOLT.Verb.__init__(self, 'compile',
+                           description = 'Run the VoltDB compiler to build the catalog',
+                           usage       = 'CLASSPATH PROJECT JAR')
     def execute(self, runner):
         # Run with the default Java options from vcli_env
         runner.java('org.voltdb.compiler.VoltCompiler',
