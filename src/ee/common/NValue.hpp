@@ -1675,21 +1675,28 @@ class NValue {
     static Pool* getTempStringPool();
 
     static NValue getTempStringValue(const char* value, size_t size) {
-        return getAllocatedValue(VALUE_TYPE_VARCHAR,value, size, getTempStringPool());
+        return getAllocatedValue(VALUE_TYPE_VARCHAR, value, size, getTempStringPool());
     }
 
-    static NValue getTempBinaryValue(const char* value, size_t size) {
-        return getAllocatedValue(VALUE_TYPE_VARBINARY, value, size, getTempStringPool());
+    static NValue getTempBinaryValue(const unsigned char* value, size_t size) {
+        return getAllocatedValue(VALUE_TYPE_VARBINARY, reinterpret_cast<const char*>(value), size, getTempStringPool());
+    }
+
+    /// Assumes hex-encoded input
+    static inline NValue getTempBinaryValueFromHex(const std::string& value) {
+        size_t rawLength = value.length() / 2;
+        unsigned char rawBuf[rawLength];
+        hexDecodeToBinary(rawBuf, value.c_str());
+        return getTempBinaryValue(rawBuf, rawLength);
     }
 
     static NValue getAllocatedValue(ValueType type, const char* value, size_t size, Pool* stringPool) {
         NValue retval(type);
-        const int32_t length = static_cast<int32_t>(size);
-        retval.initAllocatedValue(value, length, stringPool);
+        retval.initAllocatedValue(value, (int32_t)size, stringPool);
         return retval;
     }
 
-    void initAllocatedValue(const char* value, const int32_t length, Pool* stringPool) {
+    void initAllocatedValue(const char* value, int32_t length, Pool* stringPool) {
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         const int32_t minLength = length + lengthLength;
         StringRef* sref = StringRef::create(minLength, stringPool);
@@ -2289,7 +2296,7 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
               break;
           }
           const char *str = (const char*) input.getRawPointer(length);
-          retval.initAllocatedValue(str, length, dataPool);
+          retval.initAllocatedValue(str, (size_t)length, dataPool);
           break;
       }
       case VALUE_TYPE_DECIMAL: {

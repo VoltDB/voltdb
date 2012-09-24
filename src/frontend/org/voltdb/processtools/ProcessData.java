@@ -18,16 +18,21 @@
 package org.voltdb.processtools;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
+
 public class ProcessData {
-    private final Process m_process;
+    private final Session m_ssh_session;
+    private final Channel m_channel;
     private final StreamWatcher m_out;
     private final StreamWatcher m_err;
+    private Thread m_sshThread;
 
     public enum Stream { STDERR, STDOUT; }
 
@@ -92,79 +97,53 @@ public class ProcessData {
         }
     }
 
-    public ProcessData(String processName, String[] cmd, String cwd,
-                       OutputHandler handler) throws IOException {
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        if (cwd != null)
-            pb.directory(new File(cwd));
-        m_process = pb.start();
+    ProcessData(String processName, OutputHandler handler, Session ssh_session, final String command) throws JSchException, IOException {
+        m_ssh_session = ssh_session;
+        m_channel=ssh_session.openChannel("exec");
+        ((ChannelExec)m_channel).setCommand(command);
 
-        BufferedReader out = new BufferedReader(new InputStreamReader(m_process.getInputStream()));
-        BufferedReader err = new BufferedReader(new InputStreamReader(m_process.getErrorStream()));
+        // Set up the i/o streams
+        m_channel.setInputStream(null);
+        BufferedReader out = new BufferedReader(new InputStreamReader(m_channel.getInputStream()));
+        BufferedReader err = new BufferedReader(new InputStreamReader(((ChannelExec) m_channel).getErrStream()));
         m_out = new StreamWatcher(out, processName, Stream.STDOUT, handler);
         m_err = new StreamWatcher(err, processName, Stream.STDERR, handler);
-        m_out.start();
-        m_err.start();
-    }
 
-    ProcessData(String processName, OutputHandler handler, Process p) {
-        m_process = p;
-        BufferedReader out = new BufferedReader(new InputStreamReader(m_process.getInputStream()));
-        BufferedReader err = new BufferedReader(new InputStreamReader(m_process.getErrorStream()));
-        m_out = new StreamWatcher(out, processName, Stream.STDOUT, handler);
-        m_err = new StreamWatcher(err, processName, Stream.STDERR, handler);
-        m_out.start();
-        m_err.start();
+        /*
+         * Execute the command non-blocking.
+         */
+        m_sshThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    m_channel.connect();
+                    m_out.start();
+                    m_err.start();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    System.err.print("Err SSH long-running execution thread exiting.");
+                    System.err.flush();
+                }
+            }
+        };
+        m_sshThread.start();
     }
 
     public int kill() {
         m_out.m_expectDeath.set(true);
         m_err.m_expectDeath.set(true);
         int retval = -255;
-
-        synchronized(m_process) {
-            m_process.destroy();
-            try {
-                m_process.waitFor();
-                retval = m_process.exitValue();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        synchronized(m_channel) {
+            m_channel.disconnect();
+            m_ssh_session.disconnect();
         }
-
+        m_sshThread.interrupt();
         return retval;
     }
 
-    public int join() {
-        m_out.m_expectDeath.set(true);
-        m_err.m_expectDeath.set(true);
-
-        try {
-            synchronized(m_process) {
-                int waitFor = m_process.waitFor();
-                System.err.println("Joined pd.process with exit status: " + waitFor);
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        return kill();
-    }
-
-    public void write(String data) throws IOException {
-        OutputStreamWriter out = new OutputStreamWriter(m_process.getOutputStream());
-        out.write(data);
-        out.flush();
-    }
-
     public boolean isAlive() {
-        try {
-            synchronized(m_process) {
-                m_process.exitValue();
-            }
-            return false;
-        } catch (IllegalThreadStateException e) {
-            return true;
+        synchronized(m_channel) {
+            return m_ssh_session.isConnected();
         }
     }
 }

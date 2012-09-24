@@ -89,7 +89,7 @@ function async-benchmark() {
         --servers=localhost \
         --port=21212 \
         --procedure=JiggleSinglePartition \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --wait=0 \
         --ratelimit=100000 \
         --autotune=true \
@@ -128,7 +128,7 @@ function sync-benchmark() {
         --servers=localhost \
         --port=21212 \
         --procedure=JiggleSinglePartition \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --wait=0
 }
 
