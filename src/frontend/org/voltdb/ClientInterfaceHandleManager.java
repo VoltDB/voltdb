@@ -49,7 +49,7 @@ public class ClientInterfaceHandleManager
     //Add an extra bit so compared to the 14-bits in txnids so there
     //can be a short circuit read partition id
     static final int PART_ID_BITS = 15;
-    static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
+    static final int MP_PART_ID = (1 << (PART_ID_BITS - 1)) - 1;
     static final int SHORT_CIRCUIT_PART_ID = MP_PART_ID + 1;
     static final long PART_ID_SHIFT = 48;
     static final long SEQNUM_MAX = (1L << PART_ID_SHIFT) - 1L;
