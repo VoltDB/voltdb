@@ -191,17 +191,6 @@ public class StatsAgent {
     }
 
     private void collectStatsImpl(Connection c, long clientHandle, String selector) throws Exception {
-        if (selector.equals("TOPO")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
-                selector,
-                c,
-                clientHandle,
-                new VoltTable[1],
-                System.currentTimeMillis());
-            collectTopoStats(psr);
-            return;
-        }
-
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
             /*
              * Defensively check for an expired request not caught
@@ -227,6 +216,27 @@ public class StatsAgent {
                 c.writeStream().enqueue(buf);
                 return;
             }
+        }
+
+        if (selector.equals("TOPO")) {
+            if (!VoltDB.instance().isIV2Enabled()) {
+                final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                             new VoltTable[0], "IV2 is not enabled", clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                errorResponse.flattenToBuffer(buf).flip();
+                c.writeStream().enqueue(buf);
+                return;
+            }
+            PendingStatsRequest psr = new PendingStatsRequest(
+                selector,
+                c,
+                clientHandle,
+                new VoltTable[1],
+                System.currentTimeMillis());
+            collectTopoStats(psr);
+            return;
         }
 
         PendingStatsRequest psr =

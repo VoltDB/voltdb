@@ -796,7 +796,6 @@ class Distributer {
     }
 
     private void updateAffinityTopology(VoltTable vt) {
-        System.out.println(vt);
         int numPartitions = vt.getRowCount();
         TheHashinator.initialize(numPartitions);
         m_hashinatorInitialized = true;
@@ -811,7 +810,6 @@ class Distributer {
     }
 
     private void updateProcedurePartitioning(VoltTable vt) {
-        System.out.println(vt);
         m_procedureInfo.clear();
         while (vt.advanceRow()) {
             try {
