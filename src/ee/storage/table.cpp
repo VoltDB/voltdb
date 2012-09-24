@@ -551,7 +551,7 @@ void Table::removeIndex(TableIndex *index) {
     }
     for (iter = m_uniqueIndexes.begin(); *iter; iter++) {
         if ((*iter) == index) {
-            m_indexes.erase(iter);
+            m_uniqueIndexes.erase(iter);
             break;
         }
     }
