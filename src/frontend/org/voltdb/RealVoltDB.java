@@ -2182,13 +2182,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     for (ExecutionSite es : getLocalSites().values()) {
                         es.notifySitesAdded(m_siteTracker);
                     }
-
-                    if (ExportManager.instance() != null) {
-                        //Notify the export manager the cluster topology has changed
-                        ExportManager.instance().notifyOfClusterTopologyChange();
-                    }
                 }
             }
+        }
+
+        // Pre-iv2 and iv2 must inform the export manager of topology changes.
+        if (ExportManager.instance() != null) {
+            ExportManager.instance().notifyOfClusterTopologyChange();
         }
     }
 

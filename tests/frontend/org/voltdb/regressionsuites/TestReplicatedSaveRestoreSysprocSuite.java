@@ -45,7 +45,7 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
             "testCorruptedFiles",
             "testCorruptedFilesRandom",
             "testRepartition",
-            "testChaneDDL",
+            "testChangeDDL",
             "testGoodChangeAttributeTypes",
             "testBadChangeAttributeTypes",
             "testRestore12Snapshot",

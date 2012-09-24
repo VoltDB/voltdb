@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,6 +28,7 @@ import java.util.Map;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CommandLog;
+import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
@@ -47,13 +49,24 @@ public class SpScheduler extends Scheduler
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
     private CommandLog m_cl;
+    private final DurabilityListener m_durabilityListener;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    SpScheduler(int partitionId, SiteTaskerQueue taskQueue)
+    SpScheduler(int partitionId, final SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
+        m_durabilityListener = new DurabilityListener() {
+            @Override
+            public void onDurability(ArrayDeque<Object> durableThings) {
+                synchronized (m_lock) {
+                    for (Object o : durableThings) {
+                        m_pendingTasks.offer((TransactionTask)o);
+                    }
+                }
+            }
+        };
     }
 
     @Override
@@ -199,7 +212,9 @@ public class SpScheduler extends Scheduler
                     msg.setTxnId(newSpHandle);
                     msg.setTimestamp(timestamp);
                 }
-                if (m_sendToHSIds.size() > 0) {
+                //Don't replicate reads, this really assumes that DML validation
+                //is going to be integrated soonish
+                if (!msg.isReadOnly() && m_sendToHSIds.size() > 0) {
                     Iv2InitiateTaskMessage replmsg =
                         new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                 m_mailbox.getHSId(),
@@ -227,13 +242,16 @@ public class SpScheduler extends Scheduler
                 newSpHandle = msg.getSpHandle();
                 timestamp = msg.getTimestamp();
             }
-            if (!msg.isReadOnly()) {
-                m_cl.log(msg, newSpHandle);
-            }
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
-            m_pendingTasks.offer(task);
+            if (!msg.isReadOnly()) {
+                if (!m_cl.log(msg, newSpHandle, m_durabilityListener, task)) {
+                    m_pendingTasks.offer(task);
+                }
+            } else {
+                m_pendingTasks.offer(task);
+            }
             return;
         }
         else {
@@ -375,9 +393,14 @@ public class SpScheduler extends Scheduler
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
                 msg.setInitiateTask(msg.getInitiateTask());//Trigger reserialization so the new handle is used
             }
-            // If we have input dependencies, it's borrow work, there's no way we
-            // can actually distribute it
-            if (m_sendToHSIds.size() > 0) {
+
+            /*
+             * If there a replicas to send it to, forward it!
+             * Unless... it's read only AND not a sysproc. Read only sysprocs may expect to be sent
+             * everywhere.
+             * In that case don't propagate it to avoid a determinism check and extra messaging overhead
+             */
+            if (m_sendToHSIds.size() > 0 && (!msg.isReadOnly() || msg.isSysProcTask())) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
@@ -401,9 +424,6 @@ public class SpScheduler extends Scheduler
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
-        if (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly()) {
-            m_cl.log(msg.getInitiateTask(), newSpHandle);
-        }
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
         // bit of a hack...we will probably not want to create and
@@ -414,16 +434,22 @@ public class SpScheduler extends Scheduler
             m_outstandingTxns.put(msg.getTxnId(), txn);
         }
 
+        TransactionTask task;
         if (msg.isSysProcTask()) {
-            final SysprocFragmentTask task =
+            task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                                         m_pendingTasks, msg, null);
-            m_pendingTasks.offer(task);
         }
         else {
-            final FragmentTask task =
+            task =
                 new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                                  m_pendingTasks, msg, null);
+        }
+        if (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly()) {
+            if (!m_cl.log(msg.getInitiateTask(), newSpHandle, m_durabilityListener, task)) {
+                m_pendingTasks.offer(task);
+            }
+        } else {
             m_pendingTasks.offer(task);
         }
     }

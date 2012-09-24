@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -405,17 +406,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         networkLog.warn("Rejected connection from " +
                                 socket.socket().getRemoteSocketAddress() +
                                 " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
-                        /*
-                         * Send rejection message with reason code
-                         */
-                        final ByteBuffer b = ByteBuffer.allocate(1);
-                        b.put(MAX_CONNECTIONS_LIMIT_ERROR);
-                        b.flip();
-                        socket.configureBlocking(true);
-                        for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
-                            socket.write(b);
-                        }
-                        socket.close();
+                        try {
+                            /*
+                             * Send rejection message with reason code
+                             */
+                            final ByteBuffer b = ByteBuffer.allocate(1);
+                            b.put(MAX_CONNECTIONS_LIMIT_ERROR);
+                            b.flip();
+                            socket.configureBlocking(true);
+                            for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
+                                socket.write(b);
+                            }
+                            socket.close();
+                        } catch (IOException e) {}//don't care keep running
                         continue;
                     }
 
@@ -521,20 +524,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * The login message is a length preceded name string followed by a length preceded
              * SHA-1 single hash of the password.
              */
-            socket.configureBlocking(false);//Doing NIO allows timeouts via Thread.sleep()
+            socket.configureBlocking(true);
             socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
             final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
 
-            //Do non-blocking I/O to retrieve the length preceding value
-            for (int ii = 0; ii < 4; ii++) {
-                socket.read(lengthBuffer);
-                if (!lengthBuffer.hasRemaining()) {
-                    break;
-                }
-                try {
-                    Thread.sleep(400);
-                } catch (InterruptedException e) {
-                    throw new IOException(e);
+            /*
+             * Schedule a timeout to close the socket in case there is no response for the timeout
+             * period. This will wake up the current thread that is blocked on reading the login message
+             */
+            ScheduledFuture<?> timeoutFuture = VoltDB.instance().scheduleWork(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        try {
+                                                            authLog.warn("Timing out login attempt from " +
+                                                                         socket.socket().getRemoteSocketAddress() +
+                                                                         " after 1600 milliseconds");
+                                                            socket.close();
+                                                        } catch (IOException e) {
+                                                            //Don't care
+                                                        }
+                                                    }
+                                                }, 1600, 0, TimeUnit.MILLISECONDS);
+
+            while (lengthBuffer.hasRemaining()) {
+                int read = socket.read(lengthBuffer);
+                if (read == -1) {
+                    throw new EOFException();
                 }
             }
 
@@ -594,6 +609,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 socket.close();
                 return null;
             }
+
+            /*
+             * Since we got the login message, cancel the timeout.
+             * If cancellation fails then the socket is dead and the connection lost
+             */
+            if (!timeoutFuture.cancel(false)) {
+                return null;
+            }
+
             message.flip().position(1);//skip version
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
@@ -991,7 +1015,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    messageSize, now, invocation.getProcName());
+                    messageSize, now, invocation.getProcName(), isReadOnly);
             Long initiatorHSId;
             if (isSinglePartition && !isEveryPartition) {
                 initiatorHSId = m_iv2Masters.get(partitions[0]);

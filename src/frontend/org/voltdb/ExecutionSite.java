@@ -109,6 +109,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
+import com.google.common.collect.ImmutableMap;
+
 /**
  * The main executor of transactional work in the system. Controls running
  * stored procedures and manages the execution engine's running of plan
@@ -747,7 +749,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public long getNextUndo()                               { return getNextUndoToken(); }
         @Override
-        public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
+        public ImmutableMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
         public long getSiteId()                                 { return m_siteId; }
         @Override
