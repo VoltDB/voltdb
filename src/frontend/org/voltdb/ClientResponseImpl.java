@@ -74,14 +74,14 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
      * Constructor used for tests and error responses.
      */
     public ClientResponseImpl(byte status, VoltTable[] results, String statusString) {
-        this(status, Byte.MIN_VALUE, null, results, statusString, -1, null);
+        this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, -1, null);
     }
 
     /**
      * Another constructor for test and error responses
      */
     public ClientResponseImpl(byte status, VoltTable[] results, String statusString, long handle) {
-        this(status, Byte.MIN_VALUE, null, results, statusString, handle, null);
+        this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, handle, null);
     }
 
     /**
@@ -91,7 +91,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
      * @param e
      */
     public ClientResponseImpl(byte status, VoltTable[] results, String statusString, SerializableException e) {
-        this(status, Byte.MIN_VALUE, null, results, statusString, -1, e);
+        this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, -1, e);
     }
 
     /**

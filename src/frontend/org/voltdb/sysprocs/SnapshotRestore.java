@@ -279,7 +279,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             if (context.isLowestSiteId())
             {
                 ExportManager.instance().
-                truncateExportToTxnId(snapshotTxnId);
+                truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
             }
             try {
                 ByteArrayInputStream bais = new ByteArrayInputStream((byte[])params.toArray()[0]);

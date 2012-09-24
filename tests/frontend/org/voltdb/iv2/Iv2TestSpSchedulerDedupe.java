@@ -89,6 +89,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         dut = new SpScheduler(0, getSiteTaskerQueue());
         dut.setMailbox(mbox);
         dut.setCommandLog(mock(CommandLog.class));
+        dut.setLock(mbox);
     }
 
     private Iv2InitiateTaskMessage createMsg(long txnId, boolean readOnly,

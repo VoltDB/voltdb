@@ -19,13 +19,15 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Iterator;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
-import org.voltcore.utils.Pair;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -42,10 +44,14 @@ public class ClientInterfaceHandleManager
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
+
+    static final long READ_BIT = 1L << 63;
+    //Add an extra bit so compared to the 14-bits in txnids so there
+    //can be a short circuit read partition id
     static final int PART_ID_BITS = 15;
-    static final int MP_PART_ID = (1 << (PART_ID_BITS - 1)) - 1;
+    static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
     static final int SHORT_CIRCUIT_PART_ID = MP_PART_ID + 1;
-    static final long PART_ID_SHIFT = 49;
+    static final long PART_ID_SHIFT = 48;
     static final long SEQNUM_MAX = (1L << PART_ID_SHIFT) - 1L;
 
     private long m_outstandingTxns;
@@ -100,19 +106,31 @@ public class ClientInterfaceHandleManager
         final int m_messageSize;
         final long m_creationTime;
         final String m_procName;
+        final long m_initiatorHSId;
         Iv2InFlight(long ciHandle, long clientHandle,
-                int messageSize, long creationTime, String procName)
+                int messageSize, long creationTime, String procName, long initiatorHSId)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
             m_messageSize = messageSize;
             m_creationTime = creationTime;
             m_procName = procName;
+            m_initiatorHSId = initiatorHSId;
         }
     }
 
-    private ImmutableMap<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>> m_partitionStuff =
-            new Builder<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>>().build();
+    static class PartitionData {
+        private final HandleGenerator m_generator;
+        private final Deque<Iv2InFlight> m_reads = new ArrayDeque<Iv2InFlight>();
+        private final Deque<Iv2InFlight> m_writes = new ArrayDeque<Iv2InFlight>();
+
+        private PartitionData(int partitionId) {
+            m_generator = new HandleGenerator(partitionId);
+        }
+    }
+
+    private ImmutableMap<Integer, PartitionData> m_partitionStuff =
+            new Builder<Integer, PartitionData>().build();
 
     ClientInterfaceHandleManager(boolean isAdmin, Connection connection, AdmissionControlGroup acg)
     {
@@ -132,9 +150,10 @@ public class ClientInterfaceHandleManager
         return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
             @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
-                    long clientHandle, int messageSize, long creationTime, String procName, boolean isShortCircuitRead) {
+                    long clientHandle, int messageSize, long creationTime, String procName, long initiatorHSId,
+                    boolean readOnly, boolean isShortCircuitRead) {
                 return super.getHandle(isSinglePartition, partitionId,
-                        clientHandle, messageSize, creationTime, procName, isShortCircuitRead);
+                        clientHandle, messageSize, creationTime, procName, initiatorHSId, readOnly, isShortCircuitRead);
             }
             @Override
             synchronized Iv2InFlight findHandle(long ciHandle) {
@@ -147,6 +166,12 @@ public class ClientInterfaceHandleManager
             @Override
             synchronized void freeOutstandingTxns() {
                 super.freeOutstandingTxns();
+            }
+
+            @Override
+            synchronized List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
+                    Long initiatorHSId) {
+                return super.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
             }
         };
     }
@@ -165,47 +190,83 @@ public class ClientInterfaceHandleManager
             int messageSize,
             long creationTime,
             String procName,
+            long initiatorHSId,
+            boolean readOnly,
             boolean isShortCircuitRead)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
         }
+
         if (!isSinglePartition && isShortCircuitRead) {
             throw new RuntimeException("Can't short circuit read a multi-part transaction");
         }
 
-        HandleGenerator generator;
-        Deque<Iv2InFlight> perPartDeque;
-        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
-            perPartDeque = new ArrayDeque<Iv2InFlight>();
-            generator = new HandleGenerator(partitionId);
+            partitionStuff = new PartitionData(partitionId);
             m_partitionStuff =
-                    new Builder<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>>().
+                    new Builder<Integer, PartitionData>().
                         putAll(m_partitionStuff).
-                        put(partitionId, Pair.of(generator, perPartDeque)).build();
-        } else {
-            generator = partitionStuff.getFirst();
-            perPartDeque = partitionStuff.getSecond();
+                        put(partitionId, partitionStuff).build();
         }
-        long ciHandle = isShortCircuitRead ? m_shortCircuitHG.getNextHandle() : generator.getNextHandle();
-        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName);
+
+        long ciHandle =
+                isShortCircuitRead ? m_shortCircuitHG.getNextHandle() : partitionStuff.m_generator.getNextHandle();
+        Iv2InFlight inFlight =
+                new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName, initiatorHSId);
+
         if (isShortCircuitRead) {
+            /*
+             * Short circuit reads don't use a handle that is partition specific
+             * because ordering doesn't really matter since it isn't used for failure handling
+             * because the read is local to this process
+             */
             m_shortCircuitReads.put(ciHandle, inFlight);
         } else {
-            perPartDeque.addLast(inFlight);
+            /*
+             * Reads are not ordered with writes, writes might block due to command logging
+             * so track them separately because they will come back in mixed order
+             */
+            if (readOnly) {
+                /*
+                 * Encode the read only-ness into the handle
+                 */
+                ciHandle = setReadBit(ciHandle);
+                partitionStuff.m_reads.offer(inFlight);
+            } else {
+                partitionStuff.m_writes.offer(inFlight);
+            }
         }
+
         m_outstandingTxns++;
         m_acg.increaseBackpressure(messageSize);
         return ciHandle;
     }
+
+    private static boolean getReadBit(long handle) {
+        return (handle & READ_BIT) != 0;
+    }
+
+    private static long unsetReadBit(long handle) {
+        return handle & ~READ_BIT;
+    }
+
+    private static long setReadBit(long handle) {
+        return (handle |= READ_BIT);
+    }
+
 
     /**
      * Retrieve the client information for the specified handle
      */
     Iv2InFlight findHandle(long ciHandle)
     {
+        //Check read only encoded bit
+        final boolean readOnly = getReadBit(ciHandle);
+        //Remove read only encoding so comparison works
+        ciHandle = unsetReadBit(ciHandle);
         assert(m_expectedThreadId == Thread.currentThread().getId());
 
         /*
@@ -218,16 +279,19 @@ public class ClientInterfaceHandleManager
             return inflight;
         }
 
+        /*
+         * Not a short circuit read, check the partition specific
+         * queue of handles
+         */
         int partitionId = getPartIdFromHandle(ciHandle);
-        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
             // whoa, bad
             tmLog.error("Unable to find handle list for partition: " + partitionId);
             return null;
         }
 
-        Deque<Iv2InFlight> perPartDeque = partitionStuff.getSecond();
-
+        final Deque<Iv2InFlight> perPartDeque = readOnly ? partitionStuff.m_reads : partitionStuff.m_writes;
         while (perPartDeque.peekFirst() != null) {
             Iv2InFlight inFlight = perPartDeque.pollFirst();
             if (inFlight.m_ciHandle < ciHandle) {
@@ -279,8 +343,12 @@ public class ClientInterfaceHandleManager
      */
     void freeOutstandingTxns() {
         assert(m_expectedThreadId == Thread.currentThread().getId());
-        for (Pair<HandleGenerator, Deque<Iv2InFlight>> p : m_partitionStuff.values()) {
-            for (Iv2InFlight inflight : p.getSecond()) {
+        for (PartitionData pd : m_partitionStuff.values()) {
+            for (Iv2InFlight inflight : pd.m_reads) {
+                m_outstandingTxns--;
+                m_acg.reduceBackpressure(inflight.m_messageSize);
+            }
+            for (Iv2InFlight inflight : pd.m_writes) {
                 m_outstandingTxns--;
                 m_acg.reduceBackpressure(inflight.m_messageSize);
             }
@@ -289,5 +357,45 @@ public class ClientInterfaceHandleManager
             m_outstandingTxns--;
             m_acg.reduceBackpressure(inflight.m_messageSize);
         }
+    }
+
+    List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
+            Long initiatorHSId) {
+        assert(m_expectedThreadId == Thread.currentThread().getId());
+        List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
+
+        if (!m_partitionStuff.containsKey(partitionId)) return retval;
+
+        /*
+         * First clear the pending reads
+         */
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
+        Deque<Iv2InFlight> inFlight = partitionStuff.m_reads;
+        Iterator<Iv2InFlight> i = inFlight.iterator();
+        while (i.hasNext()) {
+            Iv2InFlight entry = i.next();
+            if (entry.m_initiatorHSId != initiatorHSId) {
+                i.remove();
+                retval.add(entry);
+                m_outstandingTxns--;
+                m_acg.reduceBackpressure(entry.m_messageSize);
+            }
+        }
+
+        /*
+         * Then clear the pending writes
+         */
+        inFlight = partitionStuff.m_writes;
+        i = inFlight.iterator();
+        while (i.hasNext()) {
+            Iv2InFlight entry = i.next();
+            if (entry.m_initiatorHSId != initiatorHSId) {
+                i.remove();
+                retval.add(entry);
+                m_outstandingTxns--;
+                m_acg.reduceBackpressure(entry.m_messageSize);
+            }
+        }
+        return retval;
     }
 }

@@ -20,10 +20,16 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
+
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
@@ -42,6 +48,9 @@ public abstract class BaseInitiator implements Initiator
 {
     VoltLogger tmLog = new VoltLogger("TM");
 
+    public static final String JSON_PARTITION_ID = "partitionId";
+    public static final String JSON_INITIATOR_HSID = "initiatorHSId";
+
     // External references/config
     protected final HostMessenger m_messenger;
     protected final int m_partitionId;
@@ -55,6 +64,7 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
+    private final TickProducer m_tickProducer;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
@@ -72,12 +82,15 @@ public abstract class BaseInitiator implements Initiator
                 m_repairLog,
                 rejoinProducer);
 
+        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
+
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
         rejoinProducer.setMailbox(m_initiatorMailbox);
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
+        m_scheduler.setLock(m_initiatorMailbox);
         agent.registerStatsSource(SysProcSelector.STARVATION,
                                   getInitiatorHSId(),
                                   st);
@@ -88,6 +101,14 @@ public abstract class BaseInitiator implements Initiator
         }
         m_whoami = whoamiPrefix +  " " +
             CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
+    }
+
+    private boolean isExportEnabled(CatalogContext catalogContext)
+    {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        final Connector conn= db.getConnectors().get("0");
+        return (conn != null && conn.getEnabled() == true);
     }
 
     protected void configureCommon(BackendTarget backend, String serializedCatalog,
@@ -103,6 +124,7 @@ public abstract class BaseInitiator implements Initiator
                 snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
                     getSystemsettings().get("systemsettings").getSnapshotpriority();
             }
+
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -125,6 +147,10 @@ public abstract class BaseInitiator implements Initiator
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);
+
+            if (isExportEnabled(catalogContext)) {
+                m_tickProducer.start();
+            }
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
@@ -166,5 +192,21 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
+    }
+
+    protected void acceptPromotion() throws Exception {
+        /*
+         * Notify all known client interfaces that the mastership has changed
+         * for the specified partition and that no responses from previous masters will be forthcoming
+         */
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        stringer.key(JSON_PARTITION_ID).value(m_partitionId);
+        stringer.key(JSON_INITIATOR_HSID).value(m_initiatorMailbox.getHSId());
+        stringer.endObject();
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
+        for (Integer hostId : m_messenger.getLiveHostIds()) {
+            m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), bpm);
+        }
     }
 }
