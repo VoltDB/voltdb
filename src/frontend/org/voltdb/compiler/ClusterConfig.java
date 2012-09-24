@@ -460,9 +460,9 @@ public class ClusterConfig
 
         boolean useFallbackStrategy = Boolean.valueOf(System.getenv("VOLT_REPLICA_FALLBACK"));
         if (sitesPerHost * hostCount % partitionCount > 0 || partitionCount < hostCount) {
-            hostLog.warn("Unable to use to new replica placement strategy with this configuration. " +
-                    " Falling back to old strategy. " +
-                    " Performance may be worse. Try using an even number of sites per host");
+            hostLog.warn("Unable to use optimal replica placement strategy with this configuration. " +
+                    " Falling back to a less optimal strategy that may result in worse performance. " +
+                    " Try using an even number of sites per host.");
             useFallbackStrategy = true;
         }
 
@@ -473,7 +473,8 @@ public class ClusterConfig
             try {
                 topo = newPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
             } catch (Exception e) {
-                hostLog.error("Error using new replica placement strategy, falling back to old one", e);
+                hostLog.error("Unable to use optimal replica placement strategy. " +
+                              "Falling back to a less optimal strategy that may result in worse performance");
                 topo = fallbackPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
             }
         }
