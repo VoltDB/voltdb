@@ -28,7 +28,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -36,11 +35,9 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
-
-import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
-
+import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CompressionService;
 
 /**
@@ -54,6 +51,11 @@ public class StatsAgent {
     private static final byte STATS_PAYLOAD = 1;
     private static final int MAX_IN_FLIGHT_REQUESTS = 5;
     static int STATS_COLLECTION_TIMEOUT = 60 * 1000;
+
+    // The id that responds to global requests (catalog id == -1).
+    // Start at -1 until a winner is chosen.
+    // Updated in synchronized getStats() method.
+    private static Long m_idForGlobalStats = null;
 
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
@@ -94,6 +96,7 @@ public class StatsAgent {
             registeredStatsSources.put(selectors[ii], new HashMap<Long, ArrayList<StatsSource>>());
         }
         handledSelectors.add(SysProcSelector.PROCEDURE);
+        handledSelectors.add(SysProcSelector.PLANNER);
     }
 
     public void getMailbox(final HostMessenger hostMessenger, final long hsId) {
@@ -377,11 +380,75 @@ public class StatsAgent {
         statsSources.add(source);
     }
 
+    /**
+     * Get statistics.
+     * @param selector    @Statistics selector keyword
+     * @param catalogIds  statistics catalog ids
+     * @param interval    true if processing a reporting interval
+     * @param now         current timestamp
+     * @return  statistics VoltTable results
+     */
     public synchronized VoltTable getStats(
             final SysProcSelector selector,
             final List<Long> catalogIds,
             final boolean interval,
             final Long now) {
+        return getStatsInternal(selector, catalogIds, interval, now, null);
+    }
+
+    /**
+     * Get statistics once for global stats, e.g. PLANNER. Chooses an arbitrary site
+     * as the one that triggers retrievals.
+     * @param selector  statistics selector keyword
+     * @param interval  true if processing a reporting interval
+     * @param now       current timestamp
+     * @param siteId    siteId for catalog
+     * @return  statistics VoltTable results
+     */
+    public synchronized VoltTable getSiteAndHostStats(
+            final SysProcSelector selector,
+            final boolean interval,
+            final Long now,
+            final long siteId) {
+        // If it's the first site make it the chosen site for host-global statistics.
+        if (m_idForGlobalStats == null) {
+            m_idForGlobalStats = siteId;
+        }
+
+        // First get the site-specific statistics.
+        VoltTable results;
+        {
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(siteId);
+            results = getStatsInternal(selector, catalogIds, interval, now, null);
+        }
+
+        // Then append global results if it's the chosen site.
+        if (siteId == m_idForGlobalStats) {
+            // -1 is always the global catalog id.
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(-1L);
+            results = getStatsInternal(selector, catalogIds, interval, now, results);
+        }
+
+        return results;
+    }
+
+    /**
+     * Internal statistics retrieval. Optionally append results to an existing
+     * result set. This is used by getSiteAndHostStats() for PLANNER statistics.
+     * @param selector     statistics selector keyword
+     * @param interval     true if processing a reporting interval
+     * @param now          current timestamp
+     * @param prevResults  previous results, if any, to append to
+     * @return  statistics VoltTable results
+     */
+    private synchronized VoltTable getStatsInternal(
+            final SysProcSelector selector,
+            final List<Long> catalogIds,
+            final boolean interval,
+            final Long now,
+            VoltTable prevResults) {
         assert selector != null;
         assert catalogIds != null;
         assert catalogIds.size() > 0;
@@ -395,7 +462,7 @@ public class StatsAgent {
                 return null;
             }
         } else {
-            assert statsSources != null && statsSources.size() > 0;
+            assert statsSources != null && !statsSources.isEmpty();
         }
 
         /*
@@ -415,7 +482,9 @@ public class StatsAgent {
                 columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
                                                       table.getColumnType(i));
         }
-        final VoltTable resultTable = new VoltTable(columns);
+
+         // Append to previous results if provided.
+        final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
 
         for (Long catalogId : catalogIds) {
             statsSources = catalogIdToStatsSources.get(catalogId);

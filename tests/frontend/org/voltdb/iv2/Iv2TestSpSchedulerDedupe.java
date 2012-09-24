@@ -243,7 +243,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
         dut.updateReplicas(replicas);
-        FragmentTaskMessage sptask = createFrag(txnid, true, primary_hsid);
+        FragmentTaskMessage sptask = createFrag(txnid, false, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());

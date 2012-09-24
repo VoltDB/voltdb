@@ -21,6 +21,10 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterSet;
+import org.voltdb.PlannerStatsCollector;
+import org.voltdb.StatsAgent;
+import org.voltdb.SysProcSelector;
+import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -45,6 +49,7 @@ public class PlannerTool {
     final HSQLInterface m_hsql;
     final int m_catalogVersion;
     final AdHocCompilerCache m_cache;
+    static PlannerStatsCollector m_plannerStats;
 
     public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
@@ -77,105 +82,137 @@ public class PlannerTool {
         }
 
         hostLog.info("hsql loaded");
+
+        // Create and register a singleton planner stats collector, if this is the first time.
+        // In mock test environments there may be no stats agent.
+        synchronized (this) {
+            if (m_plannerStats == null) {
+                final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
+                if (statsAgent != null) {
+                    m_plannerStats = new PlannerStatsCollector(-1);
+                    statsAgent.registerStatsSource(SysProcSelector.PLANNER, -1, m_plannerStats);
+                }
+            }
+        }
     }
 
     public AdHocPlannedStatement planSql(String sqlIn, Object partitionParam, boolean inferSP, boolean allowParameterization) {
-        if ((sqlIn == null) || (sqlIn.length() == 0)) {
-            throw new RuntimeException("Can't plan empty or null SQL.");
+        CacheUse cacheUse = CacheUse.FAIL;
+        if (m_plannerStats != null) {
+            m_plannerStats.startStatsCollection();
         }
-        // remove any spaces or newlines
-        String sql = sqlIn.trim();
-
-        hostLog.debug("received sql stmt: " + sql);
-
-        // no caching for forced single or forced multi SQL
-        boolean cacheable = (partitionParam == null) && (inferSP);
-
-        // check the literal cache for a match
-        if (cacheable) {
-            AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
-            if (cachedPlan != null) {
-                return cachedPlan;
-            }
-        }
-
-        //Reset plan node id counter
-        AbstractPlanNode.resetPlanNodeIds();
-
-        //////////////////////
-        // PLAN THE STMT
-        //////////////////////
-
-        TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
-        QueryPlanner planner = new QueryPlanner(
-                sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-                partitioning, m_hsql, new DatabaseEstimates(), true,
-                AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null);
-        CompiledPlan plan = null;
-        String parsedToken = null;
         try {
-            planner.parse();
-            parsedToken = planner.parameterize();
-            if (parsedToken != null) {
-
-                // if cacheable, check the cache for a matching pre-parameterized plan
-                // if plan found, build the full plan using the parameter data in the
-                // QueryPlanner.
-                if (cacheable) {
-                    CorePlan core = m_cache.getWithParsedToken(parsedToken);
-                    if (core != null) {
-                        ParameterSet params = new ParameterSet();
-                        planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                                core.parameterTypes, params);
-                        Object partitionKey = null;
-                        if (core.partitioningParamIndex >= 0) {
-                            partitionKey = params.toArray()[core.partitioningParamIndex];
-                        }
-                        AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(VoltDB.UTF8ENCODING),
-                                                                               core,
-                                                                               params,
-                                                                               partitionKey);
-                        m_cache.put(sql, parsedToken, ahps);
-                        return ahps;
-                    }
-                }
-
-                // if not cacheable or no cach hit, do the expensive full planning
-                plan = planner.plan();
-                assert(plan != null);
+            if ((sqlIn == null) || (sqlIn.length() == 0)) {
+                throw new RuntimeException("Can't plan empty or null SQL.");
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
+            // remove any spaces or newlines
+            String sql = sqlIn.trim();
+
+            hostLog.debug("received sql stmt: " + sql);
+
+            // no caching for forced single or forced multi SQL
+            boolean cacheable = (partitionParam == null) && (inferSP);
+
+            // check the literal cache for a match
+            if (cacheable) {
+                AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
+                if (cachedPlan != null) {
+                    cacheUse = CacheUse.HIT1;
+                    return cachedPlan;
+                }
+                else {
+                    cacheUse = CacheUse.MISS;
+                }
+            }
+
+            //Reset plan node id counter
+            AbstractPlanNode.resetPlanNodeIds();
+
+            //////////////////////
+            // PLAN THE STMT
+            //////////////////////
+
+            TrivialCostModel costModel = new TrivialCostModel();
+            PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
+            QueryPlanner planner = new QueryPlanner(
+                    sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
+                    partitioning, m_hsql, new DatabaseEstimates(), true,
+                    AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null);
+            CompiledPlan plan = null;
+            String parsedToken = null;
+            try {
+                planner.parse();
+                parsedToken = planner.parameterize();
+                if (parsedToken != null) {
+
+                    // if cacheable, check the cache for a matching pre-parameterized plan
+                    // if plan found, build the full plan using the parameter data in the
+                    // QueryPlanner.
+                    if (cacheable) {
+                        CorePlan core = m_cache.getWithParsedToken(parsedToken);
+                        if (core != null) {
+                            ParameterSet params = new ParameterSet();
+                            planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
+                                    core.parameterTypes, params);
+                            Object partitionKey = null;
+                            if (core.partitioningParamIndex >= 0) {
+                                partitionKey = params.toArray()[core.partitioningParamIndex];
+                            }
+                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(VoltDB.UTF8ENCODING),
+                                                                                   core,
+                                                                                   params,
+                                                                                   partitionKey);
+                            m_cache.put(sql, parsedToken, ahps);
+                            cacheUse = CacheUse.HIT2;
+                            return ahps;
+                        }
+                    }
+
+                    // if not cacheable or no cach hit, do the expensive full planning
+                    plan = planner.plan();
+                    assert(plan != null);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
+            }
+
+            if (plan == null) {
+                throw new RuntimeException("Null plan received in PlannerTool.planSql");
+            }
+
+            if (!allowParameterization &&
+                (plan.extractedParamValues.size() == 0) &&
+                (plan.parameters.length > 0))
+            {
+                throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
+            }
+
+            if (plan.isContentDeterministic() == false) {
+                String potentialErrMsg =
+                    "Statement has a non-deterministic result - statement: \"" +
+                    sql + "\" , reason: " + plan.nondeterminismDetail();
+                // throw new RuntimeException(potentialErrMsg);
+                hostLog.warn(potentialErrMsg);
+            }
+
+            //////////////////////
+            // OUTPUT THE RESULT
+            //////////////////////
+
+            AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, m_catalogVersion);
+
+            if (cacheable && planner.compiledAsParameterizedPlan()) {
+                assert(parsedToken != null);
+                assert(((ahps.partitionParam == null) && (ahps.core.partitioningParamIndex == -1)) ||
+                       ((ahps.partitionParam != null) && (ahps.core.partitioningParamIndex >= 0)));
+                m_cache.put(sqlIn, parsedToken, ahps);
+            }
+            return ahps;
         }
-
-        if (!allowParameterization &&
-            (plan.extractedParamValues.size() == 0) &&
-            (plan.parameters.length > 0))
-        {
-            throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
+        finally {
+            if (m_plannerStats != null) {
+                m_plannerStats.endStatsCollection(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
+            }
         }
-
-        if (plan.isContentDeterministic() == false) {
-            String potentialErrMsg =
-                "Statement has a non-deterministic result - statement: \"" +
-                sql + "\" , reason: " + plan.nondeterminismDetail();
-            // throw new RuntimeException(potentialErrMsg);
-            hostLog.warn(potentialErrMsg);
-        }
-
-        //////////////////////
-        // OUTPUT THE RESULT
-        //////////////////////
-
-        AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, m_catalogVersion);
-
-        if (cacheable && planner.compiledAsParameterizedPlan()) {
-            assert(parsedToken != null);
-            assert(((ahps.partitionParam == null) && (ahps.core.partitioningParamIndex == -1)) ||
-                   ((ahps.partitionParam != null) && (ahps.core.partitioningParamIndex >= 0)));
-            m_cache.put(sqlIn, parsedToken, ahps);
-        }
-        return ahps;
     }
 }

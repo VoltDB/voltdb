@@ -375,9 +375,14 @@ public class SpScheduler extends Scheduler
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
                 msg.setInitiateTask(msg.getInitiateTask());//Trigger reserialization so the new handle is used
             }
-            // If we have input dependencies, it's borrow work, there's no way we
-            // can actually distribute it
-            if (m_sendToHSIds.size() > 0) {
+
+            /*
+             * If there a replicas to send it to, forward it!
+             * Unless... it's read only AND not a sysproc. Read only sysprocs may expect to be sent
+             * everywhere.
+             * In that case don't propagate it to avoid a determinism check and extra messaging overhead
+             */
+            if (m_sendToHSIds.size() > 0 && (!msg.isReadOnly() || msg.isSysProcTask())) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);

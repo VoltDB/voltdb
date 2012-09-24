@@ -187,9 +187,4 @@ public abstract class BaseInitiator implements Initiator
     {
         return m_initiatorMailbox.getHSId();
     }
-
-    @Override
-    public long getCurrentTxnId() {
-        return m_scheduler.getCurrentTxnId();
-    }
 }

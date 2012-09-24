@@ -82,8 +82,7 @@ public class TestExportToFileClient extends TestCase {
 
         String simpleSchema =
             "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "PRIMARY KEY(ival));";
+            "ival bigint default 0 not null);";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
@@ -157,6 +156,7 @@ public class TestExportToFileClient extends TestCase {
         other.join();
 
         cluster.shutDown();
+        Thread.sleep(5000);
 
         // compare the output files
         File[] filesToCompare = tmpdir.listFiles(filter);

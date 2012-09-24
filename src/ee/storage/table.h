@@ -221,12 +221,39 @@ class Table {
     // ------------------------------------------------------------------
     // INDEXES
     // ------------------------------------------------------------------
-    virtual int indexCount() const                      { return 0; }
-    virtual int uniqueIndexCount() const                { return 0; }
-    virtual std::vector<TableIndex*> allIndexes() const { return std::vector<TableIndex*>(); }
-    virtual TableIndex *index(std::string name)         { return NULL; }
-    virtual TableIndex *primaryKeyIndex()               { return NULL; }
-    virtual const TableIndex *primaryKeyIndex() const   { return NULL; }
+    virtual int indexCount() const {
+        return static_cast<int>(m_indexes.size());
+    }
+
+    virtual int uniqueIndexCount() const {
+        return static_cast<int>(m_uniqueIndexes.size());
+    }
+
+    virtual std::vector<TableIndex*> allIndexes() const {
+        std::vector<TableIndex*> retval;
+        retval.insert(retval.begin(), m_indexes.begin(), m_indexes.end());
+        return retval;
+    }
+
+    virtual TableIndex *index(std::string name);
+
+    virtual TableIndex *primaryKeyIndex() {
+        return m_pkeyIndex;
+    }
+    virtual const TableIndex *primaryKeyIndex() const {
+        return m_pkeyIndex;
+    }
+
+    void configureIndexStats(CatalogId hostId,
+                             std::string hostname,
+                             int64_t siteId,
+                             CatalogId partitionId,
+                             CatalogId databaseId);
+
+    // mutating indexes
+    virtual void addIndex(TableIndex *index);
+    virtual void removeIndex(TableIndex *index);
+    virtual void setPrimaryKeyIndex(TableIndex *index);
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -399,6 +426,11 @@ protected:
 
     const int m_tableAllocationTargetSize;
     int m_tableAllocationSize;
+
+    // indexes
+    std::vector<TableIndex*> m_indexes;
+    std::vector<TableIndex*> m_uniqueIndexes;
+    TableIndex *m_pkeyIndex;
 
   private:
     int32_t m_refcount;
