@@ -95,6 +95,19 @@ public class TransactionTaskQueue
             deque = new ArrayDeque<TransactionTask>();
         }
 
+        /*
+         * Disregard of the nullness of m_multiPartPendingSentinelReceipt, if
+         * there is a MP in progress, always stash the DR sentinel. flush() will
+         * replay the sentinel when the current MP finishes.
+         */
+        if (!m_multipartBacklog.isEmpty() && m_multipartBacklog.firstKey() == txnId) {
+            // Put the DR sentinel into the backlog
+            assert(txnId == GENERIC_MP_SENTINEL);
+            assert(backlog == null);
+            m_drMPSentinelBacklog.offer(new ArrayDeque<TransactionTask>());
+            return;
+        }
+
         if (m_multiPartPendingSentinelReceipt != null) {
             boolean mismatch = false;
             if (txnId == GENERIC_MP_SENTINEL) {
@@ -124,19 +137,13 @@ public class TransactionTaskQueue
             m_multipartBacklog.put(txnId, deque);
             taskQueueOffer(ts);
         } else {
-            if (!m_multipartBacklog.isEmpty() && m_multipartBacklog.firstKey() == txnId) {
-                // Put the DR sentinel into the backlog
-                assert(txnId == GENERIC_MP_SENTINEL);
-                m_drMPSentinelBacklog.offer(new ArrayDeque<TransactionTask>());
-            } else {
-                /*
-                 * The sentinel has arrived, but not the fragment. Stash it away
-                 * and wait for the fragment. The presence of this handle
-                 * pairing indicates that execution of the single part stream
-                 * must block until the multi-part is satisfied
-                 */
-                m_multipartBacklog.put(txnId, deque);
-            }
+            /*
+             * The sentinel has arrived, but not the fragment. Stash it away
+             * and wait for the fragment. The presence of this handle
+             * pairing indicates that execution of the single part stream
+             * must block until the multi-part is satisfied
+             */
+            m_multipartBacklog.put(txnId, deque);
         }
     }
 
