@@ -1004,7 +1004,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
             }
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    messageSize, now, invocation.getProcName(), initiatorHSId);
+                    messageSize, now, invocation.getProcName(), initiatorHSId, isReadOnly);
 
             Iv2InitiateTaskMessage workRequest =
                 new Iv2InitiateTaskMessage(m_siteId,
