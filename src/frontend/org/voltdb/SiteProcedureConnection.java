@@ -141,6 +141,8 @@ public interface SiteProcedureConnection {
 
     public void toggleProfiler(int toggle);
 
+    public void tick();
+
     public void quiesce();
 
     public void exportAction(boolean syncAction,

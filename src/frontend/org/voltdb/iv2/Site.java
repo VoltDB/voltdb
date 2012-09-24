@@ -603,6 +603,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public void tick()
+    {
+        m_ee.tick(System.currentTimeMillis(), m_lastCommittedTxnId);
+    }
+
+    @Override
     public void quiesce()
     {
         m_ee.quiesce(m_lastCommittedTxnId);
