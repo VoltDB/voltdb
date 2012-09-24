@@ -30,11 +30,13 @@ import sys
 import os
 from glob import glob
 from optparse import OptionParser
+from zipfile import ZipFile
 import tempfile
 import shutil
 import subprocess
 import pwd
 import grp
+import re
 from copy import copy
 
 myname = os.path.splitext(os.path.basename(__file__))[0]
@@ -184,20 +186,16 @@ def fix_ownership(path):
 
 class Metadata:
     def __init__(self, options, args):
-        self.volt_root = None
-        self.options   = options
-        self.args      = args
-    def initialize(self, volt_root, deb_build_root, deb_output_root, clean_up_items):
+        self.volt_root   = None
+        self.options     = options
+        self.args        = args
+        self.re_volt_jar = re.compile('^voltdb-[0-9.]+[.]jar$')
+    def initialize(self, version, volt_root, build_root, output_root, clean_up_items):
+        self.version         = version
         self.volt_root       = volt_root
-        self.deb_build_root  = deb_build_root
-        self.deb_output_root = deb_output_root
+        self.build_root  = build_root
+        self.output_root = output_root
         self.clean_up_items  = clean_up_items
-        # Get the version number.
-        myroot    = find_volt_root(os.path.realpath(__file__))
-        self.version = None
-        with open(os.path.join(myroot, 'version.txt')) as f:
-            self.version = f.readline().strip()
-        assert self.version is not None
         # Detect and configure for community vs. pro edition.
         if os.path.exists(os.path.join(self.volt_root, 'README.thirdparty.ent')):
             self.edition = 'voltdb-ent'
@@ -431,14 +429,14 @@ def debian():
     with ChDir(meta.volt_root):
 
         ### Preparation
-        blddir  = os.path.join(meta.deb_build_root, 'build')
-        debdir  = os.path.join(blddir, 'DEBIAN')
+        blddir = os.path.join(meta.build_root, 'build')
+        debdir = os.path.join(blddir, 'DEBIAN')
         meta.options.prefix = blddir
-        if os.path.exists(meta.deb_build_root):
-            info('Removing existing output directory "%s"...' % meta.deb_build_root)
+        if os.path.exists(meta.build_root):
+            info('Removing existing output directory "%s"...' % meta.build_root)
             if not meta.options.dryrun:
-                fix_ownership(meta.deb_build_root)
-                shutil.rmtree(meta.deb_build_root)
+                fix_ownership(meta.build_root)
+                shutil.rmtree(meta.build_root)
 
         ### Installation
         install()
@@ -463,14 +461,14 @@ def debian():
             fout.write(meta.control_template % syms)
 
         ### Package creation
-        pkgfile = os.path.join(meta.deb_output_root,
+        pkgfile = os.path.join(meta.output_root,
                                '%(pkgname)s_%(pkgversion)s-%(pkgrelease)d_%(arch)s.deb' % syms)
         info('Creating Debian package "%s"...' % pkgfile)
         run_cmd('dpkg-deb', '-b', blddir, pkgfile)
 
         ### Cleanup
         # Change to non-root ownership of package build output.
-        fix_ownership(meta.deb_build_root)
+        fix_ownership(meta.build_root)
         if not meta.options.keep:
             info('Wiping build directory "%s"...' % blddir)
             shutil.rmtree(blddir)
@@ -480,9 +478,9 @@ def debian():
 #### Clean package building output
 
 def clean():
-    info('Cleaning package building output in "%s"...' % meta.deb_build_root)
+    info('Cleaning package building output in "%s"...' % meta.build_root)
     if not meta.options.dryrun:
-        shutil.rmtree(meta.deb_build_root)
+        shutil.rmtree(meta.build_root)
 
 #### Extract distribution tarball
 
@@ -506,6 +504,54 @@ def extract_distribution(tarball):
         if len(subdirs) > 1:
             abort('Found %d voltdb* subdirectories in the distribution tarball.' % len(subdirs))
     return tmpdir, os.path.realpath(os.path.join(tmpdir, subdirs[0]))
+
+#### Get version number from a distribution directory
+
+def get_distribution_version(dist_dir):
+    glob_pat = os.path.join(dist_dir, 'voltdb', 'voltdb-*.jar')
+    jars = [jar for jar in glob(glob_pat)
+                if meta.re_volt_jar.match(os.path.basename(jar))]
+    if len(jars) == 0:
+        abort('Could not find "%s" matching pattern "%s".'
+                    % (glob_pat, re_volt_jar.pattern))
+    if len(jars) > 1:
+        abort('Found more than one "%s" matching pattern "%s".'
+                    % (glob_pat, re_volt_jar.pattern))
+    # Read buildstring.txt from the jar file.
+    version = None
+    try:
+        info('Reading buildstring.txt from "%s"...' % jars[0])
+        with ZipFile(jars[0]) as zip:
+            with zip.open('buildstring.txt') as f:
+                version = f.readline().strip().split()[0]
+            assert version is not None
+    except (IOError, OSError, KeyError), e:
+        abort('Error reading buildstring.txt from "%s".' % jars[0], e)
+    return version
+
+#### Get the version number from a source tree
+
+def get_source_version(source_root):
+    try:
+        with open(os.path.join(source_root, 'version.txt')) as f:
+            version = f.readline().strip()
+    except (IOError, OSError), e:
+        abort('Error reading version.txt from "%s".' % source_root, e)
+    assert version is not None
+    return version
+
+#### Get the output root directory, e.g. for produced packages
+
+def get_output_root():
+    if not meta.options.output:
+        return os.getcwd()
+    output_root = meta.options.output
+    if not os.path.exists(output_root):
+        try:
+            os.makedirs(output_root)
+        except (IOError, OSError), e:
+            abort('Error creating output directory "%s".' % output_root, e)
+    return output_root
 
 #### Command line main
 
@@ -534,6 +580,8 @@ that tarball instead of the working directory.''')
                       help = "keep (don't delete) temporary directories")
     parser.add_option('-n', '--dry-run', action = 'store_true', dest = 'dryrun',
                       help = 'perform dry run without executing actions')
+    parser.add_option('-o', '--output', type = 'string', dest = 'output',
+                      help = 'create package in the specified output directory')
     parser.add_option('-p', '--prefix', type = 'string', dest = 'prefix', default = '/',
                       help = 'specify prefix directory for installation target (default=/)')
     parser.add_option('-u', '--uninstall', action = 'store_true', dest = 'uninstall',
@@ -554,20 +602,24 @@ that tarball instead of the working directory.''')
     # Configure debian package building as needed.
     meta = Metadata(options, args)
     clean_up_items = []
+    version = None
     if len(args) == 1:
         tmpdir, volt_root = extract_distribution(args[0])
+        output_root = get_output_root()
+        version = get_distribution_version(volt_root)
         clean_up_items.append(tmpdir)
         if meta.options.debian:
-            deb_build_root  = tempfile.mkdtemp(prefix = '%s_' % myname, suffix = '_deb')
-            deb_output_root = os.getcwd()
-            clean_up_items.append(deb_build_root)
+            build_root  = tempfile.mkdtemp(prefix = '%s_' % myname, suffix = '_deb')
+            clean_up_items.append(build_root)
         else:
-            deb_build_root = deb_output_root = None
+            build_root = None
     else:
-        volt_root       = find_volt_root(os.getcwd())
-        deb_build_root  = os.path.join(volt_root, 'obj', 'debian')
-        deb_output_root = deb_build_root
-    meta.initialize(volt_root, deb_build_root, deb_output_root, clean_up_items)
+        source_root  = find_volt_root(os.path.realpath(__file__))
+        version      = get_source_version(source_root)
+        volt_root    = find_volt_root(os.getcwd())
+        build_root   = os.path.join(volt_root, 'obj', 'debian')
+        output_root  = build_root
+    meta.initialize(version, volt_root, build_root, output_root, clean_up_items)
 
     # Perform selected actions.
     try:
