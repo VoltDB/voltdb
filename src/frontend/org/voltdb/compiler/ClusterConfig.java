@@ -159,13 +159,6 @@ public class ClusterConfig
         }
 
         public boolean canUseAsReplica(Node n) {
-//            if (!needsReplicas()) {
-//                System.out.println("Partition " + m_partitionId + " doesn't need replicas");
-//            } else if (m_master == n) {
-//                System.out.println("Partition " + m_partitionId + " is already mastered by this node");
-//            } else if (m_replicas.contains(n)) {
-//                System.out.println("Partition " + m_partitionId + " is already replicated by this node");
-//            }
             return needsReplicas() && m_master != n && !m_replicas.contains(n);
         }
 
@@ -328,18 +321,6 @@ public class ClusterConfig
             Collections.sort(e.getValue());
         }
 
-        // {"kfactor" : 2,
-        //  "sites_per_host" : 3,
-        //  "partitions" :
-        //    [{"partition_id" : 0,
-        //      "master" : <hostid1>,
-        //      "replicas" : [hostid1, hostid2, hostid3]},
-        //     {"partition_id" : 1,
-        //      "master" : <hostid2>,
-        //      "replicas" : [hostid1, hostid2, hostid3]}
-        //    ]
-        // }
-
         JSONStringer stringer = new JSONStringer();
         stringer.object();
         stringer.key("hostcount").value(m_hostCount);
@@ -422,18 +403,6 @@ public class ClusterConfig
                         break;
                     }
                 }
-                //In some odd configurations this will be null and the new placement strategy will fail
-//                if (partitionToUse == null) {
-//                    System.out.println("Failed on " + n.m_hostId);
-//                    System.out.println("Oops");
-//                    for (Node n2 : nodes) {
-//                        System.out.println(n2);
-//                        System.out.println("Replicates " + n2.partitionCount());
-//                    }
-//                    for (Partition p2 : partitions) {
-//                        System.out.println("Partition " + p2.m_partitionId + " has " + (1 + p2.m_replicas.size()) + " replicas");
-//                    }
-//                }
                 Set<Partition> replicatedPartitions = partitionToUse.m_master.m_replicationConnections.get(n);
                 replicatedPartitions.add(partitionToUse);
                 partitionToUse.m_replicas.add(n);
@@ -473,9 +442,6 @@ public class ClusterConfig
         stringer.endArray();
         stringer.endObject();
 
-//        for (Node n : nodes) {
-//            System.out.println(n);
-//        }
         JSONObject topo = new JSONObject(stringer.toString());
         return topo;
     }
@@ -521,18 +487,4 @@ public class ClusterConfig
     private final int m_replicationFactor;
 
     private String m_errorMsg;
-
-    public static void main(String args[]) throws Exception {
-        //int hostCount = 3;
-        for (int hostCount = 2; hostCount < 100; hostCount++) {
-            System.out.println("Host count " + hostCount);
-            List<Integer> hosts = new ArrayList<Integer>();
-            for (int ii = 0; ii < hostCount; ii++) {
-                hosts.add(ii);
-            }
-
-            new ClusterConfig(hostCount, 2, 1).getTopology(hosts).toString(4);
-            //System.out.println(new ClusterConfig(hostCount, 6, 1).getTopology(hosts).toString(4));
-        }
-    }
 }
