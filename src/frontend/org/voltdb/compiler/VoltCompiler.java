@@ -1239,7 +1239,7 @@ public class VoltCompiler {
                 }
                 if (tableref.getIndexes().size() > 0) {
                     compilerLog.error("While configuring export, table " + tablename + " has indexes defined. " +
-                            "Export tables can't have indexes.");
+                            "Export tables can't have indexes (including primary keys).");
                     throw new VoltCompilerException("Table with indexes configured as an export table");
                 }
                 if (tableref.getIsreplicated()) {
