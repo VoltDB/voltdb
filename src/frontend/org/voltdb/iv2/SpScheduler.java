@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import java.util.Map.Entry;
 
@@ -145,6 +146,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
+        if (m_drGateway != null) {
+            // Schedules to be fired every 5ms
+            VoltDB.instance().scheduleWork(new Runnable() {
+                @Override
+                public void run() {
+                    // Send a DR task to the site
+                    m_tasks.offer(new DRTask(m_drGateway));
+                }
+            }, 0, 5, TimeUnit.MILLISECONDS);
+        }
     }
 
     @Override
