@@ -28,6 +28,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 
 import org.voltdb.CatalogContext;
+
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
@@ -288,10 +290,31 @@ public class ExportGeneration {
         VoltFile.recursivelyDelete(m_directory);
     }
 
-    public void truncateExportToTxnId(long txnId) {
+    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
+        // create an easy partitionId:txnId lookup.
+        HashMap<Long, Long> partitionToTxnId = new HashMap<Long, Long>();
+        for (long tid : perPartitionTxnIds) {
+            partitionToTxnId.put(TxnEgo.getPartitionId(tid), tid);
+        }
+
+        // pre-iv2, the truncation point is the snapshot transaction id.
+        // In iv2, truncation at the per-partition txn id recorded in the snapshot.
         for (HashMap<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : dataSources.values()) {
-                source.truncateExportToTxnId(txnId);
+                if (VoltDB.instance().isIV2Enabled()) {
+                    Long truncationPoint = partitionToTxnId.get(source.getPartitionId());
+                    if (truncationPoint == null) {
+                        exportLog.error("Snapshot " + txnId +
+                                " does not include truncation point for partition " +
+                                source.getPartitionId());
+                    }
+                    else {
+                        source.truncateExportToTxnId(truncationPoint);
+                    }
+                }
+                else {
+                    source.truncateExportToTxnId(txnId);
+                }
             }
         }
     }
