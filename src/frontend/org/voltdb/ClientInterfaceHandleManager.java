@@ -24,7 +24,6 @@ import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
-import org.voltcore.utils.Pair;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -41,10 +40,11 @@ public class ClientInterfaceHandleManager
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
+    static final long READ_BIT = 1L << 63;
     static final int PART_ID_BITS = 14;
     static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
-    static final int PART_ID_SHIFT = 50;
-    static final int SEQNUM_MAX = (1 << PART_ID_SHIFT) - 1;
+    static final int PART_ID_SHIFT = 49;
+    static final long SEQNUM_MAX = (1L << PART_ID_SHIFT) - 1L;
 
     private long m_outstandingTxns;
     public final boolean isAdmin;
@@ -104,8 +104,18 @@ public class ClientInterfaceHandleManager
         }
     }
 
-    private ImmutableMap<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>> m_partitionStuff =
-            new Builder<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>>().build();
+    static class PartitionData {
+        private final HandleGenerator m_generator;
+        private final Deque<Iv2InFlight> m_reads = new ArrayDeque<Iv2InFlight>();
+        private final Deque<Iv2InFlight> m_writes = new ArrayDeque<Iv2InFlight>();
+
+        private PartitionData(int partitionId) {
+            m_generator = new HandleGenerator(partitionId);
+        }
+    }
+
+    private ImmutableMap<Integer, PartitionData> m_partitionStuff =
+            new Builder<Integer, PartitionData>().build();
 
     ClientInterfaceHandleManager(boolean isAdmin, Connection connection, AdmissionControlGroup acg)
     {
@@ -125,9 +135,9 @@ public class ClientInterfaceHandleManager
         return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
             @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
-                    long clientHandle, int messageSize, long creationTime, String procName) {
+                    long clientHandle, int messageSize, long creationTime, String procName, boolean readOnly) {
                 return super.getHandle(isSinglePartition, partitionId,
-                        clientHandle, messageSize, creationTime, procName);
+                        clientHandle, messageSize, creationTime, procName, readOnly);
             }
             @Override
             synchronized boolean removeHandle(long ciHandle) {
@@ -161,33 +171,51 @@ public class ClientInterfaceHandleManager
             long clientHandle,
             int messageSize,
             long creationTime,
-            String procName)
+            String procName,
+            boolean readOnly)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
         }
-        HandleGenerator generator;
-        Deque<Iv2InFlight> perPartDeque;
-        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
+
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
-            perPartDeque = new ArrayDeque<Iv2InFlight>();
-            generator = new HandleGenerator(partitionId);
+            partitionStuff = new PartitionData(partitionId);
             m_partitionStuff =
-                    new Builder<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>>().
+                    new Builder<Integer, PartitionData>().
                         putAll(m_partitionStuff).
-                        put(partitionId, Pair.of(generator, perPartDeque)).build();
-        } else {
-            generator = partitionStuff.getFirst();
-            perPartDeque = partitionStuff.getSecond();
+                        put(partitionId, partitionStuff).build();
         }
-        long ciHandle = generator.getNextHandle();
+        long ciHandle = partitionStuff.m_generator.getNextHandle();
+
         Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName);
-        perPartDeque.addLast(inFlight);
+        if (readOnly) {
+            /*
+             * Encode the read only-ness into the handle
+             */
+            ciHandle = setReadBit(ciHandle);
+            partitionStuff.m_reads.offer(inFlight);
+        } else {
+            partitionStuff.m_writes.offer(inFlight);
+        }
         m_outstandingTxns++;
         m_acg.increaseBackpressure(messageSize);
         return ciHandle;
     }
+
+    private static boolean getReadBit(long handle) {
+        return (handle & READ_BIT) != 0;
+    }
+
+    private static long unsetReadBit(long handle) {
+        return handle & ~READ_BIT;
+    }
+
+    private static long setReadBit(long handle) {
+        return (handle |= READ_BIT);
+    }
+
 
     /**
      * Remove the specified handle from internal storage.  Used for the 'oops'
@@ -196,14 +224,17 @@ public class ClientInterfaceHandleManager
      */
     boolean removeHandle(long ciHandle)
     {
+        final boolean readOnly = getReadBit(ciHandle);
+        //Remove read only encoding so comparison works
+        ciHandle = unsetReadBit(ciHandle);
         assert(m_expectedThreadId == Thread.currentThread().getId());
         int partitionId = getPartIdFromHandle(ciHandle);
-        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
             return false;
         }
 
-        Deque<Iv2InFlight> perPartDeque = partitionStuff.getSecond();
+        Deque<Iv2InFlight> perPartDeque = readOnly ? partitionStuff.m_reads : partitionStuff.m_writes;
         Iterator<Iv2InFlight> iter = perPartDeque.iterator();
         while (iter.hasNext())
         {
@@ -226,15 +257,19 @@ public class ClientInterfaceHandleManager
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         int partitionId = getPartIdFromHandle(ciHandle);
-        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
             // whoa, bad
             tmLog.error("Unable to find handle list for partition: " + partitionId);
             return null;
         }
 
-        Deque<Iv2InFlight> perPartDeque = partitionStuff.getSecond();
+        //Check read only encoded bit
+        final boolean readOnly = getReadBit(ciHandle);
+        //Remove read only encoding so comparison works
+        ciHandle = unsetReadBit(ciHandle);
 
+        final Deque<Iv2InFlight> perPartDeque = readOnly ? partitionStuff.m_reads : partitionStuff.m_writes;
         while (perPartDeque.peekFirst() != null) {
             Iv2InFlight inFlight = perPartDeque.pollFirst();
             if (inFlight.m_ciHandle < ciHandle) {
@@ -286,8 +321,11 @@ public class ClientInterfaceHandleManager
      */
     void freeOutstandingTxns() {
         assert(m_expectedThreadId == Thread.currentThread().getId());
-        for (Pair<HandleGenerator, Deque<Iv2InFlight>> p : m_partitionStuff.values()) {
-            for (Iv2InFlight inflight : p.getSecond()) {
+        for (PartitionData pd : m_partitionStuff.values()) {
+            for (Iv2InFlight inflight : pd.m_reads) {
+                m_acg.reduceBackpressure(inflight.m_messageSize);
+            }
+            for (Iv2InFlight inflight : pd.m_writes) {
                 m_acg.reduceBackpressure(inflight.m_messageSize);
             }
         }
