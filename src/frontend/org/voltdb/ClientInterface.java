@@ -991,7 +991,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    messageSize, now, invocation.getProcName());
+                    messageSize, now, invocation.getProcName(), isReadOnly);
             Long initiatorHSId;
             if (isSinglePartition && !isEveryPartition) {
                 initiatorHSId = m_iv2Masters.get(partitions[0]);
