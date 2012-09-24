@@ -1200,7 +1200,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientResponseImpl response =
                     new ClientResponseImpl(
                             ClientResponseImpl.GRACEFUL_FAILURE,
-                            Byte.MIN_VALUE,
+                            ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                             null,
                             new VoltTable[0],
                             "Transaction dropped due to change in mastership. " +
@@ -1424,7 +1424,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientResponseImpl response =
                     new ClientResponseImpl(
                             ClientResponseImpl.SUCCESS,
-                            Byte.MIN_VALUE,
+                            ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                             null,
                             vt,
                             null);
@@ -1473,7 +1473,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         ClientResponseImpl response =
                 new ClientResponseImpl(
                         ClientResponseImpl.SUCCESS,
-                        Byte.MIN_VALUE,
+                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                         null,
                         vt,
                         null);

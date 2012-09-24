@@ -132,7 +132,7 @@ class Distributer {
                             if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
                                 ClientResponseImpl r = new ClientResponseImpl(
                                         ClientResponse.CONNECTION_TIMEOUT,
-                                        Byte.MIN_VALUE,
+                                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                                         "",
                                         new VoltTable[0],
                                         String.format("No response received in the allotted time (set to %d ms).",
