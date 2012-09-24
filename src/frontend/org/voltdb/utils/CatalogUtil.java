@@ -121,7 +121,7 @@ public abstract class CatalogUtil {
         byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
 
         if (null == serializedCatalogBytes) {
-            throw new IOException("Database catalog not found - please build your application using the current verison of VoltDB.");
+            throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
         }
 
         serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
@@ -129,19 +129,19 @@ public abstract class CatalogUtil {
         // Get Volt version string
         byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
         if (buildInfoBytes == null) {
-            throw new IOException("Catalog build information not found - please build your application using the current verison of VoltDB.");
+            throw new IOException("Catalog build information not found - please build your application using the current version of VoltDB.");
         }
         String buildInfo = new String(buildInfoBytes, "UTF-8");
         String[] buildInfoLines = buildInfo.split("\n");
         if (buildInfoLines.length != 5) {
-            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current verison of VoltDB.");
+            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current version of VoltDB.");
         }
         voltVersionString = buildInfoLines[0].trim();
 
         // Check if it's compatible
         if (!isCatalogCompatible(voltVersionString)) {
             throw new IOException("Catalog compiled with " + voltVersionString + " is not compatible with the current version of VoltDB (" +
-                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current verison of VoltDB.");
+                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current version of VoltDB.");
         }
 
         return serializedCatalog;
