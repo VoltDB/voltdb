@@ -270,7 +270,7 @@ public class StatsAgent {
         ClientResponseImpl response =
             new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
-                    Byte.MIN_VALUE,
+                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                     null,
                     new VoltTable[0], "Stats request hit sixty second timeout before all responses were received");
         response.setClientHandle(psr.clientData);
@@ -299,7 +299,7 @@ public class StatsAgent {
         }
 
         ClientResponseImpl response =
-            new ClientResponseImpl(statusCode, Byte.MIN_VALUE, null, responseTables, statusString);
+            new ClientResponseImpl(statusCode, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, responseTables, statusString);
         response.setClientHandle(request.clientData);
         ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf.putInt(buf.capacity() - 4);
