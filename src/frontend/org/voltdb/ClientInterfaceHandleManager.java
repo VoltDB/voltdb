@@ -19,8 +19,10 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
@@ -93,14 +95,16 @@ public class ClientInterfaceHandleManager
         final int m_messageSize;
         final long m_creationTime;
         final String m_procName;
+        final long m_initiatorHSId;
         Iv2InFlight(long ciHandle, long clientHandle,
-                int messageSize, long creationTime, String procName)
+                int messageSize, long creationTime, String procName, long initiatorHSId)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
             m_messageSize = messageSize;
             m_creationTime = creationTime;
             m_procName = procName;
+            m_initiatorHSId = initiatorHSId;
         }
     }
 
@@ -135,9 +139,9 @@ public class ClientInterfaceHandleManager
         return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
             @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
-                    long clientHandle, int messageSize, long creationTime, String procName, boolean readOnly) {
+                    long clientHandle, int messageSize, long creationTime, String procName, long initiatorHSId, boolean readOnly) {
                 return super.getHandle(isSinglePartition, partitionId,
-                        clientHandle, messageSize, creationTime, procName, readOnly);
+                        clientHandle, messageSize, creationTime, procName, initiatorHSId, readOnly);
             }
             @Override
             synchronized boolean removeHandle(long ciHandle) {
@@ -154,6 +158,12 @@ public class ClientInterfaceHandleManager
             @Override
             synchronized void freeOutstandingTxns() {
                 super.freeOutstandingTxns();
+            }
+
+            @Override
+            synchronized List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
+                    Long initiatorHSId) {
+                return super.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
             }
         };
     }
@@ -172,6 +182,7 @@ public class ClientInterfaceHandleManager
             int messageSize,
             long creationTime,
             String procName,
+            long initiatorHSId,
             boolean readOnly)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
@@ -187,9 +198,10 @@ public class ClientInterfaceHandleManager
                         putAll(m_partitionStuff).
                         put(partitionId, partitionStuff).build();
         }
+
         long ciHandle = partitionStuff.m_generator.getNextHandle();
 
-        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName);
+        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime, procName, initiatorHSId);
         if (readOnly) {
             /*
              * Encode the read only-ness into the handle
@@ -199,6 +211,7 @@ public class ClientInterfaceHandleManager
         } else {
             partitionStuff.m_writes.offer(inFlight);
         }
+
         m_outstandingTxns++;
         m_acg.increaseBackpressure(messageSize);
         return ciHandle;
@@ -329,5 +342,45 @@ public class ClientInterfaceHandleManager
                 m_acg.reduceBackpressure(inflight.m_messageSize);
             }
         }
+    }
+
+    List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
+            Long initiatorHSId) {
+        assert(m_expectedThreadId == Thread.currentThread().getId());
+        List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
+
+        if (!m_partitionStuff.containsKey(partitionId)) return retval;
+
+        /*
+         * First clear the pending reads
+         */
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
+        Deque<Iv2InFlight> inFlight = partitionStuff.m_reads;
+        Iterator<Iv2InFlight> i = inFlight.iterator();
+        while (i.hasNext()) {
+            Iv2InFlight entry = i.next();
+            if (entry.m_initiatorHSId != initiatorHSId) {
+                i.remove();
+                retval.add(entry);
+                m_outstandingTxns--;
+                m_acg.reduceBackpressure(entry.m_messageSize);
+            }
+        }
+
+        /*
+         * Then clear the pending writes
+         */
+        inFlight = partitionStuff.m_writes;
+        i = inFlight.iterator();
+        while (i.hasNext()) {
+            Iv2InFlight entry = i.next();
+            if (entry.m_initiatorHSId != initiatorHSId) {
+                i.remove();
+                retval.add(entry);
+                m_outstandingTxns--;
+                m_acg.reduceBackpressure(entry.m_messageSize);
+            }
+        }
+        return retval;
     }
 }

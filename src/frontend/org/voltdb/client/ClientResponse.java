@@ -70,6 +70,11 @@ public interface ClientResponse {
     public static final byte RESPONSE_UNKNOWN = -7;
 
     /**
+     * Default value for the user specified app status code field
+     */
+    public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;
+
+    /**
      * Retrieve the status code returned by the server
      * @return Status code
      */
