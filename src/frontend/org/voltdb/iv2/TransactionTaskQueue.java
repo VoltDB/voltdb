@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
@@ -350,13 +351,15 @@ public class TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task)
+    synchronized void repair(SiteTasker task, List<Long> masters)
     {
         m_taskQueue.offer(task);
         if (!m_multipartBacklog.isEmpty()) {
+            Iterator<Long> key_iter = m_multipartBacklog.navigableKeySet().iterator();
+            Long headkey = key_iter.next();
             // get head
             MpTransactionState txn =
-                    (MpTransactionState)m_multipartBacklog.firstEntry().getValue().getFirst().getTransactionState();
+                    (MpTransactionState)m_multipartBacklog.get(headkey).getFirst().getTransactionState();
             // inject poison pill
             FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
             FragmentResponseMessage poison =
@@ -368,6 +371,13 @@ public class TransactionTaskQueue
                     "Transaction rolled back by fault recovery or shutdown.");
             poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, forcedTermination);
             txn.offerReceivedFragmentResponse(poison);
+            // Now, iterate through the rest of the data structure and update the partition masters
+            // for all MpProcedureTasks not at the head of the TransactionTaskQueue
+            while (key_iter.hasNext())
+            {
+                Long key = key_iter.next();
+                ((MpProcedureTask)m_multipartBacklog.get(key).getFirst()).updateMasters(masters);
+            }
         }
     }
 

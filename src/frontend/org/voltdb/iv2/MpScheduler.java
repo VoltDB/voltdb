@@ -76,7 +76,7 @@ public class MpScheduler extends Scheduler
             public void runForRejoin(SiteProcedureConnection siteConnection) {
             }
         };
-        m_pendingTasks.repair(nullTask);
+        m_pendingTasks.repair(nullTask, m_iv2Masters);
     }
 
 
@@ -135,7 +135,7 @@ public class MpScheduler extends Scheduler
                 throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
             }
         };
-        m_pendingTasks.repair(repairTask);
+        m_pendingTasks.repair(repairTask, replicas);
     }
 
     @Override

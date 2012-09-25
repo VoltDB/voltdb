@@ -194,6 +194,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             DuplicateCounter counter = m_duplicateCounters.remove(key);
             VoltMessage resp = counter.getLastResponse();
             if (resp != null) {
+                // MPI is tracking deps per partition HSID.  We need to make
+                // sure we write ours into the message getting sent to the MPI
+                if (resp instanceof FragmentResponseMessage) {
+                    FragmentResponseMessage fresp = (FragmentResponseMessage)resp;
+                    fresp.setExecutorSiteId(m_mailbox.getHSId());
+                }
                 m_mailbox.send(counter.m_destinationId, resp);
             }
             else {
