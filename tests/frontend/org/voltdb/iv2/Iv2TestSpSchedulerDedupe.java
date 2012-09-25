@@ -93,6 +93,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
         dut.setMailbox(mbox);
         dut.setCommandLog(mock(CommandLog.class));
+        dut.setLock(mbox);
     }
 
     private Iv2InitiateTaskMessage createMsg(long txnId, boolean readOnly,
@@ -218,7 +219,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
         dut.updateReplicas(replicas);
-        Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
+        Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
         dut.deliver(sptask);
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
         // Capture the InitiateTaskMessage that gets sent to the replica so we can test it,
@@ -247,7 +248,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
         dut.updateReplicas(replicas);
-        FragmentTaskMessage sptask = createFrag(txnid, true, primary_hsid);
+        FragmentTaskMessage sptask = createFrag(txnid, false, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());

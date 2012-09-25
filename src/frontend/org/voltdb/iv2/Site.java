@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +56,8 @@ import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.utils.LogKeys;
+
+import com.google.common.collect.ImmutableMap;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -184,7 +185,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public HashMap<String, ProcedureRunner> getProcedures() {
+        public ImmutableMap<String, ProcedureRunner> getProcedures() {
             throw new RuntimeException("Not implemented in iv2");
             // return m_loadedProcedures.procs;
         }
@@ -599,6 +600,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void toggleProfiler(int toggle)
     {
         m_ee.toggleProfiler(toggle);
+    }
+
+    @Override
+    public void tick()
+    {
+        m_ee.tick(System.currentTimeMillis(), m_lastCommittedTxnId);
     }
 
     @Override

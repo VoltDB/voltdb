@@ -57,10 +57,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltdb.ExecutionSite.CheckTxnStateCompletionMessage;
-import org.voltdb.ExecutionSite.ExecutionSiteLocalSnapshotMessage;
-import org.voltdb.ExecutionSite.ExecutionSiteNodeFailureMessage;
-import org.voltdb.ExecutionSite.SystemProcedureContext;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -112,6 +108,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.common.collect.ImmutableMap;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -751,7 +749,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public long getNextUndo()                               { return getNextUndoToken(); }
         @Override
-        public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
+        public ImmutableMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
         public long getSiteId()                                 { return m_siteId; }
         @Override

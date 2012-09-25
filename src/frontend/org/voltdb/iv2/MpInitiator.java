@@ -117,6 +117,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             + "trying. Retrying.");
                 }
             }
+            super.acceptPromotion();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
