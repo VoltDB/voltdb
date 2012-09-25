@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 
 import org.voltdb.licensetool.LicenseApi;
 
@@ -27,6 +28,8 @@ import org.voltdb.licensetool.LicenseApi;
  *
  */
 public class PartitionDRGateway {
+    protected final boolean m_iv2Enabled;
+
     /**
      * Load the full subclass if it should, otherwise load the
      * noop stub.
@@ -35,7 +38,8 @@ public class PartitionDRGateway {
      * @return Instance of PartitionDRGateway
      */
     public static PartitionDRGateway getInstance(int partitionId,
-                                                 NodeDRGateway nodeGateway)
+                                                 NodeDRGateway nodeGateway,
+                                                 boolean iv2Enabled)
     {
         final VoltDBInterface vdb = VoltDB.instance();
         LicenseApi api = vdb.getLicenseApi();
@@ -45,10 +49,10 @@ public class PartitionDRGateway {
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
         if (licensedToDR && nodeGateway != null) {
-            pdrg = tryToLoadProVersion();
+            pdrg = tryToLoadProVersion(iv2Enabled);
         }
         if (pdrg == null) {
-            pdrg = new PartitionDRGateway();
+            pdrg = new PartitionDRGateway(iv2Enabled);
         }
 
         // init the instance and return
@@ -60,30 +64,21 @@ public class PartitionDRGateway {
         return pdrg;
     }
 
-    /**
-     * shutdown is a global method to gracefully terminate the underlying
-     * gateway infrastructure. It stops anything started by getInstance().
-     */
-    public static void shutdown()
-    {
-        // intentionally avoid a license check to shutdown.
-        PartitionDRGateway pdrg = null;
-        pdrg = tryToLoadProVersion();
-        if (pdrg == null) {
-            pdrg = new PartitionDRGateway();
-        }
-        pdrg.shutdownInternal();
-    }
-
-    private static PartitionDRGateway tryToLoadProVersion()
+    private static PartitionDRGateway tryToLoadProVersion(boolean iv2Enalbed)
     {
         try {
             Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
-            Object obj = pdrgiClass.newInstance();
+            Constructor<?> constructor = pdrgiClass.getConstructor(boolean.class);
+            Object obj = constructor.newInstance(iv2Enalbed);
             return (PartitionDRGateway) obj;
         } catch (Exception e) {
         }
         return null;
+    }
+
+    public PartitionDRGateway(boolean iv2Enabled)
+    {
+        m_iv2Enabled = iv2Enabled;
     }
 
     // empty methods for community edition
@@ -99,6 +94,4 @@ public class PartitionDRGateway {
                                           ClientResponseImpl response,
                                           String adHocParam) {}
     public void tick(long txnId) {}
-    protected void shutdownInternal() {}
-
 }

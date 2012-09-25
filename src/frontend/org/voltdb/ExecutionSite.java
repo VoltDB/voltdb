@@ -807,7 +807,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         m_indexStats = null;
 
         // initialize the DR gateway
-        m_partitionDRGateway = new PartitionDRGateway();
+        m_partitionDRGateway = new PartitionDRGateway(false);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -853,7 +853,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         // initialize the DR gateway
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, nodeDRGateway);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();

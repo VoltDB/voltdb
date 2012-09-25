@@ -116,7 +116,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
         new HashMap<DuplicateCounterKey, DuplicateCounter>();
     private CommandLog m_cl;
-    private PartitionDRGateway m_drGateway = new PartitionDRGateway();
+    private PartitionDRGateway m_drGateway = new PartitionDRGateway(true);
     private final SnapshotCompletionMonitor m_snapMonitor;
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
