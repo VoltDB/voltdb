@@ -550,6 +550,6 @@ if __name__ == "__main__":
         exit(1)
     print "All tests are PASSED!!"
     for p in msgD:
-        for suitename in msgD[module]:
+        for suitename in msgD[p]:
             print "%s - %s: %s" % (pkgDict[p], suiteDict[suitename], msgD[p][suitename])
     exit(0)
