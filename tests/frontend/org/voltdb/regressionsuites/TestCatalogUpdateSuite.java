@@ -835,6 +835,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addLiteralSchema("CREATE INDEX NEWINDEX ON NEW_ORDER (NO_O_ID);");
+        // history is good because this new index is the only one (no pkey)
+        project.addLiteralSchema("CREATE INDEX NEWINDEX2 ON HISTORY (H_C_ID);");
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
         compile = config.compile(project);

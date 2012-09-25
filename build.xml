@@ -1201,7 +1201,7 @@ TEST CASES
 <!--                <exclude name="**/TestRestoreAgent.class" -->
 <!--                <exclude name="**/TestSimpleCJK.class" /> -->
 <!--                <exclude name="**/TestClientTimeouts.class" /> -->
-                <exclude name="**/TestExportToFileClient.class" />
+<!--                <exclude name="**/TestExportToFileClient.class" /> -->
                 <exclude name="**/TestNonDetermisticSeppuku.class" />
 <!--                <exclude name="**/TestJDBCDriver.class" />-->
 <!--                <exclude name="**/TestAdminMode.class" />-->

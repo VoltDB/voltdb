@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,8 +34,9 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CommandLog;
-
+import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
@@ -121,6 +123,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
+    private final DurabilityListener m_durabilityListener;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -129,6 +132,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         super(partitionId, taskQueue);
         m_snapMonitor = snapMonitor;
+        m_durabilityListener = new DurabilityListener() {
+            @Override
+            public void onDurability(ArrayDeque<Object> durableThings) {
+                synchronized (m_lock) {
+                    for (Object o : durableThings) {
+                        m_pendingTasks.offer((TransactionTask)o);
+                    }
+                }
+            }
+        };
     }
 
     public void setLeaderState(boolean isLeader)
@@ -268,7 +281,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             long newSpHandle;
             long timestamp;
             Iv2InitiateTaskMessage msg = message;
-            if (m_isLeader) {
+            if (m_isLeader || message.isReadOnly()) {
+                /*
+                 * A short circuit read is a read where the client interface is local to
+                 * this node. The CI will let a replica perform a read in this case and
+                 * it does looser tracking of client handles since it can't be
+                 * partitioned from the local replica.
+                 */
+                if (!m_isLeader &&
+                        CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
+                        CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
+                    VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
+                }
 
                 /*
                  * If this is CL replay use the txnid from the CL and also
@@ -278,10 +302,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     newSpHandle = message.getTxnId();
                     timestamp = message.getTimestamp();
                     setMaxSeenTxnId(newSpHandle);
-                } else {
+                } else if (m_isLeader) {
                     TxnEgo ego = advanceTxnEgo();
                     newSpHandle = ego.getTxnId();
                     timestamp = ego.getWallClock();
+                } else {
+                    /*
+                     * The short circuit read case. Since we are not a master
+                     * we can't create new transaction IDs, so reuse the last seen
+                     * txnid. For a timestamp, might as well give a reasonable one
+                     * for a read heavy workload so time isn't bursty
+                     */
+                    timestamp = System.currentTimeMillis();
+                    //Don't think it wise to make a new one for a short circuit read
+                    newSpHandle = getCurrentTxnId();
                 }
 
                 // Need to set the SP handle on the received message
@@ -302,10 +336,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         message.getConnectionId(),
                         message.isForReplay());
 
-                // advanceTxnEgo();
-                // newSpHandle = currentTxnEgoSequence();
-
                 msg.setSpHandle(newSpHandle);
+
                 // Also, if this is a vanilla single-part procedure, make the TXNID
                 // be the SpHandle (for now)
                 // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
@@ -314,7 +346,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     msg.setTxnId(newSpHandle);
                     msg.setTimestamp(timestamp);
                 }
-                if (m_sendToHSIds.size() > 0) {
+
+                //Don't replicate reads, this really assumes that DML validation
+                //is going to be integrated soonish
+                if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.size() > 0) {
                     Iv2InitiateTaskMessage replmsg =
                         new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                 m_mailbox.getHSId(),
@@ -342,13 +377,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 newSpHandle = msg.getSpHandle();
                 timestamp = msg.getTimestamp();
             }
-            if (!msg.isReadOnly()) {
-                m_cl.log(msg, newSpHandle);
-            }
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
-            m_pendingTasks.offer(task);
+            if (!msg.isReadOnly()) {
+                if (!m_cl.log(msg, newSpHandle, m_durabilityListener, task)) {
+                    m_pendingTasks.offer(task);
+                }
+            } else {
+                m_pendingTasks.offer(task);
+            }
             return;
         }
         else {
@@ -492,9 +530,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
                 msg.setInitiateTask(msg.getInitiateTask());//Trigger reserialization so the new handle is used
             }
-            // If we have input dependencies, it's borrow work, there's no way we
-            // can actually distribute it
-            if (m_sendToHSIds.size() > 0) {
+
+            /*
+             * If there a replicas to send it to, forward it!
+             * Unless... it's read only AND not a sysproc. Read only sysprocs may expect to be sent
+             * everywhere.
+             * In that case don't propagate it to avoid a determinism check and extra messaging overhead
+             */
+            if (m_sendToHSIds.size() > 0 && (!msg.isReadOnly() || msg.isSysProcTask())) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
@@ -518,9 +561,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
-        if (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly()) {
-            m_cl.log(msg.getInitiateTask(), newSpHandle);
-        }
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
         // bit of a hack...we will probably not want to create and
@@ -531,16 +571,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_outstandingTxns.put(msg.getTxnId(), txn);
         }
 
+        TransactionTask task;
         if (msg.isSysProcTask()) {
-            final SysprocFragmentTask task =
+            task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                                         m_pendingTasks, msg, null);
-            m_pendingTasks.offer(task);
         }
         else {
-            final FragmentTask task =
+            task =
                 new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                                  m_pendingTasks, msg, null);
+        }
+        if (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly()) {
+            if (!m_cl.log(msg.getInitiateTask(), newSpHandle, m_durabilityListener, task)) {
+                m_pendingTasks.offer(task);
+            }
+        } else {
             m_pendingTasks.offer(task);
         }
     }

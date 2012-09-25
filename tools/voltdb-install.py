@@ -304,16 +304,20 @@ class Action(object):
 
 #### Installation actions
 
-# Files are only processed once, so order matters here.
+# Files are only processed once. Action order matters.
 actions = (
-    Action('doc',           'usr/share/voltdb/doc'),
-    Action('examples',      'usr/share/voltdb/examples'),
-    Action('tools',         'usr/share/voltdb/tools'),
-    Action('bin/*',         'usr/share/voltdb/bin', link_dir = 'usr/bin'),
-    Action('lib/*',         'usr/lib/voltdb'),
-    Action('voltdb/log4j*', 'usr/share/voltdb/voltdb'),
-    Action('voltdb/*',      'usr/lib/voltdb'),
-    Action('*',             'usr/share/voltdb', recursive = False),
+    Action('doc',                     'usr/share/voltdb/doc'),
+    Action('examples',                'usr/share/voltdb/examples'),
+    Action('tools',                   'usr/share/voltdb/tools'),
+    Action('bin/*',                   'usr/share/voltdb/bin', link_dir = 'usr/bin'),
+    Action('lib/*',                   'usr/lib/voltdb'),
+    Action('management/*.jar',        'usr/lib/voltdb'),
+    Action('management/*.sh',         'usr/share/voltdb/management'),
+    Action('management/*.xml',        'usr/share/voltdb/management'),
+    Action('management/*.properties', 'usr/share/voltdb/management'),
+    Action('voltdb/log4j*',           'usr/share/voltdb/voltdb'),
+    Action('voltdb/*',                'usr/lib/voltdb'),
+    Action('*',                       'usr/share/voltdb', recursive = False),
 )
 
 #### Install

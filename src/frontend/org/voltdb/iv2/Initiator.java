@@ -63,6 +63,4 @@ public interface Initiator
 
     /** Write a viable replay set to the command log */
     public void enableWritingIv2FaultLog();
-
-    public long getCurrentTxnId();
 }

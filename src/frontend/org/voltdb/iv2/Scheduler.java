@@ -57,6 +57,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
+    protected Object m_lock;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
@@ -106,6 +107,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     public void setStarvationTracker(StarvationTracker tracker) {
         m_tasks.setStarvationTracker(tracker);
+    }
+
+    public void setLock(Object o) {
+        m_lock = o;
     }
 
     abstract public void shutdown();

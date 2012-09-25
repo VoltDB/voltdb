@@ -257,7 +257,6 @@ public class ConnectionUtil {
             returnArray[2] = new String(buildStringBytes, "UTF-8");
 
             aChannel.configureBlocking(false);
-            aChannel.socket().setTcpNoDelay(false);
             aChannel.socket().setKeepAlive(true);
             success = true;
         } finally {

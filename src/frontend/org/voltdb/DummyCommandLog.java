@@ -56,7 +56,13 @@ public class DummyCommandLog implements CommandLog {
     public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin) {}
 
     @Override
-    public void log(Iv2InitiateTaskMessage message, long spHandle) {}
+    public boolean log(
+            Iv2InitiateTaskMessage message,
+            long spHandle,
+            DurabilityListener l,
+            Object handle) {
+        return false;
+    }
 
     @Override
     public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
