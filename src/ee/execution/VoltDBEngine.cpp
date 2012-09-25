@@ -509,6 +509,14 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
 }
 
 bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload) {
+    assert(m_executorContext != NULL);
+    ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
+    if (executorContext == NULL) {
+        VOLT_DEBUG("Rebinding EC (%ld) to new thread", (long)m_executorContext);
+        // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
+        m_executorContext->bindToThread();
+    }
+
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
     m_catalog->execute(catalogPayload);

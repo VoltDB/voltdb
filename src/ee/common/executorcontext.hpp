@@ -47,6 +47,9 @@ class ExecutorContext {
                     std::string hostname,
                     CatalogId hostId);
 
+    // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
+    void bindToThread();
+
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
         m_partitionId = partitionId;
