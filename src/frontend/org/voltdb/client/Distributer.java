@@ -642,6 +642,7 @@ class Distributer {
                                 for (NodeConnection nc : partitionReplicas) {
                                     if (!nc.hadBackPressure()) {
                                         cxn = nc;
+                                        break;
                                     }
                                 }
                             }
