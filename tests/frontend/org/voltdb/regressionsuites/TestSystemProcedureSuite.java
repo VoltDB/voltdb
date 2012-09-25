@@ -125,8 +125,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertEquals(1, results.length);
         System.out.println("Test initiators table: " + results[0].toString());
-        assertEquals(1, results[0].getRowCount());
+        //Now two entries because client affinity also does a query
+        assertEquals(2, results[0].getRowCount());
         VoltTableRow resultRow = results[0].fetchRow(0);
+        assertNotNull(resultRow);
+        assertEquals("@SystemCatalog", resultRow.getString("PROCEDURE_NAME"));
+        assertEquals( 1, resultRow.getLong("INVOCATIONS"));
+
+        resultRow = results[0].fetchRow(1);
         assertNotNull(resultRow);
         assertEquals("@Statistics", resultRow.getString("PROCEDURE_NAME"));
         assertEquals( 1, resultRow.getLong("INVOCATIONS"));

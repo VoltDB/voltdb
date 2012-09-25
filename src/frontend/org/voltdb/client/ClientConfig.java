@@ -35,7 +35,7 @@ public class ClientConfig {
     int m_autoTuneTargetInternalLatency = 5;
     long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
-    boolean m_useClientAffinity = false;
+    boolean m_useClientAffinity = true;
 
     /**
      * Configuration for a client with no authentication credentials that will

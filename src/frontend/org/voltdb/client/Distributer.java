@@ -329,24 +329,28 @@ class Distributer {
                 }
             }
 
-            if (response.getClientHandle() == TOPOLOGY_HANDLE) {
-                m_callbacksToInvoke.decrementAndGet();
-                synchronized (Distributer.this) {
-                    VoltTable results[] = response.getResults();
-                    if (results != null && results.length == 1) {
-                        VoltTable vt = results[0];
-                        updateAffinityTopology(vt);
+            try {
+                if (response.getClientHandle() == TOPOLOGY_HANDLE) {
+                    m_callbacksToInvoke.decrementAndGet();
+                    synchronized (Distributer.this) {
+                        VoltTable results[] = response.getResults();
+                        if (results != null && results.length == 1) {
+                            VoltTable vt = results[0];
+                            updateAffinityTopology(vt);
+                        }
+                    }
+                } else if (response.getClientHandle() == PROCEDURE_HANDLE) {
+                    m_callbacksToInvoke.decrementAndGet();
+                    synchronized (Distributer.this) {
+                        VoltTable results[] = response.getResults();
+                        if (results != null && results.length == 1) {
+                            VoltTable vt = results[0];
+                            updateProcedurePartitioning(vt);
+                        }
                     }
                 }
-            } else if (response.getClientHandle() == PROCEDURE_HANDLE) {
-                m_callbacksToInvoke.decrementAndGet();
-                synchronized (Distributer.this) {
-                    VoltTable results[] = response.getResults();
-                    if (results != null && results.length == 1) {
-                        VoltTable vt = results[0];
-                        updateProcedurePartitioning(vt);
-                    }
-                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
 
             if (cb != null) {
@@ -631,7 +635,7 @@ class Distributer {
                      */
                     if (procedureInfo.readOnly) {
                         NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
-                        if (partitionReplicas != null) {
+                        if (partitionReplicas != null && partitionReplicas.length > 0) {
                             cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
                             if (cxn.hadBackPressure()) {
                                 //See if there is one without backpressure
@@ -650,7 +654,7 @@ class Distributer {
                          * Writes have to go to the master
                          */
                         cxn = m_partitionMasters.get(hashedPartition);
-                        if (!cxn.hadBackPressure() || ignoreBackpressure) {
+                        if (cxn != null && !cxn.hadBackPressure() || ignoreBackpressure) {
                             backpressure = false;
                         }
                     }
