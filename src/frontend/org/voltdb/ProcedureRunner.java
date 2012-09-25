@@ -90,7 +90,7 @@ public class ProcedureRunner {
     protected long m_txnId = -1; // determinism id, not ordering id
     protected TransactionState m_txnState; // used for sysprocs only
     // Status code that can be set by stored procedure upon invocation that will be returned with the response.
-    protected byte m_statusCode = Byte.MIN_VALUE;
+    protected byte m_statusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
     protected String m_statusString = null;
     // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
     // a given call don't re-seed and generate the same number over and over
@@ -176,7 +176,7 @@ public class ProcedureRunner {
     public ClientResponseImpl call(long txnId, Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_txnId == -1);
-        assert(m_statusCode == Byte.MIN_VALUE);
+        assert(m_statusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
 
@@ -206,7 +206,7 @@ public class ProcedureRunner {
             }
 
             if (paramList.length != m_paramTypes.length) {
-                m_statsCollector.endProcedure( false, true);
+                m_statsCollector.endProcedure(false, true, null, null);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 status = ClientResponse.GRACEFUL_FAILURE;
@@ -223,7 +223,7 @@ public class ProcedureRunner {
                             m_paramTypeComponentType[i],
                             paramList[i]);
                 } catch (Exception e) {
-                    m_statsCollector.endProcedure( false, true);
+                    m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.getMessage();
                     status = ClientResponse.GRACEFUL_FAILURE;
@@ -258,7 +258,7 @@ public class ProcedureRunner {
                         error = true;
                     }
                     if (ex instanceof Error) {
-                        m_statsCollector.endProcedure( false, true);
+                        m_statsCollector.endProcedure(false, true, null, null);
                         throw (Error)ex;
                     }
 
@@ -291,7 +291,10 @@ public class ProcedureRunner {
                 }
             }
 
-            m_statsCollector.endProcedure( abort, error);
+            // Record statistics for procedure call.
+            StoredProcedureInvocation invoc = (m_txnState != null ? m_txnState.getInvocation() : null);
+            ParameterSet paramSet = (invoc != null ? invoc.getParams() : null);
+            m_statsCollector.endProcedure(abort, error, results, paramSet);
 
             // don't leave empty handed
             if (results == null)
@@ -314,7 +317,7 @@ public class ProcedureRunner {
             // reset other per-txn state
             m_txnId = -1;
             m_txnState = null;
-            m_statusCode = Byte.MIN_VALUE;
+            m_statusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
             m_statusString = null;
             m_cachedRNG = null;
             m_cachedSingleStmt.params = null;

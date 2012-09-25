@@ -54,7 +54,19 @@ public class SiteMailbox implements Mailbox {
             return 0;
         }
         @Override
-        public void log(Iv2InitiateTaskMessage message, long spHandle) {}
+        public boolean log(
+                Iv2InitiateTaskMessage message,
+                long spHandle,
+                DurabilityListener l,
+                Object handle) {
+            return false;
+        }
+        @Override
+        public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+                int partitionId, long spHandle) {
+        }
+        @Override
+        public void logIv2MPFault(long txnId) {}
         };
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();

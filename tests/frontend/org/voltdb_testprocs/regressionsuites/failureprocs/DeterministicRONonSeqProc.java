@@ -33,7 +33,7 @@ import org.voltdb.VoltProcedure;
 public class DeterministicRONonSeqProc extends VoltProcedure {
 
     // Meaningless where clause makes expected output easier to test for.
-    public static final SQLStmt queryUnambiguousRows = new SQLStmt("select ival from indexed_blah where sval < 'NDC=false' order by ival limit 2");
+    public static final SQLStmt queryUnambiguousRows = new SQLStmt("select ival from indexed_replicated_blah where sval < 'NDC=false' order by ival limit 2");
 
     public long run() {
         voltQueueSQL(queryUnambiguousRows);

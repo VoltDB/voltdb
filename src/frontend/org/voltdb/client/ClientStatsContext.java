@@ -72,19 +72,23 @@ public class ClientStatsContext {
     }
 
     /**
-     * Fetch current statistics from the client internals. Update
-     * the baseline to be the previously current statistics. This
-     * will update the range covered by any {@link ClientStats}
-     * instances returned from this context.
+     * Fetch current statistics from the client internals and set them to be the current baseline.
+     * Subsequent calls to <code>getStats(..)</code> methods on this instance will return 0 values for
+     * all statistics until either <code>fetch()</code> or <code>fetchAndResetBaseline()</code> are called.
      *
-     * @return A <code>this</code> pointer for chaining calls.
+     * @return A new ClientStatsContext object that uses the newly fetched stats with the old baseline.
      */
     public ClientStatsContext fetchAndResetBaseline() {
+        fetch();
+        ClientStatsContext retval = new ClientStatsContext(m_distributor, m_current, m_currentIO);
+        retval.m_baseline = m_baseline;
+        retval.m_baselineIO = m_baselineIO;
+        retval.m_baselineTS = m_baselineTS;
+        retval.m_currentTS = m_currentTS;
         m_baseline = m_current;
         m_baselineIO = m_currentIO;
         m_baselineTS = m_currentTS;
-        fetch();
-        return this;
+        return retval;
     }
 
     /**

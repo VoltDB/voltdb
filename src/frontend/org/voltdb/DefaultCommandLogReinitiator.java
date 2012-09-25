@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.util.Map;
 
+import org.voltcore.utils.InstanceId;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionCreator;
 
@@ -97,5 +98,12 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
 
     @Override
     public void setSiteTracker(SiteTracker siteTracker) {
+    }
+
+    @Override
+    public InstanceId getInstanceId() {
+        // When we don't have a command log, return null to cause the instance ID
+        // check to get skipped entirely in RestoreAgent.generatePlans()
+        return null;
     }
 };

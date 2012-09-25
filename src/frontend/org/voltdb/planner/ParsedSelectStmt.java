@@ -525,7 +525,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return result;
     }
 
-    private boolean guaranteesUniqueRow() {
+    boolean guaranteesUniqueRow() {
         if (((grouped == false) || groupByColumns.isEmpty() ) && displaysAgg()) {
             return true;
         }

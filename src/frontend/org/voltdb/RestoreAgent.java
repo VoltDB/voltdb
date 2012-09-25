@@ -47,6 +47,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -227,13 +228,14 @@ SnapshotCompletionInterest
         public final Map<Integer, Long> partitionToTxnId = new TreeMap<Integer, Long>();
         // This is not serialized, the name of the ZK node already has the host ID embedded.
         public final int hostId;
+        public final InstanceId instanceId;
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
             partitionToTxnId.putAll(map);
         }
 
         public SnapshotInfo(long txnId, String path, String nonce, int partitions,
-                            long catalogCrc, int hostId)
+                            long catalogCrc, int hostId, InstanceId instanceId)
         {
             this.txnId = txnId;
             this.path = path;
@@ -241,6 +243,7 @@ SnapshotCompletionInterest
             this.partitionCount = partitions;
             this.catalogCrc = catalogCrc;
             this.hostId = hostId;
+            this.instanceId = instanceId;
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
@@ -251,6 +254,7 @@ SnapshotCompletionInterest
             partitionCount = jo.getInt("partitionCount");
             catalogCrc = jo.getLong("catalogCrc");
             hostId = jo.getInt("hostId");
+            instanceId = new InstanceId(jo.getJSONObject("instanceId"));
 
             JSONArray tables = jo.getJSONArray("tables");
             int cnt = tables.length();
@@ -304,6 +308,7 @@ SnapshotCompletionInterest
                     stringer.key(e.getKey().toString()).value(e.getValue());
                 }
                 stringer.endObject(); // partitionToTxnId
+                stringer.key("instanceId").value(instanceId.serializeToJSONObject());
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
@@ -545,6 +550,14 @@ SnapshotCompletionInterest
             }
 
             SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
+            // if the cluster instance IDs in the snapshot and command log don't match, just move along
+            if (m_replayAgent.getInstanceId() != null && info != null &&
+                !m_replayAgent.getInstanceId().equals(info.instanceId)) {
+                LOG.debug("Rejecting snapshot due to mismatching instance IDs.");
+                LOG.debug("Command log ID: " + m_replayAgent.getInstanceId().serializeToJSONObject().toString());
+                LOG.debug("Snapshot ID: " + info.instanceId.serializeToJSONObject().toString());
+                continue;
+            }
             if (VoltDB.instance().isIV2Enabled() && info != null) {
                 final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
                 final Map<Integer, Long> snapmap = info.partitionToTxnId;
@@ -552,6 +565,8 @@ SnapshotCompletionInterest
                 // don't do any TXN ID consistency checking between command log and snapshot
                 if (cmdlogmap != null) {
                     if (snapmap == null || cmdlogmap.size() != snapmap.size()) {
+                        LOG.debug("Rejecting snapshot due to mismatching partition count (THIS IS BOGUS)");
+                        LOG.debug("command log count: " + cmdlogmap.size() + ", snapshot count: " + snapmap.size());
                         info = null;
                     }
                     else {
@@ -559,9 +574,14 @@ SnapshotCompletionInterest
                             Long snaptxnId = snapmap.get(cmdpart);
                             if (snaptxnId == null) {
                                 info = null;
+                                LOG.debug("Rejecting snapshot due to missing partition: " + cmdpart);
                                 break;
                             }
                             else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                                LOG.debug("Rejecting snapshot because it does not overlap the command log");
+                                LOG.debug("for partition: " + cmdpart);
+                                LOG.debug("command log txn ID: " + cmdlogmap.get(cmdpart));
+                                LOG.debug("snapshot txn ID: " + snaptxnId);
                                 info = null;
                                 break;
                             }
@@ -604,6 +624,7 @@ SnapshotCompletionInterest
 
             for (boolean completed : tf.m_completed) {
                 if (!completed) {
+                    LOG.debug("Rejecting snapshot because it was not completed.");
                     return null;
                 }
             }
@@ -613,6 +634,7 @@ SnapshotCompletionInterest
                 if (partitionCount == -1) {
                     partitionCount = count;
                 } else if (count != partitionCount) {
+                    LOG.debug("Rejecting snapshot because it had the wrong partition count.");
                     return null;
                 }
             }
@@ -621,6 +643,8 @@ SnapshotCompletionInterest
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
+        // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
+        InstanceId instanceId = new InstanceId(0, 0);
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
@@ -635,6 +659,10 @@ SnapshotCompletionInterest
                     Long txnidval = pidToTxnId.getLong(pidkey);
                     pidToTxnMap.put(Integer.valueOf(pidkey), txnidval);
                 }
+            }
+
+            if (digest_detail.has("instanceId")) {
+                instanceId = new InstanceId(digest_detail.getJSONObject("instanceId"));
             }
         }
         catch (IOException ioe)
@@ -653,7 +681,7 @@ SnapshotCompletionInterest
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     parseDigestFilename(digest.getName()),
-                    partitionCount, catalog_crc, m_hostId);
+                    partitionCount, catalog_crc, m_hostId, instanceId);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();

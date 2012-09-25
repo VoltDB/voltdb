@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.util.ArrayDeque;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
@@ -44,7 +45,16 @@ public interface CommandLog {
 
     public abstract void log(InitiateTaskMessage message);
 
-    public abstract void log(Iv2InitiateTaskMessage message, long spHandle);
+    /*
+     * Returns a boolean indicating whether synchronous command logging is enabled.
+     *
+     * The listener is will be provided with the handle once the message is durable.
+     */
+    public abstract boolean log(
+            Iv2InitiateTaskMessage message,
+            long spHandle,
+            DurabilityListener listener,
+            Object durabilityHandle);
 
     public abstract void shutdown() throws InterruptedException;
 
@@ -56,7 +66,22 @@ public interface CommandLog {
     public abstract Semaphore logFault(Set<Long> failedInitiators,
                                        Set<Long> faultedTxns);
 
+    /**
+     * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
+     */
+    public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+            int partitionId, long spHandle);
+
+    /**
+     * IV2-only method.  Write this MP transaction fault to the fault log portion of the command lawg.
+     */
+    public abstract void logIv2MPFault(final long txnId);
+
     public abstract void logHeartbeat(final long txnId);
 
     public abstract long getFaultSequenceNumber();
+
+    public interface DurabilityListener {
+        public void onDurability(ArrayDeque<Object> durableThings);
+    }
 }

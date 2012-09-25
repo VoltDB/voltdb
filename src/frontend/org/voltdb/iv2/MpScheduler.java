@@ -29,6 +29,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
+import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
@@ -52,7 +53,6 @@ public class MpScheduler extends Scheduler
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
-    private CommandLog m_cl;
 
     MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
     {
@@ -77,7 +77,7 @@ public class MpScheduler extends Scheduler
             public void runForRejoin(SiteProcedureConnection siteConnection) {
             }
         };
-        m_pendingTasks.repair(nullTask);
+        m_pendingTasks.repair(nullTask, m_iv2Masters);
     }
 
 
@@ -136,7 +136,7 @@ public class MpScheduler extends Scheduler
                 throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
             }
         };
-        m_pendingTasks.repair(repairTask);
+        m_pendingTasks.repair(repairTask, replicaCopy);
     }
 
     @Override
@@ -179,14 +179,12 @@ public class MpScheduler extends Scheduler
             timestamp = ego.getWallClock();
         }
 
-        // advanceTxnEgo();
-        // final long mpTxnId = currentTxnEgoSequence();
-
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
+
         // Handle every-site system procedures (at the MPI)
-        if (SystemProcedureCatalog.listing.get(procedureName) != null &&
-                SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
+        final Config sysprocConfig = SystemProcedureCatalog.listing.get(procedureName);
+        if (sysprocConfig != null &&  sysprocConfig.getEverysite()) {
             // Send an SP initiate task to all remote sites
             final Long localId = m_mailbox.getHSId();
             Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
@@ -304,6 +302,11 @@ public class MpScheduler extends Scheduler
 
     @Override
     public void setCommandLog(CommandLog cl) {
-        m_cl = cl;
+        // the MPI currently doesn't do command logging.  Don't have a reference to one.
+    }
+
+    @Override
+    public void enableWritingIv2FaultLog() {
+        // This is currently a no-op for the MPI
     }
 }

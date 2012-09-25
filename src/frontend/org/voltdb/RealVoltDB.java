@@ -82,6 +82,7 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.DtxnInitiatorMailbox;
 import org.voltdb.dtxn.ExecutorTxnIdSafetyState;
@@ -766,7 +767,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     Class.forName("org.voltdb.management.JMXStatsManager");
                 m_statsManager = (StatsManager)statsManagerClass.newInstance();
                 m_statsManager.initialize(new ArrayList<Long>(m_localSites.keySet()));
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                int a = 0;
+            }
 
             try {
                 m_snapshotCompletionMonitor.init(m_messenger.getZK());
@@ -1012,7 +1015,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
-            Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent);
+            Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent,
+                    m_snapshotCompletionMonitor);
             initiators.add(initiator);
         }
         return initiators;
@@ -1155,7 +1159,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         + m_config.m_pathToDeployment, false, null);
             }
 
-            // note the heatbeats are specified in seconds in xml, but ms internally
+            // note the heart beats are specified in seconds in xml, but ms internally
             HeartbeatType hbt = m_deployment.getHeartbeat();
             if (hbt != null)
                 m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
@@ -1164,6 +1168,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             Catalog catalog = new Catalog();
             Cluster cluster = catalog.getClusters().add("cluster");
             Database db = cluster.getDatabases().add("database");
+
+            // enable security if set on the deployment file
+            SecurityType security = m_deployment.getSecurity();
+            if (security != null) {
+                cluster.setSecurityenabled(security.isEnabled());
+            }
+
 
             // create groups as needed for users
             if (m_deployment.getUsers() != null) {
@@ -2035,7 +2046,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         /*
-         * Enable the initiator to send normal heartbeats and accept client
+         * IV2: After the command log is initialized, force the writing of the initial
+         * viable replay set.  Turns into a no-op with no command log, on the non-leader sites, and on the MPI.
+         */
+        for (Initiator initiator : m_iv2Initiators) {
+            initiator.enableWritingIv2FaultLog();
+        }
+
+        /*
+         * LEGACY: Enable the initiator to send normal heartbeats and accept client
          * connections
          */
         for (SimpleDtxnInitiator dtxn : m_dtxns) {
@@ -2172,13 +2191,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     for (ExecutionSite es : getLocalSites().values()) {
                         es.notifySitesAdded(m_siteTracker);
                     }
-
-                    if (ExportManager.instance() != null) {
-                        //Notify the export manager the cluster topology has changed
-                        ExportManager.instance().notifyOfClusterTopologyChange();
-                    }
                 }
             }
+        }
+
+        // Pre-iv2 and iv2 must inform the export manager of topology changes.
+        if (ExportManager.instance() != null) {
+            ExportManager.instance().notifyOfClusterTopologyChange();
         }
     }
 

@@ -507,7 +507,6 @@ public class TestVoltCompiler extends TestCase {
                 "<procedure class='proc'><sql>select * from T</sql></procedure>" +
                 "</procedures>" +
             "</database>" +
-            "<security enabled='true'/>" +
             "</project>";
         final File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
         final String path = xmlFile.getPath();
@@ -517,6 +516,32 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
+    public void testXMLFileWithDeprecatedElements() {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
+        final String schemaPath = schemaFile.getPath();
+        final String project = "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database>" +
+                "<schemas>" +
+                "<schema path='" +  schemaPath  + "'/>" +
+                "</schemas>" +
+                "<procedures>" +
+                "<procedure class='proc'><sql>select * from T</sql></procedure>" +
+                "</procedures>" +
+            "</database>" +
+            "<security enabled='true'/>" +
+            "</project>";
+        final File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
+        final String path = xmlFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compile(path, nothing_jar);
+        assertFalse(success);
+        assertTrue(
+                isFeedbackPresent("Found deprecated XML element \"security\"",
+                compiler.m_errors)
+                );
+    }
 
     public void testXMLFileWithInvalidSchemaReference() {
         final String simpleXML =

@@ -150,7 +150,7 @@ public class TestReplayTxnState extends TestCase {
 
         assertFalse(mpTxn.doWork(true));
 
-        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 2, 1, false, false, true);
+        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 2, 1, false, false, true, false);
         mpTxn.processCompleteTransaction(ctm);
 
         while (!mpTxn.doWork(true));
@@ -253,7 +253,7 @@ public class TestReplayTxnState extends TestCase {
             mpTxn.doWork(true);
         }
 
-        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 1, 2, false, false, true);
+        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 1, 2, false, false, true, false);
         CompleteTransactionResponseMessage ctrm = new CompleteTransactionResponseMessage(ctm, 2);
         mpTxn.processCompleteTransactionResponse(ctrm);
 

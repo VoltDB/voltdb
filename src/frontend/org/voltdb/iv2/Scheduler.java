@@ -56,11 +56,14 @@ abstract public class Scheduler implements InitiatorMessageHandler
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
+    final protected int m_partitionId;
+    protected Object m_lock;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
+        m_partitionId = partitionId;
         m_txnEgo = TxnEgo.makeZero(partitionId);
     }
 
@@ -106,6 +109,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_tasks.setStarvationTracker(tracker);
     }
 
+    public void setLock(Object o) {
+        m_lock = o;
+    }
+
     abstract public void shutdown();
 
     @Override
@@ -114,4 +121,5 @@ abstract public class Scheduler implements InitiatorMessageHandler
     @Override
     abstract public void deliver(VoltMessage message);
 
+    abstract public void enableWritingIv2FaultLog();
 }

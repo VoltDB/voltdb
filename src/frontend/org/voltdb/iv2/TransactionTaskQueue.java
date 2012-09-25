@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
@@ -113,7 +114,7 @@ public class TransactionTaskQueue
             if (!m_multipartBacklog.isEmpty() && ts.txnId == m_multipartBacklog.firstKey()) {
                 /*
                  * This branch is for fragments that follow the first fragment during replay
-                 * or first fragments during replay that follow the sentinenl (hence the key exists)
+                 * or first fragments during replay that follow the sentinel (hence the key exists)
                  * It is executed immeidately either way, but it may need to be inserted into the backlog
                  * if it is the first fragment
                  */
@@ -136,25 +137,37 @@ public class TransactionTaskQueue
                 taskQueueOffer(task);
             }
             else {
-                /*
-                 * This is the situation where the first fragment arrived before the sentinel.
-                 * Its position in the order is not known.
-                 * m_multiPartPendingSentinelReceipt should be null because the MP coordinator should only
-                 * run one transaction at a time.
-                 * It is not time to block single parts from executing because the order is not know,
-                 * the only thing to do is stash it away for when the order is known from the sentinel
-                 */
-                if (m_multiPartPendingSentinelReceipt != null) {
-                    hostLog.fatal("\tBacklog length: " + m_multipartBacklog.size());
-                    if (!m_multipartBacklog.isEmpty()) {
-                        hostLog.fatal("\tBacklog first item: " + m_multipartBacklog.firstEntry().getValue().peekFirst());
-                    }
-                    hostLog.fatal("\tHave this one SentinelReceipt: " + m_multiPartPendingSentinelReceipt);
-                    hostLog.fatal("\tAnd got this one, too: " + task);
-                    VoltDB.crashLocalVoltDB(
-                            "There should be only one multipart pending sentinel receipt at a time", true, null);
+                // We got an FragmentTask that didn't match the head of the the
+                // queue, but if we've received multiple sentinels, it may
+                // match one of the other deques.  Check to see.  This can
+                // happen if the CompleteTransactionTask has not yet been
+                // finished by the Site thread but we get the first fragment
+                // for the next MP transaction.
+                Deque<TransactionTask> backlog = m_multipartBacklog.get(task.getTxnId());
+                if (backlog != null) {
+                    backlog.addFirst(task);
                 }
-                m_multiPartPendingSentinelReceipt = task;
+                else {
+                    /*
+                     * This is the situation where the first fragment arrived before the sentinel.
+                     * Its position in the order is not known.
+                     * m_multiPartPendingSentinelReceipt should be null because the MP coordinator should only
+                     * run one transaction at a time.
+                     * It is not time to block single parts from executing because the order is not know,
+                     * the only thing to do is stash it away for when the order is known from the sentinel
+                     */
+                    if (m_multiPartPendingSentinelReceipt != null) {
+                        hostLog.fatal("\tBacklog length: " + m_multipartBacklog.size());
+                        if (!m_multipartBacklog.isEmpty()) {
+                            hostLog.fatal("\tBacklog first item: " + m_multipartBacklog.firstEntry().getValue().peekFirst());
+                        }
+                        hostLog.fatal("\tHave this one SentinelReceipt: " + m_multiPartPendingSentinelReceipt);
+                        hostLog.fatal("\tAnd got this one, too: " + task);
+                        VoltDB.crashLocalVoltDB(
+                                "There should be only one multipart pending sentinel receipt at a time", true, null);
+                    }
+                    m_multiPartPendingSentinelReceipt = task;
+                }
                 retval = true;
             }
         } else if (!m_multipartBacklog.isEmpty()) {
@@ -220,13 +233,15 @@ public class TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task)
+    synchronized void repair(SiteTasker task, List<Long> masters)
     {
         m_taskQueue.offer(task);
         if (!m_multipartBacklog.isEmpty()) {
+            Iterator<Long> key_iter = m_multipartBacklog.navigableKeySet().iterator();
+            Long headkey = key_iter.next();
             // get head
             MpTransactionState txn =
-                    (MpTransactionState)m_multipartBacklog.firstEntry().getValue().getFirst().getTransactionState();
+                    (MpTransactionState)m_multipartBacklog.get(headkey).getFirst().getTransactionState();
             // inject poison pill
             FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
             FragmentResponseMessage poison =
@@ -238,6 +253,13 @@ public class TransactionTaskQueue
                     "Transaction rolled back by fault recovery or shutdown.");
             poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, forcedTermination);
             txn.offerReceivedFragmentResponse(poison);
+            // Now, iterate through the rest of the data structure and update the partition masters
+            // for all MpProcedureTasks not at the head of the TransactionTaskQueue
+            while (key_iter.hasNext())
+            {
+                Long key = key_iter.next();
+                ((MpProcedureTask)m_multipartBacklog.get(key).getFirst()).updateMasters(masters);
+            }
         }
     }
 
@@ -261,7 +283,10 @@ public class TransactionTaskQueue
         // then offer until the next MP or FragTask
         if (!m_multipartBacklog.isEmpty()) {
             Deque<TransactionTask> backlog = m_multipartBacklog.firstEntry().getValue();
-            if (backlog.peek().getTransactionState().isDone()) {
+            // We could have received just the sentinel for the first MP, which would
+            // give us a non-empty multipartBacklog but an empty deque in the first key.
+            // Do the null check on peek and fall through if we don't actually have the fragment.
+            if (backlog.peek() != null && backlog.peek().getTransactionState().isDone()) {
                 // remove the completed MP txn
                 backlog.removeFirst();
                 m_multipartBacklog.remove(m_multipartBacklog.firstKey());

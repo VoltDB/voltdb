@@ -24,7 +24,6 @@ CREATE TABLE export_partitioned_table2
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-, PRIMARY KEY (rowid)
 );
 CREATE TABLE export_mirror_partitioned_table2
 (
