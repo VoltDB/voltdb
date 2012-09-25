@@ -436,10 +436,10 @@ public class ExportManager
         }
     }
 
-    public void truncateExportToTxnId(long snapshotTxnId) {
+    public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
         for (ExportGeneration generation : m_generations.get().values()) {
-            generation.truncateExportToTxnId( snapshotTxnId);
+            generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
         }
     }
 }

@@ -90,7 +90,7 @@ public class ProcedureRunner {
     protected long m_txnId = -1; // determinism id, not ordering id
     protected TransactionState m_txnState; // used for sysprocs only
     // Status code that can be set by stored procedure upon invocation that will be returned with the response.
-    protected byte m_statusCode = Byte.MIN_VALUE;
+    protected byte m_statusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
     protected String m_statusString = null;
     // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
     // a given call don't re-seed and generate the same number over and over
@@ -176,7 +176,7 @@ public class ProcedureRunner {
     public ClientResponseImpl call(long txnId, Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_txnId == -1);
-        assert(m_statusCode == Byte.MIN_VALUE);
+        assert(m_statusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
 
@@ -317,7 +317,7 @@ public class ProcedureRunner {
             // reset other per-txn state
             m_txnId = -1;
             m_txnState = null;
-            m_statusCode = Byte.MIN_VALUE;
+            m_statusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
             m_statusString = null;
             m_cachedRNG = null;
             m_cachedSingleStmt.params = null;
