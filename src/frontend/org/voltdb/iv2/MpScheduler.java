@@ -136,7 +136,7 @@ public class MpScheduler extends Scheduler
                 throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
             }
         };
-        m_pendingTasks.repair(repairTask, replicas);
+        m_pendingTasks.repair(repairTask, replicaCopy);
     }
 
     @Override
