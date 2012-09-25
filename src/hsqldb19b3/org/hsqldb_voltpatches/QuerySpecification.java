@@ -1022,6 +1022,16 @@ public class QuerySpecification extends QueryExpression {
             } else {
                 rowCount += limitStart;
             }
+        }
+        // Tweaked by VoltDB to support LIMIT 0
+        // limitCount == 0 can be enforced/optimized as rowCount == 0 regardless of offset
+        // even in non-simpleLimit cases (SELECT DISTINCT, GROUP BY, and/or ORDER BY).
+        // This is an optimal handling of a hard-coded LIMIT 0, but it really shouldn't be the ONLY enforcement
+        // for zero LIMITs -- what about "LIMIT ?" with 0 passed later as a parameter?
+        // The HSQL executor may still be missing some runtime enforcement of zero limits.
+        // The VoltDB executor has such enforcement.
+        else if (limitCount == 0) {
+            rowCount = 0;
         } else {
             rowCount = Integer.MAX_VALUE;
         }
