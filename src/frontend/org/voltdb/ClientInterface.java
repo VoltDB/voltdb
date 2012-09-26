@@ -1677,7 +1677,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void sendSentinelsToAllPartitions(long txnId)
     {
         for (int partition : m_allPartitions) {
-            sendSentinel(TransactionTaskQueue.GENERIC_MP_SENTINEL, partition);
+            sendSentinel(TransactionTaskQueue.GENERIC_MP_SENTINEL, partition, false);
         }
     }
 
@@ -1696,7 +1696,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // First parameter is the partition ID
         sendSentinel(invocation.getOriginalTxnId(),
-                     (Integer) invocation.getParameterAtIndex(0));
+                     (Integer) invocation.getParameterAtIndex(0), false);
 
         ClientResponseImpl response =
                 new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -2566,17 +2566,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return m_snapshotDaemon;
     }
 
-    public void sendSentinel(long txnId, int partitionId) {
+    public void sendSentinel(long txnId, int partitionId, boolean forReplay) {
         assert(m_isIV2Enabled);
         final long initiatorHSId = m_iv2Masters.get(partitionId);
 
-        //The only field that is relevant is txnid
+        //The only field that is relevant is txnid, and forReplay.
         MultiPartitionParticipantMessage mppm =
                 new MultiPartitionParticipantMessage(
                         initiatorHSId,
                         m_cartographer.getHSIdForMultiPartitionInitiator(),
                         txnId,
-                        false);
+                        false,  // isReadOnly
+                        true);  // isForReplay
         m_mailbox.send(initiatorHSId, mppm);
     }
 

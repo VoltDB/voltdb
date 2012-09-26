@@ -86,6 +86,10 @@ public class ReplaySequencer
     // queued entries hashed by transaction id.
     TreeMap<Long, ReplayEntry> m_replayEntries = new TreeMap<Long, ReplayEntry>();
 
+    // lastPolledFragmentTxnId tracks released MP transactions; new fragments
+    // for released transactions do not need further sequencing.
+    long m_lastPolledFragmentTxnId = Long.MIN_VALUE;
+
     // Return the next correctly sequenced message or null if none exists.
     public VoltMessage poll()
     {
@@ -98,7 +102,11 @@ public class ReplaySequencer
         if (m_replayEntries.isEmpty()) {
             return null;
         }
-        return m_replayEntries.firstEntry().getValue().poll();
+        VoltMessage m = m_replayEntries.firstEntry().getValue().poll();
+        if (m instanceof FragmentTaskMessage) {
+            m_lastPolledFragmentTxnId = ((FragmentTaskMessage)m).getTxnId();
+        }
+        return m;
     }
 
     // Offer a new message. Return false if the offered message can be run immediately.
@@ -121,7 +129,11 @@ public class ReplaySequencer
             }
         }
         else if (in instanceof FragmentTaskMessage) {
-            // Incoming fragment task
+            // already sequenced
+            if (inTxnId <= m_lastPolledFragmentTxnId) {
+                return false;
+            }
+
             FragmentTaskMessage ftm  = (FragmentTaskMessage)in;
             if (found == null) {
                 ReplayEntry newEntry = new ReplayEntry();

@@ -56,7 +56,7 @@ public class CompleteTransactionTask extends TransactionTask
         hostLog.debug("COMPLETE: " + this);
 
         // Log invocation to DR
-        if (m_drGateway != null && !m_txn.isReadOnly() && !m_msg.isRollback()) {
+        if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
             FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
             Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
             assert(initiateTask != null);

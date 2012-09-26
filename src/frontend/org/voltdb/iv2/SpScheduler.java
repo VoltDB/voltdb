@@ -233,10 +233,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void deliver(VoltMessage message)
     {
-        if (message instanceof TransactionInfoBaseMessage &&
+        // the leader produces a valid replication stream during command log replay
+        if (m_isLeader && message instanceof TransactionInfoBaseMessage &&
             (((TransactionInfoBaseMessage)message).isForReplay()))
         {
-            if (!m_replaySequencer.offer(message)) {
+            if (!m_replaySequencer.offer((TransactionInfoBaseMessage)message)) {
                 deliver2(message);
             }
             else {

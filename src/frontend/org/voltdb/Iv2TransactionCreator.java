@@ -84,7 +84,7 @@ public class Iv2TransactionCreator implements TransactionCreator
 
     @Override
     public void sendSentinel(long txnId, int partitionId) {
-        m_ci.sendSentinel( txnId, partitionId);
+        m_ci.sendSentinel(txnId, partitionId, true);
     }
 
     @Override
@@ -102,7 +102,6 @@ public class Iv2TransactionCreator implements TransactionCreator
     @Override
     public boolean isOnBackPressure()
     {
-        // TODO Auto-generated method stub
         return false;
     }
 

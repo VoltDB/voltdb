@@ -83,6 +83,28 @@ public class TestReplaySequencer extends TestCase
     }
 
     @Test
+    public void testOfferSentinelThenFragments()
+    {
+        boolean result;
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sntl = makeSentinel(1L);
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage frag2 = makeFragment(1L);
+
+        result = dut.offer(sntl);
+        result = dut.offer(frag);
+        assertEquals(true, result);
+        assertEquals(frag, dut.poll());
+        assertEquals(null, dut.poll());
+
+        // subsequent fragments won't block the queue.
+        result = dut.offer(frag2);
+        assertEquals(false, result);
+        assertEquals(null, dut.poll());
+    }
+
+    @Test
     public void testOfferFragmentThenSentinel()
     {
         boolean result;
