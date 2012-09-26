@@ -1845,7 +1845,7 @@ public class TestVoltCompiler extends TestCase {
                 );
         expectedError = "Bad CREATE PROCEDURE DDL statement: " +
                 "\"CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
-                ", expected syntax: \"CREATE PROCEDURE FROM CLASS <class-name>\"";
+                ", expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -1905,7 +1905,7 @@ public class TestVoltCompiler extends TestCase {
                 );
         expectedError = "Bad CREATE PROCEDURE DDL statement: " +
                 "\"CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
-                ", expected syntax: \"CREATE PROCEDURE FROM CLASS <class-name>\"";
+                ", expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
