@@ -661,7 +661,6 @@ class Distributer {
                     }
                 }
             }
-
             if (cxn == null) {
                 for (int i=0; i < totalConnections; ++i) {
                     cxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
@@ -805,8 +804,20 @@ class Distributer {
         TheHashinator.initialize(numPartitions);
         m_hashinatorInitialized = true;
         m_partitionMasters.clear();
+        m_partitionReplicas.clear();
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
+
+            ArrayList<NodeConnection> connections = new ArrayList<NodeConnection>();
+            for (String site : vt.getString("Sites").split(",")) {
+                site = site.trim();
+                Integer hostId = Integer.valueOf(site.split(":")[0]);
+                if (m_hostIdToConnection.containsKey(hostId)) {
+                    connections.add(m_hostIdToConnection.get(hostId));
+                }
+            }
+            m_partitionReplicas.put(partition, connections.toArray(new NodeConnection[0]));
+
             Integer leaderHostId = Integer.valueOf(vt.getString("Leader").split(":")[0]);
             if (m_hostIdToConnection.containsKey(leaderHostId)) {
                 m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
