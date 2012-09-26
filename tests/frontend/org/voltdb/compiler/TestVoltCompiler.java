@@ -32,15 +32,21 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
@@ -2169,6 +2175,213 @@ public class TestVoltCompiler extends TestCase {
             final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
             final Procedure addBook = db.getProcedures().get("NotAnnotatedAddBook");
             assertEquals(true, addBook.getSinglepartition());
+    }
+
+    class TestRole {
+        final String name;
+        boolean adhoc = false;
+        boolean sysproc = false;
+        boolean defaultproc = false;
+
+        public TestRole(String name) {
+            this.name = name;
+        }
+
+        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc) {
+            this.name = name;
+            this.adhoc = adhoc;
+            this.sysproc = sysproc;
+            this.defaultproc = defaultproc;
+        }
+    }
+
+    private void checkRoleXMLAndDDL(String rolesElem, String ddl, String errorRegex, TestRole... roles) throws Exception {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl != null ? ddl : "");
+        final String schemaPath = schemaFile.getPath();
+        String rolesBlock = (rolesElem != null ? String.format("<roles>%s</roles>", rolesElem) : "");
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            rolesBlock +
+            "<procedures/>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compile(projectPath, testout_jar);
+        String error = (success || compiler.m_errors.size() == 0
+                            ? ""
+                            : compiler.m_errors.get(compiler.m_errors.size()-1).message);
+        if (errorRegex == null) {
+            assertTrue(String.format("Expected success\nXML: %s\nDDL: %s\nERR: %s", rolesElem, ddl, error), success);
+
+            Catalog cat = compiler.getCatalog();
+            CatalogMap<Group> groups = cat.getClusters().get("cluster").getDatabases().get("database").getGroups();
+            assertNotNull(groups);
+            assertEquals(roles.length, groups.size());
+            for (TestRole role : roles) {
+                Group group = groups.get(role.name);
+                assertNotNull(String.format("Missing role \"%s\"", role.name), group);
+                assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
+                assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
+                assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
+            }
+        }
+        else {
+            assertFalse(String.format("Expected error (\"%s\")\nXML: %s\nDDL: %s", errorRegex, rolesElem, ddl), success);
+            assertFalse("Expected at least one error message.", error.isEmpty());
+            Matcher m = Pattern.compile(errorRegex).matcher(error);
+            assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
+        }
+    }
+
+    private void goodRoleDDL(String ddl, TestRole... roles) throws Exception {
+        checkRoleXMLAndDDL(null, ddl, null, roles);
+    }
+
+    private void badRoleDDL(String ddl, String errorRegex) throws Exception {
+        checkRoleXMLAndDDL(null, ddl, errorRegex);
+    }
+
+    public void testRoleXML() throws Exception {
+        checkRoleXMLAndDDL("<role name='r1'/>", null, null, new TestRole("r1"));
+    }
+
+    public void testBadRoleXML() throws Exception {
+        checkRoleXMLAndDDL("<rolex name='r1'/>", null, ".*rolex.*[{]role[}].*expected.*");
+        checkRoleXMLAndDDL("<role name='r1'/>", "create role r1;", ".*already exists.*");
+    }
+
+    public void testRoleDDL() throws Exception {
+        goodRoleDDL("create role r1;", new TestRole("r1"));
+        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true));
+        goodRoleDDL("create role r1 with adhoc ,sysproc, defaultproc;", new TestRole("r1", true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true));
+    }
+
+    public void testBadRoleDDL() throws Exception {
+        badRoleDDL("create role r1", ".*no semicolon.*");
+        badRoleDDL("create role r1;create role r1;", ".*already exists.*");
+        badRoleDDL("create role r1 with ;", ".*unexpected token.*");
+        badRoleDDL("create role r1 with blah;", ".*Bad flag \"blah\".*");
+        badRoleDDL("create role r1 with adhoc sysproc;", ".*unexpected token.*");
+        badRoleDDL("create role r1 with adhoc, blah;", ".*Bad flag \"blah\".*");
+    }
+
+    private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
+        String schemaDDL =
+            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash)); " +
+            "partition table books on column cash;" +
+            StringUtils.join(ddl, " ");
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schemaDDL.toString());
+        String schemaPath = schemaFile.getPath();
+
+        String projectXML =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "</database>" +
+            "</project>";
+
+        File projectFile = VoltProjectBuilder.writeStringToTempFile(projectXML);
+        String projectPath = projectFile.getPath();
+
+        VoltCompiler compiler = new VoltCompiler();
+
+        boolean success = compiler.compile(projectPath, testout_jar);
+        String error = (success || compiler.m_errors.size() == 0
+                ? ""
+                : compiler.m_errors.get(compiler.m_errors.size()-1).message);
+        if (errorRegex == null) {
+            assertTrue(String.format("Expected success\nDDL: %s\n%s", ddl, error), success);
+            Catalog cat = compiler.getCatalog();
+            return cat.getClusters().get("cluster").getDatabases().get("database");
+        }
+        else {
+            assertFalse(String.format("Expected error (\"%s\")\nDDL: %s", errorRegex, ddl), success);
+            assertFalse("Expected at least one error message.", error.isEmpty());
+            Matcher m = Pattern.compile(errorRegex).matcher(error);
+            assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
+            return null;
+        }
+    }
+
+    private Database goodDDLAgainstSimpleSchema(String... ddl) throws Exception {
+        return checkDDLAgainstSimpleSchema(null, ddl);
+    }
+
+    private void badDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
+        checkDDLAgainstSimpleSchema(errorRegex, ddl);
+    }
+
+    public void testGoodCreateProcedureWithAllow() throws Exception {
+        Database db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create procedure p1 allow r1 as select * from books;");
+        Procedure proc = db.getProcedures().get("p1");
+        assertNotNull(proc);
+        CatalogMap<GroupRef> groups = proc.getAuthgroups();
+        assertEquals(1, groups.size());
+        assertNotNull(groups.get("r1"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create role r2;",
+                "create procedure p1 allow r1, r2 as select * from books;");
+        proc = db.getProcedures().get("p1");
+        assertNotNull(proc);
+        groups = proc.getAuthgroups();
+        assertEquals(2, groups.size());
+        assertNotNull(groups.get("r1"));
+        assertNotNull(groups.get("r2"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create procedure allow r1 from class org.voltdb.compiler.procedures.AddBook;");
+        proc = db.getProcedures().get("AddBook");
+        assertNotNull(proc);
+        groups = proc.getAuthgroups();
+        assertEquals(1, groups.size());
+        assertNotNull(groups.get("r1"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create role r2;",
+                "create procedure allow r1,r2 from class org.voltdb.compiler.procedures.AddBook;");
+        proc = db.getProcedures().get("AddBook");
+        assertNotNull(proc);
+        groups = proc.getAuthgroups();
+        assertEquals(2, groups.size());
+        assertNotNull(groups.get("r1"));
+        assertNotNull(groups.get("r2"));
+    }
+
+    public void testBadCreateProcedureWithAllow() throws Exception {
+        badDDLAgainstSimpleSchema(".*expected syntax.*",
+                "create procedure p1 allow as select * from books;");
+        badDDLAgainstSimpleSchema(".*expected syntax.*",
+                "create procedure p1 allow a b as select * from books;");
+        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+                "create procedure p1 allow rx as select * from books;");
+        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+                "create role r1;",
+                "create procedure p1 allow r1, rx as select * from books;");
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {

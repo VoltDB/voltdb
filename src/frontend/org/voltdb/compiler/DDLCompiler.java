@@ -30,6 +30,7 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -37,10 +38,12 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
@@ -157,62 +160,80 @@ public class DDLCompiler {
             "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+TABLE\\s+" +
             "([\\w$]+)\\s+COLUMN\\s+([\\w$]+)(?:\\s+PARAMETER\\s+(\\d+))?\\s*;\\z"
             );
+
     /**
+     * CREATE PROCEDURE from Java class statement regex
      * NB supports only unquoted table and column names
-     *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * CREATE -- token
-     * \\s+ -- one or more spaces
-     * PROCEDURE -- token
-     * \\s+ -- one or more spaces
-     * FROM -- token
-     * \\s+ -- one or more spaces
-     * CLASS -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$.]+) -- [class name capture group 1]
-     *    [\\w$]+ -- one or more identifier character
-     *        (letters, numbers, dollar sign ($), underscore (_) or period (.))
-     * \\s* -- 0 or more spaces
-     * ; -- a semicolon
-     * \\z -- end of string
-     * </pre>
+     * Capture groups are tagged as (1) and (2) in comments below.
      */
     static final Pattern procedureClassPattern = Pattern.compile(
-            "(?i)\\ACREATE\\s+PROCEDURE\\s+FROM\\s+CLASS\\s+([\\w$.]+)\\s*;\\z"
+            "(?i)" +                                // ignore case
+            "\\A" +                                 // beginning of statement
+            "CREATE" +                              // CREATE token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "(?:" +                                 // begin optional ALLOW clause
+            "\\s+" +                                //   one or more spaces
+            "ALLOW" +                               //   ALLOW token
+            "\\s+" +                                //   one or more spaces
+            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (1) comma-separated role list
+            ")?" +                                  // end optional ALLOW clause
+            "\\s+" +                                // one or more spaces
+            "FROM" +                                // FROM token
+            "\\s+" +                                // one or more spaces
+            "CLASS" +                               // CLASS token
+            "\\s+" +                                // one or more spaces
+            "([\\w$.]+)" +                          // (2) class name
+            "\\s*" +                                // zero or more spaces
+            ";" +                                   // semi-colon terminator
+            "\\z"                                   // end of statement
             );
 
     /**
+     * CREATE PROCEDURE with single SELECT or DML statement regex
      * NB supports only unquoted table and column names
-     *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * CREATE -- token
-     * \\s+ -- one or more spaces
-     * PROCEDURE -- token
-     * \\s+ -- one or more spaces
-     * AS -- token
-     * \\s+ -- one or more spaces
-     * ((?:SELECT|INSERT|UPDATE|DELETE)\\s+.+) -- [select/dml statement capture group 1]
-     *     (?:SELECT|INSERT|UPDATE|DELETE) -- select/dml start token [not captured]
-     *         SELECT -- token
-     *         | -- or
-     *         INSERT -- token
-     *         | -- or
-     *         UPDATE -- token
-     *         | -- or
-     *         DELETE -- token
-     *     \\s+ -- one or more spaces
-     *     .+ -- one of more of any characters
-     * ; -- a semicolon
-     * \\z -- end of string
+     * Capture groups are tagged as (1) and (2) in comments below.
      */
     static final Pattern procedureSingleStatementPattern = Pattern.compile(
-            "(?i)\\ACREATE\\s+PROCEDURE\\s+([\\w.$]+)\\s+AS\\s+((?:SELECT|INSERT|UPDATE|DELETE)\\s+.+);\\z"
+            "(?i)" +                                // ignore case
+            "\\A" +                                 // beginning of DDL statement
+            "CREATE" +                              // CREATE token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "\\s+" +                                // one or more spaces
+            "([\\w.$]+)" +                          // (1) procedure name
+            "(?:" +                                 // begin optional ALLOW clause
+            "\\s+" +                                //   one or more spaces
+            "ALLOW" +                               //   ALLOW token
+            "\\s+" +                                //   one or more spaces
+            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (2) comma-separated role list
+            ")?" +                                  // end optional ALLOW clause
+            "\\s+" +                                // one or more spaces
+            "AS" +                                  // AS token
+            "\\s+" +                                // one or more spaces
+            "(" +                                   // (3) begin SELECT or DML statement
+            "(?:SELECT|INSERT|UPDATE|DELETE)" +     //   valid DML start tokens (not captured)
+            "\\s+" +                                //   one or more spaces
+            ".+)" +                                 //   end SELECT or DML statement
+            ";" +                                   // semi-colon terminator
+            "\\z"                                   // end of DDL statement
+            );
+
+    /**
+     * Regex to parse the CREATE ROLE statement with optional WITH clause.
+     * Leave the WITH clause argument as a single group because regexes
+     * aren't capable of producing a variable number of groups.
+     * Capture groups are tagged as (1) and (2) in comments below.
+     */
+    static final Pattern createRolePattern = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "CREATE\\s+ROLE\\s+" +              // CREATE ROLE
+            "([\\w.$]+)" +                      // (1) <role name>
+            "(?:\\s+WITH\\s+" +                 // (start optional WITH clause block)
+                "(\\w+(?:\\s*,\\s*\\w+)*)" +    //   (2) <comma-separated argument string>
+            ")?" +                              // (end optional WITH clause block)
+            ";\\z"                              // (end statement)
             );
 
     /**
@@ -239,12 +260,12 @@ public class DDLCompiler {
     /**
      * Regex Description:
      *
-     *  if the statement starts with either create procedure, partition, or
-     *  replicate the first match group is set to respectively procedure,
-     *  partition, or replicate
+     *  if the statement starts with either create procedure, partition,
+     *  replicate, or role the first match group is set to respectively procedure,
+     *  partition, replicate, or role.
      * <pre>
      * (?i) -- ignore case
-     * ((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE) -- voltdb ddl
+     * ((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE|\\ACREATE\\s{0,1024})ROLE) -- voltdb ddl
      *    [capture group 1]
      *      (?<=\\ACREATE\\s{1,1024})PROCEDURE -- create procedure ddl
      *          (?<=\\ACREATE\\s{0,1024}) -- CREATE zero-width positive lookbehind
@@ -258,11 +279,14 @@ public class DDLCompiler {
      *      | -- or
      *      \\A -- beginning of statement
      *      REPLICATE -- token
+     *      | -- or
+     *      \\A -- beginning of statement
+     *      CREATE\\s{0,1024})ROLE -- create role ddl
      * \\s -- one space
      * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE)\\s"
+            "(?i)((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE|\\ACREATE\\s{0,1024}ROLE)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -278,6 +302,9 @@ public class DDLCompiler {
     /// Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     final PartitionMap m_partitionMap;
 
+    /// Groups parsed from CREATE ROLE statements.
+    final CatalogMap<Group> m_groupMap;
+
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
@@ -289,13 +316,14 @@ public class DDLCompiler {
         int lineNo;
     }
 
-    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, PartitionMap partitionMap) {
+    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, PartitionMap partitionMap, CatalogMap<Group> groupMap) {
         assert(compiler != null);
         assert(hsql != null);
         assert(partitionMap != null);
         this.m_hsql = hsql;
         this.m_compiler = compiler;
         this.m_partitionMap = partitionMap;
+        this.m_groupMap = groupMap;
 
     }
 
@@ -305,7 +333,7 @@ public class DDLCompiler {
      * @throws VoltCompiler.VoltCompilerException
      */
     public void loadSchema(String path)
-    throws VoltCompiler.VoltCompilerException {
+            throws VoltCompiler.VoltCompilerException {
         File inputFile = new File(path);
         FileReader reader = null;
         try {
@@ -391,8 +419,8 @@ public class DDLCompiler {
     }
 
     /**
-     * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE, and
-     * CREATE PROCEDURE
+     * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
+     * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException
@@ -405,7 +433,7 @@ public class DDLCompiler {
         statement = statement.trim();
 
         // matches if it is the beginning of a voltDB statement
-        Matcher statementMatcher = voltdbStatementPrefixPattern.matcher(statement);;
+        Matcher statementMatcher = voltdbStatementPrefixPattern.matcher(statement);
         if( ! statementMatcher.find()) {
             return false;
         }
@@ -413,13 +441,20 @@ public class DDLCompiler {
         // either PROCEDURE, REPLICATE, or PARTITION
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
-        // matches if it is CREATE PROCEDURE FROM CLASS <class-name>;
+        // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
         statementMatcher = procedureClassPattern.matcher(statement);
         if( statementMatcher.matches()) {
-            String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
+            String clazz = checkIdentifierStart(statementMatcher.group(2), statement);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), clazz);
+
+            // Add roles if specified.
+            if (statementMatcher.group(1) != null) {
+                for (String roleName : StringUtils.split(statementMatcher.group(1), ',')) {
+                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
+                }
+            }
 
             // track the defined procedure
             m_partitionMap.add(descriptor);
@@ -427,14 +462,21 @@ public class DDLCompiler {
             return true;
         }
 
-        // matches if it is CREATE PROCEDURE <proc-name> AS <select-or-dml-statement>
+        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS <select-or-dml-statement>
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
         if( statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
-            String sqlStatement = statementMatcher.group(2);
+            String sqlStatement = statementMatcher.group(3);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), clazz, sqlStatement, null, null, false);
+
+            // Add roles if specified.
+            if (statementMatcher.group(2) != null) {
+                for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
+                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
+                }
+            }
 
             m_partitionMap.add(descriptor);
 
@@ -516,6 +558,41 @@ public class DDLCompiler {
             return true;
         }
 
+        // matches if it is CREATE ROLE [WITH <permission> [, <permission> ...]]
+        // group 1 is role name
+        // group 2 is comma-separated permission list or null if there is no WITH clause
+        statementMatcher = createRolePattern.matcher(statement);
+        if( statementMatcher.matches()) {
+            String roleName = statementMatcher.group(1);
+            if (m_groupMap.get(roleName) != null) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Role name \"%s\" in CREATE ROLE DDL statement already exists.",
+                        roleName));
+            }
+            org.voltdb.catalog.Group catGroup = m_groupMap.add(roleName);
+            if (statementMatcher.group(2) != null) {
+                for (String tokenRaw : StringUtils.split(statementMatcher.group(2), ',')) {
+                    String token = tokenRaw.trim().toLowerCase();
+                    if (token.equals("adhoc")) {
+                        catGroup.setAdhoc(true);
+                    }
+                    else if (token.equals("sysproc")) {
+                        catGroup.setSysproc(true);
+                    }
+                    else if (token.equals("defaultproc")) {
+                        catGroup.setDefaultproc(true);
+                    }
+                    else {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                            "Bad flag \"%s\" to CREATE ROLE DDL statement: \"%s\", " +
+                            "expected syntax: CREATE ROLE <role> [WITH adhoc|sysproc|defaultproc ...]",
+                            token, statement.substring(0,statement.length()-1))); // remove trailing semicolon
+                    }
+                }
+            }
+            return true;
+        }
+
         /*
          * if no correct syntax regex matched above then at this juncture
          * the statement is syntax incorrect
@@ -540,8 +617,8 @@ public class DDLCompiler {
         if( PROCEDURE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Bad CREATE PROCEDURE DDL statement: \"%s\", " +
-                    "expected syntax: \"CREATE PROCEDURE FROM CLASS <class-name>\" " +
-                    "or: \"CREATE PROCEDURE <name> AS <single-select-or-dml-statement>\"",
+                    "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
+                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 

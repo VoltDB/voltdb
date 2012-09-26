@@ -34,8 +34,10 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
@@ -82,7 +84,7 @@ public class PlannerTestAideDeCamp {
         hsql = HSQLInterface.loadHsqldb();
         //hsql.runDDLFile(schemaPath);
         PartitionMap partitionMap = new PartitionMap(compiler);
-        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap);
+        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap, db.getGroups());
         ddl_compiler.loadSchema(schemaPath);
         ddl_compiler.compileToCatalog(catalog, db);
     }
