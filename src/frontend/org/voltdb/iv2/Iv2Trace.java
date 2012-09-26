@@ -73,8 +73,7 @@ public class Iv2Trace
             return "UNUSED";
         }
         else {
-            return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +
-                TxnEgo.getPartitionId(txnId) + ")";
+            return TxnEgo.txnIdToString(txnId);
         }
     }
 

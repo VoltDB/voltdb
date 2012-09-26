@@ -104,8 +104,9 @@ public class MpPromoteAlgo implements RepairAlgo
                 }
             }
 
-            tmLog.debug("Rejecting repair for " + handle + " minHandleSeen: " + m_minHandleSeen +
-              " maxHandleCompleted: " + m_maxHandleCompleted);
+            tmLog.debug("Rejecting repair for " + TxnEgo.txnIdToString(handle) +
+                    " minHandleSeen: " + TxnEgo.txnIdToString(m_minHandleSeen) +
+              " maxHandleCompleted: " + TxnEgo.txnIdToString(m_maxHandleCompleted));
 
             return false;
         }
@@ -245,9 +246,11 @@ public class MpPromoteAlgo implements RepairAlgo
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
                 if  (entry.getValue().needs(li.getTxnId())) {
                     ++queued;
-                    tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
-                            entry.getValue().m_maxHandleCompleted + ". Repairing with " +
-                            li.getTxnId());
+                    tmLog.debug(m_whoami + "repairing " + CoreUtils.hsIdToString(entry.getKey()) +
+                            ". Max seen " +
+                            TxnEgo.txnIdToString(entry.getValue().m_maxHandleCompleted) +
+                            ". Repairing with " +
+                            TxnEgo.txnIdToString(li.getTxnId()));
                     needsRepair.add(entry.getKey());
                 }
             }
