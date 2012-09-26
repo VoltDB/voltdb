@@ -52,7 +52,8 @@ public class ReplaySequencer
 
         boolean isReady()
         {
-            assert (m_sentinalTxnId.equals(m_firstFragment.getTxnId()));
+            assert ((m_sentinalTxnId == null || m_firstFragment == null) ||
+                    m_sentinalTxnId.equals(m_firstFragment.getTxnId()));
             return m_sentinalTxnId != null && m_firstFragment != null;
         }
 
@@ -108,7 +109,7 @@ public class ReplaySequencer
 
         if (in instanceof MultiPartitionParticipantMessage) {
             // Incoming sentinel.
-            MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage)in;
+            // MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage)in;
             if (found == null) {
                 ReplayEntry newEntry = new ReplayEntry();
                 newEntry.m_sentinalTxnId = inTxnId;
@@ -116,6 +117,7 @@ public class ReplaySequencer
             }
             else {
                 found.m_sentinalTxnId = inTxnId;
+                assert(found.isReady());
             }
         }
         else if (in instanceof FragmentTaskMessage) {
@@ -128,6 +130,7 @@ public class ReplaySequencer
             }
             else if (found.m_firstFragment == null) {
                 found.m_firstFragment = ftm;
+                assert(found.isReady());
             }
             else {
                 found.addBlockedMessage(ftm);
