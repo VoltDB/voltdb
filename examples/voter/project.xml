@@ -6,10 +6,6 @@
         <description>Demonstrates call-in vote counting scheme.</description>
     </info>
     <database>
-        <groups>
-            <group name="admin" sysproc="true" />
-            <group name="user" adhoc="true" />
-        </groups>
         <schemas>
             <schema path='ddl.sql' />
         </schemas>

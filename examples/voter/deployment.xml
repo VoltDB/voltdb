@@ -1,11 +1,6 @@
 <?xml version="1.0"?>
 <deployment>
     <security enabled="true" />
-    <users>
-        <user name="bozo" password="ozob" groups="admin" />
-        <user name="mort" password="trom" groups="user" />
-        <user name="biff" password="ffib" groups="user,admin" />
-    </users>
     <cluster hostcount="1" sitesperhost="2" kfactor="0" />
     <httpd enabled="true">
         <jsonapi enabled="true" />
