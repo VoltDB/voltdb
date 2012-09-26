@@ -54,7 +54,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
+    $VOLTDB start catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE host $HOST
 }
 

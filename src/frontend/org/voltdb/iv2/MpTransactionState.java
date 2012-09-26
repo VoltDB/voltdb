@@ -58,7 +58,7 @@ public class MpTransactionState extends TransactionState
     Map<Integer, Set<Long>> m_remoteDeps;
     Map<Integer, List<VoltTable>> m_remoteDepTables =
         new HashMap<Integer, List<VoltTable>>();
-    List<Long> m_useHSIds;
+    final List<Long> m_useHSIds = new ArrayList<Long>();
     long m_buddyHSId;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
@@ -70,8 +70,14 @@ public class MpTransactionState extends TransactionState
     {
         super(mailbox, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
-        m_useHSIds = useHSIds;
+        m_useHSIds.addAll(useHSIds);
         m_buddyHSId = buddyHSId;
+    }
+
+    public void updateMasters(List<Long> masters)
+    {
+        m_useHSIds.clear();
+        m_useHSIds.addAll(masters);
     }
 
     @Override

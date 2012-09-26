@@ -66,6 +66,17 @@ public interface CommandLog {
     public abstract Semaphore logFault(Set<Long> failedInitiators,
                                        Set<Long> faultedTxns);
 
+    /**
+     * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
+     */
+    public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+            int partitionId, long spHandle);
+
+    /**
+     * IV2-only method.  Write this MP transaction fault to the fault log portion of the command lawg.
+     */
+    public abstract void logIv2MPFault(final long txnId);
+
     public abstract void logHeartbeat(final long txnId);
 
     public abstract long getFaultSequenceNumber();

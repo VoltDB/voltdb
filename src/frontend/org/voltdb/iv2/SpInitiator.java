@@ -30,6 +30,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.Promotable;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -63,10 +64,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
     };
 
-    public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent)
+    public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
+            SnapshotCompletionMonitor snapMonitor)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(partition, new SiteTaskerQueue()),
+                new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
                 "SP", agent);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
     }
@@ -165,5 +167,10 @@ public class SpInitiator extends BaseInitiator implements Promotable
             String whoami)
     {
         return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami, m_partitionId);
+    }
+
+    @Override
+    public void enableWritingIv2FaultLog() {
+        m_initiatorMailbox.enableWritingIv2FaultLog();
     }
 }

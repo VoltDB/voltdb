@@ -63,6 +63,7 @@ import org.junit.runners.Parameterized.Parameters;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.InstanceId;
 import org.voltcore.zk.ZKTestBase;
 import org.voltdb.RestoreAgent.SnapshotInfo;
 import org.voltdb.VoltDB.START_ACTION;
@@ -735,8 +736,9 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     @Test
     public void testConsistentRestorePlan() {
         List<SnapshotInfo> infos = new ArrayList<SnapshotInfo>();
-        SnapshotInfo info1 = new SnapshotInfo(0, "blah", "nonce", 3, 0, 0);
-        SnapshotInfo info2 = new SnapshotInfo(0, "blah", "nonce", 3, 0, 1);
+        InstanceId id = new InstanceId(0, 0);
+        SnapshotInfo info1 = new SnapshotInfo(0, "blah", "nonce", 3, 0, 0, id);
+        SnapshotInfo info2 = new SnapshotInfo(0, "blah", "nonce", 3, 0, 1, id);
 
         infos.add(info1);
         infos.add(info2);
@@ -778,18 +780,21 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             si = new HashSet<SnapshotInfo>();
             frags.put(txnid, si);
         }
-        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc, -1));
+        InstanceId id = new InstanceId(0, 0);
+        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc, -1, id));
     }
 
     @Test
     public void testSnapshotInfoRoundTrip() throws JSONException
     {
-        RestoreAgent.SnapshotInfo dut = new RestoreAgent.SnapshotInfo(1234L, "dummy", "stupid", 11, 4321L, 13);
+        InstanceId id = new InstanceId(1234, 4321);
+        RestoreAgent.SnapshotInfo dut = new RestoreAgent.SnapshotInfo(1234L, "dummy", "stupid", 11, 4321L, 13, id);
         dut.partitionToTxnId.put(1, 7000L);
         dut.partitionToTxnId.put(7, 1000L);
         byte[] serial = dut.toJSONObject().toString().getBytes(VoltDB.UTF8ENCODING);
         SnapshotInfo rt = new SnapshotInfo(new JSONObject(new String(serial, VoltDB.UTF8ENCODING)));
         System.out.println("Got: " + rt.toJSONObject().toString());
         assertEquals(dut.partitionToTxnId.get(1), rt.partitionToTxnId.get(1));
+        assertEquals(id, rt.instanceId);
     }
 }
