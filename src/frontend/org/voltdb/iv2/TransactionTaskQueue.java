@@ -173,7 +173,7 @@ public class TransactionTaskQueue
         // offer to SiteTaskerQueue if:
         // the queue was empty
         // the queue wasn't empty but the txn IDs matched
-        if ((ts.isForReplay() || isDRReplicated) && (task instanceof FragmentTask)) {
+        if (isDRReplicated && (task instanceof FragmentTask)) {
             boolean hasSentinel = false;
             if (!m_multipartBacklog.isEmpty()) {
                 long txnId = m_multipartBacklog.firstKey();

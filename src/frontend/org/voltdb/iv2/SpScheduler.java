@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.Map.Entry;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -127,6 +128,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+
+    // helper class to put command log work in order
+    private final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -228,6 +232,28 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // implemented
     @Override
     public void deliver(VoltMessage message)
+    {
+        if (message instanceof TransactionInfoBaseMessage &&
+            (((TransactionInfoBaseMessage)message).isForReplay()))
+        {
+            if (!m_replaySequencer.offer(message)) {
+                deliver2(message);
+            }
+            else {
+                VoltMessage m = m_replaySequencer.poll();
+                while(m != null) {
+                    deliver2(m);
+                    m = m_replaySequencer.poll();
+                }
+            }
+        }
+        else
+        {
+            deliver2(message);
+        }
+    }
+
+    private void deliver2(VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
