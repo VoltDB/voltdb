@@ -35,6 +35,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import org.voltdb.SnapshotCompletionMonitor;
+
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
@@ -61,6 +63,7 @@ import com.google.common.collect.ImmutableMap;
 public class Iv2TestSpSchedulerDedupe extends TestCase
 {
     Mailbox mbox;
+    SnapshotCompletionMonitor snapMonitor;
     MapCache iv2masters;
     VoltDBInterface vdbi;
     ProcedureRunner runner;
@@ -80,13 +83,14 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         mbox = mock(Mailbox.class);
         when(mbox.getHSId()).thenReturn(dut_hsid);
         iv2masters = mock(MapCache.class);
+        snapMonitor = mock(SnapshotCompletionMonitor.class);
 
         // make fake MapCache of iv2masters
         HashMap<String,JSONObject> fakecache = new HashMap<String, JSONObject>();
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
-        dut = new SpScheduler(0, getSiteTaskerQueue());
+        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
         dut.setMailbox(mbox);
         dut.setCommandLog(mock(CommandLog.class));
         dut.setLock(mbox);
@@ -138,7 +142,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         long primary_hsid = 1111l;
 
         createObjs();
-        Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
+        Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
         sptask.setSpHandle(txnid);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -147,6 +151,23 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
         dut.deliver(resp);
         verify(mbox, times(1)).send(eq(primary_hsid), eq(resp));
+    }
+
+    @Test
+    public void testReplicaInitiateTaskResponseShortCircuitRead() throws Exception
+    {
+        long txnid = TxnEgo.makeZero(0).getTxnId();
+
+        createObjs();
+        Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, dut_hsid);
+        sptask.setSpHandle(txnid);
+        dut.deliver(sptask);
+        // verify no response sent yet
+        verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
+        verify(mbox, times(0)).send(new long[] {anyLong()}, (VoltMessage)anyObject());
+        InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
+        dut.deliver(resp);
+        verify(mbox, times(1)).send(eq(dut_hsid), eq(resp));
     }
 
     @Test

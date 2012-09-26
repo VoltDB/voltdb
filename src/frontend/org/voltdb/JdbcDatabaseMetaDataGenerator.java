@@ -17,6 +17,11 @@
 
 package org.voltdb;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -33,6 +38,11 @@ import org.voltdb.types.VoltDecimalHelper;
 
 public class JdbcDatabaseMetaDataGenerator
 {
+
+    public static final String JSON_PARTITION_PARAMETER = "partitionParameter";
+    public static final String JSON_SINGLE_PARTITION = "singlePartition";
+    public static final String JSON_READ_ONLY = "readOnly";
+
     static public final ColumnInfo[] TABLE_SCHEMA =
         new ColumnInfo[] {
                           new ColumnInfo("TABLE_CAT", VoltType.STRING),
@@ -522,6 +532,23 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(PROCEDURES_SCHEMA);
         for (Procedure proc : m_database.getProcedures())
         {
+            String remark = null;
+            try {
+                JSONObject jsObj = new JSONObject();
+                jsObj.put(JSON_READ_ONLY, proc.getReadonly());
+                jsObj.put(JSON_SINGLE_PARTITION, proc.getSinglepartition());
+                if (proc.getSinglepartition()) {
+                    jsObj.put(JSON_PARTITION_PARAMETER, proc.getPartitionparameter());
+                }
+                remark = jsObj.toString();
+            } catch (JSONException e) {
+                e.printStackTrace();
+                StringWriter sw = new StringWriter();
+                PrintWriter pw = new PrintWriter(sw);
+                e.printStackTrace(pw);
+                pw.flush();
+                remark = sw.toString();
+            }
             results.addRow(
                            null,
                            null, // procedure schema
@@ -529,7 +556,7 @@ public class JdbcDatabaseMetaDataGenerator
                            null, // reserved
                            null, // reserved
                            null, // reserved
-                           null, // REMARKS
+                           remark, // REMARKS
                            java.sql.DatabaseMetaData.procedureResultUnknown, // procedure time
                            proc.getTypeName() // specific name
                           );

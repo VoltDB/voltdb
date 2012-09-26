@@ -27,6 +27,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 {
     boolean m_isRollback;
     boolean m_requiresAck;
+    boolean m_rollbackForFault;
 
     /** Empty constructor for de-serialization */
     CompleteTransactionMessage() {
@@ -46,11 +47,13 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
      */
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId,
                                       long txnId, boolean isReadOnly,
-                                      boolean isRollback, boolean requiresAck)
+                                      boolean isRollback, boolean requiresAck,
+                                      boolean rollbackForFault)
     {
         super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, false);
         m_isRollback = isRollback;
         m_requiresAck = requiresAck;
+        m_rollbackForFault = rollbackForFault;
     }
 
     public boolean isRollback()
@@ -63,11 +66,16 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         return m_requiresAck;
     }
 
+    public boolean isRollbackForFault()
+    {
+        return m_rollbackForFault;
+    }
+
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 1 + 1;
+        msgsize += 1 + 1 + 1;
         return msgsize;
     }
 
@@ -78,6 +86,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.put(m_isRollback ? (byte) 1 : (byte) 0);
         buf.put(m_requiresAck ? (byte) 1 : (byte) 0);
+        buf.put(m_rollbackForFault ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -88,6 +97,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.initFromBuffer(buf);
         m_isRollback = buf.get() == 1;
         m_requiresAck = buf.get() == 1;
+        m_rollbackForFault = buf.get() == 1;
         assert(buf.capacity() == buf.position());
     }
 
@@ -105,6 +115,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
         if (m_requiresAck)
             sb.append("\n  THIS MESSAGE REQUIRES AN ACK");
+
+        if (m_rollbackForFault) {
+            sb.append("\n  THIS ROLLBACK IS FOR FAULT REPAIR");
+        }
 
         return sb.toString();
     }

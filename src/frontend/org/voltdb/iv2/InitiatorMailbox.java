@@ -63,8 +63,8 @@ public class InitiatorMailbox implements Mailbox
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
         m_repairLog.setLeaderState(true);
-        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
         m_scheduler.setLeaderState(true);
+        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
     }
 
     public synchronized void setMaxLastSeenMultipartTxnId(long txnId) {
@@ -74,6 +74,10 @@ public class InitiatorMailbox implements Mailbox
 
     synchronized public void setMaxLastSeenTxnId(long txnId) {
         m_scheduler.setMaxSeenTxnId(txnId);
+    }
+
+    synchronized public void enableWritingIv2FaultLog() {
+        m_scheduler.enableWritingIv2FaultLog();
     }
 
     public InitiatorMailbox(int partitionId,

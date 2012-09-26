@@ -105,10 +105,14 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         client.callProcedure("InsertA", 0, 1);
         client.callProcedure("InsertA", 1, 1);
         client.callProcedure("InsertA", 2, 2);
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;")
-                                 .getResults()[0];
+        VoltTable result = null;
+
+        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;").getResults()[0];
         assertEquals(1, result.getRowCount());
-    }
+
+        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 0 OFFSET 1;").getResults()[0];
+        assertEquals(0, result.getRowCount());
+}
 
     public void testJoinAndLimitOffset() throws IOException, ProcCallException, InterruptedException {
         Client client = this.getClient();

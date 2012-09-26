@@ -21,14 +21,22 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+
+import java.util.Map.Entry;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
+import org.voltdb.messaging.Iv2LogFaultMessage;
+import org.voltdb.SnapshotCompletionInterest;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
@@ -40,23 +48,87 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
-public class SpScheduler extends Scheduler
+public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
+    static class DuplicateCounterKey implements Comparable<DuplicateCounterKey>
+    {
+        private long m_txnId;
+        private long m_spHandle;
+        transient final int m_hash;
+
+        DuplicateCounterKey(long txnId, long spHandle)
+        {
+            m_txnId = txnId;
+            m_spHandle = spHandle;
+            m_hash = (37 * (int)(m_txnId ^ (m_txnId >>> 32))) +
+                ((int)(m_spHandle ^ (m_spHandle >>> 32)));
+        }
+
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || !(getClass().isInstance(o))) {
+                return false;
+            }
+
+            DuplicateCounterKey other = (DuplicateCounterKey)o;
+
+            return (m_txnId == other.m_txnId && m_spHandle == other.m_spHandle);
+        }
+
+        // Only care about comparing TXN ID part for sorting in updateReplicas
+        public int compareTo(DuplicateCounterKey o)
+        {
+            if (m_txnId < o.m_txnId) {
+                return -1;
+            } else if (m_txnId > o.m_txnId) {
+                return 1;
+            } else {
+                if (m_spHandle < o.m_spHandle) {
+                    return -1;
+                }
+                else if (m_spHandle > o.m_spHandle) {
+                    return 1;
+                }
+                else {
+                    return 0;
+                }
+            }
+        }
+
+        public int hashCode()
+        {
+            return m_hash;
+        }
+
+        public String toString()
+        {
+            return "<" + m_txnId + ", " + m_spHandle + ">";
+        }
+    };
+
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     List<Long> m_sendToHSIds = new ArrayList<Long>();
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
-    private final Map<Long, DuplicateCounter> m_duplicateCounters =
-        new HashMap<Long, DuplicateCounter>();
+    private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
+        new HashMap<DuplicateCounterKey, DuplicateCounter>();
     private CommandLog m_cl;
+    private final SnapshotCompletionMonitor m_snapMonitor;
+    // Need to track when command log replay is complete (even if not performed) so that
+    // we know when we can start writing viable replay sets to the fault log.
+    boolean m_replayComplete = false;
     private final DurabilityListener m_durabilityListener;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    SpScheduler(int partitionId, final SiteTaskerQueue taskQueue)
+    SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
+        m_snapMonitor = snapMonitor;
         m_durabilityListener = new DurabilityListener() {
             @Override
             public void onDurability(ArrayDeque<Object> durableThings) {
@@ -67,6 +139,18 @@ public class SpScheduler extends Scheduler
                 }
             }
         };
+    }
+
+    public void setLeaderState(boolean isLeader)
+    {
+        super.setLeaderState(isLeader);
+        m_snapMonitor.addInterest(this);
+    }
+
+    public void setMaxSeenTxnId(long maxSeenTxnId)
+    {
+        super.setMaxSeenTxnId(maxSeenTxnId);
+        writeIv2ViableReplayEntry();
     }
 
     @Override
@@ -90,20 +174,27 @@ public class SpScheduler extends Scheduler
 
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
-        List<Long> doneCounters = new LinkedList<Long>();
-        for (DuplicateCounter counter : m_duplicateCounters.values()) {
+        List<DuplicateCounterKey> doneCounters = new LinkedList<DuplicateCounterKey>();
+        for (Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
+            DuplicateCounter counter = entry.getValue();
             int result = counter.updateReplicas(m_replicaHSIds);
             if (result == DuplicateCounter.DONE) {
-                doneCounters.add(counter.getTxnId());
+                doneCounters.add(entry.getKey());
             }
         }
 
         // Maintain the CI invariant that responses arrive in txnid order.
         Collections.sort(doneCounters);
-        for (Long txnId : doneCounters) {
-            DuplicateCounter counter = m_duplicateCounters.remove(txnId);
+        for (DuplicateCounterKey key : doneCounters) {
+            DuplicateCounter counter = m_duplicateCounters.remove(key);
             VoltMessage resp = counter.getLastResponse();
             if (resp != null) {
+                // MPI is tracking deps per partition HSID.  We need to make
+                // sure we write ours into the message getting sent to the MPI
+                if (resp instanceof FragmentResponseMessage) {
+                    FragmentResponseMessage fresp = (FragmentResponseMessage)resp;
+                    fresp.setExecutorSiteId(m_mailbox.getHSId());
+                }
                 m_mailbox.send(counter.m_destinationId, resp);
             }
             else {
@@ -111,6 +202,7 @@ public class SpScheduler extends Scheduler
                         "had no responses.  This should be impossible?");
             }
         }
+        writeIv2ViableReplayEntry();
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -136,8 +228,12 @@ public class SpScheduler extends Scheduler
         }
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
-        } else if (message instanceof MultiPartitionParticipantMessage) {
+        }
+        else if (message instanceof MultiPartitionParticipantMessage) {
             handleMultipartSentinel((MultiPartitionParticipantMessage)message);
+        }
+        else if (message instanceof Iv2LogFaultMessage) {
+            handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -150,6 +246,7 @@ public class SpScheduler extends Scheduler
      */
     private void handleMultipartSentinel(
             MultiPartitionParticipantMessage message) {
+        Iv2Trace.logIv2MultipartSentinel(message, m_mailbox.getHSId(), message.getTxnId());
         m_pendingTasks.offerMPSentinel(message.getTxnId());
         if (m_sendToHSIds.size() > 0) {
             m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
@@ -166,7 +263,18 @@ public class SpScheduler extends Scheduler
             long newSpHandle;
             long timestamp;
             Iv2InitiateTaskMessage msg = message;
-            if (m_isLeader) {
+            if (m_isLeader || message.isReadOnly()) {
+                /*
+                 * A short circuit read is a read where the client interface is local to
+                 * this node. The CI will let a replica perform a read in this case and
+                 * it does looser tracking of client handles since it can't be
+                 * partitioned from the local replica.
+                 */
+                if (!m_isLeader &&
+                        CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
+                        CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
+                    VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
+                }
 
                 /*
                  * If this is CL replay use the txnid from the CL and also
@@ -176,10 +284,20 @@ public class SpScheduler extends Scheduler
                     newSpHandle = message.getTxnId();
                     timestamp = message.getTimestamp();
                     setMaxSeenTxnId(newSpHandle);
-                } else {
+                } else if (m_isLeader) {
                     TxnEgo ego = advanceTxnEgo();
                     newSpHandle = ego.getTxnId();
                     timestamp = ego.getWallClock();
+                } else {
+                    /*
+                     * The short circuit read case. Since we are not a master
+                     * we can't create new transaction IDs, so reuse the last seen
+                     * txnid. For a timestamp, might as well give a reasonable one
+                     * for a read heavy workload so time isn't bursty
+                     */
+                    timestamp = System.currentTimeMillis();
+                    //Don't think it wise to make a new one for a short circuit read
+                    newSpHandle = getCurrentTxnId();
                 }
 
                 // Need to set the SP handle on the received message
@@ -200,10 +318,8 @@ public class SpScheduler extends Scheduler
                         message.getConnectionId(),
                         message.isForReplay());
 
-                // advanceTxnEgo();
-                // newSpHandle = currentTxnEgoSequence();
-
                 msg.setSpHandle(newSpHandle);
+
                 // Also, if this is a vanilla single-part procedure, make the TXNID
                 // be the SpHandle (for now)
                 // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
@@ -212,9 +328,10 @@ public class SpScheduler extends Scheduler
                     msg.setTxnId(newSpHandle);
                     msg.setTimestamp(timestamp);
                 }
+
                 //Don't replicate reads, this really assumes that DML validation
                 //is going to be integrated soonish
-                if (!msg.isReadOnly() && m_sendToHSIds.size() > 0) {
+                if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.size() > 0) {
                     Iv2InitiateTaskMessage replmsg =
                         new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                 m_mailbox.getHSId(),
@@ -234,7 +351,7 @@ public class SpScheduler extends Scheduler
                     DuplicateCounter counter = new DuplicateCounter(
                             msg.getInitiatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
-                    m_duplicateCounters.put(newSpHandle, counter);
+                    m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
                 }
             }
             else {
@@ -279,7 +396,7 @@ public class SpScheduler extends Scheduler
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
                 message.getTxnId(), expectedHSIds);
-        m_duplicateCounters.put(message.getSpHandle(), counter);
+        m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
@@ -307,11 +424,11 @@ public class SpScheduler extends Scheduler
     {
         // Send the message to the duplicate counter, if any
         final long spHandle = message.getSpHandle();
-        DuplicateCounter counter = m_duplicateCounters.get(spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), spHandle));
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                m_duplicateCounters.remove(spHandle);
+                m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), spHandle));
                 m_repairLogTruncationHandle = spHandle;
                 m_mailbox.send(counter.m_destinationId, message);
             }
@@ -417,7 +534,7 @@ public class SpScheduler extends Scheduler
                             msg.getCoordinatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
                 }
-                m_duplicateCounters.put(newSpHandle, counter);
+                m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
         }
         else {
@@ -459,11 +576,12 @@ public class SpScheduler extends Scheduler
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         // Send the message to the duplicate counter, if any
-        DuplicateCounter counter = m_duplicateCounters.get(message.getSpHandle());
+        DuplicateCounter counter =
+            m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                m_duplicateCounters.remove(message.getSpHandle());
+                m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
                 m_repairLogTruncationHandle = message.getSpHandle();
                 FragmentResponseMessage resp = (FragmentResponseMessage)counter.getLastResponse();
                 // MPI is tracking deps per partition HSID.  We need to make
@@ -498,10 +616,69 @@ public class SpScheduler extends Scheduler
                 new CompleteTransactionTask(txn, m_pendingTasks, message);
             m_pendingTasks.offer(task);
         }
+
+        if (message.isRollbackForFault()) {
+            // Log the TXN ID of this MP to the command log fault loog.
+            m_cl.logIv2MPFault(message.getTxnId());
+        }
+    }
+
+    public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
+    {
+        // Should only receive these messages at replicas, call the internal log write with
+        // the provided SP handle
+        writeIv2ViableReplayEntryInternal(message.getSpHandle());
+        setMaxSeenTxnId(message.getSpHandle());
     }
 
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
+    }
+
+    public void enableWritingIv2FaultLog()
+    {
+        m_replayComplete = true;
+        writeIv2ViableReplayEntry();
+    }
+
+    /**
+     * If appropriate, cause the initiator to write the viable replay set to the command log
+     * Use when it's unclear whether the caller is the leader or a replica; the right thing will happen.
+     */
+    void writeIv2ViableReplayEntry()
+    {
+        if (m_replayComplete) {
+            if (m_isLeader) {
+                // write the viable set locally
+                long faultSpHandle = advanceTxnEgo().getTxnId();
+                writeIv2ViableReplayEntryInternal(faultSpHandle);
+                // Generate Iv2LogFault message and send it to replicas
+                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                        faultMsg);
+            }
+        }
+    }
+
+    /**
+     * Write the viable replay set to the command log with the provided SP Handle
+     */
+    void writeIv2ViableReplayEntryInternal(long spHandle)
+    {
+        if (m_replayComplete) {
+            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
+                    spHandle);
+        }
+    }
+
+    @Override
+    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
+            long[] partitionTxnIds, boolean truncationSnapshot)
+    {
+        if (truncationSnapshot) {
+            writeIv2ViableReplayEntry();
+        }
+        return new CountDownLatch(0);
     }
 }

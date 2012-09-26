@@ -117,6 +117,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             + "trying. Retrying.");
                 }
             }
+            super.acceptPromotion();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
@@ -155,5 +156,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
         m_executionSite.updateCatalog(diffCmds, context, csp, true);
+    }
+
+    @Override
+    public void enableWritingIv2FaultLog() {
+        m_initiatorMailbox.enableWritingIv2FaultLog();
     }
 }
