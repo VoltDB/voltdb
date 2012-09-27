@@ -195,9 +195,11 @@ public class TestMpPromoteAlgo extends TestCase
         algo.deliver(makeRealFragResponse(requestId, 3L, 1, 3, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 3, txnEgo(1000L)));
 
-        // verify exactly 1 repair happened.
+        // Verify that we send a complete to every site.
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
+        needsRepair.add(2L);
+        needsRepair.add(3L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
         Pair<Boolean, Long> real_result = result.get();
         assertEquals(txnEgo(1000L), (long)real_result.getSecond());
@@ -251,19 +253,12 @@ public class TestMpPromoteAlgo extends TestCase
         // 3 loses complete
         algo.deliver(makeRealFragResponse(requestId,     3L, 3, 4, txnEgo(1001L)));
 
-        // First, repair 3
+        // We should send to all hosts in all cases for all non-truncated MP txns now
         List<Long> needsRepair = new ArrayList<Long>();
-        needsRepair.add(3L);
-        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
-        needsRepair.clear();
-        needsRepair.add(2L);
-        needsRepair.add(3L);
-        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
-        needsRepair.clear();
         needsRepair.add(1L);
         needsRepair.add(2L);
         needsRepair.add(3L);
-        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        inOrder.verify(mailbox, times(4)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
 
         Pair<Boolean, Long> real_result = result.get();
         assertEquals(txnEgo(1003L), (long)real_result.getSecond());
