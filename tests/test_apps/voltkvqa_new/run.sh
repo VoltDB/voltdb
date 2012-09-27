@@ -74,9 +74,9 @@ function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.AsyncBenchmark \
-        --displayinterval=2 \
-        --duration=300 \
-        --servers=volt3d,volt3e,volt3f \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \
@@ -86,7 +86,7 @@ function async-benchmark() {
         --entropy=127 \
         --usecompression=false \
         --ratelimit=100000 \
-        --autotune=false \
+        --autotune=true \
         --latencytarget=6
 }
 
