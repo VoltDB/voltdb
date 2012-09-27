@@ -1843,7 +1843,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+        expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
                 ", expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1854,7 +1854,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
+        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
@@ -1866,7 +1866,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0;"
                 );
-        expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
+        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
@@ -1878,7 +1878,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello;"
                 );
-        expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
+        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
@@ -1890,7 +1890,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROGEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello;"
                 );
-        expectedError = "Bad PARTITION DDL statement: " +
+        expectedError = "Invalid PARTITION statement: " +
                 "\"PARTITION PROGEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER " +
                 "COLUMN PKEY PARAMETER hello\", expected syntax: \"PARTITION TABLE <table> " +
                 "ON COLUMN <column>\" or \"PARTITION PROCEDURE <procedure> ON " +
@@ -1903,7 +1903,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
                 );
-        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+        expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
                 ", expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1923,7 +1923,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN;"
                 );
-        expectedError = "Bad indentifier in DDL: \"PARTITION TABLE 1PKEY_INTEGER ON COLUMN PKEY\" " +
+        expectedError = "Unknown indentifier in DDL: \"PARTITION TABLE 1PKEY_INTEGER ON COLUMN PKEY\" " +
                 "contains invalid identifier \"1PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -1933,7 +1933,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \"PARTITION TABLE PKEY_INTEGER ON COLUMN 2PKEY\" " +
+        expectedError = "Unknown indentifier in DDL: \"PARTITION TABLE PKEY_INTEGER ON COLUMN 2PKEY\" " +
                 "contains invalid identifier \"2PKEY\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -1943,7 +1943,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS 0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS 0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger" +
                 "\" contains invalid identifier \"0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1954,7 +1954,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger" +
                 "\" contains invalid identifier \"org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1965,7 +1965,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger" +
                 "\" contains invalid identifier \"org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1976,7 +1976,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE 5NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE 5NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY" +
                 "\" contains invalid identifier \"5NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1987,7 +1987,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE 6PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE 6PKEY_INTEGER COLUMN PKEY" +
                 "\" contains invalid identifier \"6PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1998,7 +1998,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN 7PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN 7PKEY" +
                 "\" contains invalid identifier \"7PKEY\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -2009,7 +2009,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
+        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
@@ -2026,7 +2026,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+        expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -2036,7 +2036,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 0;"
                 );
-        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+        expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -2073,7 +2073,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
                 "PARTITION PROCEDURE 7Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?" +
                 "\" contains invalid identifier \"7Foo\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -2276,10 +2276,10 @@ public class TestVoltCompiler extends TestCase {
     public void testBadRoleDDL() throws Exception {
         badRoleDDL("create role r1", ".*no semicolon.*");
         badRoleDDL("create role r1;create role r1;", ".*already exists.*");
-        badRoleDDL("create role r1 with ;", ".*unexpected token.*");
-        badRoleDDL("create role r1 with blah;", ".*Bad flag \"blah\".*");
-        badRoleDDL("create role r1 with adhoc sysproc;", ".*unexpected token.*");
-        badRoleDDL("create role r1 with adhoc, blah;", ".*Bad flag \"blah\".*");
+        badRoleDDL("create role r1 with ;", ".*Invalid CREATE ROLE statement.*");
+        badRoleDDL("create role r1 with blah;", ".*Invalid permission \"blah\".*");
+        badRoleDDL("create role r1 with adhoc sysproc;", ".*Invalid CREATE ROLE statement.*");
+        badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"blah\".*");
     }
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
@@ -2370,6 +2370,15 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(2, groups.size());
         assertNotNull(groups.get("r1"));
         assertNotNull(groups.get("r2"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create procedure allow r1,r1 from class org.voltdb.compiler.procedures.AddBook;");
+        proc = db.getProcedures().get("AddBook");
+        assertNotNull(proc);
+        groups = proc.getAuthgroups();
+        assertEquals(1, groups.size());
+        assertNotNull(groups.get("r1"));
     }
 
     public void testBadCreateProcedureWithAllow() throws Exception {

@@ -286,13 +286,18 @@ public class DDLCompiler {
      * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE|\\ACREATE\\s{0,1024}ROLE)\\s"
+            "(?i)((?<=\\ACREATE\\s{0,1024})(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE)\\s"
             );
 
     static final String TABLE = "TABLE";
     static final String PROCEDURE = "PROCEDURE";
     static final String PARTITION = "PARTITION";
     static final String REPLICATE = "REPLICATE";
+    static final String ROLE = "ROLE";
+
+    static final String ADHOC = "adhoc";
+    static final String SYSPROC = "sysproc";
+    static final String DEFAULTPROC = "defaultproc";
 
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
@@ -406,7 +411,7 @@ public class DDLCompiler {
         int loc = 0;
         do {
             if( ! Character.isJavaIdentifierStart(identifier.charAt(loc))) {
-                String msg = "Bad indentifier in DDL: \"" +
+                String msg = "Unknown indentifier in DDL: \"" +
                         statement.substring(0,statement.length()-1) +
                         "\" contains invalid identifier \"" + identifier + "\"";
                 throw m_compiler.new VoltCompilerException(msg);
@@ -438,7 +443,7 @@ public class DDLCompiler {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, or PARTITION
+        // either PROCEDURE, REPLICATE, PARTITION, or ROLE
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
@@ -452,7 +457,11 @@ public class DDLCompiler {
             // Add roles if specified.
             if (statementMatcher.group(1) != null) {
                 for (String roleName : StringUtils.split(statementMatcher.group(1), ',')) {
-                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
+                    // Don't put the same role in the list more than once.
+                    String roleNameFixed = roleName.trim().toLowerCase();
+                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
+                        descriptor.m_authGroups.add(roleNameFixed);
+                    }
                 }
             }
 
@@ -496,7 +505,7 @@ public class DDLCompiler {
 
                 if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
-                            "Bad PARTITION DDL statement: \"%s\", " +
+                            "Invalid PARTITION DDL statement: \"%s\", " +
                             "expected syntax: PARTITION TABLE <table> ON COLUMN <column>",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
@@ -516,7 +525,7 @@ public class DDLCompiler {
 
                 if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
-                            "Bad PARTITION DDL statement: \"%s\", " +
+                            "Invalid PARTITION statement: \"%s\", " +
                             "expected syntax: PARTITION PROCEDURE <procedure> ON "+
                             "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
@@ -566,27 +575,28 @@ public class DDLCompiler {
             String roleName = statementMatcher.group(1);
             if (m_groupMap.get(roleName) != null) {
                 throw m_compiler.new VoltCompilerException(String.format(
-                        "Role name \"%s\" in CREATE ROLE DDL statement already exists.",
+                        "Role name \"%s\" in CREATE ROLE statement already exists.",
                         roleName));
             }
             org.voltdb.catalog.Group catGroup = m_groupMap.add(roleName);
             if (statementMatcher.group(2) != null) {
                 for (String tokenRaw : StringUtils.split(statementMatcher.group(2), ',')) {
                     String token = tokenRaw.trim().toLowerCase();
-                    if (token.equals("adhoc")) {
+                    if (ADHOC.equals(token)) {
                         catGroup.setAdhoc(true);
                     }
-                    else if (token.equals("sysproc")) {
+                    else if (SYSPROC.equals(token)) {
                         catGroup.setSysproc(true);
                     }
-                    else if (token.equals("defaultproc")) {
+                    else if (DEFAULTPROC.equals(token)) {
                         catGroup.setDefaultproc(true);
                     }
                     else {
                         throw m_compiler.new VoltCompilerException(String.format(
-                            "Bad flag \"%s\" to CREATE ROLE DDL statement: \"%s\", " +
-                            "expected syntax: CREATE ROLE <role> [WITH adhoc|sysproc|defaultproc ...]",
-                            token, statement.substring(0,statement.length()-1))); // remove trailing semicolon
+                            "Invalid permission \"%s\" in CREATE ROLE statement: \"%s\", " +
+                            "available permissions: %s %s %s", token,
+                            statement.substring(0,statement.length()-1), // remove trailing semicolon
+                            ADHOC, SYSPROC, DEFAULTPROC));
                     }
                 }
             }
@@ -600,7 +610,7 @@ public class DDLCompiler {
 
         if( PARTITION.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Bad PARTITION DDL statement: \"%s\", " +
+                    "Invalid PARTITION statement: \"%s\", " +
                     "expected syntax: \"PARTITION TABLE <table> ON COLUMN <column>\" or " +
                     "\"PARTITION PROCEDURE <procedure> ON " +
                     "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]\"",
@@ -609,16 +619,23 @@ public class DDLCompiler {
 
         if( REPLICATE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Bad REPLICATE DDL statement: \"%s\", " +
+                    "Invalid REPLICATE statement: \"%s\", " +
                     "expected syntax: REPLICATE TABLE <table>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
         if( PROCEDURE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Bad CREATE PROCEDURE DDL statement: \"%s\", " +
+                    "Invalid CREATE PROCEDURE statement: \"%s\", " +
                     "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
                     "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
+        if( ROLE.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE ROLE statement: \"%s\", " +
+                    "expected syntax: CREATE ROLE <role>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
