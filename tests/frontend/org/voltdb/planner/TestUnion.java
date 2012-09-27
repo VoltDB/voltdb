@@ -82,29 +82,84 @@ public class TestUnion  extends TestCase {
         }
     }
 
-    public void testNonSupportedUnions() {
+    public void testExcept() {
+        AbstractPlanNode pn = compile("select A from T1 EXCEPT select B from T2 EXCEPT select C from T3", 0, false, null);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
+        assertTrue(unionPN.getChildCount() == 3);
+        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
+            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
+        }
+    }
+
+    public void testExceptAll() {
+        AbstractPlanNode pn = compile("select A from T1 EXCEPT ALL select B from T2", 0, false, null);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT_ALL);
+        assertTrue(unionPN.getChildCount() == 2);
+        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
+            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
+        }
+    }
+
+    public void testIntersect() {
+        AbstractPlanNode pn = compile("select A from T1 INTERSECT select B from T2 INTERSECT select C from T3", 0, false, null);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT);
+        assertTrue(unionPN.getChildCount() == 3);
+        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
+            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
+        }
+    }
+
+    public void testIntersectAll() {
+        AbstractPlanNode pn = compile("select A from T1 INTERSECT ALL select B from T2", 0, false, null);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT_ALL);
+        assertTrue(unionPN.getChildCount() == 2);
+        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
+            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
+        }
+    }
+
+    public void testMultipleSetOperations() {
         try {
-            aide.compile("select A from T1 INTERSECT select B from T2", 0, false, null);
+            aide.compile("select A from T1 UNION select B from T2 EXCEPT select C from T3", 0, false, null);
+            fail();
+        }
+        catch (Exception ex) {}
+    }
+
+    public void testColumnMismatch() {
+        try {
+            aide.compile("select A, DESC from T1 UNION select B from T2", 0, false, null);
             fail();
         }
         catch (Exception ex) {}
         try {
-            aide.compile("select * from T1 INTERSECT select * from T2", 0, false, null);
+            aide.compile("select B from T2 EXCEPT select A, DESC from T1 ", 0, false, null);
             fail();
         }
         catch (Exception ex) {}
         try {
-            aide.compile("select A from T1 INTERSECT ALL select B from T2", 0, false, null);
+            aide.compile("select B from T2 EXCEPT select F from T1 ", 0, false, null);
+            fail();
+        }
+        catch (Exception ex) {}
+    }
+
+   public void testNonSupportedUnions() {
+        try {
+            aide.compile("select A from T1 NOUNION select B from T2", 0, false, null);
             fail();
         }
         catch (Exception ex) {}
         try {
-            aide.compile("select A from T1 EXCEPT select B from T2", 0, false, null);
-            fail();
-        }
-        catch (Exception ex) {}
-        try {
-            aide.compile("select A from T1 EXCEPT ALL select B from T2", 0, false, null);
+            aide.compile("select A from T1 TERM select B from T2", 0, false, null);
             fail();
         }
         catch (Exception ex) {}
@@ -112,15 +167,8 @@ public class TestUnion  extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestUnion.class.getResource("testjoinorder-ddl.sql"),
-                                         "testjoinorder");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(true);
-        }
+        aide = new PlannerTestAideDeCamp(TestUnion.class.getResource("testunion-ddl.sql"),
+                                         "testunion");
     }
 
     @Override

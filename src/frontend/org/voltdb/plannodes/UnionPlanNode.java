@@ -37,7 +37,7 @@ public class UnionPlanNode extends AbstractPlanNode {
 
     public UnionPlanNode() {
         super();
-        m_unionType = ParsedUnionStmt.UnionType.UNION;
+        m_unionType = ParsedUnionStmt.UnionType.NOUNION;
     }
 
     public UnionPlanNode(ParsedUnionStmt.UnionType unionType) {
@@ -53,7 +53,7 @@ public class UnionPlanNode extends AbstractPlanNode {
     @Override
     public void resolveColumnIndexes()
     {
-        // Should be at least two selects in a join
+        // Should be at least two children in a union
         assert(m_children.size() > 1);
         for (AbstractPlanNode child : m_children)
         {
@@ -65,51 +65,34 @@ public class UnionPlanNode extends AbstractPlanNode {
         return m_unionType;
     }
 
-    /**
-     * Create a DistinctPlanNode that clones the configuration information but
-     * is not inserted in the plan graph and has a unique plan node id.
-     * @return copy
-     */
-    public UnionPlanNode produceCopyForTransformation() {
-        UnionPlanNode copy = new UnionPlanNode(m_unionType);
-        super.produceCopyForTransformation(copy);
-        copy.m_unionType = this.m_unionType;
-
-        // Should be at least two selects in a join
-        assert(m_children.size() > 1);
-        // Better to have PlanNodeFactory
-        for (AbstractPlanNode child : m_children)
-        {
-            AbstractPlanNode childCopy = null;
-            if (child instanceof SeqScanPlanNode) {
-                childCopy = new SeqScanPlanNode();
-            } else if (child instanceof IndexScanPlanNode) {
-                childCopy = new IndexScanPlanNode();
-            } else if (child instanceof NestLoopPlanNode) {
-                childCopy = new NestLoopPlanNode();
-            } else if (child instanceof NestLoopIndexPlanNode) {
-                childCopy = new NestLoopIndexPlanNode();
-            } else if (child instanceof UnionPlanNode) {
-                childCopy = new UnionPlanNode();
-            } else {
-                throw new RuntimeException("Unsupported statement type in UNION");
-            }
-            child.produceCopyForTransformation(childCopy);
-        }
-        return copy;
-    }
-
     @Override
     public void generateOutputSchema(Database db)
     {
         // Should be at least two selects in a join
         assert(m_children.size() > 1);
-        for (AbstractPlanNode child : m_children)
-        {
-            child.generateOutputSchema(db);
-        }
-        // @TODO MIKE - what should be an output schema for union?
+        // The output schema for the union is the output schema from the first expression
+        m_children.get(0).generateOutputSchema(db);
         m_outputSchema = m_children.get(0).getOutputSchema();
+        ArrayList<SchemaColumn> outputColumns = m_outputSchema.getColumns();
+
+        // Then generate schemas for the remaining ones and make sure that they are identical
+        for (int i = 1; i < m_children.size(); ++i)
+        {
+            AbstractPlanNode child = m_children.get(i);
+            child.generateOutputSchema(db);
+            NodeSchema schema = child.getOutputSchema();
+            ArrayList<SchemaColumn> columns = schema.getColumns();
+            if (columns.size() != outputColumns.size()) {
+                throw new RuntimeException("Column number mismatch detected in rows of UNION");
+            }
+            for (int j = 0; j < outputColumns.size(); ++j) {
+                if (outputColumns.get(j).getType() != columns.get(j).getType()) {
+                    throw new RuntimeException("Incompatible data types in UNION");
+                }
+            }
+        }
+        m_outputSchema = m_children.get(0).getOutputSchema();
+        // Then check that they have the same types
    }
 
     @Override

@@ -195,7 +195,9 @@ public class StatementQuery extends StatementDMQL {
             return voltGetXMLSpecification(queryExpr, session);
         } else {
             String unionType = queryExpr.operatorName();
-            if (!"UNION".equalsIgnoreCase(unionType) && !"UNION_ALL".equalsIgnoreCase(unionType)) {
+            if (!"UNION".equalsIgnoreCase(unionType) && !"UNION_ALL".equalsIgnoreCase(unionType) &&
+                !"EXCEPT".equalsIgnoreCase(unionType) && !"EXCEPT_ALL".equalsIgnoreCase(unionType) &&
+                !"INTERSECT".equalsIgnoreCase(unionType) && !"INTERSECT_ALL".equalsIgnoreCase(unionType)) {
                 throw new HSQLParseException(queryExpression.operatorName() + "  tuple set operator is not supported.");
             }
             VoltXMLElement unionExpr = new VoltXMLElement("union");

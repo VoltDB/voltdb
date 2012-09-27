@@ -184,7 +184,7 @@ public class PlanAssembler {
         return false;
     }
 
-    public void verifyTablePatition (AbstractParsedStmt parsedStmt) {
+    public void verifyTablePartition (AbstractParsedStmt parsedStmt) {
         int countOfPartitionedTables = 0;
         Map<String, String> partitionColumnByTable = new HashMap<String, String>();
         // Do we have a need for a distributed scan at all?
@@ -230,7 +230,7 @@ public class PlanAssembler {
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt)
     {
-        verifyTablePatition (parsedStmt);
+        verifyTablePartition (parsedStmt);
 
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {

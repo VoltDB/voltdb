@@ -51,13 +51,6 @@ public class QueryPlanner {
     boolean m_quietPlanner;
     final boolean m_fullDebug;
 
-    class NextPlanParams {
-        // index of the plan currently being "costed"
-        int m_counter = 0;
-        // If plan is final then add Send/Receive pair on top
-        boolean m_isFinal = true;
-    }
-
     /**
      * Initialize planner with physical schema info and a reference to HSQLDB parser.
      *
@@ -155,22 +148,28 @@ public class QueryPlanner {
 
         if (parsedStmt instanceof ParsedUnionStmt) {
 
-            m_assembler.verifyTablePatition(parsedStmt);
+            m_assembler.verifyTablePartition(parsedStmt);
 
             ParsedUnionStmt parsedUnionStmt = (ParsedUnionStmt) parsedStmt;
             ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
 
-            NextPlanParams planParams = new NextPlanParams();
-            planParams.m_isFinal = false;
-            for (AbstractParsedStmt parsedSelectStmt : parsedUnionStmt.m_children) {
-                CompiledPlan bestSelectPlan = getBestCostPlan(parsedSelectStmt, costModel,
-                        sql, joinOrder, stmtName, procName, paramHints, planParams);
+            boolean orderIsDeterministic = true;
+            boolean contentIsDeterministic = true;
+
+            boolean isPlanFinal = false;
+            // Index range for the generated plans for a next statement
+            int planIdRange[] = {0, 1};
+            for (AbstractParsedStmt parsedChildStmt : parsedUnionStmt.m_children) {
+                CompiledPlan bestChildPlan = getBestCostPlan(parsedChildStmt, costModel,
+                        sql, joinOrder, stmtName, procName, paramHints, isPlanFinal, planIdRange);
                 // make sure we got a winner
-                if (bestSelectPlan == null) {
+                if (bestChildPlan == null) {
                     m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
                     return null;
                 }
-                childrenPlans.add(bestSelectPlan);
+                childrenPlans.add(bestChildPlan);
+                orderIsDeterministic = orderIsDeterministic && bestChildPlan.isOrderDeterministic();
+                contentIsDeterministic = contentIsDeterministic && bestChildPlan.isContentDeterministic();
             }
 
             // For now the best plan for union is the sum of best plans for the selects
@@ -178,23 +177,15 @@ public class QueryPlanner {
 
             bestPlan.sql = sql;
 
-            //
-            boolean orderIsDeterministic = true;
-            boolean contentIsDeterministic = true;
-            for (CompiledPlan childPlan: childrenPlans) {
-                orderIsDeterministic = orderIsDeterministic && childPlan.isOrderDeterministic();
-                contentIsDeterministic = contentIsDeterministic && childPlan.isContentDeterministic();
-            }
             bestPlan.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
 
             // compute the cost - total of all children
             bestPlan.cost = 0.0;
-            for (CompiledPlan bestSelectPlan : childrenPlans) {
-                bestPlan.cost += bestSelectPlan.cost;
+            for (CompiledPlan bestChildPlan : childrenPlans) {
+                bestPlan.cost += bestChildPlan.cost;
             }
             // filename for debug output
-            // @TODO need a single plan for the union
-            String filename = String.valueOf(planParams.m_counter++);
+            String filename = Integer.toString(planIdRange[1]);
 
             if (!m_quietPlanner) {
                 if (m_fullDebug) {
@@ -213,10 +204,10 @@ public class QueryPlanner {
                 finalizeOutput(stmtName, procName, filename, stats);
             }
         } else {
-            boolean needSendReceive = true;
-            NextPlanParams planParams = new NextPlanParams();
+            boolean isPlanFinal = true;
+            int planIdRange[] = {0, 1};
             bestPlan = getBestCostPlan(parsedStmt, costModel,
-                    sql, joinOrder, stmtName,procName, paramHints, planParams);
+                    sql, joinOrder, stmtName,procName, paramHints, isPlanFinal, planIdRange);
         }
 
         // make sure we got a winner
@@ -242,7 +233,8 @@ public class QueryPlanner {
             String stmtName,
             String procName,
             ScalarValueHints[] paramHints,
-            NextPlanParams planParams) {
+            boolean isPlanFinal,
+            int planIdRange[]) {
 
     // set up the plan assembler for this statement
     m_assembler.setupForNewPlans(parsedStmt);
@@ -259,7 +251,7 @@ public class QueryPlanner {
     while (true) {
 
         try {
-            rawplan = m_assembler.getNextPlan(planParams.m_isFinal);
+            rawplan = m_assembler.getNextPlan(isPlanFinal);
         }
         // on exception, set the error message and bail...
         catch (PlanningErrorException e) {
@@ -295,7 +287,7 @@ public class QueryPlanner {
             plan.cost = costModel.getPlanCost(stats);
 
             // filename for debug output
-            String filename = String.valueOf(planParams.m_counter++);
+            String filename = String.valueOf(planIdRange[0]++);
 
             // find the minimum cost plan
             if (plan.cost < minCost) {
@@ -315,9 +307,11 @@ public class QueryPlanner {
                 outputExplainedPlan(stmtName, procName, plan, filename);
             }
         }
+        // Advance the unique plan indexes for the next plan if any
+        planIdRange[1] = planIdRange[0];
     }
 
-    if (planParams.m_isFinal && bestPlan != null && !m_quietPlanner) {
+    if (isPlanFinal && bestPlan != null && !m_quietPlanner) {
         finalizeOutput(stmtName, procName, bestFilename, stats);
     }
 

@@ -61,9 +61,71 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C;")
                                  .getResults()[0];
         int c = result.getRowCount();
-        System.out.println("testUnionAll " + c);
         assertEquals(5, result.getRowCount());
     }
+
+    public void testExcept() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertA", 0, 1);
+        client.callProcedure("InsertA", 1, 1);
+        client.callProcedure("InsertA", 2, 1);
+        client.callProcedure("InsertB", 1, 2);
+        client.callProcedure("InsertC", 1, 1);
+        client.callProcedure("InsertC", 2, 2);
+        client.callProcedure("InsertC", 3, 3);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A EXCEPT SELECT I FROM B EXCEPT SELECT I FROM C;")
+                                 .getResults()[0];
+        assertEquals(1, result.getRowCount());
+    }
+
+    public void testExceptAll() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertA", 0, 0);
+        client.callProcedure("InsertA", 1, 0);
+        client.callProcedure("InsertA", 2, 1);
+        client.callProcedure("InsertA", 3, 2);
+        client.callProcedure("InsertA", 4, 2);
+        client.callProcedure("InsertB", 1, 1);
+        client.callProcedure("InsertB", 2, 2);
+        client.callProcedure("InsertB", 3, 2);
+        client.callProcedure("InsertB", 4, 3);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT ALL SELECT I FROM B;")
+                                 .getResults()[0];
+        assertEquals(2, result.getRowCount());
+    }
+
+    public void testIntersect() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertA", 0, 0);
+        client.callProcedure("InsertA", 1, 1);
+        client.callProcedure("InsertA", 2, 1);
+        client.callProcedure("InsertB", 1, 0);
+        client.callProcedure("InsertB", 2, 1);
+        client.callProcedure("InsertB", 3, 2);
+        client.callProcedure("InsertC", 1, 1);
+        client.callProcedure("InsertC", 2, 2);
+        client.callProcedure("InsertC", 3, 0);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT SELECT I FROM B INTERSECT SELECT I FROM C;")
+                                 .getResults()[0];
+        assertEquals(2, result.getRowCount());
+    }
+
+    public void testIntersectAll() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertA", 0, 0);
+        client.callProcedure("InsertA", 1, 1);
+        client.callProcedure("InsertA", 2, 1);
+        client.callProcedure("InsertB", 1, 0);
+        client.callProcedure("InsertB", 2, 1);
+        client.callProcedure("InsertB", 3, 2);
+        client.callProcedure("InsertC", 1, 1);
+        client.callProcedure("InsertC", 2, 2);
+        client.callProcedure("InsertC", 3, 0);
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL SELECT I FROM B INTERSECT ALL SELECT I FROM C;")
+                                 .getResults()[0];
+        assertEquals(7, result.getRowCount());
+    }
+
 
     private void load(Client client)
     throws NoConnectionsException, IOException, InterruptedException {
@@ -80,7 +142,6 @@ public class TestUnionSuite extends RegressionSuite {
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");
-        project.addStmtProcedure("UnionABC", "SELECT PKEY FROM A UNION SELECT I FROM B UNION SELECT I FROM C;");
 
         // local
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
