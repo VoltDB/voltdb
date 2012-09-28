@@ -51,6 +51,7 @@
     <xsd:all>
       <!-- elements of an all group may appear in any order at most once. -->
       <xsd:element name="groups" type="groupsType" minOccurs="0"/>
+      <xsd:element name="roles" type="rolesType" minOccurs="0"/>
       <xsd:element name="schemas" type="schemasType"/>
       <xsd:element name="procedures" type="proceduresType" minOccurs="0"/>
       <xsd:element name="partitions" type="partitionsType" minOccurs="0"/>
@@ -74,7 +75,21 @@
     </xsd:sequence>
   </xsd:complexType>
 
-  <!-- <schemas> -->
+  <!-- <roles> -->
+  <xsd:complexType name="rolesType">
+    <xsd:sequence>
+      <xsd:element name="role" minOccurs="1" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:attribute name="name" type="xsd:string" use="required"/>
+          <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="defaultproc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+    <!-- <schemas> -->
   <xsd:complexType name="schemasType">
     <xsd:sequence>
       <xsd:element name="schema" minOccurs="1" maxOccurs="unbounded">
@@ -105,6 +120,7 @@
           <xsd:attribute name="class" type="xsd:string" use="required"/>
           <xsd:attribute name="partitioninfo" type="xsd:string"/>
           <xsd:attribute name="groups" type="xsd:string"/>
+          <xsd:attribute name="roles" type="xsd:string"/>
         </xsd:complexType>
       </xsd:element>
     </xsd:sequence>
@@ -151,6 +167,7 @@
       </xsd:element>
     </xsd:all>
     <xsd:attribute name="groups" type="xsd:string"/>
+    <xsd:attribute name="roles" type="xsd:string"/>
   </xsd:complexType>
 
 </xsd:schema>
