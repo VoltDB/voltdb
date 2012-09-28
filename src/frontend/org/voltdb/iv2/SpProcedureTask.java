@@ -106,8 +106,8 @@ public class SpProcedureTask extends ProcedureTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("SpProcedureTask:");
-        sb.append("  TXN ID: ").append(getTxnId());
-        sb.append("  SP HANDLE ID: ").append(getSpHandle());
+        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+        sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }
