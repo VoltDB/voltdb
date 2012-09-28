@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.6
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2012 VoltDB Inc.
@@ -144,15 +144,6 @@ def createAFreshDir(dir):
 def installVoltDB(pkg, release):
     info = {}
     info["ok"] = False
-    if(pkg not in pkgName):
-        info["err"] = "Invalid pkg name: '%s'!" % pkg
-        info["err"] += "\nThe valid pkg names are:\n"
-        for k in pkgName:
-            info["err"] += k + ", "
-        info["err"] = info["err"].strip() # Trim the leading/trailing spaces
-        info["err"] = info["err"][:-1]    # Trim the last char ','
-        return info
-
     thispkg = pkgName[pkg] + '-' + release + "." + tail
     srce = root + thispkg
     dest = logDir + thispkg
@@ -384,7 +375,7 @@ def startTest(testSuiteList):
         logFileC = logDir + e + "_client"
         msg1 = msg2 = None
         print "logFileS = '%s'\nlogFileC = '%s'" % (logFileS, logFileC)
-#        execThisService(service, logFileS, logFileC)
+        execThisService(service, logFileS, logFileC)
         if(e == "helloworld"):
             (result, msg1) = assertHelloWorld(e, logFileC)
             statusBySuite[e] = result
