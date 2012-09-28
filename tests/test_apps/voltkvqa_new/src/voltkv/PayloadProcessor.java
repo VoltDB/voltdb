@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv;
+package voltkvqa_new;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

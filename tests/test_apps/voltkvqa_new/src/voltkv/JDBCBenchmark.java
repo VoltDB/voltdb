@@ -31,7 +31,7 @@
  * transaction), the VoltDB cluster at large is still able to perform at
  * blazing speeds when many clients are connected to it.
  */
-package voltkv;
+package voltkvqa_new;
 
 import java.sql.CallableStatement;
 import java.sql.Connection;

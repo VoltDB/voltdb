@@ -32,7 +32,7 @@
  * blazing speeds when many clients are connected to it.
  */
 
-package voltkv;
+package voltkvqa_new;
 
 import java.util.Random;
 import java.util.Timer;

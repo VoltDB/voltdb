@@ -38,7 +38,7 @@
  * VoltDB cluster with the number of servers required for your needs.
  */
 
-package voltkv;
+package voltkvqa_new;
 
 import java.io.IOException;
 import java.util.Random;

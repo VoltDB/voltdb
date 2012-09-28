@@ -26,7 +26,7 @@
 //   Puts the given Key-Value pair
 
 
-package voltkv.procedures;
+package voltkvqa_new.procedures;
 
 import org.voltdb.*;
 

@@ -6,7 +6,7 @@ APPNAME="voltkv"
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(pwd)/../../bin"
+    VOLTDB_BIN="$(pwd)/../../../bin"
 fi
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
@@ -15,8 +15,8 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
 else
-    VOLTDB_LIB="`pwd`/../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../voltdb"
+    VOLTDB_LIB="`pwd`/../../../lib"
+    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
@@ -67,13 +67,13 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltkv.AsyncBenchmark --help
+    java -classpath obj:$CLASSPATH:obj voltkvqa_new.AsyncBenchmark --help
 }
 
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.AsyncBenchmark \
+        voltkvqa_new.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -94,13 +94,13 @@ function async-benchmark() {
 # Use this target for argument help
 function sync-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltkv.SyncBenchmark --help
+    java -classpath obj:$CLASSPATH:obj voltkvqa_new.SyncBenchmark --help
 }
 
 function sync-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.SyncBenchmark \
+        voltkvqa_new.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -118,13 +118,13 @@ function sync-benchmark() {
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltkv.JDBCBenchmark --help
+    java -classpath obj:$CLASSPATH:obj voltkvqa_new.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.JDBCBenchmark \
+        voltkvqa_new.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost:21212 \
