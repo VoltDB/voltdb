@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.6
+#!/usr/bin/env python
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2012 VoltDB Inc.
@@ -99,49 +99,34 @@ def findSectionInFile(srce, start, end):
     flag = 0
     status = False
     ins = open(srce, "r" )
-    str = None
-    msg = "The Winner is NOT Edwina Burnam"
+    str = ""
     for line in ins:
-        if(line.find(start) > -1):
+        if(flag == 0 and line.find(start) > -1):
             flag = 1
         if(flag == 1):
-            if(str == None):
-                str = line
-            else:
-                str += line
-        if(line.find(end) > -1):
+            str += line
+        if(flag == 1 and line.find(end) > -1):
             flag = 0
             status = True
-            msg = "The Winner is Edwina Burnam"
-    return (status, msg)
+            break
+    return (status, str)
 
 # To read a srouce file 'srce' into an array
 def readFileIntoArray(srce):
-    firstline = None
     content = []
     if(os.path.getsize(srce) > 0):
         with open(srce) as f:
             content = f.readlines()
     return content
 
-# To read the first line of a srouce file 'srce'
-def readFirstLine(srce):
-    firstline = None
-    if(os.path.getsize(srce) > 0):
-        with open(srce) as f:
-            content = f.readlines()
-        firstline = content[0].rstrip()
-    return firstline
-
 # The release number can be optionally passed in from cmdline with -r switch
 # If it's ommitted at cmdline, then this function is called to get the release
 # number from 'version.txt'
 def getReleaseNum():
-    cwd = os.path.realpath(__file__)
     path = os.path.dirname(os.path.abspath(__file__))
     root = path.replace("tests/scripts", "")
     verFile = root + "version.txt"
-    ver = readFirstLine(verFile)
+    ver = readFileIntoArray(verFile)[0].rstrip()
     return ver
 
 # Always create a fresh new subdir
@@ -203,12 +188,11 @@ def installVoltDB(pkg, release):
     return info
 # end of installVoltDB(pkg, release):
 
-# Test Suite can be optionally passed in from cmdline with the swtich '-s'
 # Sample key/val pairs for testSuiteList are:
-# key: voltcache,   val: /tmp/exp_test/voltdb-2.8.1/examples/voltcache
-# key: voter,       val: /tmp/exp_test/voltdb-2.8.1/examples/voter
-# key: voltkv,      val: /tmp/exp_test/voltdb-2.8.1/examples/voltkv
-# key: helloworld', val: /tmp/exp_test/voltdb-2.8.1/doc/tutorials/helloworld
+# key: voltcache,   val: /tmp/<user_name>_exp_test/voltdb-2.8.1/examples/voltcache
+# key: voter,       val: /tmp/<user_name>_exp_test/voltdb-2.8.1/examples/voter
+# key: voltkv,      val: /tmp/<user_name>_exp_test/voltdb-2.8.1/examples/voltkv
+# key: helloworld', val: /tmp/<user_name>_exp_test/voltdb-2.8.1/doc/tutorials/helloworld
 def setTestSuite(dname, suite):
     testSuiteList = {}
     for dirname, dirnames, filenames in os.walk(dname):
@@ -228,7 +212,7 @@ def setTestSuite(dname, suite):
 # Not used yet.
 # It would be necessary if we wanted to run certain queries before 
 def stopPS(ps):
-    print "Going to kill this process: '%d'" % ps.id
+    print "Going to kill this process: '%d'" % ps.pid
     killer = subprocess.Popen("kill -9 %d" % (ps.pid), shell = True)
     killer.communicate()
     if killer.returncode != 0:
@@ -337,8 +321,18 @@ def assertVoter(mod, logC):
     result = False
     aStr = "Voting Results"
     expected = "The Winner is: Edwina Burnam"
+    # The 'section' returned by findSectionInFile is not used here,
+    # However, this piece of info could be used by something else
+    # which calls findSectionInFile().
     (result, section) = findSectionInFile(logC, aStr, expected)
-    return (result, section)
+    if(result == False):
+        expected = "ERROR: The Winner is NOT Edwina Burnam!"
+        # Again, 'section' is not used in this implementation
+        # section += "\n\n" + expected 
+
+    # It could return 'section' in some other implementation
+    # that calls findSectionInFile()
+    return (result, expected) 
 
 # To make sure that we see the key string 'Hola, Mundo!'
 def assertHelloWorld(modulename, logC):
@@ -390,7 +384,7 @@ def startTest(testSuiteList):
         logFileC = logDir + e + "_client"
         msg1 = msg2 = None
         print "logFileS = '%s'\nlogFileC = '%s'" % (logFileS, logFileC)
-        execThisService(service, logFileS, logFileC)
+#        execThisService(service, logFileS, logFileC)
         if(e == "helloworld"):
             (result, msg1) = assertHelloWorld(e, logFileC)
             statusBySuite[e] = result
@@ -500,24 +494,34 @@ if __name__ == "__main__":
     if(releaseNum == None):
         releaseNum = getReleaseNum()
 
-    print "############################################"
-    print "Tested Version in this RUN: %s" % releaseNum
-    if(options.pkg == "all"):
-        print "To test all packages in this RUN: %s" % pkgDict[options.pkg]
+    list = None
+    if(options.pkg in pkgDict):
+        pkgFullName = ""
+        print "############################################"
+        print "Tested Version in this RUN: %s" % releaseNum
+        print "--------------------------------------"
+        if(options.pkg == "all"):
+            list = pkgName.keys()
+            print "To test all packages in this RUN:"
+            print "---------------------------------"
+            for item in pkgName:
+                pkgFullName = pkgName[item] + '-' + releaseNum + "." + tail
+                print "%s - %s" % (pkgDict[item], pkgFullName)
+        else:
+            list = [options.pkg]
+            pkgFullName = pkgName[options.pkg] + '-' + releaseNum + "." + tail
+            print "To test this package only in this RUN:"
+            print "--------------------------------------"
+            print "%s - %s" % (pkgDict[options.pkg], pkgFullName)
+        print "############################################"
     else:
-        print "Tested pkg in this RUN: %s" % pkgDict[options.pkg]
-    print "############################################"
+        print "Unknown package name passed in from cmdline: %s" % options.pkg
+        exit(1)
 
     tf = msg = keys = None
     tfD = defaultdict(dict)
     msgD = defaultdict(dict)
     keysD = defaultdict(dict)
-
-    list = None
-    if(options.pkg == "all"):
-        list = ["comm", "pro", 'voltkv', 'voltcache']
-    else:
-        list = [options.pkg]
 
     for p in list:
         ret = installVoltDB(p, releaseNum)
