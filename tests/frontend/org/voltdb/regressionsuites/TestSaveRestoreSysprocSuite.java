@@ -403,13 +403,14 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
          * partition information.
          */
         Map<Integer, Long> expectedTransactionIds = new HashMap<Integer, Long>();
-        expectedTransactionIds.put(0, 3619631924068352L);
-        expectedTransactionIds.put(1, 3619631924068353L);
+        expectedTransactionIds.put(0, 3619631924101120L);
+        expectedTransactionIds.put(1, 3619631924084737L);
         expectedTransactionIds.put(MpInitiator.MP_INIT_PID, 3619631923249151L);
-        expectedTransactionIds.put(2, 3619631924068354L);
+        expectedTransactionIds.put(2, 3619631924084738L);
 
         JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"));
         JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
+        System.out.println("TRANSACTION IDS: " + transactionIds.toString());
         assertEquals( expectedTransactionIds.size(), transactionIds.length());
 
         for (Map.Entry<Integer, Long> expectedValues : expectedTransactionIds.entrySet()) {

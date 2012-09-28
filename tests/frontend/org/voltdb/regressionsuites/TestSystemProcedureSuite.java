@@ -32,7 +32,6 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -125,11 +124,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertEquals(1, results.length);
         System.out.println("Test initiators table: " + results[0].toString());
-        assertEquals(1, results[0].getRowCount());
-        VoltTableRow resultRow = results[0].fetchRow(0);
-        assertNotNull(resultRow);
-        assertEquals("@Statistics", resultRow.getString("PROCEDURE_NAME"));
-        assertEquals( 1, resultRow.getLong("INVOCATIONS"));
+        //Now two entries because client affinity also does a query
+        assertEquals(2, results[0].getRowCount());
+
+        int counts = 0;
+        while (results[0].advanceRow()) {
+            String procName = results[0].getString("PROCEDURE_NAME");
+            if (procName.equals("@SystemCatalog")) {
+                assertEquals( 1, results[0].getLong("INVOCATIONS"));
+                counts++;
+            } else if (procName.equals("@Statistics")) {
+                assertEquals( 1, results[0].getLong("INVOCATIONS"));
+                counts++;
+            }
+        }
+        assertEquals(2, counts);
 
         //
         // invalid selector

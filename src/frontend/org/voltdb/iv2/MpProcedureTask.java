@@ -17,12 +17,12 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -36,7 +36,7 @@ import org.voltdb.utils.LogKeys;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-    final long[] m_initiatorHSIds;
+    final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     final Iv2InitiateTaskMessage m_msg;
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
@@ -48,7 +48,19 @@ public class MpProcedureTask extends ProcedureTask
                                      buddyHSId),
               queue);
         m_msg = msg;
-        m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
+        m_initiatorHSIds.addAll(pInitiators);
+    }
+
+    /**
+     * Update the list of partition masters in the event of a failure/promotion.
+     * Currently only thread-"safe" by virtue of only calling this on
+     * MpProcedureTasks which are not at the head of the MPI's TransactionTaskQueue.
+     */
+    public void updateMasters(List<Long> masters)
+    {
+        m_initiatorHSIds.clear();
+        m_initiatorHSIds.addAll(masters);
+        ((MpTransactionState)getTransactionState()).updateMasters(masters);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -88,9 +100,10 @@ public class MpProcedureTask extends ProcedureTask
                 m_txn.txnId,
                 m_txn.isReadOnly(),
                 m_txn.needsRollback(),
-                false);  // really don't want to have ack the ack.
+                false,  // really don't want to have ack the ack.
+                false);
         complete.setTruncationHandle(m_msg.getTruncationHandle());
-        m_initiator.send(m_initiatorHSIds, complete);
+        m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txn.setDone();
         m_queue.flush();
     }
@@ -100,8 +113,8 @@ public class MpProcedureTask extends ProcedureTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("MpProcedureTask:");
-        sb.append("  TXN ID: ").append(getTxnId());
-        sb.append("  SP HANDLE ID: ").append(getSpHandle());
+        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+        sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }

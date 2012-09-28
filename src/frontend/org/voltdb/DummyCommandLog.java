@@ -63,4 +63,12 @@ public class DummyCommandLog implements CommandLog {
             Object handle) {
         return false;
     }
+
+    @Override
+    public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+            int partitionId, long spHandle) {
+    }
+
+    @Override
+    public void logIv2MPFault(long txnId) {}
 }

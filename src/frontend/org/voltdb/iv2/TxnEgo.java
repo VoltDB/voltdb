@@ -55,7 +55,7 @@ final public class TxnEgo {
     // to put the legacy transaction id seed in the most significant
     // 40-bits of the 49 bit sequence number (where it existed bit-wise
     // in the legacy id).
-    static final long SEQUENCE_ZERO = (getSequenceZero() - getEpoch());
+    static public final long SEQUENCE_ZERO = (getSequenceZero() - getEpoch());
     private final static long getSequenceZero() {
         Calendar c = Calendar.getInstance();
         c.setTimeInMillis(0);
@@ -127,7 +127,7 @@ final public class TxnEgo {
         return m_wallClock;
     }
 
-    private static long getSequence(long txnId) {
+    public static long getSequence(long txnId) {
         return txnId >> PARTITIONID_BITS;
     }
 
@@ -169,5 +169,11 @@ final public class TxnEgo {
             mask >>>= 1;
         }
         return retval;
+    }
+
+    public static String txnIdToString(long txnId)
+    {
+        return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +
+            TxnEgo.getPartitionId(txnId) + ")";
     }
 }
