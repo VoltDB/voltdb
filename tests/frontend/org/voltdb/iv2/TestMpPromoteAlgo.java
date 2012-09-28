@@ -195,9 +195,11 @@ public class TestMpPromoteAlgo extends TestCase
         algo.deliver(makeRealFragResponse(requestId, 3L, 1, 3, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 3, txnEgo(1000L)));
 
-        // verify exactly 1 repair happened.
+        // Verify that we send a complete to every site.
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
+        needsRepair.add(2L);
+        needsRepair.add(3L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
         Pair<Boolean, Long> real_result = result.get();
         assertEquals(txnEgo(1000L), (long)real_result.getSecond());
@@ -251,19 +253,12 @@ public class TestMpPromoteAlgo extends TestCase
         // 3 loses complete
         algo.deliver(makeRealFragResponse(requestId,     3L, 3, 4, txnEgo(1001L)));
 
-        // First, repair 3
+        // We should send to all hosts in all cases for all non-truncated MP txns now
         List<Long> needsRepair = new ArrayList<Long>();
-        needsRepair.add(3L);
-        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
-        needsRepair.clear();
-        needsRepair.add(2L);
-        needsRepair.add(3L);
-        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
-        needsRepair.clear();
         needsRepair.add(1L);
         needsRepair.add(2L);
         needsRepair.add(3L);
-        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        inOrder.verify(mailbox, times(4)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
 
         Pair<Boolean, Long> real_result = result.get();
         assertEquals(txnEgo(1003L), (long)real_result.getSecond());
@@ -297,147 +292,5 @@ public class TestMpPromoteAlgo extends TestCase
         Pair<Boolean, Long> real_result = result.get();
         assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), (long)real_result.getSecond());
     }
-
-
-
-
-
-
-/*
-    // verify that bad request ids are not submitted to the log.
-    @Test
-    public void testStaleResponse() throws Exception
-    {
-        MpPromoteAlgo term = new SpPromoteAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
-        term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
-        assertEquals(0L, term.m_repairLogUnion.size());
-    }
-
-
-
-    // verify that the all-done logic works on replica repair structs
-    @Test
-    public void testRepairLogsAreComplete()
-    {
-        MpPromoteAlgo term = new SpPromoteAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
-        MpPromoteAlgo.ReplicaRepairStruct notDone1 = new SpPromoteAlgo.ReplicaRepairStruct();
-        notDone1.m_receivedResponses = 1;
-        notDone1.m_expectedResponses = 2;
-        assertFalse(notDone1.logsComplete());
-
-        MpPromoteAlgo.ReplicaRepairStruct notDone2 = new SpPromoteAlgo.ReplicaRepairStruct();
-        notDone2.m_receivedResponses = 0;
-        notDone2.m_expectedResponses = 10;
-
-        MpPromoteAlgo.ReplicaRepairStruct done1 = new SpPromoteAlgo.ReplicaRepairStruct();
-        done1.m_receivedResponses = 5;
-        done1.m_expectedResponses = 5;
-        assertTrue(done1.logsComplete());
-
-        MpPromoteAlgo.ReplicaRepairStruct done2 = new SpPromoteAlgo.ReplicaRepairStruct();
-        done2.m_receivedResponses = 10;
-        done2.m_expectedResponses = 10;
-
-        term.m_replicaRepairStructs.put(0L, notDone1);
-        term.m_replicaRepairStructs.put(1L, done1);
-        term.m_replicaRepairStructs.put(2L, notDone2);
-        term.m_replicaRepairStructs.put(3L, done2);
-        assertFalse(term.areRepairLogsComplete());
-
-        term.m_replicaRepairStructs.clear();
-        term.m_replicaRepairStructs.put(2L, notDone2);
-        assertFalse(term.areRepairLogsComplete());
-
-        term.m_replicaRepairStructs.clear();
-        term.m_replicaRepairStructs.put(1L, done1);
-        term.m_replicaRepairStructs.put(3L, done2);
-        assertTrue(term.areRepairLogsComplete());
-
-        term.m_replicaRepairStructs.clear();
-        term.m_replicaRepairStructs.put(3L, done2);
-        assertTrue(term.areRepairLogsComplete());
-    }
-
-
-    // be a little a paranoid about order. note that the union test also verifies
-    // order; unsure this is interesting... This test is on one replica because
-    // I'm not sure that we guarentee the orer of iteration across replicas.
-    @SuppressWarnings("unchecked")
-    @Test
-    public void testRepairSurvivorOrder()
-    {
-        InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        InOrder inOrder = inOrder(mailbox);
-
-        MpPromoteAlgo term = new SpPromoteAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
-
-        // missing 3, 4, 5
-        MpPromoteAlgo.ReplicaRepairStruct r3 = new SpPromoteAlgo.ReplicaRepairStruct();
-        r3.m_maxSpHandleSeen = 2L;
-
-        term.m_replicaRepairStructs.put(3L, r3);
-
-        // build the log
-        long spHandles[] = new long[]{0L, 1L, 2L, 3L, 4L, 5L};
-        Iv2RepairLogResponseMessage msgs[] = new Iv2RepairLogResponseMessage[6];
-        for (int i=1; i < spHandles.length; ++i) {
-            msgs[i] = makeResponse(spHandles[i]);
-            term.m_repairLogUnion.add(msgs[i]);
-        }
-
-        // call the function being tested...
-        term.repairSurvivors();
-
-        List<Long> repair3 = new ArrayList<Long>();
-        repair3.add(3L);
-
-        // verify that r3 saw 3, 4, 5
-        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[3]);
-        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[4]);
-        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[5]);
-
-        // verify exactly 3 repairs happened.
-        verify(mailbox, times(3)).repairReplicasWith(any(repair3.getClass()), any(Iv2RepairLogResponseMessage.class));
-    }
-
-    // Verify that a babysitter update causes the term to be cancelled.
-    @Test
-    public void testMidPromotionReplicaUpdate() throws Exception
-    {
-        final AtomicBoolean promotionResult = new AtomicBoolean(true);
-        final InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-
-        // Stub some portions of a concrete Term instance - this is the
-        // object being tested.
-        final MpPromoteAlgo term = new SpPromoteAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test") {
-            // there aren't replicas to ask for repair logs
-            @Override
-            void prepareForFaultRecovery() {
-            }
-
-        };
-
-        Thread promotionThread = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    promotionResult.set(term.start().get().getFirst());
-                } catch (Exception e) {
-                    System.out.println("Promotion thread threw: " + e);
-                    throw new RuntimeException(e);
-                }
-            }
-        };
-        promotionThread.start();
-
-        // cancel the term as if updateReplica() triggered.
-        term.cancel();
-        promotionThread.join();
-
-        // promotion success must be false after cancel.
-        assertFalse(promotionResult.get());
-    }
-*/
-
 }
 
