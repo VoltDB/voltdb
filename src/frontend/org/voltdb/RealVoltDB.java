@@ -588,8 +588,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class);
-                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir);
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
+                    m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
+                                                                                   m_replicationActive);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB(e.getMessage(), false, null);
                 }
@@ -2149,6 +2150,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     {
         if (m_replicationActive != active) {
             m_replicationActive = active;
+
+            try {
+                JSONStringer js = new JSONStringer();
+                js.object();
+                // Replication role should the be same across the cluster
+                js.key("role").value(getReplicationRole().ordinal());
+                js.key("active").value(m_replicationActive);
+                js.endObject();
+
+                getHostMessenger().getZK().setData(VoltZK.replicationconfig,
+                                                   js.toString().getBytes("UTF-8"),
+                                                   -1);
+            } catch (Exception e) {
+                e.printStackTrace();
+                hostLog.error("Failed to write replication active state to ZK: " +
+                              e.getMessage());
+            }
+
             if (m_nodeDRGateway != null) {
                 m_nodeDRGateway.setActive(active);
             }
