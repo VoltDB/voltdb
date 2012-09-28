@@ -170,4 +170,10 @@ final public class TxnEgo {
         }
         return retval;
     }
+
+    public static String txnIdToString(long txnId)
+    {
+        return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +
+            TxnEgo.getPartitionId(txnId) + ")";
+    }
 }
