@@ -603,6 +603,11 @@ public class SQLCommand
             {
                 printResponse(VoltDB.updateApplicationCatalog(new File((String) objectParams[0]),
                                                               new File((String) objectParams[1])));
+
+                // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
+                Procedures.clear();
+                loadSystemProcedures();
+                loadStoredProcedures(Procedures);
             }
             else
             {

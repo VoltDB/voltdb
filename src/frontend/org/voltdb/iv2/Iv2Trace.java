@@ -73,8 +73,7 @@ public class Iv2Trace
             return "UNUSED";
         }
         else {
-            return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +
-                TxnEgo.getPartitionId(txnId) + ")";
+            return TxnEgo.txnIdToString(txnId);
         }
     }
 
@@ -183,11 +182,12 @@ public class Iv2Trace
                 iv2log.error("FragmentTaskMessage SP HANDLE conflict.  Message: " + ftask.getSpHandle() +
                         ", locally held: " + spHandle);
             }
-            String logmsg = new String("%s %s from %s txnId %s spHandle %s");
+            String logmsg = new String("%s %s from %s txnId %s spHandle %s trunc %s");
             iv2log.trace(String.format(logmsg, label, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(ftask.m_sourceHSId),
                         txnIdToString(ftask.getTxnId()),
-                        txnIdToString(spHandle)));
+                        txnIdToString(spHandle),
+                        txnIdToString(ftask.getTruncationHandle())));
         }
     }
 
