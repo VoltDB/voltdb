@@ -75,6 +75,7 @@ import org.voltdb.compiler.projectfile.ExportType.Tables;
 import org.voltdb.compiler.projectfile.GroupsType;
 import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
+import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
@@ -538,13 +539,23 @@ public class VoltCompiler {
             schemas.add(schema.getPath());
         }
 
-        // groups/group.
+        // groups/group (alias for roles/role).
         if (database.getGroups() != null) {
             for (GroupsType.Group group : database.getGroups().getGroup()) {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
                 catGroup.setAdhoc(group.isAdhoc());
                 catGroup.setSysproc(group.isSysproc());
                 catGroup.setDefaultproc(group.isDefaultproc());
+            }
+        }
+
+        // roles/role (alias for groups/group).
+        if (database.getRoles() != null) {
+            for (RolesType.Role role : database.getRoles().getRole()) {
+                org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
+                catGroup.setAdhoc(role.isAdhoc());
+                catGroup.setSysproc(role.isSysproc());
+                catGroup.setDefaultproc(role.isDefaultproc());
             }
         }
 
@@ -580,7 +591,7 @@ public class VoltCompiler {
         // Actually parse and handle all the DDL
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, partitionMap);
+        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, partitionMap, db.getGroups());
 
         for (final String schemaPath : schemas) {
             File schemaFile = null;
@@ -1495,11 +1506,11 @@ public class VoltCompiler {
         /**
          * message regular expression that pertains to the deprecated element
          */
-        private Pattern messagePattern;
+        private final Pattern messagePattern;
         /**
          * a suggestion string to exaplain alternatives
          */
-        private String suggestion;
+        private final String suggestion;
 
         DeprecatedProjectElement(String messageRegex, String suggestion) {
             this.messagePattern = Pattern.compile(messageRegex);
