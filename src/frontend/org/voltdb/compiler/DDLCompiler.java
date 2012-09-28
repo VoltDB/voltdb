@@ -505,7 +505,7 @@ public class DDLCompiler {
 
                 if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid PARTITION DDL statement: \"%s\", " +
+                            "Invalid PARTITION statement: \"%s\", " +
                             "expected syntax: PARTITION TABLE <table> ON COLUMN <column>",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
