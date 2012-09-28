@@ -34,12 +34,12 @@ java_ext_opts = (
     '-XX:-ReduceInitialCardMarks'
 )
 
-class VerbStart(Verb):
+class VerbStart(VOLT.Verb):
     def __init__(self):
-        Verb.__init__(self, 'start',
-                      description = 'Start the VoltDB server.')
+        VOLT.Verb.__init__(self, 'start',
+                           description = 'Start the VoltDB server.')
     def execute(self, runner):
-        catalog = runner.config.get_required('volt', 'catalog')
+        catalog = runner.config.get_required('volt.catalog')
         if not os.path.exists(catalog):
             runner.shell('volt', 'compile')
         runner.java('org.voltdb.VoltDB', java_ext_opts, 'create', 'catalog', catalog, *runner.args)

@@ -33,10 +33,9 @@ import copy
 import optparse
 
 import vcli_meta
-import vcli_opt
+import vcli_cli
 import vcli_env
 import vcli_util
-import vcli_config
 
 #### Verb runner class
 
@@ -55,7 +54,7 @@ class VerbRunner(object):
         self.project_path = project_path
         self.classpath    = ':'.join(vcli_env.classpath)
         # Extend the classpath if volt.classpath is configured.
-        classpath_ext = self.config.get('volt', 'classpath')
+        classpath_ext = self.config.get('volt.classpath')
         if classpath_ext:
             self.classpath += ':'.join((self.classpath, classpath_ext))
 
@@ -74,7 +73,7 @@ class VerbRunner(object):
             if verb.name == name:
                 break
         else:
-            abort('Verb "%s" (being called by "%s") was not found.' % (name, self.name))
+            self.abort('Verb "%s" (being called by "%s") was not found.' % (name, self.name))
         verb.execute(runner)
 
     def shell(self, *args):
@@ -127,6 +126,8 @@ class VerbRunner(object):
                             usage = '%%prog %s %s' % (verb.name, verb.metadata.usage))
                     parser.print_help()
                     print ''
+                    if verb.metadata.description2:
+                        print verb.metadata.description2.strip()
                     break
             else:
                 vcli_util.error('Verb "%s" was not found.' % verb.name)
@@ -156,14 +157,16 @@ class VoltConfig(vcli_util.PersistentConfig):
     """
     Persistent configuration adds volt-specific messages to generic base class.
     """
-    def get_required(self, section, option):
-        if not self.loaded:
-            self.load()
-        value = self.get(section, option)
+
+    def __init__(self, permanent_path, local_path):
+        vcli_util.PersistentConfig.__init__(self, 'INI', permanent_path, local_path)
+
+    def get_required(self, key):
+        value = self.get(key)
         if value is None:
-            vcli_util.abort('Configuration parameter "%s.%s" was not found.' % (section, option),
+            vcli_util.abort('Configuration parameter "%s.%s" was not found.' % (path, name),
                             'Set parameters using the "config" command, for example:',
-                            ['%s config %s.%s=VALUE' % (vcli_meta.bin_name, section, option)])
+                            ['%s config %s.%s=VALUE' % (vcli_meta.bin_name, path, name)])
         return value
 
 def run_command(description, *cmdargs):
@@ -171,17 +174,22 @@ def run_command(description, *cmdargs):
     Run a command after parsing the command line arguments provided.
     """
     # Determine important paths
-    project_path = os.path.join(os.getcwd(), 'project.xml')
-    config_path  = os.path.join(os.getcwd(), 'volt.cfg')
-    state_path   = os.path.join(os.getcwd(), 'volt_local.cfg')
+    project_path   = os.path.join(os.getcwd(), 'project.xml')
+    permanent_path = os.path.join(os.getcwd(), 'volt.cfg')
+    local_path     = os.path.join(os.getcwd(), 'volt_local.cfg')
 
     # Load the configuration and state
-    config = VoltConfig(state_path, config_path)
+    config = VoltConfig(permanent_path, local_path)
 
     # Parse the command line.
-    processor = vcli_opt.VoltCLICommandProcessor(vcli_meta.verbs,
+    aliases = {}
+    alias_dict = config.query(filter = 'alias.')
+    for key in alias_dict:
+        name = key.split('.', 2)[1]
+        aliases[name] = alias_dict[key]
+    processor = vcli_cli.VoltCLICommandProcessor(vcli_meta.verbs,
                                                  vcli_meta.cli.options,
-                                                 config,
+                                                 aliases,
                                                  vcli_meta.cli.usage,
                                                  '\n'.join((
                                                      description,

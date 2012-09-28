@@ -31,7 +31,7 @@ import sys
 import subprocess
 from xml.etree import ElementTree
 
-import vcli_opt
+import vcli_cli
 
 # Republish all the symbols from _util.
 from _util import *
@@ -42,7 +42,7 @@ def debug(*msgs):
     """
     Display debug message(s) if debug is enabled.
     """
-    if vcli_opt.debug:
+    if vcli_cli.debug:
         display_messages(msgs, tag = 'DEBUG')
 
 def parse_xml(xml_path):
@@ -65,7 +65,7 @@ def run_cmd(cmd, *args):
             fullcmd += ' "%s"' % arg
         else:
             fullcmd += ' %s' % arg
-    if vcli_opt.dryrun:
+    if vcli_cli.dryrun:
         print fullcmd
     else:
         retcode = os.system(fullcmd)
@@ -129,66 +129,142 @@ def merge_java_options(*opts):
                 ret_opts.append(opt)
     return ret_opts
 
-class Config(ConfigParser.SafeConfigParser):
-    """Read access to configuration data."""
+class XMLConfigManager(object):
+    """Loads/saves XML format configuration to and from a dictionary."""
 
-    def __init__(self, *paths):
-        self.paths  = paths
-        self.loaded = False
-        ConfigParser.SafeConfigParser.__init__(self)
+    def load(self, path):
+        parser = ConfigParser.SafeConfigParser()
+        parser.read(path)
+        d = dict()
+        for section in parser.sections():
+            for name, value in parser.items(section):
+                d['%s.%s' % (section, name)] = value
+        return d
 
-    def load(self):
-        self.read(self.paths)
-        self.loaded = True
+    def save(self, path, d):
+        parser = ConfigParser.SafeConfigParser()
+        keys = d.keys()
+        keys.sort()
+        cur_section = None
+        for key in keys:
+            section, name = key.split('.', 1)
+            if cur_section is None or section != cur_section:
+                parser.add_section(section)
+                cur_section = section
+            parser.set(cur_section, name, d[name])
+        with open(path, 'w') as f:
+            parser.write(f)
 
-    def get(self, section, option):
-        if not self.loaded:
-            self.load()
-        try:
-            return ConfigParser.SafeConfigParser.get(self, section, option)
-        except ConfigParser.NoSectionError:
-            return None
-        except ConfigParser.NoOptionError:
-            return None
+class INIConfigManager(object):
+    """Loads/saves INI format configuration to and from a dictionary."""
 
-    def items(self, section):
-        if not self.loaded:
-            self.load()
-        try:
-            items = ConfigParser.SafeConfigParser.items(self, section)
-            items.sort(cmp = lambda x, y: cmp(x[0], y[0]))
-            return items
-        except ConfigParser.NoSectionError:
-            return []
+    def load(self, path):
+        parser = ConfigParser.SafeConfigParser()
+        parser.read(path)
+        d = dict()
+        for section in parser.sections():
+            for name, value in parser.items(section):
+                d['%s.%s' % (section, name)] = value
+        return d
 
-    def __enter__(self):
-        self.load()
+    def save(self, path, d):
+        parser = ConfigParser.SafeConfigParser()
+        keys = d.keys()
+        keys.sort()
+        cur_section = None
+        for key in keys:
+            if key.find('.') == -1:
+                abort('Key "%s" must have a section, e.g. "volt.%s"' % (key, key))
+            else:
+                section, name = key.split('.', 1)
+            if cur_section is None or section != cur_section:
+                parser.add_section(section)
+                cur_section = section
+            parser.set(cur_section, name, d[key])
+        with open(path, 'w') as f:
+            parser.write(f)
 
-    def __exit__(self, type, value, traceback):
-        pass
+class PersistentConfig(object):
+    """Persistent access to configuration data. Manages two configuration
+    files, one for permanent configuration and the other for local state."""
 
-class PersistentConfig(Config):
-    """Persistent access to configuration data. One path is designated to
-    contain persistent state."""
+    def __init__(self, format, permanent_path, local_path):
+        """
+        Construct persistent configuration based on specified format name, path
+        to permanent config file, and path to local config file.
+        """
+        self.permanent_path = permanent_path
+        self.local_path     = local_path
+        if format.lower() == 'ini':
+            self.config_manager = INIConfigManager()
+        else:
+            abort('Unsupported configuration format "%s".' % format)
+        self.permanent = self.config_manager.load(self.permanent_path)
+        self.local     = self.config_manager.load(self.local_path)
 
-    def __init__(self, state_path, *paths):
-        Config.__init__(self, state_path, *paths)
-        self.state_path = state_path
+    def save_permanent(self):
+        """
+        Save the permanent configuration.
+        """
+        self.config_manager.save(self.permanent_path, self.permanent)
 
-    def save(self):
-        with open(self.state_path, 'w') as f:
-            ConfigParser.SafeConfigParser.write(self, f)
+    def save_local(self):
+        """
+        Save the local configuration (overrides and additions to permanent).
+        """
+        self.config_manager.save(self.local_path, self.local)
 
-    def set(self, section, option, value):
-        if not self.loaded:
-            self.load()
-        if not self.has_section(section):
-            self.add_section(section)
-        ConfigParser.SafeConfigParser.set(self, section, option, value)
-        self.save()
+    def get(self, key):
+        """
+        Get a value for a key from the merged configuration.
+        """
+        if key in self.local:
+            return self.local[key]
+        return self.permanent.get(key, None)
 
-    def __enter__(self):
-        self.load()
+    def set_permanent(self, key, value):
+        """
+        Set a key/value pair in the permanent configuration.
+        """
+        self.permanent[key] = value
+        self.save_permanent()
 
-    def __exit__(self, type, value, traceback):
-        self.save()
+    def set_local(self, key, value):
+        """
+        Set a key/value pair in the local configuration.
+        """
+        self.local[key] = value
+        self.save_local()
+
+    def query(self, filter = filter):
+        """
+        Query for keys and values as a merged dictionary.
+        The optional filter is matched against the start of each key.
+        """
+        if filter:
+            results = {}
+            for key in self.local:
+                if key.startswith(filter):
+                    results[key] = self.local[key]
+            for key in self.permanent:
+                if key not in results and key.startswith(filter):
+                    self.results[key] = self.permanent[key]
+        else:
+            results = self.local
+            for key in self.permanent:
+                if key not in results:
+                    self.results[key] = self.permanent[key]
+        return results
+
+    def query_pairs(self, filter = None):
+        """
+        Query for keys and values as a sorted list of (key, value) pairs.
+        The optional filter is matched against the start of each key.
+        """
+        d = self.query(filter = filter)
+        keys = d.keys()
+        keys.sort()
+        results = []
+        for key in keys:
+            results.append((key, d[key]))
+        return results

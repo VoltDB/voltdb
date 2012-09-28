@@ -53,7 +53,7 @@ __author__ = 'scooper'
 import sys
 import os
 
-version = "0.9"
+version = '0.9'
 description = '''\
 This is the command line interface to VoltDB development functions.
 '''

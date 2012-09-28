@@ -1,11 +1,5 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
-
-# Copyright (C) 2008-2011 VoltDB Inc.
-#
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -17,7 +11,7 @@
 #
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -26,12 +20,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-description = 'This is the command line interface to the Voter sample application.'
+# Contains all the commands provided by the "voter" command.
 
-# Add the voltcli library to the Python system path.
-import sys
-sys.path.insert(0, '../../lib/voltcli')
+import os
+import vcli_util
 
-if __name__ == '__main__':
-    import vcli_run
-    vcli_run.main(version, description)
+class Test1(VOLT.Verb):
+    def __init__(self):
+        VOLT.Verb.__init__(self, 'test1',
+                           description = 'Run test 1.',
+                           passthrough = True)
+    def execute(self, runner):
+        if not os.path.exists('voter.jar'):
+            runner.run('compile')
+        runner.java('voter.AsyncBenchmark', None, *runner.args)

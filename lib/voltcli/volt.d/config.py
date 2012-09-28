@@ -27,29 +27,21 @@
 
 import vcli_util
 
-class VerbConfig(VOLT.Verb):
-
-    def __init__(self):
-        VOLT.Verb.__init__(self, 'config',
-                           description = 'Configure project settings.',
-                           usage       = 'NAME=VALUE ...')
-
-    def execute(self, runner):
-        if not runner.args:
-            vcli_util.abort('At least one argument is required.')
-        bad = []
-        for arg in runner.args:
-            if arg.find('=') == -1:
-                bad.append(arg)
-        if bad:
-            vcli_util.abort('Bad arguments (must be NAME=VALUE format):', bad)
-        with runner.config:
-            for arg in runner.args:
-                full_name, value = [s.strip() for s in arg.split('=', 1)]
-                try:
-                    section, option = full_name.split('.')
-                except ValueError:
-                    vcli_util.abort('Parameter name must be in section.name format. E.g.',
-                                        ['SECTION.%s=%s' % (full_name, value)])
-                runner.config.set(section, option, value)
-                vcli_util.info('Configuration: %s.%s=%s' % (section, option, value))
+@Command(description = 'Configure project settings.',
+         usage       = 'KEY=VALUE ...')
+def config(runner):
+    if not runner.args:
+        vcli_util.abort('At least one argument is required.')
+    bad = []
+    for arg in runner.args:
+        if arg.find('=') == -1:
+            bad.append(arg)
+    if bad:
+        vcli_util.abort('Bad arguments (must be KEY=VALUE format):', bad)
+    for arg in runner.args:
+        key, value = [s.strip() for s in arg.split('=', 1)]
+        # Default to 'volt.' if simple name is given.
+        if key.find('.') == -1:
+            key = 'volt.%s' % key
+        runner.config.set_local(key, value)
+        vcli_util.info('Configuration: %s=%s' % (key, value))

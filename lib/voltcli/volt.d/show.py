@@ -25,21 +25,45 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
+import vcli_util
 
-java_ext_opts = (
-    '-server',
-    '-XX:+HeapDumpOnOutOfMemoryError',
-    '-XX:HeapDumpPath=/tmp',
-    '-XX:-ReduceInitialCardMarks'
+def show_config(runner, *args):
+    if not args:
+        # All labels.
+        for (key, value) in runner.config.query_pairs():
+            print '%s=%s' % (key, value)
+    else:
+        # Specific keys requested.
+        for filter in args:
+            n = 0
+            for (key, value) in runner.config.query_pairs(filter = filter):
+                print '%s=%s' % (key, d[key])
+                n += 1
+            if n == 0:
+                print '%s *not found*' % filter
+
+subcommands = dict(
+    config = show_config,
 )
 
-class VerbRejoin(VOLT.Verb):
-    def __init__(self):
-        VOLT.Verb.__init__(self, 'rejoin',
-                           description = 'Rejoin the VoltDB cluster.')
-    def execute(self, runner):
-        catalog = runner.config.get_required('volt.catalog')
-        if not os.path.exists(catalog):
-            runner.shell('volt', 'compile')
-        runner.java('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)
+@Command(description = 'Display various types of information.',
+         usage = 'SUB_COMMAND [ARGUMENT ...]',
+         description2 = '''
+Sub-Commands:
+
+    Display all or specific configuration key/value pairs.
+
+        show config [KEY ...]
+''')
+def show(runner):
+    if not runner.args:
+        vcli_util.error('No sub-command specified for "show".')
+        runner.help()
+    else:
+        subcommand = runner.args[0].lower()
+        subargs = runner.args[1:]
+        if subcommand in subcommands:
+            subcommands[subcommand](runner, *subargs)
+        else:
+            vcli_util.error('Invalid sub-command "%s" specified.' % subcommand)
+            runner.help()

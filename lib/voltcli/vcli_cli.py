@@ -48,10 +48,10 @@ class VoltCLICommandProcessor(optparse.OptionParser):
     and verb-specific arguments and options.
     '''
 
-    def __init__(self, verbs, options, config, usage, description, version):
+    def __init__(self, verbs, options, aliases, usage, description, version):
         self.verbs   = verbs
         self.options = options
-        self.config  = config
+        self.aliases = aliases
         full_usage = '%s\n' % usage
         for verb in verbs:
             full_usage += '\n       %%prog %s %s' % (verb.name, verb.metadata.usage)
@@ -98,18 +98,16 @@ class VoltCLICommandProcessor(optparse.OptionParser):
 
         # Resolve an alias (not recursive).
         verb_name = cmdargs[iverb].lower()
-        for alias_name, alias_value in self.config.items('aliases'):
-            if alias_name == verb_name:
-                # Use shell-style splitting to get mapped verb and arguments.
-                alias_tokens = shlex.split(alias_value)
-                if len(alias_tokens) == 0:
-                    self._abort('Missing alias definition for "%s"' % alias_name)
-                # The first token is the mapped verb
-                verb_name = alias_tokens[0]
-                # Prepend the remaing arguments to the command line arguments.
-                if len(alias_tokens) > 1:
-                    args = alias_tokens[1:] + args
-                break
+        if verb_name in self.aliases:
+            # Use shell-style splitting to get mapped verb and arguments.
+            alias_tokens = shlex.split(self.aliases[verb_name])
+            if len(alias_tokens) == 0:
+                self._abort('Missing alias definition for "%s"' % verb_name)
+            # The first token is the mapped verb
+            verb_name = alias_tokens[0]
+            # Prepend the remaing arguments to the command line arguments.
+            if len(alias_tokens) > 1:
+                args = alias_tokens[1:] + args
 
         # See if we know about the verb.
         verb = None
@@ -131,7 +129,7 @@ class VoltCLICommandProcessor(optparse.OptionParser):
             if verb.metadata.passthrough:
                 # Provide all options and arguments without processing the options.
                 # E.g. Java programs want to handle all the options without interference.
-                args = tuple(['--'] + list(cmdargs[iverb+1:]))
+                args = cmdargs[iverb+1:]
                 options = None
             else:
                 # Parse the secondary command line.

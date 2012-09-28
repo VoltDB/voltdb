@@ -48,13 +48,27 @@ verbs_subdir = '%s.d' % bin_name
 # can import anything from here.
 sys.path.insert(0, lib_dir)
 
+verbs = []
+
+# @Command decorator
+# Decorator must be called - there must be an argument list, even if empty.
+def Command(*args, **kwargs):
+    def inner_decorator(function):
+        def wrapper(*args, **kwargs):
+            function(*args, **kwargs)
+        global verbs
+        verbs.append(_volt.FunctionVerb(function.__name__, wrapper, *args, **kwargs))
+        return wrapper
+    return inner_decorator
+
 # Verbs support the possible actions.
 # Look for Verb subclasses in the .d subdirectory (relative to this file and to
 # the working directory).
-verbs = _util.find_and_load_subclasses(_volt.Verb,
-                                       (lib_dir, '.'),
-                                       verbs_subdir,
-                                       VOLT = _volt)
+verbs.extend(_util.find_and_load_subclasses(_volt.Verb,
+                                            (lib_dir, '.'),
+                                            verbs_subdir,
+                                            VOLT = _volt,
+                                            Command = Command))
 verbs.sort(cmp = lambda x, y: cmp(x.name, y.name))
 
 # Options define the CLI behavior modifiers.

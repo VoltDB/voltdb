@@ -1,6 +1,7 @@
+#!/usr/bin/env python
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2011 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -25,28 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import vcli_util
+version = '0.9'
+description = 'This is the command line interface to the Voter sample application.'
 
-class VerbShow(VOLT.Verb):
-    def __init__(self):
-        VOLT.Verb.__init__(self, 'configshow',
-                           description = 'Show project settings.',
-                           usage       = '[NAME ...]')
-    def execute(self, runner):
-        if not runner.args:
-            # All labels.
-            for section in runner.config.sections():
-                for name, value in runner.config.items(section):
-                    print '%s.%s=%s' % (section, name, value)
-        else:
-            # Specific section.name items requested.
-            for full_name in runner.args:
-                try:
-                    section, name = full_name.split('.')
-                except ValueError:
-                    vcli_util.abort('Option name format is section.name, e.g. volt.catalog.')
-                value = runner.config.get(section, name)
-                if value is None:
-                    print '%s.%s=%s  *not found*' % (section, name, value)
-                else:
-                    print '%s.%s=%s' % (section, name, value)
+# Add the voltcli library to the Python system path.
+import sys
+sys.path.insert(0, '../../lib/voltcli')
+
+if __name__ == '__main__':
+    import vcli_run
+    vcli_run.main(version, description)

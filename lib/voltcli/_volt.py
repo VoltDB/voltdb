@@ -66,23 +66,17 @@ class Verb(object):
                         % (self.__class__.__name__, self.name))
     def __cmp__(self, other):
         return cmp(self.name, other.name)
+    def help(self, runner):
+        runner.help(self.name)
 
 #### FunctionVerb class
 
 class FunctionVerb(Verb):
     """
-    Verb that wraps any function. Used by @volt_command decorator.
+    Verb that wraps any function. Used by @Command decorator.
     """
     def __init__(self, name, function, **kwargs):
         Verb.__init__(self, name, **kwargs)
         self.function = function
     def execute(self, runner):
         self.function(runner)
-
-#### @volt_command decorator
-
-def volt_command(*args):
-    """
-    @volt_command decorator for declaring functions exported as commands.
-    """
-    return args[0]
