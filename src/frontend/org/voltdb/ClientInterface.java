@@ -99,6 +99,7 @@ import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCacheReader;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -180,6 +181,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
             new HashMap<String, List<InvocationAcceptancePolicy>>();
+
+    /**
+     * For IV2 only: this is used to track the last txnId replicated for a
+     * certain partition, so that duped DR txns can be dropped.
+     */
+    private final Map<Integer, Long> m_partitionTxnIds = new HashMap<Integer, Long>();
 
     /*
      * Allow the async compiler thread to immediately process completed planning tasks
@@ -1024,6 +1031,34 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             Long initiatorHSId = null;
             boolean isShortCircuitRead = false;
 
+            if (invocation.getType() == ProcedureInvocationType.REPLICATED)
+            {
+                int partitionId;
+                if (isSinglePartition) {
+                    partitionId = partitions[0];
+                } else {
+                    partitionId = MpInitiator.MP_INIT_PID;
+                }
+
+                Long lastTxnId = m_partitionTxnIds.get(partitionId);
+                if (lastTxnId != null) {
+                    /*
+                     * Ning - @LoadSinglepartTable and @LoadMultipartTable
+                     * always have the same txnId which is the txnId of the
+                     * snapshot.
+                     */
+                    if (!(invocation.getProcName().equalsIgnoreCase("@LoadSinglepartitionTable") ||
+                            invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
+                            invocation.getOriginalTxnId() <= lastTxnId)
+                    {
+                        hostLog.debug("Dropping duplicate replicated transaction, txnid: " +
+                                invocation.getOriginalTxnId() + ", last seen: " + lastTxnId);
+                        return false;
+                    }
+                }
+                m_partitionTxnIds.put(partitionId, invocation.getOriginalTxnId());
+            }
+
             /*
              * If this is a read only single part, check if there is a local replica,
              * if there is, send it to the replica as a short circuit read
@@ -1657,6 +1692,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchSendSentinel(ByteBuffer buf,
                                             StoredProcedureInvocation invocation)
     {
+        // TODO: need real txnIds for deduping
+
         // First parameter is the partition ID
         sendSentinel(invocation.getOriginalTxnId(),
                      (Integer) invocation.getParameterAtIndex(0));
