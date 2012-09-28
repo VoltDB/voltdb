@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os, sys, shutil, datetime
-from fabric.api import run, cd, local, get, settings, lcd
+from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
 
 username='test'
@@ -37,6 +37,7 @@ def makeReleaseDir(releaseDir):
         shutil.rmtree(releaseDir)
     # create a release dir
     os.makedirs(releaseDir)
+    print "Created dir: " + releaseDir
 
 ################################################
 # BUILD THE COMMUNITY VERSION
@@ -85,6 +86,7 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
 def copyEnterpriseFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/pro/obj/pro/voltdb-ent-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-ent-%s.tar.gz" % (releaseDir, operatingsys, version))
+
 
 ################################################
 # COMPUTE CHECKSUMS
@@ -155,7 +157,7 @@ if len(sys.argv) == 3:
     proTreeish = sys.argv[2]
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
-print "Create link for releases/candidate = %s" % createCandidate 
+print "Create link for releases/candidate = %s" % createCandidate
 
 version = "unknown"
 releaseDir = "unknown"
@@ -163,6 +165,7 @@ releaseDir = "unknown"
 # get ssh config
 volt5f = getSSHInfoForHost("volt5f")
 voltmini = getSSHInfoForHost("voltmini")
+volt12c = getSSHInfoForHost("volt12c")
 
 # build kits on 5f
 with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
@@ -188,6 +191,23 @@ with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key
     buildPro()
     copyEnterpriseFilesToReleaseDir(releaseDir, version, "MAC")
 
+with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_filename=volt12c[0]):
+    debbuilddir = "%s/deb_build/" % builddir
+    run("rm -rf " + debbuilddir)
+    run("mkdir -p " + debbuilddir)
+
+    with cd(debbuilddir):
+        put ("tools/voltdb-install.py",".")
+
+        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', version)
+        put("%s/%s" % (releaseDir, commbld),".")
+        run ("sudo python voltdb-install.py -D " + commbld)
+        get("voltdb_%s-1_amd64.deb" % (version), releaseDir)
+
+        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', version)
+        put("%s/%s" % (releaseDir, entbld),".")
+        run ("sudo python voltdb-install.py -D " + entbld)
+        get("voltdb-ent_%s-1_amd64.deb" % (version), releaseDir)
 
 computeChecksums(releaseDir)
 if createCandidate:
