@@ -195,6 +195,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
 
         switch(funcType) {
+        /*
+         * The types to the FIELD functions parameters are VARCHAR
+         */
         case FunctionId.FUNC_VOLT_FIELD:
             if (nodes[0].dataType == null && nodes[0].isParam) {
                 nodes[0].dataType = Type.SQL_VARCHAR;

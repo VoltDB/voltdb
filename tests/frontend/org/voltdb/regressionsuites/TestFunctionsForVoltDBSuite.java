@@ -487,7 +487,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
         catch(ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains(
-                    "{\"id\":1 \"bool\": false} is not valid JSON"
+                    "'{\"id\":1 \"bool\": false}' is not valid JSON"
                     ));
         }
         try {
@@ -496,7 +496,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
         catch(ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains(
-                    "{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりませ ... is not valid JSON"
+                    "'{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりませ ...' is not valid JSON"
                     ));
         }
     }

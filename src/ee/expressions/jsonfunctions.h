@@ -24,6 +24,7 @@
 #include <sstream>
 
 #include "json_spirit/json_spirit.h"
+#include "stringfunctions.h"
 
 namespace voltdb {
 
@@ -57,7 +58,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
 
     json_spirit::mValue docVal;
 
-    /* if false it is an invalid json */
+    /*
+     * if false it is an invalid JSON. It reports the full JSON doc in the error
+     * message if it is 50 characters or less. If it is longer than 50, it truncates
+     * the reported JSON doc to the first 50 characters, and appends ellipses '...'
+     */
     if (! json_spirit::read(doc, docVal)) {
 
         char msg[1024];
@@ -69,7 +74,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
             elipsed += " ...";
         }
 
-        snprintf(msg, 1024, "%s is not valid JSON", elipsed.c_str());
+        snprintf(msg, sizeof(msg), "'%s' is not valid JSON", elipsed.c_str());
         throw SQLException(SQLException::
                            data_exception_invalid_parameter,
                            msg);
@@ -96,7 +101,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     case json_spirit::int_type:  ss << value.get_int(); break;
     case json_spirit::bool_type: ss << (value.get_bool() ? "true" : "false"); break;
     case json_spirit::real_type: ss << value.get_real(); break;
-    case json_spirit::null_type: return getNullStringValue(); break;
+    case json_spirit::null_type: return getNullStringValue();
     default:
         json_spirit::write(value, ss);
         break;
