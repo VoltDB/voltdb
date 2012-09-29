@@ -15,6 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef STRINGFUNCTIONS_H
+#define STRINGFUNCTIONS_H
+
 namespace voltdb {
 
 static inline int32_t getCharLength(const char *valueChars, const size_t length) {
@@ -306,3 +309,5 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
 }
 
 }
+
+#endif /* STRINGFUNCTIONS_H */
