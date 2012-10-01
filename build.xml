@@ -1981,10 +1981,13 @@ DEBIAN PACKAGE CREATION
 -->
 
 <target name="debian_package"
-	    depends=""
+	    depends="buildinfo"
         description="Create Debian/Ubuntu package. Uses sudo, so it may prompt for a password.">
-    <exec dir="." executable="sudo" failonerror="true">
-        <arg line="python ${base.dir}/tools/voltdb-install.py -D" />
+    <exec executable="sudo" failonerror="true">
+        <arg value="python" />
+        <arg value="${base.dir}/tools/voltdb-install.py" />
+        <arg value="-D" />
+        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz" />
     </exec>
 </target>
 

@@ -278,19 +278,19 @@ public class TestPartitionDDL extends TestCase {
                 new DDL("REPLICATE TABLE books"));
 
         // REPLICATE statement with missing argument.
-        tester.bad(".*Bad REPLICATE DDL statement.*",
+        tester.bad(".*Invalid REPLICATE statement.*",
                 new DDL("REPLICATE TABLE;"));
 
         // REPLICATE statement with too many arguments.
-        tester.bad(".*Bad REPLICATE DDL statement.*",
+        tester.bad(".*Invalid REPLICATE statement.*",
                 new DDL("REPLICATE TABLE books NOW;"));
 
         // REPLICATE with bad table clause.
-        tester.bad(".*Bad REPLICATE DDL statement.*",
+        tester.bad(".*Invalid REPLICATE statement.*",
                 new DDL("REPLICATE TABLEX books;"));
 
         //REPLICATE with bad table identifier
-        tester.bad(".*Bad indentifier in DDL.*",
+        tester.bad(".*Unknown indentifier in DDL.*",
                 new DDL("REPLICATE TABLE 0books;"));
     }
 
@@ -312,19 +312,19 @@ public class TestPartitionDDL extends TestCase {
                 new DDL("PARTITION TABLE books ON COLUMN cash"));
 
         // PARTITION statement with missing arguments.
-        tester.bad(".*Bad PARTITION DDL statement.*",
+        tester.bad(".*Invalid PARTITION statement.*",
                 new DDL("PARTITION TABLE;"));
 
         // PARTITION statement with too many arguments.
-        tester.bad(".*Bad PARTITION DDL statement.*",
+        tester.bad(".*Invalid PARTITION statement.*",
                 new DDL("PARTITION TABLE books ON COLUMN cash COW;"));
 
         // PARTITION statement intermixed with procedure.
-        tester.bad(".*Bad PARTITION DDL statement.*",
+        tester.bad(".*Invalid PARTITION statement.*",
                 new DDL("PARTITION TABLE books PROCEDURE bruha ON COLUMN cash;"));
 
         // PARTITION with bad table clause.
-        tester.bad(".*Bad PARTITION DDL statement.*",
+        tester.bad(".*Invalid PARTITION statement.*",
                 new DDL("PARTITION TABLEX books ON COLUMN cash;"));
     }
 

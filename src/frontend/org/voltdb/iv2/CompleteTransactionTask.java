@@ -62,8 +62,8 @@ public class CompleteTransactionTask extends TransactionTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("CompleteTransactionTask:");
-        sb.append("  TXN ID: ").append(getTxnId());
-        sb.append("  SP HANDLE: ").append(getSpHandle());
+        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+        sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  UNDO TOKEN: ").append(m_txn.getBeginUndoToken());
         sb.append("  MSG: ").append(m_msg.toString());
         return sb.toString();

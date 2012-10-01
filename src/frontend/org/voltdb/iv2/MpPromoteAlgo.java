@@ -59,28 +59,12 @@ public class MpPromoteAlgo implements RepairAlgo
     {
         int m_receivedResponses = 0;
         int m_expectedResponses = -1; // (a log msg cares about this init. value)
-        long m_maxHandleCompleted = Long.MAX_VALUE;
-        long m_minHandleSeen = Long.MAX_VALUE;
 
         // update counters and return the number of outstanding messages.
         boolean update(Iv2RepairLogResponseMessage response)
         {
             m_receivedResponses++;
             m_expectedResponses = response.getOfTotal();
-            // track the oldest MP not truncated from the log.
-            m_minHandleSeen = Math.min(m_minHandleSeen, response.getTxnId());
-            // track the newest MP that was completed.
-            if (response.getPayload() != null &&
-                response.getPayload() instanceof CompleteTransactionMessage) {
-                // this is overly defensive: the replies should always arrive
-                // in increasing handle order.
-                if (m_maxHandleCompleted == Long.MAX_VALUE) {
-                    m_maxHandleCompleted = response.getTxnId();
-                }
-                else {
-                    m_maxHandleCompleted = Math.max(m_maxHandleCompleted, response.getTxnId());
-                }
-            }
             return logsComplete();
         }
 
@@ -88,26 +72,6 @@ public class MpPromoteAlgo implements RepairAlgo
         boolean logsComplete()
         {
             return (m_expectedResponses - m_receivedResponses) == 0;
-        }
-
-        // If the replica saw at least one MP transaction, it requires repair
-        // for all transactions GT the known max completed handle.
-        boolean needs(long handle)
-        {
-            if (m_minHandleSeen != Long.MAX_VALUE) {
-                // must repair if no transactions were completed.
-                if (m_maxHandleCompleted == Long.MAX_VALUE) {
-                    return true;
-                }
-                else if (handle > m_maxHandleCompleted) {
-                    return true;
-                }
-            }
-
-            tmLog.debug("Rejecting repair for " + handle + " minHandleSeen: " + m_minHandleSeen +
-              " maxHandleCompleted: " + m_maxHandleCompleted);
-
-            return false;
         }
     }
 
@@ -237,25 +201,16 @@ public class MpPromoteAlgo implements RepairAlgo
             return;
         }
 
-        int queued = 0;
         tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
-            // survivors that require a repair message for log entry li.
-            List<Long> needsRepair = new ArrayList<Long>(5);
-            for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
-                if  (entry.getValue().needs(li.getTxnId())) {
-                    ++queued;
-                    tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
-                            entry.getValue().m_maxHandleCompleted + ". Repairing with " +
-                            li.getTxnId());
-                    needsRepair.add(entry.getKey());
-                }
-            }
-            if (!needsRepair.isEmpty()) {
-                m_mailbox.repairReplicasWith(needsRepair, createRepairMessage(li));
-            }
+            // send the repair log union to all the survivors. SPIs will ignore
+            // CompleteTransactionMessages for transcations which have already
+            // completed, so this has the effect of making sure that any holes
+            // in the repair log are filled without explicitly having to
+            // discover and track them.
+            tmLog.debug(m_whoami + "repairing: " + m_survivors + " with: " + TxnEgo.txnIdToString(li.getTxnId()));
+            m_mailbox.repairReplicasWith(m_survivors, createRepairMessage(li));
         }
-        tmLog.info(m_whoami + "finished queuing " + queued + " replica repair messages.");
 
         m_promotionResult.done(m_maxSeenTxnId);
     }

@@ -284,6 +284,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
         } else if (functionId == FUNC_VOLT_SQL_ERROR) {
             ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
+        } else if (functionId == FUNC_VOLT_FIELD) {
+            ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
         }
     }
     // May return null, leaving it to the caller (with more context) to generate an exception.

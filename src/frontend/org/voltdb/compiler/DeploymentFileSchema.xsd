@@ -231,6 +231,7 @@
         <xs:complexType>
           <xs:attribute name="name" type="xs:string" use="required"/>
           <xs:attribute name="groups" type="xs:string"/>
+          <xs:attribute name="roles" type="xs:string"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
         </xs:complexType>
       </xs:element>

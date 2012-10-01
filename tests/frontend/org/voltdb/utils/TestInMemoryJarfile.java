@@ -47,8 +47,12 @@ public class TestInMemoryJarfile extends TestCase {
     protected File m_jarPath;
     protected Catalog m_catalog;
     protected Database m_catalogDb;
+    // For backward compatibility test of <groups> and <group> elements.
+    protected File m_jarPathWithGroupInsteadOfRole;
+    protected Catalog m_catalogWithGroupInsteadOfRole;
+    protected Database m_catalogDbWithGroupInsteadOfRole;
 
-    private Catalog createTestJarFile(String jarFileName, boolean adhoc)
+    private Catalog createTestJarFile(String jarFileName, boolean adhoc, String elemPfx)
     {
         String schemaPath = "";
         try {
@@ -58,18 +62,19 @@ public class TestInMemoryJarfile extends TestCase {
             e.printStackTrace();
             System.exit(-1);
         }
-        String simpleProject =
+        String simpleProjectTmpl =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             "<database name='database'>" +
-            "<groups>" +
-            "<group adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='true'/>" +
-            "</groups>" +
+            "<%ss>" +
+            "<%s adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='true'/>" +
+            "</%ss>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
             "<partitions><partition table='WAREHOUSE' column='W_ID' /></partitions>" +
             "</database>" +
             "</project>";
+        String simpleProject = String.format(simpleProjectTmpl, elemPfx, elemPfx, elemPfx);
         System.out.println(simpleProject);
         File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
         String projectPath = projectFile.getPath();
@@ -78,15 +83,25 @@ public class TestInMemoryJarfile extends TestCase {
         return compiler.getCatalog();
     }
 
+    private Catalog createTestJarFile(String jarFileName, boolean adhoc) {
+        return createTestJarFile(jarFileName, adhoc, "role");
+    }
+
     @Override
     protected void setUp() throws Exception {
         System.out.print("START: " + System.currentTimeMillis());
         super.setUp();
-        m_catalog = createTestJarFile("testout.jar", true);
+        m_catalog = createTestJarFile("testout.jar", true, "role");
         assertNotNull(m_catalog);
         m_catalogDb = m_catalog.getClusters().get("cluster").getDatabases().get("database");
         assertNotNull(m_catalogDb);
         m_jarPath = new File("testout.jar");
+        m_catalogWithGroupInsteadOfRole = createTestJarFile("testout_with_groups.jar", true, "group");
+        assertNotNull(m_catalogWithGroupInsteadOfRole);
+        m_catalogDbWithGroupInsteadOfRole = m_catalogWithGroupInsteadOfRole.getClusters().
+                                                get("cluster").getDatabases().get("database");
+        assertNotNull(m_catalogDbWithGroupInsteadOfRole);
+        m_jarPathWithGroupInsteadOfRole = new File("testout_with_groups.jar");
     }
 
     @Override
@@ -137,15 +152,16 @@ public class TestInMemoryJarfile extends TestCase {
         // Create a second jarfile with identical contents
         // Sleep for 5 seconds so the timestamps will differ
         // and cause different global CRCs
+        // Use "group*" element names for backward compatibility test.
         Thread.sleep(5000);
         createTestJarFile("testout-dupe.jar", true);
-        long crc1 = new InMemoryJarfile("testout.jar").getCRC();
+        long crc1 = new InMemoryJarfile(m_jarPath).getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertEquals(crc1, crc2);
 
         // Check the modification times and make sure
         // that they differ in the two jars
-        JarInputStream j_in = new JarInputStream(new FileInputStream("testout.jar"));
+        JarInputStream j_in = new JarInputStream(new FileInputStream(m_jarPath));
         JarEntry entry = j_in.getNextJarEntry();
         long time1 = entry.getTime();
         j_in.close();
@@ -167,5 +183,33 @@ public class TestInMemoryJarfile extends TestCase {
         long crc1 = new InMemoryJarfile("testout.jar").getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertFalse(crc1 == crc2);
+    }
+
+    public void testIdenticalJarContentsWithGroupsMatchCRCs()
+    throws IOException, InterruptedException
+    {
+        // Same as testIdenticalJarContentsMatchCRCs but with <groups>
+        // instead of <roles>.
+        // Create a second jarfile with identical contents
+        // Sleep for 5 seconds so the timestamps will differ
+        // and cause different global CRCs
+        // Use "group*" element names for backward compatibility test.
+        Thread.sleep(5000);
+        createTestJarFile("testout-dupe-groups.jar", true, "group");
+        long crc1 = new InMemoryJarfile(m_jarPathWithGroupInsteadOfRole).getCRC();
+        long crc2 = new InMemoryJarfile("testout-dupe-groups.jar").getCRC();
+        assertEquals(crc1, crc2);
+
+        // Check the modification times and make sure
+        // that they differ in the two jars
+        JarInputStream j_in = new JarInputStream(new FileInputStream(m_jarPathWithGroupInsteadOfRole));
+        JarEntry entry = j_in.getNextJarEntry();
+        long time1 = entry.getTime();
+        j_in.close();
+
+        j_in = new JarInputStream(new FileInputStream("testout-dupe-groups.jar"));
+        entry = j_in.getNextJarEntry();
+        long time2 = entry.getTime();
+        assertFalse(time1 == time2);
     }
 }
