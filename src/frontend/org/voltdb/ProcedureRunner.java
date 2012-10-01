@@ -368,10 +368,6 @@ public class ProcedureRunner {
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, args);
         queuedSQL.stmt = stmt;
-        // log SQL run by all adhocs
-        if (stmt.plan != null) {
-            getTxnState().appendAdHocSQL(stmt.sqlText);
-        }
         m_batch.add(queuedSQL);
     }
 
