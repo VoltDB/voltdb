@@ -366,7 +366,6 @@ def startTest(testSuiteList):
     statusBySuite = {}
     msgBySuite = {}
     keyWordsBySuite = {}
-    keyStrSet = None
     msg = ""
     result = False
     # testSuiteList is a dictionary whose keys are test suite names, e.g. helloworld,
@@ -374,6 +373,7 @@ def startTest(testSuiteList):
     # executable run.sh is in. Note that all run.sh can only be invoked as './run.sh
     # by design.
     for (suiteName, path) in testSuiteList.iteritems():
+        keyStrSet = None
         if suiteName in elem2Test.keys():
             # Could be an overkill
             os.chdir(path)
