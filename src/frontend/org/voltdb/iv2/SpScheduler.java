@@ -34,7 +34,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -295,28 +294,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
         }
-        else if (message instanceof MultiPartitionParticipantMessage) {
-            handleMultipartSentinel((MultiPartitionParticipantMessage)message);
-        }
         else if (message instanceof Iv2LogFaultMessage) {
             handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
-        }
-    }
-
-    /*
-     * Use the sentinel to block the pending tasks queue until the multipart arrives
-     * and forward it to replicas so that their queues are blocked as well.
-     */
-    private void handleMultipartSentinel(
-            MultiPartitionParticipantMessage message) {
-        Iv2Trace.logIv2MultipartSentinel(message, m_mailbox.getHSId(), message.getTxnId());
-        m_pendingTasks.offerMPSentinel(message.getTxnId());
-        if (m_sendToHSIds.size() > 0) {
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
-                    message);
         }
     }
 
