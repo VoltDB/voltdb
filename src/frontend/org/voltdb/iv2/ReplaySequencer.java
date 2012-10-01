@@ -38,6 +38,13 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  * check the return code of <code>offer</code>. If offering makes
  * other messages available, they must be retrieved by calling poll()
  * until it returns null.
+ *
+ * NOTE: messages are sequenced according to the transactionId passed
+ * in to the offer() method. This transaction id may differ from the
+ * value stored in the ReplayEntry.m_firstFragment in the case of
+ * DR fragment tasks. The ReplaySequencer MUST do all txnId comparisons
+ * on the value passed to offer (which becomes a key in m_replayEntries
+ * tree map).
  */
 public class ReplaySequencer
 {
@@ -52,8 +59,6 @@ public class ReplaySequencer
 
         boolean isReady()
         {
-            assert ((m_sentinalTxnId == null || m_firstFragment == null) ||
-                    m_sentinalTxnId.equals(m_firstFragment.getTxnId()));
             return m_sentinalTxnId != null && m_firstFragment != null;
         }
 
@@ -104,15 +109,14 @@ public class ReplaySequencer
         }
         VoltMessage m = m_replayEntries.firstEntry().getValue().poll();
         if (m instanceof FragmentTaskMessage) {
-            m_lastPolledFragmentTxnId = ((FragmentTaskMessage)m).getTxnId();
+            m_lastPolledFragmentTxnId = m_replayEntries.firstEntry().getKey();
         }
         return m;
     }
 
     // Offer a new message. Return false if the offered message can be run immediately.
-    public boolean offer(TransactionInfoBaseMessage in)
+    public boolean offer(long inTxnId, TransactionInfoBaseMessage in)
     {
-        long inTxnId = in.getTxnId();
         ReplayEntry found = m_replayEntries.get(inTxnId);
 
         if (in instanceof MultiPartitionParticipantMessage) {

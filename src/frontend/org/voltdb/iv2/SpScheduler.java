@@ -33,6 +33,8 @@ import java.util.Map.Entry;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -233,11 +235,30 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void deliver(VoltMessage message)
     {
-        // the leader produces a valid replication stream during command log replay
-        if (m_isLeader && message instanceof TransactionInfoBaseMessage &&
-            (((TransactionInfoBaseMessage)message).isForReplay()))
-        {
-            if (!m_replaySequencer.offer((TransactionInfoBaseMessage)message)) {
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean sequenceForCommandLog =
+            (m_isLeader && message instanceof TransactionInfoBaseMessage &&
+             (((TransactionInfoBaseMessage)message).isForReplay()));
+
+        boolean sequenceForDR = m_isLeader &&
+             ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        boolean sequenceForSentinel = m_isLeader &&
+            (message instanceof MultiPartitionParticipantMessage);
+
+        assert(!(sequenceForCommandLog && sequenceForDR));
+
+        if (sequenceForCommandLog || sequenceForSentinel) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+        }
+        else if (sequenceForDR) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+        }
+
+        if (sequenceWithTxnId != Long.MIN_VALUE) {
+            if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage)message)) {
                 deliver2(message);
             }
             else {

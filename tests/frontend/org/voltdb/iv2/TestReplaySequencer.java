@@ -39,26 +39,23 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class TestReplaySequencer extends TestCase
 {
 
-    TransactionInfoBaseMessage makeIv2InitTask(long txnId)
+    TransactionInfoBaseMessage makeIv2InitTask(long unused)
     {
         Iv2InitiateTaskMessage m = mock(Iv2InitiateTaskMessage.class);
-        when(m.getTxnId()).thenReturn(txnId);
         when(m.isForReplay()).thenReturn(true);
         return m;
     }
 
-    TransactionInfoBaseMessage makeSentinel(long txnId)
+    TransactionInfoBaseMessage makeSentinel(long unused)
     {
         MultiPartitionParticipantMessage m = mock(MultiPartitionParticipantMessage.class);
-        when(m.getTxnId()).thenReturn(txnId);
         when(m.isForReplay()).thenReturn(true);
         return m;
     }
 
-    TransactionInfoBaseMessage makeFragment(long txnId)
+    TransactionInfoBaseMessage makeFragment(long unused)
     {
         FragmentTaskMessage m = mock(FragmentTaskMessage.class);
-        when(m.getTxnId()).thenReturn(txnId);
         when(m.isForReplay()).thenReturn(true);
         return m;
     }
@@ -72,11 +69,11 @@ public class TestReplaySequencer extends TestCase
         TransactionInfoBaseMessage sntl = makeSentinel(1L);
         TransactionInfoBaseMessage frag = makeFragment(1L);
 
-        result = dut.offer(sntl);
+        result = dut.offer(1L, sntl);
         assertEquals(true, result);
         assertEquals(null, dut.poll());
 
-        result = dut.offer(frag);
+        result = dut.offer(1L, frag);
         assertEquals(true, result);
         assertEquals(frag, dut.poll());
         assertEquals(null, dut.poll());
@@ -92,14 +89,14 @@ public class TestReplaySequencer extends TestCase
         TransactionInfoBaseMessage frag = makeFragment(1L);
         TransactionInfoBaseMessage frag2 = makeFragment(1L);
 
-        result = dut.offer(sntl);
-        result = dut.offer(frag);
+        result = dut.offer(1L, sntl);
+        result = dut.offer(1L, frag);
         assertEquals(true, result);
         assertEquals(frag, dut.poll());
         assertEquals(null, dut.poll());
 
         // subsequent fragments won't block the queue.
-        result = dut.offer(frag2);
+        result = dut.offer(1L, frag2);
         assertEquals(false, result);
         assertEquals(null, dut.poll());
     }
@@ -113,11 +110,11 @@ public class TestReplaySequencer extends TestCase
         TransactionInfoBaseMessage sntl = makeSentinel(1L);
         TransactionInfoBaseMessage frag = makeFragment(1L);
 
-        result = dut.offer(frag);
+        result = dut.offer(1L, frag);
         assertEquals(true, result);
         assertEquals(null, dut.poll());
 
-        result = dut.offer(sntl);
+        result = dut.offer(1L, sntl);
         assertEquals(true, result);
         assertEquals(frag, dut.poll());
         assertEquals(null, dut.poll());
@@ -129,7 +126,7 @@ public class TestReplaySequencer extends TestCase
         boolean result;
         ReplaySequencer dut = new ReplaySequencer();
         TransactionInfoBaseMessage m = makeIv2InitTask(2L);
-        result = dut.offer(m);
+        result = dut.offer(2L, m);
         assertEquals(false, result);
     }
 
@@ -153,22 +150,22 @@ public class TestReplaySequencer extends TestCase
         ReplaySequencer dut = new ReplaySequencer();
 
         // offer all non-fragment work first..
-        dut.offer(sntl1);
-        dut.offer(sp1a);
-        dut.offer(sp1b);
-        dut.offer(sp1c);
-        dut.offer(sp1d);
-        dut.offer(sntl2);
-        dut.offer(sp2a);
-        dut.offer(sp2b);
-        dut.offer(sp2c);
-        dut.offer(sp2d);
+        dut.offer(1L, sntl1);
+        dut.offer(100L, sp1a);
+        dut.offer(101L, sp1b);
+        dut.offer(102L, sp1c);
+        dut.offer(103L, sp1d);
+        dut.offer(2L, sntl2);
+        dut.offer(104L, sp2a);
+        dut.offer(105L, sp2b);
+        dut.offer(106L, sp2c);
+        dut.offer(107L, sp2d);
 
         // Nothing satisified.
         assertEquals(null, dut.poll());
 
         // Offer the first fragment to free up the first half.
-        dut.offer(frag1);
+        dut.offer(1L, frag1);
         assertEquals(frag1, dut.poll());
         assertEquals(sp1a, dut.poll());
         assertEquals(sp1b, dut.poll());
@@ -177,7 +174,7 @@ public class TestReplaySequencer extends TestCase
         assertEquals(null, dut.poll());
 
         // Offer the second fragment to free up the second half
-        dut.offer(frag2);
+        dut.offer(2L, frag2);
         assertEquals(frag2, dut.poll());
         assertEquals(sp2a, dut.poll());
         assertEquals(sp2b, dut.poll());
@@ -199,21 +196,21 @@ public class TestReplaySequencer extends TestCase
 
         ReplaySequencer dut = new ReplaySequencer();
 
-        dut.offer(sntl1);
-        dut.offer(sntl2);
-        dut.offer(sp2a);
-        dut.offer(sp2b);
+        dut.offer(1L, sntl1);
+        dut.offer(2L, sntl2);
+        dut.offer(104L, sp2a);
+        dut.offer(105L, sp2b);
 
         // Nothing satisified.
         assertEquals(null, dut.poll());
 
         // Offer the first fragment to free up the first half.
-        dut.offer(frag1);
+        dut.offer(1L, frag1);
         assertEquals(frag1, dut.poll());
         assertEquals(null, dut.poll());
 
         // Offer the second fragment to free up the second half
-        dut.offer(frag2);
+        dut.offer(2L, frag2);
         assertEquals(frag2, dut.poll());
         assertEquals(sp2a, dut.poll());
         assertEquals(sp2b, dut.poll());

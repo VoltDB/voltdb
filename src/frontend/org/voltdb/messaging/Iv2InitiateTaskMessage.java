@@ -23,8 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.StoredProcedureInvocation;
 
+import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.StoredProcedureInvocation;
 
 /**
  * Message from a client interface to an initiator, instructing the
@@ -66,8 +67,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         boolean isForReplay)
     {
         super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
-        setTruncationHandle(truncationHandle);
+        super.setOriginalTxnId(invocation.getOriginalTxnId());
 
+        setTruncationHandle(truncationHandle);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
@@ -83,6 +85,12 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
+    }
+
+    @Override
+    public boolean isForDR() {
+        assert(!super.isForDR() || m_invocation.getType() == ProcedureInvocationType.REPLICATED);
+        return super.isForDR();
     }
 
     @Override

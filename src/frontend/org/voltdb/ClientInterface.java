@@ -1677,7 +1677,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void sendSentinelsToAllPartitions(long txnId)
     {
         for (int partition : m_allPartitions) {
-            sendSentinel(TransactionTaskQueue.GENERIC_MP_SENTINEL, partition, false);
+            sendSentinel(txnId, partition, false);
         }
     }
 
