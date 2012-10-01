@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -138,14 +140,17 @@ public abstract class SubPlanAssembler {
         assert(index != null);
         assert(table != null);
 
-        // indexes on generalized expressions are not yet enabled.
-        if ( ! index.getExpressionsjson().equals("")) {
-            return null;
-        }
-
         // indexes are not useful if there are no filter expressions for this table
         if (exprs == null) {
             return null;
+        }
+
+        // Indexes on generalized expressions are handled separately in getRelevantAccessPathForExpressionIndex
+        // Unfortunately, a lot of the logic here is replicated there.
+        // TODO: Consider adapting this original code to the generalized Expression case by re-constituting
+        // the indexed column indexes into the full-blown TupleValueExpressions that they imply.
+        if ( ! index.getExpressionsjson().equals("")) {
+            return getRelevantAccessPathForExpressionIndex(table, exprs, index);
         }
 
         AccessPath retval = new AccessPath();
@@ -157,6 +162,13 @@ public abstract class SubPlanAssembler {
             (index.getType() == IndexType.BALANCED_TREE.getValue()) ||
             (index.getType() == IndexType.BTREE.getValue());
 
+        List<ColumnRef> sortedColumns = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+        int[] colIds = new int[sortedColumns.size()];
+        int ii = 0;
+        for (ColumnRef cr : sortedColumns) {
+            colIds[ii++] = cr.getColumn().getIndex();
+        }
+
         // build a set of all columns we can filter on (using equality for now)
         // sort expressions in to the proper buckets within the access path
         HashMap<Column, ArrayList<AbstractExpression>> eqColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
@@ -164,7 +176,7 @@ public abstract class SubPlanAssembler {
         HashMap<Column, ArrayList<AbstractExpression>> ltColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
         for (AbstractExpression ae : exprs)
         {
-            AbstractExpression expr = getIndexableExpressionForFilter(table, ae);
+            AbstractExpression expr = getIndexableExpressionForFilter(table, ae, colIds, null);
             if (expr != null) {
                 AbstractExpression indexable = expr.getLeft();
                 assert(indexable.getExpressionType() == ExpressionType.VALUE_TUPLE);
@@ -203,34 +215,32 @@ public abstract class SubPlanAssembler {
 
         // See if we can use index scan for ORDER BY.
         // The only scenario where we can use index scan is when the ORDER BY
-        // columns is a subset of the tree index columns, in the same order from
-        // left to right. It also requires that all columns are ordered in the
+        // columns list is a prefix or match of the tree index columns,
+        // in the same order from left to right. It also requires that all columns are ordered in the
         // same direction. For example, if a table has a tree index of columns
-        // A, B, C, then 'ORDER BY A, B', 'ORDER BY A DESC, B DESC, C DESC'
+        // A, B, C, then 'ORDER BY A, B' or 'ORDER BY A DESC, B DESC, C DESC'
         // work, but not 'ORDER BY A, C' or 'ORDER BY A, B DESC'.
+        // Currently only ascending key indexes can be defined and supported.
         if (indexScannable && m_parsedStmt instanceof ParsedSelectStmt) {
             ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
             if (!parsedSelectStmt.orderColumns.isEmpty()) {
-                List<ColumnRef> sortedColumns = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
                 Iterator<ColumnRef> colRefIter = sortedColumns.iterator();
 
                 boolean ascending = parsedSelectStmt.orderColumns.get(0).ascending;
                 for (ParsedColInfo colInfo : parsedSelectStmt.orderColumns) {
+                    // Explicitly advance colRefIter in synch with the loop over orderColumns
+                    // to match the index's "ON" columns with the query's "ORDER BY" columns
                     if (!colRefIter.hasNext()) {
                         retval.sortDirection = SortDirectionType.INVALID;
                         break;
                     }
-
                     ColumnRef colRef = colRefIter.next();
                     if (colInfo.expression instanceof TupleValueExpression &&
                         colInfo.tableName.equals(table.getTypeName()) &&
                         colInfo.columnName.equals(colRef.getColumn().getTypeName()) &&
                         colInfo.ascending == ascending) {
 
-                        if (ascending)
-                            retval.sortDirection = SortDirectionType.ASC;
-                        else
-                            retval.sortDirection = SortDirectionType.DESC;
+                        retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
 
                         retval.use = IndexUseType.INDEX_SCAN;
                     } else {
@@ -350,20 +360,246 @@ public abstract class SubPlanAssembler {
     }
 
     /**
-     * For a given filter expression, get the column involved that is part of the table
-     * specified. For example, "WHERE F_ID = 2" would return F_ID if F_ID is in the table
-     * passed in. For join expressions like, "WHERE F_ID = Q_ID", this returns the column
-     * that is in the table passed in.
+     * Given a table, a set of predicate expressions and a specific index, find the best way to
+     * access the data using the given index, or return null if no good way exists.
      *
-     * This method just sanity-checks some conditions under which using an index
-     * for the given expression would actually make sense and then hands off to
-     * getColumnForFilterExpressionRecursive to do the real work.
+     * @param table The table we want data from.
+     * @param exprs The set of predicate expressions.
+     * @param index The index we want to use to access the data.
+     * @return A valid access path using the data or null if none found.
+     */
+    protected AccessPath getRelevantAccessPathForExpressionIndex(Table table, List<AbstractExpression> exprs, Index index) {
+
+        // This MAY want to happen once when the plan is loaded from the catalog and cached in a sticky cached index-to-expressions map?
+        List<AbstractExpression> indexedExprs;
+        try {
+            indexedExprs = AbstractExpression.fromJSONArrayString(index.getExpressionsjson(), null);
+        } catch (JSONException e) {
+            e.printStackTrace();
+            assert(false);
+            return null;
+        }
+        // There may be a missing step here in which the base column expressions get normalized to the table.
+
+        AccessPath retval = new AccessPath();
+        retval.use = IndexUseType.COVERING_UNIQUE_EQUALITY;
+        retval.index = index;
+
+        // Non-scannable indexes require equality, full coverage expressions
+        final boolean indexScannable =
+            (index.getType() == IndexType.BALANCED_TREE.getValue()) ||
+            (index.getType() == IndexType.BTREE.getValue());
+
+        List<ColumnRef> sortedColumns = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+        int[] colIds = new int[sortedColumns.size()];
+        int ii = 0;
+        for (ColumnRef cr : sortedColumns) {
+            colIds[ii++] = cr.getColumn().getIndex();
+        }
+
+        // build a set of all columns or exprs we can filter on
+        // sort expressions into the proper buckets within the access path
+        HashMap<AbstractExpression, ArrayList<AbstractExpression>> eqExprs = null;
+        HashMap<AbstractExpression, ArrayList<AbstractExpression>> gtExprs = null;
+        HashMap<AbstractExpression, ArrayList<AbstractExpression>> ltExprs = null;
+
+        eqExprs = new HashMap<AbstractExpression, ArrayList<AbstractExpression>>();
+        gtExprs = new HashMap<AbstractExpression, ArrayList<AbstractExpression>>();
+        ltExprs = new HashMap<AbstractExpression, ArrayList<AbstractExpression>>();
+
+        for (AbstractExpression ae : exprs)
+        {
+            AbstractExpression expr = getIndexableExpressionForFilter(table, ae, colIds, indexedExprs);
+            if (expr != null) {
+                AbstractExpression indexable = expr.getLeft();
+                if (expr.getExpressionType() == ExpressionType.COMPARE_EQUAL) {
+                    if (eqExprs.containsKey(indexable) == false) {
+                        eqExprs.put(indexable, new ArrayList<AbstractExpression>());
+                    }
+                    eqExprs.get(indexable).add(expr);
+                    continue;
+                }
+                if ((expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) ||
+                        (expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO)) {
+                    if (gtExprs.containsKey(indexable) == false) {
+                        gtExprs.put(indexable, new ArrayList<AbstractExpression>());
+                    }
+                    gtExprs.get(indexable).add(expr);
+                    continue;
+                }
+                if ((expr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) ||
+                        (expr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO)) {
+                    if (ltExprs.containsKey(indexable) == false) {
+                        ltExprs.put(indexable, new ArrayList<AbstractExpression>());
+                    }
+                    ltExprs.get(indexable).add(expr);
+                    continue;
+                }
+            }
+            retval.otherExprs.add(ae);
+        }
+
+        // See if we can use index scan for ORDER BY.
+        // The only scenario where we can use index scan is when the ORDER BY
+        // columns/expressions list is a prefix or match of the tree index columns/expressions,
+        // in the same order from left to right. It also requires that all columns are ordered in the
+        // same direction. For example, if a table has a tree index of columns
+        // A, B, C, then 'ORDER BY A, B' or 'ORDER BY A DESC, B DESC, C DESC'
+        // work, but not 'ORDER BY A, C' or 'ORDER BY A, B DESC'.
+        // Currently only ascending key indexes can be defined and supported.
+        if (indexScannable && m_parsedStmt instanceof ParsedSelectStmt) {
+            ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
+            if (!parsedSelectStmt.orderColumns.isEmpty()) {
+
+                boolean ascending = parsedSelectStmt.orderColumns.get(0).ascending;
+                int jj = 0;
+                for (ParsedColInfo colInfo : parsedSelectStmt.orderColumns) {
+
+                    // Explicitly advance nextExpr in synch with the loop over orderColumns
+                    // to match the index's "ON" expressions with the query's "ORDER BY" expressions
+                    if (jj >= indexedExprs.size()) {
+                        retval.sortDirection = SortDirectionType.INVALID;
+                        break;
+                    }
+                    AbstractExpression nextExpr = indexedExprs.get(jj++);
+
+                    if (colInfo.expression.equals(nextExpr) && colInfo.ascending == ascending) {
+                        retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
+                        retval.use = IndexUseType.INDEX_SCAN;
+                    } else {
+                        retval.sortDirection = SortDirectionType.INVALID;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // cover as much of the index as possible with comparator expressions that use indexed expressions
+        for (AbstractExpression coveredExpr : indexedExprs) {
+            if (eqExprs.containsKey(coveredExpr) && (eqExprs.get(coveredExpr).size() >= 0)) {
+                AbstractExpression comparator = eqExprs.get(coveredExpr).remove(0);
+                retval.indexExprs.add(comparator);
+                retval.endExprs.add(comparator);
+
+                /*
+                 * The index executor cannot handle desc order if the lookup
+                 * type is equal. This includes partial index coverage cases
+                 * with only equality expressions.
+                 *
+                 * Setting the sort direction to invalid here will make
+                 * PlanAssembler generate a suitable order by plan node after
+                 * the scan.
+                 */
+                if (retval.sortDirection == SortDirectionType.DESC) {
+                    retval.sortDirection = SortDirectionType.INVALID;
+                }
+            } else {
+                if (gtExprs.containsKey(coveredExpr) && (gtExprs.get(coveredExpr).size() >= 0)) {
+                    AbstractExpression comparator = gtExprs.get(coveredExpr).remove(0);
+                    if (retval.sortDirection != SortDirectionType.DESC)
+                        retval.indexExprs.add(comparator);
+                    if (retval.sortDirection == SortDirectionType.DESC)
+                        retval.endExprs.add(comparator);
+
+                    if (comparator.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN)
+                        retval.lookupType = IndexLookupType.GT;
+                    else if (comparator.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO) {
+                        retval.lookupType = IndexLookupType.GTE;
+                    } else
+                        assert (false);
+
+                    retval.use = IndexUseType.INDEX_SCAN;
+                }
+
+                if (ltExprs.containsKey(coveredExpr) && (ltExprs.get(coveredExpr).size() >= 0)) {
+                    AbstractExpression comparator = ltExprs.get(coveredExpr).remove(0);
+                    retval.endExprs.add(comparator);
+                    if (retval.indexExprs.size() == 0) {
+                        // SearchKey is null,but has end key
+                        retval.lookupType = IndexLookupType.GTE;
+                    }
+                }
+
+                // if we didn't find an equality match, we can stop looking
+                // whether we found a non-equality comp or not
+                break;
+            }
+        }
+
+        // index not relevant to expression
+        if (retval.indexExprs.size() == 0 && retval.endExprs.size() == 0 && retval.sortDirection == SortDirectionType.INVALID) {
+            return null;
+        }
+
+        // If IndexUseType is the default of COVERING_UNIQUE_EQUALITY, and not
+        // all columns are covered (but some are with equality)
+        // then it is possible to scan use GTE. The columns not covered will have
+        // null supplied. This will not execute if there is already a GT or LT lookup
+        // type set because those also change the IndexUseType to INDEX_SCAN
+        // Maybe setting the IndexUseType should be done separately from
+        // determining if the last expression is GT/LT?
+        if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY && retval.indexExprs.size() < indexedExprs.size())
+        {
+            retval.use = IndexUseType.INDEX_SCAN;
+            retval.lookupType = IndexLookupType.GTE;
+        }
+
+        if ((indexScannable == false)) {
+            // partial coverage
+            if (retval.indexExprs.size() < indexedExprs.size())
+                return null;
+
+            // non-equality
+            if ((retval.use == IndexUseType.INDEX_SCAN))
+                return null;
+        }
+
+        // add all unused expressions to the retval's other list
+        for (ArrayList<AbstractExpression> list : eqExprs.values()) {
+            assert(list != null);
+            for (AbstractExpression expr : list) {
+                assert(expr != null);
+                retval.otherExprs.add(expr);
+            }
+        }
+        for (ArrayList<AbstractExpression> list : gtExprs.values()) {
+            assert(list != null);
+            for (AbstractExpression expr : list) {
+                assert(expr != null);
+                retval.otherExprs.add(expr);
+            }
+        }
+        for (ArrayList<AbstractExpression> list : ltExprs.values()) {
+            assert(list != null);
+            for (AbstractExpression expr : list) {
+                assert(expr != null);
+                retval.otherExprs.add(expr);
+            }
+        }
+        return retval;
+    }
+
+    /**
+     * For a given filter expression, return a normalized version of it that is always a comparison operator whose
+     * left-hand-side references the table specified and whose right-hand-side does not.
+     * Returns null if no such formulation of the filter expression is possible.
+     * For example, "WHERE F_ID = 2" would return it input intact if F_ID is in the table passed in.
+     * For join expressions like, "WHERE F_ID = Q_ID", it would also return the input expression if F_ID is in the table
+     * but Q_ID is not. If only Q_ID were defined for the table, it would return an expression for (Q_ID = F_ID).
+     * If both Q_ID and F_ID were defined on the table, null would be returned.
+     * Ideally, the left-hand-side expression is intended to be an indexed expression on the table using the current
+     * index. To help reduce false positives, the (base) columns and/or indexed expressions of the index are also
+     * provided to help further reduce non-null returns in uninteresting cases.
      *
      * @param table The table we want the column from.
-     * @param expr The comparison expression to search.
-     * @return The column found or null if none found.
+     * @param expr The comparison expression to qualify and possibly normalize.
+     * @param colIds The columns indexed by a column index -- any of the table's other columns are not interesting.
+     * @param indexedExprs The indexed expressions on the table's columns, for a general expression index
+     * @return A normalized form of expr with the potentially indexed expression on the left-hand-side and the
+     * potential index key expression on the right of a comparison operator
+     * -- or null if the filter can not be expressed in that way.
      */
-    protected AbstractExpression getIndexableExpressionForFilter(Table table, AbstractExpression expr)
+    protected AbstractExpression getIndexableExpressionForFilter(Table table, AbstractExpression expr, int[] colIds, List<AbstractExpression> indexedExprs)
     {
         if (expr == null)
             return null;
@@ -380,8 +616,8 @@ public abstract class SubPlanAssembler {
 
         AbstractExpression indexableExpr = null;
 
-        boolean indexableOnLeft = isIndexableFilterOperand(table, expr.getLeft());
-        boolean indexableOnRight = isIndexableFilterOperand(table, expr.getRight());
+        boolean indexableOnLeft = isIndexableFilterOperand(table, expr.getLeft(), colIds, indexedExprs);
+        boolean indexableOnRight = isIndexableFilterOperand(table, expr.getRight(),  colIds, indexedExprs);
 
         // Left and right columns must not be from the same table,
         // e.g. where t.a = t.b is not indexable with the current technology.
@@ -396,7 +632,7 @@ public abstract class SubPlanAssembler {
         VoltType otherType = null;
         ComparisonExpression normalizedExpr = (ComparisonExpression) expr;
         if (indexableOnLeft) {
-            if (isOperandDependentOnTable(table, expr.getRight())) {
+            if (isOperandDependentOnTable(expr.getRight(), table)) {
                 // Left and right operands must not be from the same table,
                 // e.g. where t.a = t.b is not indexable with the current technology.
                 return null;
@@ -404,7 +640,7 @@ public abstract class SubPlanAssembler {
             indexableExpr = expr.getLeft();
             otherType = expr.getRight().getValueType();
         } else {
-            if (isOperandDependentOnTable(table, expr.getLeft())) {
+            if (isOperandDependentOnTable(expr.getLeft(), table)) {
                 // Left and right operands must not be from the same table,
                 // e.g. where t.a = t.b is not indexable with the current technology.
                 return null;
@@ -424,7 +660,7 @@ public abstract class SubPlanAssembler {
         return normalizedExpr;
     }
 
-    private boolean isOperandDependentOnTable(Table table, AbstractExpression expr) {
+    boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
             //TODO: This clumsy testing of table names regardless of table aliases is
             // EXACTLY why we can't have nice things like self-joins.
@@ -441,11 +677,21 @@ public abstract class SubPlanAssembler {
         return table.getColumns().getIgnoreCase(searchColumnName);
     }
 
-    private boolean isIndexableFilterOperand(Table table, AbstractExpression expr) {
+    private boolean isIndexableFilterOperand(Table table, AbstractExpression expr, int[] colIds, List<AbstractExpression> indexedExprs) {
         assert(expr != null);
         if (expr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+            // This is just a crude filter to eliminate column filters on completely unrelated columns of the index's table.
+            // If the TVE filter is on a column of the index's base table and has a colId ("column index") used by the
+            // index, tentatively accept the filter as relevant.
+            // It may get thrown out later in lots of cases, including:
+            // * when the filtered column is not actually indexed, just a BASE column for a more complex indexed expression, or
+            // * when the column is indexed but AFTER another column or expression that does not have its own filter in the query
+            //   or, on a HASH index, even if it is BEFORE such a non-filtered column or expression.
             TupleValueExpression tve = (TupleValueExpression)expr;
-            //TODO: This clumsy testing of table names regardless of table aliases is
+            if ( ! ArrayUtils.contains(colIds, tve.getColumnIndex())) {
+                return false;
+            }
+            //FIXME: This clumsy testing of table names regardless of table aliases is
             // EXACTLY why we can't have nice things like self-joins.
             if (table.getTypeName().equals(tve.getTableName()))
             {
@@ -453,7 +699,18 @@ public abstract class SubPlanAssembler {
             }
             return false;
         }
-        // In the future, general expressions of one or more of the table's columns will be indexable
+        // More general filtered expressions are pre-qualified more aggressively than simple columns.
+        // They must exactly match an indexed expression.
+        // They can still be thrown out later if the indexed expression is listed AFTER another expression or column
+        // that does not have its own filter in the query
+        // or, on a HASH index, even if it is BEFORE such a non-filtered expression or column.
+        if (indexedExprs != null) {
+            for (AbstractExpression abstractExpression : indexedExprs) {
+                if (expr.equals(abstractExpression)) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -552,7 +809,7 @@ public abstract class SubPlanAssembler {
         // build the list of search-keys for the index in question
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
         for (AbstractExpression expr : path.indexExprs) {
-            AbstractExpression expr2 = ExpressionUtil.getOtherTableExpression(expr, table.getTypeName());
+            AbstractExpression expr2 = TupleValueExpression.getOtherTableExpression(expr, table);
             assert(expr2 != null);
             scanNode.addSearchKeyExpression(expr2);
         }

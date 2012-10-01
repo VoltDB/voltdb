@@ -396,6 +396,32 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return expr;
     }
 
+    public static List<AbstractExpression> fromJSONArrayString(String jsontext, Database db) throws JSONException {
+        JSONArray jarray = new JSONArray(jsontext);
+        return loadFromJSONArray(null, jarray, db);
+    }
+
+    public static List<AbstractExpression> loadFromJSONArray(List<AbstractExpression> starter, JSONObject parent, String key, Database db) throws JSONException {
+        if( parent.isNull( key ) ) {
+            return starter;
+        }
+        JSONArray jarray = parent.getJSONArray( key );
+        return loadFromJSONArray(starter, jarray, db);
+    }
+
+    public static List<AbstractExpression> loadFromJSONArray(List<AbstractExpression> starter, JSONArray jarray, Database db) throws JSONException {
+        List<AbstractExpression> result = starter;
+        if (result == null) {
+            result = new ArrayList<AbstractExpression>();
+        }
+        int size = jarray.length();
+        for( int i = 0 ; i < size; i++ ) {
+            JSONObject tempjobj = jarray.getJSONObject( i );
+            result.add(fromJSONObject(tempjobj, db));
+        }
+        return result;
+    }
+
     public ArrayList<AbstractExpression> findBaseTVEs() {
         return findAllSubexpressionsOfType(ExpressionType.VALUE_TUPLE);
     }

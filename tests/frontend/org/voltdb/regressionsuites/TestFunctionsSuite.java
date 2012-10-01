@@ -56,9 +56,46 @@ public class TestFunctionsSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+    public void testNumericExpressionIndex() throws Exception {
+        System.out.println("STARTING testAbsWithLimit_ENG3572");
+        Client client = getClient();
+        initialLoad(client, "R1");
+
+        ClientResponse cr = null;
+        VoltTable result = null;
+        /*
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                // Test generalized index on a function of a non-indexed column.
+                "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " +
+                // Test generalized index on an expression of multiple columns.
+                "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
+                // Test generalized index on a string function.
+                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE TABLE R1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                // Test unique generalized index on a function of an already indexed column.
+                "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
+        */
+        cr = client.callProcedure("@AdHoc", "select ID from R1 where ABS(ID) > 9 order by NUM, ID");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(5, result.getRowCount());
+    }
+
     public void testAbsWithLimit_ENG3572() throws Exception
     {
-        System.out.println("STARTING testAbs");
+        System.out.println("STARTING testAbsWithLimit_ENG3572");
         Client client = getClient();
         /*
         CREATE TABLE P1 (
@@ -79,29 +116,8 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         System.out.println("STARTING testAbs");
         Client client = getClient();
-        ProcedureCallback callback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
-                }
-            }
-        };
-        /*
-        CREATE TABLE P1 (
-                ID INTEGER DEFAULT '0' NOT NULL,
-                DESC VARCHAR(300),
-                NUM INTEGER,
-                RATIO FLOAT,
-                PAST TIMESTAMP DEFAULT NULL,
-                PRIMARY KEY (ID)
-                );
-        */
-        for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
-            client.drain();
-        }
+        initialLoad(client, "P1");
+
         ClientResponse cr = null;
         VoltTable r = null;
 
@@ -793,6 +809,22 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("Xin@VoltDB", result.getString(1));
     }
 
+    private void initialLoad(Client client, String tableName) throws IOException, NoConnectionsException, InterruptedException {
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+
+        for (int id=7; id < 15; id++) {
+            client.callProcedure(callback, tableName+".insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
+            client.drain();
+        }
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -816,12 +848,16 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "RATIO FLOAT, " +
                 "PAST TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
+
                 // Test generalized index on a function of a non-indexed column.
                 "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " +
+
                 // Test generalized index on an expression of multiple columns.
                 "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
+
                 // Test generalized index on a string function.
                 "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+
                 "CREATE TABLE R1 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "DESC VARCHAR(300), " +
@@ -829,6 +865,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "RATIO FLOAT, " +
                 "PAST TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
+
                 // Test unique generalized index on a function of an already indexed column.
                 "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
                 "";
