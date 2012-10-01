@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.6
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2012 VoltDB Inc.
@@ -366,7 +366,7 @@ def startTest(testSuiteList):
     statusBySuite = {}
     msgBySuite = {}
     keyWordsBySuite = {}
-    keyStrings = None
+    keyStrSet = None
     msg = ""
     result = False
     # testSuiteList is a dictionary whose keys are test suite names, e.g. helloworld,
@@ -384,13 +384,13 @@ def startTest(testSuiteList):
             logFileC = logDir + suiteName + "_client"
             print "Log File for VoltDB Server: '%s'" % logFileS
             print "Log File for VoltDB Client: '%s'" % logFileC
-#            execThisService(service, logFileS, logFileC)
+            execThisService(service, logFileS, logFileC)
             if(suiteName == "helloworld"):
                 (result, msg) = assertHelloWorld(suiteName, logFileC)
             elif(suiteName == "voter"):
                 (result, msg) = assertVoter(suiteName, logFileC)
             elif(suiteName == "voltkv" or suiteName == "voltcache"):
-                (result, msg, keyStrings) = assertVotekv_Votecache(suiteName, logFileC)
+                (result, msg, keyStrSet) = assertVotekv_Votecache(suiteName, logFileC)
         else:
             # Should never fall into this block
             msg = "Unknown Suite Name: '%s'. To be implemented. Exit with an error..." % suiteName
@@ -399,7 +399,7 @@ def startTest(testSuiteList):
 
         statusBySuite[suiteName] = result
         msgBySuite[suiteName] = msg
-        keyWordsBySuite[suiteName] = keyStrings
+        keyWordsBySuite[suiteName] = keyStrSet
 
         os.chdir(origDir)
     # end of for e in testSuiteList:
