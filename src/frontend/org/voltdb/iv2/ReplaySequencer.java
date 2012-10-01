@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
@@ -151,6 +152,23 @@ public class ReplaySequencer
             else {
                 found.addBlockedMessage(ftm);
             }
+        }
+        else if (in instanceof CompleteTransactionMessage) {
+            // already sequenced
+            if (inTxnId <= m_lastPolledFragmentTxnId) {
+                return false;
+            }
+            if (found != null) {
+                found.addBlockedMessage(in);
+            }
+            else {
+                // Always expect to see the fragment first, but there are places in the protocol
+                // where CompleteTransactionMessages may arrive for transactions that this site hasn't
+                // done/won't do, so just tell the caller that we can't do anything with it and hope
+                // the right thing happens.
+                return false;
+            }
+
         }
         else {
             if (m_replayEntries.isEmpty()) {
