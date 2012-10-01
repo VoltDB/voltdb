@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.6
+#!/usr/bin/env python
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2012 VoltDB Inc.
@@ -148,7 +148,7 @@ def installVoltDB(pkg, release):
     srce = root + thispkg
     dest = logDir + thispkg
     cmd = "wget " + srce + " -O " + dest + " 2>/dev/null"
-    print "cmd: %s" % cmd
+    print "To execute this cmd: %s" % cmd
 
     ret = call(cmd, shell=True)
     if ret != 0 or not os.path.exists(dest):
@@ -263,7 +263,7 @@ def execThisService(service, logS, logC):
     cmd = service + " client > " + logC + " 2>&1"
     print "Client - Exec CMD: '%s'" % cmd
     ret = call(cmd, shell=True)
-    print "returning results from service execution: '%s'" % ret
+    print "Returning results from service execution: '%s'" % ret
     client.onecmd("shutdown")
     service_ps.communicate()
 
@@ -366,73 +366,86 @@ def startTest(testSuiteList):
     statusBySuite = {}
     msgBySuite = {}
     keyWordsBySuite = {}
-    for e in testSuiteList:
-        os.chdir(testSuiteList[e])
-        currDir = os.getcwd()
-        service = elem2Test[e]
-        print "===--->>> Start to test this suite: %s\nCurrent Dir: '%s'" % (e, currDir)
-        logFileS = logDir + e + "_server"
-        logFileC = logDir + e + "_client"
-        msg1 = msg2 = None
-        print "logFileS = '%s'\nlogFileC = '%s'" % (logFileS, logFileC)
-        execThisService(service, logFileS, logFileC)
-        if(e == "helloworld"):
-            (result, msg1) = assertHelloWorld(e, logFileC)
-            statusBySuite[e] = result
-            msgBySuite[e] = msg1
-            keyWordsBySuite[e] = None
-        elif(e == "voter"):
-            (result, msg1) = assertVoter(e, logFileC)
-            statusBySuite[e] = result
-            msgBySuite[e] = msg1
-            keyWordsBySuite[e] = None
-        elif(e == "voltkv" or e == "voltcache"):
-            (result, msg1, keys) = assertVotekv_Votecache(e, logFileC)
-            statusBySuite[e] = result
-            msgBySuite[e] = msg1
-            keyWordsBySuite[e] = keys
+    keyStrings = None
+    msg = ""
+    result = False
+    # testSuiteList is a dictionary whose keys are test suite names, e.g. helloworld,
+    # voter, voltkv, & voltcache and the corresponding values are paths where the 
+    # executable run.sh is in. Note that all run.sh can only be invoked as './run.sh
+    # by design.
+    for (suiteName, path) in testSuiteList.iteritems():
+        if suiteName in elem2Test.keys():
+            # Could be an overkill
+            os.chdir(path)
+            currDir = os.getcwd()
+            service = elem2Test[suiteName]
+            print "===--->>> Start to test this suite: %s\nCurrent Directory: '%s'" % (suiteName, currDir)
+            logFileS = logDir + suiteName + "_server"
+            logFileC = logDir + suiteName + "_client"
+            print "Log File for VoltDB Server: '%s'" % logFileS
+            print "Log File for VoltDB Client: '%s'" % logFileC
+#            execThisService(service, logFileS, logFileC)
+            if(suiteName == "helloworld"):
+                (result, msg) = assertHelloWorld(suiteName, logFileC)
+            elif(suiteName == "voter"):
+                (result, msg) = assertVoter(suiteName, logFileC)
+            elif(suiteName == "voltkv" or suiteName == "voltcache"):
+                (result, msg, keyStrings) = assertVotekv_Votecache(suiteName, logFileC)
         else:
             # Should never fall into this block
-            print "e = '%s' ==-->> to be implemented..." % e
-            statusBySuite[e] = False
-            msgBySuite[e] = "Unknown Suite:'%s'. To be implemented..." % e
-            keyWordsBySuite[e] = None
+            msg = "Unknown Suite Name: '%s'. To be implemented. Exit with an error..." % suiteName
+            print "==-->> %s" % msg
+            exit(1)
+
+        statusBySuite[suiteName] = result
+        msgBySuite[suiteName] = msg
+        keyWordsBySuite[suiteName] = keyStrings
 
         os.chdir(origDir)
     # end of for e in testSuiteList:
     return (statusBySuite, msgBySuite, keyWordsBySuite)
 # end of startTest(testSuiteList):
 
-def create_rpt(info, status, msg, keys, elapsed):
+# status, msg, & keyStrings are all 2-D dictionaries, which have the same keys with 
+# different values.
+# First level keys: module name, e.g. comm, pro, voltkv, voltcache
+# Second level keys: suite name, e.g. helloworld, voter, voltkv, voltcache
+# Values for status: True or False, which is the testing status for this suite in this package
+# Values for msg: A descriptive testing message for this suite in this package
+# Values for keyStrings: Only applied for package 'voltkv' & 'voltcache'. If a test suite is
+#                        failed for package either 'voltkv' or 'voltcache', the final report
+#                        will display a list missing strings that are expected in log files
+#                        for client.
+def create_rpt(info, status, msg, keyStrings, elapsed):
     testtime = "%.2f" % elapsed
     testsuites = Element('testsuites', {'time':testtime})
-    for mod in status:
+    for (mod, suiteNameDict) in status.iteritems():
         testsuite = SubElement(testsuites, 'testsuite',
                 {'package':info["pkgname"],'URL':info["srce"],
                  'hostname':hostname, 'name':pkgDict[mod]})
-        for i in status[mod]:
+        for (suitename, status4ThisSuite) in suiteNameDict.iteritems():
             failureCnt = "0"
             errCnt = "0"
-            if(status[mod][i] == False):
+            if(status4ThisSuite == False):
                 failureCnt = "1"
             else:
                 failureCnt = "0"
     
-            print "==-->>suite name: '%s', failureCnt: '%s', status = '%s'" \
-                % (i, failureCnt, status[mod][i])
+            print "==-->>Package Name: '%s', Suite Name: '%s', Status = '%s'" \
+                % (mod, suitename, status4ThisSuite)
             if(info["ok"] == False):
                 errCnt = "1"
             else:
                 errCnt = "0"
             testcase = SubElement(testsuite, 'testcase',
-                {'errors':errCnt,'failures':failureCnt, 'name':i})
+                {'errors':errCnt,'failures':failureCnt, 'name':suitename})
     
             if(failureCnt == "1"):
                 failure = SubElement(testcase, 'failure',
-                        {'Message':msg[mod][i]})
+                        {'Message':msg[mod][suitename]})
                 misStr = None
-                if(keys[mod][i] != None):
-                    for j in keys[mod][i]:
+                if(keyStrings[mod][suitename] != None):
+                    for j in keyStrings[mod][suitename]:
                         if(misStr == None):
                             misStr = j
                         else:
@@ -441,7 +454,7 @@ def create_rpt(info, status, msg, keys, elapsed):
                             {'MissingString':misStr})
             else:
                 failure = SubElement(testcase, 'info',
-                        {'Message':msg[mod][i]})
+                        {'Message':msg[mod][suitename]})
             if(errCnt == "1"):
                 error = SubElement(testcase, 'error',
                         {'Error':info["err"]})
@@ -457,13 +470,13 @@ def create_rpt(info, status, msg, keys, elapsed):
 if __name__ == "__main__":
     start = time.time()
     usage = "Usage: %prog [options]"
-    parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro|voltkv|voltcache> <-s helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
+    parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro|voltkv|voltcache|all> <-s all|helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
     parser.add_option("-r", "--release", dest="release",
-                      help="VoltDB release no. If ommitted, it will find it from version.txt.")
-    parser.add_option("-p", "--pkg", dest="pkg",
-                      help="VoltDB package type: Community, Pro, Voltkv or Voltcache. Defalut is Community.")
+                      help="VoltDB release number. If omitted, will be read from version.txt.")
+    parser.add_option("-p", "--package", dest="pkg",
+                      help="VoltDB package type: comm, pro, voltkv or voltcache. Default is comm. If not set, then this framework will take all packages.")
     parser.add_option("-s", "--suite", dest="suite",
-                      help="Test suite name, if not set, then take all suites")
+                      help="Test suite name, if not set, then this framework will take all suites. If an incorrect suite name is passed in, then the test suite name is set to 'all' as a default value.")
 
     parser.set_defaults(pkg="all")
     parser.set_defaults(suite="all")
@@ -487,13 +500,12 @@ if __name__ == "__main__":
 
     list = None
     if(options.pkg in pkgDict):
-        pkgFullName = ""
         print "############################################"
-        print "Tested Version in this RUN: %s" % releaseNum
+        print "Testing Version in this RUN: %s" % releaseNum
         print "--------------------------------------"
         if(options.pkg == "all"):
             list = pkgName.keys()
-            print "To test all packages in this RUN:"
+            print "Testing all packages in this RUN:"
             print "---------------------------------"
             for item in pkgName:
                 pkgFullName = pkgName[item] + '-' + releaseNum + "." + tail
@@ -501,7 +513,7 @@ if __name__ == "__main__":
         else:
             list = [options.pkg]
             pkgFullName = pkgName[options.pkg] + '-' + releaseNum + "." + tail
-            print "To test this package only in this RUN:"
+            print "Testing this package only in this RUN:"
             print "--------------------------------------"
             print "%s - %s" % (pkgDict[options.pkg], pkgFullName)
         print "############################################"
@@ -529,22 +541,28 @@ if __name__ == "__main__":
 
     sepLineD = "================================================="
     status = True
-    for module in tfD:
-        for suitename in tfD[module]:
-            if not tfD[module][suitename]:
+    # tfD is a 2-D dictionary.
+    # First level keys: module name, e.g. comm, pro, voltkv, voltcache
+    # Second level keys: suite name, e.g. helloworld, voter, voltkv, voltcache
+    # Values: True or False, which is the testing status for this suite in this package
+    for (module, suiteNameDict) in tfD.iteritems():
+        for (suitename, status4ThisSuite) in suiteNameDict.iteritems():
+            if not status4ThisSuite: # status4ThisSuite == tfD[module][suitename]:
                 status = False
-                print >> sys.stderr, "The test suite '%s' in '%s' package FAILED \
+                print >> sys.stderr, "The test suite '%s' in '%s' package is FAILED \
                     \n'%s'\n%s" \
                     % (suitename, module, msgD[module][suitename], sepLineD)
     elapsed = (time.time() - start)
     reportXML = create_rpt(ret, tfD, msgD, keysD, elapsed)
     print "Refer to the final report '%s' for details." % reportXML
-    print "Total time consumed: '%.2f'" % elapsed
+    print "Total time consumed in this run: '%.2f'" % elapsed
     if(status == False):
-        print "\nAt lease one test suite is Failed!!\n"
+        print "\nAt least one test suite is Failed!!\n"
         exit(1)
+    print "######################"
     print "All tests are PASSED!!"
+    print "######################"
     for p in msgD:
         for suitename in msgD[p]:
-            print "%s - %s: %s" % (pkgDict[p], suiteDict[suitename], msgD[p][suitename])
+            print "%s - %s -> %s" % (pkgDict[p], suiteDict[suitename], msgD[p][suitename])
     exit(0)
