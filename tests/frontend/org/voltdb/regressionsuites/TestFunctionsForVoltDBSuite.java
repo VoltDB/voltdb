@@ -349,6 +349,158 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
+    public void testFIELDFunction() throws Exception {
+
+        final String jstemplate = "{\n" +
+                "    \"id\": %d,\n" +
+                "    \"bool\": true,\n" +
+                "    \"inner\": {\n" +
+                "        \"veggies\": \"good for you\",\n" +
+                "        \"贾鑫Vo\": \"wakarimasen\"\n" +
+                "    },\n" +
+                "    \"arr\": [\n" +
+                "        1,\n" +
+                "        2,\n" +
+                "        3,\n" +
+                "        4\n" +
+                "    ],\n" +
+                "    \"tag\": \"%s\"\n" +
+                "}";
+
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("JS1.insert",1,String.format(jstemplate, 1, "one"));
+        cr = client.callProcedure("JS1.insert",2,String.format(jstemplate, 2, "two"));
+        cr = client.callProcedure("JS1.insert",3,String.format(jstemplate, 3, "three"));
+        cr = client.callProcedure("JS1.insert",4,"{\"id\":4,\"bool\": false}");
+        cr = client.callProcedure("JS1.insert",5,"{}");
+        cr = client.callProcedure("JS1.insert",6,"[]");
+        cr = client.callProcedure("JS1.insert",7,"{\"id\":7,\"funky\": null}");
+        cr = client.callProcedure("JS1.insert",8, null);
+        cr = client.callProcedure("JS1.insert",9, "{\"id\":9, \"贾鑫Vo\":\"分かりません\"}");
+
+        cr = client.callProcedure("IdProc", "id","1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1L,result.getLong(0));
+
+        try {
+            cr = client.callProcedure("IdProc", "id", 1);
+            fail("parameter check failed");
+        }
+        catch ( ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 1"));
+        }
+
+        try {
+            cr = client.callProcedure("IdProc", 1, "1");
+            fail("parameter check failed");
+        }
+        catch ( ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 0"));
+        }
+
+        cr = client.callProcedure("IdProc", "tag", "three");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+
+        cr = client.callProcedure("IdProc", "bool", "false");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(4L,result.getLong(0));
+
+        cr = client.callProcedure("IdProc", "贾鑫Vo", "分かりません");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(9L,result.getLong(0));
+
+        cr = client.callProcedure("NullFieldProc", "funky");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(9, result.getRowCount());
+
+        cr = client.callProcedure("NullFieldProc", "id");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(3, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(5L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(6L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(8L,result.getLong(0));
+
+        cr = client.callProcedure("InnerProc", "贾鑫Vo" ,"wakarimasen");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(3, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(2L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+
+        cr = client.callProcedure("IdProc", "arr" ,"[1,2,3,4]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(3, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(2L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+    }
+
+    public void testFIELDFunctionWithInvalidJSON() throws Exception {
+
+        Client client = getClient();
+        ClientResponse cr;
+
+        cr = client.callProcedure(
+                "JSBAD.insert",1,
+                "{\"id\":1 \"bool\": false}"
+                );
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure(
+                "JSBAD.insert",2,
+                "{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません\"}"
+                );
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        try {
+            cr = client.callProcedure("BadIdProc", 1, "id", "1");
+            fail("document validity check failed");
+        }
+        catch(ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains(
+                    "'{\"id\":1 \"bool\": false}' is not valid JSON"
+                    ));
+        }
+        try {
+            cr = client.callProcedure("BadIdProc", 2, "id", "2");
+            fail("document validity check failed");
+        }
+        catch(ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains(
+                    "'{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりませ ...' is not valid JSON"
+                    ));
+        }
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -370,7 +522,33 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DESC VARCHAR(300), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
-                "PRIMARY KEY (ID) ); ";
+                "PRIMARY KEY (ID) ); " +
+                "CREATE TABLE JS1 (\n" +
+                "  ID INTEGER NOT NULL, \n" +
+                "  DOC VARCHAR(8192),\n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+                "CREATE PROCEDURE FieldProc AS\n" +
+                "   SELECT FIELD(DOC, ?) AS JFIELD FROM JS1 WHERE FIELD( DOC, ?) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE IdProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD( DOC, ?) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE InnerProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD( DOC, ?) IS NULL\n" +
+                ";\n" +
+                "CREATE TABLE JSBAD (\n" +
+                "  ID INTEGER NOT NULL,\n" +
+                "  DOC VARCHAR(8192),\n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND FIELD(DOC, ?) = ?\n" +
+                ";\n" +
+                "";
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
