@@ -70,8 +70,7 @@ public class SpProcedureTask extends ProcedureTask
         if (m_drGateway != null && !m_txn.isReadOnly() && !m_txn.needsRollback()) {
             m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.timestamp,
                                                   txn.getInvocation(),
-                                                  response.getClientResponseData(),
-                                                  null);
+                                                  response.getClientResponseData());
         }
     }
 

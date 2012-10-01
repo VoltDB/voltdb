@@ -86,12 +86,10 @@ public class PartitionDRGateway {
                         NodeDRGateway gateway) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, long timestamp,
                                           StoredProcedureInvocation spi,
-                                          ClientResponseImpl response,
-                                          String adHocParam) {}
+                                          ClientResponseImpl response) {}
     public void onSuccessfulProcedureCall(long txnId, long timestamp,
                                           boolean isMultipart,
                                           StoredProcedureInvocation spi,
-                                          ClientResponseImpl response,
-                                          String adHocParam) {}
+                                          ClientResponseImpl response) {}
     public void tick(long txnId) {}
 }

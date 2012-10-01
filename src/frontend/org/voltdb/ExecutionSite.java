@@ -1484,15 +1484,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
             if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
-                    String adhocParam = null;
-                    if (invocation.procName.startsWith("@AdHoc")) {
-                        adhocParam = txnState.getBatchFormattedAdHocSQLString();
-                    }
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
                                                                    -1,
                                                                    invocation,
-                                                                   txnState.getResults(),
-                                                                   adhocParam);
+                                                                   txnState.getResults());
                 }
             }
 
