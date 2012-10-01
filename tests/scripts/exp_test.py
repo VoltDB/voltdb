@@ -175,7 +175,7 @@ def installVoltDB(pkg, release):
         info["ok"] = True
     else:
         info["err"] = "VoltDB pkg '%s' installation FAILED at location '%s'" \
-            % (dest, workDir) 
+            % (dest, workDir)
     return info
 # end of installVoltDB(pkg, release):
 
@@ -201,7 +201,7 @@ def setTestSuite(dname, suite):
     return testSuiteList
 
 # Not used yet.
-# It would be necessary if we wanted to run certain queries before 
+# It would be necessary if we wanted to run certain queries before
 def stopPS(ps):
     print "Going to kill this process: '%d'" % ps.pid
     killer = subprocess.Popen("kill -9 %d" % (ps.pid), shell = True)
@@ -231,9 +231,9 @@ def getClient():
 
     return client
 
-# Not used yet. 
-# Currently, both startService() and stopService() are implemented in 
-# execThisService(). However, if we wanted to run certain queries before 
+# Not used yet.
+# Currently, both startService() and stopService() are implemented in
+# execThisService(). However, if we wanted to run certain queries before
 # shutdown VoltDB, we have to separate startService() and stopService(),
 # so that we can add more implementations in between.
 def startService(service, logS, logC):
@@ -319,11 +319,11 @@ def assertVoter(mod, logC):
     if(result == False):
         expected = "ERROR: The Winner is NOT Edwina Burnam!"
         # Again, 'section' is not used in this implementation
-        # section += "\n\n" + expected 
+        # section += "\n\n" + expected
 
     # It could return 'section' in some other implementation
     # that calls findSectionInFile()
-    return (result, expected) 
+    return (result, expected)
 
 # To make sure that we see the key string 'Hola, Mundo!'
 def assertHelloWorld(modulename, logC):
@@ -342,7 +342,7 @@ def assertHelloWorld(modulename, logC):
 # To make sure the content of logC which is the output of 'run.sh client'
 # is identical to the static baseline file.
 # If True, the test is PASSED
-# If False, then we need to parse the LogC more carefully before we declare 
+# If False, then we need to parse the LogC more carefully before we declare
 # this test is FAILED
 def assertClient(e, logC):
     baselineD = origDir + "/plannertester/baseline/"
@@ -369,7 +369,7 @@ def startTest(testSuiteList):
     msg = ""
     result = False
     # testSuiteList is a dictionary whose keys are test suite names, e.g. helloworld,
-    # voter, voltkv, & voltcache and the corresponding values are paths where the 
+    # voter, voltkv, & voltcache and the corresponding values are paths where the
     # executable run.sh is in. Note that all run.sh can only be invoked as './run.sh
     # by design.
     for (suiteName, path) in testSuiteList.iteritems():
@@ -406,7 +406,7 @@ def startTest(testSuiteList):
     return (statusBySuite, msgBySuite, keyWordsBySuite)
 # end of startTest(testSuiteList):
 
-# status, msg, & keyStrings are all 2-D dictionaries, which have the same keys with 
+# status, msg, & keyStrings are all 2-D dictionaries, which have the same keys with
 # different values.
 # First level keys: module name, e.g. comm, pro, voltkv, voltcache
 # Second level keys: suite name, e.g. helloworld, voter, voltkv, voltcache
@@ -430,7 +430,7 @@ def create_rpt(info, status, msg, keyStrings, elapsed):
                 failureCnt = "1"
             else:
                 failureCnt = "0"
-    
+
             print "==-->>Package Name: '%s', Suite Name: '%s', Status = '%s'" \
                 % (mod, suitename, status4ThisSuite)
             if(info["ok"] == False):
@@ -439,7 +439,7 @@ def create_rpt(info, status, msg, keyStrings, elapsed):
                 errCnt = "0"
             testcase = SubElement(testsuite, 'testcase',
                 {'errors':errCnt,'failures':failureCnt, 'name':suitename})
-    
+
             if(failureCnt == "1"):
                 failure = SubElement(testcase, 'failure',
                         {'Message':msg[mod][suitename]})
