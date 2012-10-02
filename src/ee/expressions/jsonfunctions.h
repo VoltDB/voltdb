@@ -70,7 +70,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
         const size_t elipsedLen = static_cast<size_t>( fiftyith - docChars);
         std::string elipsed( docChars, elipsedLen);
 
-        if (*fiftyith != '\0') {
+        if (fiftyith < docChars + lenDoc) {
             elipsed += " ...";
         }
 
