@@ -214,7 +214,7 @@ TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
     }
 
     return getIndexIdFromMap((TableIndexType)catalogIndex.type(),
-                             catalogIndex.countable(),
+                             true, //catalogIndex.countable(), // always counting for now
                              catalogIndex.unique(),
                              columns);
 }
@@ -229,7 +229,7 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
     }
 
     return getIndexIdFromMap(indexScheme.type,
-                             indexScheme.countable,
+                             true, // indexScheme.countable, // // always counting for now
                              indexScheme.unique,
                              columns);
 }
