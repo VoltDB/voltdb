@@ -50,64 +50,63 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         m_unionType = UnionType.valueOf(type);
 
         assert(stmtNode.children.size() == m_children.size());
-        HashSet<Table> tableSet = new HashSet<Table>();
         int i = 0;
         for (VoltXMLElement selectSQL : stmtNode.children) {
             AbstractParsedStmt nextSelectStmt = m_children.get(i++);
             nextSelectStmt.parse(selectSQL, db);
-            // @TODO MIKE
-            // When HSQLInterface.getXMLCompiledStatement() parses the union statement
-            // it adds ALL tables across the entire union to each child statement (table sources)
-            // SCAN columns though contains right set of tables related to this particular
-            // sub-select only
-            // What to do if nextSelectStmt.scanColumns is NULL?
-            if (nextSelectStmt.scanColumns != null)
-            {
-                Set<String> tableNames = nextSelectStmt.scanColumns.keySet();
-                // need to remove duplicates in case of union of a same table
-                HashSet<Table> nextTableSet = new HashSet<Table>();
-                nextTableSet.addAll(nextSelectStmt.tableList);
-                Iterator<Table> it = nextTableSet.iterator();
-                // Filter out tables which are not from this statement
-                while (it.hasNext()) {
-                    Table next = it.next();
-                    if (!tableNames.contains(next.getTypeName())) {
-                        it.remove();
-                    }
-                }
-                // Replace the original tables
-                nextSelectStmt.tableList.clear();
-                nextSelectStmt.tableList.addAll(nextTableSet);
-                tableSet.addAll(nextTableSet);
-            } else {
-                throw new RuntimeException("Select * is not supported within the UNION statement");
-            }
         }
-        // List of all tables across the union
-        tableList.clear();
-        tableList.addAll(tableSet);
     }
 
     /**Parse tables and parameters
-     * .
+     *
      * @param root
      * @param db
      */
     void parseTablesAndParams(VoltXMLElement stmtNode, Database db) {
 
         assert(stmtNode.children.size() > 1);
-        for (VoltXMLElement selectSQL : stmtNode.children) {
-            if (!selectSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-                throw new RuntimeException("Unexpected Element in UNION statement: " + selectSQL.name);
+        tableList.clear();
+        for (VoltXMLElement childSQL : stmtNode.children) {
+            if (!childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+                throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
-            AbstractParsedStmt selectStmt = new ParsedSelectStmt();
-            selectStmt.parseTablesAndParams(selectSQL, db);
-            m_children.add(selectStmt);
-            //tableList.addAll(selectStmt.tableList);
+            AbstractParsedStmt childStmt = new ParsedSelectStmt();
+            childStmt.parseTablesAndParams(childSQL, db);
+            m_children.add(childStmt);
+
+
+            // So far T UNION T (as well as T JOIN T) are not handled properly
+            // by the fragmentizer. Need to give an error if any table mentioned
+            // in a UNION's (UNION TREE's) children occurs more than once.
+            HashSet<String> uniqueTables = new HashSet<String>();
+
+            if (childStmt.scanColumns != null)
+            {
+                Set<String> tableNames = childStmt.scanColumns.keySet();
+
+                Iterator<Table> it = childStmt.tableList.iterator();
+                // When HSQLInterface.getXMLCompiledStatement() parses the union statement
+                // it adds ALL tables across the entire union to each child statement (table sources)
+                // SCAN columns though contains right set of tables related to this particular
+                // sub-select only. Filter out tables which are not from this statement
+                while (it.hasNext()) {
+                    String tableName = it.next().getTypeName();
+                    if (!tableNames.contains(tableName)) {
+                        it.remove();
+                    } else if (uniqueTables.contains(tableName)) {
+                        // Is this table 'unique' across the union?
+                        throw new PlanningErrorException("Table " + tableName +
+                            " appears more than once in the union statement");
+                    } else {
+                        uniqueTables.add(tableName);
+                    }
+                }
+            } else {
+                throw new PlanningErrorException("Select * is not supported within the UNION statement");
+            }
+            // Add statement's tables to the consolidated list
+            tableList.addAll(childStmt.tableList);
         }
-        // MIKE. This is I don't understand why all fragments have the same table list
-        // all tables across all selects in the union
-        tableList.addAll(m_children.get(0).tableList);
     }
 
     /**Miscellaneous post parse activity

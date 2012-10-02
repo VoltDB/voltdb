@@ -206,23 +206,23 @@ public class StatementQuery extends StatementDMQL {
                     queryExpr.getLeftQueryExpression(), session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
                     queryExpr.getRightQueryExpression(), session);
-            unionExpr = voltSimplifyUnionXMLExpression(unionExpr, leftExpr);
-            unionExpr = voltSimplifyUnionXMLExpression(unionExpr, rightExpr);
+            unionExpr = voltTransformUnionXMLExpression(unionExpr, leftExpr);
+            unionExpr = voltTransformUnionXMLExpression(unionExpr, rightExpr);
             return unionExpr;
         }
     }
     
     /**
-     * VoltDB added method to simplify VoltXMLElement representing tuple set expression.
+     * VoltDB added method to transform VoltXMLElement representing tuple set expression.
      * So far only expressions with a single distinct operation are supported. Such expressions
-     * can be flattened 
+     * can be reduced to a single node with multiple children instead of the expression tree 
      * @param unionExpr The parent UNION element
      * @param childExpr The child expression
      * @return VoltXMLElement representing UNION element having all of it's grand children
      * as promoted to the immediate children.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltSimplifyUnionXMLExpression(VoltXMLElement unionExpr, VoltXMLElement childExpr)
+    VoltXMLElement voltTransformUnionXMLExpression(VoltXMLElement unionExpr, VoltXMLElement childExpr)
     throws HSQLParseException
     {
         if ("union".equalsIgnoreCase(childExpr.name)) {

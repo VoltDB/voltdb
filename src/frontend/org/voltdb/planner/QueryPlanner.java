@@ -148,6 +148,8 @@ public class QueryPlanner {
 
         if (parsedStmt instanceof ParsedUnionStmt) {
 
+            // the final plan can only have 1 or 2 fragments,
+            // meaning that only one of the selects can be multi-partition.
             m_assembler.verifyTablePartition(parsedStmt);
 
             ParsedUnionStmt parsedUnionStmt = (ParsedUnionStmt) parsedStmt;

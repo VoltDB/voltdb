@@ -217,7 +217,7 @@ public class PlanAssembler {
             int multiPartitionScanCount = m_partitioning.getCountOfIndependentlyPartitionedTables();
             if (multiPartitionScanCount > 1) {
                 // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
-                String msg = "Join of multiple partitioned tables has insufficient join criteria.";
+                String msg = "Join or union of multiple partitioned tables has insufficient join criteria.";
                 throw new PlanningErrorException(msg);
             }
         }

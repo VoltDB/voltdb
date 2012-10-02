@@ -29,6 +29,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.*;
 import org.voltdb.types.PlanNodeType;
@@ -66,9 +67,6 @@ public class TestUnion  extends TestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
         assertTrue(unionPN.getChildCount() == 3);
-        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
-            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
-        }
     }
 
     public void testUnionAll() {
@@ -77,9 +75,6 @@ public class TestUnion  extends TestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION_ALL);
         assertTrue(unionPN.getChildCount() == 2);
-        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
-            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
-        }
     }
 
     public void testExcept() {
@@ -88,9 +83,6 @@ public class TestUnion  extends TestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
         assertTrue(unionPN.getChildCount() == 3);
-        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
-            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
-        }
     }
 
     public void testExceptAll() {
@@ -99,9 +91,6 @@ public class TestUnion  extends TestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT_ALL);
         assertTrue(unionPN.getChildCount() == 2);
-        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
-            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
-        }
     }
 
     public void testIntersect() {
@@ -110,9 +99,6 @@ public class TestUnion  extends TestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT);
         assertTrue(unionPN.getChildCount() == 3);
-        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
-            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
-        }
     }
 
     public void testIntersectAll() {
@@ -121,9 +107,19 @@ public class TestUnion  extends TestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT_ALL);
         assertTrue(unionPN.getChildCount() == 2);
-        for (int i = 0; i < unionPN.getChildCount(); ++i ) {
-            assertTrue(unionPN.getChild(i).getPlanNodeType() == PlanNodeType.SEQSCAN);
+    }
+
+    public void testDistributedUnion() {
+        try {
+            aide.compile("select A from T1 UNION select D from T4", 0, false, null);
+            fail();
         }
+        catch (Exception ex) {}
+        try {
+            aide.compile("select A from T1 UNION select A from T1", 0, false, null);
+            fail();
+        }
+        catch (Exception ex) {}
     }
 
     public void testMultipleSetOperations() {
@@ -169,6 +165,21 @@ public class TestUnion  extends TestCase {
     protected void setUp() throws Exception {
         aide = new PlannerTestAideDeCamp(TestUnion.class.getResource("testunion-ddl.sql"),
                                          "testunion");
+        // Set all tables to non-replicated.
+        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
+        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
+        for (Table t : tmap) {
+            String name = t.getTypeName();
+            if ("T1".equalsIgnoreCase(name)) {
+                t.setPartitioncolumn(t.getColumns().get("A"));
+                t.setIsreplicated(false);
+            } else if ("T4".equalsIgnoreCase(name)) {
+                t.setPartitioncolumn(t.getColumns().get("D"));
+                t.setIsreplicated(false);
+            } else {
+                t.setIsreplicated(true);
+            }
+        }
     }
 
     @Override
