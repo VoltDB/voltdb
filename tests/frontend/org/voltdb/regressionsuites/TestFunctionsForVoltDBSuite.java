@@ -349,6 +349,52 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
+    public void testDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING DECODE No Default");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // use DECODE as string input to operator
+        cr = client.callProcedure("@AdHoc", "select desc || DECODE(id, 1, ' is the 1', ' is not the 1') from P1 where id = 2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("li is not the 1",result.getString(0));
+
+        // use DECODE as integer input to operator
+        cr = client.callProcedure("@AdHoc", "select id + DECODE(desc, 'li', 0, -2*id) from P1 where id = 2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(2,result.getLong(0));
+
+        // use DECODE as integer input to operator, with unused incompatible option
+        cr = client.callProcedure("@AdHoc", "select id + DECODE(id, 2, 0, 'incompatible') from P1 where id = 2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(2,result.getLong(0));
+
+        // use DECODE as integer input to operator, with used incompatible option
+        try {
+            cr = client.callProcedure("@AdHoc", "select id + DECODE(id, 1, 0, 'incompatible') from P1 where id = 2");
+            fail();
+        } catch (ProcCallException pce) {
+            String message = pce.getMessage();
+            // It's about that string argument to the addition operator.
+            assertTrue(message.contains("varchar"));
+        }
+    }
+
     public void testFIELDFunction() throws Exception {
 
         final String jstemplate = "{\n" +

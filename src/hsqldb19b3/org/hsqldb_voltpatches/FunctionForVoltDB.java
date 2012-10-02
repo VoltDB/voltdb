@@ -214,7 +214,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             if (nodes[i] != null) {
                 if (i >= paramTypes.length) {
                  // TODO support type checking for variadic functions
-                    continue;
+                    break;
                 }
                 if (paramTypes[i] == null) {
                     continue; // accept all argument types
@@ -228,7 +228,10 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         dataType = m_def.getDataType();
         if (dataType == null && nodes.length > 0) {
-            Expression like_child = nodes[0];
+            if (parameterArg < 0 || parameterArg >= nodes.length) {
+                throw Error.error(ErrorCode.X_42565); // incompatible data type (so says the error -- we're missing one, actually)
+            }
+            Expression like_child = nodes[parameterArg];
             if (like_child != null) {
                 dataType = like_child.dataType;
             }

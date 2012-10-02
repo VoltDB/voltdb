@@ -2722,8 +2722,8 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
         break;
     }
     throwDynamicSQLException("Promotion of %s and %s failed in op_subtract.",
-               getTypeName(getValueType()).c_str(),
-               getTypeName(rhs.getValueType()).c_str());
+               getValueTypeString().c_str(),
+               rhs.getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_add(const NValue rhs) const {
@@ -2750,7 +2750,7 @@ inline NValue NValue::op_add(const NValue rhs) const {
     }
     throwDynamicSQLException("Promotion of %s and %s failed in op_add.",
                getValueTypeString().c_str(),
-               getValueTypeString().c_str());
+               rhs.getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_multiply(const NValue rhs) const {
