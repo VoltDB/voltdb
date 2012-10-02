@@ -44,6 +44,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
@@ -214,7 +215,7 @@ public class Iv2TestMpTransactionState extends TestCase
                     System.currentTimeMillis(),
                     true,
                     false,
-                    null,
+                    new StoredProcedureInvocation(),
                     0,
                     0,
                     false);
@@ -270,7 +271,7 @@ public class Iv2TestMpTransactionState extends TestCase
                     System.currentTimeMillis(),
                     true,
                     false,
-                    null,
+                    new StoredProcedureInvocation(),
                     0,
                     0,
                     false);
@@ -323,7 +324,7 @@ public class Iv2TestMpTransactionState extends TestCase
                     System.currentTimeMillis(),
                     true,
                     false,
-                    null,
+                    new StoredProcedureInvocation(),
                     0,
                     0,
                     false);
@@ -378,7 +379,7 @@ public class Iv2TestMpTransactionState extends TestCase
                     System.currentTimeMillis(),
                     true,
                     false,
-                    null,
+                    new StoredProcedureInvocation(),
                     0,
                     0,
                     false);
@@ -438,7 +439,7 @@ public class Iv2TestMpTransactionState extends TestCase
                     System.currentTimeMillis(),
                     true,
                     false,
-                    null,
+                    new StoredProcedureInvocation(),
                     0,
                     0,
                     false);
@@ -493,7 +494,8 @@ public class Iv2TestMpTransactionState extends TestCase
     {
         long truncPt = 100L;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, 0, truncPt, 101L, System.currentTimeMillis(), true, false, null, 0, 0, false);
+            new Iv2InitiateTaskMessage(0, 0, truncPt, 101L, System.currentTimeMillis(),
+                                       true, false, new StoredProcedureInvocation(), 0, 0, false);
         assertEquals(truncPt, taskmsg.getTruncationHandle());
 
         FragmentTaskMessage localFrag = mock(FragmentTaskMessage.class);

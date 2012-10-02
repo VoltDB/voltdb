@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.StoredProcedureInvocation;
 
 /**
@@ -89,7 +88,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     @Override
     public boolean isForDR() {
-        assert(!super.isForDR() || m_invocation.getType() == ProcedureInvocationType.REPLICATED);
         return super.isForDR();
     }
 
