@@ -20,6 +20,8 @@ package org.voltdb.catalog;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.voltdb.types.ConstraintType;
+
 public class CatalogDiffEngine {
 
     // contains the text of the difference
@@ -167,6 +169,23 @@ public class CatalogDiffEngine {
             return true;
         }
 
+        // the only meaty constraints (for now) are UNIQUE, PKEY and NOT NULL.
+        // others are basically no-ops and are cool
+        if (suspect instanceof Constraint) {
+            Constraint constraint = (Constraint) suspect;
+            if (constraint.getType() == ConstraintType.NOT_NULL.getValue()) {
+                // for the time being, you can't add/drop NOT NULL constraints,
+                // but you should be able to make some changes when we support
+                // changing column schema
+                return false;
+            }
+            // all other constraints are either no-ops or will
+            // pass or fail with the indexes that support them.
+            else {
+                return true;
+            }
+        }
+
         // Support add/drop anywhere in these sub-trees
         do {
             if (suspect instanceof User)
@@ -179,6 +198,13 @@ public class CatalogDiffEngine {
                 return true;
             if (suspect instanceof SnapshotSchedule)
                 return true;
+
+            // refs are safe to add drop if the thing they reference is
+            if (suspect instanceof ConstraintRef)
+                return true;
+            if (suspect instanceof ColumnRef)
+                return true;
+
         } while ((suspect = suspect.m_parent) != null);
 
         m_errors.append("May not dynamically add/drop: " + orig + "\n");

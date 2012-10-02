@@ -26,7 +26,9 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -906,6 +908,9 @@ public class DDLCompiler {
         //  then this is reversed
         table.setIsreplicated(true);
 
+        // map of index replacements for later constraint fixup
+        Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+
         ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
         for (VoltXMLElement subNode : node.children) {
 
@@ -926,14 +931,14 @@ public class DDLCompiler {
             if (subNode.name.equals("indexes")) {
                 for (VoltXMLElement indexNode : subNode.children) {
                     if (indexNode.name.equals("index"))
-                        addIndexToCatalog(table, indexNode);
+                        addIndexToCatalog(table, indexNode, indexReplacementMap);
                 }
             }
 
             if (subNode.name.equals("constraints")) {
                 for (VoltXMLElement constraintNode : subNode.children) {
                     if (constraintNode.name.equals("constraint"))
-                        addConstraintToCatalog(table, constraintNode);
+                        addConstraintToCatalog(table, constraintNode, indexReplacementMap);
                 }
             }
         }
@@ -1042,7 +1047,50 @@ public class DDLCompiler {
         columnMap.put(name, column);
     }
 
-    void addIndexToCatalog(Table table, VoltXMLElement node) throws VoltCompilerException {
+    /**
+     * Return two if the two indexes are identical with a different name.
+     */
+    boolean indexesAreDups(Index idx1, Index idx2) {
+        // same attributes?
+        if (idx1.getType() != idx2.getType()) {
+            return false;
+        }
+        if (idx1.getCountable() != idx2.getCountable()) {
+            return false;
+        }
+        if (idx1.getUnique() != idx2.getUnique()) {
+            return false;
+        }
+
+        // same column count?
+        if (idx1.getColumns().size() != idx2.getColumns().size()) {
+            return false;
+        }
+
+        // same actual columns?
+        for (ColumnRef crefOuter : idx1.getColumns()) {
+            boolean found = false;
+            for (ColumnRef crefInner : idx2.getColumns()) {
+                if (crefInner.getIndex() == crefOuter.getIndex()) {
+                    // return false if the columns don't line up
+                    if (crefInner.getColumn().getIndex() != crefOuter.getColumn().getIndex()) {
+                        return false;
+                    }
+                    found = true;
+                    break;
+                }
+            }
+            // should find all columns
+            assert(found);
+        }
+
+        // made it through the gauntlet
+        return true;
+    }
+
+    void addIndexToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+            throws VoltCompilerException
+    {
         assert node.name.equals("index");
 
         String name = node.attributes.get("name");
@@ -1156,6 +1204,32 @@ public class DDLCompiler {
 
         index.setUnique(unique);
 
+        // check if an existing index duplicates another index (if so, drop it)
+        // note that this is an exact dup... uniqueness, counting-ness and type
+        // will make two indexes different
+        for (Index existingIndex : table.getIndexes()) {
+            // skip thineself
+            if (existingIndex == index) {
+                 continue;
+            }
+
+            if (indexesAreDups(existingIndex, index)) {
+                // replace any constraints using one index with the other
+                //for () TODO
+                // get ready for replacements from contraints created later
+                indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
+
+                // add a warning but don't fail
+                String msg = String.format("Dropping index %s on table %s becuse it duplicates index %s.",
+                        index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
+                m_compiler.addWarn(msg);
+
+                // drop the index and GTFO
+                table.getIndexes().delete(index.getTypeName());
+                return;
+            }
+        }
+
         String msg = "Created index: " + name + " on table: " +
                     table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
 
@@ -1182,7 +1256,9 @@ public class DDLCompiler {
      * @param node
      * @throws VoltCompilerException
      */
-    void addConstraintToCatalog(Table table, VoltXMLElement node) throws VoltCompilerException {
+    void addConstraintToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+            throws VoltCompilerException
+    {
         assert node.name.equals("constraint");
 
         String name = node.attributes.get("name");
@@ -1226,6 +1302,12 @@ public class DDLCompiler {
         Constraint catalog_const = null;
         if (node.attributes.get("index") != null) {
             String indexName = node.attributes.get("index");
+
+            // handle replacements from duplicate index pruning
+            if (indexReplacementMap.containsKey(indexName)) {
+                indexName = indexReplacementMap.get(indexName);
+            }
+
             Index catalog_index = indexMap.get(indexName);
 
             // if the constraint name contains index type hints, exercise them (giant hack)

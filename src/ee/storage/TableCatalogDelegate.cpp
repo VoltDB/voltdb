@@ -157,10 +157,36 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
  * Locally defined function to make a string from an index schema
  */
 std::string
-getIndexIdFromMap(bool isUnique, map<int32_t, int32_t> columns) {
+getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique, map<int32_t, int32_t> columns) {
+    // add the uniqueness of the index
     std::string retval = isUnique ? "U" : "M";
 
-    // concat the indexes and types into a unique string
+    // add the type of the index
+    switch (type) {
+        case BALANCED_TREE_INDEX:
+            retval += "B";
+            break;
+        case HASH_TABLE_INDEX:
+            retval += "H";
+            break;
+        case ARRAY_INDEX:
+            retval += "A";
+            break;
+        default:
+            // this would need to change if we added index types
+            assert(false);
+            break;
+    }
+
+    // add whether it's counting or not
+    if (countable) {
+        retval += "C";
+    }
+    else {
+        retval += "N"; // (N)ot countable?
+    }
+
+    // concat the column indexes and types into a unique string
     map<int32_t, int32_t>::const_iterator iter;
     for (iter = columns.begin(); iter != columns.end(); iter++)
     {
@@ -187,7 +213,10 @@ TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
         columns[catalogColumn->index()] = catalogColumn->type();
     }
 
-    return getIndexIdFromMap(catalogIndex.unique(), columns);
+    return getIndexIdFromMap((TableIndexType)catalogIndex.type(),
+                             catalogIndex.countable(),
+                             catalogIndex.unique(),
+                             columns);
 }
 
 std::string
@@ -199,7 +228,10 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
         columns[indexScheme.columnIndices[i]] = indexScheme.columnTypes[i];
     }
 
-    return getIndexIdFromMap(indexScheme.unique, columns);
+    return getIndexIdFromMap(indexScheme.type,
+                             indexScheme.countable,
+                             indexScheme.unique,
+                             columns);
 }
 
 int
