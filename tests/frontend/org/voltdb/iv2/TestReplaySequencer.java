@@ -217,5 +217,26 @@ public class TestReplaySequencer extends TestCase
         assertEquals(null, dut.poll());
     }
 
+    @Test
+    public void testPollsInOrder3()
+    {
+        TransactionInfoBaseMessage frag1 = makeFragment(1L);
+        TransactionInfoBaseMessage sp2a = makeIv2InitTask(104L);
+        TransactionInfoBaseMessage sp2b = makeIv2InitTask(105L);
+        TransactionInfoBaseMessage sntl1 = makeSentinel(1L);
+
+        ReplaySequencer dut = new ReplaySequencer();
+
+        // Offer fragment first, should be sequenced
+        assertTrue(dut.offer(1L, frag1));
+        // Offer SPs, should not be sequenced
+        assertFalse(dut.offer(104L, sp2a));
+        assertFalse(dut.offer(105L, sp2b));
+        // Offer sentinel to free up the first fragment
+        assertTrue(dut.offer(1L, sntl1));
+
+        assertEquals(frag1, dut.poll());
+        assertEquals(null, dut.poll());
+    }
 }
 

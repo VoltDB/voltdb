@@ -63,6 +63,11 @@ public class ReplaySequencer
             return m_sentinalTxnId != null && m_firstFragment != null;
         }
 
+        boolean hasSentinel()
+        {
+            return m_sentinalTxnId != null;
+        }
+
         void addBlockedMessage(VoltMessage m)
         {
             m_blockedMessages.addLast(m);
@@ -171,7 +176,7 @@ public class ReplaySequencer
 
         }
         else {
-            if (m_replayEntries.isEmpty()) {
+            if (m_replayEntries.isEmpty() || !m_replayEntries.lastEntry().getValue().hasSentinel()) {
                 // not-blocked work; rejected and not queued.
                 return false;
             }
