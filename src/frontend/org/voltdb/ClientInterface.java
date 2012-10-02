@@ -100,7 +100,6 @@ import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCacheReader;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -1692,7 +1691,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchSendSentinel(ByteBuffer buf,
                                             StoredProcedureInvocation invocation)
     {
-        // TODO: need real txnIds for deduping
+        /*
+         * Sentinels will be deduped by ReplaySequencer. They don't advance the
+         * last replayed txnIds.
+         */
 
         // First parameter is the partition ID
         sendSentinel(invocation.getOriginalTxnId(),
