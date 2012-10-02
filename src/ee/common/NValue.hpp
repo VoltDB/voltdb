@@ -1882,8 +1882,8 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(TTInt);
       default:
           char message[128];
-          snprintf(message, 128, "NValue::getTupleStorageSize() unrecognized type"
-                  " '%d'", type);
+          snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
+                   getTypeName(type).c_str());
           throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                         message);
     }
@@ -2174,7 +2174,8 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         break;
       default:
           char message[128];
-          snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%d'", type);
+          snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%s'",
+                   getTypeName(type).c_str());
           throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
                              message);
     }
@@ -2252,8 +2253,8 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
       }
       default:
           char message[128];
-          snprintf(message, 128, "NValue::deserializeFrom() unrecognized type '%d'",
-                  type);
+          snprintf(message, 128, "NValue::deserializeFrom() unrecognized type '%s'",
+                   getTypeName(type).c_str());
           throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                         message);
     }

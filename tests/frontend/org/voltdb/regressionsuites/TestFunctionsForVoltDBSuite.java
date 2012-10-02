@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -42,15 +41,6 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
  */
 
 public class TestFunctionsForVoltDBSuite extends RegressionSuite {
-
-    /**
-     * Inner class procedure to see if we can invoke it.
-     */
-    public static class InnerProc extends VoltProcedure {
-        public long run() {
-            return 0L;
-        }
-    }
 
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
@@ -307,6 +297,48 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("where",result.getString(1));
+
+        // param cases
+        // For project.addStmtProcedure("DECODE_PARAM_INFER_STRING", "select desc,  DECODE (desc,?,?,desc) from P1 where id = ?");
+        cr = client.callProcedure("DECODE_PARAM_INFER_STRING", "Gateway", "You got it!", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("You got it!",result.getString(1));
+
+        // For project.addStmtProcedure("DECODE_PARAM_INFER_INT", "select desc,  DECODE (id,?,?,id) from P1 where id = ?");
+        cr = client.callProcedure("DECODE_PARAM_INFER_INT", 4, -4, 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(-4,result.getLong(1));
+
+        // For project.addStmtProcedure("DECODE_PARAM_INFER_DEFAULT", "select desc,  DECODE (?,?,?,?) from P1 where id = ?");
+        cr = client.callProcedure("DECODE_PARAM_INFER_DEFAULT", "Gateway", "Gateway", "You got it!", "You ain't got it!", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("You got it!",result.getString(1));
+
+        // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
+        cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", "You got it!", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("You got it!",result.getString(1));
+
+        // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
+        try {
+            cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", 1000, 1);
+            fail("Should have thrown unfortunate type error.");
+        } catch (ProcCallException pce) {
+            String msg = pce.getMessage();
+            assertTrue(msg.contains("TYPE ERROR FOR PARAMETER 0"));
+        }
     }
 
     public void testDECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
@@ -427,7 +459,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         cr = client.callProcedure("JS1.insert",8, null);
         cr = client.callProcedure("JS1.insert",9, "{\"id\":9, \"贾鑫Vo\":\"分かりません\"}");
 
-        cr = client.callProcedure("IdProc", "id","1");
+        cr = client.callProcedure("IdFieldProc", "id","1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -435,7 +467,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1L,result.getLong(0));
 
         try {
-            cr = client.callProcedure("IdProc", "id", 1);
+            cr = client.callProcedure("IdFieldProc", "id", 1);
             fail("parameter check failed");
         }
         catch ( ProcCallException pcex) {
@@ -443,28 +475,28 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         try {
-            cr = client.callProcedure("IdProc", 1, "1");
+            cr = client.callProcedure("IdFieldProc", 1, "1");
             fail("parameter check failed");
         }
         catch ( ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 0"));
         }
 
-        cr = client.callProcedure("IdProc", "tag", "three");
+        cr = client.callProcedure("IdFieldProc", "tag", "three");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals(3L,result.getLong(0));
 
-        cr = client.callProcedure("IdProc", "bool", "false");
+        cr = client.callProcedure("IdFieldProc", "bool", "false");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals(4L,result.getLong(0));
 
-        cr = client.callProcedure("IdProc", "贾鑫Vo", "分かりません");
+        cr = client.callProcedure("IdFieldProc", "贾鑫Vo", "分かりません");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -487,7 +519,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(8L,result.getLong(0));
 
-        cr = client.callProcedure("InnerProc", "贾鑫Vo" ,"wakarimasen");
+        cr = client.callProcedure("InnerFieldProc", "贾鑫Vo" ,"wakarimasen");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(3, result.getRowCount());
@@ -498,7 +530,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(3L,result.getLong(0));
 
-        cr = client.callProcedure("IdProc", "arr" ,"[1,2,3,4]");
+        cr = client.callProcedure("IdFieldProc", "arr" ,"[1,2,3,4]");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(3, result.getRowCount());
@@ -528,16 +560,15 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         try {
-            cr = client.callProcedure("BadIdProc", 1, "id", "1");
+            cr = client.callProcedure("BadIdFieldProc", 1, "id", "1");
             fail("document validity check failed");
         }
         catch(ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains(
-                    "'{\"id\":1 \"bool\": false}' is not valid JSON"
-                    ));
+            String msg = pcex.getMessage();
+            assertTrue(msg.contains("'{\"id\":1 \"bool\": false}' is not valid JSON"));
         }
         try {
-            cr = client.callProcedure("BadIdProc", 2, "id", "2");
+            cr = client.callProcedure("BadIdFieldProc", 2, "id", "2");
             fail("document validity check failed");
         }
         catch(ProcCallException pcex) {
@@ -577,21 +608,21 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "CREATE PROCEDURE FieldProc AS\n" +
                 "   SELECT FIELD(DOC, ?) AS JFIELD FROM JS1 WHERE FIELD( DOC, ?) = ?\n" +
                 ";\n" +
-                "CREATE PROCEDURE IdProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD( DOC, ?) = ?\n" +
+                "CREATE PROCEDURE IdFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD( DOC, ?) = ? ORDER BY ID\n" +
                 ";\n" +
-                "CREATE PROCEDURE InnerProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ?\n" +
+                "CREATE PROCEDURE InnerFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ? ORDER BY ID\n" +
                 ";\n" +
                 "CREATE PROCEDURE NullFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD( DOC, ?) IS NULL\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD( DOC, ?) IS NULL ORDER BY ID\n" +
                 ";\n" +
                 "CREATE TABLE JSBAD (\n" +
                 "  ID INTEGER NOT NULL,\n" +
                 "  DOC VARCHAR(8192),\n" +
                 "  PRIMARY KEY(ID))\n" +
                 ";\n" +
-                "CREATE PROCEDURE BadIdProc AS\n" +
+                "CREATE PROCEDURE BadIdFieldProc AS\n" +
                 "  SELECT ID FROM JSBAD WHERE ID = ? AND FIELD(DOC, ?) = ?\n" +
                 ";\n" +
                 "";
@@ -621,6 +652,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "'a','a'," +
                 "'a','a'," +
                 "'where') from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_STRING", "select desc,  DECODE (desc,?,?,desc) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_INT", "select desc,  DECODE (id,?,?,id) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_DEFAULT", "select desc,  DECODE (?,?,?,?) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
         // Test OCTET_LENGTH
         project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
         // Test POSITION and CHAR_LENGTH

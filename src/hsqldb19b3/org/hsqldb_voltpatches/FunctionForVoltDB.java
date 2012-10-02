@@ -206,6 +206,77 @@ public class FunctionForVoltDB extends FunctionSQL {
                 nodes[1].dataType = Type.SQL_VARCHAR;
             }
             break;
+
+            /*
+             * Infer parameter types to make the types of the 1st, 2nd, and (if not the last) 4th, 6th, etc.
+             * arguments to DECODE as consistent as possible,
+             * and the types of the 3rd, 5th, 7th, etc. and LAST arguments as consistent as possible.
+             * Punt to inferring VARCHAR if the other arguments give no clue or are inconsistent
+             * -- the VoltDB EE complains about NULL-typed parameters but is somewhat forgiving about
+             * mixed argument types.
+             */
+        case FunctionId.FUNC_VOLT_DECODE:
+            Type inferredInputType = null;
+            Type inferredResultType = null;
+            boolean needParamType = false;
+            for (int ii = 0; ii < nodes.length; ii++) {
+                if (ii >= 2 && (ii == (nodes.length - 1) || (ii % 2) == 0)) {
+                    // These arguments represent candidate result values.
+                    if (nodes[ii].dataType == null) {
+                        if (nodes[ii].isParam) {
+                            needParamType = true;
+                        }
+                    }
+                    else if (inferredResultType == null) {
+                        inferredResultType = nodes[ii].dataType; // Take the first hint.
+                    } else if (inferredResultType != nodes[ii].dataType) {
+                        inferredResultType = Type.SQL_VARCHAR; // Discard contradictory hints.
+                    }
+                } else {
+                    // These arguments represent candidate input values.
+                    if (nodes[ii].dataType == null) {
+                        if (nodes[ii].isParam) {
+                            needParamType = true;
+                        }
+                    }
+                    else if (inferredInputType == null) {
+                        inferredInputType = nodes[ii].dataType; // Take the first hint.
+                    } else if (inferredInputType != nodes[ii].dataType) {
+                        inferredInputType = Type.SQL_VARCHAR; // Discard contradictory hints.
+                    }
+                }
+            }
+            // With any luck, we don't have any parameter "?" arguments to worry about.
+            if ( ! needParamType) {
+                break;
+            }
+            // No luck, so we do our best to infer the parameters' types.
+            // Punt to guessing VARCHAR for lack of better information.
+            for (int ii = 0; ii < nodes.length; ii++) {
+                if (nodes[ii].dataType != null) {
+                    continue;
+                }
+                if ( ! nodes[ii].isParam) {
+                    continue;
+                }
+                if (ii >= 2 && (ii == (nodes.length - 1) || (ii % 2) == 0)) {
+                    // These arguments represent untyped parameter candidate result values.
+                    if (inferredResultType == null) {
+                        nodes[ii].dataType = Type.SQL_VARCHAR;
+                    } else {
+                        nodes[ii].dataType = inferredResultType;
+                    }
+                } else {
+                    // These arguments represent untyped parameter candidate input values.
+                    if (inferredInputType == null) {
+                        nodes[ii].dataType = Type.SQL_VARCHAR;
+                    } else {
+                        nodes[ii].dataType = inferredInputType;
+                    }
+                }
+            }
+            break;
+
         default:
             break;
         }
