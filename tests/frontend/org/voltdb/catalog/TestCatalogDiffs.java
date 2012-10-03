@@ -385,7 +385,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testAddUniqueTableIndexRejected() throws IOException {
+    public void testAddUniqueCoveringTableIndex() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // start with a table
@@ -393,13 +393,32 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
-        builder.compile(testDir + File.separator + "addindexrejected1.jar");
-        Catalog catOriginal = catalogForJar(testDir + File.separator + "addindexrejected1.jar");
+        builder.compile(testDir + File.separator + "testAddUniqueCoveringTableIndex1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddUniqueCoveringTableIndex1.jar");
 
         // add an index
         builder.addLiteralSchema("\nCREATE UNIQUE INDEX IDX ON A(C1,C2);");
-        builder.compile(testDir + File.separator + "addindexrejected2.jar");
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "addindexrejected2.jar");
+        builder.compile(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
+
+        verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testAddUniqueNonCoveringTableIndexRejected() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a table
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "testAddUniqueNonCoveringTableIndexRejected1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddUniqueNonCoveringTableIndexRejected1.jar");
+
+        // add an index
+        builder.addLiteralSchema("\nCREATE UNIQUE INDEX IDX ON A(C2);");
+        builder.compile(testDir + File.separator + "testAddUniqueNonCoveringTableIndexRejected2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueNonCoveringTableIndexRejected2.jar");
 
         verifyDiffRejected(catOriginal, catUpdated);
     }
@@ -412,18 +431,44 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
-        builder.compile(testDir + File.separator + "addindex1.jar");
-        Catalog catOriginal = catalogForJar(testDir + File.separator + "addindex1.jar");
+        builder.compile(testDir + File.separator + "testAddNonUniqueTableIndex1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddNonUniqueTableIndex1.jar");
 
         // add an index
         builder.addLiteralSchema("\nCREATE INDEX IDX ON A(C1,C2);");
-        builder.compile(testDir + File.separator + "addindex2.jar");
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "addindex2.jar");
+        builder.compile(testDir + File.separator + "testAddNonUniqueTableIndex2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddNonUniqueTableIndex2.jar");
 
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testRemoveUniqueIndexRejected() throws IOException {
+    public void renameUniqueIndexes() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a table
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addLiteralSchema("\nCREATE UNIQUE INDEX IDX ON A(C1,C2);");
+        builder.addLiteralSchema("\nCREATE INDEX IDX2 ON A(C2);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "renameUniqueIndexes1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "renameUniqueIndexes1.jar");
+
+        // rename an index
+        VoltProjectBuilder builder2 = new VoltProjectBuilder();
+        builder2.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder2.addLiteralSchema("\nCREATE UNIQUE INDEX RYANLIKETHEYANKEES ON A(C1,C2);");
+        builder2.addLiteralSchema("\nCREATE INDEX GAGNAMSTYLE ON A(C2);");
+        builder2.addPartitionInfo("A", "C1");
+        builder2.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder2.compile(testDir + File.separator + "renameUniqueIndexes2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "renameUniqueIndexes2.jar");
+
+        verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testRemoveUniqueIndex() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // start with a table with an index
@@ -432,12 +477,12 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE UNIQUE INDEX IDX ON A(C1,C2);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
-        builder.compile(testDir + File.separator + "removeindexrejected1.jar");
-        Catalog catOriginal = catalogForJar(testDir +  File.separator + "removeindexrejected1.jar");
+        builder.compile(testDir + File.separator + "testRemoveUniqueIndex1.jar");
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "testRemoveUniqueIndex1.jar");
 
         // remove the index
-        Catalog catUpdated = get2ColumnCatalogForTable("A", "removeindexrejected2");
-        verifyDiffRejected(catOriginal, catUpdated);
+        Catalog catUpdated = get2ColumnCatalogForTable("A", "testRemoveUniqueIndex2");
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testRemoveNonUniqueIndex() throws IOException {
@@ -449,11 +494,11 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE INDEX IDX ON A(C1,C2);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
-        builder.compile(testDir + File.separator + "removeindex1.jar");
-        Catalog catOriginal = catalogForJar(testDir +  File.separator + "removeindex1.jar");
+        builder.compile(testDir + File.separator + "testRemoveNonUniqueIndex1.jar");
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "testRemoveNonUniqueIndex1.jar");
 
         // remove the index
-        Catalog catUpdated = get2ColumnCatalogForTable("A", "removeindex2");
+        Catalog catUpdated = get2ColumnCatalogForTable("A", "testRemoveNonUniqueIndex2");
         verifyDiff(catOriginal, catUpdated);
     }
 
@@ -465,11 +510,11 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
-        builder.compile(testDir + File.separator + "addconstraint1.jar");
-        Catalog catOriginal = catalogForJar(testDir + File.separator + "addconstraint1.jar");
+        builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
 
         // add a constraint (this function creates a primary key)
-        Catalog catUpdated = getCatalogForTable("A", "addconstraint2");
+        Catalog catUpdated = getCatalogForTable("A", "testAddTableConstraintRejected2");
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
