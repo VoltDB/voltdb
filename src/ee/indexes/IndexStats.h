@@ -75,6 +75,8 @@ public:
             voltdb::CatalogId partitionId,
             voltdb::CatalogId databaseId);
 
+    void rename(std::string name);
+
 protected:
 
     /**

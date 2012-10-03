@@ -1658,6 +1658,62 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
+    public void testDDLCompilerTwoIdenticalIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum1 on t(id,num);\n" +
+                "create index idx_t_idnum2 on t(id,num);";
+
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+    }
+
+    public void testDDLCompilerSameNameIndexesOnTwoTables()
+    {
+        final String s =
+                "create table t1(id integer not null, num integer not null);\n" +
+                "create table t2(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum on t1(id,num);\n" +
+                "create index idx_t_idnum on t2(id,num);";
+
+        // if this test ever fails, it's worth figuring out why
+        // When written, HSQL wouldn't allow two indexes with the same name,
+        //  even across tables.
+        compileForDDLTest(getPathForSchema(s), false);
+    }
+
+    public void testDDLCompilerTwoCoveringIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum_hash on t(id,num);\n" +
+                "create index idx_t_idnum_tree on t(id,num);";
+
+        compileForDDLTest(getPathForSchema(s), true);
+    }
+
+    public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index idx_t_idnum_unique on t(id,num);\n" +
+                "create index idx_t_idnum on t(id,num);";
+
+        compileForDDLTest(getPathForSchema(s), true);
+    }
+
+    public void testDDLCompilerTwoIndexesWithSameName()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum on t(id);\n" +
+                "create index idx_t_idnum on t(id,num);";
+
+        compileForDDLTest(getPathForSchema(s), false);
+    }
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
