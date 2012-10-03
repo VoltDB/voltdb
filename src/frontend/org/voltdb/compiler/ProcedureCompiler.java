@@ -236,8 +236,10 @@ public abstract class ProcedureCompiler {
                 stmt = (SQLStmt) f.get(procInstance);
             } catch (IllegalArgumentException e) {
                 e.printStackTrace();
+                continue;
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
+                continue;
             }
 
             // add the statement to the catalog
