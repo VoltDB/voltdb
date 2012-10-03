@@ -24,6 +24,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PrivateVoltTableFactory;
@@ -47,12 +48,20 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 public class RejoinProducer extends SiteTasker
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
 
     private final SiteTaskerQueue m_taskQueue;
     private final int m_partitionId;
     private InitiatorMailbox m_mailbox;
     private long m_rejoinCoordinatorHsId;
     private RejoinSiteProcessor m_rejoinSiteProcessor;
+
+    // True: use live rejoin; false use community blocking implementation.
+    private final boolean m_liveRejoin = true;
+    boolean useLiveRejoin()
+    {
+        return m_liveRejoin;
+    }
 
     /*
      * The handler will be called when a SnapshotUtil.requestSnapshot response comes
@@ -159,14 +168,14 @@ public class RejoinProducer extends SiteTasker
         String data = makeSnapshotRequest(hsId, sourceSite);
         String nonce = "Rejoin_" + m_mailbox.getHSId() + "_" + System.currentTimeMillis();
 
-        // request a blocking snapshot.
-        SnapshotUtil.requestSnapshot(0l, "", nonce, true,
-                                     SnapshotFormat.STREAM, data, m_handler, true);
+        SnapshotUtil.requestSnapshot(0l, "", nonce,
+                !useLiveRejoin(), // community rejoin uses blocking snapshot (true)
+                SnapshotFormat.STREAM, data, m_handler, true);
 
-        // There are problems here, Chester. First, the site thread needs
-        // to stay unblocked until the first data block is available. So,
-        // do a messy blocking poll on the first unit of work (by spinning!).
-        // Safe that first unit in "firstWork" and then enter the taskQueue.
+        // A little awkward here...
+        // The site must stay unblocked until the first snapshot data block arrrives.
+        // Do a messy blocking poll on the first unit of work (by spinning!).
+        // Save that first unit in "m_firstWork" and then enter the taskQueue.
         // Future: need a blocking peek on rejoinSiteProcessor(); then firstWork
         // can go away and the weird special casing of the first block in
         // run() can also go away.
@@ -192,12 +201,13 @@ public class RejoinProducer extends SiteTasker
     private String makeSnapshotRequest(long hsId, long sourceSite)
     {
         try {
+            // make this snapshot only contain data from this site
+            m_recoveryLog.debug(
+                    "Rejoin source for site " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                    " is " + CoreUtils.hsIdToString(sourceSite));
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
             jsStringer.key("hsId").value(hsId);
-            // make this snapshot only contain data from this site
-            // m_recoveryLog.debug("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
-            //                   " is " + CoreUtils.hsIdToString(sourceSite));
             jsStringer.key("target_hsid").value(sourceSite);
             jsStringer.endObject();
             return jsStringer.toString();
@@ -210,10 +220,29 @@ public class RejoinProducer extends SiteTasker
 
     /**
      * SiteTasker run -- load this site!
+     *
+     * run() is invoked when the RejoinProducer (this) submits itself to the
+     * site tasker. RejoinProducer submits itself to the site tasker queue
+     * when rejoin data is available. Rejoin data is available after the
+     * snapshot request is fulfilled. The snapshot request is triggered
+     * by the node-wise snapshot coordinator telling this producer that it's
+     * its turn to start the rejoin sequence.
      */
     @Override
-    public void run(SiteProcedureConnection siteConnection) {
+    public void run(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException(
+                "Unexpected execution of run method in rejoin producer.");
+    }
+
+    /**
+     * An implementation of run() that blocks the site thread
+     * until the streaming snapshot queue is emptied.
+     */
+    void runForCommunityRejoin(SiteProcedureConnection siteConnection)
+    {
         Pair<Integer, ByteBuffer> rejoinWork = firstWork.get();
+        firstWork.set(null);
         while (rejoinWork != null) {
             restoreBlock(rejoinWork, siteConnection);
             try {
@@ -223,11 +252,12 @@ public class RejoinProducer extends SiteTasker
                 rejoinWork = null;
             }
         }
-        // m_recoveryLog.debug("Rejoin snapshot transfer is finished");
+        m_recoveryLog.debug("Rejoin snapshot transfer is finished");
         m_rejoinSiteProcessor.close();
+
         // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
         // m_rejoinSiteProcessor = null;
-        // m_taskExeStartTime = System.currentTimeMillis();
+
         /*
          * Don't notify the rejoin coordinator yet. The stream snapshot may
          * have not finished on all nodes, let the snapshot completion
@@ -237,6 +267,44 @@ public class RejoinProducer extends SiteTasker
         SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
     }
 
+    /**
+     * An implementation of run() that does not block the site thread.
+     * The Site has responsibility for transactions that occur between
+     * schedulings of this task.
+     */
+    void runForLiveRejoin(SiteProcedureConnection siteConnection)
+    {
+        // the first block is a special case.
+        Pair<Integer, ByteBuffer> rejoinWork = firstWork.get();
+        if (rejoinWork != null) {
+            firstWork.set(null);
+        }
+        else {
+            rejoinWork = m_rejoinSiteProcessor.poll();
+        }
+        if (rejoinWork != null) {
+            restoreBlock(rejoinWork, siteConnection);
+        }
+
+        if (m_rejoinSiteProcessor.isEOF() == false) {
+            m_recoveryLog.debug("Rejoin rescheduling for more work...");
+            m_taskQueue.offer(this);
+        }
+        else {
+            m_recoveryLog.debug("Rejoin snapshot transfer is finished");
+            m_rejoinSiteProcessor.close();
+
+            // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
+            // m_rejoinSiteProcessor = null;
+
+            // Don't notify the rejoin coordinator yet. The stream snapshot may
+            // have not finished on all nodes, let the snapshot completion
+            // monitor tell the rejoin coordinator.
+            siteConnection.setRejoinComplete();
+            SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
+        }
+    }
+
     void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork, SiteProcedureConnection siteConnection)
     {
         int tableId = rejoinWork.getFirst();
@@ -244,7 +312,7 @@ public class RejoinProducer extends SiteTasker
         VoltTable table =
             PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
                     true);
-        //m_recoveryLog.info("table " + tableId + ": " + table.toString());
+
         // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
         // doesn't yet care about export, just use Long.MIN_VALUE
         siteConnection.loadTable(Long.MIN_VALUE, tableId, table);
@@ -253,6 +321,11 @@ public class RejoinProducer extends SiteTasker
 
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection) {
-        run(siteConnection);
+        if (useLiveRejoin()) {
+            runForLiveRejoin(siteConnection);
+        }
+        else {
+            runForCommunityRejoin(siteConnection);
+        }
     }
 }
