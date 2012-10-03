@@ -344,7 +344,7 @@ public:
     }
 
     void rename(std::string name) {
-        if (m_scheme.name.compare(name) == 0) {
+        if (m_scheme.name.compare(name) != 0) {
             m_scheme.name = name;
             IndexStats *stats = getIndexStats();
             if (stats) {

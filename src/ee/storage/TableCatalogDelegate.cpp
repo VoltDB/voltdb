@@ -156,7 +156,7 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
 /**
  * Locally defined function to make a string from an index schema
  */
-std::string
+static std::string
 getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique, map<int32_t, int32_t> columns) {
     // add the uniqueness of the index
     std::string retval = isUnique ? "U" : "M";
@@ -168,9 +168,6 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique, map<int32_
             break;
         case HASH_TABLE_INDEX:
             retval += "H";
-            break;
-        case ARRAY_INDEX:
-            retval += "A";
             break;
         default:
             // this would need to change if we added index types

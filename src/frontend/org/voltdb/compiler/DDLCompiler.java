@@ -1048,7 +1048,7 @@ public class DDLCompiler {
     }
 
     /**
-     * Return two if the two indexes are identical with a different name.
+     * Return true if the two indexes are identical with a different name.
      */
     boolean indexesAreDups(Index idx1, Index idx2) {
         // same attributes?
@@ -1220,7 +1220,7 @@ public class DDLCompiler {
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // add a warning but don't fail
-                String msg = String.format("Dropping index %s on table %s becuse it duplicates index %s.",
+                String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                         index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
                 m_compiler.addWarn(msg);
 

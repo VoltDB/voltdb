@@ -77,7 +77,7 @@ public class CatalogDiffEngine {
 
     /**
      * Check if a candidate unique index (for addition) covers an existing unique index.
-     * If a unique index exists on a subset of the rows, then the less specific index
+     * If a unique index exists on a subset of the columns, then the less specific index
      * can be created without failing.
      */
     private boolean indexCovers(Index newIndex, Index existingIndex) {
@@ -91,7 +91,7 @@ public class CatalogDiffEngine {
         // iterate over all of the existing columns
         for (ColumnRef existingColRef : existingIndex.getColumns()) {
             boolean foundMatch = false;
-            // see if the current column in also in the candidate index
+            // see if the current column is also in the candidate index
             // for now, assume the tables in question have the same schema
             for (ColumnRef colRef : newIndex.getColumns()) {
                 int index1 = colRef.getColumn().getIndex();
@@ -147,43 +147,39 @@ public class CatalogDiffEngine {
         // of certain unique indexes that might fail if created
         if (suspect instanceof Index) {
             Index index = (Index) suspect;
-            if (index.m_unique) {
-                // it's cool to remove unique indexes
-                if (changeType == ChangeType.DELETION) {
-                    return true;
-                }
-                // if adding a unique index, check if the columns in the new
-                // index cover an existing index
-                else {
-                    if (checkNewUniqueIndex(index)) {
-                        return true;
-                    }
-                    else {
-                        m_errors.append("May not dynamically add unique indexes that don't cover existing unique indexes.\n");
-                        m_supported = false;
-                        return false;
-                    }
-                }
+            if (!index.m_unique) {
+                return true;
             }
-            // it's cool to add/drop non-unique indexes
-            return true;
+
+            // it's cool to remove unique indexes
+            if (changeType == ChangeType.DELETION) {
+                return true;
+            }
+
+            // if adding a unique index, check if the columns in the new
+            // index cover an existing index
+            if (checkNewUniqueIndex(index)) {
+                return true;
+            }
+
+            m_errors.append("May not dynamically add unique indexes that don't cover existing unique indexes.\n");
+            m_supported = false;
+            return false;
         }
 
         // the only meaty constraints (for now) are UNIQUE, PKEY and NOT NULL.
         // others are basically no-ops and are cool
         if (suspect instanceof Constraint) {
             Constraint constraint = (Constraint) suspect;
+
             if (constraint.getType() == ConstraintType.NOT_NULL.getValue()) {
-                // for the time being, you can't add/drop NOT NULL constraints,
-                // but you should be able to make some changes when we support
-                // changing column schema
-                return false;
+                // for the time being, you can't add NOT NULL constraints
+                return changeType == ChangeType.ADDITION;
             }
+
             // all other constraints are either no-ops or will
             // pass or fail with the indexes that support them.
-            else {
-                return true;
-            }
+            return true;
         }
 
         // Support add/drop anywhere in these sub-trees
