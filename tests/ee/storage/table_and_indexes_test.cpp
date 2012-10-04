@@ -107,7 +107,7 @@ class TableAndIndexTest : public Test {
             warehouseIndex1ColumnIndices.push_back(0);
             warehouseIndex1ColumnTypes.push_back(VALUE_TYPE_TINYINT);
 
-            warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", ARRAY_INDEX, warehouseIndex1ColumnIndices, warehouseIndex1ColumnTypes, true, true, warehouseTupleSchema);
+            warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", HASH_TABLE_INDEX, warehouseIndex1ColumnIndices, warehouseIndex1ColumnTypes, true, true, warehouseTupleSchema);
 
             vector<voltdb::ValueType> customerColumnTypes;
             vector<int32_t> customerColumnLengths;
