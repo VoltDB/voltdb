@@ -22,9 +22,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
 
@@ -39,6 +37,7 @@ class GlobalServiceElector implements LeaderNoticeHandler
     private final LeaderElector m_leaderElector;
     private final List<Promotable> m_services = new ArrayList<Promotable>();
     private final int m_hostId;
+    private boolean m_isLeader = false;
 
     GlobalServiceElector(ZooKeeper zk, int hostId)
     {
@@ -51,6 +50,14 @@ class GlobalServiceElector implements LeaderNoticeHandler
     synchronized void registerService(Promotable service)
     {
         m_services.add(service);
+        if (m_isLeader) {
+            try {
+                service.acceptPromotion();
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to promote global service.", true, e);
+            }
+        }
     }
 
     /** Kick off the leader election.
@@ -65,6 +72,7 @@ class GlobalServiceElector implements LeaderNoticeHandler
     synchronized public void becomeLeader()
     {
         hostLog.info("Host " + m_hostId + " promoted to be the global service provider");
+        m_isLeader = true;
         for (Promotable service : m_services) {
             try {
                 service.acceptPromotion();
