@@ -86,20 +86,20 @@ class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Smallest result size
      */
-    private long m_minResultSize = Long.MAX_VALUE;
-    private long m_lastMinResultSize = Long.MAX_VALUE;
+    private int m_minResultSize = Integer.MAX_VALUE;
+    private int m_lastMinResultSize = Integer.MAX_VALUE;
 
     /**
      * Largest result size
      */
-    private long m_maxResultSize = Long.MIN_VALUE;
-    private long m_lastMaxResultSize = Long.MIN_VALUE;
+    private int m_maxResultSize = Integer.MIN_VALUE;
+    private int m_lastMaxResultSize = Integer.MIN_VALUE;
 
     /**
      * Total result size for calculating averages
      */
-    private long m_totalResultSize = 0;
-    private long m_lastTotalResultSize = 0;
+    private int m_totalResultSize = 0;
+    private int m_lastTotalResultSize = 0;
 
     /**
      * Smallest parameter set size
@@ -180,7 +180,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
                 m_lastMaxExecutionTime = Math.max( delta, m_lastMaxExecutionTime);
 
                 // sampled size statistics
-                long resultSize = 0;
+                int resultSize = 0;
                 if (results != null) {
                     for (VoltTable result : results ) {
                         resultSize += result.getSerializedSize();
@@ -228,9 +228,9 @@ class ProcedureStatsCollector extends SiteStatsSource {
         long maxExecutionTime = m_maxExecutionTime;
         long abortCount = m_abortCount;
         long failureCount = m_failureCount;
-        long minResultSize = m_minResultSize;
-        long maxResultSize = m_maxResultSize;
-        long totalResultSize = m_totalResultSize;
+        int minResultSize = m_minResultSize;
+        int maxResultSize = m_maxResultSize;
+        int totalResultSize = m_totalResultSize;
         long minParameterSetSize = m_minParameterSetSize;
         long maxParameterSetSize = m_maxParameterSetSize;
         long totalParameterSetSize = m_totalParameterSetSize;
@@ -258,8 +258,8 @@ class ProcedureStatsCollector extends SiteStatsSource {
 
             minResultSize = m_lastMinResultSize;
             maxResultSize = m_lastMaxResultSize;
-            m_lastMinResultSize = Long.MAX_VALUE;
-            m_lastMaxResultSize = Long.MIN_VALUE;
+            m_lastMinResultSize = Integer.MAX_VALUE;
+            m_lastMaxResultSize = Integer.MIN_VALUE;
 
             totalResultSize = m_totalResultSize - m_lastTotalResultSize;
             m_lastTotalResultSize = m_totalResultSize;
