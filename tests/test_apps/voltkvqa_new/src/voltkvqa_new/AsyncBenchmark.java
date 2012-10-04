@@ -192,7 +192,8 @@ public class AsyncBenchmark {
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
                 totalConnections--;
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-                if(totalConnections > 0) {
+                if(connectionsLeft > 0) {
+                    totalConnections--;
                     try {
                         connectThis(hostname);
                     } catch (Exception e) {
@@ -433,61 +434,27 @@ public class AsyncBenchmark {
      *
      */
     class GetCallback implements ProcedureCallback {
-        String key = null;
-        public GetCallback(String key) {
-            this.key = key;
-        }
-
-        public GetCallback() {
-            // do nothing
-        }
-
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            if(key != null) {
-                if (response.getStatus() == ClientResponse.SUCCESS) {
-                    final VoltTable pairData = response.getResults()[0];
-                    if (pairData.getRowCount() != 0) {
-                        successfulPutCount.incrementAndGet();
-                        final String key = pairData.fetchRow(0).getString(0);
-                        final long hashMapCount = hashMap.get(key);
-                        final long dbCount = ByteBuffer.wrap(pairData.fetchRow(0).getVarbinary(1)).getLong(0);
-                        if (dbCount < hashMapCount) {
-                            missingPutCount.incrementAndGet();
-                            incorrectPutCount.addAndGet(hashMapCount - dbCount);
-                            System.out.printf("ERROR: Key %s: count in db '%d' is less than client expected '%d'\n",
-                                              key.replaceAll("\\s", ""), dbCount, hashMapCount);
-                            System.out.print("ERROR 1!");
-                            System.exit(1);
-                        }
-                    }
+            // Track the result of the operation (Success, Failure, Payload traffic...)
+            if (response.getStatus() == ClientResponse.SUCCESS) {
+                final VoltTable pairData = response.getResults()[0];
+                // Cache miss (Key does not exist)
+                if (pairData.getRowCount() == 0) {
+                    missedGets.incrementAndGet();
                 }
                 else {
-                    System.out.print("ERROR: Bad Client response from Volt");
-                    System.exit(1);
+                    final PayloadProcessor.Pair pair =
+                            processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
+                                                        pairData.fetchRow(0).getVarbinary(1));
+                    successfulGets.incrementAndGet();
+                    networkGetData.addAndGet(pair.getStoreValueLength());
+                    rawGetData.addAndGet(pair.getRawValueLength());
                 }
             }
             else {
-                // Track the result of the operation (Success, Failure, Payload traffic...)
-                if (response.getStatus() == ClientResponse.SUCCESS) {
-                    final VoltTable pairData = response.getResults()[0];
-                    // Cache miss (Key does not exist)
-                    if (pairData.getRowCount() == 0) {
-                        missedGets.incrementAndGet();
-                    }
-                    else {
-                        final PayloadProcessor.Pair pair =
-                                processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
-                                                            pairData.fetchRow(0).getVarbinary(1));
-                        successfulGets.incrementAndGet();
-                        networkGetData.addAndGet(pair.getStoreValueLength());
-                        rawGetData.addAndGet(pair.getRawValueLength());
-                    }
-                }
-                else {
-                    failedGets.incrementAndGet();
-                }
-            } // end of if(key != null) else
+                failedGets.incrementAndGet();
+            }
         }
     }
 
@@ -518,6 +485,38 @@ public class AsyncBenchmark {
             }
             networkPutData.addAndGet(storeValueLength);
             rawPutData.addAndGet(rawValueLength);
+        }
+    }
+
+    class SumCallback implements ProcedureCallback {
+        String key = null;
+        public SumCallback(String key) {
+            this.key = key;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            // TODO Auto-generated method stub
+            if (response.getStatus() == ClientResponse.SUCCESS) {
+                final VoltTable pairData = response.getResults()[0];
+                if (pairData.getRowCount() != 0) {
+                    successfulPutCount.incrementAndGet();
+                    final long hashMapCount = hashMap.get(key);
+                    final long dbCount = ByteBuffer.wrap(pairData.fetchRow(0).getVarbinary(1)).getLong(0);
+                    if (dbCount < hashMapCount) {
+                        missingPutCount.incrementAndGet();
+                        incorrectPutCount.addAndGet(hashMapCount - dbCount);
+                        System.out.printf("ERROR: Key %s: count in db '%d' is less than client expected '%d'\n",
+                                          key.replaceAll("\\s", ""), dbCount, hashMapCount);
+                        System.out.print("ERROR 1!\n");
+                        System.exit(1);
+                    }
+                }
+            }
+            else {
+                System.out.print("ERROR: Bad Client response from Volt");
+                System.exit(1);
+            }
         }
     }
 
@@ -627,7 +626,7 @@ public class AsyncBenchmark {
             Iterator<String> it = hashMap.keySet().iterator();
             while (it.hasNext()) {
                 String key = it.next().toString();
-                client.callProcedure(new GetCallback(key), "Get", key);
+                client.callProcedure(new SumCallback(key), "Get", key);
             }
         }
         catch (Exception x)    {
