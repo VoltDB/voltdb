@@ -35,8 +35,8 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
-        src/voltkv/*.java \
-        src/voltkv/procedures/*.java
+        src/voltkvqa_new/*.java \
+        src/voltkvqa_new/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
