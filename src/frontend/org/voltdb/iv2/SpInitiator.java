@@ -82,6 +82,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin,
+                          StatsAgent agent,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
@@ -94,7 +95,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
                 createForRejoin && isRejoinable(),
-                cl);
+                agent, cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),

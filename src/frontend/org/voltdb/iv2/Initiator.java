@@ -27,6 +27,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.CommandLog;
+import org.voltdb.StatsAgent;
 
 /**
  * Abstracts the top-level interface to create and configure an Iv2
@@ -40,6 +41,7 @@ public interface Initiator
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin,
+                          StatsAgent agent,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway)
         throws KeeperException, InterruptedException, ExecutionException;

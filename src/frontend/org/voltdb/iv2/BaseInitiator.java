@@ -27,9 +27,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.ProcedureRunnerFactory;
@@ -104,19 +101,12 @@ public abstract class BaseInitiator implements Initiator
             CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
     }
 
-    private boolean isExportEnabled(CatalogContext catalogContext)
-    {
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
-        return (conn != null && conn.getEnabled() == true);
-    }
-
     protected void configureCommon(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin,
+                          StatsAgent agent,
                           CommandLog cl)
         throws KeeperException, ExecutionException, InterruptedException
     {
@@ -135,7 +125,8 @@ public abstract class BaseInitiator implements Initiator
                                        numberOfPartitions,
                                        createForRejoin,
                                        snapshotPriority,
-                                       m_initiatorMailbox);
+                                       m_initiatorMailbox,
+                                       agent);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -149,9 +140,7 @@ public abstract class BaseInitiator implements Initiator
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);
 
-            if (isExportEnabled(catalogContext)) {
-                m_tickProducer.start();
-            }
+            m_tickProducer.start();
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
