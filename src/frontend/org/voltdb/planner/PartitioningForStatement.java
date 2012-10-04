@@ -179,8 +179,7 @@ public class PartitioningForStatement {
      */
     public void setPartitionedTables(Map<String,String> partitionColumnByTable, int countOfPartitionedTables) {
         // Should only be set once, early on.
-        // @TODO MIKE
-        //assert(m_countOfPartitionedTables == -1);
+        assert(m_countOfPartitionedTables == -1);
         m_partitionColumnByTable = partitionColumnByTable;
         m_countOfPartitionedTables = countOfPartitionedTables;
         m_countOfIndependentlyPartitionedTables = countOfPartitionedTables; // Initial guess -- as if no equality filters.

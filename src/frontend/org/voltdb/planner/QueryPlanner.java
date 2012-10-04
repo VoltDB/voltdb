@@ -148,10 +148,6 @@ public class QueryPlanner {
 
         if (parsedStmt instanceof ParsedUnionStmt) {
 
-            // the final plan can only have 1 or 2 fragments,
-            // meaning that only one of the selects can be multi-partition.
-            m_assembler.verifyTablePartition(parsedStmt);
-
             ParsedUnionStmt parsedUnionStmt = (ParsedUnionStmt) parsedStmt;
             ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
 
@@ -159,11 +155,15 @@ public class QueryPlanner {
             boolean contentIsDeterministic = true;
 
             boolean isPlanFinal = false;
+            ArrayList<PartitioningForStatement> partitioningList = new ArrayList<PartitioningForStatement>();
+
             // Index range for the generated plans for a next statement
             int planIdRange[] = {0, 1};
             for (AbstractParsedStmt parsedChildStmt : parsedUnionStmt.m_children) {
+                PartitioningForStatement partitioning = new PartitioningForStatement(null, false, true);
                 CompiledPlan bestChildPlan = getBestCostPlan(parsedChildStmt, costModel,
-                        sql, joinOrder, stmtName, procName, paramHints, isPlanFinal, planIdRange);
+                        sql, joinOrder, stmtName, procName, paramHints, isPlanFinal, planIdRange,
+                        partitioning);
                 // make sure we got a winner
                 if (bestChildPlan == null) {
                     m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
@@ -172,6 +172,21 @@ public class QueryPlanner {
                 childrenPlans.add(bestChildPlan);
                 orderIsDeterministic = orderIsDeterministic && bestChildPlan.isOrderDeterministic();
                 contentIsDeterministic = contentIsDeterministic && bestChildPlan.isContentDeterministic();
+                partitioningList.add(partitioning);
+            }
+
+            // Iterate over individual partition objects. It should be either zero or one
+            // of them where count of independent partitioned tables is greater then 0
+            // (we don't allow same table to appear in multiple child statements of the UNION statement)
+            boolean hasPrtitionedTable = false;
+            for (PartitioningForStatement partition : partitioningList) {
+                if (partition.getCountOfIndependentlyPartitionedTables() > 0)
+                    if (!hasPrtitionedTable) {
+                        hasPrtitionedTable = true;
+                    } else {
+                        m_recentErrorMsg = "Unable to plan for statement. More than one partitioned table in the union.";
+                        return null;
+                    }
             }
 
             // For now the best plan for union is the sum of best plans for the selects
@@ -209,7 +224,7 @@ public class QueryPlanner {
             boolean isPlanFinal = true;
             int planIdRange[] = {0, 1};
             bestPlan = getBestCostPlan(parsedStmt, costModel,
-                    sql, joinOrder, stmtName,procName, paramHints, isPlanFinal, planIdRange);
+                    sql, joinOrder, stmtName, procName, paramHints, isPlanFinal, planIdRange, null);
         }
 
         // make sure we got a winner
@@ -236,10 +251,11 @@ public class QueryPlanner {
             String procName,
             ScalarValueHints[] paramHints,
             boolean isPlanFinal,
-            int planIdRange[]) {
+            int planIdRange[],
+            PartitioningForStatement partitioning) {
 
     // set up the plan assembler for this statement
-    m_assembler.setupForNewPlans(parsedStmt);
+    m_assembler.setupForNewPlans(parsedStmt, partitioning);
 
     // get ready to find the plan with minimal cost
     CompiledPlan rawplan = null;

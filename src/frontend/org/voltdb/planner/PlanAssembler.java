@@ -184,7 +184,7 @@ public class PlanAssembler {
         return false;
     }
 
-    public void verifyTablePartition (AbstractParsedStmt parsedStmt) {
+    public void verifyTablePartition (AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning) {
         int countOfPartitionedTables = 0;
         Map<String, String> partitionColumnByTable = new HashMap<String, String>();
         // Do we have a need for a distributed scan at all?
@@ -211,10 +211,10 @@ public class PlanAssembler {
             String partitionedTable = table.getTypeName();
             partitionColumnByTable.put(partitionedTable, colName);
         }
-        m_partitioning.setPartitionedTables(partitionColumnByTable, countOfPartitionedTables);
-        if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_partitioning.getCountOfPartitionedTables() > 0) {
-            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, parsedStmt.valueEquivalence);
-            int multiPartitionScanCount = m_partitioning.getCountOfIndependentlyPartitionedTables();
+        partitioning.setPartitionedTables(partitionColumnByTable, countOfPartitionedTables);
+        if ((partitioning.wasSpecifiedAsSingle() == false) && partitioning.getCountOfPartitionedTables() > 0) {
+            partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, parsedStmt.valueEquivalence);
+            int multiPartitionScanCount = partitioning.getCountOfIndependentlyPartitionedTables();
             if (multiPartitionScanCount > 1) {
                 // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
                 String msg = "Join or union of multiple partitioned tables has insufficient join criteria.";
@@ -228,9 +228,13 @@ public class PlanAssembler {
      * getNextPlan() will return the first candidate plan for these parameters.
      *
      */
-    void setupForNewPlans(AbstractParsedStmt parsedStmt)
+    void setupForNewPlans(AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
-        verifyTablePartition (parsedStmt);
+        if (partitioning == null) {
+            partitioning = m_partitioning;
+        }
+
+        verifyTablePartition (parsedStmt, partitioning);
 
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {
@@ -238,7 +242,7 @@ public class PlanAssembler {
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, partitioning);
         } else {
             // check that no modification happens to views
             if (tableListIncludesView(parsedStmt.tableList)) {
@@ -251,13 +255,13 @@ public class PlanAssembler {
             assert (parsedStmt.tableList.size() == 1);
             Table targetTable = parsedStmt.tableList.get(0);
             if (targetTable.getIsreplicated()) {
-                if (m_partitioning.wasSpecifiedAsSingle()) {
+                if (partitioning.wasSpecifiedAsSingle()) {
                     String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
                                  + "' in a single-partition procedure.";
                     throw new PlanningErrorException(msg);
                 }
-            } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
-                m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
+            } else if (partitioning.wasSpecifiedAsSingle() == false) {
+                partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
             }
 
             if (parsedStmt instanceof ParsedInsertStmt) {
@@ -282,7 +286,7 @@ public class PlanAssembler {
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");
             }
-            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, partitioning);
         }
     }
 
