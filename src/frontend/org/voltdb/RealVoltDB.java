@@ -280,7 +280,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
             if (config.m_enableIV2) {
-                consoleLog.warn("ENABLE IV2: " + config.m_enableIV2 + ". NOT SUPPORTED IN PRODUCTION.");
+                consoleLog.warn("Running Iv2 (3.0 preview). NOT SUPPORTED IN PRODUCTION.");
             }
 
             // If there's no deployment provide a default and put it under voltdbroot.
