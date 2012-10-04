@@ -25,6 +25,9 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
+
+import org.voltdb.NodeDRGateway;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -79,7 +82,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin,
-                          CommandLog cl)
+                          CommandLog cl,
+                          NodeDRGateway nodeDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -96,6 +100,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+
+        // configure DR
+        ((SpScheduler) m_scheduler).setDRGateway(PartitionDRGateway.getInstance(m_partitionId,
+                                                                                nodeDRGateway,
+                                                                                true));
     }
 
     @Override

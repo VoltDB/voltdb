@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.NodeDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
@@ -62,7 +63,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin,
-                          CommandLog cl)
+                          CommandLog cl,
+                          NodeDRGateway drGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
         super.configureCommon(backend, serializedCatalog, catalogContext,

@@ -131,13 +131,13 @@ final public class TxnEgo {
         return txnId >> PARTITIONID_BITS;
     }
 
-    public static long getPartitionId(long txnId) {
-        return txnId & PARTITIONID_MAX_VALUE;
+    public static int getPartitionId(long txnId) {
+        return (int) txnId & PARTITIONID_MAX_VALUE;
     }
 
-    final public long getPartitionId()
+    final public int getPartitionId()
     {
-        return m_txnId & PARTITIONID_MAX_VALUE;
+        return (int) m_txnId & PARTITIONID_MAX_VALUE;
     }
 
     long getSequence() {

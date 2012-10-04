@@ -25,6 +25,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.NodeDRGateway;
 import org.voltdb.CommandLog;
 
 /**
@@ -39,7 +40,8 @@ public interface Initiator
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin,
-                          CommandLog cl)
+                          CommandLog cl,
+                          NodeDRGateway nodeDRGateway)
         throws KeeperException, InterruptedException, ExecutionException;
 
     /** Shutdown an Initiator and its sub-components. */
