@@ -51,7 +51,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicLongArray;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -68,9 +67,6 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 
 public class AsyncBenchmark {
-    private static final AtomicLongArray PutCountResults = new AtomicLongArray(3);
-    private static Map<String, Long> hm = Collections.synchronizedMap(new HashMap<String, Long>());
-
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
@@ -105,6 +101,10 @@ public class AsyncBenchmark {
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
     int totalConnections = 0;
+    private static final AtomicLong successfulPutCount = new AtomicLong(0);
+    private static final AtomicLong missingPutCount = new AtomicLong(0);
+    private static final AtomicLong incorrectPutCount = new AtomicLong(0);
+    private static Map<String, Long> hashMap = Collections.synchronizedMap(new HashMap<String, Long>());
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -448,15 +448,15 @@ public class AsyncBenchmark {
                 if (response.getStatus() == ClientResponse.SUCCESS) {
                     final VoltTable pairData = response.getResults()[0];
                     if (pairData.getRowCount() != 0) {
-                        PutCountResults.incrementAndGet(0);
+                        successfulPutCount.incrementAndGet();
                         final String key = pairData.fetchRow(0).getString(0);
-                        final long hmCount = hm.get(key);
+                        final long hashMapCount = hashMap.get(key);
                         final long dbCount = ByteBuffer.wrap(pairData.fetchRow(0).getVarbinary(1)).getLong(0);
-                        if (dbCount < hmCount) {
-                            PutCountResults.incrementAndGet(1);
-                            PutCountResults.addAndGet(2, hmCount - dbCount);
+                        if (dbCount < hashMapCount) {
+                            missingPutCount.incrementAndGet();
+                            incorrectPutCount.addAndGet(hashMapCount - dbCount);
                             System.out.printf("ERROR: Key %s: count in db '%d' is less than client expected '%d'\n",
-                                              key.replaceAll("\\s", ""), dbCount, hmCount);
+                                              key.replaceAll("\\s", ""), dbCount, hashMapCount);
                             System.out.print("ERROR 1!");
                             System.exit(1);
                         }
@@ -511,7 +511,7 @@ public class AsyncBenchmark {
                 final VoltTable pairData = response.getResults()[0];
                 final VoltTableRow tablerow = pairData.fetchRow(0);
                 final long counter = tablerow.getLong(0);
-                hm.put(thisPair.Key, counter);
+                hashMap.put(thisPair.Key, counter);
             }
             else {
                 failedPuts.incrementAndGet();
@@ -616,7 +616,6 @@ public class AsyncBenchmark {
         summary4qa();
         client.drain();
 
-
         // close down the client connections
         client.close();
     }
@@ -624,11 +623,8 @@ public class AsyncBenchmark {
     public void summary4qa() {
         try {
             // Put a key/value pair, asynchronously
-            PutCountResults.set(0, 0l);
-            PutCountResults.set(1, 0l);
-            PutCountResults.set(2, 0l);
-            //System.out.printf("HashMap Size: %10d\n",hm.size());
-            Iterator<String> it = hm.keySet().iterator();
+            //System.out.printf("HashMap Size: %10d\n", hashMap.size());
+            Iterator<String> it = hashMap.keySet().iterator();
             while (it.hasNext()) {
                 String key = it.next().toString();
                 client.callProcedure(new GetCallback(key), "Get", key);
@@ -649,16 +645,17 @@ public class AsyncBenchmark {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        System.out.printf("\n\t%10d\tKV Rows Checked <<--== cyan\n",hm.size());
-        System.out.printf("\t%10d\tKV Rows Found in database\n", PutCountResults.get(0));
-        System.out.printf("\t%10d\tKV Rows Missing in database\n",hm.size() - PutCountResults.get(0));
-        System.out.printf("\n\t%10d\tKV Rows are Correct\n", PutCountResults.get(0)- PutCountResults.get(1) );
-        System.out.printf("\t%10d\tKV Rows are Incorrect (off by %d Puts)\n", PutCountResults.get(1), PutCountResults.get(2));
+        System.out.printf("\n\t%10d\tKV Rows Checked\n", hashMap.size());
+        System.out.printf("\t%10d\tKV Rows Found in database\n", successfulPutCount.get());
+        System.out.printf("\t%10d\tKV Rows Missing in database\n", hashMap.size() - successfulPutCount.get());
+        System.out.printf("\n\t%10d\tKV Rows are Correct\n", successfulPutCount.get() - missingPutCount.get());
+        System.out.printf("\t%10d\tKV Rows are Incorrect (off by %d Puts)\n", missingPutCount.get(), incorrectPutCount.get());
 
-        if (PutCountResults.get(0) == hm.size() && PutCountResults.get(1) == 0){
+        if (successfulPutCount.get() == hashMap.size() && missingPutCount.get() == 0){
             System.out.println("\n-------------------\nGood News:  Database Put counts match\n");
         }
         else {
+            System.out.println("\n-------------------\nError! Database Put counts don't match!!\n");
             System.exit(1);
         }
     }
