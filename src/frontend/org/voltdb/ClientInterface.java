@@ -1371,13 +1371,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
-    public void initializeSnapshotDaemon(ZooKeeper zk) {
+    public void initializeSnapshotDaemon(ZooKeeper zk, GlobalServiceElector gse) {
         m_snapshotDaemon.init(this, zk, new Runnable() {
             @Override
             public void run() {
                 bindAdapter(m_snapshotDaemonAdapter);
             }
-        });
+        },
+        gse);
     }
 
     /**
