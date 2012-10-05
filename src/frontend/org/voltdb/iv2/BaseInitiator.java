@@ -63,7 +63,6 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
-    private final TickProducer m_tickProducer;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
@@ -80,8 +79,6 @@ public abstract class BaseInitiator implements Initiator
                 m_messenger,
                 m_repairLog,
                 rejoinProducer);
-
-        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
@@ -142,8 +139,6 @@ public abstract class BaseInitiator implements Initiator
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);
-
-            m_tickProducer.start();
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
