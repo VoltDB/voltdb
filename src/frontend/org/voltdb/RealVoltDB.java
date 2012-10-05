@@ -787,16 +787,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
                 if (statsManagerClass != null) {
                     ArrayList<Long> localHSIds;
+                    Long MPHSId;
                     if (isIV2Enabled()) {
                         localHSIds = new ArrayList<Long>();
                         for (Initiator iv2Initiator : m_iv2Initiators) {
                             localHSIds.add(iv2Initiator.getInitiatorHSId());
                         }
+                        MPHSId = m_MPI.getInitiatorHSId();
                     } else {
                         localHSIds = new ArrayList<Long>(m_localSites.keySet());
+                        MPHSId = null;
                     }
                     m_statsManager = (StatsManager)statsManagerClass.newInstance();
-                    m_statsManager.initialize(localHSIds);
+                    m_statsManager.initialize(localHSIds, MPHSId);
                 }
             } catch (Exception e) {
                 hostLog.error("Failed to instantiate the JMX stats manager: " + e.getMessage() +
