@@ -596,6 +596,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 }
             }
 
+            // Initialize stats
+            m_partitionCountStats = new PartitionCountStats( clusterConfig.getPartitionCount());
+            m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
+                    0, m_partitionCountStats);
+            m_ioStats = new IOStats();
+            m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
+                    0, m_ioStats);
+            m_memoryStats = new MemoryStats();
+            m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
+                    0, m_memoryStats);
+            if (isIV2Enabled()) {
+                m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+            }
+
             /*
              * Configure and start all the IV2 sites
              */
@@ -617,6 +631,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 csp,
                                 clusterConfig.getPartitionCount(),
                                 m_rejoining,
+                                m_statsAgent,
+                                m_memoryStats,
                                 m_commandLog,
                                 m_nodeDRGateway);
                     }
@@ -764,27 +780,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_dtxns.add(initiator);
             }
 
-            m_partitionCountStats = new PartitionCountStats( clusterConfig.getPartitionCount());
-            m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
-                    0, m_partitionCountStats);
-            m_ioStats = new IOStats();
-            m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
-                    0, m_ioStats);
-            m_memoryStats = new MemoryStats();
-            m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
-                    0, m_memoryStats);
-            if (isIV2Enabled()) {
-                m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
-            }
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
                 final Class<?> statsManagerClass =
-                    Class.forName("org.voltdb.management.JMXStatsManager");
-                m_statsManager = (StatsManager)statsManagerClass.newInstance();
-                m_statsManager.initialize(new ArrayList<Long>(m_localSites.keySet()));
+                        MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
+                if (statsManagerClass != null) {
+                    ArrayList<Long> localHSIds;
+                    if (isIV2Enabled()) {
+                        localHSIds = new ArrayList<Long>();
+                        for (Initiator iv2Initiator : m_iv2Initiators) {
+                            localHSIds.add(iv2Initiator.getInitiatorHSId());
+                        }
+                    } else {
+                        localHSIds = new ArrayList<Long>(m_localSites.keySet());
+                    }
+                    m_statsManager = (StatsManager)statsManagerClass.newInstance();
+                    m_statsManager.initialize(localHSIds);
+                }
             } catch (Exception e) {
-                int a = 0;
+                hostLog.error("Failed to instantiate the JMX stats manager: " + e.getMessage() +
+                              ". Disabling JMX.");
+                e.printStackTrace();
             }
 
             try {
