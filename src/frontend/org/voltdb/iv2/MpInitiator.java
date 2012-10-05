@@ -72,7 +72,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
     {
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable(), agent, memStats, cl);
+                createForRejoin && isRejoinable(), null, null, cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),

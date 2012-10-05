@@ -303,15 +303,22 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
 
-        m_tableStats = new TableStats(m_siteId);
-        agent.registerStatsSource(SysProcSelector.TABLE,
-                                  m_siteId,
-                                  m_tableStats);
-        m_indexStats = new IndexStats(m_siteId);
-        agent.registerStatsSource(SysProcSelector.INDEX,
-                                  m_siteId,
-                                  m_indexStats);
-        m_memStats = memStats;
+        if (agent != null) {
+            m_tableStats = new TableStats(m_siteId);
+            agent.registerStatsSource(SysProcSelector.TABLE,
+                                      m_siteId,
+                                      m_tableStats);
+            m_indexStats = new IndexStats(m_siteId);
+            agent.registerStatsSource(SysProcSelector.INDEX,
+                                      m_siteId,
+                                      m_indexStats);
+            m_memStats = memStats;
+        } else {
+            // MPI doesn't need to track these stats
+            m_tableStats = null;
+            m_indexStats = null;
+            m_memStats = null;
+        }
     }
 
     /** Update the loaded procedures. */
