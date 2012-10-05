@@ -107,6 +107,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Stats
     final TableStats m_tableStats;
     final IndexStats m_indexStats;
+    final MemoryStats m_memStats;
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private SnapshotSiteProcessor m_snapshotter;
@@ -284,7 +285,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             boolean createForRejoin,
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
-            StatsAgent agent)
+            StatsAgent agent,
+            MemoryStats memStats)
     {
         m_siteId = siteId;
         m_context = context;
@@ -309,6 +311,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         agent.registerStatsSource(SysProcSelector.INDEX,
                                   m_siteId,
                                   m_indexStats);
+        m_memStats = memStats;
     }
 
     /** Update the loaded procedures. */
@@ -627,7 +630,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         long time = System.currentTimeMillis();
 
         m_ee.tick(time, m_lastCommittedTxnId);
+        statsTick(time);
+    }
 
+    /**
+     * Cache the current statistics.
+     *
+     * @param time
+     */
+    private void statsTick(long time)
+    {
         /*
          * grab the table statistics from ee and put it into the statistics
          * agent.
@@ -683,15 +695,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
 
             // update the rolled up memory statistics
-            MemoryStats memoryStats = VoltDB.instance().getMemoryStatsSource();
-            if (memoryStats != null) {
-                memoryStats.eeUpdateMemStats(m_siteId,
-                                             tupleCount,
-                                             tupleDataMem,
-                                             tupleAllocatedMem,
-                                             indexMem,
-                                             stringMem,
-                                             m_ee.getThreadLocalPoolAllocations());
+            if (m_memStats != null) {
+                m_memStats.eeUpdateMemStats(m_siteId,
+                                            tupleCount,
+                                            tupleDataMem,
+                                            tupleAllocatedMem,
+                                            indexMem,
+                                            stringMem,
+                                            m_ee.getThreadLocalPoolAllocations());
             }
         }
     }

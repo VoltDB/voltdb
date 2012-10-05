@@ -26,6 +26,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 
+import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.BackendTarget;
@@ -83,6 +84,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           int numberOfPartitions,
                           boolean createForRejoin,
                           StatsAgent agent,
+                          MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
@@ -95,7 +97,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
                 createForRejoin && isRejoinable(),
-                agent, cl);
+                agent, memStats, cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),

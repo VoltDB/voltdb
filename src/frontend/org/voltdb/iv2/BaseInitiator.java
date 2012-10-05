@@ -33,6 +33,7 @@ import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.MemoryStats;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
@@ -107,6 +108,7 @@ public abstract class BaseInitiator implements Initiator
                           int numberOfPartitions,
                           boolean createForRejoin,
                           StatsAgent agent,
+                          MemoryStats memStats,
                           CommandLog cl)
         throws KeeperException, ExecutionException, InterruptedException
     {
@@ -126,7 +128,8 @@ public abstract class BaseInitiator implements Initiator
                                        createForRejoin,
                                        snapshotPriority,
                                        m_initiatorMailbox,
-                                       agent);
+                                       agent,
+                                       memStats);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
