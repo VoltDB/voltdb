@@ -1245,6 +1245,19 @@ public class VoltCompiler {
             return;
         }
 
+        // Catalog Connector
+        // Relying on schema's enforcement of at most 1 connector
+        //
+        // This check is also done here to mimic the same behavior of the
+        // previous implementation of this method, where the connector is created as
+        // long as the export element is present in project XML. Now that we are
+        // deprecating project.xml, we won't be able to mimic in DDL, what an
+        // empty <export/> element currently implies.
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        if (catconn == null) {
+            catconn = catdb.getConnectors().add("0");
+        }
+
         // add authorized users and groups
         final ArrayList<String> groupslist = new ArrayList<String>();
 
