@@ -76,7 +76,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 // Test generalized index on an expression of multiple columns.
                 "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
                 // Test generalized index on a string function.
-                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                // "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
                 "CREATE TABLE R1 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "DESC VARCHAR(300), " +
@@ -856,7 +856,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
 
                 // Test generalized index on a string function.
-                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                //"CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
 
                 "CREATE TABLE R1 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +

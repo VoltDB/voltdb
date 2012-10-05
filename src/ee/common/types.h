@@ -356,6 +356,7 @@ enum RecoveryMsgType {
 // -----------------------------------------------------------------
 std::string getTypeName(ValueType type);
 bool isNumeric(ValueType type);
+bool isIntegralType(ValueType type);
 
 // for testing, obtain a random instance of the specified type
 NValue getRandomValue(ValueType type);

@@ -46,6 +46,7 @@
 #include <cassert>
 #include <iostream>
 #include "indexes/tableindexfactory.h"
+#include "common/SerializableEEException.h"
 #include "common/types.h"
 #include "catalog/index.h"
 #include "indexes/tableindex.h"
@@ -201,33 +202,35 @@ private:
     TableIndexType m_type;
 };
 
-// check if any indexed expression does not have an int type
-static bool isNotIntType(ValueType exprType) {
-    return (exprType != VALUE_TYPE_TINYINT) &&
-           (exprType != VALUE_TYPE_SMALLINT) &&
-           (exprType != VALUE_TYPE_INTEGER) &&
-           (exprType != VALUE_TYPE_BIGINT);
-}
-
-
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     const TupleSchema *tupleSchema = scheme.tupleSchema;
     assert(tupleSchema);
     bool isIntsOnly = true;
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
-    size_t valueCount = (int) scheme.indexedExpressions.size();
-    if (valueCount != 0) {
+    size_t valueCount = 0;
+    size_t exprCount = scheme.indexedExpressions.size();
+    if (exprCount != 0) {
+        valueCount = exprCount;
         for (size_t ii = 0; ii < valueCount; ++ii) {
             ValueType exprType = scheme.indexedExpressions[ii]->getValueType();
-            if (isNotIntType(exprType)) {
+            if ( ! isIntegralType(exprType)) {
                 isIntsOnly = false;
             }
             keyColumnTypes.push_back(exprType);
             if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
-                // Not enough information to reliably determine that the value is small enough to "inline".
+                // There's not enough information to reliably determine that the value is small enough to "inline".
+                // Setting the column length to UNINLINEABLE_OBJECT_LENGTH is NOT intended to constrain the
+                // maximum length of the values or to be the basis of any kind of pre-allocation.
+                // Quite the opposite, it is intended only to convince the tuple storage code that the
+                // values MAY be too large for inlining, so all bets are off. It's not clear whether
+                // scheme.indexedExpressions[ii]->getValueSize() can or should be called for a more useful answer.
                 keyColumnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH);
-                //TODO: short term, throw here for all non-inline types
+                // Short term, there is no support for non-inline types, for lack of proper memory management
+                // (persisting non-inline storage for calculated values not that is not a column value managed by
+                // a persistent table tuple.
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              "TableIndexFactory::getInstance detected expression-based index on non-numeric value");
             } else {
                 keyColumnLengths.push_back(NValue::getTupleStorageSize(exprType));
             }
@@ -236,8 +239,8 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         valueCount = scheme.columnIndices.size();
         for (size_t ii = 0; ii < valueCount; ++ii) {
             ValueType exprType = tupleSchema->columnType(scheme.columnIndices[ii]);
-            if (isNotIntType(exprType)) {
-                    isIntsOnly = false;
+            if ( ! isIntegralType(exprType)) {
+                isIntsOnly = false;
             }
             keyColumnTypes.push_back(exprType);
             keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[ii]));

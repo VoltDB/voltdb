@@ -993,7 +993,7 @@ NATIVE EE STUFF
     </copy>
 </target>
 
-<target name='reee'
+<target name='recompile_ee_nodepends'
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <arg line="build.py ${build}" />
