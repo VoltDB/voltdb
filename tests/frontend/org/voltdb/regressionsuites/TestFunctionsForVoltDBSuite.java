@@ -324,12 +324,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("You got it!",result.getString(1));
 
         // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
-        cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", "You got it!", 1);
+        cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", "贾鑫?贾鑫!", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("You got it!",result.getString(1));
+        assertEquals("贾鑫?贾鑫!",result.getString(1));
 
         // For project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'99') from P1 where id = ?");
         try {

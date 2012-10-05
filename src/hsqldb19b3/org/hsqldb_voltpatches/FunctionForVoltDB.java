@@ -216,63 +216,99 @@ public class FunctionForVoltDB extends FunctionSQL {
              * mixed argument types.
              */
         case FunctionId.FUNC_VOLT_DECODE:
-            Type inferredInputType = null;
-            Type inferredResultType = null;
+            // Track whether parameter type hinting is needed for either key or value arguments.
+            // For simplicity(?), parameters are not tracked explicitly (by position)
+            // or even by category (key vs. value). So, if any parameter hinting is required at all,
+            // all arguments get re-checked.
             boolean needParamType = false;
-            for (int ii = 0; ii < nodes.length; ii++) {
-                if (ii >= 2 && (ii == (nodes.length - 1) || (ii % 2) == 0)) {
-                    // These arguments represent candidate result values.
-                    if (nodes[ii].dataType == null) {
-                        if (nodes[ii].isParam) {
-                            needParamType = true;
-                        }
-                    }
-                    else if (inferredResultType == null) {
-                        inferredResultType = nodes[ii].dataType; // Take the first hint.
-                    } else if (inferredResultType != nodes[ii].dataType) {
-                        inferredResultType = Type.SQL_VARCHAR; // Discard contradictory hints.
-                    }
-                } else {
-                    // These arguments represent candidate input values.
-                    if (nodes[ii].dataType == null) {
-                        if (nodes[ii].isParam) {
-                            needParamType = true;
-                        }
-                    }
-                    else if (inferredInputType == null) {
-                        inferredInputType = nodes[ii].dataType; // Take the first hint.
-                    } else if (inferredInputType != nodes[ii].dataType) {
-                        inferredInputType = Type.SQL_VARCHAR; // Discard contradictory hints.
-                    }
+
+            // Start by trying to infer the inputs' common type from the first argument.
+            Type inputTypeInferred = nodes[0].dataType; // Take the first hint.
+            // If starting the args with a param, there's already work to be done, below.
+            needParamType = (inputTypeInferred == null) && nodes[0].isParam;
+
+            // Similarly, try to infer the common results' type from the last/default argument
+            // (present only if there are an even number of arguments).
+            Type resultTypeInferred = null;
+            if ((nodes.length % 2 == 0)) {
+                resultTypeInferred = nodes[nodes.length-1].dataType; // Take the hint.
+                // A param here means (more) work to do, below.
+                needParamType |= (resultTypeInferred == null) && nodes[nodes.length-1].isParam;
+            }
+
+            // With the first and the optional last/"default" argument out of the way,
+            // the arguments alternate between candidate key inputs and candidate value results.
+            for (int keyIndex = 1; keyIndex < nodes.length-1; keyIndex+=2) {
+
+                // These (odd-numbered) arguments represent additional candidate input keys
+                // that may hint at the input type or may require hinting from the other input keys.
+                Type argType = nodes[keyIndex].dataType;
+                if (argType == null) {
+                    // A param here means (more) work to do, below.
+                    needParamType |= nodes[keyIndex].isParam;
+                }
+                else if (inputTypeInferred == null) {
+                    inputTypeInferred = argType; // Take the first input type hint.
+                } else if (inputTypeInferred != argType) {
+                    inputTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints, falling back to string type.
+                }
+
+                int valueIndex = keyIndex+1;
+                // These (even numbered) arguments represent candidate result values
+                // that may hint at the result type or require hinting from the other result values.
+                argType = nodes[valueIndex].dataType;
+                if (argType == null) {
+                    // A param here means (more) work to do, below.
+                    needParamType |= nodes[valueIndex].isParam;
+                }
+                else if (resultTypeInferred == null) {
+                    resultTypeInferred = argType; // Take the first result type hint.
+                } else if (resultTypeInferred != argType) {
+                    resultTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints.
                 }
             }
-            // With any luck, we don't have any parameter "?" arguments to worry about.
+
+            // With any luck, there are no parameter "?" arguments to worry about.
             if ( ! needParamType) {
                 break;
             }
-            // No luck, so we do our best to infer the parameters' types.
+
+            // No luck, try to infer the parameters' types.
             // Punt to guessing VARCHAR for lack of better information.
-            for (int ii = 0; ii < nodes.length; ii++) {
-                if (nodes[ii].dataType != null) {
-                    continue;
+            if (inputTypeInferred == null) {
+                inputTypeInferred = Type.SQL_VARCHAR;
+            }
+            if (resultTypeInferred == null) {
+                resultTypeInferred = Type.SQL_VARCHAR;
+            }
+
+            // If needed, start by tagging the first argument as an input.
+            if (nodes[0].isParam && (nodes[0].dataType == null)) {
+                nodes[0].dataType = inputTypeInferred;
+            }
+
+            // Similarly, tag any last/default argument as a result.
+            if ((nodes.length % 2 == 0)) {
+                if (nodes[nodes.length-1].isParam && (nodes[nodes.length-1].dataType == null)) {
+                    nodes[nodes.length-1].dataType = resultTypeInferred;
                 }
-                if ( ! nodes[ii].isParam) {
-                    continue;
+            }
+
+            // With the first and the optional last/"default" argument out of the way,
+            // the arguments alternate between candidate key inputs and candidate value results.
+            for (int keyIndex = 1; keyIndex < nodes.length-1; keyIndex+=2) {
+
+                // These (odd-numbered) arguments represent additional candidate input keys
+                // that may require hinting from the other input keys.
+                if (nodes[keyIndex].isParam && (nodes[keyIndex].dataType == null)) {
+                    nodes[keyIndex].dataType = inputTypeInferred;
                 }
-                if (ii >= 2 && (ii == (nodes.length - 1) || (ii % 2) == 0)) {
-                    // These arguments represent untyped parameter candidate result values.
-                    if (inferredResultType == null) {
-                        nodes[ii].dataType = Type.SQL_VARCHAR;
-                    } else {
-                        nodes[ii].dataType = inferredResultType;
-                    }
-                } else {
-                    // These arguments represent untyped parameter candidate input values.
-                    if (inferredInputType == null) {
-                        nodes[ii].dataType = Type.SQL_VARCHAR;
-                    } else {
-                        nodes[ii].dataType = inferredInputType;
-                    }
+
+                int valueIndex = keyIndex+1;
+                // These (even numbered) arguments represent candidate result values
+                // that may require hinting from the other result values.
+                if (nodes[valueIndex].isParam && (nodes[valueIndex].dataType == null)) {
+                    nodes[valueIndex].dataType = resultTypeInferred;
                 }
             }
             break;
