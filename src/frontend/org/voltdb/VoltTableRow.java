@@ -729,7 +729,7 @@ public abstract class VoltTableRow {
             throw new RuntimeException("VoltTableRow is in an invalid state. Consider calling advanceRow().");
 
         if ((columnIndex >= getColumnCount()) || (columnIndex < 0)) {
-            throw new IndexOutOfBoundsException("Column index " + columnIndex + " is type greater than the number of columns");
+            throw new IndexOutOfBoundsException("Column index " + columnIndex + " is greater than the number of columns");
         }
         final VoltType columnType = getColumnType(columnIndex);
         for (VoltType type : types)
