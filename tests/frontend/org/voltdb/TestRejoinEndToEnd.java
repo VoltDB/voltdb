@@ -525,10 +525,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @Test
     public void testRejoinWithExportWithActuallyExportedTables() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
+
         builder.setTableAsExportOnly("export_ok_blah_with_no_pk");
-        //builder.setTableAsExportOnly("blah_replicated", false);
-        //builder.setTableAsExportOnly("PARTITIONED", false);
-        //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
         builder.addExport("org.voltdb.export.processors.RawProcessor",
                 true,  // enabled
                 null);  // authGroups (off)
