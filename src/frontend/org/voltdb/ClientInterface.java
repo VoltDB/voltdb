@@ -2284,8 +2284,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_iv2Masters != null) {
             m_iv2Masters.shutdown();
         }
+        if (m_localReplicasBuilder != null) {
+            m_localReplicasBuilder.join(10000);
+            hostLog.error("Local replica map builder took more than ten seconds, probably hung");
+            m_localReplicasBuilder.join();
+        }
     }
 
+    private volatile Thread m_localReplicasBuilder = null;
     public void startAcceptingConnections() throws IOException {
         if (m_isIV2Enabled) {
             /*
@@ -2296,7 +2302,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Populate the map in the background and it will be used to route
              * requests to local replicas once the info is available
              */
-            new Thread() {
+            m_localReplicasBuilder = new Thread() {
                 @Override
                 public void run() {
                     /*
@@ -2314,7 +2320,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                     m_localReplicas = localReplicas.build();
                 }
-            }.start();
+            };
+            m_localReplicasBuilder.start();
         }
 
         /*
