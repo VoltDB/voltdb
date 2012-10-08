@@ -419,7 +419,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // use DECODE as integer input to operator, with used incompatible option
         try {
             cr = client.callProcedure("@AdHoc", "select id + DECODE(id, 1, 0, 'incompatible') from P1 where id = 2");
-            fail();
+            fail("failed to except incompatible option");
         } catch (ProcCallException pce) {
             String message = pce.getMessage();
             // It's about that string argument to the addition operator.
@@ -564,8 +564,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             fail("document validity check failed");
         }
         catch(ProcCallException pcex) {
-            String msg = pcex.getMessage();
-            assertTrue(msg.contains("'{\"id\":1 \"bool\": false}' is not valid JSON"));
+            assertTrue(pcex.getMessage().contains(
+                    "Invalid JSON * Line 1, Column 9"
+                    ));
         }
         try {
             cr = client.callProcedure("BadIdFieldProc", 2, "id", "2");
@@ -573,7 +574,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
         catch(ProcCallException pcex) {
             assertTrue(pcex.getMessage().contains(
-                    "'{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりませ ...' is not valid JSON"
+                    "Invalid JSON * Line 1, Column 16"
                     ));
         }
     }
