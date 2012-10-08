@@ -12,6 +12,12 @@
         </procedures>
         <partitions>
             <partition table='store' column='key' />
+            <partition table='store_export' column='key'/>
         </partitions>
+        <export>
+            <tables>
+                <table name="store_export" />
+            </tables>
+        </export>
     </database>
 </project>
