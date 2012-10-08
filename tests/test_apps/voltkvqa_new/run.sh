@@ -70,6 +70,7 @@ function async-benchmark-help() {
     java -classpath obj:$CLASSPATH:obj voltkvqa_new.AsyncBenchmark --help
 }
 
+#        --servers=volt3d,volt3e,volt3f \
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
@@ -78,8 +79,8 @@ function async-benchmark() {
         --duration=120 \
         --servers=localhost \
         --poolsize=100000 \
-        --preload=true \
-        --getputratio=0.90 \
+        --preload=false \
+        --getputratio=0.50 \
         --keysize=32 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
@@ -87,6 +88,7 @@ function async-benchmark() {
         --usecompression=false \
         --ratelimit=100000 \
         --autotune=true \
+        --mpratio=0.5 \
         --latencytarget=6
 }
 

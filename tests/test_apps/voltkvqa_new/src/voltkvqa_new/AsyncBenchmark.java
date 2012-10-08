@@ -67,6 +67,8 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 
 public class AsyncBenchmark {
+    boolean slow = false;
+    boolean debug = false;
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
@@ -106,6 +108,12 @@ public class AsyncBenchmark {
     private static final AtomicLong incorrectPutCount = new AtomicLong(0);
     private static Map<String, Long> hashMap = Collections.synchronizedMap(new HashMap<String, Long>());
 
+    final AtomicLong successfulGetsMPT = new AtomicLong(0);
+    final AtomicLong successfulGetsMPF = new AtomicLong(0);
+    final AtomicLong successfulPutsMPT = new AtomicLong(0);
+    final AtomicLong successfulPutsMPF = new AtomicLong(0);
+
+
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -132,6 +140,11 @@ public class AsyncBenchmark {
 
         @Option(desc = "Fraction of ops that are gets (vs puts).")
         double getputratio = 0.90;
+
+        @Option(desc = "Fraction of ops that are gets (singlePartition vs multiPartition) " +
+                "and puts (singlePartition vs multiPartition).")
+        double mpratio = 0.50;
+
 
         @Option(desc = "Size of keys in bytes.")
         int keysize = 32;
@@ -168,6 +181,9 @@ public class AsyncBenchmark {
             if (poolsize <= 0) exitWithMessageAndUsage("poolsize must be > 0");
             if (getputratio < 0) exitWithMessageAndUsage("getputratio must be >= 0");
             if (getputratio > 1) exitWithMessageAndUsage("getputratio must be <= 1");
+
+            if (mpratio < 0) exitWithMessageAndUsage("mpratio must be >= 0");
+            if (mpratio > 1) exitWithMessageAndUsage("mpratio must be <= 1");
 
             if (keysize <= 0) exitWithMessageAndUsage("keysize must be > 0");
             if (keysize > 250) exitWithMessageAndUsage("keysize must be <= 250");
@@ -375,10 +391,14 @@ public class AsyncBenchmark {
                          HORIZONTAL_RULE +
                          "\nA total of %,d operations were posted...\n" +
                          " - GETs: %,9d Operations (%,d Misses and %,d Failures)\n" +
+                         "         %,9d  Multi-partition Operations (%.2f%%)\n" +
+                         "         %,9d Single-partition Operations (%.2f%%)\n" +
                          "         %,9d MB in compressed store data\n" +
                          "         %,9d MB in uncompressed application data\n" +
                          "         Network Throughput: %6.3f Gbps*\n" +
                          " - PUTs: %,9d Operations (%,d Failures)\n" +
+                         "         %,9d  Multi-partition Operations (%.2f%%)\n" +
+                         "         %,9d Single-partition Operations (%.2f%%)\n" +
                          "         %,9d MB in compressed store data\n" +
                          "         %,9d MB in uncompressed application data\n" +
                          "         Network Throughput: %6.3f Gbps*\n" +
@@ -393,13 +413,28 @@ public class AsyncBenchmark {
         double putThroughput = networkGetData.get() + (totalPuts * config.keysize);
                putThroughput /= (oneGigabit * config.duration);
 
+        long gtt = successfulGetsMPT.get() + successfulGetsMPF.get();
+        long gst = successfulGetsMPT.get();
+        long gsf = successfulGetsMPF.get();
+        double getMptR = (double)(100.00*gst/gtt);
+        double getMpfR = (double)(100.00*gsf/gtt);
+        //System.out.printf("st = %d, sf = %d, tt = %d, getMptR = '%.2f%%', getMpfR = '%.2f%%',",
+        //        gst, gsf, gtt, getMptR, getMpfR);
+        long ptt = successfulPutsMPT.get() + successfulPutsMPF.get();
+        long pst = successfulPutsMPT.get();
+        long psf = successfulPutsMPF.get();
+        double putMptR = (double)(100.00*pst/ptt);
+        double putMpfR = (double)(100.00*psf/ptt);
+
         System.out.printf(display,
                 stats.getInvocationsCompleted(),
                 successfulGets.get(), missedGets.get(), failedGets.get(),
+                successfulGetsMPT.get(), getMptR, successfulGetsMPF.get(), getMpfR,
                 networkGetData.get() / oneMB,
                 rawGetData.get() / oneMB,
                 getThroughput,
                 successfulPuts.get(), failedPuts.get(),
+                successfulPutsMPT.get(), putMptR, successfulPutsMPF.get(), putMpfR,
                 networkPutData.get() / oneMB,
                 rawPutData.get() / oneMB,
                 putThroughput,
@@ -434,6 +469,10 @@ public class AsyncBenchmark {
      *
      */
     class GetCallback implements ProcedureCallback {
+        double rand;
+        GetCallback(double rand) {
+            this.rand = rand;
+        }
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             // Track the result of the operation (Success, Failure, Payload traffic...)
@@ -448,6 +487,11 @@ public class AsyncBenchmark {
                             processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
                                                         pairData.fetchRow(0).getVarbinary(1));
                     successfulGets.incrementAndGet();
+                    if(rand > config.mpratio)
+                        successfulGetsMPT.incrementAndGet();
+                    else
+                        successfulGetsMPF.incrementAndGet();
+
                     networkGetData.addAndGet(pair.getStoreValueLength());
                     rawGetData.addAndGet(pair.getRawValueLength());
                 }
@@ -462,12 +506,13 @@ public class AsyncBenchmark {
         final long storeValueLength;
         final long rawValueLength;
         PayloadProcessor.Pair thisPair;
+        double rand;
 
-
-        PutCallback(PayloadProcessor.Pair pair) {
+        PutCallback(PayloadProcessor.Pair pair, double rand) {
             storeValueLength = pair.getStoreValueLength();
             rawValueLength = pair.getRawValueLength();
             thisPair = pair;
+            this.rand = rand;
         }
 
         @Override
@@ -475,6 +520,11 @@ public class AsyncBenchmark {
             // Track the result of the operation (Success, Failure, Payload traffic...)
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 successfulPuts.incrementAndGet();
+                if(rand > config.mpratio)
+                    successfulPutsMPT.incrementAndGet();
+                else
+                    successfulPutsMPF.incrementAndGet();
+
                 final VoltTable pairData = response.getResults()[0];
                 final VoltTableRow tablerow = pairData.fetchRow(0);
                 final long counter = tablerow.getLong(0);
@@ -563,20 +613,20 @@ public class AsyncBenchmark {
 
         // Run the benchmark loop for the requested warmup time
         // The throughput may be throttled depending on client configuration
-        System.out.println("Warming up...");
-        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-        while (warmupEndTime > System.currentTimeMillis()) {
-            // Decide whether to perform a GET or PUT operation
-            if (rand.nextDouble() < config.getputratio) {
-                // Get a key/value pair, asynchronously
-                client.callProcedure(new NullCallback(), "Get", processor.generateRandomKeyForRetrieval());
-            }
-            else {
-                // Put a key/value pair, asynchronously
-                final PayloadProcessor.Pair pair = processor.generateForStore();
-                client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
-            }
-        }
+//        System.out.println("Warming up...");
+//        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
+//        while (warmupEndTime > System.currentTimeMillis()) {
+//            // Decide whether to perform a GET or PUT operation
+//            if (rand.nextDouble() < config.getputratio) {
+//                // Get a key/value pair, asynchronously
+//                client.callProcedure(new NullCallback(), "Get", processor.generateRandomKeyForRetrieval());
+//            }
+//            else {
+//                // Put a key/value pair, asynchronously
+//                final PayloadProcessor.Pair pair = processor.generateForStore();
+//                client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
+//            }
+//        }
 
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
@@ -586,20 +636,49 @@ public class AsyncBenchmark {
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
 
+        if(totalConnections == 1)
+            // If Volt is running on one node only, no need to run this test on multi-partition
+            config.mpratio = 1;
+
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        double mpRand;
         while (benchmarkEndTime > System.currentTimeMillis()) {
             // Decide whether to perform a GET or PUT operation
             if (rand.nextDouble() < config.getputratio) {
                 // Get a key/value pair, asynchronously
-                client.callProcedure(new GetCallback(), "Get", processor.generateRandomKeyForRetrieval());
+                mpRand = rand.nextDouble();
+                if(mpRand > config.mpratio) {
+                    if(totalConnections > 1 && config.poolsize > 10000) {
+                        slow = true;
+                        debug = true;
+                    }
+                    else
+                        debug = false;
+                    client.callProcedure(new GetCallback(mpRand), "GetMp", processor.generateRandomKeyForRetrieval());
+                }
+                else {
+                    client.callProcedure(new GetCallback(mpRand), "Get", processor.generateRandomKeyForRetrieval());
+                }
             }
             else {
                 // Put a key/value pair, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
-                client.callProcedure(new PutCallback(pair), "Put", pair.Key, pair.getStoreValue());
+                mpRand = rand.nextDouble();
+                if(rand.nextDouble() > config.mpratio) {
+                    if(totalConnections > 1 && config.poolsize > 10000 && config.mpratio < 1) {
+                        slow = true;
+                        debug = true;
+                    }
+                    else
+                        debug = false;
+                    client.callProcedure(new PutCallback(pair, mpRand), "PutMp", pair.Key, pair.getStoreValue());
+                }
+                else {
+                    client.callProcedure(new PutCallback(pair, mpRand), "Put", pair.Key, pair.getStoreValue());
+                }
             }
         }
 
@@ -613,6 +692,7 @@ public class AsyncBenchmark {
         printResults();
 
         summary4qa();
+
         client.drain();
 
         // close down the client connections
@@ -622,12 +702,31 @@ public class AsyncBenchmark {
     public void summary4qa() {
         try {
             // Put a key/value pair, asynchronously
-            //System.out.printf("HashMap Size: %10d\n", hashMap.size());
             Iterator<String> it = hashMap.keySet().iterator();
+            if(debug) {
+                System.out.printf("HashMap Size: %10d\n", hashMap.size());
+                System.out.println("poolsize = " + config.poolsize);
+            }
+            int printInterval = (int)hashMap.size()/5;
+            if(hashMap.size() > 10000)
+                if(slow)
+                    printInterval = (int)config.poolsize/200;
+
+            int c = 0;
+            String lastkey = "error";
             while (it.hasNext()) {
                 String key = it.next().toString();
+
+                if(debug && c%printInterval == 0)
+                    System.out.printf("in summary4qa() count = %d, key = '%s'\n", c, key);
+
                 client.callProcedure(new SumCallback(key), "Get", key);
+                lastkey = key;
+                c++;
             }
+            if(debug)
+                System.out.printf("last!! count = %d, lastkey = '%s'\n", c, lastkey);
+
         }
         catch (Exception x)    {
             System.out.println("This is not working: " + x);
