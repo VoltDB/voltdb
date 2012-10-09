@@ -44,11 +44,12 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     String procName = null;
 
     /*
-     * The original txn ID the procedure invocation was assigned with. It's
-     * saved here so that if the procedure needs it for determinism, we can
-     * provide it again. -1 means not set.
+     * The original txn ID and the timestamp the procedure invocation was
+     * assigned with. They are saved here so that if the procedure needs them
+     * for determinism, we can provide them again. -1 means not set.
      */
     long originalTxnId = -1;
+    long originalTs = -1;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -70,6 +71,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         copy.params = params;
         copy.procName = procName;
         copy.originalTxnId = originalTxnId;
+        copy.originalTs = originalTs;
         if (serializedParams != null)
         {
             copy.serializedParams = serializedParams.duplicate();
@@ -83,8 +85,11 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     }
 
     private void setType() {
-        type = originalTxnId == -1 ? ProcedureInvocationType.ORIGINAL
-                                   : ProcedureInvocationType.REPLICATED;
+        if (originalTxnId == -1 && originalTs == -1) {
+            type = ProcedureInvocationType.ORIGINAL;
+        } else {
+            type = ProcedureInvocationType.REPLICATED;
+        }
     }
 
     public void setProcName(String name) {
@@ -93,6 +98,11 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     public void setOriginalTxnId(long txnId) {
         originalTxnId = txnId;
+        setType();
+    }
+
+    public void setOriginalTimestamp(long ts) {
+        originalTs = ts;
         setType();
     }
 
@@ -119,6 +129,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     public long getOriginalTxnId() {
         return originalTxnId;
+    }
+
+    public long getOriginalTimestamp() {
+        return originalTs;
     }
 
     public ParameterSet getParams() {
@@ -160,7 +174,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
         if (type == ProcedureInvocationType.REPLICATED)
         {
-            size += 8; // original TXN ID for WAN replication procedures
+            size += 8 + // original TXN ID for WAN replication procedures
+                    8; // original timestamp for WAN replication procedures
         }
 
         if (serializedParams != null)
@@ -182,6 +197,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         buf.put(type.getValue()); //version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(originalTxnId);
+            buf.putLong(originalTs);
         }
         buf.putInt(procName.length());
         buf.put(procName.getBytes());
@@ -220,6 +236,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          */
         if (type == ProcedureInvocationType.REPLICATED) {
             originalTxnId = in.readLong();
+            originalTs = in.readLong();
         }
 
         procName = in.readString();
@@ -248,6 +265,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          */
         if (type == ProcedureInvocationType.REPLICATED) {
             originalTxnId = in.readLong();
+            originalTs = in.readLong();
         }
 
         procName = in.readString();
@@ -271,6 +289,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         out.write(type.getValue());//version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             out.writeLong(originalTxnId);
+            out.writeLong(originalTs);
         }
         out.writeString(procName);
         out.writeLong(clientHandle);

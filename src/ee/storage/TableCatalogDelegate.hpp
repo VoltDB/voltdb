@@ -58,6 +58,13 @@ class TableCatalogDelegate : public CatalogDelegate {
                                const TupleSchema *schema,
                                TableIndexScheme *scheme);
 
+    /**
+     * Return a string that identifies this index by table name and schema,
+     * rather than by given/assigned name.
+     */
+    static std::string getIndexIdString(const catalog::Index &catalogIndex);
+    static std::string getIndexIdString(const TableIndexScheme &indexScheme);
+
     // ADXXX: should be const
     Table *getTable() {
         return m_table;

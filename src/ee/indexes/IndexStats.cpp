@@ -142,6 +142,11 @@ void IndexStats::configure(
     m_isCountable = static_cast<int8_t>(m_index->isCountableIndex() ? 1 : 0);
 }
 
+void IndexStats::rename(std::string name) {
+    m_indexName.free();
+    m_indexName = ValueFactory::getStringValue(name);
+}
+
 /**
  * Generates the list of column names that will be in the statTable_. Derived classes must override
  * this method and call the parent class's version to obtain the list of columns contributed by

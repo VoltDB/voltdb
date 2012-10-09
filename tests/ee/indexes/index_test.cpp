@@ -81,7 +81,6 @@ using namespace voltdb;
 #define INT_MULTI_ID 102
 #define INTS_UNIQUE_ID 103
 #define INTS_MULTI_ID 104
-#define ARRAY_UNIQUE_ID 105
 
 class IndexTest : public Test {
 public:
@@ -403,85 +402,6 @@ TEST_F(IndexTest, IntUnique) {
     //EXPECT_EQ( 38528, index->getMemoryEstimate());
 
     // TODO
-}
-
-TEST_F(IndexTest, ArrayUnique) {
-    vector<int> iu_column_indices;
-    vector<ValueType> iu_column_types;
-    iu_column_indices.push_back(0);
-    iu_column_types.push_back(VALUE_TYPE_BIGINT);
-    init("iu2",
-         HASH_TABLE_INDEX,
-         iu_column_indices,
-         iu_column_types,
-         true);
-    TableIndex* index = table->index("iu2");
-    EXPECT_EQ(true, index != NULL);
-
-    TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(1, VALUE_TYPE_BIGINT);
-    vector<int32_t>
-        keyColumnLengths(1, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    vector<bool> keyColumnAllowNull(1, true);
-    TupleSchema* keySchema =
-        TupleSchema::createTupleSchema(keyColumnTypes,
-                                       keyColumnLengths,
-                                       keyColumnAllowNull,
-                                       true);
-    TableTuple searchkey(keySchema);
-    searchkey.move(new char[searchkey.tupleLength()]);
-    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(50)));
-    EXPECT_TRUE(index->moveToKey(&searchkey));
-    tuple = index->nextValueAtKey();
-    EXPECT_FALSE(tuple.isNullTuple());
-
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
-
-    tuple = index->nextValueAtKey();
-    EXPECT_TRUE(tuple.isNullTuple());
-
-    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(1001)));
-    EXPECT_FALSE(index->moveToKey(&searchkey));
-    tuple = index->nextValueAtKey();
-    EXPECT_TRUE(tuple.isNullTuple());
-
-    TableTuple &tmptuple = table->tempTuple();
-    tmptuple.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(1234)));
-    tmptuple.setNValue(1, ValueFactory::getBigIntValue(0));
-    tmptuple.
-        setNValue(2, ValueFactory::getBigIntValue(static_cast<int64_t>(3333)));
-    tmptuple.
-        setNValue(3, ValueFactory::getBigIntValue(static_cast<int64_t>(-200)));
-    tmptuple.
-        setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    EXPECT_EQ(true, table->insertTuple(tmptuple));
-    tmptuple.
-        setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(1234)));
-    tmptuple.
-        setNValue(1, ValueFactory::getBigIntValue(0));
-    tmptuple.
-        setNValue(2, ValueFactory::getBigIntValue(static_cast<int64_t>(50 % 3)));
-    tmptuple.
-        setNValue(3, ValueFactory::getBigIntValue(static_cast<int64_t>(-200)));
-    tmptuple.
-        setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    TupleSchema::freeTupleSchema(keySchema);
-    delete[] searchkey.address();
-    bool exceptionThrown = false;
-    try
-    {
-        EXPECT_EQ(false, table->insertTuple(tmptuple));
-    }
-    catch (SerializableEEException &e)
-    {
-        exceptionThrown = true;
-    }
-    EXPECT_TRUE(exceptionThrown);
 }
 
 TEST_F(IndexTest, IntMulti) {

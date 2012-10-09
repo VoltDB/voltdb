@@ -21,7 +21,9 @@ import static org.voltdb.compiler.ProcedureCompiler.deriveShortProcedureName;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -32,17 +34,18 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
  * and procedures and their respective partition info
  * Column name is null if replicated.
  */
-public class PartitionMap {
+public class VoltDDLElementTracker {
     final VoltCompiler m_compiler;
-    final Map<String, String> m_map = new HashMap<String, String>();
+    final Map<String, String> m_partitionMap = new HashMap<String, String>();
     final Map<String, ProcedureDescriptor> m_procedureMap =
             new HashMap<String, ProcedureDescriptor>();
+    final Set<String> m_exports = new HashSet<String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
      * @param compiler VoltCompiler instance
      */
-    public PartitionMap(VoltCompiler compiler) {
+    public VoltDDLElementTracker(VoltCompiler compiler) {
         m_compiler = compiler;
     }
 
@@ -61,12 +64,12 @@ public class PartitionMap {
             throw m_compiler.new VoltCompilerException("PARTITION or REPLICATE has no TABLE specified");
         }
 
-        if (m_map.containsKey(tableName.toLowerCase())) {
+        if (m_partitionMap.containsKey(tableName.toLowerCase())) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Partitioning already specified for table \"%s\"", tableName));
         }
 
-        m_map.put(tableName.toLowerCase(), colName);
+        m_partitionMap.put(tableName.toLowerCase(), colName);
     }
 
     /**
@@ -137,6 +140,33 @@ public class PartitionMap {
      */
     Collection<ProcedureDescriptor> getProcedureDescriptors() {
         return m_procedureMap.values();
+    }
+
+    /**
+     * Track an exported table
+     * @param tableName a table name
+     * @throws VoltCompilerException when the given table is already exported
+     */
+    void addExportedTable( String tableName)
+        throws VoltCompilerException
+    {
+        assert tableName != null && ! tableName.trim().isEmpty();
+
+        if( m_exports.contains(tableName)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Table \"%s\" is already exported", tableName
+                    ));
+        }
+
+        m_exports.add(tableName);
+    }
+
+    /**
+     * Get a collection with tracked table exports
+     * @return a collection with tracked table exports
+     */
+    Collection<String> getExportedTables() {
+        return m_exports;
     }
 
 }

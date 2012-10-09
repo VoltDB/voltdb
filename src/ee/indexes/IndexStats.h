@@ -71,6 +71,8 @@ public:
             std::string tableName,
             voltdb::CatalogId databaseId);
 
+    void rename(std::string name);
+
 protected:
 
     /**

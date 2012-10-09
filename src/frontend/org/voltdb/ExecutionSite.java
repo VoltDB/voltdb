@@ -66,7 +66,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
@@ -810,21 +809,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         m_indexStats = null;
 
         // initialize the DR gateway
-        m_partitionDRGateway = new PartitionDRGateway();
+        m_partitionDRGateway = new PartitionDRGateway(false);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
             String serializedCatalog,
             RestrictedPriorityQueue transactionQueue,
             boolean recovering,
-            boolean replicationActive,
+            NodeDRGateway nodeDRGateway,
             final long txnId,
             int configuredNumberOfPartitions,
             CatalogSpecificPlanner csp) throws Exception
     {
         this(voltdb, mailbox, serializedCatalog, transactionQueue,
-             new ProcedureRunnerFactory(), recovering, replicationActive,
-             txnId, configuredNumberOfPartitions, csp);
+             new ProcedureRunnerFactory(), recovering,
+             nodeDRGateway, txnId, configuredNumberOfPartitions, csp);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -832,7 +831,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                   RestrictedPriorityQueue transactionQueue,
                   ProcedureRunnerFactory runnerFactory,
                   boolean recovering,
-                  boolean replicationActive,
+                  NodeDRGateway nodeDRGateway,
                   final long txnId,
                   int configuredNumberOfPartitions,
                   CatalogSpecificPlanner csp) throws Exception
@@ -855,10 +854,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                              FaultType.SITE_FAILURE);
 
         // initialize the DR gateway
-        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "dr_overflow");
-
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, replicationActive, overflowDir);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -1487,14 +1484,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
             if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
-                    String adhocParam = null;
-                    if (invocation.procName.startsWith("@AdHoc")) {
-                        adhocParam = txnState.getBatchFormattedAdHocSQLString();
-                    }
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
+                                                                   -1,
                                                                    invocation,
-                                                                   txnState.getResults(),
-                                                                   adhocParam);
+                                                                   txnState.getResults());
                 }
             }
 
@@ -2730,22 +2723,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 if (callerParams != null) {
                     ClientResponseImpl cr = null;
 
-                    // find the txn id visible to the proc
-                    long txnId = txnState.txnId;
-                    StoredProcedureInvocation invocation = txnState.getInvocation();
-                    // this can't be null, initiate task must have an invocation
-                    if (invocation == null) {
-                        VoltDB.crashLocalVoltDB("Initiate task " + txnId + " missing invocation", false, null);
-                        // Prevent potential null warnings below.
-                        return null;
-                    }
-                    if ((invocation.getType() == ProcedureInvocationType.REPLICATED)) {
-                        txnId = invocation.getOriginalTxnId();
-                    }
-
                     // call the proc
                     runner.setupTransaction(txnState);
-                    cr = runner.call(txnId, itask.getParameters());
+                    cr = runner.call(itask.getParameters());
                     response.setResults(cr);
 
                     // record the results of write transactions to the transaction state

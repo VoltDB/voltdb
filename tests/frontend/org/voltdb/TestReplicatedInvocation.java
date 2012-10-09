@@ -123,13 +123,14 @@ public class TestReplicatedInvocation {
         client.createConnection("localhost");
         ReplicaProcCaller pc = client;
         SyncCallback callback = new SyncCallback();
-        pc.callProcedure(3, callback, "ReplicatedProcedure", 1, "haha");
+        pc.callProcedure(3, 4, callback, "ReplicatedProcedure", 1, "haha");
         callback.waitForResponse();
         ClientResponse response = callback.getResponse();
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         VoltTable result = response.getResults()[0];
         result.advanceRow();
         assertEquals(3, result.getLong("txnId"));
+        assertEquals(4, result.getLong("timestamp"));
         client.close();
     }
 

@@ -691,13 +691,15 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                  indexIter++)
             {
                 std::string indexName = indexIter->first;
-
+                std::string indexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
 
                 // Look for an index on the table to match the catalog index
                 bool found = false;
                 for (int i = 0; i < currentIndexes.size(); i++) {
-                    std::string currentIndexName = currentIndexes[i]->getName();
-                    if (indexName.compare(currentIndexName) == 0) {
+                    std::string currentIndexId = currentIndexes[i]->getId();
+                    if (indexId.compare(currentIndexId) == 0) {
+                        // rename the index if needed (or even if not)
+                        currentIndexes[i]->rename(indexName);
                         found = true;
                         break;
                     }
@@ -737,7 +739,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
             bool found = false;
             // iterate through all of the existing indexes
             for (int i = 0; i < currentIndexes.size(); i++) {
-                std::string indexName = currentIndexes[i]->getName();
+                std::string indexId = currentIndexes[i]->getId();
 
                 // iterate through all of the catalog indexes,
                 //  looking for a match.
@@ -746,8 +748,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                      indexIter != catalogTable->indexes().end();
                      indexIter++)
                 {
-                    std::string currentIndexName = indexIter->first;
-                    if (indexName.compare(currentIndexName) == 0) {
+                    std::string currentIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
+                    if (indexId.compare(currentIndexId) == 0) {
                         found = true;
                         break;
                     }

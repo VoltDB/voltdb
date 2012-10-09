@@ -39,7 +39,12 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     private long m_spHandle;
     // IV2: allow PI to signal RI repair log truncation with a new task.
     private long m_truncationHandle;
+    // The originalTxnId for DR. Duplicates logic in ProcedureInvocation
+    // to communicate DR state and ordering for CompleteTransaction
+    // and FragmentTaskMessages and MultipartitionParticipantMessages.
+    protected long m_originalDRTxnId = -1;
     protected boolean m_isReadOnly;
+    // Message create for command log replay.
     protected boolean m_isForReplay;
 
 
@@ -53,7 +58,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
                                       long txnId,
                                       long timestamp,
                                       boolean isReadOnly,
-                                      boolean isForReplay) {
+                                      boolean isForReplay)
+    {
         m_initiatorHSId = initiatorHSId;
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = txnId;
@@ -77,6 +83,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_subject = rhs.m_subject;
         m_spHandle = rhs.m_spHandle;
         m_truncationHandle = rhs.m_truncationHandle;
+        m_originalDRTxnId = rhs.m_originalDRTxnId;
     }
 
     public long getInitiatorHSId() {
@@ -131,6 +138,18 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_isForReplay;
     }
 
+    public boolean isForDR() {
+        return m_originalDRTxnId != -1;
+    }
+
+    public void setOriginalTxnId(long txnId) {
+        m_originalDRTxnId = txnId;
+    }
+
+    public long getOriginalTxnId() {
+        return m_originalDRTxnId;
+    }
+
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
@@ -140,6 +159,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
             + 8        // m_timestamp
             + 8        // m_spHandle
             + 8        // m_truncationHandle
+            + 8        // m_originalDRTxnId
             + 1        // m_isReadOnly
             + 1;       // is for replay flag
         return msgsize;
@@ -153,6 +173,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_timestamp);
         buf.putLong(m_spHandle);
         buf.putLong(m_truncationHandle);
+        buf.putLong(m_originalDRTxnId);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
         buf.put(m_isForReplay ? (byte) 1 : (byte) 0);
     }
@@ -165,6 +186,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_timestamp = buf.getLong();
         m_spHandle = buf.getLong();
         m_truncationHandle = buf.getLong();
+        m_originalDRTxnId = buf.getLong();
         m_isReadOnly = buf.get() == 1;
         m_isForReplay = buf.get() == 1;
     }

@@ -40,8 +40,9 @@ public class ReplicatedProcedure extends VoltProcedure {
             throw new VoltAbortException();
         }
 
-        VoltTable result = new VoltTable(new ColumnInfo("txnId", VoltType.BIGINT));
-        result.addRow(getTransactionId());
+        VoltTable result = new VoltTable(new ColumnInfo("txnId", VoltType.BIGINT),
+                                         new ColumnInfo("timestamp", VoltType.BIGINT));
+        result.addRow(getTransactionId(), getTransactionTime().getTime());
         return result;
     }
 }

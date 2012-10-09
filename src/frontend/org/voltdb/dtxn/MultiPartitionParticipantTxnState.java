@@ -333,7 +333,9 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                            true,
                                            rollback,
                                            requiresAck,
+                                           false,
                                            false);
+
         return ft;
     }
 

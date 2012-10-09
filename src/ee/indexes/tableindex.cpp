@@ -46,12 +46,14 @@
 #include <iostream>
 #include "indexes/tableindex.h"
 #include "expressions/abstractexpression.h"
+#include "storage/TableCatalogDelegate.hpp"
 
 using namespace voltdb;
 
 TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
     m_scheme(scheme),
     m_keySchema(keySchema),
+    m_id(TableCatalogDelegate::getIndexIdString(scheme)),
 
     // initialize all the counters to zero
     m_lookups(0),

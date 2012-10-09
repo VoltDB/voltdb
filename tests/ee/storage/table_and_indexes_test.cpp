@@ -96,7 +96,7 @@ class TableAndIndexTest : public Test {
 
             warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", HASH_TABLE_INDEX,
                                                      warehouseIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                     true, false, warehouseTupleSchema);
+                                                     true, true, warehouseTupleSchema);
 
             vector<voltdb::ValueType> customerColumnTypes;
             vector<int32_t> customerColumnLengths;

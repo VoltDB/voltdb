@@ -450,7 +450,7 @@ DISTRIBUTION
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
             <include name="tools/generate"/>
-            <include name="bin/sqlcmd"/> 
+            <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
 
@@ -1193,12 +1193,12 @@ TEST CASES
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestVoltLicense.class" />
+                <!-- <exclude name="**/TestPrimary.class" /> -->
                 <exclude name="**/TestPauselessRejoinEndToEnd" />
                 <exclude name="**/TestPauselessRejoinFuzz" />
-                <exclude name="**/TestPrimary.class" />
                 <exclude name="**/TestSecondaryRejoin.class" />
-                <exclude name="**/TestInvocationBufferServer.class" />
-                <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" />
+                <!-- <exclude name="**/TestInvocationBufferServer.class" /> -->
+                <!-- <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" /> -->
                 <exclude name="**/TestSnapshotSaveTruncation.class" />
                 <!-- community tests -->
 <!--                <exclude name="**/TestHSQLBackend.class" /> -->
