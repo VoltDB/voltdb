@@ -446,7 +446,10 @@ class NValue {
             rt = VALUE_TYPE_INVALID;
             break;
         }
-        assert(rt != VALUE_TYPE_INVALID);
+        // There ARE rare but legitimate runtime type check exceptions in SQL, so
+        // unless/until those legitimate cases get re-routed to some other code path,
+        // it is not safe here to ...
+        // assert(rt != VALUE_TYPE_INVALID);
         return rt;
     }
 
@@ -1882,8 +1885,8 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(TTInt);
       default:
           char message[128];
-          snprintf(message, 128, "NValue::getTupleStorageSize() unrecognized type"
-                  " '%d'", type);
+          snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
+                   getTypeName(type).c_str());
           throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                         message);
     }
@@ -2174,7 +2177,8 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         break;
       default:
           char message[128];
-          snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%d'", type);
+          snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%s'",
+                   getTypeName(type).c_str());
           throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
                              message);
     }
@@ -2252,8 +2256,8 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
       }
       default:
           char message[128];
-          snprintf(message, 128, "NValue::deserializeFrom() unrecognized type '%d'",
-                  type);
+          snprintf(message, 128, "NValue::deserializeFrom() unrecognized type '%s'",
+                   getTypeName(type).c_str());
           throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                         message);
     }
@@ -2722,8 +2726,8 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
         break;
     }
     throwDynamicSQLException("Promotion of %s and %s failed in op_subtract.",
-               getTypeName(getValueType()).c_str(),
-               getTypeName(rhs.getValueType()).c_str());
+               getValueTypeString().c_str(),
+               rhs.getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_add(const NValue rhs) const {
@@ -2750,7 +2754,7 @@ inline NValue NValue::op_add(const NValue rhs) const {
     }
     throwDynamicSQLException("Promotion of %s and %s failed in op_add.",
                getValueTypeString().c_str(),
-               getValueTypeString().c_str());
+               rhs.getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_multiply(const NValue rhs) const {

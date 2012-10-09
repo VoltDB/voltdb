@@ -216,7 +216,7 @@ public class TestProcedureInvocation extends TestCase{
      * @throws IOException
      */
     public void testWriteReplicated() throws IOException {
-        ProcedureInvocation invocation = new ProcedureInvocation(12345, 54321, "test", 1);
+        ProcedureInvocation invocation = new ProcedureInvocation(12345, -1, 54321, "test", 1);
         ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
         try {
             invocation.flattenToBuffer(buf);

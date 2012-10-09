@@ -47,6 +47,9 @@ public class RejoinTestBase extends TestCase {
             "create table blah (" +
             "ival bigint default 0 not null, " +
             "PRIMARY KEY(ival));\n" +
+            "create table export_ok_blah_with_no_pk (" +
+            "ival bigint default 0 not null, " +
+            ");\n" +
             "create table blah_replicated (" +
             "ival bigint default 0 not null, " +
             "PRIMARY KEY(ival));" +

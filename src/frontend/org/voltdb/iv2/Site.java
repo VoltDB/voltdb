@@ -33,18 +33,23 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
+import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
+import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TableStats;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -98,6 +103,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Almighty execution engine and its HSQL sidekick
     ExecutionEngine m_ee;
     HsqlBackend m_hsql;
+
+    // Stats
+    final TableStats m_tableStats;
+    final IndexStats m_indexStats;
+    final MemoryStats m_memStats;
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private SnapshotSiteProcessor m_snapshotter;
@@ -274,7 +284,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             int numPartitions,
             boolean createForRejoin,
             int snapshotPriority,
-            InitiatorMailbox initiatorMailbox)
+            InitiatorMailbox initiatorMailbox,
+            StatsAgent agent,
+            MemoryStats memStats)
     {
         m_siteId = siteId;
         m_context = context;
@@ -290,6 +302,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
+
+        if (agent != null) {
+            m_tableStats = new TableStats(m_siteId);
+            agent.registerStatsSource(SysProcSelector.TABLE,
+                                      m_siteId,
+                                      m_tableStats);
+            m_indexStats = new IndexStats(m_siteId);
+            agent.registerStatsSource(SysProcSelector.INDEX,
+                                      m_siteId,
+                                      m_indexStats);
+            m_memStats = memStats;
+        } else {
+            // MPI doesn't need to track these stats
+            m_tableStats = null;
+            m_indexStats = null;
+            m_memStats = null;
+        }
     }
 
     /** Update the loaded procedures. */
@@ -605,7 +634,84 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void tick()
     {
-        m_ee.tick(System.currentTimeMillis(), m_lastCommittedTxnId);
+        long time = System.currentTimeMillis();
+
+        m_ee.tick(time, m_lastCommittedTxnId);
+        statsTick(time);
+    }
+
+    /**
+     * Cache the current statistics.
+     *
+     * @param time
+     */
+    private void statsTick(long time)
+    {
+        /*
+         * grab the table statistics from ee and put it into the statistics
+         * agent.
+         */
+        if (m_tableStats != null) {
+            CatalogMap<Table> tables = m_context.database.getTables();
+            int[] tableIds = new int[tables.size()];
+            int i = 0;
+            for (Table table : tables) {
+                tableIds[i++] = table.getRelativeIndex();
+            }
+
+            // data to aggregate
+            long tupleCount = 0;
+            int tupleDataMem = 0;
+            int tupleAllocatedMem = 0;
+            int indexMem = 0;
+            int stringMem = 0;
+
+            // update table stats
+            final VoltTable[] s1 =
+                m_ee.getStats(SysProcSelector.TABLE, tableIds, false, time);
+            if (s1 != null) {
+                VoltTable stats = s1[0];
+                assert(stats != null);
+
+                // rollup the table memory stats for this site
+                while (stats.advanceRow()) {
+                    tupleCount += stats.getLong(7);
+                    tupleAllocatedMem += (int) stats.getLong(8);
+                    tupleDataMem += (int) stats.getLong(9);
+                    stringMem += (int) stats.getLong(10);
+                }
+                stats.resetRowPosition();
+
+                m_tableStats.setStatsTable(stats);
+            }
+
+            // update index stats
+            final VoltTable[] s2 =
+                m_ee.getStats(SysProcSelector.INDEX, tableIds, false, time);
+            if ((s2 != null) && (s2.length > 0)) {
+                VoltTable stats = s2[0];
+                assert(stats != null);
+
+                // rollup the index memory stats for this site
+                while (stats.advanceRow()) {
+                    indexMem += stats.getLong(10);
+                }
+                stats.resetRowPosition();
+
+                m_indexStats.setStatsTable(stats);
+            }
+
+            // update the rolled up memory statistics
+            if (m_memStats != null) {
+                m_memStats.eeUpdateMemStats(m_siteId,
+                                            tupleCount,
+                                            tupleDataMem,
+                                            tupleAllocatedMem,
+                                            indexMem,
+                                            stringMem,
+                                            m_ee.getThreadLocalPoolAllocations());
+            }
+        }
     }
 
     @Override

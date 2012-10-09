@@ -23,8 +23,8 @@
 
 package org.voltdb.client;
 
-import org.voltdb.ClientResponseImpl;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.ClientResponseImpl;
 
 /**
  * {@link ClientStatusListenerExt} implementation that just logs the
@@ -62,8 +62,8 @@ public class ClientConfigForTest extends ClientConfig {
          */
         @Override
         public void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e) {
-            log.info(String.format("ClientConfigForTest reports uncaught excepetion in callback: %s",
-                    callback.getClass().getSimpleName()));
+            log.info(String.format("ClientConfigForTest reports uncaught exception in callback: %s",
+                    callback != null ? callback.getClass().getSimpleName() : "null"));
             log.info(((ClientResponseImpl) r).toJSONString());
             log.info(e);
         }

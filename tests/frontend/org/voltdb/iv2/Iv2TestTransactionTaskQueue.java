@@ -63,7 +63,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         when(mbox.getHSId()).thenReturn(1337l);
 
         SpProcedureTask task =
-            new SpProcedureTask(mbox, "TestProc", queue, init);
+            new SpProcedureTask(mbox, "TestProc", queue, init, null);
         return task;
     }
 
@@ -108,7 +108,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         CompleteTransactionTask task =
-            new CompleteTransactionTask(txn, queue, msg);
+            new CompleteTransactionTask(txn, queue, msg, null);
         return task;
     }
 
@@ -171,142 +171,6 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         System.out.println("blocked: " + blocked);
 
         // now, do more work on the blocked task
-        next = createFrag(block.getTransactionState(), blocking_mp_txnid, dut);
-        addTask(next, dut, expected_order);
-        // Should have passed through and not be in the queue
-        assertEquals(blocked.size() + 1, dut.size());
-
-        // now, complete the blocked task
-        next = createComplete(block.getTransactionState(), blocking_mp_txnid, dut);
-        addTask(next, dut, expected_order);
-        // Should have passed through and not be in the queue
-        assertEquals(blocked.size() + 1, dut.size());
-        // DONE!  Should flush everything to the next blocker
-        block.getTransactionState().setDone();
-        int offered = dut.flush();
-        assertEquals(blocked.size(), offered);
-        assertEquals(1, dut.size());
-        expected_order.addAll(blocked);
-
-        while (!expected_order.isEmpty())
-        {
-            TransactionTask next_poll = (TransactionTask)task_queue.poll();
-            TransactionTask expected = expected_order.removeFirst();
-            assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
-            assertEquals(expected.getTxnId(), next_poll.getTxnId());
-        }
-    }
-
-    @Test
-    public void testReplayFragmentFirst() throws InterruptedException
-    {
-        long localTxnId = 0;
-        long mpTxnId = 0;
-        SiteTaskerQueue task_queue = getSiteTaskerQueue();
-        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
-        Deque<TransactionTask> expected_order =
-            new ArrayDeque<TransactionTask>();
-
-        // add a few SP procs
-        TransactionTask next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, expected_order);
-        next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, expected_order);
-        next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, expected_order);
-        // Should squirt on through the queue
-        assertEquals(0, dut.size());
-
-        // Now a fragment task that should not block things because it is for replay
-        long blocking_mp_txnid = mpTxnId;
-        next = createFrag(localTxnId + 3, mpTxnId++, dut, true);
-        TransactionTask block = next;
-        addTask(next, dut, null);
-        //Size is 0 because the fragment is for replay and position is not known
-        assertEquals(0, dut.size());
-
-        // Add some tasks that are going to be blocked
-        // Manually track the should-be-blocked procedures
-        // for comparison later.
-        next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, expected_order);
-        next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, expected_order);
-
-        //This is where the fragment task goes
-        localTxnId++;
-        expected_order.addLast(block);
-
-        //Should be zero because the SPs passed through and the replay frag position is not known
-        assertEquals(0, dut.size());
-        dut.offerMPSentinel(blocking_mp_txnid);
-        assertEquals(1, dut.size());
-
-        while (!expected_order.isEmpty() || !task_queue.isEmpty())
-        {
-            TransactionTask next_poll = (TransactionTask)task_queue.poll();
-            TransactionTask expected = expected_order.removeFirst();
-            assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
-            assertEquals(expected.getTxnId(), next_poll.getTxnId());
-        }
-    }
-
-    @Test
-    public void testReplaySentinelFirst() throws InterruptedException
-    {
-        long localTxnId = 0;
-        long mpTxnId = 0;
-        SiteTaskerQueue task_queue = getSiteTaskerQueue();
-        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
-        Deque<TransactionTask> expected_order =
-            new ArrayDeque<TransactionTask>();
-
-        // add a few SP procs
-        TransactionTask next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, expected_order);
-        next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, expected_order);
-        next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, expected_order);
-        // Should squirt on through the queue
-        assertEquals(0, dut.size());
-
-        // Now offer a sentinel that should block everything that follows
-        long blocking_mp_txnid = mpTxnId;
-        dut.offerMPSentinel(blocking_mp_txnid);
-
-        // Add some tasks that are going to be blocked
-        // Manually track the should-be-blocked procedures
-        // for comparison later.
-        ArrayDeque<TransactionTask> blocked = new ArrayDeque<TransactionTask>();
-        next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, blocked);
-        next = createSpProc(localTxnId++, dut);
-        addTask(next, dut, blocked);
-        assertEquals(blocked.size(), dut.size());
-
-        //This is where the fragment task comes in after the sentinel
-        TransactionTask block = createFrag(localTxnId++, mpTxnId++, dut, true);
-        addTask(block, dut, expected_order);
-        //Size is 3 because the complete task didn't happen
-        assertEquals(blocked.size() + 1, dut.size());
-
-
-        // here's our next blocker, sentinel is provided so it is counted
-        dut.offerMPSentinel(mpTxnId);
-        next = createFrag(localTxnId++, mpTxnId++, dut);
-        addTask(next, dut, blocked);
-        //Size should now be 4
-        assertEquals(blocked.size() + 1, dut.size());
-
-        // Add a completion for the next blocker, too.  Simulates rollback causing
-        // an additional task for this TXN ID to appear before it's blocking the queue
-        next = createComplete(next.getTransactionState(), next.getTxnId(), dut);
-        addTask(next, dut, blocked);
-        assertEquals(blocked.size() + 1, dut.size());
-        System.out.println("blocked: " + blocked);
-
-        // now, do more work on the 1st/original blocked task
         next = createFrag(block.getTransactionState(), blocking_mp_txnid, dut);
         addTask(next, dut, expected_order);
         // Should have passed through and not be in the queue

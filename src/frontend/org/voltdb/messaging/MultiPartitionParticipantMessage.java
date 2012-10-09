@@ -42,6 +42,19 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
                 false);
     }
 
+    public MultiPartitionParticipantMessage(long initiatorHSId,
+                                            long coordinatorHSId,
+                                            long txnId,
+                                            boolean isReadOnly,
+                                            boolean isForReplay) {
+        super(initiatorHSId,
+                coordinatorHSId,
+                txnId,
+                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                isReadOnly,
+                isForReplay);
+    }
+
     @Override
     public int getSerializedSize()
     {

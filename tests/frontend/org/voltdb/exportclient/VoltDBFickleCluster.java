@@ -72,7 +72,8 @@ public class VoltDBFickleCluster extends LocalCluster {
             "ival bigint default 23 not null);\n" +
             "create table blah2 (" +
             "ival bigint default 23 not null, " +
-            "PRIMARY KEY(ival));";
+            "PRIMARY KEY(ival));" +
+            "export table blah;";
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         String schemaPath = schemaFile.getPath();
@@ -84,7 +85,6 @@ public class VoltDBFickleCluster extends LocalCluster {
         builder.addPartitionInfo("blah2", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?);", "blah2.ival: 0");
         builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
-        builder.setTableAsExportOnly("blah");
         boolean success = m_cluster.compile(builder);
         assert(success);
 

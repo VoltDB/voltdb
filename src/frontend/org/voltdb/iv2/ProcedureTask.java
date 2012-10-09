@@ -27,11 +27,9 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -84,16 +82,9 @@ abstract public class ProcedureTask extends TransactionTask
             if (callerParams != null) {
                 ClientResponseImpl cr = null;
 
-                // find the txn id visible to the proc
-                long txnId = m_txn.txnId;
-                StoredProcedureInvocation invocation = m_txn.getInvocation();
-                if ((invocation != null) && (invocation.getType() == ProcedureInvocationType.REPLICATED)) {
-                    txnId = invocation.getOriginalTxnId();
-                }
-
                 ProcedureRunner runner = siteConnection.getProcedureRunner(m_procName);
                 runner.setupTransaction(m_txn);
-                cr = runner.call(txnId, task.getParameters());
+                cr = runner.call(task.getParameters());
 
                 response.setResults(cr);
                 // record the results of write transactions to the transaction state

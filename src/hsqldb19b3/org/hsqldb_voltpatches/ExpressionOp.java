@@ -524,22 +524,27 @@ public class ExpressionOp extends Expression {
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
+        boolean unsupported = false;
         switch (opType) {
         case OpTypes.LIMIT:             element = "limit"; break;
         //TODO: Enable these as they are supported in VoltDB.
         // They appear to be a complete set as supported by the other methods in this module.
-        case OpTypes.ALTERNATIVE :
-        case OpTypes.CASEWHEN :
-        case OpTypes.CAST :
-        case OpTypes.ORDER_BY :
-        case OpTypes.SIMPLE_COLUMN :
-        case OpTypes.TABLE :
-        case OpTypes.VALUE :
-        case OpTypes.ZONE_MODIFIER :
+        case OpTypes.ALTERNATIVE :   unsupported = true; element = "alternative"; break;
+        case OpTypes.CASEWHEN :      unsupported = true; element = "case"; break;
+        case OpTypes.CAST :          unsupported = true; element = "cast (possibly implied)"; break;
+        case OpTypes.ORDER_BY :      unsupported = true; element = "order by"; break;
+        case OpTypes.SIMPLE_COLUMN : unsupported = true; element = "simple column"; break;
+        case OpTypes.TABLE :         unsupported = true; element = "tablen"; break;
+        case OpTypes.VALUE :         unsupported = true; element = "value"; break;
+        case OpTypes.ZONE_MODIFIER : unsupported = true; element = "zone modifier"; break;
         default:
             throw new HSQLParseException("Unsupported Expression Operation: " +
                                          String.valueOf(opType));
         }
+        if (unsupported) {
+            throw new HSQLParseException(element + " operation is not supported");
+        }
+
 
         VoltXMLElement exp = new VoltXMLElement("operation");
         // We want to keep track of which expressions are the same in the XML output

@@ -17,20 +17,27 @@
 
 package org.voltdb.iv2;
 
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class CompleteTransactionTask extends TransactionTask
 {
     final private CompleteTransactionMessage m_msg;
+    final private PartitionDRGateway m_drGateway;
 
     public CompleteTransactionTask(TransactionState txn,
                                    TransactionTaskQueue queue,
-                                   CompleteTransactionMessage msg)
+                                   CompleteTransactionMessage msg,
+                                   PartitionDRGateway drGateway)
     {
         super(txn, queue);
         m_msg = msg;
+        m_drGateway = drGateway;
     }
 
     @Override
@@ -47,6 +54,18 @@ public class CompleteTransactionTask extends TransactionTask
         m_txn.setDone();
         m_queue.flush();
         hostLog.debug("COMPLETE: " + this);
+
+        // Log invocation to DR
+        if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
+            FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
+            Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
+            assert(initiateTask != null);
+            StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
+            invocation.setOriginalTxnId(m_txn.txnId);
+            invocation.setOriginalTimestamp(m_txn.timestamp);
+            m_drGateway.onSuccessfulProcedureCall(m_txn.spHandle, m_txn.timestamp, true,
+                                                  invocation, m_txn.getResults());
+        }
     }
 
     @Override
