@@ -161,7 +161,8 @@ public class LeaderAppointer implements Promotable
             else {
                 // Check for k-safety
                 if (!isClusterKSafe()) {
-                    VoltDB.crashGlobalVoltDB("Cluster has become unviable.", false, null);
+                    VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                            false, null);
                 }
                 else if (missingHSIds.contains(m_currentLeader)) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
@@ -383,6 +384,54 @@ public class LeaderAppointer implements Promotable
         Set<Integer> previousHosts = readPriorKnownLiveNodes();
 
         // Real partition detection stuff would go here
+        // find the lowest hostId between the still-alive hosts and the
+        // failed hosts. Which set contains the lowest hostId?
+        int blessedHostId = Integer.MAX_VALUE;
+        boolean blessedHostIdInFailedSet = true;
+
+        // This should be all the pre-partition hosts IDs.  Any new host IDs
+        // (say, if this was triggered by rejoin), will be greater than any surviving
+        // host ID, so don't worry about including it in this search.
+        for (Integer hostId : previousHosts) {
+            if (hostId < blessedHostId) {
+                blessedHostId = hostId;
+            }
+        }
+
+        for (Integer hostId : currentHosts) {
+            if (hostId.equals(blessedHostId)) {
+                blessedHostId = hostId;
+                blessedHostIdInFailedSet = false;
+            }
+        }
+
+        // Evaluate PPD triggers.
+        boolean partitionDetectionTriggered = false;
+        // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
+        // If the blessed host is in the failure set, this set is not blessed.
+        if (currentHosts.size() * 2 == previousHosts.size()) {
+            if (blessedHostIdInFailedSet) {
+                tmLog.info("Partition detection triggered for 50/50 cluster failure. " +
+                        "This survivor set is shutting down.");
+                partitionDetectionTriggered = true;
+            }
+            else {
+                tmLog.info("Partition detected for 50/50 failure. " +
+                        "This survivor set is continuing execution.");
+            }
+        }
+
+        // A strict, viable minority is always a partition.
+        if (currentHosts.size() * 2 < previousHosts.size()) {
+            tmLog.info("Partition detection triggered. " +
+                         "This minority survivor set is shutting down.");
+            partitionDetectionTriggered = true;
+        }
+
+        if (partitionDetectionTriggered) {
+            VoltDB.crashGlobalVoltDB("Partition detection triggered.  This survivor set will shut down.",
+                    false, null);
+        }
 
         // If the cluster host set has changed, then write the new set to ZK
         if (!currentHosts.equals(previousHosts)) {
@@ -398,7 +447,7 @@ public class LeaderAppointer implements Promotable
             try {
                 List<String> replicas = m_zk.getChildren(dir, null, null);
                 if (replicas.isEmpty()) {
-                    tmLog.fatal("No replicas found for partition: " + i);
+                    tmLog.fatal("K-Safety violation: No replicas found for partition: " + i);
                     retval = false;
                 }
             }
