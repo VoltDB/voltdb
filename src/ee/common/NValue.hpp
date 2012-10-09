@@ -446,7 +446,10 @@ class NValue {
             rt = VALUE_TYPE_INVALID;
             break;
         }
-        assert(rt != VALUE_TYPE_INVALID);
+        // There ARE rare but legitimate runtime type check exceptions in SQL, so
+        // unless/until those legitimate cases get re-routed to some other code path,
+        // it is not safe here to ...
+        // assert(rt != VALUE_TYPE_INVALID);
         return rt;
     }
 
