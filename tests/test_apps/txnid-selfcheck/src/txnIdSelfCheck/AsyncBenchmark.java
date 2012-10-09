@@ -46,13 +46,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -99,8 +97,6 @@ public class AsyncBenchmark {
     });
 
     final AtomicLong previousReplicated = new AtomicLong(0);
-    // rids in-flight per cid
-    final Map<Integer, Queue<Long>> inFlight = new HashMap<Integer, Queue<Long>>();
     final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     /**
@@ -380,18 +376,9 @@ public class AsyncBenchmark {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             c.incrementAndGet();
-            Queue<Long> queue = inFlight.get(-1); // MP is always -1
-            Long expectedRid = queue.poll();
 
             if (response.getStatus() == ClientResponse.SUCCESS) {
-                assert(expectedRid != null);
-                VoltTable result = response.getResults()[0];
-
-                result.advanceRow();
-                long rid = result.getLong("rid");
-                if (expectedRid != rid) {
-                    crash("Expecting " + expectedRid + " for replicated, but got " + rid);
-                }
+                // pass
             } else if (response.getStatus() == ClientResponse.USER_ABORT) {
                 if (response.getAppStatus() != updateReplicated.AbortStatus.NORMAL.ordinal()) {
                     crash(response.getStatusString());
@@ -409,32 +396,13 @@ public class AsyncBenchmark {
      *
      */
     class doTxnCallback implements ProcedureCallback {
-        private final int cid;
-
-        public doTxnCallback(int cid) {
-            this.cid = cid;
-        }
-
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             c.incrementAndGet();
-            Queue<Long> queue = inFlight.get(cid);
-            Long expectedRid = queue.poll();
 
             if (response.getStatus() != ClientResponse.SUCCESS) {
 //                System.err.println("doTxn for cid " + cid + " failed: " +
 //                        response.getStatusString());
-            } else {
-                assert(expectedRid != null);
-                VoltTable result = response.getResults()[0];
-                if (result.getRowCount() >= 1) {
-                    result.advanceRow();
-                    long rid = -result.getLong("rid");
-                    if (expectedRid != rid) {
-                        crash("Expecting " + expectedRid + " for cid " +
-                                cid + ", but got " + rid);
-                    }
-                }
             }
         }
     }
@@ -472,7 +440,6 @@ public class AsyncBenchmark {
         // reset all cids to 0 and initialize inFlight queues
         for (int i = -1; i < cidCount; i++) {
             rids.put(i, 0l);
-            inFlight.put(i, new LinkedBlockingQueue<Long>());
         }
         // populate the rids with values from previous run
         while (rowResults[0].advanceRow()) {
@@ -526,7 +493,7 @@ public class AsyncBenchmark {
                                          rid);
                 } else {
                     // asynchronously call the "doTxn" procedure
-                    client.callProcedure(new doTxnCallback(cid),
+                    client.callProcedure(new doTxnCallback(),
                                          "doTxn",
                                          cid,
                                          rid,
@@ -541,7 +508,6 @@ public class AsyncBenchmark {
                 continue;
             }
 
-            inFlight.get(cid).add(rid);
             rids.put(cid, rid + 1);
         }
 
