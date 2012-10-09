@@ -55,7 +55,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST enableiv2
+        license $LICENSE host $HOST
 }
 
 # run the client that drives the example
