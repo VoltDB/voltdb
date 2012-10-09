@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -436,7 +437,27 @@ public class Statistics extends VoltSystemProcedure {
             results = getIndexData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.PROCEDURE.name())) {
-            results = getProcedureData(interval, now);
+            /*
+             * For IV2, MP procedure stats are stored at the MPI, which is the
+             * site that's running this procedure now. Get the MP procedure
+             * stats and stick them to the end of the SP stats gathered from
+             * other sites.
+             */
+            VoltTable[] spResults = getProcedureData(interval, now);
+            if (VoltDB.instance().isIV2Enabled()) {
+                List<VoltTable> allResults = new ArrayList<VoltTable>();
+                allResults.addAll(Arrays.asList(spResults));
+                List<Long> catalogIds = new ArrayList<Long>();
+                catalogIds.add(ctx.getSiteId());
+                allResults.add(VoltDB.instance().getStatsAgent().getStats(
+                                                 SysProcSelector.PROCEDURE,
+                                                 catalogIds,
+                                                 interval != 0,
+                                                 now));
+                results = new VoltTable[] {unionTables(allResults)};
+            } else {
+                results = spResults;
+            }
         }
         else if (selector.toUpperCase().equals(SysProcSelector.PLANNER.name())) {
             results = getPlannerData(interval, now);

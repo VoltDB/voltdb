@@ -82,6 +82,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -98,6 +99,7 @@ import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCacheReader;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -178,6 +180,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
             new HashMap<String, List<InvocationAcceptancePolicy>>();
+
+    /**
+     * For IV2 only: this is used to track the last txnId replicated for a
+     * certain partition, so that duped DR txns can be dropped.
+     */
+    private final Map<Integer, Long> m_partitionTxnIds = new HashMap<Integer, Long>();
 
     /*
      * Allow the async compiler thread to immediately process completed planning tasks
@@ -1022,6 +1030,34 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             Long initiatorHSId = null;
             boolean isShortCircuitRead = false;
 
+            if (invocation.getType() == ProcedureInvocationType.REPLICATED)
+            {
+                int partitionId;
+                if (isSinglePartition) {
+                    partitionId = partitions[0];
+                } else {
+                    partitionId = MpInitiator.MP_INIT_PID;
+                }
+
+                Long lastTxnId = m_partitionTxnIds.get(partitionId);
+                if (lastTxnId != null) {
+                    /*
+                     * Ning - @LoadSinglepartTable and @LoadMultipartTable
+                     * always have the same txnId which is the txnId of the
+                     * snapshot.
+                     */
+                    if (!(invocation.getProcName().equalsIgnoreCase("@LoadSinglepartitionTable") ||
+                            invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
+                            invocation.getOriginalTxnId() <= lastTxnId)
+                    {
+                        hostLog.debug("Dropping duplicate replicated transaction, txnid: " +
+                                invocation.getOriginalTxnId() + ", last seen: " + lastTxnId);
+                        return false;
+                    }
+                }
+                m_partitionTxnIds.put(partitionId, invocation.getOriginalTxnId());
+            }
+
             /*
              * If this is a read only single part, check if there is a local replica,
              * if there is, send it to the replica as a short circuit read
@@ -1630,6 +1666,48 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
+    /**
+     * Send a multipart sentinel to all partitions. This is only used when the
+     * multipart didn't generate any sentinels for partitions, e.g. DR
+     * @LoadMultipartitionTable.
+     *
+     * @param txnId
+     */
+    void sendSentinelsToAllPartitions(long txnId)
+    {
+        for (int partition : m_allPartitions) {
+            sendSentinel(txnId, partition, false);
+        }
+    }
+
+    /**
+     * Send a multipart sentinel to the specified partition. This comes from the
+     * DR agent in prepare of a multipart transaction.
+     *
+     * @param buf
+     * @param invocation
+     * @return
+     */
+    ClientResponseImpl dispatchSendSentinel(ByteBuffer buf,
+                                            StoredProcedureInvocation invocation)
+    {
+        /*
+         * Sentinels will be deduped by ReplaySequencer. They don't advance the
+         * last replayed txnIds.
+         */
+
+        // First parameter is the partition ID
+        sendSentinel(invocation.getOriginalTxnId(),
+                     (Integer) invocation.getParameterAtIndex(0), false);
+
+        ClientResponseImpl response =
+                new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                       new VoltTable[0],
+                                       ClientResponseImpl.DUPE_TRANSACTION,
+                                       invocation.clientHandle);
+        return response;
+    }
+
     ClientResponseImpl dispatchStatistics(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
@@ -1735,6 +1813,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if(task.procName.equals("@ExplainProc")) {
                 return dispatchExplainProcedure(task, handler, ccxn);
             }
+            else if (task.procName.equals("@SendSentinel")) {
+                return dispatchSendSentinel(buf, task);
+            }
         }
 
         if (user == null) {
@@ -1772,6 +1853,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
             } else if (task.procName.equals("@LoadSinglepartitionTable")) {
                 return dispatchLoadSinglepartitionTable(buf, task, handler, ccxn);
+            } else if (task.procName.equals("@LoadMultipartitionTable")) {
+                /*
+                 * For IV2 DR: This will generate a sentinel for each partition,
+                 * but doesn't initiate the invocation. It will fall through to
+                 * the shared dispatch of sysprocs.
+                 */
+                if (VoltDB.instance().isIV2Enabled() &&
+                        task.getType() == ProcedureInvocationType.REPLICATED) {
+                    sendSentinelsToAllPartitions(task.getOriginalTxnId());
+                }
             } else if (task.procName.equals("@SnapshotSave")) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
@@ -2193,8 +2284,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_iv2Masters != null) {
             m_iv2Masters.shutdown();
         }
+        if (m_localReplicasBuilder != null) {
+            m_localReplicasBuilder.join(10000);
+            hostLog.error("Local replica map builder took more than ten seconds, probably hung");
+            m_localReplicasBuilder.join();
+        }
     }
 
+    private volatile Thread m_localReplicasBuilder = null;
     public void startAcceptingConnections() throws IOException {
         if (m_isIV2Enabled) {
             /*
@@ -2205,7 +2302,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Populate the map in the background and it will be used to route
              * requests to local replicas once the info is available
              */
-            new Thread() {
+            m_localReplicasBuilder = new Thread() {
                 @Override
                 public void run() {
                     /*
@@ -2223,7 +2320,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                     m_localReplicas = localReplicas.build();
                 }
-            }.start();
+            };
+            m_localReplicasBuilder.start();
         }
 
         /*
@@ -2477,17 +2575,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return m_snapshotDaemon;
     }
 
-    public void sendSentinel(long txnId, int partitionId) {
+    public void sendSentinel(long txnId, int partitionId, boolean forReplay) {
         assert(m_isIV2Enabled);
         final long initiatorHSId = m_iv2Masters.get(partitionId);
 
-        //The only field that is relevant is txnid
+        //The only field that is relevant is txnid, and forReplay.
         MultiPartitionParticipantMessage mppm =
                 new MultiPartitionParticipantMessage(
                         initiatorHSId,
                         m_cartographer.getHSIdForMultiPartitionInitiator(),
                         txnId,
-                        false);
+                        false,  // isReadOnly
+                        true);  // isForReplay
         m_mailbox.send(initiatorHSId, mppm);
     }
 

@@ -15,17 +15,31 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.iv2;
 
-import java.io.IOException;
-import java.util.ArrayList;
+import org.voltdb.PartitionDRGateway;
+import org.voltdb.SiteProcedureConnection;
 
-import javax.management.*;
+/**
+ * Pokes PartitionDRGateway once in a while to see if there are any data that
+ * needs to be sent.
+ */
+public class DRTask extends SiteTasker {
+    private final PartitionDRGateway m_gateway;
 
-public interface StatsManager {
-    // Global constant
-    public static final int POLL_INTERVAL = 500; // 500ms
+    public DRTask(PartitionDRGateway gateway) {
+        m_gateway = gateway;
+    }
 
-    public void initialize(ArrayList<Long> localSiteIds, Long MPHSId) throws JMException,  IOException;
-    public void sendNotification();
+    @Override
+    public void run(SiteProcedureConnection siteConnection) {
+        // IV2 doesn't use the txnId passed to tick, so pass a dummy value
+        m_gateway.tick(0);
+    }
+
+    @Override
+    public void runForRejoin(SiteProcedureConnection siteConnection) {
+        // no-op during rejoin
+    }
+
 }

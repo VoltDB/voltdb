@@ -323,7 +323,7 @@ public class TestVoltMessageSerialization extends TestCase {
     {
         CompleteTransactionMessage ctm =
             new CompleteTransactionMessage(12345, 54321, 67890, false, false,
-                                           true, false);
+                                           true, false, true);
 
         CompleteTransactionMessage ctm2 = (CompleteTransactionMessage) checkVoltMessage(ctm);
         assertEquals(ctm.m_isRollback, ctm2.m_isRollback);
@@ -335,7 +335,7 @@ public class TestVoltMessageSerialization extends TestCase {
     {
         CompleteTransactionMessage ctm =
             new CompleteTransactionMessage(12345, 54321, 67890, false, false,
-                                           true, false);
+                                           true, false, true);
 
         CompleteTransactionResponseMessage ctrm =
             new CompleteTransactionResponseMessage(ctm, Long.MAX_VALUE - 4);

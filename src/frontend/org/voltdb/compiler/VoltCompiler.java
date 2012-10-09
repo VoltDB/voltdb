@@ -517,7 +517,7 @@ public class VoltCompiler {
         final ArrayList<String> schemas = new ArrayList<String>();
         final ArrayList<ProcedureDescriptor> procedures = new ArrayList<ProcedureDescriptor>();
         final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
-        final PartitionMap partitionMap = new PartitionMap(this);
+        final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
         final String databaseName = database.getName();
 
@@ -562,7 +562,7 @@ public class VoltCompiler {
         // procedures/procedure
         if (database.getProcedures() != null) {
             for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
-                partitionMap.add(getProcedure(proc));
+                voltDdlTracker.add(getProcedure(proc));
             }
         }
 
@@ -576,7 +576,7 @@ public class VoltCompiler {
         // partitions/table
         if (database.getPartitions() != null) {
             for (org.voltdb.compiler.projectfile.PartitionsType.Partition table : database.getPartitions().getPartition()) {
-                partitionMap.put(table.getTable(), table.getColumn());
+                voltDdlTracker.put(table.getTable(), table.getColumn());
             }
         }
 
@@ -591,7 +591,7 @@ public class VoltCompiler {
         // Actually parse and handle all the DDL
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, partitionMap, db.getGroups());
+        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, voltDdlTracker, db);
 
         for (final String schemaPath : schemas) {
             File schemaFile = null;
@@ -625,8 +625,8 @@ public class VoltCompiler {
         // this needs to happen before procedures are compiled
         String msg = "In database \"" + databaseName + "\", ";
         final CatalogMap<Table> tables = db.getTables();
-        for (String tableName : partitionMap.m_map.keySet()) {
-            String colName = partitionMap.m_map.get(tableName);
+        for (String tableName : voltDdlTracker.m_partitionMap.keySet()) {
+            String colName = voltDdlTracker.m_partitionMap.get(tableName);
             // A null column name indicates a replicated table. Ignore it here
             // because it defaults to replicated in the catalog.
             if (colName != null) {
@@ -687,6 +687,11 @@ public class VoltCompiler {
         // add database estimates info
         addDatabaseEstimatesInfo(m_estimates, db);
 
+        // Process DDL exported tables
+        for( String exportedTableName: voltDdlTracker.getExportedTables()) {
+            addExportTableToConnector(exportedTableName, db);
+        }
+
         // Process and add exports and connectors to the catalog
         // Must do this before compiling procedures to deny updates
         // on append-only tables.
@@ -703,7 +708,7 @@ public class VoltCompiler {
         procedures.addAll(autoCrudProcedures);
 
         // Add procedures read from DDL and project file
-        procedures.addAll( partitionMap.getProcedureDescriptors());
+        procedures.addAll( voltDdlTracker.getProcedureDescriptors());
 
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
@@ -1194,6 +1199,44 @@ public class VoltCompiler {
         return cls;
     }
 
+    void grantExportToGroup( final String groupName, final Database catdb)
+        throws VoltCompilerException
+    {
+        assert groupName != null && ! groupName.trim().isEmpty() && catdb != null;
+
+        // Catalog Connector
+        // Relying on schema's enforcement of at most 1 connector
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        if (catconn == null) {
+            catconn = catdb.getConnectors().add("0");
+        }
+
+        final Group group = catdb.getGroups().getIgnoreCase(groupName);
+        if (group == null) {
+            throw new VoltCompilerException("Export has a role " + groupName + " that does not exist");
+        }
+
+        GroupRef groupRef = catconn.getAuthgroups().getIgnoreCase(groupName);
+
+        if      (groupRef == null) {
+            groupRef = catconn.getAuthgroups().add(groupName);
+            groupRef.setGroup(group);
+        }
+        else if (groupRef.getGroup() == null) {
+                groupRef.setGroup(group);
+        }
+
+        if (groupRef.getGroup() != group) {
+            throw new VoltCompilerException(
+                    "Mismatched group reference found in export connector auth groups: " +
+                    "it references '" + groupRef.getGroup().getTypeName() +
+                    "(" + System.identityHashCode(groupRef.getGroup()) +") " +
+                    "', when it should reference '" + group.getTypeName() +
+                    "(" + System.identityHashCode(group) +")" +
+                    "' instead");
+        }
+    }
+
     void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
@@ -1204,7 +1247,16 @@ public class VoltCompiler {
 
         // Catalog Connector
         // Relying on schema's enforcement of at most 1 connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().add("0");
+        //
+        // This check is also done here to mimic the same behavior of the
+        // previous implementation of this method, where the connector is created as
+        // long as the export element is present in project XML. Now that we are
+        // deprecating project.xml, we won't be able to mimic in DDL, what an
+        // empty <export/> element currently implies.
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        if (catconn == null) {
+            catconn = catdb.getConnectors().add("0");
+        }
 
         // add authorized users and groups
         final ArrayList<String> groupslist = new ArrayList<String>();
@@ -1217,53 +1269,13 @@ public class VoltCompiler {
         }
 
         for (String groupName : groupslist) {
-            final Group group = catdb.getGroups().get(groupName);
-            if (group == null) {
-                throw new VoltCompilerException("Export has a group " + groupName + " that does not exist");
-            }
-            final GroupRef groupRef = catconn.getAuthgroups().add(groupName);
-            groupRef.setGroup(group);
+            grantExportToGroup(groupName, catdb);
         }
 
-
         // Catalog Connector.ConnectorTableInfo
-        Integer i = 0;
         if (export.getTables() != null) {
             for (Tables.Table xmltable : export.getTables().getTable()) {
-                // verify that the table exists in the catalog
-                String tablename = xmltable.getName();
-                org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tablename);
-                if (tableref == null) {
-                    throw new VoltCompilerException("While configuring export, table " + tablename + " was not present in " +
-                    "the catalog.");
-                }
-                if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
-                    compilerLog.error("While configuring export, table " + tablename + " is a source table " +
-                            "for a materialized view. Export only tables do not support views.");
-                    throw new VoltCompilerException("Export table configured with materialized view.");
-                }
-                if (tableref.getMaterializer() != null)
-                {
-                    compilerLog.error("While configuring export, table " + tablename + " is a " +
-                                                "materialized view.  A view cannot be an export table.");
-                    throw new VoltCompilerException("View configured as an export table");
-                }
-                if (tableref.getIndexes().size() > 0) {
-                    compilerLog.error("While configuring export, table " + tablename + " has indexes defined. " +
-                            "Export tables can't have indexes (including primary keys).");
-                    throw new VoltCompilerException("Table with indexes configured as an export table");
-                }
-                if (tableref.getIsreplicated()) {
-                    // if you don't specify partition columns, make
-                    // export tables partitioned, but on no specific column (iffy)
-                    tableref.setIsreplicated(false);
-                    tableref.setPartitioncolumn(null);
-                }
-
-                org.voltdb.catalog.ConnectorTableInfo connTableInfo = catconn.getTableinfo().add(tablename);
-                connTableInfo.setAppendonly(true);
-                connTableInfo.setTable(tableref);
-                ++i;
+                addExportTableToConnector(xmltable.getName(), catdb);
             }
             if (export.getTables().getTable().isEmpty()) {
                 compilerLog.warn("Export defined with an empty <tables> element");
@@ -1271,6 +1283,60 @@ public class VoltCompiler {
         } else {
             compilerLog.warn("Export defined with no <tables> element");
         }
+    }
+
+    void addExportTableToConnector( final String tableName, final Database catdb)
+            throws VoltCompilerException
+    {
+        assert tableName != null && ! tableName.trim().isEmpty() && catdb != null;
+
+        // Catalog Connector
+        // Relying on schema's enforcement of at most 1 connector
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        if (catconn == null) {
+            catconn = catdb.getConnectors().add("0");
+        }
+        org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tableName);
+        if (tableref == null) {
+            throw new VoltCompilerException("While configuring export, table " + tableName + " was not present in " +
+            "the catalog.");
+        }
+        if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
+            compilerLog.error("While configuring export, table " + tableName + " is a source table " +
+                    "for a materialized view. Export only tables do not support views.");
+            throw new VoltCompilerException("Export table configured with materialized view.");
+        }
+        if (tableref.getMaterializer() != null)
+        {
+            compilerLog.error("While configuring export, table " + tableName + " is a " +
+                                        "materialized view.  A view cannot be an export table.");
+            throw new VoltCompilerException("View configured as an export table");
+        }
+        if (tableref.getIndexes().size() > 0) {
+            compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
+                    "Export tables can't have indexes (including primary keys).");
+            throw new VoltCompilerException("Table with indexes configured as an export table");
+        }
+        if (tableref.getIsreplicated()) {
+            // if you don't specify partition columns, make
+            // export tables partitioned, but on no specific column (iffy)
+            tableref.setIsreplicated(false);
+            tableref.setPartitioncolumn(null);
+        }
+        org.voltdb.catalog.ConnectorTableInfo connTableInfo =
+                catconn.getTableinfo().getIgnoreCase(tableName);
+
+        if (connTableInfo == null) {
+            connTableInfo = catconn.getTableinfo().add(tableName);
+            connTableInfo.setTable(tableref);
+            connTableInfo.setAppendonly(true);
+        }
+        else  {
+            throw new VoltCompilerException(String.format(
+                    "Table \"%s\" is already exported", tableName
+                    ));
+        }
+
     }
 
     public static void main(final String[] args) {

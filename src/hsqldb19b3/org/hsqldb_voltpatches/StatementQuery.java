@@ -42,6 +42,7 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of Statement for query expressions.<p>
@@ -438,7 +439,10 @@ public class StatementQuery extends StatementDMQL {
             parameter.attributes.put("index", String.valueOf(i));
             ExpressionColumn param = parameters[i];
             parameter.attributes.put("id", param.getUniqueId(session));
-            parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
+            Type paramType = param.getDataType();
+            if (paramType != null) {
+                parameter.attributes.put("type", Types.getTypeName(paramType.typeCode));
+            }
         }
 
         // scans

@@ -48,9 +48,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId,
                                       long txnId, boolean isReadOnly,
                                       boolean isRollback, boolean requiresAck,
-                                      boolean rollbackForFault)
+                                      boolean rollbackForFault, boolean isForReplay)
     {
-        super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, false);
+        super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, isForReplay);
         m_isRollback = isRollback;
         m_requiresAck = requiresAck;
         m_rollbackForFault = rollbackForFault;

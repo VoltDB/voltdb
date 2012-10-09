@@ -292,7 +292,7 @@ public class ExportGeneration {
 
     public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
         // create an easy partitionId:txnId lookup.
-        HashMap<Long, Long> partitionToTxnId = new HashMap<Long, Long>();
+        HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
         for (long tid : perPartitionTxnIds) {
             partitionToTxnId.put(TxnEgo.getPartitionId(tid), tid);
         }
