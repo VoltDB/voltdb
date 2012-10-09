@@ -160,7 +160,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         client.drain();
         assertTrue(callbackSuccess);
 
-        // add a new table in the middle
+        // drop a unique constraint
         String newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-dropconstraint.jar");
         VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
         assertTrue(results.length == 1);
@@ -204,7 +204,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         long tupleCount = TestCatalogUpdateSuite.indexEntryCountFromStats(client, "P1", "RLTY");
         assertTrue(tupleCount > 0);
 
-        // add a new table in the middle
+        // rename the one user-created index in the table
         String newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-renamedindex.jar");
         VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
         assertTrue(results.length == 1);
@@ -217,7 +217,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         client.drain();
         assertTrue(callbackSuccess);
 
-        // add a constraint back in, supported by a unique index
+        // rename the index back for fun
         newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-base.jar");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
         assertTrue(results.length == 1);
