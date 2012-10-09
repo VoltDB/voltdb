@@ -17,6 +17,12 @@
 
 package org.voltdb.iv2;
 
+import java.io.File;
+import java.io.IOException;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltdb.BackendTarget;
@@ -34,14 +42,20 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
+
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
+
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -78,7 +92,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     final BackendTarget m_backend;
 
     // Is the site in a rejoining mode.
-    boolean m_isRejoining;
+    private final static int kStateRunning = 0;
+    private final static int kStateRejoining = 1;
+    private final static int kStateReplayingRejoin = 2;
+    int m_rejoinState;
+    TaskLog m_rejoinTaskLog;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -282,7 +300,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_isRejoining = createForRejoin;
+        m_rejoinState = createForRejoin ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, txnId);
@@ -329,6 +347,30 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 return (now - 5) > m_lastTxnTime;
             }
         });
+
+        if (m_rejoinState == kStateRejoining) {
+            initializeForLiveRejoin();
+        }
+    }
+
+    void initializeForLiveRejoin()
+    {
+        // Construct task log and start logging task messages
+        File overflowDir =
+            new File(m_context.cluster.getVoltroot(), "rejoin_overflow");
+        Class<?> taskLogKlass =
+            MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Rejoin", false);
+        if (taskLogKlass != null) {
+            Constructor<?> taskLogConstructor;
+            try {
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
+                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir);
+            } catch (InvocationTargetException e) {
+                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e);
+            }
+        }
     }
 
     /** Create a native VoltDB execution engine */
@@ -349,9 +391,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                         m_numberOfPartitions);
                 eeTemp.loadCatalog( txnId, serializedCatalog);
-                // TODO: export integration will require a tick.
-                // lastTickTime = EstTime.currentTimeMillis();
-                // eeTemp.tick(lastTickTime, txnId);
             }
             else {
                 // set up the EE over IPC
@@ -368,9 +407,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
                             m_numberOfPartitions);
                 eeTemp.loadCatalog( 0, serializedCatalog);
-                // TODO: export integration will require a tick.
-                // lastTickTime = EstTime.currentTimeMillis();
-                // eeTemp.tick( lastTickTime, 0);
             }
         }
         // just print error info an bail if we run into an error here
@@ -416,19 +452,64 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         shutdown();
     }
 
-    void runLoop() throws InterruptedException
+    void runLoop() throws InterruptedException, IOException
     {
         SiteTasker task = m_scheduler.poll();
+
+        // Normal runtime operation...
+        if (m_rejoinState == kStateRunning) {
+            if (task != null) {
+                if (task instanceof TransactionTask) {
+                    m_currentTxnId = ((TransactionTask)task).getTxnId();
+                    m_lastTxnTime = EstTime.currentTimeMillis();
+                }
+                task.run(getSiteProcedureConnection());
+            }
+            return;
+        }
+
+        // During live rejoin, the site takes responsibility for
+        // the deferred transaction info base message.
+        // (Cleaner to pass m_rejoinTaskLog to runForRejoin()?)
         if (task != null) {
             if (task instanceof TransactionTask) {
-                m_currentTxnId = ((TransactionTask)task).getTxnId();
-                m_lastTxnTime = EstTime.currentTimeMillis();
+                TransactionInfoBaseMessage tibm = ((TransactionTask)task).m_txn.getNotice();
+                m_rejoinTaskLog.logTask(tibm);
             }
-            if (m_isRejoining) {
-                task.runForRejoin(getSiteProcedureConnection());
+            task.runForRejoin(getSiteProcedureConnection());
+        }
+
+        // During the rejoin-catchup period, run some transactions
+        // from the task back log.
+        if (m_rejoinState == kStateReplayingRejoin) {
+            replayFromTaskLog();
+        }
+    }
+
+    void replayFromTaskLog() throws IOException
+    {
+        if (m_rejoinTaskLog == null) {
+            setReplayRejoinComplete();
+            return;
+        }
+        for (int i=0; i < 10 /* REJOIN::REAL RATIO */; ++i) {
+            if (m_rejoinTaskLog.isEmpty()) {
+                setReplayRejoinComplete();
+                return;
+            }
+            TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
+            if (tibm == null) {
+                // asynchronous fetch - queue unavailable, not empty.
+                break;
             }
             else {
-                task.run(getSiteProcedureConnection());
+                if (tibm instanceof Iv2InitiateTaskMessage) {
+                    Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
+                    SpProcedureTask t = new SpProcedureTask(
+                            m_initiatorMailbox, m.getStoredProcedureName(),
+                            null, m);
+                    t.runFromTaskLog(this);
+                }
             }
         }
     }
@@ -639,7 +720,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void setRejoinComplete() {
-        m_isRejoining = false;
+        // transition from kStateRejoining to live rejoin replay.
+        // pass through this transition in all cases; if not doing
+        // live rejoin, will transfer to kStateRunning as usual
+        // as the rejoin task log will be empty.
+        assert(m_rejoinState == kStateRejoining);
+        m_rejoinState = kStateReplayingRejoin;
+    }
+
+    private void setReplayRejoinComplete() {
+        // transition out of rejoin replay to normal running state.
+        assert(m_rejoinState == kStateReplayingRejoin);
+        m_rejoinState = kStateRunning;
     }
 
     @Override

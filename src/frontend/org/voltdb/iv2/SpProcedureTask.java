@@ -80,6 +80,42 @@ public class SpProcedureTask extends ProcedureTask
         m_initiator.deliver(response);
     }
 
+    // This is an ugly copy/paste mix of run() and completeInitiateTask()
+    // that avoids using the mailbox -- since no response should be
+    // generated...
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        hostLog.fatal("START replaying txn: " + this);
+        if (!m_txn.isReadOnly()) {
+            m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+        }
+
+        // cast up here .. ugly.
+        SpTransactionState txn = (SpTransactionState)m_txn;
+        final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
+        if (!response.shouldCommit()) {
+            m_txn.setNeedsRollback();
+        }
+        if (!m_txn.isReadOnly()) {
+            assert(siteConnection.getLatestUndoToken() != Site.kInvalidUndoToken) :
+                "[SP][RW] transaction found invalid latest undo token state in Iv2ExecutionSite.";
+            assert(siteConnection.getLatestUndoToken() >= m_txn.getBeginUndoToken()) :
+                "[SP][RW] transaction's undo log token farther advanced than latest known value.";
+            assert (m_txn.getBeginUndoToken() != Site.kInvalidUndoToken) :
+                "[SP][RW] with invalid undo token in completeInitiateTask.";
+
+            // the truncation point token SHOULD be part of m_txn. However, the
+            // legacy interaces don't work this way and IV2 hasn't changed this
+            // ownership yet. But truncateUndoLog is written assuming the right
+            // eventual encapsulation.
+            siteConnection.truncateUndoLog(m_txn.needsRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
+        }
+        m_txn.setDone();
+        execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        hostLog.debug("COMPLETE replaying txn: " + this);
+    }
+
+
     @Override
     void completeInitiateTask(SiteProcedureConnection siteConnection)
     {
