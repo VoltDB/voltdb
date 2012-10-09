@@ -451,7 +451,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
-    public long indexEntryCountFromStats(Client client, String tableName, String indexName) throws Exception {
+    public static long indexEntryCountFromStats(Client client, String tableName, String indexName) throws Exception {
         ClientResponse callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
         assertTrue(callProcedure.getResults().length == 1);
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);

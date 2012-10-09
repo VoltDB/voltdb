@@ -977,9 +977,23 @@ public class DDLCompiler {
             }
 
             if (subNode.name.equals("indexes")) {
+                // do non-system indexes first so they get priority when the compiler
+                // starts throwing out duplicate indexes
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index"))
+                    if (indexNode.name.equals("index") == false) continue;
+                    String indexName = indexNode.attributes.get("name");
+                    if (indexName.startsWith("SYS_IDX_SYS_") == false) {
                         addIndexToCatalog(table, indexNode, indexReplacementMap);
+                    }
+                }
+
+                // now do system indexes
+                for (VoltXMLElement indexNode : subNode.children) {
+                    if (indexNode.name.equals("index") == false) continue;
+                    String indexName = indexNode.attributes.get("name");
+                    if (indexName.startsWith("SYS_IDX_SYS_") == true) {
+                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                    }
                 }
             }
 
@@ -1262,7 +1276,7 @@ public class DDLCompiler {
             if (indexesAreDups(existingIndex, index)) {
                 // replace any constraints using one index with the other
                 //for () TODO
-                // get ready for replacements from contraints created later
+                // get ready for replacements from constraints created later
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // add a warning but don't fail
