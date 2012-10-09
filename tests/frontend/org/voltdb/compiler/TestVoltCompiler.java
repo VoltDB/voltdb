@@ -1695,6 +1695,36 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), true);
     }
 
+    public void testDDLCompilerTwoSwappedOrderIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum_a on t(num,id);\n" +
+                "create index idx_t_idnum_b on t(id,num);";
+
+        final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertEquals(false, c.hasErrorsOrWarnings());
+    }
+
+    public void testDDLCompilerDropOneOfThreeIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum_a on t(num,id);\n" +
+                "create index idx_t_idnum_b on t(id,num);\n" +
+                "create index idx_t_idnum_c on t(id,num);\n";
+
+        final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertEquals(true, c.hasErrorsOrWarnings());
+        int foundCount = 0;
+        for (VoltCompiler.Feedback f : c.m_warnings) {
+            if (f.message.contains("Dropping index")) {
+                foundCount++;
+            }
+        }
+        assertEquals(1, foundCount);
+    }
+
     public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
     {
         final String s =
