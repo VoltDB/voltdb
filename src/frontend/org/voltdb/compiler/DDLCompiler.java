@@ -1115,25 +1115,23 @@ public class DDLCompiler {
             return false;
         }
 
-        // same actual columns?
-        for (ColumnRef crefOuter : idx1.getColumns()) {
-            boolean found = false;
-            for (ColumnRef crefInner : idx2.getColumns()) {
-                if (crefInner.getIndex() == crefOuter.getIndex()) {
-                    // return false if the columns don't line up
-                    if (crefInner.getColumn().getIndex() != crefOuter.getColumn().getIndex()) {
-                        return false;
-                    }
-                    found = true;
-                    break;
-                }
-            }
-            // should find all columns
-            assert(found);
+        // comute the base table order for idx1
+        int[] idx1baseTableOrder = new int[idx1.getColumns().size()];
+        for (ColumnRef cref : idx1.getColumns()) {
+            int index = cref.getIndex();
+            int baseTableIndex = cref.getColumn().getIndex();
+            idx1baseTableOrder[index] = baseTableIndex;
         }
 
-        // made it through the gauntlet
-        return true;
+        // comute the base table order for idx2
+        int[] idx2baseTableOrder = new int[idx2.getColumns().size()];
+        for (ColumnRef cref : idx2.getColumns()) {
+            int index = cref.getIndex();
+            int baseTableIndex = cref.getColumn().getIndex();
+            idx2baseTableOrder[index] = baseTableIndex;
+        }
+
+        return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
     }
 
     void addIndexToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
