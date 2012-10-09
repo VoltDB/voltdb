@@ -160,9 +160,8 @@ public class LeaderAppointer implements Promotable
             }
             else {
                 // Check for k-safety
-                if (children.size() == 0) {
-                    VoltDB.crashGlobalVoltDB("Cluster has become unviable: No remaining replicas for partition "
-                            + m_partitionId + ", shutting down.", false, null);
+                if (!isClusterKSafe()) {
+                    VoltDB.crashGlobalVoltDB("Cluster has become unviable.", false, null);
                 }
                 else if (missingHSIds.contains(m_currentLeader)) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
@@ -389,6 +388,25 @@ public class LeaderAppointer implements Promotable
         if (!currentHosts.equals(previousHosts)) {
             writeKnownLiveNodes(currentNodes);
         }
+    }
+
+    private boolean isClusterKSafe()
+    {
+        boolean retval = true;
+        for (int i = 0; i < m_partitionCount; i++) {
+            String dir = LeaderElector.electionDirForPartition(i);
+            try {
+                List<String> replicas = m_zk.getChildren(dir, null, null);
+                if (replicas.isEmpty()) {
+                    tmLog.fatal("No replicas found for partition: " + i);
+                    retval = false;
+                }
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+            }
+        }
+        return retval;
     }
 
     public void shutdown()
