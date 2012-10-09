@@ -105,8 +105,9 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
     }
 
     vector<AbstractExpression*> indexedExpressions = TableIndex::simplyIndexColumns();
-    if (catalogIndex.expressionsjson().length() != 0) {
-        ExpressionUtil::loadIndexedExprsFromJson(indexedExpressions, catalogIndex.expressionsjson());
+    const std::string expressionsAsText = catalogIndex.expressionsjson();
+    if (expressionsAsText.length() != 0) {
+        ExpressionUtil::loadIndexedExprsFromJson(indexedExpressions, expressionsAsText);
     }
 
     // Since the columns are not going to come back in the proper order from
@@ -134,6 +135,7 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
                                indexedExpressions,
                                catalogIndex.unique(),
                                true, // support counting indexes (wherever supported)
+                               expressionsAsText,
                                schema);
     return true;
 }
@@ -142,7 +144,8 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
  * Locally defined function to make a string from an index schema
  */
 static std::string
-getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique, vector<int32_t> columnIndexes) {
+getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
+                  const std::string& expressionsAsText, vector<int32_t> columnIndexes) {
     // add the uniqueness of the index
     std::string retval = isUnique ? "U" : "M";
 
@@ -176,6 +179,11 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique, vector<int
         retval += buf;
     }
 
+    // Expression indexes need to have IDs that stand out as unique from each other and from colunn indexes
+    // that may reference the exact same set of columns.
+    if (expressionsAsText.length() != 0) {
+        retval += expressionsAsText;
+    }
     return retval;
 }
 
@@ -196,9 +204,12 @@ TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
         columnIndexes[index] = catalogColumn->index();
     }
 
+    const std::string expressionsAsText = catalogIndex.expressionsjson();
+
     return getIndexIdFromMap((TableIndexType)catalogIndex.type(),
                              true, //catalogIndex.countable(), // always counting for now
                              catalogIndex.unique(),
+                             expressionsAsText,
                              columnIndexes);
 }
 
@@ -216,6 +227,7 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
     return getIndexIdFromMap(indexScheme.type,
                              true, // indexScheme.countable, // // always counting for now
                              indexScheme.unique,
+                             indexScheme.expressionsAsText,
                              columnIndexes);
 }
 
