@@ -37,6 +37,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.voltcore.messaging.HostMessenger;
+
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
@@ -54,6 +56,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     private ClusterConfig m_config = null;
     private List<Integer> m_hostIds;
     private MpInitiator m_mpi = null;
+    private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
     private LeaderCache m_cache = null;
     private AtomicBoolean m_newAppointee = new AtomicBoolean(false);
@@ -86,7 +89,9 @@ public class TestLeaderAppointer extends ZKTestBase {
 
     void configure(int hostCount, int sitesPerHost, int replicationFactor) throws JSONException, Exception
     {
+        m_hm = mock(HostMessenger.class);
         m_zk = getClient(0);
+        when(m_hm.getZK()).thenReturn(m_zk);
         VoltZK.createPersistentZKNodes(m_zk);
 
         m_config = new ClusterConfig(hostCount, sitesPerHost, replicationFactor);
@@ -103,7 +108,7 @@ public class TestLeaderAppointer extends ZKTestBase {
 
     void createAppointer() throws JSONException
     {
-        m_dut = new LeaderAppointer(m_zk, m_config.getPartitionCount(),
+        m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                 m_config.getReplicationFactor(), m_config.getTopology(m_hostIds), m_mpi);
     }
 

@@ -616,7 +616,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (isIV2Enabled()) {
                 try {
                     m_leaderAppointer = new LeaderAppointer(
-                            m_messenger.getZK(),
+                            m_messenger,
                             clusterConfig.getPartitionCount(),
                             m_deployment.getCluster().getKfactor(),
                             topo, m_MPI);

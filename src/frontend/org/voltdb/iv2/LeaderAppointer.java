@@ -37,8 +37,11 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 
 import org.voltcore.logging.VoltLogger;
+
+import org.voltcore.messaging.HostMessenger;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -70,6 +73,7 @@ public class LeaderAppointer implements Promotable
         DONE            // indicates normal running conditions, including repair
     }
 
+    private final HostMessenger m_hostMessenger;
     private final ZooKeeper m_zk;
     private final int m_partitionCount;
     private final BabySitter[] m_partitionWatchers;
@@ -163,6 +167,7 @@ public class LeaderAppointer implements Promotable
                 else if (missingHSIds.contains(m_currentLeader)) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
                 }
+                doPartitionDetectionActivities();
             }
             m_replicas.clear();
             m_replicas.addAll(updatedHSIds);
@@ -189,10 +194,11 @@ public class LeaderAppointer implements Promotable
         }
     };
 
-    public LeaderAppointer(ZooKeeper zk, int numberOfPartitions,
+    public LeaderAppointer(HostMessenger hm, int numberOfPartitions,
             int kfactor, JSONObject topology, MpInitiator mpi)
     {
-        m_zk = zk;
+        m_hostMessenger = hm;
+        m_zk = hm.getZK();
         m_kfactor = kfactor;
         m_topo = topology;
         m_MPI = mpi;
@@ -232,6 +238,7 @@ public class LeaderAppointer implements Promotable
             // LeaderCache callback will count it down once it has seen all the
             // appointed leaders publish themselves as the actual leaders.
             m_startupLatch = new CountDownLatch(1);
+            writeKnownLiveNodes(m_hostMessenger.getLiveHostIds());
             for (int i = 0; i < m_partitionCount; i++) {
                 String dir = LeaderElector.electionDirForPartition(i);
                 // Race along with all of the replicas for this partition to create the ZK parent node
@@ -318,6 +325,70 @@ public class LeaderAppointer implements Promotable
             VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
         }
         return masterHSId;
+    }
+
+    private void writeKnownLiveNodes(List<Integer> liveNodes)
+    {
+        try {
+            if (m_zk.exists(VoltZK.lastKnownLiveNodes, null) == null)
+            {
+                // VoltZK.createPersistentZKNodes should have done this
+                m_zk.create(VoltZK.lastKnownLiveNodes, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
+            JSONStringer stringer = new JSONStringer();
+            stringer.object();
+            stringer.key("liveNodes").array();
+            for (Integer node : liveNodes) {
+                stringer.value(node);
+            }
+            stringer.endArray();
+            stringer.endObject();
+            JSONObject obj = new JSONObject(stringer.toString());
+            tmLog.debug("Writing live nodes to ZK: " + obj.toString(4));
+            m_zk.setData(VoltZK.lastKnownLiveNodes, obj.toString(4).getBytes("UTF-8"), -1);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to update known live nodes at ZK path: " +
+                    VoltZK.lastKnownLiveNodes, true, e);
+        }
+    }
+
+    private Set<Integer> readPriorKnownLiveNodes()
+    {
+        Set<Integer> nodes = new HashSet<Integer>();
+        try {
+            byte[] data = m_zk.getData(VoltZK.lastKnownLiveNodes, false, null);
+            String jsonString = new String(data, "UTF-8");
+            tmLog.debug("Read prior known live nodes: " + jsonString);
+            JSONObject jsObj = new JSONObject(jsonString);
+            JSONArray jsonNodes = jsObj.getJSONArray("liveNodes");
+            for (int ii = 0; ii < jsonNodes.length(); ii++) {
+                nodes.add(jsonNodes.getInt(ii));
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to read prior known live nodes at ZK path: " +
+                    VoltZK.lastKnownLiveNodes, true, e);
+        }
+        return nodes;
+    }
+
+    private void doPartitionDetectionActivities()
+    {
+        // After everything is resolved, write the new surviving set to ZK
+        List<Integer> currentNodes = null;
+        try {
+            currentNodes = m_hostMessenger.getLiveHostIds();
+        } catch (Exception e) {
+
+        }
+        Set<Integer> currentHosts = new HashSet<Integer>(currentNodes);
+        Set<Integer> previousHosts = readPriorKnownLiveNodes();
+
+        // Real partition detection stuff would go here
+
+        // If the cluster host set has changed, then write the new set to ZK
+        if (!currentHosts.equals(previousHosts)) {
+            writeKnownLiveNodes(currentNodes);
+        }
     }
 
     public void shutdown()
