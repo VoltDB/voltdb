@@ -1133,7 +1133,7 @@ public class DDLCompiler {
         // permutations of the same list of columns/expressions could be considered dupes. This code skips that edge
         // case optimization in favor of using a simpler more exact permutation-sensitive algorithm for all indexes.
 
-        if ( ! (idx1.getExpressionsjson().equals(idx2.getExpressionsjson()) {
+        if ( ! (idx1.getExpressionsjson().equals(idx2.getExpressionsjson()))) {
             return false;
         }
 
