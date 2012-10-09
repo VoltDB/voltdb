@@ -221,6 +221,8 @@ public class CatalogDiffEngine {
             return true;
         if (suspect instanceof Cluster && field.equals("securityEnabled"))
             return true;
+        if (suspect instanceof Constraint && field.equals("index"))
+            return true;
 
         // Support modification of these entire sub-trees
         do {
