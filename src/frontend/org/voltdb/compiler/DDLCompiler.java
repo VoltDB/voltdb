@@ -1115,7 +1115,19 @@ public class DDLCompiler {
             return false;
         }
 
-        // comute the base table order for idx1
+        //TODO: For index types like HASH that support only random access vs. scanned ranges, indexes on different
+        // permutations of the same list of columns/expressions could be considered dupes. This code skips that edge
+        // case optimization in favor of using a simpler more exact permutation-sensitive algorithm for all indexes.
+
+        if ( ! (idx1.getExpressionsjson().equals(idx2.getExpressionsjson()) {
+            return false;
+        }
+
+        // Simple column indexes have identical empty expression strings so need to be distinguished other ways.
+        // More complex expression indexes that have the same expression strings always have the same set of (base)
+        // columns referenced in the same order, but we fall through and check them, anyway.
+        
+        // sort in index order the columns of idx1, each identified by its index in the base table
         int[] idx1baseTableOrder = new int[idx1.getColumns().size()];
         for (ColumnRef cref : idx1.getColumns()) {
             int index = cref.getIndex();
@@ -1123,7 +1135,7 @@ public class DDLCompiler {
             idx1baseTableOrder[index] = baseTableIndex;
         }
 
-        // comute the base table order for idx2
+        // sort in index order the columns of idx2, each identified by its index in the base table
         int[] idx2baseTableOrder = new int[idx2.getColumns().size()];
         for (ColumnRef cref : idx2.getColumns()) {
             int index = cref.getIndex();
@@ -1131,6 +1143,7 @@ public class DDLCompiler {
             idx2baseTableOrder[index] = baseTableIndex;
         }
 
+        // Duplicate indexes have identical columns in identical order.
         return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
     }
 
