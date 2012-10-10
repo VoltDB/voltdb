@@ -1179,6 +1179,7 @@ public class DDLCompiler {
                     exprs[j] = AbstractParsedStmt.parseExpressionTree(null, exprNode);
                     exprs[j].resolveForTable(table);
                     exprs[j].finalizeValueTypes();
+                    ++j;
                 }
             }
         }
