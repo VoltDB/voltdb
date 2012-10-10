@@ -190,7 +190,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
 
         while (!expected_order.isEmpty())
         {
-            TransactionTask next_poll = (TransactionTask)task_queue.poll();
+            TransactionTask next_poll = (TransactionTask)task_queue.take();
             TransactionTask expected = expected_order.removeFirst();
             assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
             assertEquals(expected.getTxnId(), next_poll.getTxnId());
@@ -244,7 +244,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
 
         while (!expected_order.isEmpty() || !task_queue.isEmpty())
         {
-            TransactionTask next_poll = (TransactionTask)task_queue.poll();
+            TransactionTask next_poll = (TransactionTask)task_queue.take();
             TransactionTask expected = expected_order.removeFirst();
             assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
             assertEquals(expected.getTxnId(), next_poll.getTxnId());
@@ -326,7 +326,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
 
         while (!expected_order.isEmpty())
         {
-            TransactionTask next_poll = (TransactionTask)task_queue.poll();
+            TransactionTask next_poll = (TransactionTask)task_queue.take();
             TransactionTask expected = expected_order.removeFirst();
             assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
             assertEquals(expected.getTxnId(), next_poll.getTxnId());

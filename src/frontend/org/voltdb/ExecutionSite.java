@@ -57,6 +57,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -2917,7 +2918,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     @Override
-    public void setRejoinComplete() {
+    public void setRejoinComplete(org.voltdb.iv2.RejoinProducer.ReplayCompletionAction ignored) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 

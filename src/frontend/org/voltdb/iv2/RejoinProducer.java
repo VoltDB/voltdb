@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.json_voltpatches.JSONException;
@@ -27,8 +28,12 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
+
+import org.voltdb.iv2.RejoinProducer;
+import org.voltdb.iv2.RejoinProducer;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
@@ -52,9 +57,11 @@ public class RejoinProducer extends SiteTasker
 
     private final SiteTaskerQueue m_taskQueue;
     private final int m_partitionId;
+    private final String m_snapshotNonce;
     private InitiatorMailbox m_mailbox;
     private long m_rejoinCoordinatorHsId;
     private RejoinSiteProcessor m_rejoinSiteProcessor;
+    private ReplayCompletionAction m_replayCompleteAction;
 
     // True: use live rejoin; false use community blocking implementation.
     private final boolean m_liveRejoin = true;
@@ -63,12 +70,210 @@ public class RejoinProducer extends SiteTasker
         return m_liveRejoin;
     }
 
-    /*
-     * The handler will be called when a SnapshotUtil.requestSnapshot response comes
-     * back. It could potentially take a long time to successfully queue the
-     * snapshot request, or it may fail.
+    // Some notes for rtb's bad memory...
+    //
+    // Calculate the snapshot nonce first.
+    //
+    // Then register the completion interest.
+    //
+    // When the completion interest callback fires for the nonce,
+    // tell the replay agent the snapshot is complete. And
+    // unregister the interest. The only purpose of SnapshotCompletionAction
+    // is to tell the replay agent the snapshot ended.
+    //
+    // When the snapshot *request* finishes (not the
+    // snapshot itself), it will call the SnapshotResponseHandler
+    // callback. This handler must capture the snapshot's txnId
+    // so that post-rejoin replay knows where to start. This txnId
+    // is stored in a ReplayCompletionAction, which also bundles
+    // the Replay complete logic; When the snapshot transfer is
+    // complete, the RejoinProducer will hand the ReplayCompletionAction
+    // to the Site which must take its own action to conclude rejoin.
+    //
+    // The rest of RejoinProducer is driven by the snapshot sink..
+    //
+    // When the first data sink block arrives, offer the
+    // producer to the SiteTaskerQueue.
+    //
+    // Blocking rejoin will block block the tasker queue until
+    // all snapshot data is transferred.
+    //
+    // Non-blocking rejoin will release the queue and reschedule
+    // the producer with the site to incrementally transfer
+    // snapshot data.
+    //
+    // In both cases, the site is responding with REJOINING to
+    // all incoming tasks.
+    //
+    // The RejoinProducer's work is done when the snapshot is
+    // fully transfered. Responsibility to wrap up the
+    // rejoin process is passed to the site (via ReplayCompletionAction)
+    //
+    // The site then concludes rejoin (in both community and
+    // live rejoin cases).
+
+    /**
+     * SnapshotCompletionAction waits for the completion
+     * notice of m_snapshotNonce and instructs the replay agent
+     * that the snapshot completed.
      *
-     * This runs on the snapshot daemon thread.
+     * Inner class references m_mailbox, m_nonce, m_rejoinCoordinatorHsId.
+     */
+    private class SnapshotCompletionAction implements SnapshotCompletionInterest
+    {
+        private void register()
+        {
+            VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
+        }
+
+        private void deregister()
+        {
+            VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
+        }
+
+        @Override
+        public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
+                long[] partitionTxnIds, boolean truncationSnapshot)
+        {
+            if (nonce.equals(m_snapshotNonce)) {
+                RejoinMessage snap_complete =
+                    new RejoinMessage(m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+                m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
+                deregister();
+            }
+            return null;
+        }
+    }
+
+    /**
+     * ReplayCompletionAction communicates the snapshot txn id to
+     * the site and offers a run() method that closes the open
+     * rejoin state with the rejoin coordinator once the site has
+     * concluded rejoin.
+     */
+    public static class ReplayCompletionAction implements Runnable
+    {
+        private final long m_snapshotTxnId;
+        private final Runnable m_action;
+
+        ReplayCompletionAction(long snapshotTxnId, Runnable action)
+        {
+            m_snapshotTxnId = snapshotTxnId;
+            m_action = action;
+        }
+
+        long getSnapshotTxnId()
+        {
+            return m_snapshotTxnId;
+        }
+
+        @Override
+        public void run()
+        {
+            m_action.run();
+            SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
+        }
+    }
+
+    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
+    {
+        m_partitionId = partitionId;
+        m_taskQueue = taskQueue;
+        m_snapshotNonce = "Rejoin_" + m_partitionId + "_" + System.currentTimeMillis();
+    }
+
+    public void setMailbox(InitiatorMailbox mailbox)
+    {
+        m_mailbox = mailbox;
+    }
+
+    public void deliver(RejoinMessage message)
+    {
+        if (message.getType() == RejoinMessage.Type.INITIATION) {
+            doInitiation(message);
+        }
+        else if (message.getType() == RejoinMessage.Type.REQUEST_RESPONSE) {
+            doRequestResponse(message);
+        }
+        else {
+            VoltDB.crashLocalVoltDB("Unknown rejoin message type: " +
+                    message.getType(), false, null);
+        }
+    }
+
+    final AtomicReference<Pair<Integer, ByteBuffer>> firstWork =
+        new AtomicReference<Pair<Integer, ByteBuffer>>();
+
+    /**
+     * Runs when the RejoinCoordinator decides this site should star5t
+     * rejoin.
+     */
+    void doInitiation(RejoinMessage message)
+    {
+        m_rejoinCoordinatorHsId = message.m_sourceHSId;
+        m_rejoinSiteProcessor = new StreamSnapshotSink();
+
+        // MUST choose the leader as the source.
+        long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
+        long hsId = m_rejoinSiteProcessor.initialize();
+
+        // Initiate a snapshot with stream snapshot target
+        String data = makeSnapshotRequest(hsId, sourceSite);
+        SnapshotCompletionAction interest = new SnapshotCompletionAction();
+        interest.register();
+
+        SnapshotUtil.requestSnapshot(0l, "", m_snapshotNonce,
+                !useLiveRejoin(), // community rejoin uses blocking snapshot (true)
+                SnapshotFormat.STREAM, data, m_handler, true);
+
+        // A little awkward here...
+        // The site must stay unblocked until the first snapshot data block arrrives.
+        // Do a messy blocking poll on the first unit of work (by spinning!).
+        // Save that first unit in "m_firstWork" and then enter the taskQueue.
+        // Future: need a blocking peek on rejoinSiteProcessor(); then firstWork
+        // can go away and the weird special casing of the first block in
+        // run() can also go away.
+        Thread firstSnapshotBlock = new Thread() {
+            @Override
+            public void run()
+            {
+                Pair<Integer, ByteBuffer> rejoinWork = null;
+                try {
+                    rejoinWork = m_rejoinSiteProcessor.take();
+                } catch (InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Interrupted in take()ing first snapshot block for rejoin",
+                                            true, e);
+                }
+                firstWork.set(rejoinWork);
+                m_taskQueue.offer(RejoinProducer.this);
+            }
+        };
+        firstSnapshotBlock.start();
+    }
+
+    private String makeSnapshotRequest(long hsId, long sourceSite)
+    {
+        try {
+            // make this snapshot only contain data from this site
+            m_recoveryLog.debug(
+                    "Rejoin source for site " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                    " is " + CoreUtils.hsIdToString(sourceSite));
+            JSONStringer jsStringer = new JSONStringer();
+            jsStringer.object();
+            jsStringer.key("hsId").value(hsId);
+            jsStringer.key("target_hsid").value(sourceSite);
+            jsStringer.endObject();
+            return jsStringer.toString();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
+        }
+        // unreachable;
+        return null;
+    }
+
+    /*
+     * m_handler is called when a SnapshotUtil.requestSnapshot response occurs.
+     * This callback runs on the snapshot daemon thread.
      */
     SnapshotResponseHandler m_handler = new SnapshotResponseHandler() {
         @Override
@@ -99,7 +304,7 @@ public class RejoinProducer extends SiteTasker
                     return;
                 }
 
-                // Send a message to self to avoid synchronization
+                // Send a RequestResponse message to self to avoid synchronization
                 RejoinMessage msg = new RejoinMessage(txnId);
                 m_mailbox.send(m_mailbox.getHSId(), msg);
             } else {
@@ -109,113 +314,21 @@ public class RejoinProducer extends SiteTasker
         }
     };
 
-    // m_handler sends this message when a non-blocking snapshot is
-    // completed.
+    // m_handler sends this message to communicate the snapshot txnid after
+    // the snapshot has been initiated. Setup the ReplayCompleteAction
+    // that the Site will need.
     void doRequestResponse(RejoinMessage message)
     {
-        /*
-            m_rejoinSnapshotTxnId = rm.getSnapshotTxnId();
-            if (m_rejoinTaskLog != null) {
-                m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
-            }
-            VoltDB.instance().getSnapshotCompletionMonitor()
-                  .addInterest(m_snapshotCompletionHandler);
-        */
-        RejoinMessage snap_complete = new RejoinMessage(m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
-        RejoinMessage replay_complete = new RejoinMessage(m_mailbox.getHSId(), Type.REPLAY_FINISHED);
-        m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
-        m_mailbox.send(m_rejoinCoordinatorHsId, replay_complete);
-    }
-
-    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
-    {
-        m_partitionId = partitionId;
-        m_taskQueue = taskQueue;
-    }
-
-    public void setMailbox(InitiatorMailbox mailbox)
-    {
-        m_mailbox = mailbox;
-    }
-
-    public void deliver(RejoinMessage message)
-    {
-        if (message.getType() == RejoinMessage.Type.INITIATION) {
-            doInitiation(message);
-        }
-        else if (message.getType() == RejoinMessage.Type.REQUEST_RESPONSE) {
-            doRequestResponse(message);
-        }
-        else {
-            VoltDB.crashLocalVoltDB("Unknown rejoin message type: " +
-                    message.getType(), false, null);
-        }
-    }
-
-    final AtomicReference<Pair<Integer, ByteBuffer>> firstWork =
-        new AtomicReference<Pair<Integer, ByteBuffer>>();
-
-    void doInitiation(RejoinMessage message)
-    {
-        m_rejoinCoordinatorHsId = message.m_sourceHSId;
-        m_rejoinSiteProcessor = new StreamSnapshotSink();
-
-        // MUST choose the leader as the source.
-        long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
-        long hsId = m_rejoinSiteProcessor.initialize();
-
-        // Initiate a snapshot with stream snapshot target
-        String data = makeSnapshotRequest(hsId, sourceSite);
-        String nonce = "Rejoin_" + m_mailbox.getHSId() + "_" + System.currentTimeMillis();
-
-        SnapshotUtil.requestSnapshot(0l, "", nonce,
-                !useLiveRejoin(), // community rejoin uses blocking snapshot (true)
-                SnapshotFormat.STREAM, data, m_handler, true);
-
-        // A little awkward here...
-        // The site must stay unblocked until the first snapshot data block arrrives.
-        // Do a messy blocking poll on the first unit of work (by spinning!).
-        // Save that first unit in "m_firstWork" and then enter the taskQueue.
-        // Future: need a blocking peek on rejoinSiteProcessor(); then firstWork
-        // can go away and the weird special casing of the first block in
-        // run() can also go away.
-        Thread firstSnapshotBlock = new Thread() {
-            @Override
-            public void run()
-            {
-                Pair<Integer, ByteBuffer> rejoinWork = null;
-                try {
-                    rejoinWork = m_rejoinSiteProcessor.take();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Interrupted in take()ing first snapshot block for rejoin",
-                                            true, e);
-                }
-                firstWork.set(rejoinWork);
-                // run the rejoin task (ourself) in the Site
-                m_taskQueue.offer(RejoinProducer.this);
+        Runnable action = new Runnable() {
+            public void run() {
+                RejoinMessage replay_complete =
+                    new RejoinMessage(m_mailbox.getHSId(), Type.REPLAY_FINISHED);
+                m_mailbox.send(m_rejoinCoordinatorHsId, replay_complete);
             }
         };
-        firstSnapshotBlock.start();
-    }
 
-    private String makeSnapshotRequest(long hsId, long sourceSite)
-    {
-        try {
-            // make this snapshot only contain data from this site
-            m_recoveryLog.debug(
-                    "Rejoin source for site " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                    " is " + CoreUtils.hsIdToString(sourceSite));
-            JSONStringer jsStringer = new JSONStringer();
-            jsStringer.object();
-            jsStringer.key("hsId").value(hsId);
-            jsStringer.key("target_hsid").value(sourceSite);
-            jsStringer.endObject();
-            return jsStringer.toString();
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
-        }
-        // unreachable;
-        return null;
+        m_replayCompleteAction =
+            new ReplayCompletionAction(message.getSnapshotTxnId(), action);
     }
 
     /**
@@ -235,36 +348,14 @@ public class RejoinProducer extends SiteTasker
                 "Unexpected execution of run method in rejoin producer.");
     }
 
-    /**
-     * An implementation of run() that blocks the site thread
-     * until the streaming snapshot queue is emptied.
-     */
-    void runForCommunityRejoin(SiteProcedureConnection siteConnection)
-    {
-        Pair<Integer, ByteBuffer> rejoinWork = firstWork.get();
-        firstWork.set(null);
-        while (rejoinWork != null) {
-            restoreBlock(rejoinWork, siteConnection);
-            try {
-                rejoinWork = m_rejoinSiteProcessor.take();
-            } catch (InterruptedException e) {
-                hostLog.warn("RejoinProducer interrupted at take()");
-                rejoinWork = null;
-            }
+    @Override
+    public void runForRejoin(SiteProcedureConnection siteConnection) {
+        if (useLiveRejoin()) {
+            runForLiveRejoin(siteConnection);
         }
-        m_recoveryLog.debug("Rejoin snapshot transfer is finished");
-        m_rejoinSiteProcessor.close();
-
-        // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
-        // m_rejoinSiteProcessor = null;
-
-        /*
-         * Don't notify the rejoin coordinator yet. The stream snapshot may
-         * have not finished on all nodes, let the snapshot completion
-         * monitor tell the rejoin coordinator.
-         */
-        siteConnection.setRejoinComplete();
-        SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
+        else {
+            runForCommunityRejoin(siteConnection);
+        }
     }
 
     /**
@@ -301,8 +392,38 @@ public class RejoinProducer extends SiteTasker
             // have not finished on all nodes, let the snapshot completion
             // monitor tell the rejoin coordinator.
             siteConnection.setRejoinComplete();
-            SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
         }
+    }
+
+    /**
+     * An implementation of run() that blocks the site thread
+     * until the streaming snapshot queue is emptied.
+     */
+    void runForCommunityRejoin(SiteProcedureConnection siteConnection)
+    {
+        Pair<Integer, ByteBuffer> rejoinWork = firstWork.get();
+        firstWork.set(null);
+        while (rejoinWork != null) {
+            restoreBlock(rejoinWork, siteConnection);
+            try {
+                rejoinWork = m_rejoinSiteProcessor.take();
+            } catch (InterruptedException e) {
+                hostLog.warn("RejoinProducer interrupted at take()");
+                rejoinWork = null;
+            }
+        }
+        m_recoveryLog.debug("Rejoin snapshot transfer is finished");
+        m_rejoinSiteProcessor.close();
+
+        // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
+        // m_rejoinSiteProcessor = null;
+
+        /*
+         * Don't notify the rejoin coordinator yet. The stream snapshot may
+         * have not finished on all nodes, let the snapshot completion
+         * monitor tell the rejoin coordinator.
+         */
+        siteConnection.setRejoinComplete();
     }
 
     void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork, SiteProcedureConnection siteConnection)
@@ -319,13 +440,5 @@ public class RejoinProducer extends SiteTasker
     }
 
 
-    @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection) {
-        if (useLiveRejoin()) {
-            runForLiveRejoin(siteConnection);
-        }
-        else {
-            runForCommunityRejoin(siteConnection);
-        }
-    }
+
 }

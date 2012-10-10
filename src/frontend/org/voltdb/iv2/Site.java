@@ -97,6 +97,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private final static int kStateReplayingRejoin = 2;
     int m_rejoinState;
     TaskLog m_rejoinTaskLog;
+    RejoinProducer.ReplayCompletionAction m_replayCompletionAction;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -428,7 +429,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         try {
             while (m_shouldContinue) {
-                runLoop();
+                if (m_rejoinState == kStateRunning) {
+                    // Normal operation blocks the site thread on the sitetasker queue.
+                    SiteTasker task = m_scheduler.take();
+                    if (task instanceof TransactionTask) {
+                        m_currentTxnId = ((TransactionTask)task).getTxnId();
+                        m_lastTxnTime = EstTime.currentTimeMillis();
+                    }
+                    task.run(getSiteProcedureConnection());
+                }
+                else {
+                    rejoinRunLoop();
+                }
             }
         }
         catch (final InterruptedException e) {
@@ -452,25 +464,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         shutdown();
     }
 
-    void runLoop() throws InterruptedException, IOException
+    void rejoinRunLoop() throws InterruptedException, IOException
     {
-        SiteTasker task = m_scheduler.poll();
-
-        // Normal runtime operation...
-        if (m_rejoinState == kStateRunning) {
-            if (task != null) {
-                if (task instanceof TransactionTask) {
-                    m_currentTxnId = ((TransactionTask)task).getTxnId();
-                    m_lastTxnTime = EstTime.currentTimeMillis();
-                }
-                task.run(getSiteProcedureConnection());
-            }
-            return;
-        }
-
         // During live rejoin, the site takes responsibility for
         // the deferred transaction info base message.
         // (Cleaner to pass m_rejoinTaskLog to runForRejoin()?)
+        SiteTasker task = m_scheduler.poll();
         if (task != null) {
             if (task instanceof TransactionTask) {
                 TransactionInfoBaseMessage tibm = ((TransactionTask)task).m_txn.getNotice();
@@ -482,34 +481,32 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // During the rejoin-catchup period, run some transactions
         // from the task back log.
         if (m_rejoinState == kStateReplayingRejoin) {
-            replayFromTaskLog();
+            if (m_rejoinTaskLog == null || m_rejoinTaskLog.isEmpty()) {
+                setReplayRejoinComplete();
+            }
+            else {
+                replayFromTaskLog();
+            }
         }
     }
 
     void replayFromTaskLog() throws IOException
     {
-        if (m_rejoinTaskLog == null) {
-            setReplayRejoinComplete();
-            return;
-        }
         for (int i=0; i < 10 /* REJOIN::REAL RATIO */; ++i) {
             if (m_rejoinTaskLog.isEmpty()) {
-                setReplayRejoinComplete();
                 return;
             }
             TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
             if (tibm == null) {
-                // asynchronous fetch - queue unavailable, not empty.
-                break;
+                // asynchronous fetch - queue temporarily unavailable
+                return;
             }
-            else {
-                if (tibm instanceof Iv2InitiateTaskMessage) {
-                    Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
-                    SpProcedureTask t = new SpProcedureTask(
-                            m_initiatorMailbox, m.getStoredProcedureName(),
-                            null, m);
-                    t.runFromTaskLog(this);
-                }
+            if (tibm instanceof Iv2InitiateTaskMessage) {
+                Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
+                SpProcedureTask t = new SpProcedureTask(
+                        m_initiatorMailbox, m.getStoredProcedureName(),
+                        null, m);
+                t.runFromTaskLog(this);
             }
         }
     }
@@ -719,18 +716,24 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setRejoinComplete() {
+    public void setRejoinComplete(RejoinProducer.ReplayCompletionAction replayComplete) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
         // live rejoin, will transfer to kStateRunning as usual
         // as the rejoin task log will be empty.
         assert(m_rejoinState == kStateRejoining);
         m_rejoinState = kStateReplayingRejoin;
+        m_replayCompletionAction = replayComplete;
+        if (m_rejoinTaskLog != null) {
+            m_rejoinTaskLog.setEarliestTxnId(
+                    m_replayCompletionAction.getSnapshotTxnId());
+        }
     }
 
     private void setReplayRejoinComplete() {
         // transition out of rejoin replay to normal running state.
         assert(m_rejoinState == kStateReplayingRejoin);
+        m_replayCompletionAction.run();
         m_rejoinState = kStateRunning;
     }
 
