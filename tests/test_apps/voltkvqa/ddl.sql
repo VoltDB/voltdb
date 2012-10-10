@@ -12,3 +12,4 @@ CREATE TABLE store_export (
 , txnid bigint not null
 , random float not null
 );
+export table store_export;
