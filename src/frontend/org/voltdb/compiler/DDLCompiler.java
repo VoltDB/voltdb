@@ -977,9 +977,23 @@ public class DDLCompiler {
             }
 
             if (subNode.name.equals("indexes")) {
+                // do non-system indexes first so they get priority when the compiler
+                // starts throwing out duplicate indexes
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index"))
+                    if (indexNode.name.equals("index") == false) continue;
+                    String indexName = indexNode.attributes.get("name");
+                    if (indexName.startsWith("SYS_IDX_SYS_") == false) {
                         addIndexToCatalog(table, indexNode, indexReplacementMap);
+                    }
+                }
+
+                // now do system indexes
+                for (VoltXMLElement indexNode : subNode.children) {
+                    if (indexNode.name.equals("index") == false) continue;
+                    String indexName = indexNode.attributes.get("name");
+                    if (indexName.startsWith("SYS_IDX_SYS_") == true) {
+                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                    }
                 }
             }
 
@@ -1115,25 +1129,23 @@ public class DDLCompiler {
             return false;
         }
 
-        // same actual columns?
-        for (ColumnRef crefOuter : idx1.getColumns()) {
-            boolean found = false;
-            for (ColumnRef crefInner : idx2.getColumns()) {
-                if (crefInner.getIndex() == crefOuter.getIndex()) {
-                    // return false if the columns don't line up
-                    if (crefInner.getColumn().getIndex() != crefOuter.getColumn().getIndex()) {
-                        return false;
-                    }
-                    found = true;
-                    break;
-                }
-            }
-            // should find all columns
-            assert(found);
+        // comute the base table order for idx1
+        int[] idx1baseTableOrder = new int[idx1.getColumns().size()];
+        for (ColumnRef cref : idx1.getColumns()) {
+            int index = cref.getIndex();
+            int baseTableIndex = cref.getColumn().getIndex();
+            idx1baseTableOrder[index] = baseTableIndex;
         }
 
-        // made it through the gauntlet
-        return true;
+        // comute the base table order for idx2
+        int[] idx2baseTableOrder = new int[idx2.getColumns().size()];
+        for (ColumnRef cref : idx2.getColumns()) {
+            int index = cref.getIndex();
+            int baseTableIndex = cref.getColumn().getIndex();
+            idx2baseTableOrder[index] = baseTableIndex;
+        }
+
+        return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
     }
 
     void addIndexToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
@@ -1264,7 +1276,7 @@ public class DDLCompiler {
             if (indexesAreDups(existingIndex, index)) {
                 // replace any constraints using one index with the other
                 //for () TODO
-                // get ready for replacements from contraints created later
+                // get ready for replacements from constraints created later
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
                 // add a warning but don't fail
