@@ -19,6 +19,7 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -26,16 +27,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
-
 import org.voltdb.CatalogContext;
-
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.VoltFile;
+
+import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -282,12 +285,18 @@ public class ExportGeneration {
     }
 
     public void closeAndDelete() throws IOException {
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (HashMap<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : map.values()) {
-                source.closeAndDelete();
+                tasks.add(source.closeAndDelete());
             }
         }
         VoltFile.recursivelyDelete(m_directory);
+        try {
+            Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            Throwables.propagateIfPossible(e, IOException.class);
+        }
     }
 
     public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
@@ -296,6 +305,8 @@ public class ExportGeneration {
         for (long tid : perPartitionTxnIds) {
             partitionToTxnId.put(TxnEgo.getPartitionId(tid), tid);
         }
+
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
 
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
@@ -309,21 +320,33 @@ public class ExportGeneration {
                                 source.getPartitionId());
                     }
                     else {
-                        source.truncateExportToTxnId(truncationPoint);
+                        tasks.add(source.truncateExportToTxnId(truncationPoint));
                     }
                 }
                 else {
-                    source.truncateExportToTxnId(txnId);
+                    tasks.add(source.truncateExportToTxnId(txnId));
                 }
             }
+        }
+        try {
+            Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data", false, e);
         }
     }
 
     public void close() {
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (HashMap<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : sources.values()) {
-                source.close();
+                tasks.add(source.close());
             }
+        }
+        try {
+            Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            //Logging of errors  is done inside the tasks so nothing to do here
+            //intentionally not failing if there is an issue with close
         }
     }
 }

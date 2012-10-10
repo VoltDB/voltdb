@@ -42,6 +42,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import jsr166y.LinkedTransferQueue;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -54,7 +56,8 @@ public class CoreUtils {
      */
     public static ListeningExecutorService getBoundedSingleThreadExecutor(String name, int capacity) {
         LinkedBlockingQueue<Runnable> lbq = new LinkedBlockingQueue<Runnable>(capacity);
-        ThreadPoolExecutor tpe = new ThreadPoolExecutor(1, 1, Long.MAX_VALUE, TimeUnit.DAYS, lbq, CoreUtils.getThreadFactory(name));
+        ThreadPoolExecutor tpe =
+                new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, lbq, CoreUtils.getThreadFactory(name));
         return MoreExecutors.listeningDecorator(tpe);
     }
 
@@ -69,8 +72,31 @@ public class CoreUtils {
         return ses;
     }
 
+    public static ListeningExecutorService getListeningExecutorService(final String name, final int threads) {
+        if (threads < 1) {
+            throw new IllegalArgumentException("Must specify > 0 threads");
+        }
+        if (name == null) {
+            throw new IllegalArgumentException("Name cannot be null");
+        }
+        return MoreExecutors.listeningDecorator(
+                new ThreadPoolExecutor(threads, threads,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedTransferQueue<Runnable>(),
+                        new ThreadFactory() {
+                            private int threadIndex = 0;
+                            @Override
+                            public synchronized Thread  newThread(Runnable r) {
+                                String nameToUse = threads == 1 ? name : name + " - " + threadIndex++;
+                                Thread t = new Thread(null, r, nameToUse, 131072);
+                                t.setDaemon(true);
+                                return t;
+                            }
+                        }));
+    }
+
     public static ThreadFactory getThreadFactory(String name) {
-        return getThreadFactory(name, 1024 * 1024);
+        return getThreadFactory(name, 131072);
     }
 
     public static ThreadFactory getThreadFactory(final String name, final int stackSize) {

@@ -24,15 +24,15 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.InputHandler;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
@@ -213,7 +213,7 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
         m_loaderClass = conn.getLoaderclass();
-
+        //m_loaderClass = "org.voltdb.export.processors.GuestProcessor";
         try {
             exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = null;
@@ -292,6 +292,8 @@ public class ExportManager
         }
 
         m_loaderClass = conn.getLoaderclass();
+        //m_loaderClass = "org.voltdb.export.processors.GuestProcessor";
+
 
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 
@@ -350,6 +352,7 @@ public class ExportManager
         for (ExportGeneration generation : m_generations.get().values()) {
             generation.close();
         }
+        m_generations.set(new TreeMap<Long, ExportGeneration>());
         m_loaderClass = null;
     }
 
