@@ -291,12 +291,13 @@ public class ExportGeneration {
                 tasks.add(source.closeAndDelete());
             }
         }
-        VoltFile.recursivelyDelete(m_directory);
         try {
             Futures.allAsList(tasks).get();
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
         }
+        VoltFile.recursivelyDelete(m_directory);
+
     }
 
     public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
@@ -331,7 +332,9 @@ public class ExportGeneration {
         try {
             Futures.allAsList(tasks).get();
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data", false, e);
+            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
+                                    "You can back up export overflow data and start the " +
+                                    "DB without it to get past this error", false, e);
         }
     }
 
@@ -347,6 +350,7 @@ public class ExportGeneration {
         } catch (Exception e) {
             //Logging of errors  is done inside the tasks so nothing to do here
             //intentionally not failing if there is an issue with close
+            exportLog.error("Error closing export data sources", e);
         }
     }
 }

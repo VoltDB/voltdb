@@ -213,7 +213,7 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
         m_loaderClass = conn.getLoaderclass();
-        //m_loaderClass = "org.voltdb.export.processors.GuestProcessor";
+
         try {
             exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = null;
@@ -292,8 +292,6 @@ public class ExportManager
         }
 
         m_loaderClass = conn.getLoaderclass();
-        //m_loaderClass = "org.voltdb.export.processors.GuestProcessor";
-
 
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 
