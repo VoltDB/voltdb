@@ -1140,7 +1140,7 @@ public class DDLCompiler {
         // Simple column indexes have identical empty expression strings so need to be distinguished other ways.
         // More complex expression indexes that have the same expression strings always have the same set of (base)
         // columns referenced in the same order, but we fall through and check them, anyway.
-        
+
         // sort in index order the columns of idx1, each identified by its index in the base table
         int[] idx1baseTableOrder = new int[idx1.getColumns().size()];
         for (ColumnRef cref : idx1.getColumns()) {

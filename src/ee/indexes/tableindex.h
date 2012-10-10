@@ -91,13 +91,13 @@ struct TableIndexScheme {
     // TODO: Better yet: move the call to construct the indexId:
     // Since the expressionsAsText is only used to additionally qualify the index id string, a process that is
     // initiated (rather awkwardly) from the TypeIndex constructor, it would be less trouble for the VoltDBEngine
-    // (which already knows how) to always construct the entire indexId from the catalog index and pass THAT to 
+    // (which already knows how) to always construct the entire indexId from the catalog index and pass THAT to
     // the TableIndexScheme constructor above (fully qualified by expressionsAsText) in place of expressionsAsText.
     // The small downside is the slightly larger string buffer being subject to the copying and recopying of
     // TableIndexScheme members on their way to their final embedding in the TableIndex.
-    // This change would eliminate the mostly redundant method for TaleIndexScheme-to-indexId conversion.
+    // This change would eliminate the mostly redundant method for TableIndexScheme-to-indexId conversion.
     // TableIndexScheme construction in most if not all ee tests could provide a dummy (empty or nonce) value
-    // for indexId. Index Ids seem only to be of interest in catalog-driven tests.
+    // for indexId. Index Ids seem only to be of interest in catalog-driven processing.
     TableIndexScheme(std::string a_name, TableIndexType a_type,
                      const std::vector<int32_t>& a_columnIndices,
                      const std::vector<AbstractExpression*>& a_indexedExpressions,
