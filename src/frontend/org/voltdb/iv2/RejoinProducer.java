@@ -391,7 +391,7 @@ public class RejoinProducer extends SiteTasker
             // Don't notify the rejoin coordinator yet. The stream snapshot may
             // have not finished on all nodes, let the snapshot completion
             // monitor tell the rejoin coordinator.
-            siteConnection.setRejoinComplete();
+            siteConnection.setRejoinComplete(m_replayCompleteAction);
         }
     }
 
@@ -423,7 +423,7 @@ public class RejoinProducer extends SiteTasker
          * have not finished on all nodes, let the snapshot completion
          * monitor tell the rejoin coordinator.
          */
-        siteConnection.setRejoinComplete();
+        siteConnection.setRejoinComplete(m_replayCompleteAction);
     }
 
     void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork, SiteProcedureConnection siteConnection)
