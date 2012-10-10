@@ -32,7 +32,6 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -292,7 +291,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         ((LocalCluster) config).setHasLocalServer(true);
 
         // build up a project builder for the workload
-        VoltProjectBuilder project = new TPCCProjectBuilder();
+        VoltProjectBuilder project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
@@ -311,7 +310,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("liveschema-newtableinmiddle.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
+        project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("P2", true, false, false, false));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));
@@ -320,7 +319,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         assertTrue(compile);
 
         config = new LocalCluster("liveschema-dropconstraint.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
+        project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, false));
         project.addLiteralSchema(makeTable("R1", true, true, false, false));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
@@ -329,7 +328,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         assertTrue(compile);
 
         config = new LocalCluster("liveschema-addconstraint.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
+        project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, false));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
@@ -338,7 +337,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         assertTrue(compile);
 
         config = new LocalCluster("liveschema-renamedindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
+        project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTYX ON P1 (BIG);");
