@@ -481,17 +481,17 @@ public class AsyncBenchmark {
             Client client = null;
             try {
                 if (clients.isEmpty()) {
-                    Thread.sleep(1000);
-                    continue;
+                    crash("No connection to any server");
                 }
 
-                client = clients.get(cid % clients.size());
                 if (cid == -1) {
+                    client = clients.get(0);
                     // update the replicated table
                     client.callProcedure(new updateReplicatedCallback(),
                                          "updateReplicated",
                                          rid);
                 } else {
+                    client = clients.get(cid % clients.size());
                     // asynchronously call the "doTxn" procedure
                     client.callProcedure(new doTxnCallback(),
                                          "doTxn",
