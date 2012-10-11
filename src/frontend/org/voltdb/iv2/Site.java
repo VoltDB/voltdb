@@ -502,7 +502,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // (Cleaner to pass m_rejoinTaskLog to runForRejoin()?)
         SiteTasker task = m_scheduler.poll();
         if (task != null) {
-            if (task instanceof TransactionTask) {
+            if (m_rejoinTaskLog != null && task instanceof TransactionTask) {
                 TransactionInfoBaseMessage tibm = ((TransactionTask)task).m_txn.getNotice();
                 m_rejoinTaskLog.logTask(tibm);
             }

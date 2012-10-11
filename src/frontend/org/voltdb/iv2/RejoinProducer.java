@@ -55,6 +55,7 @@ public class RejoinProducer extends SiteTasker
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
 
+    private final CountDownLatch m_snapshotCompletionMonitorHappend;
     private final SiteTaskerQueue m_taskQueue;
     private final int m_partitionId;
     private final String m_snapshotNonce;
@@ -101,16 +102,19 @@ public class RejoinProducer extends SiteTasker
     // Non-blocking rejoin will release the queue and reschedule
     // the producer with the site to incrementally transfer
     // snapshot data.
+
     //
     // In both cases, the site is responding with REJOINING to
     // all incoming tasks.
     //
-    // The RejoinProducer's work is done when the snapshot is
-    // fully transfered. Responsibility to wrap up the
-    // rejoin process is passed to the site (via ReplayCompletionAction)
+    // There are two conditions to complete RejoinProducer and
+    // transition the Site controlled portion of rejoin.
+    // 1. Snapshot must be fully transfered (sink EOF reached)
+    // 2. The SnapshotCompletion interest event must be received.
     //
-    // The site then concludes rejoin (in both community and
-    // live rejoin cases).
+    // When both of these events have been observed, the Site
+    // is handed a ReplayCompletionAction and instructed to
+    // complete its portion of rejoin.
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -139,6 +143,7 @@ public class RejoinProducer extends SiteTasker
                 RejoinMessage snap_complete =
                     new RejoinMessage(m_rejoinCoordinatorHsId, Type.SNAPSHOT_FINISHED);
                 m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
+                m_snapshotCompletionMonitorHappend.countDown();
                 deregister();
             }
             return null;
@@ -180,6 +185,7 @@ public class RejoinProducer extends SiteTasker
         m_partitionId = partitionId;
         m_taskQueue = taskQueue;
         m_snapshotNonce = "Rejoin_" + m_partitionId + "_" + System.currentTimeMillis();
+        m_snapshotCompletionMonitorHappend = new CountDownLatch(1);
     }
 
     public void setMailbox(InitiatorMailbox mailbox)
@@ -395,6 +401,13 @@ public class RejoinProducer extends SiteTasker
             // Don't notify the rejoin coordinator yet. The stream snapshot may
             // have not finished on all nodes, let the snapshot completion
             // monitor tell the rejoin coordinator.
+
+            // Block until the snapshot interest triggers.
+            try {
+                m_snapshotCompletionMonitorHappend.await();
+            } catch (InterruptedException crashme) {
+                VoltDB.crashLocalVoltDB("Interrupted awaiting snapshot completion.", true, crashme);
+            }
             siteConnection.setRejoinComplete(m_replayCompleteAction);
         }
     }
@@ -427,6 +440,17 @@ public class RejoinProducer extends SiteTasker
          * have not finished on all nodes, let the snapshot completion
          * monitor tell the rejoin coordinator.
          */
+
+        // Block until the snapshot interest triggers.
+        // -- rtb: not sure this race can happen in the live rejoin case?
+        // Maybe with tiny data sets? I'm going to accept
+        // the simple and correct action of blocking until there
+        // is an indication that a non-blocking wait is necesary.
+        try {
+            m_snapshotCompletionMonitorHappend.await();
+        } catch (InterruptedException crashme) {
+            VoltDB.crashLocalVoltDB("Interrupted awaiting snapshot completion.", true, crashme);
+        }
         siteConnection.setRejoinComplete(m_replayCompleteAction);
     }
 
