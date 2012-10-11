@@ -26,6 +26,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -34,10 +35,14 @@ import org.voltdb.utils.LogKeys;
  */
 public class SpProcedureTask extends ProcedureTask
 {
+    final private PartitionDRGateway m_drGateway;
+
     SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg)
+                  Iv2InitiateTaskMessage msg,
+                  PartitionDRGateway drGateway)
     {
        super(initiator, procName, new SpTransactionState(msg), queue);
+       m_drGateway = drGateway;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -60,6 +65,13 @@ public class SpProcedureTask extends ProcedureTask
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
+
+        // Log invocation to DR
+        if (m_drGateway != null && !m_txn.isReadOnly() && !m_txn.needsRollback()) {
+            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.timestamp,
+                                                  txn.getInvocation(),
+                                                  response.getClientResponseData());
+        }
     }
 
     @Override

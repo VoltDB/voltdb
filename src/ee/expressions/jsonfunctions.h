@@ -22,9 +22,10 @@
 #include <cstring>
 #include <string>
 #include <sstream>
+#include <algorithm>
 
-#include "json_spirit/json_spirit.h"
-#include "stringfunctions.h"
+#include <jsoncpp/jsoncpp.h>
+#include <jsoncpp/jsoncpp-forwards.h>
 
 namespace voltdb {
 
@@ -56,59 +57,44 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     const std::string doc(docChars, lenDoc);
     const std::string field(fieldChars,lenField);
 
-    json_spirit::mValue docVal;
+    Json::Value root;
+    Json::Reader reader;
 
-    /*
-     * if false it is an invalid JSON. It reports the full JSON doc in the error
-     * message if it is 50 characters or less. If it is longer than 50, it truncates
-     * the reported JSON doc to the first 50 characters, and appends ellipses '...'
-     */
-    if (! json_spirit::read(doc, docVal)) {
-
+    if( ! reader.parse(doc, root)) {
         char msg[1024];
-        const char *fiftyith = getIthCharPosition(docChars, lenDoc, 50);
-        const size_t elipsedLen = static_cast<size_t>( fiftyith - docChars);
-        std::string elipsed( docChars, elipsedLen);
-
-        if (fiftyith < docChars + lenDoc) {
-            elipsed += " ...";
-        }
-
-        snprintf(msg, sizeof(msg), "'%s' is not valid JSON", elipsed.c_str());
+        // get formattedErrorMessafe returns concise message about location
+        // of the error rather than the malformed document itself
+        snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
         throw SQLException(SQLException::
                            data_exception_invalid_parameter,
                            msg);
     }
 
-    /* only object type contain fields. primitives, arrays do not */
-    if( docVal.type() != json_spirit::obj_type) {
+    // only object type contain fields. primitives, arrays do not
+    if( ! root.isObject()) {
         return getNullStringValue();
     }
 
-    json_spirit::mObject mObj = docVal.get_obj();
-    json_spirit::mObject::const_iterator itr = mObj.find(field);
-
-    if (itr == mObj.end() || itr->first != field) {
+    // field is not present in the document
+    if( ! root.isMember(field)) {
         return getNullStringValue();
     }
 
-    const json_spirit::mValue& value = itr->second;
+    Json::Value fieldValue = root[field];
 
-    std::stringstream ss;
-
-    switch( value.type()) {
-    case json_spirit::str_type:  ss << value.get_str(); break;
-    case json_spirit::int_type:  ss << value.get_int(); break;
-    case json_spirit::bool_type: ss << (value.get_bool() ? "true" : "false"); break;
-    case json_spirit::real_type: ss << value.get_real(); break;
-    case json_spirit::null_type: return getNullStringValue();
-    default:
-        json_spirit::write(value, ss);
-        break;
+    if (fieldValue.isNull()) {
+        return getNullStringValue();
     }
 
-    const std::string& returnValue = ss.str();
-    return getTempStringValue(returnValue.c_str(), returnValue.length());
+    if (fieldValue.isConvertibleTo(Json::stringValue)) {
+        std::string stringValue(fieldValue.asString());
+        return getTempStringValue(stringValue.c_str(), stringValue.length());
+    }
+
+    Json::FastWriter writer;
+    std::string serializedValue(writer.write(fieldValue));
+    // writer always appends a trailing new line \n
+    return getTempStringValue(serializedValue.c_str(), serializedValue.length() -1);
 }
 
 }

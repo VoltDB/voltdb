@@ -22,8 +22,8 @@
 package org.voltdb.catalog;
 
 import java.util.LinkedHashMap;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  * The base class for all objects in the Catalog. CatalogType instances all
@@ -283,6 +283,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
     }
 
+    @Override
     public int compareTo(CatalogType o) {
         if (this == o) {
             return 0;
@@ -302,6 +303,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
             throw new RuntimeException(e);
         }
 
+        assert(parent.getCatalog() == catalog);
         copy.setBaseValues(catalog, parent, m_path, m_typename);
         copy.m_relativeIndex = m_relativeIndex;
 
@@ -314,7 +316,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
                 value = uinfo;
             }
 
-            copy.m_fields.put(e.getKey(), e.getValue());
+            copy.m_fields.put(e.getKey(), value);
         }
 
         for (Entry<String, CatalogMap<? extends CatalogType>> e : m_childCollections.entrySet()) {
@@ -373,6 +375,27 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
 
         return true;
+    }
+
+    /**
+     * Fails an assertion if any child of this object doesn't think
+     * it's part of the same catalog.
+     */
+    public void validate() {
+        for (Entry<String, Object> e : m_fields.entrySet()) {
+            Object value = e.getValue();
+            if (value instanceof CatalogType) {
+                CatalogType ct = (CatalogType) value;
+                assert(ct.getCatalog() == getCatalog()) : ct.getPath() + " has wrong catalog";
+            }
+        }
+
+        for (Entry<String, CatalogMap<? extends CatalogType>> e : m_childCollections.entrySet()) {
+            for (CatalogType ct : e.getValue()) {
+                assert(ct.getCatalog() == getCatalog()) : ct.getPath() + " has wrong catalog";
+                ct.validate();
+            }
+        }
     }
 }
 

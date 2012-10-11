@@ -153,6 +153,87 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
     return true;
 }
 
+/**
+ * Locally defined function to make a string from an index schema
+ */
+static std::string
+getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique, vector<int32_t> columnIndexes) {
+    // add the uniqueness of the index
+    std::string retval = isUnique ? "U" : "M";
+
+    // add the type of the index
+    switch (type) {
+        case BALANCED_TREE_INDEX:
+            retval += "B";
+            break;
+        case HASH_TABLE_INDEX:
+            retval += "H";
+            break;
+        default:
+            // this would need to change if we added index types
+            assert(false);
+            break;
+    }
+
+    // add whether it's counting or not
+    if (countable) {
+        retval += "C";
+    }
+    else {
+        retval += "N"; // (N)ot countable?
+    }
+
+    // concat the target table column indexes into a unique string
+    // using the order they appear in the index
+    for (size_t i = 0; i < columnIndexes.size(); i++) {
+        char buf[128];
+        snprintf(buf, 128, "-%d", columnIndexes[i]);
+        retval += buf;
+    }
+
+    return retval;
+}
+
+std::string
+TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
+{
+    vector<int32_t> columnIndexes(catalogIndex.columns().size());
+
+    // get the list of column indexes in the target table
+    // in the order they appear in the index
+    map<string, catalog::ColumnRef*>::const_iterator col_iterator;
+    for (col_iterator = catalogIndex.columns().begin();
+         col_iterator != catalogIndex.columns().end();
+         col_iterator++)
+    {
+        int32_t index = col_iterator->second->index();
+        const catalog::Column *catalogColumn = col_iterator->second->column();
+        columnIndexes[index] = catalogColumn->index();
+    }
+
+    return getIndexIdFromMap((TableIndexType)catalogIndex.type(),
+                             true, //catalogIndex.countable(), // always counting for now
+                             catalogIndex.unique(),
+                             columnIndexes);
+}
+
+std::string
+TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
+{
+    vector<int32_t> columnIndexes(indexScheme.columnIndices.size());
+
+    // get the list of column indexes in the target table
+    // in the order they appear in the index
+    for (int i = 0; i < indexScheme.columnIndices.size(); i++) {
+        columnIndexes[i] = indexScheme.columnIndices[i];
+    }
+
+    return getIndexIdFromMap(indexScheme.type,
+                             true, // indexScheme.countable, // // always counting for now
+                             indexScheme.unique,
+                             columnIndexes);
+}
+
 int
 TableCatalogDelegate::init(ExecutorContext *executorContext,
                            catalog::Database &catalogDatabase,
@@ -166,7 +247,9 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
     map<string, catalog::Column*>::const_iterator col_iterator;
     boost::scoped_array<string> columnNames(new string[numColumns]);
     for (col_iterator = catalogTable.columns().begin();
-         col_iterator != catalogTable.columns().end(); col_iterator++) {
+         col_iterator != catalogTable.columns().end();
+         col_iterator++)
+    {
         const catalog::Column *catalog_column = col_iterator->second;
         columnNames[catalog_column->index()] = catalog_column->name();
     }

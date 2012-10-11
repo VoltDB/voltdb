@@ -17,8 +17,8 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 
 import org.voltdb.licensetool.LicenseApi;
 
@@ -28,6 +28,7 @@ import org.voltdb.licensetool.LicenseApi;
  *
  */
 public class PartitionDRGateway {
+    protected final boolean m_iv2Enabled;
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -37,8 +38,8 @@ public class PartitionDRGateway {
      * @return Instance of PartitionDRGateway
      */
     public static PartitionDRGateway getInstance(int partitionId,
-                                                 boolean replicationActive,
-                                                 File overflowDir)
+                                                 NodeDRGateway nodeGateway,
+                                                 boolean iv2Enabled)
     {
         final VoltDBInterface vdb = VoltDB.instance();
         LicenseApi api = vdb.getLicenseApi();
@@ -47,60 +48,48 @@ public class PartitionDRGateway {
         // if this is a primary cluster in a DR-enabled scenario
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToDR) {
-            pdrg = tryToLoadProVersion();
+        if (licensedToDR && nodeGateway != null) {
+            pdrg = tryToLoadProVersion(iv2Enabled);
         }
         if (pdrg == null) {
-            pdrg = new PartitionDRGateway();
+            pdrg = new PartitionDRGateway(iv2Enabled);
         }
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, replicationActive, overflowDir);
+            pdrg.init(partitionId, nodeGateway);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
         return pdrg;
     }
 
-    /**
-     * shutdown is a global method to gracefully terminate the underlying
-     * gateway infrastructure. It stops anything started by getInstance().
-     */
-    public static void shutdown()
-    {
-        // intentionally avoid a license check to shutdown.
-        PartitionDRGateway pdrg = null;
-        pdrg = tryToLoadProVersion();
-        if (pdrg == null) {
-            pdrg = new PartitionDRGateway();
-        }
-        pdrg.shutdownInternal();
-    }
-
-    private static PartitionDRGateway tryToLoadProVersion()
+    private static PartitionDRGateway tryToLoadProVersion(boolean iv2Enalbed)
     {
         try {
             Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
-            Object obj = pdrgiClass.newInstance();
+            Constructor<?> constructor = pdrgiClass.getConstructor(boolean.class);
+            Object obj = constructor.newInstance(iv2Enalbed);
             return (PartitionDRGateway) obj;
         } catch (Exception e) {
         }
         return null;
     }
 
+    public PartitionDRGateway(boolean iv2Enabled)
+    {
+        m_iv2Enabled = iv2Enabled;
+    }
+
     // empty methods for community edition
     protected void init(int partitionId,
-                        boolean replicationActive,
-                        File overflowDir) throws IOException {}
-    public void onSuccessfulProcedureCall(long txnId,
+                        NodeDRGateway gateway) throws IOException {}
+    public void onSuccessfulProcedureCall(long txnId, long timestamp,
                                           StoredProcedureInvocation spi,
-                                          ClientResponseImpl response,
-                                          String adHocParam) {}
+                                          ClientResponseImpl response) {}
+    public void onSuccessfulProcedureCall(long txnId, long timestamp,
+                                          boolean isMultipart,
+                                          StoredProcedureInvocation spi,
+                                          ClientResponseImpl response) {}
     public void tick(long txnId) {}
-    public void start() {}
-    public void setActive(boolean active) {}
-    public boolean isActive() { return false; }
-    protected void shutdownInternal() {}
-
 }

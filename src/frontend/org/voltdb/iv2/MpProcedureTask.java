@@ -101,8 +101,11 @@ public class MpProcedureTask extends ProcedureTask
                 m_txn.isReadOnly(),
                 m_txn.needsRollback(),
                 false,  // really don't want to have ack the ack.
-                false);
+                false,
+                m_msg.isForReplay());
+
         complete.setTruncationHandle(m_msg.getTruncationHandle());
+        complete.setOriginalTxnId(m_msg.getOriginalTxnId());
         m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txn.setDone();
         m_queue.flush();
