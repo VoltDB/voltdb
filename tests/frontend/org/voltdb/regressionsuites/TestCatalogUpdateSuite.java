@@ -545,7 +545,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callbackSuccess);
     }
 
-    public void MYSTERIOUSLY_FAILING_testAddDropExpressionIndex() throws Exception
+    public void testAddDropExpressionIndex() throws Exception
     {
         ClientResponse callProcedure;
         String explanation;
@@ -557,7 +557,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callbackSuccess);
 
         // check that no index was used by checking the plan itself
-        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID*2)-NO_O_ID = 5;");
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
         explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
         assertFalse(explanation.contains("INDEX SCAN"));
 
@@ -578,13 +578,13 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         // do a call that uses the index
-        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where (NO_O_ID*2)-NO_O_ID = 5;");
+        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
         result = callProcedure.getResults()[0];
         result.advanceRow();
         assertEquals(5, result.getLong("NO_O_ID"));
 
         // check that an index was used by checking the plan itself
-        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID*2)-NO_O_ID = 5;");
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
         explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
         assertTrue(explanation.contains("INDEX SCAN"));
 
@@ -609,13 +609,13 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(results.length == 1);
 
         // do a call that uses the index
-        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where (NO_O_ID*2)-NO_O_ID = 5;");
+        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
         result = callProcedure.getResults()[0];
         result.advanceRow();
         assertEquals(5, result.getLong("NO_O_ID"));
 
         // check that no index was used by checking the plan itself
-        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID*2)-NO_O_ID = 5;");
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
         explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
         assertFalse(explanation.contains("INDEX SCAN"));
 
@@ -929,13 +929,13 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         config = new LocalCluster("catalogupdate-cluster-addexpressindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
-        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX ON NEW_ORDER ((NO_O_ID*2)-NO_O_ID);");
+        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX ON NEW_ORDER ((NO_O_ID+NO_O_ID)-NO_O_ID);");
         // history is good because this new index is the only one (no pkey)
-        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX2 ON HISTORY ((2*H_C_ID)-H_C_ID);");
+        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX2 ON HISTORY ((H_C_ID+H_C_ID)-H_C_ID);");
         // unique index
         // This needs to wait until the test for unique index coverage for indexed expressions can parse out any simple column expressions
         // and discover a unique index on some subset.
-        //TODO: project.addLiteralSchema("CREATE UNIQUE INDEX NEWEXPRESSINDEX3 ON STOCK (S_I_ID, S_W_ID, 2*S_QUANTITY-S_QUANTITY);");
+        //TODO: project.addLiteralSchema("CREATE UNIQUE INDEX NEWEXPRESSINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY+S_QUANTITY-S_QUANTITY);");
 
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
