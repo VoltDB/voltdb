@@ -346,7 +346,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         assertTrue(compile);
 
         config = new LocalCluster("liveschema-renamedexpressionindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
+        project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
