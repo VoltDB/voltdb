@@ -86,6 +86,7 @@ public class LeaderAppointer implements Promotable
     private AtomicReference<AppointerState> m_state =
         new AtomicReference<AppointerState>(AppointerState.INIT);
     private CountDownLatch m_startupLatch = null;
+    private final boolean m_partitionDetectionEnabled;
 
     private class PartitionCallback extends BabySitter.Callback
     {
@@ -167,7 +168,9 @@ public class LeaderAppointer implements Promotable
                 else if (missingHSIds.contains(m_currentLeader)) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
                 }
-                doPartitionDetectionActivities();
+                if (m_partitionDetectionEnabled) {
+                    doPartitionDetectionActivities();
+                }
             }
             m_replicas.clear();
             m_replicas.addAll(updatedHSIds);
@@ -195,7 +198,8 @@ public class LeaderAppointer implements Promotable
     };
 
     public LeaderAppointer(HostMessenger hm, int numberOfPartitions,
-            int kfactor, JSONObject topology, MpInitiator mpi)
+            int kfactor, boolean partitionDetectionEnabled,
+            JSONObject topology, MpInitiator mpi)
     {
         m_hostMessenger = hm;
         m_zk = hm.getZK();
@@ -207,6 +211,7 @@ public class LeaderAppointer implements Promotable
         m_partitionWatchers = new BabySitter[m_partitionCount];
         m_iv2appointees = new LeaderCache(m_zk, VoltZK.iv2appointees);
         m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
+        m_partitionDetectionEnabled = partitionDetectionEnabled;
     }
 
     @Override

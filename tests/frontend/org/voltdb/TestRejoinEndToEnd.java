@@ -74,7 +74,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             VoltProjectBuilder builder = getBuilderForTest();
             builder.setSecurityEnabled(true);
 
-            LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
+            LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, true, m_useIv2);
@@ -750,7 +750,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);

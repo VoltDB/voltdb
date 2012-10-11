@@ -902,9 +902,18 @@ public abstract class CatalogUtil {
                 }
             }
             else {
-                catCluster.setNetworkpartition(false);
-                if (printLog) {
-                    hostLog.info("Detection of network partitions in the cluster is not enabled.");
+                // Default partition detection on for IV2
+                if (VoltDB.instance().isIV2Enabled()) {
+                    catCluster.setNetworkpartition(true);
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is enabled.");
+                    }
+                }
+                else {
+                    catCluster.setNetworkpartition(false);
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
+                    }
                 }
             }
 

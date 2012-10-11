@@ -385,7 +385,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_faultManager.registerFaultHandler(SiteFailureFault.SITE_FAILURE_CATALOG,
                     m_faultHandler,
                     FaultType.SITE_FAILURE);
-            if (!m_faultManager.testPartitionDetectionDirectory(
+            // This doesn't happen/work for IV2 yet:
+            if (!isIV2Enabled() && !m_faultManager.testPartitionDetectionDirectory(
                     m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
                 VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at" +
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"), false, null);
@@ -619,6 +620,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_messenger,
                             clusterConfig.getPartitionCount(),
                             m_deployment.getCluster().getKfactor(),
+                            m_deployment.getPartitionDetection().isEnabled(),
                             topo, m_MPI);
                     m_globalServiceElector.registerService(m_leaderAppointer);
 
