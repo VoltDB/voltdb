@@ -620,7 +620,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_messenger,
                             clusterConfig.getPartitionCount(),
                             m_deployment.getCluster().getKfactor(),
-                            m_deployment.getPartitionDetection().isEnabled(),
+                            m_catalogContext.cluster.getNetworkpartition(),
                             topo, m_MPI);
                     m_globalServiceElector.registerService(m_leaderAppointer);
 
