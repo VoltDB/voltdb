@@ -137,7 +137,7 @@ public class RejoinProducer extends SiteTasker
         {
             if (nonce.equals(m_snapshotNonce)) {
                 RejoinMessage snap_complete =
-                    new RejoinMessage(m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+                    new RejoinMessage(m_rejoinCoordinatorHsId, Type.SNAPSHOT_FINISHED);
                 m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
                 deregister();
             }
