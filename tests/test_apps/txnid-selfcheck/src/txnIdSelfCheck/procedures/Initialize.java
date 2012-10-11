@@ -21,37 +21,37 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package voter.procedures;
+package txnIdSelfCheck.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class Initialize extends VoltProcedure
 {
     // Check if the database has already been initialized
-    public final SQLStmt checkStmt = new SQLStmt("SELECT COUNT(*) FROM replicated;");
+    public final SQLStmt checkStmt = new SQLStmt("SELECT * FROM replicated ORDER BY rid;");
 
     // Insert into the replicated table
-    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?);");
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?, ?, ?);");
 
     public long run() {
-        voltQueueSQL(checkStmt, EXPECT_SCALAR_LONG);
-        long currentCount = voltExecuteSQL()[0].asScalarLong();
+        voltQueueSQL(checkStmt, EXPECT_ZERO_OR_ONE_ROW);
+        VoltTable result = voltExecuteSQL()[0];
 
         // if the data is initialized, return the current count
-        if (currentCount != 0)
-            return currentCount;
+        if (result.getRowCount() != 0) {
+            result.advanceRow();
+            return result.getLong("rid");
+        }
 
-        // initialize the data using the txnId as a base
-        long base = this.getTransactionId();
-        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), base);
+        // initialize the data using the txnId
+        long txnId = getTransactionId();
+        long ts = getTransactionTime().getTime();
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, ts, -1);
         voltExecuteSQL(true);
 
-        // return the number of rows added
-        return 1;
+        // return the rid
+        return 0;
     }
 }
