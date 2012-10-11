@@ -100,9 +100,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private final static int kStateRunning = 0;
     private final static int kStateRejoining = 1;
     private final static int kStateReplayingRejoin = 2;
-    int m_rejoinState;
-    TaskLog m_rejoinTaskLog;
-    RejoinProducer.ReplayCompletionAction m_replayCompletionAction;
+    private int m_rejoinState;
+    private TaskLog m_rejoinTaskLog;
+    private RejoinProducer.ReplayCompletionAction m_replayCompletionAction;
+    private final VoltDB.START_ACTION m_startAction;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -301,7 +302,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long txnId,
             int partitionId,
             int numPartitions,
-            boolean createForRejoin,
+            VoltDB.START_ACTION startAction,
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
@@ -313,7 +314,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_rejoinState = createForRejoin ? kStateRejoining : kStateRunning;
+        m_startAction = startAction;
+        m_rejoinState = VoltDB.createForRejoin(startAction) ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, txnId);
@@ -378,7 +380,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         });
 
-        if (m_rejoinState == kStateRejoining) {
+        if (m_startAction == VoltDB.START_ACTION.LIVE_REJOIN) {
             initializeForLiveRejoin();
         }
     }
