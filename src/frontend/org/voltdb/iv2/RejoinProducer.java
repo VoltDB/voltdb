@@ -64,7 +64,7 @@ public class RejoinProducer extends SiteTasker
     private ReplayCompletionAction m_replayCompleteAction;
 
     // True: use live rejoin; false use community blocking implementation.
-    private final boolean m_liveRejoin = true;
+    private boolean m_liveRejoin;
     boolean useLiveRejoin()
     {
         return m_liveRejoin;
@@ -192,6 +192,9 @@ public class RejoinProducer extends SiteTasker
         if (message.getType() == RejoinMessage.Type.INITIATION) {
             doInitiation(message);
         }
+        else if (message.getType() == RejoinMessage.Type.INITIATION_COMMUNITY) {
+            doInitiation(message);
+        }
         else if (message.getType() == RejoinMessage.Type.REQUEST_RESPONSE) {
             doRequestResponse(message);
         }
@@ -210,6 +213,7 @@ public class RejoinProducer extends SiteTasker
      */
     void doInitiation(RejoinMessage message)
     {
+        m_liveRejoin = message.getType() == RejoinMessage.Type.INITIATION;
         m_rejoinCoordinatorHsId = message.m_sourceHSId;
         m_rejoinSiteProcessor = new StreamSnapshotSink();
 
