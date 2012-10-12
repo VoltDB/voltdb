@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.InputHandler;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.CatalogContext;
@@ -58,6 +59,8 @@ public class ExportManager
 
     private final AtomicReference<TreeMap< Long, ExportGeneration>> m_generations =
         new AtomicReference<TreeMap<Long, ExportGeneration>>(new TreeMap<Long, ExportGeneration>());
+
+    private final HostMessenger m_messenger;
 
     /**
      * Thrown if the initial setup of the loader fails
@@ -140,7 +143,11 @@ public class ExportManager
      * @param catalogContext
      * @throws ExportManager.SetupException
      */
-    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, boolean isRejoin)
+    public static synchronized void initialize(
+            int myHostId,
+            CatalogContext catalogContext,
+            boolean isRejoin,
+            HostMessenger messenger)
     throws ExportManager.SetupException
     {
         /*
@@ -150,7 +157,7 @@ public class ExportManager
         if (isRejoin) {
             deleteExportOverflowData(catalogContext);
         }
-        ExportManager tmp = new ExportManager(myHostId, catalogContext);
+        ExportManager tmp = new ExportManager(myHostId, catalogContext, messenger);
         m_self = tmp;
     }
 
@@ -185,17 +192,18 @@ public class ExportManager
 
     protected ExportManager() {
         m_hostId = 0;
+        m_messenger = null;
     }
 
     /**
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
      */
-    private ExportManager(int myHostId, CatalogContext catalogContext)
+    private ExportManager(int myHostId, CatalogContext catalogContext, HostMessenger messenger)
     throws ExportManager.SetupException
     {
         m_hostId = myHostId;
-
+        m_messenger = messenger;
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
@@ -226,8 +234,11 @@ public class ExportManager
                     exportOverflowDirectory,
                     catalogContext, conn);
             ExportGeneration currentGeneration =
-                new ExportGeneration( catalogContext.m_transactionId, m_onGenerationDrained, exportOverflowDirectory);
-            currentGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
+                new ExportGeneration(
+                        catalogContext.m_transactionId,
+                        m_onGenerationDrained,
+                        exportOverflowDirectory);
+            currentGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId, messenger);
             m_generations.get().put( catalogContext.m_transactionId, currentGeneration);
             newProcessor.setExportGeneration(m_generations.get().firstEntry().getValue());
             newProcessor.readyForData();
@@ -263,7 +274,7 @@ public class ExportManager
                         m_onGenerationDrained,
                         generationDirectory,
                         Long.valueOf(generationDirectory.getName()));
-            generation.initializeGenerationFromDisk(conn);
+            generation.initializeGenerationFromDisk(conn, m_messenger);
             m_generations.get().put( Long.valueOf(generationDirectory.getName()), generation);
         }
     }
@@ -304,7 +315,7 @@ public class ExportManager
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB(e1.getMessage(), true, e1);
         }
-        newGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
+        newGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId, m_messenger);
 
         while (true) {
             TreeMap<Long, ExportGeneration> oldGenerations = m_generations.get();

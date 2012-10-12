@@ -597,7 +597,7 @@ public class Inits {
         public void run() {
             // Let the Export system read its configuration from the catalog.
             try {
-                ExportManager.initialize(m_rvdb.m_myHostId, m_rvdb.m_catalogContext, m_isRejoin);
+                ExportManager.initialize(m_rvdb.m_myHostId, m_rvdb.m_catalogContext, m_isRejoin, m_rvdb.m_messenger);
             } catch (ExportManager.SetupException e) {
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ExportInitFailure.name(), e);
                 System.exit(-1);

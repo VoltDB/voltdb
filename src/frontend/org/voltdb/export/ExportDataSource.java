@@ -689,40 +689,50 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         @Override
         public void discard() {
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        ack(m_uso);
-                    } catch (Exception e) {
-                        exportLog.error("Error acking export buffer", e);
-                    } catch (Error e) {
-                        VoltDB.crashLocalVoltDB("Error acking export buffer", false, e);
-                    }
-                }
-            });
+            ack(m_uso);
         }
     }
 
-    private void ack(long uso) {
+    public void ack(final long uso) {
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    ackImpl(uso);
+                } catch (Exception e) {
+                    exportLog.error("Error acking export buffer", e);
+                } catch (Error e) {
+                    VoltDB.crashLocalVoltDB("Error acking export buffer", false, e);
+                }
+            }
+        });
+    }
+
+    private void ackImpl(long uso) {
         //Assemble a list of blocks to delete so that they can be deleted
         //outside of the m_committedBuffers critical section
-        ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
         try {
-            //Process the ack if any and add blocks to the delete list or move the released USO pointer
-            if (uso > 0) {
-                try {
-                    releaseExportBytes(uso, blocksToDelete);
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
-                    return;
+            ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
+            try {
+                //Process the ack if any and add blocks to the delete list or move the released USO pointer
+                if (uso > 0) {
+                    try {
+                        releaseExportBytes(uso, blocksToDelete);
+                    } catch (IOException e) {
+                        VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
+                        return;
+                    }
+                }
+            } finally {
+                //Try hard not to leak memory
+                for (StreamBlock sb : blocksToDelete) {
+                    sb.deleteContent();
                 }
             }
         } finally {
-            //Try hard not to leak memory
-            for (StreamBlock sb : blocksToDelete) {
-                sb.deleteContent();
-            }
+            /*
+             * Need to forward the ack iff I am the master
+             */
         }
     }
 }

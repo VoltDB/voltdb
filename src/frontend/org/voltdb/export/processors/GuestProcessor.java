@@ -42,6 +42,7 @@ public class GuestProcessor implements ExportDataProcessor {
     private ExportClientBase2 m_client;
     private String m_exportClientClass = "org.voltdb.exportclient.ExportToFileClient";
     private String m_guestConfig = "{\"type\":\"tsv\",\"batched\":true,\"with-schema\":true,\"nonce\":\"zorag\"}";
+    private VoltLogger m_logger;
 
     private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders =
             new ArrayList<Pair<ExportDecoderBase, AdvertisedDataSource>>();
@@ -58,8 +59,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     @Override
     public void addLogger(VoltLogger logger) {
-        // TODO Auto-generated method stub
-
+        m_logger = logger;
     }
 
     @Override
@@ -123,7 +123,7 @@ public class GuestProcessor implements ExportDataProcessor {
                         cont.discard();
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    m_logger.error("Error processing export block", e);
                 }
                 constructListener(source, source.poll(), edb, ads);
             }
