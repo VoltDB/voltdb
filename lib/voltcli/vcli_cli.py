@@ -31,16 +31,22 @@ import sys
 import optparse
 import shlex
 
-# Use the internal utility module that has no circular dependencies.
-import _util
-
-# Set during option processing
-debug = False
+import VOLT
+import vcli_util
 
 # Volt CLI command processor
 
 # Individual option variables are added by the option parser. They are available
 # externally as module attributes.
+
+class ParsedCommand(object):
+    def __init__(self, outer_parser, outer_opts, inner_parser, inner_opts, inner_args, verb):
+        self.outer_parser = outer_parser
+        self.outer_opts   = outer_opts
+        self.inner_opts   = inner_opts
+        self.inner_args   = inner_args
+        self.inner_parser = inner_parser
+        self.verb         = verb
 
 class VoltCLICommandProcessor(optparse.OptionParser):
     '''
@@ -48,19 +54,19 @@ class VoltCLICommandProcessor(optparse.OptionParser):
     and verb-specific arguments and options.
     '''
 
-    def __init__(self, verbs, options, aliases, usage, description, version):
-        self.verbs   = verbs
-        self.options = options
-        self.aliases = aliases
-        full_usage = '%s\n' % usage
+    def __init__(self, verbs, options_spec, aliases, usage, description, version):
+        self.verbs        = verbs
+        self.options_spec = options_spec
+        self.aliases      = aliases
+        full_usage        = '%s\n' % usage
         for verb in verbs:
             full_usage += '\n       %%prog %s %s' % (verb.name, verb.metadata.usage)
         optparse.OptionParser.__init__(self,
             description = description,
             usage       = full_usage,
             version     = version)
-        for cli_option in options:
-            self.add_option(*cli_option.args, **cli_option.kwargs)
+        for option_spec in self.options_spec:
+            self.add_option(*option_spec.args, **option_spec.kwargs)
 
     def parse(self, cmdargs):
 
@@ -75,10 +81,10 @@ class VoltCLICommandProcessor(optparse.OptionParser):
                 # line with no arguments to pass for those options.
                 if cmdargs[iverb] in ('-h', '--help', '--version'):
                     allow_no_command = True
-                for opt in self.options:
-                    if cmdargs[iverb] in opt.args:
+                for option_spec in self.options_spec:
+                    if cmdargs[iverb] in option_spec.args:
                         # Skip the argument of an option that takes one
-                        if (not 'action' in opt.kwargs or opt.kwargs['action'] == 'store'):
+                        if (not 'action' in option_spec.kwargs or option_spec.kwargs['action'] == 'store'):
                             iverb += 1
             else:
                 # Found the command.
@@ -88,13 +94,8 @@ class VoltCLICommandProcessor(optparse.OptionParser):
             self._abort('Missing command.')
 
         # Parse the global options. args should be empty
-        opts, args = optparse.OptionParser.parse_args(self, list(cmdargs[:iverb]))
-        assert len(args) == 0
-
-        # Set all the options as module attributes.
-        for option in self.options:
-            name = option.kwargs['dest']
-            setattr(sys.modules[__name__], name, getattr(opts, name))
+        outer_opts, outer_args = optparse.OptionParser.parse_args(self, list(cmdargs[:iverb]))
+        assert len(outer_args) == 0
 
         # Resolve an alias (not recursive).
         verb_name = cmdargs[iverb].lower()
@@ -107,7 +108,7 @@ class VoltCLICommandProcessor(optparse.OptionParser):
             verb_name = alias_tokens[0]
             # Prepend the remaing arguments to the command line arguments.
             if len(alias_tokens) > 1:
-                args = alias_tokens[1:] + args
+                outer_args = alias_tokens[1:] + outer_args
 
         # See if we know about the verb.
         verb = None
@@ -119,35 +120,35 @@ class VoltCLICommandProcessor(optparse.OptionParser):
             self._abort('Unknown command: %s' % verb_name)
 
         # Parse the command-specific options.
-        secondary = optparse.OptionParser(
+        inner_parser = optparse.OptionParser(
                 description = verb.metadata.description,
                 usage = '%%prog %s %s' % (verb.name, verb.metadata.usage))
         if iverb < len(cmdargs):
-            if verb.metadata.options:
-                for opt in verb.metadata.options:
-                    secondary.add_option(*opt.args, **opt.kwargs)
+            if verb.metadata.options_spec:
+                for option_spec in verb.metadata.options_spec:
+                    inner_parser.add_option(*option_spec.args, **option_spec.kwargs)
             if verb.metadata.passthrough:
                 # Provide all options and arguments without processing the options.
                 # E.g. Java programs want to handle all the options without interference.
-                args = cmdargs[iverb+1:]
-                options = None
+                inner_args = cmdargs[iverb+1:]
+                inner_opts = None
             else:
-                # Parse the secondary command line.
-                options, args = secondary.parse_args(list(cmdargs[iverb+1:]))
+                # Parse the inner command line.
+                inner_opts, inner_args = inner_parser.parse_args(list(cmdargs[iverb+1:]))
         else:
-            options = None
-            args = []
+            inner_opts = None
+            inner_args = []
 
-        return verb, options, args, self, secondary
+        return ParsedCommand(self, outer_opts, inner_parser, inner_opts, inner_args, verb)
 
     def _abort(self, *msgs):
-        _util.error(*msgs)
+        vcli_util.error(*msgs)
         sys.stdout.write('\n')
         self.print_help()
         sys.stdout.write('\n')
         sys.stderr.write('\n')
-        _util.abort()
+        vcli_util.abort()
 
     def format_epilog(self, formatter):
         rows = ((verb.name, verb.metadata.description) for verb in self.verbs)
-        return '\n%s' % _util.format_table("Subcommand Descriptions", None, rows)
+        return '\n%s' % vcli_util.format_table("Subcommand Descriptions", None, rows)

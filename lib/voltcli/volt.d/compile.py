@@ -25,12 +25,18 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@Command(description = 'Run the VoltDB compiler to build the catalog',
+@Command(description = 'Run the VoltDB compiler to build the catalog.',
          usage       = 'CLASSPATH PROJECT JAR')
 def compile(runner):
     # Run with the default Java options from vcli_env
     runner.java('org.voltdb.compiler.VoltCompiler',
                 None,
                 runner.project_path,
-                runner.config.get_required('volt.catalog'),
+                runner.get_catalog(),
                 *runner.args)
+
+@Command(description = 'Build the catalog as needed.')
+def compile_as_needed(runner):
+    catalog_jar = runner.get_catalog()
+    if not os.path.exists(catalog_jar):
+        compile(runner)

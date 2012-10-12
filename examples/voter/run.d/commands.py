@@ -20,63 +20,47 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# Contains all the commands provided by the "voter" command.
+# All the commands supported by the "voter" command.
 
-import os
-import vcli_util
+@Command(description = 'Build the Voter application and catalog.')
+def build(runner):
+    runner.mkdir('obj')
+    runner.java_compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
+    runner.volt.compile()
 
-java_ext_opts = (
-    '-server',
-    '-XX:+HeapDumpOnOutOfMemoryError',
-    '-XX:HeapDumpPath=/tmp',
-    '-XX:-ReduceInitialCardMarks'
-)
+@Command(description = 'Build the Voter application and catalog only as needed.')
+def build_as_needed(runner):
+    if not runner.catalog_exists():
+        build(runner)
+
+@Command(description = 'Clean the Voter build output.')
+def clean(runner):
+    runner.shell('rm', '-rfv', 'obj', 'debugoutput', runner.get_catalog(), 'voltdbroot')
 
 @Command(description = 'Start the Voter VoltDB server.')
 def server(runner):
-    catalog = runner.config.get_required('volt.catalog')
-    if not os.path.exists(catalog):
-        runner.shell('volt', 'catalog')
-    runner.java('org.voltdb.VoltDB', java_ext_opts, 'create', 'catalog', catalog, *runner.args)
+    runner.voltadmin.start()
 
-@Command(description = 'Run the Voter asynchronous benchmark. Use --help for usage.',
-         passthrough = True)
-def async(runner):
-    if not os.path.exists('voter.jar'):
-        runner.run('catalog')
-    runner.java('voter.AsyncBenchmark', None, *runner.args)
-
-@Command(description = 'Run the Voter JDBC benchmark. Use --help for usage.',
-         passthrough = True)
+@Java_Command('voter.JDBCBenchmark',
+             description = 'Run the Voter JDBC benchmark.',
+             depends = build_as_needed)
 def jdbc(runner):
-    if not os.path.exists('voter.jar'):
-        runner.run('catalog')
-    runner.java('voter.JDBCBenchmark', None, *runner.args)
+    runner.go()
 
-@Command(description = 'Run the Voter simple benchmark. Use --help for usage.',
-         passthrough = True)
+@Java_Command('voter.SimpleBenchmark',
+             description = 'Run the Voter simple benchmark.',
+             depends = build_as_needed)
 def simple(runner):
-    if not os.path.exists('voter.jar'):
-        runner.run('catalog')
-    runner.java('voter.SimpleBenchmark', None, 'localhost', *runner.args)
+    runner.go()
 
-@Command(description = 'Run the Voter synchronous benchmark. Use --help for usage.',
-         passthrough = True)
+@Java_Command('voter.AsyncBenchmark',
+             description = 'Run the Voter asynchronous benchmark.',
+             depends = build_as_needed)
+def async(runner):
+    runner.go()
+
+@Java_Command('voter.SyncBenchmark',
+             description = 'Run the Voter synchronous benchmark.',
+             depends = build_as_needed)
 def sync(runner):
-    if not os.path.exists('voter.jar'):
-        runner.run('catalog')
-    runner.java('voter.SyncBenchmark', None, *runner.args)
-
-@Command(description = 'Clean Voter build output.')
-def clean(runner):
-    catalog = runner.config.get_required('volt.catalog')
-    runner.shell('rm', '-rfv', 'obj', 'debugoutput', catalog, 'voltdbroot')
-
-@Command(description = 'Build the Voter application and catalog.')
-def catalog(runner):
-    runner.shell('mkdir', '-p', 'obj')
-    vcli_util.info('Compiling application...')
-    runner.java_compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
-    vcli_util.info('Compiling catalog...')
-    runner.java('org.voltdb.compiler.VoltCompiler', None, 'project.xml', 'voter.jar')
-    vcli_util.info('Voter compilation succeeded.')
+    runner.go()

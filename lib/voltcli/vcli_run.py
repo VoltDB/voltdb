@@ -32,49 +32,74 @@ import os
 import copy
 import optparse
 
-import vcli_meta
+import VOLT
 import vcli_cli
 import vcli_env
 import vcli_util
+
+# Standard CLI options.
+base_cli_spec = VOLT.CLISpec(
+    description = '''\
+Specific actions are provided by subcommands.  Run "%prog help SUBCOMMAND" to
+display full usage for a subcommand, including its options and arguments.  Note
+that some subcommands are fully handled in Java.  For these subcommands help is
+usually available by running the subcommand with no additional arguments or
+followed by the -h option.
+''',
+    usage = '%prog [OPTIONS] COMMAND [ARGUMENTS ...]',
+    options_spec = (
+        VOLT.CLIOption('-d', '--debug', action = 'store_true', dest = 'debug',
+                       help = 'display debug messages'),
+        VOLT.CLIOption('-n', '--dry-run', action = 'store_true', dest = 'dryrun',
+                       help = 'dry run displays actions without executing them'),
+        VOLT.CLIOption('-p', '--pause', action = 'store_true', dest = 'pause',
+                       help = 'pause before significant actions'),
+        VOLT.CLIOption('-v', '--verbose', action = 'store_true', dest = 'verbose',
+                       help = 'display verbose messages, including external command lines'),
+    )
+)
+
+#### ToolRunner class - invokes other tools using <tool>.command(args...) syntax.
+
+class ToolCallable(object):
+    def __init__(self, runner, tool, command):
+        self.runner  = runner
+        self.tool    = tool
+        self.command = command
+    def __call__(self, *args):
+        self.runner.shell(self.tool, self.command, *args)
+
+class ToolRunner(object):
+    def __init__(self, runner, tool):
+        self.runner = runner
+        self.tool   = tool
+    def __getattr__(self, command):
+        return ToolCallable(self.runner, self.tool, command)
 
 #### Verb runner class
 
 class VerbRunner(object):
 
-    def __init__(self, name, options, config, args, primary, secondary, project_path):
+    def __init__(self, parsed_command, verbspace, config, project_path, version):
         """
         VerbRunner constructor.
         """
-        self.name         = name
-        self.options      = options
+        self.name         = parsed_command.verb.name
+        self.verbspace    = verbspace
         self.config       = config
-        self.args         = args
-        self.primary      = primary
-        self.secondary    = secondary
+        self.parser       = parsed_command.outer_parser
+        self.opts         = parsed_command.inner_opts
+        self.args         = parsed_command.inner_args
         self.project_path = project_path
         self.classpath    = ':'.join(vcli_env.classpath)
+        self.go_default   = None
         # Extend the classpath if volt.classpath is configured.
         classpath_ext = self.config.get('volt.classpath')
         if classpath_ext:
             self.classpath += ':'.join((self.classpath, classpath_ext))
-
-    def run(self, name, *args):
-        """
-        Run a CLI command with arguments.
-        """
-        runner = VerbRunner(name,
-                            self.options,
-                            self.config,
-                            args,
-                            self.primary,
-                            self.secondary,
-                            self.project_path)
-        for verb in vcli_meta.verbs:
-            if verb.name == name:
-                break
-        else:
-            self.abort('Verb "%s" (being called by "%s") was not found.' % (name, self.name))
-        verb.execute(runner)
+        # Allows invoking volt or voltadmin tools via runner.<tool>.command(args...).
+        self.volt      = ToolRunner(self, 'volt')
+        self.voltadmin = ToolRunner(self, 'voltadmin')
 
     def shell(self, *args):
         """
@@ -105,6 +130,24 @@ class VerbRunner(object):
         vcli_util.run_cmd('javac', '-target', '1.6', '-source', '1.6',
                           '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
+    def get_catalog(self):
+        """
+        Get the catalog path from the configuration.
+        """
+        return self.config.get_required('volt.catalog')
+
+    def mkdir(self, dir):
+        """
+        Create a directory recursively.
+        """
+        self.shell('mkdir', '-p', dir)
+
+    def catalog_exists(self):
+        """
+        Test if catalog file exists.
+        """
+        return os.path.exists(self.get_catalog())
+
     def abort(self, *msgs):
         """
         Display errors (optional) and abort execution.
@@ -118,7 +161,7 @@ class VerbRunner(object):
         Display help for command.
         """
         for name in args:
-            for verb in vcli_meta.verbs:
+            for verb in self.verbspace.verbs:
                 if verb.name == name:
                     print ''
                     parser = optparse.OptionParser(
@@ -137,21 +180,92 @@ class VerbRunner(object):
         Display usage screen.
         """
         print ''
-        self.primary.print_help()
+        self.parser.print_help()
         print ''
+
+    def set_go_default(self, go_default):
+        """
+        Called by Verb to set the default go action.
+        """
+        self.go_default = go_default
+
+    def go(self, verb, *args):
+        """
+        Default go action provided by Verb object.
+        """
+        if self.go_default is None:
+            vcli_util.abort('Verb "%s" (class %s) does not provide a default go action.'
+                                % (verb.name, verb.__class__.__name__))
+        else:
+            self.go_default(self, *args)
+
+class VerbSpace(object):
+    """
+    Manages a collection of Verb objects that support a particular CLI interface.
+    """
+
+    def __init__(self, command_path):
+        self.verbs = []
+        self.search_dirs = [os.path.dirname(__file__)]
+        self.command_path = os.path.realpath(command_path)
+        self.command_dir, self.command_name = os.path.split(self.command_path)
+        self.verbs_subdir = '%s.d' % self.command_name
+        if self.command_dir not in self.search_dirs:
+            self.search_dirs.append(self.command_dir)
+
+    # @Command decorator
+    # Decorator invocation must have an argument list, even if empty.
+    def decorator_Command(self, *args, **kwargs):
+        def inner_decorator(function):
+            def wrapper(*args, **kwargs):
+                function(*args, **kwargs)
+            self.verbs.append(VOLT.FunctionVerb(function.__name__, wrapper, *args, **kwargs))
+            return wrapper
+        return inner_decorator
+
+    # @Java_Command decorator
+    # Decorator invocation must have an argument list, even if empty.
+    def decorator_Java_Command(self, java_class, *args, **kwargs):
+        def inner_decorator(function):
+            def wrapper(*args, **kwargs):
+                function(*args, **kwargs)
+            # Automatically set passthrough to True.
+            kwargs['passthrough'] = True
+            # Add extra message to description.
+            extra_help = '(use --help for full usage)'
+            if 'description' in kwargs:
+                kwargs['description'] += ' %s' % extra_help
+            else:
+                kwargs['description'] = extra_help
+            self.verbs.append(VOLT.JavaFunctionVerb(function.__name__, java_class, wrapper, *args, **kwargs))
+            return wrapper
+        return inner_decorator
+
+    def initialize(self):
+        # Verbs support the possible actions.
+        # Look for Verb subclasses in the .d subdirectory (relative to this file and to
+        # the working directory).
+        self.verbs.extend(vcli_util.find_and_load_subclasses(VOLT.Verb,
+                                                             self.search_dirs,
+                                                             self.verbs_subdir,
+                                                             VOLT         = VOLT,
+                                                             Command      = self.decorator_Command,
+                                                             Java_Command = self.decorator_Java_Command))
+        self.verbs.sort(cmp = lambda x, y: cmp(x.name, y.name))
 
 def main(version, description):
     """
     Called by main script to run using command line arguments.
     """
     # Initialize the environment
-    vcli_env.initialize()
+    vcli_env.initialize(version)
 
-    # Set the version number
-    vcli_meta.version = version
+    # Pull in the verb space based on the running script name.
+    verbspace = VerbSpace(sys.argv[0])
+    verbspace.initialize()
 
     # Run the command
-    run_command(description, *sys.argv[1:])
+    run_command(verbspace, description, version, *sys.argv[1:])
 
 class VoltConfig(vcli_util.PersistentConfig):
     """
@@ -166,10 +280,10 @@ class VoltConfig(vcli_util.PersistentConfig):
         if value is None:
             vcli_util.abort('Configuration parameter "%s.%s" was not found.' % (path, name),
                             'Set parameters using the "config" command, for example:',
-                            ['%s config %s.%s=VALUE' % (vcli_meta.bin_name, path, name)])
+                            ['%s config %s.%s=VALUE' % (vcli_env.bin_name, path, name)])
         return value
 
-def run_command(description, *cmdargs):
+def run_command(verbspace, description, version, *cmdargs):
     """
     Run a command after parsing the command line arguments provided.
     """
@@ -187,16 +301,19 @@ def run_command(description, *cmdargs):
     for key in alias_dict:
         name = key.split('.', 2)[1]
         aliases[name] = alias_dict[key]
-    processor = vcli_cli.VoltCLICommandProcessor(vcli_meta.verbs,
-                                                 vcli_meta.cli.options,
+    processor = vcli_cli.VoltCLICommandProcessor(verbspace.verbs,
+                                                 base_cli_spec.options_spec,
                                                  aliases,
-                                                 vcli_meta.cli.usage,
-                                                 '\n'.join((
-                                                     description,
-                                                     vcli_meta.cli.description)),
-                                                 '%%prog version %s' % vcli_meta.version)
-    verb, options, args, primary, secondary = processor.parse(cmdargs)
+                                                 base_cli_spec.usage,
+                                                 '\n'.join((description,
+                                                            base_cli_spec.description)),
+                                                 '%%prog version %s' % version)
+    parsed_command = processor.parse(cmdargs)
+
+    # Initialize utility function options according to parsed options.
+    vcli_util.set_debug(parsed_command.outer_opts.debug)
+    vcli_util.set_dryrun(parsed_command.outer_opts.dryrun)
 
     # Run the command.
-    runner = VerbRunner(verb.name, options, config, args, primary, secondary, project_path)
-    verb.execute(runner)
+    runner = VerbRunner(parsed_command, verbspace, config, project_path, version)
+    parsed_command.verb.execute(runner)
