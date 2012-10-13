@@ -25,6 +25,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@Command(description = 'Load CSV data. Run without arguments for usage.')
+@VOLT.Command(description = 'Load CSV data. Run without arguments for usage.')
 def csvload(self, runner):
-    runner.java('org.voltdb.utils.CSVLoader', None, *runner.args)
+    VOLT.java.execute('org.voltdb.utils.CSVLoader', None, *runner.args)

@@ -20,17 +20,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# Contains all the commands provided by the "voter" command.
+# All the tests for the Voter application.
 
-import os
-import vcli_util
-
-class Test1(VOLT.Verb):
-    def __init__(self):
-        VOLT.Verb.__init__(self, 'test1',
-                           description = 'Run test 1.',
-                           passthrough = True)
-    def execute(self, runner):
-        if not os.path.exists('voter.jar'):
-            runner.run('compile')
-        runner.java('voter.AsyncBenchmark', None, *runner.args)
+@VOLT.Java_Command('voter.AsyncBenchmark',
+                   description = 'Run test 1.',
+                   depends = 'build_as_needed')
+def test1(runner):
+    runner.go()

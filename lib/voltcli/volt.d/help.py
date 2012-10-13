@@ -25,8 +25,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@Command(description = 'Display command help',
-         usage       = '[COMMAND ...]')
+@VOLT.Command(description = 'Display command help',
+              usage       = '[COMMAND ...]')
 def help(runner):
     if runner.args:
         for arg in runner.args:

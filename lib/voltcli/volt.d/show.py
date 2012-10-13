@@ -46,9 +46,9 @@ subcommands = dict(
     config = show_config,
 )
 
-@Command(description = 'Display various types of information.',
-         usage = 'SUB_COMMAND [ARGUMENT ...]',
-         description2 = '''
+@VOLT.Command(description = 'Display various types of information.',
+              usage = 'SUB_COMMAND [ARGUMENT ...]',
+              description2 = '''
 Sub-Commands:
 
     Display all or specific configuration key/value pairs.

@@ -25,6 +25,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@Command(description = 'Run SQL interpreter.')
+@VOLT.Command(description = 'Run SQL interpreter.')
 def sql(runner):
-    runner.java('org.voltdb.utils.SQLCommand', None, *runner.args)
+    VOLT.java.execute('org.voltdb.utils.SQLCommand', None, *runner.args)

@@ -20,47 +20,42 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# All the commands supported by the "voter" command.
+# All the commands supported by the Voter application.
 
-@Command(description = 'Build the Voter application and catalog.')
+@VOLT.Command(description = 'Build the Voter application and catalog.')
 def build(runner):
-    runner.mkdir('obj')
-    runner.java_compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
-    runner.volt.compile()
+    VOLT.java.compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
+    VOLT.volt.compile()
 
-@Command(description = 'Build the Voter application and catalog only as needed.')
+@VOLT.Command(description = 'Build the Voter application and catalog only as needed.')
 def build_as_needed(runner):
     if not runner.catalog_exists():
         build(runner)
 
-@Command(description = 'Clean the Voter build output.')
+@VOLT.Command(description = 'Clean the Voter build output.')
 def clean(runner):
     runner.shell('rm', '-rfv', 'obj', 'debugoutput', runner.get_catalog(), 'voltdbroot')
 
-@Command(description = 'Start the Voter VoltDB server.')
+@VOLT.Command(description = 'Start the Voter VoltDB server.')
 def server(runner):
-    runner.voltadmin.start()
+    VOLT.voltadmin.start()
 
-@Java_Command('voter.JDBCBenchmark',
-             description = 'Run the Voter JDBC benchmark.',
-             depends = build_as_needed)
+@VOLT.Java_Command('voter.JDBCBenchmark', description = 'Run the Voter JDBC benchmark.')
 def jdbc(runner):
+    VOLT.run.build_as_needed()
     runner.go()
 
-@Java_Command('voter.SimpleBenchmark',
-             description = 'Run the Voter simple benchmark.',
-             depends = build_as_needed)
+@VOLT.Java_Command('voter.SimpleBenchmark', description = 'Run the Voter simple benchmark.')
 def simple(runner):
+    VOLT.run.build_as_needed()
     runner.go()
 
-@Java_Command('voter.AsyncBenchmark',
-             description = 'Run the Voter asynchronous benchmark.',
-             depends = build_as_needed)
+@VOLT.Java_Command('voter.AsyncBenchmark', description = 'Run the Voter asynchronous benchmark.')
 def async(runner):
+    VOLT.run.build_as_needed()
     runner.go()
 
-@Java_Command('voter.SyncBenchmark',
-             description = 'Run the Voter synchronous benchmark.',
-             depends = build_as_needed)
+@VOLT.Java_Command('voter.SyncBenchmark', description = 'Run the Voter synchronous benchmark.')
 def sync(runner):
+    VOLT.run.build_as_needed()
     runner.go()

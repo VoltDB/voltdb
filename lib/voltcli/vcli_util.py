@@ -131,15 +131,16 @@ def find_in_path(name):
             return os.path.join(dir, name)
     return None
 
-def find_and_load_subclasses(base_class, base_dirs, sub_dir, **kwargs):
+def search_and_execute(base_dirs, sub_dir, **syms):
     """
-    Look for python modules in a named subdirectory of a set of base
-    directories. Load any modules found and find all classes derived from the
-    specified base class. Return the classes found. Classes should implement
-    a __cmp__() method to properly support duplicate detection.
+    Look for python source files in a named subdirectory of a set of base
+    directories. Execute all discovered source files and pass in the symbols
+    provided.
+    A typical usage will be to supply decorators among the symbols which can
+    mark discoverable functions in user code. The decorator will be called when
+    the source file is executed which serves as an opportunity to keep track of
+    the discovered functions.
     """
-    # found holds (class, path) pairs
-    found = []
     processed_dirs = set()
     for base_dir in base_dirs:
         scan_dir = os.path.realpath(os.path.join(base_dir, sub_dir))
@@ -147,33 +148,8 @@ def find_and_load_subclasses(base_class, base_dirs, sub_dir, **kwargs):
             processed_dirs.add(scan_dir)
             if os.path.exists(scan_dir):
                 for modpath in glob.glob(os.path.join(scan_dir, '*.py')):
-                    filename = os.path.basename(modpath)
-                    name = os.path.splitext(filename)[0]
-                    # Start with an initial symbol table based on what the caller provided.
-                    syms = copy.copy(kwargs)
-                    before = set(syms.keys())
-                    # Execute the module. The symbol table gets populated with the module symbols.
+                    debug('Executing module "%s"...' % modpath)
                     execfile(modpath, syms)
-                    # Check the symbol table additions for subclasses of base_class.
-                    after = set(syms)
-                    for name in after.difference(before):
-                        # Ignore modules starting with '_' to allow utility modules.
-                        if not name.startswith('_'):
-                            o = syms[name]
-                            if inspect.isclass(o) and issubclass(o, base_class):
-                                subclass = o()
-                                for subclass2, modpath2 in found:
-                                    if subclass2 == subclass:
-                                        warning('Ignoring class "%s" in "%s"'
-                                                        % (o.__name__, modpath), [
-                                                    'It conflicts with "%s" in "%s".'
-                                                            % (subclass2.__class__.__name__,
-                                                               modpath2),
-                                                    'Check metadata for conflicting identifier.'])
-                                        break
-                                else:
-                                    found.append((subclass, modpath))
-    return [subclass for subclass, modpath in found]
 
 def normalize_list(items, width, filler = None):
     """

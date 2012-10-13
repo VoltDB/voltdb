@@ -31,7 +31,6 @@ import sys
 import optparse
 import shlex
 
-import VOLT
 import vcli_util
 
 # Volt CLI command processor
@@ -152,3 +151,69 @@ class VoltCLICommandProcessor(optparse.OptionParser):
     def format_epilog(self, formatter):
         rows = ((verb.name, verb.metadata.description) for verb in self.verbs)
         return '\n%s' % vcli_util.format_table("Subcommand Descriptions", None, rows)
+
+#### CLI metadata class
+
+class CLISpec(object):
+    def __init__(self, **kwargs):
+        if 'description' not in kwargs:
+            self.description = '(description missing)'
+        if 'usage' not in kwargs:
+            self.usage = ''
+        self._kwargs = kwargs
+    def __getattr__(self, name):
+        return self._kwargs.get(name, None)
+
+#### CLI option class
+
+class CLIOption(object):
+    def __init__(self, *args, **kwargs):
+        self.args   = args
+        self.kwargs = kwargs
+
+#### Verb class
+
+class Verb(object):
+    """
+    Base class for verb implementations that provide the available sub-commands.
+    """
+    def __init__(self, name, **kwargs):
+        self.name     = name
+        self.metadata = CLISpec(**kwargs)
+    def execute(self, runner):
+        vcli_util.abort('%s "%s" object does not implement the required execute() method.'
+                            % (self.__class__.__name__, self.name))
+    def __cmp__(self, other):
+        return cmp(self.name, other.name)
+    def help(self, runner):
+        runner.help(self.name)
+
+#### FunctionVerb class
+
+class FunctionVerb(Verb):
+    """
+    Verb that wraps any function. Used by @VOLT.Command decorator.
+    """
+    def __init__(self, name, function, **kwargs):
+        Verb.__init__(self, name, **kwargs)
+        self.function = function
+    def execute(self, runner):
+        self.function(runner)
+
+#### JavaFunctionVerb class
+
+class JavaFunctionVerb(Verb):
+    """
+    Verb that wraps any function implemented in Java. Used by @JavaCommand decorator.
+    """
+    def __init__(self, name, java_class, function, **kwargs):
+        Verb.__init__(self, name, **kwargs)
+        self.java_class         = java_class
+        self.function           = function
+        self.java_opts_override = kwargs.get('java_opts_override', None)
+    def execute(self, runner):
+        runner.set_go_default(self.go)
+        self.function(runner)
+    def go(self, runner, *args):
+        java_args = list(args) + list(runner.args)
+        runner.java(self.java_class, self.java_opts_override, *java_args)

@@ -34,12 +34,9 @@ java_ext_opts = (
     '-XX:-ReduceInitialCardMarks'
 )
 
-class VerbRejoin(VOLT.Verb):
-    def __init__(self):
-        VOLT.Verb.__init__(self, 'rejoin',
-                           description = 'Rejoin the VoltDB cluster.')
-    def execute(self, runner):
-        catalog = runner.config.get_required('volt.catalog')
-        if not os.path.exists(catalog):
-            runner.shell('volt', 'compile')
-        runner.java('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)
+@VOLT.Command(description = 'Rejoin the VoltDB cluster.')
+def rejoin(runner):
+    catalog = runner.config.get_required('volt.catalog')
+    if not os.path.exists(catalog):
+        runner.shell('volt', 'compile')
+    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)

@@ -27,7 +27,7 @@
 
 import vcli_util
 
-@Command(description = 'Configure project settings.',
+@VOLT.Command(description = 'Configure project settings.',
          usage       = 'KEY=VALUE ...')
 def config(runner):
     if not runner.args:
