@@ -42,6 +42,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -69,6 +70,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
+    private Runnable m_onMastership;
     private final ListeningExecutorService m_es;
     private SettableFuture<BBContainer> m_pollFuture;
 
@@ -734,5 +736,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
              * Need to forward the ack iff I am the master
              */
         }
+    }
+
+    /**
+     * Trigger an execution of the mastership runnable by the associated
+     * executor service
+     */
+    public void acceptMastership() {
+        if (m_es == null) return;
+
+        Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
+
+        m_es.execute(m_onMastership);
+    }
+
+    /**
+     * set the runnable task that is to be executed on mastership designation
+     * @param toBeRunOnMastership a {@link @Runnable} task
+     */
+    public void setOnMastership(Runnable toBeRunOnMastership) {
+        Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
+
+        m_onMastership = toBeRunOnMastership;
     }
 }

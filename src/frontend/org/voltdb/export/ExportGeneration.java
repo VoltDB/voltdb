@@ -143,7 +143,6 @@ public class ExportGeneration {
     }
 
     void initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
-        m_zk = messenger.getZK();
 
         Set<Integer> partitions = new HashSet<Integer>();
 
@@ -201,6 +200,8 @@ public class ExportGeneration {
     }
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
+        m_zk = messenger.getZK();
+
         //Intentionally ignoring return values of all but the last operation
         m_zk.create(
                 VoltZK.exportGenerations,
@@ -266,7 +267,7 @@ public class ExportGeneration {
         for (Integer partition : localPartitions) {
             ZKUtil.StringCallback callback = new ZKUtil.StringCallback();
             m_zk.create(
-                    VoltZK.exportGenerations + "/" + partition + "/" + m_mbox.getHSId(),
+                    m_zkPath + "/" + partition + "/" + m_mbox.getHSId(),
                     null,
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.EPHEMERAL,
@@ -592,6 +593,20 @@ public class ExportGeneration {
             //Logging of errors  is done inside the tasks so nothing to do here
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
+        }
+    }
+
+    /**
+     * Indicate to all associated {@link ExportDataSource}to assume
+     * mastership role for the given partition id
+     * @param partitionId
+     */
+    public void acceptMastershipTask( int partitionId) {
+        HashMap<String, ExportDataSource> partitionDataSourceMap =
+                m_dataSourcesByPartition.get(partitionId);
+
+        for( ExportDataSource eds: partitionDataSourceMap.values()) {
+            eds.acceptMastership();
         }
     }
 }

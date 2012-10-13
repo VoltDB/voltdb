@@ -70,25 +70,34 @@ public class GuestProcessor implements ExportDataProcessor {
 
     @Override
     public void readyForData() {
+
         for (HashMap<String, ExportDataSource> sources : m_generation.m_dataSourcesByPartition.values()) {
+
             for (final ExportDataSource source : sources.values()) {
-                ArrayList<VoltType> types = new ArrayList<VoltType>();
-                for (int type : source.m_columnTypes) {
-                    types.add(VoltType.get((byte)type));
-                }
-                AdvertisedDataSource ads =
-                        new AdvertisedDataSource(
-                                source.getPartitionId(),
-                                source.getSignature(),
-                                source.getTableName(),
-                                System.currentTimeMillis(),
-                                source.getGeneration(),
-                                source.m_columnNames,
-                                types);
-                ExportDecoderBase edb = m_client.constructExportDecoder(ads);
-                m_decoders.add(Pair.of(edb, ads));
-                final ListenableFuture<BBContainer> fut = source.poll();
-                constructListener( source, fut, edb, ads);
+                source.setOnMastership(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        ArrayList<VoltType> types = new ArrayList<VoltType>();
+                        for (int type : source.m_columnTypes) {
+                            types.add(VoltType.get((byte)type));
+                        }
+                        AdvertisedDataSource ads =
+                                new AdvertisedDataSource(
+                                        source.getPartitionId(),
+                                        source.getSignature(),
+                                        source.getTableName(),
+                                        System.currentTimeMillis(),
+                                        source.getGeneration(),
+                                        source.m_columnNames,
+                                        types);
+                        ExportDecoderBase edb = m_client.constructExportDecoder(ads);
+                        m_decoders.add(Pair.of(edb, ads));
+                        final ListenableFuture<BBContainer> fut = source.poll();
+                        constructListener( source, fut, edb, ads);
+
+                    }
+                });
             }
         }
     }
@@ -132,7 +141,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     @Override
     public void queueWork(Runnable r) {
-        r.run();
+        new Thread(r, "GuestProcessor gen " + m_generation + " shutdown task").start();
     }
 
     @Override

@@ -20,6 +20,8 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -63,17 +65,22 @@ public class ExportManager
     private final HostMessenger m_messenger;
 
     /**
+     * Set of partition ids for which this export manager instance is master of
+     */
+    private final Set<Integer> m_masterOfPartitions = new HashSet<Integer>();
+
+    /**
      * Thrown if the initial setup of the loader fails
      */
     public static class SetupException extends Exception {
         private static final long serialVersionUID = 1L;
-        private final String m_msg;
+
         SetupException(final String msg) {
-            m_msg = msg;
+            super(msg);
         }
-        @Override
-        public String getMessage() {
-            return m_msg;
+
+        SetupException(final Throwable cause) {
+            super(cause);
         }
     }
 
@@ -104,25 +111,35 @@ public class ExportManager
             proc.queueWork(new Runnable() {
                 @Override
                 public void run() {
-                    TreeMap<Long, ExportGeneration> generations =
-                        new TreeMap<Long, ExportGeneration>(m_generations.get());
-                    ExportGeneration generation = generations.firstEntry().getValue();
-                    generations.remove(generations.firstEntry().getKey());
-                    exportLog.info("Finished draining generation " + generation.m_timestamp);
-                    m_generations.set(generations);
 
-                    exportLog.info("Creating connector " + m_loaderClass);
+                    TreeMap<Long, ExportGeneration> generations =
+                            new TreeMap<Long, ExportGeneration>(m_generations.get());
+                    ExportGeneration generation = generations.firstEntry().getValue();
                     ExportDataProcessor newProcessor = null;
-                    try {
-                        final Class<?> loaderClass = Class.forName(m_loaderClass);
-                        newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-                        newProcessor.addLogger(exportLog);
-                        newProcessor.setExportGeneration(generations.firstEntry().getValue());
-                        newProcessor.readyForData();
-                    } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
-                        exportLog.error(e);
-                    } catch (IllegalAccessException e) {
-                        exportLog.error(e);
+
+                    synchronized (ExportManager.this) {
+
+                        generations.remove(generations.firstEntry().getKey());
+                        exportLog.info("Finished draining generation " + generation.m_timestamp);
+                        m_generations.set(generations);
+
+                        exportLog.info("Creating connector " + m_loaderClass);
+                        try {
+                            final Class<?> loaderClass = Class.forName(m_loaderClass);
+                            //TODO may set master ship here
+                            newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+                            newProcessor.addLogger(exportLog);
+                            newProcessor.setExportGeneration(generations.firstEntry().getValue());
+                            newProcessor.readyForData();
+                            for( Integer partitionId: m_masterOfPartitions) {
+                                generation.acceptMastershipTask(partitionId);
+                            }
+                        } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
+                            exportLog.error(e);
+                        } catch (IllegalAccessException e) {
+                            exportLog.error(e);
+                        }
+
                     }
 
                     m_processor.getAndSet(newProcessor).shutdown();
@@ -159,6 +176,19 @@ public class ExportManager
         }
         ExportManager tmp = new ExportManager(myHostId, catalogContext, messenger);
         m_self = tmp;
+    }
+
+    /**
+     * Indicate to associated {@link ExportGeneration}s to become
+     * masters for the given partition id
+     * @param partitionId
+     */
+    synchronized public void acceptMastership(int partitionId) {
+        if (m_masterOfPartitions.add(partitionId)) {
+          for( ExportGeneration gen: m_generations.get().values()) {
+              gen.acceptMastershipTask(partitionId);
+          }
+        }
     }
 
     private static void deleteExportOverflowData(CatalogContext context) {
@@ -245,10 +275,10 @@ public class ExportManager
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
-            throw new ExportManager.SetupException(e.getMessage());
+            throw new ExportManager.SetupException(e);
         }
         catch (final Exception e) {
-            throw new ExportManager.SetupException(e.getMessage());
+            throw new ExportManager.SetupException(e);
         }
     }
 
