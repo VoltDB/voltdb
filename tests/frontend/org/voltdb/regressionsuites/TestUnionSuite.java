@@ -28,10 +28,8 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestUnionSuite extends RegressionSuite {
@@ -60,7 +58,6 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 2, 3);
         VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION ALL SELECT I FROM B UNION ALL SELECT I FROM C;")
                                  .getResults()[0];
-        int c = result.getRowCount();
         assertEquals(5, result.getRowCount());
     }
 
@@ -124,6 +121,23 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A INTERSECT ALL SELECT I FROM B INTERSECT ALL SELECT I FROM C;")
                                  .getResults()[0];
         assertEquals(7, result.getRowCount());
+    }
+
+    public void testMultipleSetOperations() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A UNION SELECT I FROM B EXCEPT SELECT I FROM C;")
+                .getResults()[0];
+        client.callProcedure("InsertA", 0, 0);
+        client.callProcedure("InsertA", 1, 1);
+        client.callProcedure("InsertA", 2, 1);
+        client.callProcedure("InsertB", 1, 0);
+        client.callProcedure("InsertB", 2, 1);
+        client.callProcedure("InsertB", 3, 2);
+        client.callProcedure("InsertC", 1, 1);
+        client.callProcedure("InsertC", 2, 2);
+        client.callProcedure("InsertC", 3, 0);
+        client.callProcedure("InsertC", 4, 3);
+        assertEquals(0, result.getRowCount());
     }
 
 

@@ -60,7 +60,6 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
@@ -92,6 +91,8 @@ public class PlanAssembler {
     ParsedSelectStmt m_parsedSelect = null;
     /** parsed statement for an union */
     ParsedUnionStmt m_parsedUnion = null;
+
+    PlanProcessor m_processor;
 
     /** Describes the specified and inferred partition context. */
     private final PartitioningForStatement m_partitioning;
@@ -125,10 +126,11 @@ public class PlanAssembler {
      * @param partitioning
      *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning) {
+    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning, PlanProcessor processor) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
         m_partitioning = partitioning;
+        m_processor = processor;
     }
 
     String getSQLText() {
@@ -190,7 +192,7 @@ public class PlanAssembler {
         return false;
     }
 
-    public void verifyTablePartition (AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning) {
+    public void verifyTablePartition (AbstractParsedStmt parsedStmt) {
         int countOfPartitionedTables = 0;
         Map<String, String> partitionColumnByTable = new HashMap<String, String>();
         // Do we have a need for a distributed scan at all?
@@ -217,10 +219,10 @@ public class PlanAssembler {
             String partitionedTable = table.getTypeName();
             partitionColumnByTable.put(partitionedTable, colName);
         }
-        partitioning.setPartitionedTables(partitionColumnByTable, countOfPartitionedTables);
-        if ((partitioning.wasSpecifiedAsSingle() == false) && partitioning.getCountOfPartitionedTables() > 0) {
-            partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, parsedStmt.valueEquivalence);
-            int multiPartitionScanCount = partitioning.getCountOfIndependentlyPartitionedTables();
+        m_partitioning.setPartitionedTables(partitionColumnByTable, countOfPartitionedTables);
+        if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_partitioning.getCountOfPartitionedTables() > 0) {
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, parsedStmt.valueEquivalence);
+            int multiPartitionScanCount = m_partitioning.getCountOfIndependentlyPartitionedTables();
             if (multiPartitionScanCount > 1) {
                 // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
                 String msg = "Join or union of multiple partitioned tables has insufficient join criteria.";
@@ -234,26 +236,20 @@ public class PlanAssembler {
      * getNextPlan() will return the first candidate plan for these parameters.
      *
      */
-    void setupForNewPlans(AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
+    void setupForNewPlans(AbstractParsedStmt parsedStmt)
     {
-        if (partitioning == null) {
-            partitioning = m_partitioning;
-        }
-
+        verifyTablePartition (parsedStmt);
         if (parsedStmt instanceof ParsedUnionStmt) {
             m_parsedUnion = (ParsedUnionStmt) parsedStmt;
+            subAssembler = new UnionSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         } else if (parsedStmt instanceof ParsedSelectStmt) {
-            verifyTablePartition (parsedStmt, partitioning);
-
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                 throw new RuntimeException(
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, partitioning);
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         } else {
-            verifyTablePartition (parsedStmt, partitioning);
-
             // check that no modification happens to views
             if (tableListIncludesView(parsedStmt.tableList)) {
                 throw new RuntimeException(
@@ -265,13 +261,13 @@ public class PlanAssembler {
             assert (parsedStmt.tableList.size() == 1);
             Table targetTable = parsedStmt.tableList.get(0);
             if (targetTable.getIsreplicated()) {
-                if (partitioning.wasSpecifiedAsSingle()) {
+                if (m_partitioning.wasSpecifiedAsSingle()) {
                     String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
                                  + "' in a single-partition procedure.";
                     throw new PlanningErrorException(msg);
                 }
-            } else if (partitioning.wasSpecifiedAsSingle() == false) {
-                partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
+            } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
+                m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
             }
 
             if (parsedStmt instanceof ParsedInsertStmt) {
@@ -296,7 +292,7 @@ public class PlanAssembler {
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");
             }
-            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, partitioning);
+            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         }
     }
 
@@ -304,20 +300,14 @@ public class PlanAssembler {
      * Generate the best cost plan for the current SQL statement context.
      *
      * @param parsedStmt Current SQL statement to generate plan for
-     * @param processor plan processor object
-     * @param partitioning partitioning object for the given plan
-     * @param isPlanFinal hint to the assembler whether it needs to add receive/send pair
+     * @param isTopPlan hint to the assembler whether it needs to add a send node
      *        (true) or not (false) to the plan
      * @return The best cost plan or null.
      */
-    public CompiledPlan getBestCostPlan(
-            AbstractParsedStmt parsedStmt,
-            PlanProcessor processor,
-            PartitioningForStatement partitioning,
-            boolean isPlanFinal) {
+    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt, boolean isTopPlan) {
 
         // set up the plan assembler for this statement
-        setupForNewPlans(parsedStmt, partitioning);
+        setupForNewPlans(parsedStmt);
 
         // get ready to find the plan with minimal cost
         CompiledPlan rawplan = null;
@@ -326,7 +316,7 @@ public class PlanAssembler {
         while (true) {
 
             try {
-                rawplan = getNextPlan(processor, isPlanFinal);
+                rawplan = getNextPlan(isTopPlan);
             }
             // on exception, set the error message and bail...
             catch (PlanningErrorException e) {
@@ -338,41 +328,39 @@ public class PlanAssembler {
             if (rawplan == null)
                 break;
             // Update the best cost plan so far
-            processor.processPlan(rawplan);
+            m_processor.processPlan(rawplan);
         }
 
-        if (isPlanFinal && processor.m_bestPlan != null) {
-            processor.finalizeOutput(processor.m_bestFilename, processor.m_stats);
+        if (isTopPlan && m_processor.m_bestPlan != null) {
+            m_processor.finalizeOutput(m_processor.m_bestFilename, m_processor.m_stats);
         }
-        return processor.m_bestPlan;
+        return m_processor.m_bestPlan;
     }
 
     /**
      * Generate a unique and correct plan for the current SQL statement context.
      * This method gets called repeatedly until it returns null, meaning there
      * are no more plans.
+     * @param isTopPlan true if the plan's root is the root node for the entire statement
      *
      * @return A not-previously returned query plan or null if no more
      *         computable plans.
      */
-    CompiledPlan getNextPlan(PlanProcessor planProcessor, boolean addSendReceive) {
+    CompiledPlan getNextPlan(boolean isTopPlan) {
         // reset the plan column guids and pool
         //PlanColumn.resetAll();
 
         CompiledPlan retval = new CompiledPlan();
         AbstractParsedStmt nextStmt = null;
-        // getNextPlan is called multiple times for a UNION statement. The first time
-        // is for the whole statement and then once per each individual expression
-        // (currently only SELECT statement is allowed).
-        // The second check in the below IF statement is suppose to prevent parsing union
-        // statement multiple times.
-        if (m_parsedUnion != null && m_parsedSelect == null) {
+        if (m_parsedUnion != null) {
             nextStmt = m_parsedUnion;
-            retval = getNextUnionPlan(planProcessor);
-            retval.readOnly = true;
+            retval = getNextUnionPlan(isTopPlan);
+            if (retval != null) {
+                retval.readOnly = true;
+            }
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
-            retval.rootPlanGraph = getNextSelectPlan(addSendReceive);
+            retval.rootPlanGraph = getNextSelectPlan(isTopPlan);
             retval.readOnly = true;
             if (retval.rootPlanGraph != null)
             {
@@ -424,27 +412,36 @@ public class PlanAssembler {
 
     /**
      * This is a UNION specific method. Generate a unique and correct plan
-     * for the current SQL UNION statement given the best plans for each individual SELECT.
-     * This method gets called ones.
+     * for the current SQL UNION statement by building the best plans for each individual statements
+     * within the UNION.
+     * @param isTopPlan true if the plan's root is the root node for the entire statement
      *
      * @return A union plan or null.
      */
-    public CompiledPlan getNextUnionPlan(PlanProcessor planProcessor) {
-        CompiledPlan retval = new CompiledPlan();
+    private CompiledPlan getNextUnionPlan(boolean isTopPlan) {
+        AbstractPlanNode subUnionRoot = subAssembler.nextPlan();
+        if (subUnionRoot == null) {
+            return null;
+        }
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
         boolean orderIsDeterministic = true;
         boolean contentIsDeterministic = true;
 
+        // The children plans are never final - don't need send/receive pair on top
         boolean isPlanFinal = false;
         ArrayList<PartitioningForStatement> partitioningList = new ArrayList<PartitioningForStatement>();
 
         // Build best plans for the children first
+        int planId = 0;
         for (AbstractParsedStmt parsedChildStmt : m_parsedUnion.m_children) {
-            PartitioningForStatement partitioning = new PartitioningForStatement(null, false, true);
-            CompiledPlan bestChildPlan = getBestCostPlan(
-                    parsedChildStmt, planProcessor, partitioning, isPlanFinal);
+            PartitioningForStatement partitioning = (PartitioningForStatement)m_partitioning.clone();
+            PlanProcessor processor = (PlanProcessor) m_processor.clone();
+            processor.m_planId = planId;
+            PlanAssembler assembler = new PlanAssembler(
+                    m_catalogCluster, m_catalogDb, partitioning, processor);
+            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt, isPlanFinal);
             // make sure we got a winner
             if (bestChildPlan == null) {
                 if (m_recentErrorMsg == null) {
@@ -456,36 +453,32 @@ public class PlanAssembler {
             orderIsDeterministic = orderIsDeterministic && bestChildPlan.isOrderDeterministic();
             contentIsDeterministic = contentIsDeterministic && bestChildPlan.isContentDeterministic();
             partitioningList.add(partitioning);
+            // Make sure that next child's plans won't override current ones.
+            planId = processor.m_planId;
         }
+        // need to reset plan id for the entire UNION
+        m_processor.m_planId = planId;
 
-        // Iterate over individual partition objects. It should be either zero or one
-        // of them where count of independent partitioned tables is greater then 0
-        // (we don't allow same table to appear in multiple child statements of the UNION statement)
-        boolean hasPrtitionedTable = false;
-        for (PartitioningForStatement partition : partitioningList) {
-            if (partition.getCountOfIndependentlyPartitionedTables() > 0)
-                if (!hasPrtitionedTable) {
-                    hasPrtitionedTable = true;
-                } else {
-                    m_recentErrorMsg = "Unable to plan for statement. More than one partitioned table in the union.";
-                    return null;
-                }
-        }
         // Add and link children plans
-        AbstractPlanNode root = new UnionPlanNode(m_parsedUnion.m_unionType);
         for (CompiledPlan selectPlan : childrenPlans) {
-            root.addAndLinkChild(selectPlan.rootPlanGraph);
+            subUnionRoot.addAndLinkChild(selectPlan.rootPlanGraph);
         }
 
-        SendPlanNode sendNode = new SendPlanNode();
+        CompiledPlan retval = new CompiledPlan();
+        if (isTopPlan) {
+            // If this is the top plan add send node on top of it
+            SendPlanNode sendNode = new SendPlanNode();
 
-        // connect the nodes to build the graph
-        sendNode.addAndLinkChild(root);
-        sendNode.generateOutputSchema(m_catalogDb);
+            // connect the nodes to build the graph
+            sendNode.addAndLinkChild(subUnionRoot);
+            sendNode.generateOutputSchema(m_catalogDb);
 
-        retval.rootPlanGraph = sendNode;
+            retval.rootPlanGraph = sendNode;
+        } else {
+            retval.rootPlanGraph = subUnionRoot;
+        }
         retval.readOnly = true;
-        retval.sql = planProcessor.m_sql;
+        retval.sql = m_processor.m_sql;
         retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
 
         // compute the cost - total of all children
@@ -532,7 +525,7 @@ public class PlanAssembler {
         }
     }
 
-    private AbstractPlanNode getNextSelectPlan(boolean addSendReceive) {
+    private AbstractPlanNode getNextSelectPlan(boolean isTopPlan) {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
@@ -565,7 +558,7 @@ public class PlanAssembler {
             root = handleLimitOperator(root);
         }
 
-        if (addSendReceive) {
+        if (isTopPlan) {
             SendPlanNode sendNode = new SendPlanNode();
 
             // connect the nodes to build the graph

@@ -39,7 +39,7 @@ import org.voltdb.utils.BuildDirectoryUtils;
  * compute the cost of a specific plan. The plan with the lowest cost wins.
  *
  */
-public class PlanProcessor {
+public class PlanProcessor implements Cloneable{
     /** pointer to the cluster object in the catalog */
     final Cluster m_cluster;
     /** pointer to the database object in the catalog */
@@ -101,6 +101,15 @@ public class PlanProcessor {
         m_planId = 0;
         m_quietPlanner = quietPlanner;
         m_fullDebug = fullDebug;
+    }
+
+    /**
+     * Clone itself.
+     * @return deep copy of self
+     */
+    public Object clone() {
+        return new PlanProcessor(m_cluster, m_db, m_estimates, m_stmtName, m_procName, m_sql,
+                m_costModel, m_paramHints, m_quietPlanner, m_fullDebug);
     }
 
     /**

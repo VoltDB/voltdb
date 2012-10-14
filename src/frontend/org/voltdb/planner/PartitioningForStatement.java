@@ -43,7 +43,7 @@ import org.voltdb.expressions.TupleValueExpression;
  * As a multi-partition statement is analyzed in the planner, this object is filled in with details regarding its
  * suitability for running correctly on a single partition.
  */
-public class PartitioningForStatement {
+public class PartitioningForStatement implements Cloneable{
 
     /**
      * This value can be provided any non-null value to force single-partition statement planning and
@@ -114,6 +114,13 @@ public class PartitioningForStatement {
         m_specifiedValue = specifiedValue;
         m_lockIn = lockInInferredPartitioningConstant;
         m_inferSP = inferSP;
+    }
+
+    /**
+     * @return deep copy of self
+     */
+    public Object clone() {
+        return new PartitioningForStatement(m_specifiedValue, m_lockIn, m_inferSP);
     }
 
     /**

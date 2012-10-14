@@ -17,8 +17,6 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -34,8 +32,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
  *
  */
 public class QueryPlanner {
-    PlanAssembler m_assembler;
-    PlanProcessor m_planProcessor;
+    PartitioningForStatement m_partitioning;
     HSQLInterface m_HSQL;
     DatabaseEstimates m_estimates;
     Cluster m_cluster;
@@ -61,9 +58,9 @@ public class QueryPlanner {
         assert(catalogDb != null);
 
         m_HSQL = HSQL;
-        m_assembler = new PlanAssembler(catalogCluster, catalogDb, partitioning);
         m_db = catalogDb;
         m_cluster = catalogCluster;
+        m_partitioning = partitioning;
         m_estimates = estimates;
         //m_quietPlanner = suppressDebugOutput;
         //m_fullDebug = System.getProperties().contains("compilerdebug");
@@ -114,9 +111,11 @@ public class QueryPlanner {
         }
 
         // Init PlanProcessor
-        m_planProcessor = new PlanProcessor(m_cluster, m_db, m_estimates, stmtName,
+        PlanProcessor planProcessor = new PlanProcessor(m_cluster, m_db, m_estimates, stmtName,
                 procName, sql, costModel, paramHints, m_quietPlanner, m_fullDebug);
-        m_planProcessor.outputCompiledStatement(xmlSQL);
+        planProcessor.outputCompiledStatement(xmlSQL);
+        // Init Assembler
+        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, planProcessor);
 
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
@@ -133,18 +132,16 @@ public class QueryPlanner {
             return null;
         }
 
-        m_planProcessor.outputParsedStatement(parsedStmt);
+        planProcessor.outputParsedStatement(parsedStmt);
 
         // find the plan with minimal cost
-        // Hint to the assembler that plan needs receive/send pair to be added
-        boolean isPlanFinal = true;
-        // Use partitioning object from the plan assembler
-        PartitioningForStatement partitioning = null;
-        CompiledPlan bestPlan = m_assembler.getBestCostPlan(parsedStmt, m_planProcessor, partitioning, isPlanFinal);
+        // Hint to the assembler that plan needs send node to be added
+        boolean isTopPlan = true;
+        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, isTopPlan);
 
         // make sure we got a winner
         if (bestPlan == null) {
-            m_recentErrorMsg = m_assembler.getErrorMessage();
+            m_recentErrorMsg = assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
                 m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
             }

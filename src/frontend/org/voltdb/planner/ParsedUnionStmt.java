@@ -67,45 +67,56 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         assert(stmtNode.children.size() > 1);
         tableList.clear();
         for (VoltXMLElement childSQL : stmtNode.children) {
-            if (!childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+            // @TODO MIKE
+            //if (!childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+            //    throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
+            //}
+            if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+                AbstractParsedStmt childStmt = new ParsedSelectStmt();
+                childStmt.parseTablesAndParams(childSQL, db);
+                m_children.add(childStmt);
+
+
+                // So far T UNION T (as well as T JOIN T) are not handled properly
+                // by the fragmentizer. Need to give an error if any table mentioned
+                // in a UNION's (UNION TREE's) children occurs more than once.
+                HashSet<String> uniqueTables = new HashSet<String>();
+
+                if (childStmt.scanColumns != null)
+                {
+                    Set<String> tableNames = childStmt.scanColumns.keySet();
+
+                    Iterator<Table> it = childStmt.tableList.iterator();
+                    // When HSQLInterface.getXMLCompiledStatement() parses the union statement
+                    // it adds ALL tables across the entire union to each child statement (table sources)
+                    // SCAN columns though contains right set of tables related to this particular
+                    // sub-select only. Filter out tables which are not from this statement
+                    while (it.hasNext()) {
+                        String tableName = it.next().getTypeName();
+                        if (!tableNames.contains(tableName)) {
+                            it.remove();
+                        } else if (uniqueTables.contains(tableName)) {
+                            // Is this table 'unique' across the union?
+                            throw new PlanningErrorException("Table " + tableName +
+                                    " appears more than once in the union statement");
+                        } else {
+                            uniqueTables.add(tableName);
+                        }
+                    }
+                } else {
+                    throw new PlanningErrorException("Select * is not supported within the UNION statement");
+                }
+                // Add statement's tables to the consolidated list
+                tableList.addAll(childStmt.tableList);
+            } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+                AbstractParsedStmt childStmt = new ParsedUnionStmt();
+                childStmt.parseTablesAndParams(childSQL, db);
+                m_children.add(childStmt);
+                // Add statement's tables to the consolidated list
+                tableList.addAll(childStmt.tableList);
+            } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
-            AbstractParsedStmt childStmt = new ParsedSelectStmt();
-            childStmt.parseTablesAndParams(childSQL, db);
-            m_children.add(childStmt);
-
-
-            // So far T UNION T (as well as T JOIN T) are not handled properly
-            // by the fragmentizer. Need to give an error if any table mentioned
-            // in a UNION's (UNION TREE's) children occurs more than once.
-            HashSet<String> uniqueTables = new HashSet<String>();
-
-            if (childStmt.scanColumns != null)
-            {
-                Set<String> tableNames = childStmt.scanColumns.keySet();
-
-                Iterator<Table> it = childStmt.tableList.iterator();
-                // When HSQLInterface.getXMLCompiledStatement() parses the union statement
-                // it adds ALL tables across the entire union to each child statement (table sources)
-                // SCAN columns though contains right set of tables related to this particular
-                // sub-select only. Filter out tables which are not from this statement
-                while (it.hasNext()) {
-                    String tableName = it.next().getTypeName();
-                    if (!tableNames.contains(tableName)) {
-                        it.remove();
-                    } else if (uniqueTables.contains(tableName)) {
-                        // Is this table 'unique' across the union?
-                        throw new PlanningErrorException("Table " + tableName +
-                            " appears more than once in the union statement");
-                    } else {
-                        uniqueTables.add(tableName);
-                    }
-                }
-            } else {
-                throw new PlanningErrorException("Select * is not supported within the UNION statement");
-            }
-            // Add statement's tables to the consolidated list
-            tableList.addAll(childStmt.tableList);
         }
     }
 

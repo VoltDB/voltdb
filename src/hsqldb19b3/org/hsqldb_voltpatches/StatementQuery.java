@@ -190,18 +190,14 @@ public class StatementQuery extends StatementDMQL {
         // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
         // The only other instances of QueryExpression are direct QueryExpression instances instantiated in XreadSetOperation
         // to represent UNION, etc.
-        // The latter are not yet supported in VoltDB.
-        if (queryExpr.getUnionType() == QueryExpression.NOUNION) {
+        int exprType = queryExpr.getUnionType();
+        if (exprType == QueryExpression.NOUNION) {
             return voltGetXMLSpecification(queryExpr, session);
-        } else {
-            String unionType = queryExpr.operatorName();
-            if (!"UNION".equalsIgnoreCase(unionType) && !"UNION_ALL".equalsIgnoreCase(unionType) &&
-                !"EXCEPT".equalsIgnoreCase(unionType) && !"EXCEPT_ALL".equalsIgnoreCase(unionType) &&
-                !"INTERSECT".equalsIgnoreCase(unionType) && !"INTERSECT_ALL".equalsIgnoreCase(unionType)) {
-                throw new HSQLParseException(queryExpression.operatorName() + "  tuple set operator is not supported.");
-            }
+        } else if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
+                   exprType == QueryExpression.EXCEPT || exprType == QueryExpression.EXCEPT_ALL ||
+                   exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
             VoltXMLElement unionExpr = new VoltXMLElement("union");
-            unionExpr.attributes.put("uniontype", unionType);
+            unionExpr.attributes.put("uniontype", queryExpr.operatorName());
             VoltXMLElement leftExpr = voltGetXMLExpression(
                     queryExpr.getLeftQueryExpression(), session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
@@ -209,6 +205,8 @@ public class StatementQuery extends StatementDMQL {
             unionExpr = voltTransformUnionXMLExpression(unionExpr, leftExpr);
             unionExpr = voltTransformUnionXMLExpression(unionExpr, rightExpr);
             return unionExpr;
+        } else {
+            throw new HSQLParseException(queryExpression.operatorName() + "  tuple set operator is not supported.");
         }
     }
     
@@ -218,18 +216,24 @@ public class StatementQuery extends StatementDMQL {
      * can be reduced to a single node with multiple children instead of the expression tree 
      * @param unionExpr The parent UNION element
      * @param childExpr The child expression
-     * @return VoltXMLElement representing UNION element having all of it's grand children
+     * @return VoltXMLElement representing UNION element having all of its grand children
      * as promoted to the immediate children.
      * @throws HSQLParseException
      */
     VoltXMLElement voltTransformUnionXMLExpression(VoltXMLElement unionExpr, VoltXMLElement childExpr)
     throws HSQLParseException
     {
-        if ("union".equalsIgnoreCase(childExpr.name)) {
+        // @TODO MIKE
+/*        if ("union".equalsIgnoreCase(childExpr.name)) {
             if (!unionExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
                 throw new HSQLParseException("Union expressions with distinct tuple set operations are not supported.");
             }
             unionExpr.children.addAll(childExpr.children);
+        } else {
+*/     
+        if ("union".equalsIgnoreCase(childExpr.name) &&
+            unionExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
+                unionExpr.children.addAll(childExpr.children);
         } else {
             unionExpr.children.add(childExpr);
         }

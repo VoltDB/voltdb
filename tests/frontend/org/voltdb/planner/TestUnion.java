@@ -29,10 +29,8 @@ import junit.framework.TestCase;
 
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.*;
-import org.voltdb.types.PlanNodeType;
 
 public class TestUnion  extends TestCase {
 
@@ -123,11 +121,16 @@ public class TestUnion  extends TestCase {
     }
 
     public void testMultipleSetOperations() {
-        try {
-            aide.compile("select A from T1 UNION select B from T2 EXCEPT select C from T3", 0, false, null);
-            fail();
-        }
-        catch (Exception ex) {}
+        AbstractPlanNode pn = compile("select A from T1 UNION select B from T2 EXCEPT select C from T3", 0, false, null);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        UnionPlanNode unionPN1 = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN1.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
+        assertTrue(unionPN1.getChildCount() == 2);
+        assertTrue(unionPN1.getChild(0) instanceof UnionPlanNode);
+        UnionPlanNode unionPN2 = (UnionPlanNode) unionPN1.getChild(0);
+        assertTrue(unionPN2.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        assertTrue(unionPN2.getChildCount() == 2);
+        assertTrue(unionPN1.getChild(1) instanceof SeqScanPlanNode);
     }
 
     public void testColumnMismatch() {

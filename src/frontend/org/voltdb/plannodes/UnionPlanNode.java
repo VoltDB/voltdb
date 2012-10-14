@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.List;
 import java.util.ArrayList;
 
 import org.json_voltpatches.JSONException;
@@ -103,7 +102,7 @@ public class UnionPlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "UNION";
+        return "UNION " + m_unionType.name();
     }
 
 }
