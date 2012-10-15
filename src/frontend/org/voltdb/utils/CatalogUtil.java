@@ -892,19 +892,36 @@ public abstract class CatalogUtil {
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
             // copy partition detection configuration from xml to catalog
-            if (deployment.getPartitionDetection() != null && deployment.getPartitionDetection().isEnabled()) {
-                catCluster.setNetworkpartition(true);
-                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
-                if (printLog) {
-                    hostLog.info("Detection of network partitions in the cluster is enabled.");
+            if (deployment.getPartitionDetection() != null) {
+                if (deployment.getPartitionDetection().isEnabled()) {
+                    catCluster.setNetworkpartition(true);
+                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+                    sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is enabled.");
+                    }
+                }
+                else {
+                    catCluster.setNetworkpartition(false);
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
+                    }
                 }
             }
             else {
-                catCluster.setNetworkpartition(false);
-                if (printLog) {
-                    hostLog.info("Detection of network partitions in the cluster is not enabled.");
+                // Default partition detection on for IV2
+                if (VoltDB.instance().isIV2Enabled()) {
+                    catCluster.setNetworkpartition(true);
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is enabled.");
+                    }
+                }
+                else {
+                    catCluster.setNetworkpartition(false);
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
+                    }
                 }
             }
 

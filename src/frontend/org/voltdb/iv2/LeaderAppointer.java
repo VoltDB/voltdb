@@ -37,8 +37,11 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 
 import org.voltcore.logging.VoltLogger;
+
+import org.voltcore.messaging.HostMessenger;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -70,6 +73,7 @@ public class LeaderAppointer implements Promotable
         DONE            // indicates normal running conditions, including repair
     }
 
+    private final HostMessenger m_hostMessenger;
     private final ZooKeeper m_zk;
     private final int m_partitionCount;
     private final BabySitter[] m_partitionWatchers;
@@ -82,6 +86,7 @@ public class LeaderAppointer implements Promotable
     private AtomicReference<AppointerState> m_state =
         new AtomicReference<AppointerState>(AppointerState.INIT);
     private CountDownLatch m_startupLatch = null;
+    private final boolean m_partitionDetectionEnabled;
 
     private class PartitionCallback extends BabySitter.Callback
     {
@@ -156,12 +161,15 @@ public class LeaderAppointer implements Promotable
             }
             else {
                 // Check for k-safety
-                if (children.size() == 0) {
-                    VoltDB.crashGlobalVoltDB("Cluster has become unviable: No remaining replicas for partition "
-                            + m_partitionId + ", shutting down.", false, null);
+                if (!isClusterKSafe()) {
+                    VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                            false, null);
                 }
                 else if (missingHSIds.contains(m_currentLeader)) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                }
+                if (m_partitionDetectionEnabled) {
+                    doPartitionDetectionActivities();
                 }
             }
             m_replicas.clear();
@@ -189,10 +197,12 @@ public class LeaderAppointer implements Promotable
         }
     };
 
-    public LeaderAppointer(ZooKeeper zk, int numberOfPartitions,
-            int kfactor, JSONObject topology, MpInitiator mpi)
+    public LeaderAppointer(HostMessenger hm, int numberOfPartitions,
+            int kfactor, boolean partitionDetectionEnabled,
+            JSONObject topology, MpInitiator mpi)
     {
-        m_zk = zk;
+        m_hostMessenger = hm;
+        m_zk = hm.getZK();
         m_kfactor = kfactor;
         m_topo = topology;
         m_MPI = mpi;
@@ -201,6 +211,7 @@ public class LeaderAppointer implements Promotable
         m_partitionWatchers = new BabySitter[m_partitionCount];
         m_iv2appointees = new LeaderCache(m_zk, VoltZK.iv2appointees);
         m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
+        m_partitionDetectionEnabled = partitionDetectionEnabled;
     }
 
     @Override
@@ -232,6 +243,7 @@ public class LeaderAppointer implements Promotable
             // LeaderCache callback will count it down once it has seen all the
             // appointed leaders publish themselves as the actual leaders.
             m_startupLatch = new CountDownLatch(1);
+            writeKnownLiveNodes(m_hostMessenger.getLiveHostIds());
             for (int i = 0; i < m_partitionCount; i++) {
                 String dir = LeaderElector.electionDirForPartition(i);
                 // Race along with all of the replicas for this partition to create the ZK parent node
@@ -318,6 +330,137 @@ public class LeaderAppointer implements Promotable
             VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
         }
         return masterHSId;
+    }
+
+    private void writeKnownLiveNodes(List<Integer> liveNodes)
+    {
+        try {
+            if (m_zk.exists(VoltZK.lastKnownLiveNodes, null) == null)
+            {
+                // VoltZK.createPersistentZKNodes should have done this
+                m_zk.create(VoltZK.lastKnownLiveNodes, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
+            JSONStringer stringer = new JSONStringer();
+            stringer.object();
+            stringer.key("liveNodes").array();
+            for (Integer node : liveNodes) {
+                stringer.value(node);
+            }
+            stringer.endArray();
+            stringer.endObject();
+            JSONObject obj = new JSONObject(stringer.toString());
+            tmLog.debug("Writing live nodes to ZK: " + obj.toString(4));
+            m_zk.setData(VoltZK.lastKnownLiveNodes, obj.toString(4).getBytes("UTF-8"), -1);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to update known live nodes at ZK path: " +
+                    VoltZK.lastKnownLiveNodes, true, e);
+        }
+    }
+
+    private Set<Integer> readPriorKnownLiveNodes()
+    {
+        Set<Integer> nodes = new HashSet<Integer>();
+        try {
+            byte[] data = m_zk.getData(VoltZK.lastKnownLiveNodes, false, null);
+            String jsonString = new String(data, "UTF-8");
+            tmLog.debug("Read prior known live nodes: " + jsonString);
+            JSONObject jsObj = new JSONObject(jsonString);
+            JSONArray jsonNodes = jsObj.getJSONArray("liveNodes");
+            for (int ii = 0; ii < jsonNodes.length(); ii++) {
+                nodes.add(jsonNodes.getInt(ii));
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to read prior known live nodes at ZK path: " +
+                    VoltZK.lastKnownLiveNodes, true, e);
+        }
+        return nodes;
+    }
+
+    private void doPartitionDetectionActivities()
+    {
+        // After everything is resolved, write the new surviving set to ZK
+        List<Integer> currentNodes = null;
+        try {
+            currentNodes = m_hostMessenger.getLiveHostIds();
+        } catch (Exception e) {
+
+        }
+        Set<Integer> currentHosts = new HashSet<Integer>(currentNodes);
+        Set<Integer> previousHosts = readPriorKnownLiveNodes();
+
+        // Real partition detection stuff would go here
+        // find the lowest hostId between the still-alive hosts and the
+        // failed hosts. Which set contains the lowest hostId?
+        int blessedHostId = Integer.MAX_VALUE;
+        boolean blessedHostIdInFailedSet = true;
+
+        // This should be all the pre-partition hosts IDs.  Any new host IDs
+        // (say, if this was triggered by rejoin), will be greater than any surviving
+        // host ID, so don't worry about including it in this search.
+        for (Integer hostId : previousHosts) {
+            if (hostId < blessedHostId) {
+                blessedHostId = hostId;
+            }
+        }
+
+        for (Integer hostId : currentHosts) {
+            if (hostId.equals(blessedHostId)) {
+                blessedHostId = hostId;
+                blessedHostIdInFailedSet = false;
+            }
+        }
+
+        // Evaluate PPD triggers.
+        boolean partitionDetectionTriggered = false;
+        // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
+        // If the blessed host is in the failure set, this set is not blessed.
+        if (currentHosts.size() * 2 == previousHosts.size()) {
+            if (blessedHostIdInFailedSet) {
+                tmLog.info("Partition detection triggered for 50/50 cluster failure. " +
+                        "This survivor set is shutting down.");
+                partitionDetectionTriggered = true;
+            }
+            else {
+                tmLog.info("Partition detected for 50/50 failure. " +
+                        "This survivor set is continuing execution.");
+            }
+        }
+
+        // A strict, viable minority is always a partition.
+        if (currentHosts.size() * 2 < previousHosts.size()) {
+            tmLog.info("Partition detection triggered. " +
+                         "This minority survivor set is shutting down.");
+            partitionDetectionTriggered = true;
+        }
+
+        if (partitionDetectionTriggered) {
+            VoltDB.crashGlobalVoltDB("Partition detection triggered.  This survivor set will shut down.",
+                    false, null);
+        }
+
+        // If the cluster host set has changed, then write the new set to ZK
+        if (!currentHosts.equals(previousHosts)) {
+            writeKnownLiveNodes(currentNodes);
+        }
+    }
+
+    private boolean isClusterKSafe()
+    {
+        boolean retval = true;
+        for (int i = 0; i < m_partitionCount; i++) {
+            String dir = LeaderElector.electionDirForPartition(i);
+            try {
+                List<String> replicas = m_zk.getChildren(dir, null, null);
+                if (replicas.isEmpty()) {
+                    tmLog.fatal("K-Safety violation: No replicas found for partition: " + i);
+                    retval = false;
+                }
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+            }
+        }
+        return retval;
     }
 
     public void shutdown()
