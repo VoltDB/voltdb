@@ -48,12 +48,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.CRC32;
@@ -119,7 +117,6 @@ import org.voltdb.utils.VoltSampler;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 
 /**
@@ -328,21 +325,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_localSites = new COWMap<Long, ExecutionSite>();
             m_siteThreads = new HashMap<Long, Thread>();
             m_runners = new ArrayList<ExecutionSiteRunner>();
-
-            m_computationService = MoreExecutors.listeningDecorator(
-                    Executors.newFixedThreadPool(
-                        Math.max(2, CoreUtils.availableProcessors() / 4),
-                        new ThreadFactory() {
-                            private int threadIndex = 0;
-                            @Override
-                            public synchronized Thread  newThread(Runnable r) {
-                                Thread t = new Thread(null, r, "Computation service thread - " + threadIndex++, 131072);
-                                t.setDaemon(true);
-                                return t;
-                            }
-
-                        })
-                    );
+            final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
+            m_computationService =
+                    CoreUtils.getListeningExecutorService("Computation service thread", computationThreads);
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
