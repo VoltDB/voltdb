@@ -48,12 +48,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.CRC32;
@@ -119,7 +117,6 @@ import org.voltdb.utils.VoltSampler;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 
 /**
@@ -328,21 +325,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_localSites = new COWMap<Long, ExecutionSite>();
             m_siteThreads = new HashMap<Long, Thread>();
             m_runners = new ArrayList<ExecutionSiteRunner>();
-
-            m_computationService = MoreExecutors.listeningDecorator(
-                    Executors.newFixedThreadPool(
-                        Math.max(2, CoreUtils.availableProcessors() / 4),
-                        new ThreadFactory() {
-                            private int threadIndex = 0;
-                            @Override
-                            public synchronized Thread  newThread(Runnable r) {
-                                Thread t = new Thread(null, r, "Computation service thread - " + threadIndex++, 131072);
-                                t.setDaemon(true);
-                                return t;
-                            }
-
-                        })
-                    );
+            final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
+            m_computationService =
+                    CoreUtils.getListeningExecutorService("Computation service thread", computationThreads);
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -385,7 +370,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_faultManager.registerFaultHandler(SiteFailureFault.SITE_FAILURE_CATALOG,
                     m_faultHandler,
                     FaultType.SITE_FAILURE);
-            if (!m_faultManager.testPartitionDetectionDirectory(
+            // This doesn't happen/work for IV2 yet:
+            if (!isIV2Enabled() && !m_faultManager.testPartitionDetectionDirectory(
                     m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
                 VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at" +
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"), false, null);
@@ -616,9 +602,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (isIV2Enabled()) {
                 try {
                     m_leaderAppointer = new LeaderAppointer(
-                            m_messenger.getZK(),
+                            m_messenger,
                             clusterConfig.getPartitionCount(),
                             m_deployment.getCluster().getKfactor(),
+                            m_catalogContext.cluster.getNetworkpartition(),
                             topo, m_MPI);
                     m_globalServiceElector.registerService(m_leaderAppointer);
 

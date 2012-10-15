@@ -4,18 +4,5 @@
         <schemas>
             <schema path='ddl.sql' />
         </schemas>
-        <procedures>
-            <procedure class='voter.procedures.Initialize' />
-            <procedure class='voter.procedures.doTxn' />
-            <procedure class='voter.procedures.updateReplicated' />
-
-            <!-- Statement procedures to help initialize -->
-            <procedure class='voter.procedures.getLastRow'>
-              <sql>SELECT rid FROM transactions ORDER BY rid DESC LIMIT 1;</sql>
-            </procedure>
-        </procedures>
-        <partitions>
-            <partition table='transactions' column='pid' />
-        </partitions>
     </database>
 </project>

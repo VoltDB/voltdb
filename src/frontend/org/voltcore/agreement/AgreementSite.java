@@ -685,7 +685,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             }
 
             if (m == null) {
-                //Don't need to do anything here?
+                // Send a heartbeat to keep the dead host timeout active.  Needed because IV2 doesn't
+                // generate its own heartbeats to keep this running.
+                sendHeartbeats();
                 continue;
             }
             if (!m_hsIds.contains(m.m_sourceHSId)) continue;

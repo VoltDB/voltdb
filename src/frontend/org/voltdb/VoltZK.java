@@ -91,6 +91,7 @@ public class VoltZK {
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
     public static final String leaders_globalservice = "/db/leaders/globalservice";
+    public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -103,7 +104,8 @@ public class VoltZK {
             iv2mpi,
             leaders,
             leaders_initiators,
-            leaders_globalservice
+            leaders_globalservice,
+            lastKnownLiveNodes
     };
 
     /**

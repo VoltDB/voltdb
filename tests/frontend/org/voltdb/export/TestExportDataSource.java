@@ -147,7 +147,7 @@ public class TestExportDataSource extends TestCase {
         ExportInternalMessage pair = new ExportInternalMessage(esb, m);
 
         m.poll();
-        s.exportAction(pair);
+        s.exportAction(pair).get();
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 96, s.sizeInBytes());
@@ -166,7 +166,7 @@ public class TestExportDataSource extends TestCase {
         m.poll();
         pair = new ExportInternalMessage(esb, m);
 
-        s.exportAction(pair);
+        s.exportAction(pair).get();
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 96, s.sizeInBytes());
@@ -181,7 +181,7 @@ public class TestExportDataSource extends TestCase {
         m.poll();
 
         pair = new ExportInternalMessage(esb, m);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
         //The two buffers pushed into a file at the head are now gone
         //One file with a single buffer remains.
         assertEquals( 32, s.sizeInBytes());
@@ -195,7 +195,7 @@ public class TestExportDataSource extends TestCase {
         m.ack(83);
         m.poll();
         pair = new ExportInternalMessage(esb, m);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
         //4-bytes remain, this is the number of entries in the write segment
         assertEquals( 0, s.sizeInBytes());
         System.out.println(s.sizeInBytes());
@@ -238,7 +238,7 @@ public class TestExportDataSource extends TestCase {
         ExportInternalMessage pair = new ExportInternalMessage(esb, m);
 
         m.poll();
-        s.exportAction(pair);
+        s.exportAction(pair).get();
 
         m = ref.get();
         assertEquals(m.getAckOffset(), 0);
@@ -255,7 +255,7 @@ public class TestExportDataSource extends TestCase {
         m.poll();
         ref.set(null);
         pair = new ExportInternalMessage(esb, m);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
 
         // now get the second
         m = ref.get();
@@ -294,7 +294,7 @@ public class TestExportDataSource extends TestCase {
         ExportInternalMessage pair = new ExportInternalMessage(esb, m);
 
         m.poll();
-        s.exportAction(pair);
+        s.exportAction(pair).get();
 
         m = ref.get();
         assertEquals(m.getAckOffset(), 0);
@@ -307,12 +307,12 @@ public class TestExportDataSource extends TestCase {
         m.ack(MAGIC_TUPLE_SIZE * 2);
         m.poll();
         pair = new ExportInternalMessage(esb, m);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
 
         //Verify the release was done correctly, should only get one tuple back
         m.close();
         pair = new ExportInternalMessage(esb, m);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
         m = ref.get();
         assertEquals(m.getAckOffset(), MAGIC_TUPLE_SIZE * 3);
         m.m_data.order(java.nio.ByteOrder.LITTLE_ENDIAN);
@@ -325,7 +325,7 @@ public class TestExportDataSource extends TestCase {
 
         // now try to release past committed data
         m.ack(MAGIC_TUPLE_SIZE * 10);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
 
         //verify that we have moved to the end of the committed data
         m = ref.get();
@@ -338,7 +338,7 @@ public class TestExportDataSource extends TestCase {
         m.ack(MAGIC_TUPLE_SIZE * 3);
         m.poll();
         pair = new ExportInternalMessage(esb, m);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
 
         // now, more data and make sure we get the all of it
         m = ref.get();
@@ -385,7 +385,7 @@ public class TestExportDataSource extends TestCase {
 
         // release part of the first buffer
         m.ack(MAGIC_TUPLE_SIZE * 4);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
 
         m = ref.get();
 
@@ -398,7 +398,7 @@ public class TestExportDataSource extends TestCase {
         m.ack(MAGIC_TUPLE_SIZE * 9);
         m.poll();
         pair = new ExportInternalMessage(esb, m);
-        s.exportAction(pair);
+        s.exportAction(pair).get();
 
         m = ref.get();
         assertEquals(m.getAckOffset(), MAGIC_TUPLE_SIZE * 19);
