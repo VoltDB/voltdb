@@ -112,13 +112,6 @@ public class MpScheduler extends Scheduler
                     boolean success = result.getFirst();
                     if (success) {
                         tmLog.info(whoami + "finished repair.");
-                        // We need to update the replicas with the InitiatorMailbox's
-                        // deliver() lock held.  Since we're not calling
-                        // InitiatorMailbox.updateReplicas() here, grab the lock manually
-                        //synchronized (initiatorMailbox) {
-                        //    m_iv2Masters.clear();
-                        //    m_iv2Masters.addAll(replicaCopy);
-                        //}
                     }
                     else {
                         tmLog.info(whoami + "interrupted during repair.  Retrying.");
