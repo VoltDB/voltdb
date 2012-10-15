@@ -211,12 +211,22 @@ public enum VoltType {
 
     /**
      * Converts string representations to an enum value.
-     * @param str A string in the form "VoltType.TYPENAME"
+     * @param str A string in the form "TYPENAME" or "VoltType.TYPENAME",
+     * e.g. "BIGINT" or "VoltType.VARCHAR"
      * @return One of the valid enum values for VoltType
      */
     public static VoltType typeFromString(String str) {
-        if (str.compareToIgnoreCase("null") == 0)
+        if (str == null) {
             return NULL;
+        }
+
+        if (str.startsWith("VoltType.")) {
+            str = str.substring("VoltType.".length());
+        }
+
+        if (str.compareToIgnoreCase("null") == 0) {
+            return NULL;
+        }
 
         for (VoltType type: values()) {
             if (type.matchesString(str)) {
@@ -224,7 +234,7 @@ public enum VoltType {
             }
         }
         if (str.equals("DOUBLE")) return FLOAT;
-        if (str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
+        if (str.equals("CHARACTER") || str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
 
         throw new RuntimeException("Can't find type: " + str);
     }
@@ -496,6 +506,29 @@ public enum VoltType {
             default:
                 return false;
         }
+    }
+
+    /* Indicate whether a value can be assigned to this type without loss of range or precision,
+     * important for index key and partition key initialization. */
+    public boolean canExactlyRepresentAnyValueOf(VoltType otherType) {
+        // self to self conversion is obviously fine.
+        if (this == otherType)
+            return true;
+
+        if (otherType.isInteger()) {
+            if (this.isInteger()) {
+                // Don't allow integers getting smaller.
+                return this.getMaxLengthInBytes() >= otherType.getMaxLengthInBytes();
+            }
+            else if (this == VoltType.FLOAT) {
+                // Non-big integers make acceptable (exact) floats
+                if (otherType != VoltType.BIGINT) {
+                    return true;
+                }
+            }
+            // Not sure about integer-to-decimal: for now, just give up.
+        }
+        return false;
     }
 
     /**

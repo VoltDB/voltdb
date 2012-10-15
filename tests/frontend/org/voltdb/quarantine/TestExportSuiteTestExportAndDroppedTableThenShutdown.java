@@ -234,9 +234,9 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
 
 
     static final GroupInfo GROUPS[] = new GroupInfo[] {
-        new GroupInfo("export", false, false),
-        new GroupInfo("proc", true, true),
-        new GroupInfo("admin", true, true)
+        new GroupInfo("export", false, false, false),
+        new GroupInfo("proc", true, true, true),
+        new GroupInfo("admin", true, true, true)
     };
 
     static final UserInfo[] USERS = new UserInfo[] {
@@ -282,8 +282,8 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
         project.setSecurityEnabled(true);
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true  /*enabled*/,
                 java.util.Arrays.asList(new String[]{"export"}));
@@ -327,7 +327,7 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
         project = new VoltProjectBuilder();
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true,  //enabled
                 java.util.Arrays.asList(new String[]{"export"}));
@@ -355,9 +355,9 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
         project = new VoltProjectBuilder();
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-addedtable-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-addedtable-export-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true  /*enabled*/,
                 java.util.Arrays.asList(new String[]{"export"}));

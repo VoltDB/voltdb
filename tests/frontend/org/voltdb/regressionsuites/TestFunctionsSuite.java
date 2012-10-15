@@ -24,12 +24,15 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -53,6 +56,25 @@ public class TestFunctionsSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+    public void testAbsWithLimit_ENG3572() throws Exception
+    {
+        System.out.println("STARTING testAbs");
+        Client client = getClient();
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        ClientResponse cr = null;
+        cr = client.callProcedure("@AdHoc", "select abs(NUM) from P1 where ID = 0 limit 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
     public void testAbs() throws Exception
     {
         System.out.println("STARTING testAbs");
@@ -72,11 +94,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 DESC VARCHAR(300),
                 NUM INTEGER,
                 RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
                 PRIMARY KEY (ID)
                 );
         */
         for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1);
+            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             client.drain();
         }
         ClientResponse cr = null;
@@ -286,11 +309,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 DESC VARCHAR(300),
                 NUM INTEGER,
                 RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
                 PRIMARY KEY (ID)
                 );
         */
         for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1);
+            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             client.drain();
         }
         ClientResponse cr = null;
@@ -431,6 +455,330 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
+    public void testExtract() throws Exception
+    {
+        System.out.println("STARTING testExtract");
+        Client client = getClient();
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        client.callProcedure(callback, "P1.insert", 0, "X0", 10, 1.1, new Timestamp(1000000000000L));
+        client.drain();
+        ClientResponse cr = null;
+        VoltTable r = null;
+        long result;
+
+        cr = client.callProcedure("@AdHoc",
+                                  "select " +
+                                  "EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
+                                  "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), " +
+                                  //"EXTRACT(WEEK_OF_YEAR FROM PAST), " +
+                                  "EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) " +
+                                  "from P1;");
+
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        int columnIndex = 0;
+
+        final int EXPECTED_YEAR = 2001;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_YEAR, result);
+
+        final int EXPECTED_MONTH = 9;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MONTH, result);
+
+        final int EXPECTED_DAY = 9;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DAY, result);
+
+        final int EXPECTED_DOW = 1;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOW, result);
+
+        final int EXPECTED_DOY = 252;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOY, result);
+
+//        final int EXPECTED_WOY = 36;
+//        result = r.getLong(columnIndex++);
+//        assertEquals(EXPECTED_WOY, result);
+
+        final int EXPECTED_QUARTER = 3;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_QUARTER, result);
+
+        final int EXPECTED_HOUR = 1;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_HOUR, result);
+
+        final int EXPECTED_MINUTE = 46;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MINUTE, result);
+
+        final BigDecimal EXPECTED_SECONDS = new BigDecimal("40.000000000000");
+        BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
+        assertEquals(EXPECTED_SECONDS, decimalResult);
+
+    }
+
+    public void testParams() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING testSubstring");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // next one disabled until ENG-3486
+        /*cr = client.callProcedure("PARAM_SUBSTRING", "eeoo");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertEquals("eoo", result.fetchRow(0).getString(0));*/
+
+        cr = client.callProcedure("PARAM_ABS", -2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertEquals(1, result.asScalarLong());
+    }
+
+    public void testLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING Left and Right");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // test LEFT function
+        cr = client.callProcedure("LEFT", 0, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 2, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 3, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫V", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 4, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫Vo", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 5, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫Vo", result.getString(1));
+
+        // invalid case
+        Exception ex = null;
+        try {
+            cr = client.callProcedure("LEFT", -1, 1);
+        } catch (Exception e) {
+            assertTrue(e instanceof ProcCallException);
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test RIGHT function
+        cr = client.callProcedure("RIGHT", 0, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("o", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 2, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Vo", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 3, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("鑫Vo", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 4, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫Vo", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 5, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫Vo", result.getString(1));
+
+        ex = null;
+        try {
+            cr = client.callProcedure("RIGHT", -1, 1);
+        } catch (Exception e) {
+            assertTrue(e instanceof ProcCallException);
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+        }
+    }
+
+    public void testSpace() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Space");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("SPACE", 0, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("", result.getString(1));
+
+        cr = client.callProcedure("SPACE", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(" ", result.getString(1));
+
+        cr = client.callProcedure("SPACE", 5, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("     ", result.getString(1));
+    }
+
+    public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Repeat");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("REPEAT", 0, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("", result.getString(1));
+
+        cr = client.callProcedure("REPEAT", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("foo", result.getString(1));
+
+        cr = client.callProcedure("REPEAT", 3, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("foofoofoo", result.getString(1));
+    }
+
+    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Concat and its Operator");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CONCAT", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin", result.getString(1));
+
+        cr = client.callProcedure("CONCAT", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin@VoltDB", result.getString(1));
+
+        cr = client.callProcedure("ConcatOpt", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin", result.getString(1));
+
+        cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin@VoltDB", result.getString(1));
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -452,7 +800,13 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "DESC VARCHAR(300), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
-                "PRIMARY KEY (ID) ); ";
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "CREATE INDEX P1_ABS_ID ON P1 ( ABS(ID) ); " + // Test generalized index on a function of an already indexed column.
+                "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " + // Test generalized index on a function of a non-indexed column.
+                "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " + // Test generalized index on an expression of multiple columns.
+                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " + // Test generalized index on a string function.
+                "";
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
@@ -486,12 +840,24 @@ public class TestFunctionsSuite extends RegressionSuite {
         // Test GROUP BY by support
         project.addStmtProcedure("AGG_OF_SUBSTRING", "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
 
+        // Test parameterizing functions
+        // next one disabled until ENG-3486
+        //project.addStmtProcedure("PARAM_SUBSTRING", "select SUBSTRING(? FROM 2) from P1");
+        project.addStmtProcedure("PARAM_ABS", "select ABS(? + NUM) from P1");
 
-        project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null)");
+        project.addStmtProcedure("LEFT", "select id, LEFT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("RIGHT", "select id, RIGHT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("SPACE", "select id, SPACE(?) from P1 where id = ?");
+        project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
+
+        project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        // /* alternative for debug*/ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

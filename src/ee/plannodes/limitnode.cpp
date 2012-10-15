@@ -61,58 +61,31 @@ LimitPlanNode::~LimitPlanNode() {
     }
 }
 
-void LimitPlanNode::setLimit(int limit) {
-    this->limit = limit;
-}
-int LimitPlanNode::getLimit() const {
-    return (this->limit);
-}
-
-void LimitPlanNode::setOffset(int offset) {
-    this->offset = offset;
-}
-int LimitPlanNode::getOffset() const {
-    return (this->offset);
-}
-
-AbstractExpression* LimitPlanNode::getLimitExpression() const {
-    return this->limitExpression;
-}
-
-void LimitPlanNode::setLimitExpression(AbstractExpression* expression) {
-    if (limitExpression && limitExpression != expression)
-    {
-        throwFatalException("limitExpression initialized twice in LimitPlanNode");
-        delete limitExpression;
-    }
-    this->limitExpression = expression;
-}
-
 /*
  * This code is needed in the limit executor as well as anywhere limit
  * is inlined. Centralize it here.
  */
 void
-LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset)
+LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limitOut, int &offsetOut)
 {
-    limit = getLimit();
-    offset = getOffset();
+    limitOut = limit;
+    offsetOut = offset;
 
     // Limit and offset parameters strictly integers. Can't limit <?=varchar>.
     // Converting the loop counter to NValue's doesn't make it cleaner -
     // and probably makes it slower. Would have to initialize an nvalue for
     // each loop iteration.
-    if (getLimitParamIdx() != -1) {
-        limit = ValuePeeker::peekInteger(params[getLimitParamIdx()]);
-        if (limit < 0) {
+    if (limitParamIdx != -1) {
+        limitOut = ValuePeeker::peekInteger(params[limitParamIdx]);
+        if (limitOut < 0) {
             throw SQLException(SQLException::data_exception_invalid_parameter,
                                "Negative parameter to LIMIT");
         }
 
     }
-    if (getOffsetParamIdx() != -1) {
-        offset = ValuePeeker::peekInteger(params[getOffsetParamIdx()]);
-        if (offset < 0) {
+    if (offsetParamIdx != -1) {
+        offsetOut = ValuePeeker::peekInteger(params[offsetParamIdx]);
+        if (offsetOut < 0) {
             throw SQLException(SQLException::data_exception_invalid_parameter,
                                "Negative parameter to LIMIT OFFSET");
         }
@@ -124,8 +97,8 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
         // The expression should be an operator expression with either constant
         // value expression or parameter value expression as children
         limitExpression->substitute(params);
-        limit = ValuePeeker::peekAsInteger(limitExpression->eval(NULL, NULL));
-        assert(offset == 0);
+        limitOut = ValuePeeker::peekAsInteger(limitExpression->eval(NULL, NULL));
+        assert(offsetOut == 0);
     }
 }
 
@@ -155,11 +128,11 @@ void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
 
     json_spirit::Value paramIdx = json_spirit::find_value(obj, "LIMIT_PARAM_IDX");
     if (!(paramIdx == json_spirit::Value::null)) {
-        setLimitParamIdx(paramIdx.get_int());
+        limitParamIdx = paramIdx.get_int();
     }
     paramIdx = json_spirit::find_value(obj, "OFFSET_PARAM_IDX");
     if (!(paramIdx == json_spirit::Value::null)) {
-        setOffsetParamIdx(paramIdx.get_int());
+        offsetParamIdx = paramIdx.get_int();
     }
 
     json_spirit::Value expr = json_spirit::find_value(obj, "LIMIT_EXPRESSION");

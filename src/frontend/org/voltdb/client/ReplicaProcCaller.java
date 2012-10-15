@@ -34,6 +34,7 @@ public interface ReplicaProcCaller {
      */
     public boolean callProcedure(
             long originalTxnId,
+            long originalTimestamp,
             ProcedureCallback callback,
             String procName,
             Object... parameters)
@@ -52,6 +53,7 @@ public interface ReplicaProcCaller {
      */
     public ClientResponse callProcedure(
             long originalTxnId,
+            long originalTimestamp,
             String procName,
             Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException;

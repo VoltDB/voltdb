@@ -19,6 +19,7 @@ package org.voltdb.jni;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
+import org.voltdb.PlannerStatsCollector;
+import org.voltdb.PlannerStatsCollector.CacheUse;
+import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.VoltDB;
@@ -52,6 +56,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_SUCCESS = 0;
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
+
+    /** Partition ID */
+    protected final int m_partitionId;
+
+    /** Statistics collector (provided later) */
+    private PlannerStatsCollector m_plannerStats = null;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -82,8 +92,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine() {
+    public ExecutionEngine(long siteId, int partitionId) {
+        m_partitionId = partitionId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        // In mock test environments there may be no stats agent.
+        final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
+        if (statsAgent != null) {
+            m_plannerStats = new PlannerStatsCollector(siteId);
+            statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
+        }
+    }
+
+    /** Alternate constructor without planner statistics tracking. */
+    public ExecutionEngine() {
+        m_partitionId = 0;  // not used
+        m_plannerStats = null;
     }
 
     /*
@@ -182,6 +205,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotFound.name(),
                                new Object[] { dependencyId }, null);
                 VoltDB.crashLocalVoltDB("No additional info.", false, null);
+                // Prevent warnings.
+                return;
             }
             for (final Object dependency : dependencies) {
                 if (dependency == null) {
@@ -189,6 +214,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                    new Object[] { dependencyId },
                             null);
                     VoltDB.crashLocalVoltDB("No additional info.", false, null);
+                    // Prevent warnings.
+                    return;
                 }
                 if (log.isTraceEnabled()) {
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
@@ -236,7 +263,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public byte[] nextDependencyAsBytes(final int dependencyId) {
         final VoltTable vt =  m_dependencyTracker.nextDependency(dependencyId);
         if (vt != null) {
-            final byte[]  bytes = vt.getTableDataReference().array();
+            final ByteBuffer buf2 = vt.getTableDataReference();
+            byte[] bytes = buf2.array();
+            // if a buffer has an offset, just getting the array will give you the wrong thing
+            if (buf2.arrayOffset() != 0) {
+                bytes = Arrays.copyOfRange(bytes, buf2.arrayOffset(), bytes.length);
+            }
             return bytes;
         }
         else {
@@ -270,24 +302,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
 
-    /** Run a plan fragment */
-    abstract public VoltTable executePlanFragment(
-        long planFragmentId, int inputDepId, ParameterSet parameterSet,
-        long txnId, long lastCommittedTxnId, long undoQuantumToken)
-      throws EEException;
+    /** Load a fragment, given a plan, into the EE with a specific fragment id */
+    abstract public long loadPlanFragment(byte[] plan) throws EEException;
 
-    /** Run a plan fragment */
-    abstract public VoltTable executeCustomPlanFragment(
-            String plan, int inputDepId, long txnId,
-            long lastCommittedTxnId, long undoQuantumToken, ParameterSet params) throws EEException;
-
-    /** Run multiple query plan fragments */
-    abstract public VoltTable[] executeQueryPlanFragmentsAndGetResults(long[] planFragmentIds,
-                                                                       int numFragmentIds,
-                                                                       ParameterSet[] parameterSets,
-                                                                       int numParameterSets,
-                                                                       long txnId, long lastCommittedTxnId,
-                                                                       long undoQuantumToken) throws EEException;
+    /** Run multiple plan fragments */
+    abstract public VoltTable[] executePlanFragments(int numFragmentIds,
+                                                     long[] planFragmentIds,
+                                                     long[] inputDepIds,
+                                                     ParameterSet[] parameterSets,
+                                                     long txnId,
+                                                     long lastCommittedTxnId,
+                                                     long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
     abstract public VoltTable serializeTable(int tableId) throws EEException;
@@ -296,7 +321,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public void loadTable(
         int tableId, VoltTable table, long txnId,
-        long lastCommittedTxnId, long undoToken) throws EEException;
+        long lastCommittedTxnId) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -474,32 +499,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken token for undo quantum where changes should be logged.
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long txnId, long lastCommittedTxnId, long undoToken);
+            long txnId, long lastCommittedTxnId);
 
-    //Execution
-
-    /**
-     * Executes a plan fragment with the given parameter set.
-     * @param pointer the VoltDBEngine pointer
-     * @param plan_fragment_id ID of the plan fragment to be executed.
-     * @return error code
-     */
-    protected native int nativeExecutePlanFragment(long pointer, long planFragmentId,
-            int outputDepId, // outputDepId is unused, can set to 0
-            int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
-
-    protected native int nativeExecuteCustomPlanFragment(long pointer, byte plan[],
-            int outputDepId, // outputDepId is unused, can set to 0
-            int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
+    protected native int nativeLoadPlanFragment(long pointer, byte[] plan);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
      * @param pointer the VoltDBEngine pointer
      * @param planFragmentIds ID of the plan fragment to be executed.
+     * @param inputDepIds list of input dependency ids or null if no deps expected
      * @return error code
      */
-    protected native int nativeExecuteQueryPlanFragmentsAndGetResults(long pointer,
-            long[] planFragmentIds, int numFragments, long txnId, long lastCommittedTxnId, long undoToken);
+    protected native int nativeExecutePlanFragments(
+            long pointer,
+            int numFragments,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            long txnId, long lastCommittedTxnId, long undoToken);
 
     /**
      * Serialize the result temporary table.
@@ -655,4 +671,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Returns the RSS size in bytes or -1 on error (or wrong platform).
      */
     public native static long nativeGetRSS();
+
+    /**
+     * Start collecting statistics (starts timer).
+     */
+    protected void startStatsCollection() {
+        if (m_plannerStats != null) {
+            m_plannerStats.startStatsCollection();
+        }
+    }
+
+    /**
+     * Finalize collected statistics (stops timer and supplies cache statistics).
+     *
+     * @param cacheSize  size of cache
+     * @param cacheUse   where the plan came from
+     */
+    protected void endStatsCollection(long cacheSize, CacheUse cacheUse) {
+        if (m_plannerStats != null) {
+            m_plannerStats.endStatsCollection(cacheSize, 0, cacheUse, m_partitionId);
+        }
+    }
 }

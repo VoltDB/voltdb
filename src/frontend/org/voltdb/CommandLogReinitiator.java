@@ -17,8 +17,12 @@
 
 package org.voltdb;
 
+import java.util.Map;
+
+import org.voltcore.utils.InstanceId;
+
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.dtxn.TransactionCreator;
 
 public interface CommandLogReinitiator {
     public interface Callback {
@@ -29,7 +33,7 @@ public interface CommandLogReinitiator {
      * Set the snapshot transaction ID that got restored
      * @param txnId
      */
-    public void setSnapshotTxnId(long txnId);
+    public void setSnapshotTxnId(RestoreAgent.SnapshotInfo info);
 
     public void setCallback(Callback callback);
 
@@ -37,7 +41,7 @@ public interface CommandLogReinitiator {
 
     public void setSiteTracker(SiteTracker siteTracker);
 
-    public void setInitiator(TransactionInitiator initiator);
+    public void setInitiator(TransactionCreator initiator);
 
     /**
      * Generate the local replay plan. Call this before starting replay.
@@ -93,6 +97,17 @@ public interface CommandLogReinitiator {
      * @return null if the log is empty
      */
     public Long getMaxLastSeenTxn();
+
+    /**
+     * IV2 ONLY:
+     * Get the map of the max TXN ID seen for each partition in the command l0g
+     */
+    public Map<Integer, Long> getMaxLastSeenTxnByPartition();
+
+    /**
+     * Get the cluster InstanceId of the cluster that wrote the command log.
+     */
+    public InstanceId getInstanceId();
 
     /**
      * Returns all command log segments to the pool and closes the reader. This

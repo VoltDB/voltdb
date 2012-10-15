@@ -127,6 +127,15 @@
                       "ddl": "int-DDL.sql",
                       "template": "regression-advanced-ints.sql",
                       "normalizer": "normalizer.py"},
+    "advanced-ints-cntonly": {"schema": "int-schema.py",
+                              "ddl": "int-DDL.sql",
+                              "template": "regression-advanced-ints-cntonly.sql",
+                              "normalizer": "not-a-normalizer.py"},
+# To test index count
+    "index-count1": {"schema": "index-count1-schema.py",
+                     "ddl": "index-count1-DDL.sql",
+                     "template": "index-count1.sql",
+                     "normalizer": "normalizer.py"},
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.
     "pushdown": {"schema": "pushdown-schema.py",

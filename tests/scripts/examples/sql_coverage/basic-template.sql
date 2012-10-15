@@ -12,7 +12,7 @@
 --INSERT
 -- test basic INSERT
 INSERT INTO _table VALUES (@insert_vals)
-
+--SELECT * FROM P1 INNER JOIN R1 ON P1.RATIO = R1.ID
 <basic-select.sql>
 <basic-update.sql>
 <basic-delete.sql>

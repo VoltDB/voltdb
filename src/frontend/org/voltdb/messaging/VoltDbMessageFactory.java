@@ -19,6 +19,8 @@ package org.voltdb.messaging;
 
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.messaging.VoltMessageFactory;
+import org.voltdb.rejoin.RejoinDataAckMessage;
+import org.voltdb.rejoin.RejoinDataMessage;
 
 public class VoltDbMessageFactory extends VoltMessageFactory
 {
@@ -30,8 +32,14 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte COMPLETE_TRANSACTION_ID = VOLTCORE_MESSAGE_ID_MAX + 6;
     final public static byte COMPLETE_TRANSACTION_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 7;
     final public static byte COALESCED_HEARTBEAT_ID = VOLTCORE_MESSAGE_ID_MAX + 8;
-    final public static byte REJOIN_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 9;
-    final public static byte FRAGMENT_TASK_LOG_ID = VOLTCORE_MESSAGE_ID_MAX + 10;
+    final public static byte IV2_INITIATE_TASK_ID = VOLTCORE_MESSAGE_ID_MAX + 9;
+    final public static byte IV2_REPAIR_LOG_REQUEST = VOLTCORE_MESSAGE_ID_MAX + 10;
+    final public static byte IV2_REPAIR_LOG_RESPONSE = VOLTCORE_MESSAGE_ID_MAX + 11;
+    final public static byte REJOIN_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 12;
+    final public static byte REJOIN_DATA_ID = VOLTCORE_MESSAGE_ID_MAX + 13;
+    final public static byte REJOIN_DATA_ACK_ID = VOLTCORE_MESSAGE_ID_MAX + 14;
+    final public static byte FRAGMENT_TASK_LOG_ID = VOLTCORE_MESSAGE_ID_MAX + 15;
+    final public static byte IV2_LOG_FAULT_ID = VOLTCORE_MESSAGE_ID_MAX + 16;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -69,11 +77,29 @@ public class VoltDbMessageFactory extends VoltMessageFactory
         case COMPLETE_TRANSACTION_RESPONSE_ID:
             message = new CompleteTransactionResponseMessage();
             break;
+        case IV2_INITIATE_TASK_ID:
+            message = new Iv2InitiateTaskMessage();
+            break;
+        case IV2_REPAIR_LOG_REQUEST:
+            message = new Iv2RepairLogRequestMessage();
+            break;
+        case IV2_REPAIR_LOG_RESPONSE:
+            message = new Iv2RepairLogResponseMessage();
+            break;
         case REJOIN_RESPONSE_ID:
             message = new RejoinMessage();
             break;
+        case REJOIN_DATA_ID:
+            message = new RejoinDataMessage();
+            break;
+        case REJOIN_DATA_ACK_ID:
+            message = new RejoinDataAckMessage();
+            break;
         case FRAGMENT_TASK_LOG_ID:
             message = new FragmentTaskLogMessage();
+            break;
+        case IV2_LOG_FAULT_ID:
+            message = new Iv2LogFaultMessage();
             break;
         default:
             message = null;

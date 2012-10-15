@@ -47,6 +47,9 @@ public class RejoinTestBase extends TestCase {
             "create table blah (" +
             "ival bigint default 0 not null, " +
             "PRIMARY KEY(ival));\n" +
+            "create table export_ok_blah_with_no_pk (" +
+            "ival bigint default 0 not null, " +
+            ");\n" +
             "create table blah_replicated (" +
             "ival bigint default 0 not null, " +
             "PRIMARY KEY(ival));" +
@@ -90,7 +93,7 @@ public class RejoinTestBase extends TestCase {
         builder.addPartitionInfo("TEST_INLINED_STRING", "pkey");
         builder.addPartitionInfo("ENG798", "C1");
 
-        GroupInfo gi = new GroupInfo("foo", true, true);
+        GroupInfo gi = new GroupInfo("foo", true, true, true);
         builder.addGroups(new GroupInfo[] { gi } );
         UserInfo ui = new UserInfo( "ry@nlikesthe", "y@nkees", new String[] { "foo" } );
         builder.addUsers(new UserInfo[] { ui } );
@@ -106,6 +109,7 @@ public class RejoinTestBase extends TestCase {
             new ProcedureInfo(new String[] { "foo" }, "InsertPartitioned", "insert into PARTITIONED values (?, ?);", "PARTITIONED.pkey:0"),
             new ProcedureInfo(new String[] { "foo" }, "UpdatePartitioned", "update PARTITIONED set value = ? where pkey = ?;", "PARTITIONED.pkey:1"),
             new ProcedureInfo(new String[] { "foo" }, "SelectPartitioned", "select * from PARTITIONED order by pkey;", null),
+            new ProcedureInfo(new String[] { "foo" }, "SelectCountPartitioned", "select count(*) from PARTITIONED;", null),
             new ProcedureInfo(new String[] { "foo" }, "InsertPartitionedLarge", "insert into PARTITIONED_LARGE values (?, ?, ?);", "PARTITIONED_LARGE.pkey:0")
         };
 

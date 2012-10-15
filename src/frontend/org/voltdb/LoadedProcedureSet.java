@@ -21,20 +21,21 @@ import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.SystemProcedureCatalog;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.utils.LogKeys;
+
+import com.google.common.collect.ImmutableMap;
 
 public class LoadedProcedureSet {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     // user procedures.
-    final HashMap<String, ProcedureRunner> procs =
-        new HashMap<String, ProcedureRunner>(16, (float) .1);
+    ImmutableMap<String, ProcedureRunner> procs = ImmutableMap.<String, ProcedureRunner>builder().build();
 
     // map of sysproc fragment ids to system procedures.
     final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
@@ -46,7 +47,7 @@ public class LoadedProcedureSet {
     final int m_numberOfPartitions;
     final SiteProcedureConnection m_site;
 
-    public LoadedProcedureSet(ExecutionSite site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex, int numberOfPartitions) {
+    public LoadedProcedureSet(SiteProcedureConnection site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex, int numberOfPartitions) {
         m_runnerFactory = runnerFactory;
         m_siteId = siteId;
         m_siteIndex = siteIndex;
@@ -54,7 +55,7 @@ public class LoadedProcedureSet {
         m_site = site;
     }
 
-    public ProcedureRunner getSysproc(long fragmentId) {
+   public ProcedureRunner getSysproc(long fragmentId) {
         synchronized (m_registeredSysProcPlanFragments) {
             return m_registeredSysProcPlanFragments.get(fragmentId);
         }
@@ -67,22 +68,24 @@ public class LoadedProcedureSet {
         }
     }
 
-    void loadProcedures(
+    public void loadProcedures(
             CatalogContext catalogContext,
             BackendTarget backendTarget,
             CatalogSpecificPlanner csp) {
-        procs.clear();
         m_registeredSysProcPlanFragments.clear();
-        loadProceduresFromCatalog(catalogContext, backendTarget, csp);
-        loadSystemProcedures(catalogContext, backendTarget, csp);
+        ImmutableMap.Builder<String, ProcedureRunner> builder =
+                loadProceduresFromCatalog(catalogContext, backendTarget, csp);
+        loadSystemProcedures(catalogContext, backendTarget, csp, builder);
+        procs = builder.build();
     }
 
-    private void loadProceduresFromCatalog(
+    private ImmutableMap.Builder<String, ProcedureRunner> loadProceduresFromCatalog(
             CatalogContext catalogContext,
             BackendTarget backendTarget,
             CatalogSpecificPlanner csp) {
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = catalogContext.database.getProcedures();
+        ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
         for (final Procedure proc : catalogProcedures) {
 
             // Sysprocs used to be in the catalog. Now they aren't. Ignore
@@ -128,14 +131,16 @@ public class LoadedProcedureSet {
 
             assert(procedure != null);
             runner = m_runnerFactory.create(procedure, proc, csp);
-            procs.put(proc.getTypeName(), runner);
+            builder.put(proc.getTypeName(), runner);
         }
+        return builder;
     }
 
     private void loadSystemProcedures(
             CatalogContext catalogContext,
             BackendTarget backendTarget,
-            CatalogSpecificPlanner csp) {
+            CatalogSpecificPlanner csp,
+            ImmutableMap.Builder<String, ProcedureRunner> builder) {
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
@@ -175,8 +180,12 @@ public class LoadedProcedureSet {
 
             runner = m_runnerFactory.create(procedure, proc, csp);
             procedure.initSysProc(m_numberOfPartitions, m_site, this, proc, catalogContext.cluster);
-            procs.put(entry.getKey(), runner);
+            builder.put(entry.getKey(), runner);
         }
     }
 
+    public ProcedureRunner getProcByName(String procName)
+    {
+        return procs.get(procName);
+    }
 }

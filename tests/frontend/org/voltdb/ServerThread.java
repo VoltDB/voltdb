@@ -26,6 +26,10 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
+import org.voltcore.utils.InstanceId;
+
+import org.voltdb.utils.MiscUtils;
+
 /**
  * Wraps VoltDB in a Thread
  */
@@ -36,12 +40,17 @@ public class ServerThread extends Thread {
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
         m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = "";
+        if (m_config.m_leader == null) {
+            m_config.m_leader = "";
+        }
 
         if (!m_config.validate()) {
             m_config.usage();
             System.exit(-1);
         }
+
+        // Disable loading the EE if running against HSQL.
+        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         setName("ServerThread");
     }
@@ -53,6 +62,9 @@ public class ServerThread extends Thread {
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "";
 
+        // Disable loading the EE if running against HSQL.
+        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+
         setName("ServerThread");
     }
 
@@ -63,6 +75,9 @@ public class ServerThread extends Thread {
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "";
+
+        // Disable loading the EE if running against HSQL.
+        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         if (!m_config.validate()) {
             m_config.usage();
@@ -92,11 +107,12 @@ public class ServerThread extends Thread {
         m_config.m_pathToDeployment = pathToDeployment;
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = "localhost";
+        m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
         m_config.m_internalPort = internalPort;
-        m_config.m_leaderPort = leaderPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
-        m_config.m_leader = "";
+
+        // Disable loading the EE if running against HSQL.
+        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
 
         if (!m_config.validate()) {
             m_config.usage();
@@ -153,5 +169,10 @@ public class ServerThread extends Thread {
         // return the filesystem path
         File licxml = new File(resource.getFile());
         return licxml.getPath();
+    }
+
+    public InstanceId getInstanceId()
+    {
+        return VoltDB.instance().getHostMessenger().getInstanceId();
     }
 }

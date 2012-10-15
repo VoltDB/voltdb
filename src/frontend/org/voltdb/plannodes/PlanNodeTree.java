@@ -17,12 +17,20 @@
 
 package org.voltdb.plannodes;
 
-import java.util.*;
-import org.voltdb.VoltType;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Database;
+import org.voltdb.types.PlanNodeType;
 
 /**
  *
@@ -107,5 +115,58 @@ public class PlanNodeTree implements JSONString {
             stringer.array().value(parameter.getFirst()).value(parameter.getSecond().name()).endArray();
         }
         stringer.endArray();
+    }
+
+    public List<AbstractPlanNode> getNodeList() {
+        return m_planNodes;
+    }
+
+    public void loadFromJSONArray( JSONArray jArray, Database db )  {
+        int size = jArray.length();
+
+        try {
+            for( int i = 0; i < size; i++ ) {
+                JSONObject jobj;
+                jobj = jArray.getJSONObject(i);
+                String nodeTypeStr = jobj.getString("PLAN_NODE_TYPE");
+                PlanNodeType nodeType = PlanNodeType.get( nodeTypeStr );
+                AbstractPlanNode apn = null;
+                try {
+                    apn = nodeType.getPlanNodeClass().newInstance();
+                } catch (InstantiationException e) {
+                    System.err.println( e.getMessage() );
+                    e.printStackTrace();
+                    return;
+                } catch (IllegalAccessException e) {
+                    System.err.println( e.getMessage() );
+                    e.printStackTrace();
+                    return;
+                }
+                apn.loadFromJSONObject(jobj, db);
+                m_planNodes.add(apn);
+            }
+            //link children and parents
+            for( int i = 0; i < size; i++ ) {
+                JSONObject jobj;
+                jobj = jArray.getJSONObject(i);
+                JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
+                for( int j = 0; j < children.length(); j++ ) {
+                    m_planNodes.get(i).addAndLinkChild( getNodeofId( children.getInt(j) ) );
+                }
+            }
+        }
+        catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public AbstractPlanNode getNodeofId ( int ID ) {
+        int size = m_planNodes.size();
+        for( int i = 0; i < size; i++ ) {
+            if( m_planNodes.get(i).getPlanNodeId() == ID ) {
+                return m_planNodes.get(i);
+            }
+        }
+        return null;
     }
 }

@@ -21,6 +21,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <vector>
+#include <string>
+#include <stdint.h>
+#include <boost/foreach.hpp>
+
 #include "harness.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
@@ -31,9 +36,6 @@
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
-#include <vector>
-#include <string>
-#include <stdint.h>
 
 using namespace std;
 using namespace voltdb;
@@ -56,18 +58,12 @@ public:
         m_primaryKeyIndexSchemaTypes.push_back(VALUE_TYPE_VARCHAR);
 
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        m_primaryKeyIndexSchemaColumnSizes.push_back(VALUE_TYPE_TINYINT);
         m_tableSchemaColumnSizes.push_back(300);
-        m_primaryKeyIndexSchemaColumnSizes.push_back(300);
         m_tableSchemaColumnSizes.push_back(100);
-        m_primaryKeyIndexSchemaColumnSizes.push_back(100);
 
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
 
         m_primaryKeyIndexColumns.push_back(0);
         m_primaryKeyIndexColumns.push_back(1);
@@ -79,7 +75,6 @@ public:
     ~PersistentTableMemStatsTest() {
         delete m_engine;
         delete m_table;
-        TupleSchema::freeTupleSchema(m_primaryKeyIndexSchema);
     }
 
     void initTable(bool allowInlineStrings) {
@@ -88,12 +83,6 @@ public:
                                                        m_tableSchemaAllowNull,
                                                        allowInlineStrings);
 
-        m_primaryKeyIndexSchema =
-            TupleSchema::createTupleSchema(m_primaryKeyIndexSchemaTypes,
-                                           m_primaryKeyIndexSchemaColumnSizes,
-                                           m_primaryKeyIndexSchemaAllowNull,
-                                           allowInlineStrings);
-
         TableIndexScheme indexScheme =
             TableIndexScheme("primaryKeyIndex",
                              BALANCED_TREE_INDEX,
@@ -101,29 +90,35 @@ public:
                              m_primaryKeyIndexSchemaTypes,
                              true, false, m_tableSchema);
 
-        indexScheme.keySchema = m_primaryKeyIndexSchema;
-
         vector<TableIndexScheme> indexes;
 
         m_table =
             dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable
                                            (0, m_engine->getExecutorContext(),
                                             "Foo", m_tableSchema,
-                                            &m_columnNames[0], indexScheme,
-                                            indexes, 0, false, false));
+                                            &m_columnNames[0], 0, false, false));
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        assert(pkeyIndex);
+        m_table->addIndex(pkeyIndex);
+        m_table->setPrimaryKeyIndex(pkeyIndex);
+
+        // add other indexes
+        BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+            TableIndex *index = TableIndexFactory::getInstance(scheme);
+            assert(index);
+            m_table->addIndex(index);
+        }
     }
 
     VoltDBEngine *m_engine;
     TupleSchema *m_tableSchema;
-    TupleSchema *m_primaryKeyIndexSchema;
     PersistentTable *m_table;
     vector<string> m_columnNames;
     vector<ValueType> m_tableSchemaTypes;
     vector<int32_t> m_tableSchemaColumnSizes;
     vector<bool> m_tableSchemaAllowNull;
     vector<ValueType> m_primaryKeyIndexSchemaTypes;
-    vector<int32_t> m_primaryKeyIndexSchemaColumnSizes;
-    vector<bool> m_primaryKeyIndexSchemaAllowNull;
     vector<int> m_primaryKeyIndexColumns;
 };
 
@@ -227,7 +222,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
     // de-duplicated with executorcontext data
     m_engine->getExecutorContext();
 
-    m_table->updateTuple(tempTuple, tuple, true);
+    m_table->updateTuple(tuple, tempTuple);
 
     m_engine->releaseUndoToken(INT64_MIN + 2);
 
@@ -276,7 +271,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
     // de-duplicated with executorcontext data
     m_engine->getExecutorContext();
 
-    m_table->updateTuple(tempTuple, tuple, true);
+    m_table->updateTuple(tuple, tempTuple);
 
     ASSERT_EQ(orig_size + added_bytes - removed_bytes, m_table->nonInlinedMemorySize());
 

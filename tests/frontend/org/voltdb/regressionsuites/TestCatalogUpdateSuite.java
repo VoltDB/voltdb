@@ -23,15 +23,19 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.io.File;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
@@ -56,6 +60,10 @@ import org.voltdb.utils.MiscUtils;
  *
  */
 public class TestCatalogUpdateSuite extends RegressionSuite {
+
+    static final int SITES_PER_HOST = 2;
+    static final int HOSTS = 2;
+    static final int K = 1;
 
     // procedures used by these tests
     static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
@@ -86,6 +94,15 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
                                         org.voltdb.benchmark.tpcc.procedures.paymentByCustomerName.class,
                                         org.voltdb.benchmark.tpcc.procedures.slev.class,
                                         org.voltdb.benchmark.tpcc.procedures.delivery.class };
+
+    // testUpdateHonkingBigCatalog constants and statistics. 100/100/40 makes a ~2MB jar.
+    private static final int HUGE_TABLES = 100;
+    private static final int HUGE_COLUMNS = 100;
+    private static final int HUGE_NAME_SIZE = 40;
+    private static double hugeCompileElapsed = 0.0;
+    private static double hugeTestElapsed = 0.0;
+    private static String hugeCatalogXML;
+    private static String hugeCatalogJar;
 
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -136,41 +153,41 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             m_config.createDirectory(new File("/tmp/snapshotdir2"));
             Client client = getClient();
 
-            /*
-             * Test that we can enable snapshots
-             */
+            //
+            // Test that we can enable snapshots
+            //
             String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
             String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
             VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(5000);
 
-            /*
-             * Make sure snapshot files are generated
-             */
+            //
+            // Make sure snapshot files are generated
+            //
             for (File f : m_config.listFiles(new File("/tmp/snapshotdir1"))) {
                 assertTrue(f.getName().startsWith("foo1"));
             }
 
-            /*
-             * Test that we can change settings like the path
-             */
+            //
+            // Test that we can change settings like the path
+            //
             newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.jar");
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml");
             results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(5000);
 
-            /*
-             * Check that files are made in the new path
-             */
+            //
+            // Check that files are made in the new path
+            //
             for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
                 assertTrue(f.getName().startsWith("foo2"));
             }
 
-            /*
-             * Change the snapshot path to something that doesn't exist, no crashes
-             */
+            //
+            // Change the snapshot path to something that doesn't exist, no crashes
+            //
             newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.jar");
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml");
             results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
@@ -179,25 +196,25 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             System.out.println("Waiting for failed snapshots");
             Thread.sleep(5000);
 
-            /*
-             * Change it back
-             */
+            //
+            // Change it back
+            //
             newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
             results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(5000);
 
-            /*
-             * Make sure snapshots resume
-             */
+            //
+            // Make sure snapshots resume
+            //
             for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
                 assertTrue(f.getName().startsWith("foo2"));
             }
 
-            /*
-             * Make sure you can disable snapshots
-             */
+            //
+            // Make sure you can disable snapshots
+            //
             newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
             results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
@@ -208,30 +225,30 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
             Thread.sleep(5000);
 
-            /*
-             * Make sure you can reenable snapshot files
-             */
+            //
+            // Make sure you can reenable snapshot files
+            //
             assertEquals( 0, m_config.listFiles(new File("/tmp/snapshotdir2")).size());
 
-            /*
-             * Test that we can enable snapshots
-             */
+            //
+            // Test that we can enable snapshots
+            //
             newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.jar");
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
             results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(5000);
 
-            /*
-             * Make sure snapshot files are generated
-             */
+            //
+            // Make sure snapshot files are generated
+            //
             for (File f : m_config.listFiles(new File("/tmp/snapshotdir1"))) {
                 assertTrue(f.getName().startsWith("foo1"));
             }
 
-            /*
-             * Turn snapshots off so that we can clean up
-             */
+            //
+            // Turn snapshots off so that we can clean up
+            //
             newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
             results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
@@ -434,6 +451,100 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
+    public static long indexEntryCountFromStats(Client client, String tableName, String indexName) throws Exception {
+        ClientResponse callProcedure = client.callProcedure("@Statistics", "INDEX", 0);
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+        VoltTable result = callProcedure.getResults()[0];
+        long tupleCount = 0;
+        while (result.advanceRow()) {
+            if (result.getString("TABLE_NAME").equals(tableName) && result.getString("INDEX_NAME").equals(indexName)) {
+                tupleCount += result.getLong("ENTRY_COUNT");
+            }
+        }
+        return tupleCount;
+    }
+
+    public void testAddDropIndex() throws Exception
+    {
+        ClientResponse callProcedure;
+        String explanation;
+        VoltTable result;
+
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // check that no index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertFalse(explanation.contains("INDEX SCAN"));
+
+        // add index to NEW_ORDER
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.jar");
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml");
+        VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        // check the index for non-zero size
+
+        long tupleCount = indexEntryCountFromStats(client, "NEW_ORDER", "NEWINDEX");
+        assertTrue(tupleCount > 0);
+
+        // verify that the new table(s) support an insert
+        callProcedure = client.callProcedure("@AdHoc", "insert into NEW_ORDER values (-1, -1, -1);");
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        // do a call that uses the index
+        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where NO_O_ID = 5;");
+        result = callProcedure.getResults()[0];
+        result.advanceRow();
+        assertEquals(5, result.getLong("NO_O_ID"));
+
+        // check that an index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertTrue(explanation.contains("INDEX SCAN"));
+
+        // tables can still be accessed
+        loadSomeData(client, 20, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // check the index for even biggerer size from stats
+        long newTupleCount = indexEntryCountFromStats(client, "NEW_ORDER", "NEWINDEX");
+        assertTrue(newTupleCount > tupleCount);
+
+        // check table for the right number of tuples
+        callProcedure = client.callProcedure("@AdHoc", "select count(*) from NEW_ORDER;");
+        long rowCount = callProcedure.getResults()[0].asScalarLong();
+        assertEquals(newTupleCount, rowCount * (K + 1)); // index count is double for k=1
+
+        // revert to the original schema
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        // do a call that uses the index
+        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where NO_O_ID = 5;");
+        result = callProcedure.getResults()[0];
+        result.advanceRow();
+        assertEquals(5, result.getLong("NO_O_ID"));
+
+        // check that no index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertFalse(explanation.contains("INDEX SCAN"));
+
+        // and loading still succeeds
+        loadSomeData(client, 30, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+    }
+
     public void testAddDropTable() throws IOException, ProcCallException, InterruptedException
     {
         Client client = getClient();
@@ -543,7 +654,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         result = callProcedure.getResults()[0];
 
         System.out.println("MATVIEW:"); System.out.println(result);
-        assertTrue(result.getRowCount() == 2);
+        assertEquals(10, result.getRowCount());
     }
 
     public void testAddDropTableRepeat() throws Exception {
@@ -574,6 +685,30 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
        }
     }
 
+    public void testUpdateHonkingBigCatalog() throws IOException, ProcCallException, InterruptedException {
+        System.out.println("\n\n-----\n testUpdateHonkingBigCatalog\n");
+        System.out.printf("jar: %s (%.2f MB)\n", hugeCatalogJar, new File(hugeCatalogJar).length() / 1048576.0);
+        System.out.printf("compile: %.2f seconds (%.2f/second)\n", hugeCompileElapsed, HUGE_TABLES / hugeCompileElapsed);
+        long t = System.currentTimeMillis();
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.jar");
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.xml");
+        try {
+            VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+            assertTrue(results.length == 1);
+        }
+        catch (ProcCallException e) {
+            fail(String.format("@UpdateApplicationCatalog: ProcCallException: %s", e.getLocalizedMessage()));
+        }
+        hugeTestElapsed = (System.currentTimeMillis() - t) / 1000.0;
+        System.out.printf("test: %.2f seconds (%.2f/second)\n", hugeTestElapsed, HUGE_TABLES / hugeTestElapsed);
+        System.out.println("-----\n\n");
+    }
+
     private void deleteDirectory(File dir) {
         if (!dir.exists() || !dir.isDirectory()) {
             return;
@@ -583,6 +718,33 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             assertTrue(f.delete());
         }
         assertTrue(dir.delete());
+    }
+
+    private static String generateRandomDDL(String name, int ntables, int ncols, int width)
+            throws IOException {
+        // Generate huge DDL file. Make it relatively uncompressible with randomness.
+        File temp = File.createTempFile(name, ".sql");
+        temp.deleteOnExit();
+        FileWriter out = new FileWriter(temp);
+        char[] charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".toCharArray();
+        Random random = new Random(99);
+        for (int itable = 0; itable < ntables; itable++) {
+            out.write(String.format("\nCREATE TABLE HUGE_TABLE_%d (\n", itable));
+            out.write("C_FIRST INTEGER,\n");
+            for (int icolumn = 0; icolumn < ncols; icolumn++) {
+                String columnID = RandomStringUtils.random(width,
+                                                           0,
+                                                           charset.length,
+                                                           false,
+                                                           false,
+                                                           charset,
+                                                           random);
+                out.write(String.format("C_%s INTEGER,\n", columnID));
+            }
+            out.write("PRIMARY KEY (C_FIRST));\n");
+        }
+        out.close();
+        return URLEncoder.encode(temp.getAbsolutePath(), "UTF-8");
     }
 
     /**
@@ -603,8 +765,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        //VoltServerConfig config = new LocalSingleProcessServer("catalogupdate-local-base.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        //((LocalCluster) config).setHasLocalServer(true);
 
         // build up a project builder for the workload
         TPCCProjectBuilder project = new TPCCProjectBuilder();
@@ -624,11 +786,12 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
-        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, false)};
+        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, false, false)};
         UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
         ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
 
-        config = new LocalCluster("catalogupdate-cluster-base-secure.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);        project = new TPCCProjectBuilder();
+        config = new LocalCluster("catalogupdate-cluster-base-secure.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addUsers(users);
@@ -640,7 +803,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-addtables.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-addtables.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
@@ -653,11 +816,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // as above but also with a materialized view added to O1
         try {
-            config = new LocalCluster("catalogupdate-cluster-addtableswithmatview.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+            config = new LocalCluster("catalogupdate-cluster-addtableswithmatview.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
             project = new TPCCProjectBuilder();
             project.addDefaultSchema();
             project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
-            project.addLiteralSchema("CREATE VIEW MATVIEW_O1(C1,NUM) AS SELECT A_INT, COUNT(*) FROM O1 GROUP BY A_INT;");
+            project.addLiteralSchema("CREATE VIEW MATVIEW_O1(C1, C2, NUM) AS SELECT A_INT, PKEY, COUNT(*) FROM O1 GROUP BY A_INT, PKEY;");
             project.addDefaultPartitioning();
             project.addPartitionInfo("O1", "PKEY");
             project.addProcedures(BASEPROCS_OPROCS);
@@ -668,8 +831,23 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             fail();
         }
 
+        config = new LocalCluster("catalogupdate-cluster-addindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addLiteralSchema("CREATE INDEX NEWINDEX ON NEW_ORDER (NO_O_ID);");
+        // history is good because this new index is the only one (no pkey)
+        project.addLiteralSchema("CREATE INDEX NEWINDEX2 ON HISTORY (H_C_ID);");
+        // unique index
+        project.addLiteralSchema("CREATE UNIQUE INDEX NEWINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY);");
+
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml"));
+
         //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-expanded.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-expanded.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -679,7 +857,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-conflict.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-conflict.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -689,7 +867,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config = new LocalCluster("catalogupdate-cluster-many.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-many.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -700,7 +878,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
 
         // A catalog change that enables snapshots
-        config = new LocalCluster("catalogupdate-cluster-enable_snapshot.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-enable_snapshot.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -712,7 +890,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml"));
 
         //Another catalog change to modify the schedule
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-change_snapshot.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -724,7 +902,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml"));
 
         //Another catalog change to modify the schedule
-        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -734,6 +912,23 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
+
+        //A huge catalog update to test size limits
+        config = new LocalCluster("catalogupdate-cluster-huge.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        long t = System.currentTimeMillis();
+        String hugeSchemaURL = generateRandomDDL("catalogupdate-cluster-huge",
+                                                  HUGE_TABLES, HUGE_COLUMNS, HUGE_NAME_SIZE);
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addSchema(hugeSchemaURL);
+        project.addProcedures(BASEPROCS);
+        compile = config.compile(project);
+        assertTrue(compile);
+        hugeCompileElapsed = (System.currentTimeMillis() - t) / 1000.0;
+        hugeCatalogXML = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.xml");
+        hugeCatalogJar = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.jar");
+        MiscUtils.copyFile(project.getPathToDeployment(), hugeCatalogXML);
 
         return builder;
     }

@@ -99,6 +99,10 @@ public class StreamBlock {
         return responseBuffer;
     }
 
+    ByteBuffer unreleasedBufferV2() {
+        return m_buffer.b.asReadOnlyBuffer();
+    }
+
     BBContainer[] asBufferChain() {
         ByteBuffer usoBuffer = ByteBuffer.allocate(8);
         usoBuffer.putLong(uso()).flip();

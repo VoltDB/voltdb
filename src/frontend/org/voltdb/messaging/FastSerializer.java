@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltTable;
@@ -227,7 +228,6 @@ public class FastSerializer implements DataOutput {
      * wrapping the byte buffer.
      */
     public static void writeString(String string, ByteBuffer buffer) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
         final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
             buffer.putInt(NULL_STRING_INDICATOR);
@@ -242,10 +242,7 @@ public class FastSerializer implements DataOutput {
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-        if (len > MAX_LENGTH) {
-            throw new IOException("String exceeds maximum length of "
-                                  + MAX_LENGTH + " bytes.");
-        }
+
         buffer.putInt(len);
         buffer.put(strbytes);
     }
@@ -259,7 +256,6 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeString(String string) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
         final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
             writeInt(NULL_STRING_INDICATOR);
@@ -274,10 +270,7 @@ public class FastSerializer implements DataOutput {
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-        if (len > MAX_LENGTH) {
-            throw new IOException("String exceeds maximum length of "
-                                  + MAX_LENGTH + " bytes.");
-        }
+
         writeInt(len);
         write(strbytes);
     }
@@ -328,9 +321,12 @@ public class FastSerializer implements DataOutput {
         }
         buf.putShort((short)values.length);
         for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null)
-                throw new IOException("Array being fastserialized can't contain null values (position " + i + ")");
-            writeArray(values[i], buf);
+            if (values[i] == null) {
+                buf.putInt(-1); // null length prefix
+            }
+            else {
+                writeArray(values[i], buf);
+            }
         }
     }
 
@@ -356,15 +352,29 @@ public class FastSerializer implements DataOutput {
         buf.put(values);
     }
 
+    public void writeArray(byte[][] values) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        writeShort(values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                writeInt(-1);
+            }
+            else {
+                writeArray(values[i]);
+            }
+        }
+    }
+
     public void writeArray(byte[] values) throws IOException {
         if (values.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Array exceeds maximum length of "
                                   + VoltType.MAX_VALUE_LENGTH + " bytes");
         }
         writeInt(values.length);
-        for (int i = 0; i < values.length; ++i) {
-            writeByte(values[i]);
-        }
+        write(values);
     }
 
     public static void writeArray(short[] values, ByteBuffer buf) throws IOException {
@@ -622,16 +632,10 @@ public class FastSerializer implements DataOutput {
     }
 
     public static void writeString(byte[] m_procNameBytes, ByteBuffer buf) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
         final int NULL_STRING_INDICATOR = -1;
         if (m_procNameBytes == null) {
             buf.putInt(NULL_STRING_INDICATOR);
             return;
-        }
-
-        if (m_procNameBytes.length > MAX_LENGTH) {
-            throw new IOException("String exceeds maximum length of "
-                                  + MAX_LENGTH + " bytes.");
         }
         buf.putInt(m_procNameBytes.length);
         buf.put(m_procNameBytes);

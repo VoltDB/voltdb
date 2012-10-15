@@ -54,7 +54,7 @@ public class FragmentTaskLogMessage extends TransactionInfoBaseMessage {
     public FragmentTaskLogMessage(long initiatorHSId,
                                   long coordinatorHSId,
                                   long txnId) {
-        super(initiatorHSId, coordinatorHSId, txnId, false);
+        super(initiatorHSId, coordinatorHSId, txnId, 0, false, false);
     }
 
     private ArrayList<FragmentTaskMessage> m_fragmentTasks = new ArrayList<FragmentTaskMessage>();

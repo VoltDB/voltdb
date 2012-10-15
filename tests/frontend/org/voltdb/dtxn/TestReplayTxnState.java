@@ -71,10 +71,10 @@ public class TestReplayTxnState extends TestCase {
     final static MockMailbox mbox = new MockMailbox();
     final static VoltTable result = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT));
     static MultiPartitionParticipantMessage participantNotice = new MultiPartitionParticipantMessage(0, 2, 1, true);
-    final static FragmentTaskMessage ftmR = new FragmentTaskMessage(0, 2, 1, true, true);
-    final static FragmentTaskMessage ftmW = new FragmentTaskMessage(0, 2, 1, false, false);
-    final static FragmentTaskMessage ftmCol = new FragmentTaskMessage(0, 1, 2, false, false);
-    final static FragmentTaskMessage ftmAgg = new FragmentTaskMessage(0, 1, 2, false, false);
+    final static FragmentTaskMessage ftmR = new FragmentTaskMessage(0, 2, 1, System.currentTimeMillis(), true, true, false);
+    final static FragmentTaskMessage ftmW = new FragmentTaskMessage(0, 2, 1, System.currentTimeMillis(), false, false, false);
+    final static FragmentTaskMessage ftmCol = new FragmentTaskMessage(0, 1, 2, System.currentTimeMillis(), false, false, false);
+    final static FragmentTaskMessage ftmAgg = new FragmentTaskMessage(0, 1, 2, System.currentTimeMillis(), false, false, false);
     final static ParameterSet params = new ParameterSet();
     static ByteBuffer paramsBuf;
     static FragmentResponseMessage frmR, frmW;
@@ -150,7 +150,7 @@ public class TestReplayTxnState extends TestCase {
 
         assertFalse(mpTxn.doWork(true));
 
-        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 2, 1, false, false, true);
+        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 2, 1, false, false, true, false, false);
         mpTxn.processCompleteTransaction(ctm);
 
         while (!mpTxn.doWork(true));
@@ -192,7 +192,8 @@ public class TestReplayTxnState extends TestCase {
         frmColReal.addDependency(13, result);
         frmColReal.setStatus(FragmentResponseMessage.SUCCESS, null);
 
-        InitiateTaskMessage initiateNotice = new InitiateTaskMessage(0, 1, 2, false, false, invocation, 2);
+        InitiateTaskMessage initiateNotice = new InitiateTaskMessage(0, 1, 2, false, false, invocation, 2,
+                                                                     tracker.getAllSitesExcluding(1));
         irm = new InitiateResponseMessage(initiateNotice);
         final ClientResponseImpl response = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
         irm.setResults(response);
@@ -252,7 +253,7 @@ public class TestReplayTxnState extends TestCase {
             mpTxn.doWork(true);
         }
 
-        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 1, 2, false, false, true);
+        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 1, 2, false, false, true, false, false);
         CompleteTransactionResponseMessage ctrm = new CompleteTransactionResponseMessage(ctm, 2);
         mpTxn.processCompleteTransactionResponse(ctrm);
 
@@ -273,5 +274,12 @@ public class TestReplayTxnState extends TestCase {
                 Mockito.any(TransactionState.class),
                 any(HashMap.class),
                 any(VoltMessage.class));
+    }
+
+    public void testReturnInvocation() {
+        ExecutionSite site = mock(ExecutionSite.class);
+        InitiateTaskMessage task = new InitiateTaskMessage(0, 0, 0, false, true, invocation, 0);
+        ReplayedTxnState txnState = new ReplayedTxnState(site, task);
+        assertNotNull(txnState.getInvocation());
     }
 }

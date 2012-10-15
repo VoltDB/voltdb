@@ -221,6 +221,9 @@ VoltDBEngine::~VoltDBEngine() {
     // object multiple times.  Change at your own risk.
     // --izzy 8/19/2009
 
+    // clean up execution plans
+    m_executorMap.clear();
+
     // Get rid of any dummy undo quantum first so m_undoLog.clear()
     // doesn't wipe this out before we do it.
     if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
@@ -232,10 +235,6 @@ VoltDBEngine::~VoltDBEngine() {
     // actually find the memory that has been allocated to non-inlined
     // strings and deallocated it.
     m_undoLog.clear();
-
-    for (int ii = 0; ii < m_planFragments.size(); ii++) {
-        delete m_planFragments[ii];
-    }
 
     // clean up memory for the template memory for the single long (int) table
     if (m_templateSingleLongTable) {
@@ -310,6 +309,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
 {
+    assert(planfragmentId != 0);
+
     Table *cleanUpTable = NULL;
     m_currentOutputDepId = outputDependencyId;
     m_currentInputDepId = inputDependencyId;
@@ -343,11 +344,10 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                              txnId,
                                              lastCommittedTxnId);
 
-   // count the number of plan fragments executed
+    // count the number of plan fragments executed
     ++m_pfCount;
 
     // execution lists for planfragments are cached by planfragment id
-    assert (planfragmentId >= -1);
     //printf("Looking to execute fragid %jd\n", (intmax_t)planfragmentId);
     map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(planfragmentId);
     assert (iter != m_executorMap.end());
@@ -430,69 +430,47 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
-/*
- * Execute the supplied fragment in the context of the specified
- * cluster and database with the supplied parameters as arguments. A
- * catalog with all the necessary tables needs to already have been
- * loaded.
- */
-int VoltDBEngine::executePlanFragment(string fragmentString,
-                                      int32_t outputDependencyId,
-                                      int32_t inputDependencyId,
-                                      const NValueArray &params,
-                                      int64_t txnId,
-                                      int64_t lastCommittedTxnId)
+int VoltDBEngine::loadFragment(const char *plan, int32_t length, int64_t &fragId, bool &wasHit, int64_t &cacheSize)
 {
-    int retval = ENGINE_ERRORCODE_ERROR;
+    fragId = 0;
 
-    m_currentOutputDepId = outputDependencyId;
-    m_currentInputDepId = inputDependencyId;
-
-    // how many current plans (too see if we added any)
-    size_t frags = m_planFragments.size();
-
-    try
-    {
-        if (initPlanFragment(AD_HOC_FRAG_ID, fragmentString))
+    wasHit = m_fragmentManager.upsert(plan, length, fragId);
+    cacheSize = m_fragmentManager.size();
+    if (!wasHit) {
+        try
         {
-            retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId,
-                                  inputDependencyId, params,
-                                  txnId, lastCommittedTxnId, true, true);
+            std::string fragmentString(plan, length);
+            if (!initPlanFragment(fragId, fragmentString))
+            {
+                char message[128];
+                snprintf(message, 128, "Unable to load plan fragment for"
+                         " fragment id %jd.", (intmax_t)fragId);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              message);
+            }
         }
-        else
+        catch (SerializableEEException &e)
         {
-            char message[128];
-            snprintf(message, 128, "Unable to load ad-hoc plan fragment for"
-                    " transaction %jd.", (intmax_t)txnId);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+            VOLT_TRACE("loadFragment: failed to initialize plan fragment");
+            e.serialize(getExceptionOutputSerializer());
+            fragId = 0;
+            return 1;
         }
     }
-    catch (SerializableEEException &e)
-    {
-        VOLT_TRACE("executePlanFragment: failed to initialize "
-                   "ad-hoc plan fragment");
-        resetReusedResultOutputBuffer();
-        e.serialize(getExceptionOutputSerializer());
-        retval = ENGINE_ERRORCODE_ERROR;
+
+    // nonzero on failure
+    return fragId == 0 ? 1 : 0;
+}
+
+void VoltDBEngine::resizePlanCache() {
+    while (int64_t purgeFragId = m_fragmentManager.purgeNext()) {
+        std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
+        iter = m_executorMap.find(purgeFragId);
+        if (iter != m_executorMap.end()) {
+            // clean up stuff
+            m_executorMap.erase(purgeFragId);
+        }
     }
-
-    // clean up stuff
-    m_executorMap.erase(AD_HOC_FRAG_ID);
-
-    // delete any generated plan
-    size_t nowFrags = m_planFragments.size();
-    if (nowFrags > frags) {
-        assert ((nowFrags - frags) == 1);
-        delete m_planFragments.back();
-        m_planFragments.pop_back();
-    }
-
-    // set these back to -1 for error handling
-    m_currentOutputDepId = -1;
-    m_currentInputDepId = -1;
-
-    return retval;
 }
 
 // -------------------------------------------------
@@ -584,17 +562,19 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
  * TODO: This should be extended to find the parent delegate if the
  * deletion isn't a top-level object .. and delegates should have a
  * deleteChildCommand() interface.
+ *
+ * Note, this only deletes tables, indexes are deleted in
+ * processCatalogAdditions(..) for dumb reasons.
  */
 bool
 VoltDBEngine::processCatalogDeletes(int64_t txnId)
 {
     vector<string> deletions;
     m_catalog->getDeletedPaths(deletions);
-    vector<string>::iterator pathIter = deletions.begin();
-    while (pathIter != deletions.end())
-    {
+
+    BOOST_FOREACH(string path, deletions) {
         map<string, CatalogDelegate*>::iterator pos;
-        if ((pos = m_catalogDelegates.find(*pathIter)) != m_catalogDelegates.end()) {
+        if ((pos = m_catalogDelegates.find(path)) != m_catalogDelegates.end()) {
             TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
             /*
              * Instruct the table to flush all export data
@@ -610,54 +590,174 @@ VoltDBEngine::processCatalogDeletes(int64_t txnId)
             delete pos->second;
             m_catalogDelegates.erase(pos++);
         }
-        ++pathIter;
     }
     return true;
 }
 
 /*
- * Create catalog delegates for new catalog items.
+ * Create catalog delegates for new catalog tables.
+ * Create the tables themselves when new tables are needed.
+ * Add and remove indexes if indexes are added or removed from an
+ * existing table.
  * Use the txnId of the catalog update as the generation for export
- * data
+ * data.
  */
 bool
 VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 {
-    // process new tables.
-    map<string, catalog::Table*>::const_iterator it = m_database->tables().begin();
-    while (it != m_database->tables().end())
+    // iterate over all of the tables in the new catalog
+    map<string, catalog::Table*>::const_iterator catTableIter;
+    for (catTableIter = m_database->tables().begin();
+         catTableIter != m_database->tables().end();
+         catTableIter++)
     {
-        catalog::Table *t = it->second;
-        if (addAll || t->wasAdded()) {
-            TableCatalogDelegate *tcd =
-                new TableCatalogDelegate(t->relativeIndex(), t->path(), t->signature());
-            if (tcd->init(m_executorContext, *m_database, *t) != 0) {
+        // get the catalog's table object
+        catalog::Table *catalogTable = catTableIter->second;
+
+        if (addAll || catalogTable->wasAdded()) {
+
+            //////////////////////////////////////////
+            // add a completely new table
+            //////////////////////////////////////////
+
+            TableCatalogDelegate *tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
+                                                                 catalogTable->path(),
+                                                                 catalogTable->signature());
+
+            // use the delegate to init the table and create indexes n' stuff
+            if (tcd->init(m_executorContext, *m_database, *catalogTable) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
-                           it->second->name().c_str());
+                           catTableIter->second->name().c_str());
                 return false;
             }
             m_catalogDelegates[tcd->path()] = tcd;
+
+            // set export info on the new table
             if (tcd->exportEnabled()) {
-                tcd->getTable()->setSignatureAndGeneration(t->signature(), txnId);
-                m_exportingTables[t->signature()] = tcd->getTable();
+                tcd->getTable()->setSignatureAndGeneration(catalogTable->signature(), txnId);
+                m_exportingTables[catalogTable->signature()] = tcd->getTable();
             }
-        } else {
+        }
+        else {
+
+            //////////////////////////////////////////////
+            // update the export info for existing tables
+            //
+            // add/modify/remove indexes that have changed
+            //  in the catalog
+            //////////////////////////////////////////////
+
+            // get the delegate and bail if it's not here
+            // - JHH: I'm not sure why not finding a delegate is safe to ignore
+            map<string, CatalogDelegate*>::iterator pos;
+            if ((pos = m_catalogDelegates.find(catalogTable->path())) == m_catalogDelegates.end()) {
+                continue;
+            }
+            TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
+            if (!tcd) {
+                continue;
+            }
+
+            Table *table = tcd->getTable();
+
             /*
              * Instruct the table that was not added but is being retained to flush
              * Then tell it about the new export generation/catalog txnid
              * which will cause it to notify the topend export data source
              * that no more data is coming for the previous generation
              */
-            map<string, CatalogDelegate*>::iterator pos;
-            if ((pos = m_catalogDelegates.find(t->path())) != m_catalogDelegates.end()) {
-                TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
-                if (tcd && tcd->exportEnabled()) {
-                    Table *table = tcd->getTable();
-                    table->setSignatureAndGeneration( t->signature(), txnId);
+            if (tcd->exportEnabled()) {
+                table->setSignatureAndGeneration(catalogTable->signature(), txnId);
+            }
+
+            vector<TableIndex*> currentIndexes = table->allIndexes();
+
+            //////////////////////////////////////////
+            // find all of the indexes to add
+            //////////////////////////////////////////
+
+            // iterate over indexes for this table in the catalog
+            map<string, catalog::Index*>::const_iterator indexIter;
+            for (indexIter = catalogTable->indexes().begin();
+                 indexIter != catalogTable->indexes().end();
+                 indexIter++)
+            {
+                std::string indexName = indexIter->first;
+                std::string indexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
+
+                // Look for an index on the table to match the catalog index
+                bool found = false;
+                for (int i = 0; i < currentIndexes.size(); i++) {
+                    std::string currentIndexId = currentIndexes[i]->getId();
+                    if (indexId.compare(currentIndexId) == 0) {
+                        // rename the index if needed (or even if not)
+                        currentIndexes[i]->rename(indexName);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    // create and add the index
+                    TableIndexScheme scheme;
+                    bool success = TableCatalogDelegate::getIndexScheme(*catalogTable,
+                                                                        *indexIter->second,
+                                                                        table->schema(),
+                                                                        &scheme);
+                    if (!success) {
+                        VOLT_ERROR("Failed to initialize index '%s' from catalog",
+                                   indexIter->second->name().c_str());
+                        return false;
+                    }
+
+                    TableIndex *index = TableIndexFactory::getInstance(scheme);
+                    assert(index);
+
+                    // all of the data should be added here
+                    table->addIndex(index);
+
+                    // add the index to the stats source
+                    index->getIndexStats()->configure(index->getName() + " stats",
+                                                      table->name(),
+                                                      m_executorContext->m_hostId,
+                                                      m_executorContext->m_hostname,
+                                                      m_executorContext->m_siteId,
+                                                      m_executorContext->m_partitionId,
+                                                      indexIter->second->relativeIndex());
+                }
+            }
+
+
+            //////////////////////////////////////////
+            // now find all of the indexes to remove
+            //////////////////////////////////////////
+
+            bool found = false;
+            // iterate through all of the existing indexes
+            for (int i = 0; i < currentIndexes.size(); i++) {
+                std::string indexId = currentIndexes[i]->getId();
+
+                // iterate through all of the catalog indexes,
+                //  looking for a match.
+                map<string, catalog::Index*>::const_iterator indexIter;
+                for (indexIter = catalogTable->indexes().begin();
+                     indexIter != catalogTable->indexes().end();
+                     indexIter++)
+                {
+                    std::string currentIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
+                    if (indexId.compare(currentIndexId) == 0) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                // if the table has an index that the catalog doesn't,
+                // then remove the index
+                if (!found) {
+                    table->removeIndex(currentIndexes[i]);
                 }
             }
         }
-        ++it;
     }
 
     // new plan fragments are handled differently.
@@ -786,7 +886,6 @@ bool VoltDBEngine::rebuildTableCollections() {
                                                       index->getIndexStats());
             }
 
-
             /*map<string, catalog::Index*>::const_iterator index_iterator;
             for (index_iterator = catTable->indexes().begin();
                  index_iterator != catTable->indexes().end(); index_iterator++) {
@@ -811,10 +910,8 @@ bool VoltDBEngine::rebuildTableCollections() {
  * Delete and rebuild all plan fragments.
  */
 bool VoltDBEngine::rebuildPlanFragmentCollections() {
-    for (int ii = 0; ii < m_planFragments.size(); ii++)
-        delete m_planFragments[ii];
-    m_planFragments.clear();
     m_executorMap.clear();
+    m_fragmentManager.clear();
 
     // initialize all the planfragments.
     map<string, catalog::Procedure*>::const_iterator proc_iterator;
@@ -876,7 +973,6 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
 
     // catalog method plannodetree returns PlanNodeList.java
     PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree);
-    m_planFragments.push_back(pnf);
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
     assert(pnf->getRootNode());
 
@@ -898,7 +994,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
 
     boost::shared_ptr<ExecutorVector> ev =
         boost::shared_ptr<ExecutorVector>
-        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit));
+        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit, pnf));
 
     // Initialize each node!
     for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();

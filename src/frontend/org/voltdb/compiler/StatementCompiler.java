@@ -17,20 +17,17 @@
 
 package org.voltdb.compiler;
 
-import java.util.Collections;
-
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.ParameterInfo;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
@@ -59,8 +56,6 @@ public abstract class StatementCompiler {
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, String stmt, String joinOrder, PartitioningForStatement partitioning)
     throws VoltCompiler.VoltCompilerException {
-
-        boolean compilerDebug = System.getProperties().contains("compilerdebug");
 
         // Cleanup whitespace newlines for catalog compatibility
         // and to make statement parsing easier.
@@ -116,32 +111,33 @@ public abstract class StatementCompiler {
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(0);
 
+
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
-        PlanNodeList node_list = null;
+        String sql = catalogStmt.getSqltext();
+        String stmtName = catalogStmt.getTypeName();
+        String procName = catalogStmt.getParent().getTypeName();
         TrivialCostModel costModel = new TrivialCostModel();
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, false);
+                sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
+                partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
+                costModel, null, joinOrder);
 
         CompiledPlan plan = null;
         try {
-            plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
-                    catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(), DEFAULT_MAX_JOIN_TABLES, null);
+            planner.parse();
+            plan = planner.plan();
+            assert(plan != null);
         } catch (PlanningErrorException e) {
             // These are normal expectable errors -- don't normally need a stack-trace.
-            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
-        }
-        if (plan == null) {
-            String msg = "Failed to plan for statement type("
-                + catalogStmt.getTypeName() + ") "
-                + catalogStmt.getSqltext();
-            String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null) {
-                msg += " Error: \"" + plannerMsg + "\"";
+            String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") " + catalogStmt.getSqltext();
+            if (e.getMessage() != null) {
+                msg += " Error: \"" + e.getMessage() + "\"";
             }
             throw compiler.new VoltCompilerException(msg);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         }
 
         // Check order determinism before accessing the detail which it caches.
@@ -156,10 +152,11 @@ public abstract class StatementCompiler {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        for (ParameterInfo param : plan.parameters) {
-            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(param.index));
-            catalogParam.setJavatype(param.type.getValue());
-            catalogParam.setIndex(param.index);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            VoltType type = plan.parameters[i];
+            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
+            catalogParam.setJavatype(type.getValue());
+            catalogParam.setIndex(i);
         }
 
         // Output Columns
@@ -197,62 +194,43 @@ public abstract class StatementCompiler {
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
 
-        int i = 0;
-        Collections.sort(plan.fragments);
-        for (CompiledPlan.Fragment fragment : plan.fragments) {
-            node_list = new PlanNodeList(fragment.planGraph);
+        // Now update our catalog information
+        PlanFragment planFragment = catalogStmt.getFragments().add("0");
+        planFragment.setHasdependencies(plan.subPlanGraph != null);
+        // mark a fragment as non-transactional if it never touches a persistent table
+        planFragment.setNontransactional(!fragmentReferencesPersistentTable(plan.rootPlanGraph));
+        planFragment.setMultipartition(plan.subPlanGraph != null);
+        writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
 
-            // Now update our catalog information
-            String planFragmentName = Integer.toString(i);
-            PlanFragment planFragment = catalogStmt.getFragments().add(planFragmentName);
-
-            // mark a fragment as non-transactional if it never touches a persistent table
-            planFragment.setNontransactional(!fragmentReferencesPersistentTable(fragment.planGraph));
-
-            planFragment.setHasdependencies(fragment.hasDependencies);
-            planFragment.setMultipartition(fragment.multiPartition);
-
-            String json = node_list.toJSONString();
-            compiler.captureDiagnosticJsonFragment(json);
-
-            // if we're generating more than just explain plans
-            if (compilerDebug) {
-                String prettyJson = null;
-
-                try {
-                    JSONObject jobj = new JSONObject(json);
-                    prettyJson = jobj.toString(4);
-                } catch (JSONException e2) {
-                    e2.printStackTrace();
-                    throw compiler.new VoltCompilerException(e2.getMessage());
-                }
-
-                // output the plan to disk as pretty json for debugging
-                BuildDirectoryUtils.writeFile("statement-winner-plan-fragments", name + "-" + String.valueOf(i) + ".txt",
-                                              prettyJson);
-
-                // output the plan to disk for debugging
-                BuildDirectoryUtils.writeFile("statement-winner-plan-fragments", name + String.valueOf(i) + ".dot",
-                                              node_list.toDOTString(name + "-" + String.valueOf(i)));
-            }
-
-            // Place serialized version of PlanNodeTree into a PlanFragment
-            try {
-                FastSerializer fs = new FastSerializer(true, false);
-                fs.write(json.getBytes());
-                String hexString = fs.getHexEncodedBytes();
-                planFragment.setPlannodetree(hexString);
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw compiler.new VoltCompilerException(e.getMessage());
-            }
-
-            // increment the counter for fragment id
-            i++;
+        if (plan.subPlanGraph != null) {
+            planFragment = catalogStmt.getFragments().add("1");
+            planFragment.setHasdependencies(false);
+            planFragment.setNontransactional(false);
+            planFragment.setMultipartition(true);
+            writePlanBytes(compiler, planFragment, plan.subPlanGraph);
         }
+
         // Planner should have rejected with an exception any statement with an unrecognized type.
         int validType = catalogStmt.getQuerytype();
         assert(validType != QueryType.INVALID.getValue());
+    }
+
+    static void writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
+    throws VoltCompilerException {
+        // get the plan bytes
+        PlanNodeList node_list = new PlanNodeList(planGraph);
+        String json = node_list.toJSONString();
+        compiler.captureDiagnosticJsonFragment(json);
+        // Place serialized version of PlanNodeTree into a PlanFragment
+        try {
+            FastSerializer fs = new FastSerializer(true, false);
+            fs.write(json.getBytes());
+            String hexString = fs.getHexEncodedBytes();
+            fragment.setPlannodetree(hexString);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw compiler.new VoltCompilerException(e.getMessage());
+        }
     }
 
     /**

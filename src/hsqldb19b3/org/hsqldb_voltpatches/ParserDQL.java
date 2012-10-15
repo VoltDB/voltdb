@@ -90,6 +90,7 @@ public class ParserDQL extends ParserBase {
      *
      * @param sql a new SQL character sequence to replace the current one
      */
+    @Override
     void reset(String sql) {
 
         super.reset(sql);
@@ -3778,6 +3779,46 @@ public class ParserDQL extends ParserBase {
         return l;
     }
 
+    /** This wraps either an Expression result of readSQLFunction or a throwable Exception discovered
+     *  in the process of reading that Expression.
+     *  It allows different parser paths to be tried without losing exception
+     *  information OR needlessly throwing, catching, and recovering from those exceptions.
+     *  The main purpose of this class is to avoid using Exception for "normal case" flow control,
+     *  so that more significant exception throws can be tracked down more easily.
+     *  This helped a lot in the development of VoltDB-specific SQL functions.
+     *  It might have been slightly more traditional to collect the HsqlException 's initializers and
+     *  only construct the HsqlException when ready to throw it.
+     *  But having an HsqlException handy allowed better integration with the existing logic for
+     *  conditional re-throws.
+     */
+    static class ExpressionOrException {
+        private Expression m_good;
+        private HsqlException m_bad;
+
+        ExpressionOrException(Expression good) { m_good = good; }
+        ExpressionOrException(HsqlException bad) { m_bad = bad; }
+
+        // It MAY be safe to extract the Expression,
+        // but if there was an exception, throw that now, instead.
+        Expression orThrow() throws HsqlException {
+            if (m_bad != null)
+                throw m_bad;
+            return m_good;
+        }
+
+        // Allow checking, to ensure whether the Expression value is valid.
+        public HsqlException exception() {
+            return m_bad;
+        }
+
+        // It is safe to extract the Expression when there is known not to be an Exception.
+        public Expression knownGood() {
+            // TODO Auto-generated method stub
+            assert(m_bad == null);
+            return m_good;
+        }
+    }
+
     /**
      * reads a Column or Function expression
      */
@@ -3789,16 +3830,28 @@ public class ParserDQL extends ParserBase {
         String  prePrefix      = token.namePrePrefix;
 
         if (isUndelimitedSimpleName()) {
-            FunctionSQL function =
-                FunctionCustom.newCustomFunction(token.tokenString,
-                                                 token.tokenType);
+            FunctionSQL function;
+            // These are VoltDB-specific extensions to the standard sql function set.
+            function = FunctionForVoltDB.newVoltDBFunction(name, token.tokenType);
 
+            if (function == null) {
+                // These seem to be JDBC ("Open Group"?) aliases and extensions to the standard sql functions.
+                function = FunctionCustom.newCustomFunction(token.tokenString, token.tokenType);
+            }
             if (function != null) {
                 int pos = getPosition();
 
+                HsqlException ex = null;
                 try {
-                    return readSQLFunction(function);
-                } catch (HsqlException ex) {
+                    ExpressionOrException result = readSQLFunction(function, false);
+                    ex = result.exception();
+                    if (ex == null) {
+                        return result.knownGood();
+                    }
+                } catch (HsqlException caught) {
+                    ex = caught;
+                }
+                if (ex != null) {
                     ex.setLevel(compileContext.subQueryDepth);
 
                     if (lastError == null
@@ -3812,6 +3865,8 @@ public class ParserDQL extends ParserBase {
                 function = FunctionSQL.newSQLFunction(name, compileContext);
 
                 if (function != null) {
+                    // It's not really clear why readSQLFunction exceptions just get thrown through here
+                    // but get post-processed in the similar call above for FunctionForVoltDB and FunctionCustom
                     return readSQLFunction(function);
                 }
             }
@@ -3966,6 +4021,12 @@ public class ParserDQL extends ParserBase {
     }
 
     Expression readSQLFunction(FunctionSQL function) {
+        // Throwing exceptions as they are detected ensures that the normal code path
+        // returns a valid expression.
+        return readSQLFunction(function, true).knownGood();
+    }
+
+    ExpressionOrException readSQLFunction(FunctionSQL function, boolean preferToThrow) {
 
         read();
 
@@ -3973,15 +4034,22 @@ public class ParserDQL extends ParserBase {
         short[] parseList = function.parseList;
 
         if (parseList.length == 0) {
-            return function;
+            return new ExpressionOrException(function);
         }
 
         HsqlArrayList exprList = new HsqlArrayList();
 
+        HsqlException e = null;
         try {
-            readExpression(exprList, parseList, 0, parseList.length, false);
-        } catch (HsqlException e) {
+            e = readExpression(exprList, parseList, 0, parseList.length, false, false);
+        } catch (HsqlException caught) {
+            e = caught;
+        }
+        if (e != null) {
             if (function.parseListAlt == null) {
+                if ( ! preferToThrow) {
+                    return new ExpressionOrException(e);
+                }
                 throw e;
             }
 
@@ -3990,7 +4058,15 @@ public class ParserDQL extends ParserBase {
             parseList = function.parseListAlt;
             exprList  = new HsqlArrayList();
 
-            readExpression(exprList, parseList, 0, parseList.length, false);
+            e = readExpression(exprList, parseList, 0, parseList.length, false, preferToThrow);
+            if (e != null) {
+                if ( ! preferToThrow ) {
+                    return new ExpressionOrException(e);
+                }
+                // It's a little strange to be here -- should have thrown already.
+                // But better late than sorry.
+                throw e;
+            }
         }
 
         Expression[] expr = new Expression[exprList.size()];
@@ -3998,11 +4074,25 @@ public class ParserDQL extends ParserBase {
         exprList.toArray(expr);
         function.setArguments(expr);
 
-        return function.getFunctionExpression();
+        return new ExpressionOrException(function.getFunctionExpression());
     }
 
-    void readExpression(HsqlArrayList exprList, short[] parseList, int start,
-                        int count, boolean isOption) {
+    /***
+     *
+     * @param exprList
+     * @param parseList
+     * @param start
+     * @param count
+     * @param isOption
+     * @param preferToThrow - if false, exceptions are quietly passed up the stack rather than thrown.
+     *                        making it possible to distinguish (breakpoint at) serious exceptions
+     *                        vs. false alarms that would merely indicate that the parser wandered
+     *                        down an unfruitful path and needs to backtrack.
+     *                        Exceptions should not be used for normal control flow.
+     * @return a non-thrown HsqlException that can be thrown later if/when the alternatives have run out.
+     */
+    private HsqlException readExpression(HsqlArrayList exprList, short[] parseList, int start,
+                                          int count, boolean isOption, boolean preferToThrow) {
 
         for (int i = start; i < start + count; i++) {
             int exprType = parseList[i];
@@ -4041,10 +4131,13 @@ public class ParserDQL extends ParserBase {
                     int elementCount     = parseList[i++];
                     int initialExprIndex = exprList.size();
 
+                    HsqlException ex = null;
                     try {
-                        readExpression(exprList, parseList, i, elementCount,
-                                       true);
-                    } catch (HsqlException ex) {
+                        ex = readExpression(exprList, parseList, i, elementCount, true, false);
+                    } catch (HsqlException caught) {
+                        ex = caught;
+                    }
+                    if (ex != null) {
                         ex.setLevel(compileContext.subQueryDepth);
 
                         if (lastError == null
@@ -4085,8 +4178,28 @@ public class ParserDQL extends ParserBase {
                     while (true) {
                         int initialExprIndex = exprList.size();
 
-                        readExpression(exprList, parseList, parseIndex,
-                                       elementCount, true);
+                        if (preferToThrow) {
+                            readExpression(exprList, parseList, parseIndex,
+                                           elementCount, true, true);
+                        } else {
+                            HsqlException ex = null;
+                            try {
+                                ex = readExpression(exprList, parseList, parseIndex,
+                                                           elementCount, true, false);
+                            } catch (HsqlException caught) {
+                                ex = caught;
+                            }
+                            if (ex != null) {
+                                // TODO: There is likely a more elegant pre-emptive way of handling
+                                // the inevitable close paren that properly terminates a repeating group.
+                                // This filtering probably masks/ignores some syntax errors such as
+                                // a trailing comma right before the paren.
+                                if (ex.getMessage().equalsIgnoreCase("unexpected token: )")) {
+                                    break;
+                                }
+                                return ex;
+                            }
+                        }
 
                         if (exprList.size() == initialExprIndex) {
                             break;
@@ -4104,6 +4217,9 @@ public class ParserDQL extends ParserBase {
                     if (ArrayUtil.find(parseList, token.tokenType, i
                                        + 1, elementCount) == -1) {
                         if (!isOption) {
+                            if ( ! preferToThrow) {
+                                return unexpectedToken();
+                            }
                             throw unexpectedToken();
                         }
                     } else {
@@ -4125,6 +4241,9 @@ public class ParserDQL extends ParserBase {
                 case Tokens.COMMA :
                 default :
                     if (token.tokenType != exprType) {
+                        if ( ! preferToThrow) {
+                            return unexpectedToken();
+                        }
                         throw unexpectedToken();
                     }
 
@@ -4133,6 +4252,7 @@ public class ParserDQL extends ParserBase {
                     continue;
             }
         }
+        return null; // Successful return -- no exception to pass back.
     }
 
     private Expression readSequenceExpression() {

@@ -41,6 +41,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.VoltDDLElementTracker;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -80,7 +81,8 @@ public class PlannerTestAideDeCamp {
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
         //hsql.runDDLFile(schemaPath);
-        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql);
+        VoltDDLElementTracker partitionMap = new VoltDDLElementTracker(compiler);
+        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap, db);
         ddl_compiler.loadSchema(schemaPath);
         ddl_compiler.compileToCatalog(catalog, db);
     }
@@ -92,24 +94,35 @@ public class PlannerTestAideDeCamp {
         return catalog;
     }
 
+    public Database getDatabase() {
+        return db;
+    }
+
     /**
      * Compile a statement and return the head of the plan.
      * @param sql
-     * @param paramCount
      */
-    public CompiledPlan compilePlan(String sql, int paramCount, boolean singlePartition, String joinOrder)
+    public CompiledPlan compileAdHocPlan(String sql)
     {
-        compile(sql, paramCount, singlePartition, joinOrder);
+        compile(sql, 0, null, null, true, false);
         return m_currentPlan;
     }
 
     public List<AbstractPlanNode> compile(String sql, int paramCount)
     {
-        return compile(sql, paramCount, false);
+        return compile(sql, paramCount, false, null);
     }
 
     public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {
         return compile(sql, paramCount, singlePartition, null);
+    }
+
+    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
+        Object partitionBy = null;
+        if (singlePartition) {
+            partitionBy = "Forced single partitioning";
+        }
+        return compile(sql, paramCount, joinOrder, partitionBy, true, false);
     }
 
     /**
@@ -117,11 +130,11 @@ public class PlannerTestAideDeCamp {
      * @param sql
      * @param paramCount
      */
-    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder)
+    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
-        catalogStmt.setSinglepartition(singlePartition);
+        catalogStmt.setSinglepartition(partitionParameter != null);
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(paramCount);
 
@@ -146,40 +159,25 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        Object partitionParameter = null;
-        if (singlePartition) {
-            // Dummy up a partitioning value to indicate the intent and prevent the planner
-            // from trying to infer a constant partitioning value from the statement.
-            partitionParameter = "PlannerTestAideDeCamp dummied up single partitioning for QueryPlanner";
-        }
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, true, true);
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
         QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
-                             hsql, estimates, false);
+            new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
+                    catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),
+                    db, partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                    costModel, null, joinOrder);
 
         CompiledPlan plan = null;
-        plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
-
-        if (plan == null)
-        {
-            String msg = "planner.compilePlan returned null plan";
-            String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null)
-            {
-                msg += " with error: \"" + plannerMsg + "\"";
-            }
-            throw new NullPointerException(msg);
-        }
+        planner.parse();
+        plan = planner.plan();
+        assert(plan != null);
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
         // If this is an adhoc query then there won't be any parameters
-        for (ParameterInfo param : plan.parameters) {
-            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(param.index));
-            catalogParam.setJavatype(param.type.getValue());
-            catalogParam.setIndex(param.index);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
+            catalogParam.setJavatype(plan.parameters[i].getValue());
+            catalogParam.setIndex(i);
         }
 
         // Output Columns
@@ -196,15 +194,15 @@ public class PlannerTestAideDeCamp {
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
-        for (CompiledPlan.Fragment fragment : plan.fragments) {
-            PlanNodeList nodeList = new PlanNodeList(fragment.planGraph);
-            nodeLists.add(nodeList);
+        nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
+        if (plan.subPlanGraph != null) {
+            nodeLists.add(new PlanNodeList(plan.subPlanGraph));
         }
 
         //Store the list of parameters types and indexes in the plan node list.
         List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
-        for (ParameterInfo param : plan.parameters) {
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(param.index, param.type);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, plan.parameters[i]);
             parameters.add(parameter);
         }
 

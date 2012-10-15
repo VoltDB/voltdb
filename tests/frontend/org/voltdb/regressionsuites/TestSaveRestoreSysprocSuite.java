@@ -34,12 +34,17 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.zip.GZIPInputStream;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.VoltDB;
@@ -54,81 +59,26 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
+import org.voltdb.utils.VoltFile;
+import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
 
 /**
  * Test the SnapshotSave and SnapshotRestore system procedures
  */
-public class TestSaveRestoreSysprocSuite extends RegressionSuite {
-
-    private static final String TMPDIR = "/tmp/" + System.getProperty("user.name");
-    private static final String TESTNONCE = "testnonce";
-    protected static final String JAR_NAME = "sysproc-threesites.jar";
+public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
-    }
-
-    @Override
-    public void setUp() throws Exception
-    {
-        File tempDir = new File(TMPDIR);
-        if (!tempDir.exists()) {
-            assertTrue(tempDir.mkdirs());
-        }
-        deleteTestFiles();
-        super.setUp();
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
-        org.voltdb.sysprocs.SnapshotRegistry.clear();
-    }
-
-    @Override
-    public void tearDown() throws Exception
-    {
-        deleteTestFiles();
-        super.tearDown();
-    }
-
-    private void deleteRecursively(File f) {
-        if (f.isDirectory()) {
-            for (File f2 : f.listFiles()) {
-                deleteRecursively(f2);
-            }
-            assertTrue(f.delete());
-        } else  {
-            assertTrue(f.delete());
-        }
-    }
-
-    private void deleteTestFiles()
-    {
-        FilenameFilter cleaner = new FilenameFilter()
-        {
-            @Override
-            public boolean accept(File dir, String file)
-            {
-                return file.startsWith(TESTNONCE) ||
-                file.endsWith(".vpt") ||
-                file.endsWith(".digest") ||
-                file.endsWith(".tsv") ||
-                file.endsWith(".csv") ||
-                file.endsWith(".incomplete") ||
-                new File(dir, file).isDirectory();
-            }
-        };
-
-        File tmp_dir = new File(TMPDIR);
-        File[] tmp_files = tmp_dir.listFiles(cleaner);
-        for (File tmp_file : tmp_files)
-        {
-            deleteRecursively(tmp_file);
-        }
     }
 
     private void corruptTestFiles(java.util.Random r) throws Exception
@@ -184,9 +134,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         for (int i = indexBase; i < numberOfItems + indexBase; i++) {
             String stringVal = null;
             String escapedVal = null;
-            StringBuilder sb = null;
             if (expectedText != null) {
-                sb = new StringBuilder(64);
                 if (generateCSV) {
                     int escapable = i % 5;
                     switch (escapable) {
@@ -224,6 +172,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                          i,
                                          new Double(i)};
             if (expectedText != null) {
+                StringBuilder sb = new StringBuilder(64);
                 if (generateCSV) {
                     sb.append('"').append(i).append('"').append(delimeter).append(escapedVal).append(delimeter);
                     sb.append('"').append(i).append('"').append(delimeter);
@@ -260,14 +209,31 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         return partition_table;
     }
 
-    private VoltTable[] loadTable(Client client, String tableName,
+    private VoltTable[] loadTable(Client client, String tableName, boolean replicated,
                                   VoltTable table)
     {
         VoltTable[] results = null;
         try
         {
-            client.callProcedure("@LoadMultipartitionTable", tableName,
-                                 table);
+            if (replicated) {
+                client.callProcedure("@LoadMultipartitionTable", tableName,
+                            table);
+            } else {
+                ArrayList<SyncCallback> callbacks = new ArrayList<SyncCallback>();
+                VoltType columnTypes[] = new VoltType[table.getColumnCount()];
+                for (int ii = 0; ii < columnTypes.length; ii++) {
+                    columnTypes[ii] = table.getColumnType(ii);
+                }
+                while (table.advanceRow()) {
+                    SyncCallback cb = new SyncCallback();
+                    callbacks.add(cb);
+                    Object params[] = new Object[table.getColumnCount()];
+                    for (int ii = 0; ii < columnTypes.length; ii++) {
+                        params[ii] = table.get(ii, columnTypes[ii]);
+                    }
+                    client.callProcedure(cb, tableName + ".insert", params);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -289,7 +255,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             VoltTable repl_table =
                 createReplicatedTable(itemsPerChunk, i * itemsPerChunk, expectedText, generateCSV);
-            loadTable(client, tableName, repl_table);
+            loadTable(client, tableName, true, repl_table);
         }
     }
 
@@ -300,18 +266,37 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             VoltTable part_table =
                 createPartitionedTable(itemsPerChunk, i * itemsPerChunk);
-            loadTable(client, tableName, part_table);
+            loadTable(client, tableName, false, part_table);
         }
     }
 
-    private VoltTable[] saveTables(Client client)
+    private VoltTable[] saveTablesWithDefaultOptions(Client client)
+    {
+        return saveTables(client, TMPDIR, TESTNONCE, true, false);
+    }
+
+    private VoltTable[] saveTables(Client client, String dir, String nonce, boolean block, boolean csv)
     {
         VoltTable[] results = null;
         try
         {
-            results = client.callProcedure("@SnapshotSave", TMPDIR,
-                                           TESTNONCE,
-                                           (byte)1).getResults();
+            // For complete coverage test with JSON for CSV saves and legacy args otherwise.
+            if (csv) {
+                JSONObject jsObj = new JSONObject();
+                try {
+                    jsObj.put("uripath", String.format("file://%s", dir));
+                    jsObj.put("nonce", nonce);
+                    jsObj.put("block", block);
+                    jsObj.put("format", "csv");
+                } catch (JSONException e) {
+                    fail("JSON exception" + e.getMessage());
+                }
+                results = client.callProcedure("@SnapshotSave", jsObj.toString()).getResults();
+            }
+            else {
+                results = client.callProcedure("@SnapshotSave", dir, nonce, (byte)(block ? 1 : 0))
+                                    .getResults();
+            }
         }
         catch (Exception ex)
         {
@@ -384,6 +369,90 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     }
 
     /*
+     * Test that IV2 transaction ids for inactive partitions are propagated during snapshot restore. This
+     * test is sufficient to test restore as well because the transactions ids are published
+     * to ZK and retrieved by the snapshot daemon for each @SnapshotSave invocation.
+     */
+    public void testPropagateIV2TransactionIds()
+    throws Exception
+    {
+        if (!VoltDB.instance().isIV2Enabled()) return;
+
+
+        System.out.println("Starting testPropagateIV2TransactionIds");
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        Client client = getClient();
+        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+        // make a TPCC warehouse table
+        VoltTable partition_table =
+            createPartitionedTable(num_partitioned_items, 0);
+
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
+
+        saveTablesWithDefaultOptions(client);
+
+
+        /*
+         * It's really hard to derive/access these values, so I pulled them
+         * from the generated digest. They won't be changing often, but if they
+         * do you will have to update them from the generated digest unless
+         * it is a genuine failure where the values are missing or contain incorrect
+         * partition information.
+         */
+        Map<Integer, Long> expectedTransactionIds = new HashMap<Integer, Long>();
+        expectedTransactionIds.put(0, 3619631924101120L);
+        expectedTransactionIds.put(1, 3619631924084737L);
+        expectedTransactionIds.put(MpInitiator.MP_INIT_PID, 3619631923249151L);
+        expectedTransactionIds.put(2, 3619631924084738L);
+
+        JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"));
+        JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
+        System.out.println("TRANSACTION IDS: " + transactionIds.toString());
+        assertEquals( expectedTransactionIds.size(), transactionIds.length());
+
+        for (Map.Entry<Integer, Long> expectedValues : expectedTransactionIds.entrySet()) {
+            final long foundTxnId = transactionIds.getLong(expectedValues.getKey().toString());
+            assertEquals(expectedValues.getValue().longValue(), foundTxnId);
+        }
+
+        m_config.shutDown();
+
+        CatalogChangeSingleProcessServer config =
+                (CatalogChangeSingleProcessServer) m_config;
+        config.recompile(1);
+        try {
+            m_config.startUp(false);
+            client = getClient();
+
+            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
+
+            saveTables(client, TMPDIR, TESTNONCE + 2, true, false);
+
+            digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"));
+            transactionIds = digest.getJSONObject("partitionTransactionIds");
+            assertEquals(expectedTransactionIds.size(), transactionIds.length());
+            for (Map.Entry<Integer, Long> expectedValues : expectedTransactionIds.entrySet()) {
+                final long txnid = transactionIds.getLong(expectedValues.getKey().toString());
+                final int partitionId = expectedValues.getKey();
+
+                //Because these are no longer part of the cluster they should be unchanged
+                if (partitionId == 2 || partitionId == 1) {
+                    assertEquals(txnid, expectedValues.getValue().longValue());
+                } else if (partitionId == MpInitiator.MP_INIT_PID || partitionId == 1) {
+                    //These should be > then the one from the other snapshot
+                    //because it picked up where it left off on restore and did more work
+                    assertTrue(txnid > expectedValues.getValue().longValue());
+                }
+            }
+        } finally {
+            config.revertCompile();
+        }
+    }
+
+    /*
      * Test that a replicated table can be distributed correctly
      */
     public void testDistributeReplicatedTable()
@@ -411,9 +480,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 VoltTable partition_table =
                     createPartitionedTable(num_partitioned_items, 0);
 
-                loadTable(client, "REPLICATED_TESTER", repl_table);
-                loadTable(client, "PARTITION_TESTER", partition_table);
-                saveTables(client);
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
+                saveTablesWithDefaultOptions(client);
 
                 boolean skipFirst = true;
                 for (File f : lc.listFiles(new File("/tmp"))) {
@@ -666,7 +735,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
 
-        saveTables(client);
+        saveTablesWithDefaultOptions(client);
         validateSnapshot(true);
 
         releaseClient(client);
@@ -884,15 +953,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         /*
          * Check that snapshot status returns a reasonable result
          */
-        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
-        assertNotNull(statusResults);
-        assertEquals( 1, statusResults.length);
-        assertEquals( 14, statusResults[0].getColumnCount());
-        assertTrue(statusResults[0].advanceRow());
-        assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
-        assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
-        assertFalse( 0 == statusResults[0].getLong("END_TIME"));
-        assertTrue("SUCCESS".equals(statusResults[0].getString("RESULT")));
+        checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", 8);
 
         VoltTable scanResults[] = client.callProcedure("@SnapshotScan", new Object[] { null }).getResults();
         assertNotNull(scanResults);
@@ -1165,16 +1226,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         /*
          * Check that snapshot status returns a reasonable result
          */
-        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
-        assertNotNull(statusResults);
-        assertEquals( 1, statusResults.length);
-        assertEquals( 14, statusResults[0].getColumnCount());
-        assertEquals( 8, statusResults[0].getRowCount());
-        assertTrue(statusResults[0].advanceRow());
-        assertTrue(TMPDIR.equals(statusResults[0].getString("PATH")));
-        assertTrue(TESTNONCE.equals(statusResults[0].getString("NONCE")));
-        assertFalse( 0 == statusResults[0].getLong("END_TIME"));
-        assertTrue("SUCCESS".equals(statusResults[0].getString("RESULT")));
+        checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", 8);
 
         validateSnapshot(true);
     }
@@ -1209,7 +1261,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
 
         VoltTable[] results = null;
-        results = saveTables(client);
+        results = saveTablesWithDefaultOptions(client);
 
         // Kill and restart all the execution sites.
         m_config.shutDown();
@@ -1303,7 +1355,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
 
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
-        results = saveTables(client);
+        results = saveTablesWithDefaultOptions(client);
         deleteTestFiles();
 
         while (results[0].advanceRow()) {
@@ -1314,7 +1366,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         validateSnapshot(false);
 
-        results = saveTables(client);
+        results = saveTablesWithDefaultOptions(client);
 
         validateSnapshot(true);
 
@@ -1327,10 +1379,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         try
         {
-            results = client.callProcedure("@SnapshotStatus").getResults();
-            assertTrue(results[0].advanceRow());
-            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
-            assertEquals( 8, results[0].getRowCount());
+            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", 8);
         }
         catch (Exception ex)
         {
@@ -1411,7 +1460,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
 
-        results = saveTables(client);
+        results = saveTablesWithDefaultOptions(client);
 
         validateSnapshot(false);
 
@@ -1431,7 +1480,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
         deleteTestFiles();
-        results = saveTables(client);
+        results = saveTablesWithDefaultOptions(client);
 
         validateSnapshot(true);
 
@@ -1502,9 +1551,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable partition_table =
             createPartitionedTable(num_partitioned_items, 0);
 
-        loadTable(client, "REPLICATED_TESTER", repl_table);
-        loadTable(client, "PARTITION_TESTER", partition_table);
-        saveTables(client);
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
+        saveTablesWithDefaultOptions(client);
 
         validateSnapshot(true);
 
@@ -1542,9 +1591,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             VoltTable partition_table =
                 createPartitionedTable(num_partitioned_items, 0);
 
-            loadTable(client, "REPLICATED_TESTER", repl_table);
-            loadTable(client, "PARTITION_TESTER", partition_table);
-            VoltTable results[] = saveTables(client);
+            loadTable(client, "REPLICATED_TESTER", true, repl_table);
+            loadTable(client, "PARTITION_TESTER", false, partition_table);
+            VoltTable results[] = saveTablesWithDefaultOptions(client);
             validateSnapshot(true);
             while (results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
@@ -1602,9 +1651,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             VoltTable partition_table =
                 createPartitionedTable(num_partitioned_items, 0);
 
-            loadTable(client, "REPLICATED_TESTER", repl_table);
-            loadTable(client, "PARTITION_TESTER", partition_table);
-            saveTables(client);
+            loadTable(client, "REPLICATED_TESTER", true, repl_table);
+            loadTable(client, "PARTITION_TESTER", false, partition_table);
+            saveTablesWithDefaultOptions(client);
             validateSnapshot(true);
             releaseClient(client);
             // Kill and restart all the execution sites.
@@ -1653,9 +1702,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable partition_table =
             createPartitionedTable(num_partitioned_items, 0);
 
-        loadTable(client, "REPLICATED_TESTER", repl_table);
-        loadTable(client, "PARTITION_TESTER", partition_table);
-        saveTables(client);
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
+        saveTablesWithDefaultOptions(client);
 
         // Kill and restart all the execution sites.
         m_config.shutDown();
@@ -1689,7 +1738,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
         VoltTable[] results = null;
-        results = saveTables(client);
+        results = saveTablesWithDefaultOptions(client);
         validateSnapshot(true);
         // Kill and restart all the execution sites.
         m_config.shutDown();
@@ -1763,11 +1812,11 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             eng_2025_table.addRow(new Object[] {Integer.toString(i), new byte[64]});
         }
 
-        loadTable(client, "CHANGE_COLUMNS", change_table);
-        loadTable(client, "ENG_2025", eng_2025_table);
+        loadTable(client, "CHANGE_COLUMNS", false, change_table);
+        loadTable(client, "ENG_2025", true, eng_2025_table);
 
         VoltTable[] results = null;
-        results = saveTables(client);
+        results = saveTablesWithDefaultOptions(client);
         validateSnapshot(true);
 
         // Kill and restart all the execution sites.
@@ -1851,9 +1900,9 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         change_types.addRow(1, VoltType.NULL_TINYINT, VoltType.NULL_INTEGER,
                             VoltType.NULL_INTEGER);
 
-        loadTable(client, "CHANGE_TYPES", change_types);
+        loadTable(client, "CHANGE_TYPES", true, change_types);
 
-        saveTables(client);
+        saveTablesWithDefaultOptions(client);
         validateSnapshot(true);
 
         // Kill and restart all the execution sites.
@@ -1919,10 +1968,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         change_types.addRow(0, 100, 100, 100000);
 
-        loadTable(client, "CHANGE_TYPES", change_types);
+        loadTable(client, "CHANGE_TYPES", true, change_types);
 
         VoltTable[] results = null;
-        results = saveTables(client);
+        results = saveTablesWithDefaultOptions(client);
         validateSnapshot(true);
 
         // Kill and restart all the execution sites.
@@ -1968,6 +2017,65 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertTrue(type_failure);
 
         config.revertCompile();
+    }
+
+    public static class SnapshotResult {
+        Long hostID;
+        String table;
+        String path;
+        String filename;
+        String nonce;
+        Long txnID;
+        Long endTime;
+        String result;
+    }
+
+    public static SnapshotResult[] checkSnapshotStatus(Client client, String path, String nonce, Integer endTime,
+            String result, Integer rowCount)
+            throws NoConnectionsException, IOException, ProcCallException {
+
+        // Execute @SnapshotStatus to get raw results.
+        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
+        assertNotNull(statusResults);
+        assertEquals( 1, statusResults.length);
+        assertEquals( 14, statusResults[0].getColumnCount());
+
+        // Validate row count if requested.
+        Integer resultRowCount = statusResults[0].getRowCount();
+        if (rowCount != null) {
+            assertEquals(rowCount, resultRowCount);
+        }
+
+        // Populate status data object list.
+        SnapshotResult[] results = new SnapshotResult[resultRowCount];
+        for (int i = 0; i < resultRowCount; i++) {
+            assertTrue(statusResults[0].advanceRow());
+            results[i] = new SnapshotResult();
+            results[i].hostID = statusResults[0].getLong("HOST_ID");
+            results[i].table = statusResults[0].getString("TABLE");
+            results[i].path = statusResults[0].getString("PATH");
+            results[i].filename = statusResults[0].getString("FILENAME");
+            results[i].nonce = statusResults[0].getString("NONCE");
+            results[i].txnID = statusResults[0].getLong("TXNID");
+            results[i].endTime = statusResults[0].getLong("END_TIME");
+            results[i].result = statusResults[0].getString("RESULT");
+
+            // Perform requested validation.
+            if (path != null) {
+                assertEquals(path, results[i].path);
+            }
+            if (nonce != null) {
+                assertEquals(nonce, results[i].nonce);
+            }
+            if (endTime != null) {
+                assertEquals(endTime, results[i].endTime);
+            }
+            if (result != null) {
+                assertEquals(result, results[i].result);
+            }
+        }
+
+        return results;
     }
 
     /**

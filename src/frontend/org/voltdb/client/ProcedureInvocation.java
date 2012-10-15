@@ -21,8 +21,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
 
 /**
@@ -38,24 +36,29 @@ public class ProcedureInvocation {
 
     // used for replicated procedure invocations
     private final long m_originalTxnId;
+    private final long m_originalTs;
     private final ProcedureInvocationType m_type;
 
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
-        this(-1, handle, procName, parameters);
+        this(-1, -1, handle, procName, parameters);
     }
 
-    ProcedureInvocation(long originalTxnId, long handle,
+    ProcedureInvocation(long originalTxnId, long originalTs, long handle,
                         String procName, Object... parameters) {
         super();
         m_originalTxnId = originalTxnId;
+        m_originalTs = originalTs;
         m_clientHandle = handle;
         m_procName = procName;
         m_parameters = new ParameterSet();
         m_parameters.setParameters(parameters);
 
         // auto-set the type if both txn IDs are set
-        m_type = (m_originalTxnId == -1 ? ProcedureInvocationType.ORIGINAL
-                                        : ProcedureInvocationType.REPLICATED);
+        if (m_originalTxnId == -1 && m_originalTs == -1) {
+            m_type = ProcedureInvocationType.ORIGINAL;
+        } else {
+            m_type = ProcedureInvocationType.REPLICATED;
+        }
     }
 
     /** return the clientHandle value */
@@ -72,15 +75,20 @@ public class ProcedureInvocation {
             m_procNameBytes = m_procName.getBytes("UTF-8");
         } catch (Exception e) {/*No UTF-8? Really?*/}
         int size =
-            1 + (m_type == ProcedureInvocationType.REPLICATED ? 8 : 0) +
+            1 + (m_type == ProcedureInvocationType.REPLICATED ? 16 : 0) +
             m_procNameBytes.length + 4 + 8 + m_parameters.getSerializedSize();
         return size;
+    }
+
+    public Integer getHashinatedParam(int index) {
+        return m_parameters.getHashinatedParam(index);
     }
 
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(m_type.getValue());//Version
         if (m_type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(m_originalTxnId);
+            buf.putLong(m_originalTs);
         }
         FastSerializer.writeString(m_procNameBytes, buf);
         buf.putLong(m_clientHandle);

@@ -35,6 +35,7 @@ public class ClientConfig {
     int m_autoTuneTargetInternalLatency = 5;
     long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
+    boolean m_useClientAffinity = true;
 
     /**
      * Configuration for a client with no authentication credentials that will
@@ -201,6 +202,18 @@ public class ClientConfig {
     }
 
     /**
+     * Only works with IV2 enabled, is on by default and harmless if IV2 is not enable.
+     *
+     * If you are using persistent connections you definitely want this.
+     *
+     * Attempts to route transactions to the correct master partition improving latency
+     * and throughput
+     */
+    public void setClientAffinity(boolean on) {
+        m_useClientAffinity = on;
+    }
+
+    /**
      * Set the target latency for the Auto Tune feature. Note this represents internal
      * latency as reported by the server(s), not round-trip latency measured by the
      * client. Default value is 5 if this is not called.
@@ -211,5 +224,6 @@ public class ClientConfig {
             throw new IllegalArgumentException(
                     "Max auto tune latency must be greater than 0, " + targetLatency + " was specified");
         }
+        m_autoTuneTargetInternalLatency = targetLatency;
     }
 }

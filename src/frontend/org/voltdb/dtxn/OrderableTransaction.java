@@ -18,10 +18,14 @@ package org.voltdb.dtxn;
 
 public abstract class OrderableTransaction implements Comparable<OrderableTransaction> {
     public final long txnId;
+    public final long spHandle;
+    public final long timestamp;
     public final long initiatorHSId;
 
-    public OrderableTransaction(final long txnId, final long initiatorHSId) {
+    public OrderableTransaction(final long txnId, final long spHandle, final long timestamp, final long initiatorHSId) {
         this.txnId = txnId;
+        this.spHandle = spHandle;
+        this.timestamp = timestamp;
         this.initiatorHSId = initiatorHSId;
     }
 

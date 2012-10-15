@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HeartbeatMessage;
@@ -418,7 +419,7 @@ public class TestExecutionSite extends TestCase {
                         m_rpqs.get(siteId),
                         new MockProcedureRunnerFactory(),
                         false,
-                        false,
+                        null,
                         0,
                         partitionCount,
                         null));
@@ -487,10 +488,11 @@ public class TestExecutionSite extends TestCase {
         // initiator are co-located
         long coordinator = getSiteIdForInitiatorId(initiator);
         for (int i=0; i < SITE_COUNT; i++) {
-            if (i == coordinator)
+            long hsId = getHSIdForES(i);
+            if (hsId == coordinator)
                 continue;
             else
-                participants.add(getHSIdForES(i));
+                participants.add(hsId);
         }
         return coordinator;
     }
@@ -558,7 +560,8 @@ public class TestExecutionSite extends TestCase {
         }
 
         @Override
-        ClientResponseImpl call(long txnId, Object... paramList) {
+        public
+        ClientResponseImpl call(Object... paramList) {
             m_site.simulateExecutePlanFragments(m_txnState.txnId, m_procedure.testReadOnly());
 
             final ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS,
@@ -669,7 +672,8 @@ public class TestExecutionSite extends TestCase {
         }
 
         @Override
-        ClientResponseImpl call(long txnId, Object... paramList)
+        public
+        ClientResponseImpl call(Object... paramList)
         {
             try {
                 parseParamList(paramList);
@@ -688,10 +692,12 @@ public class TestExecutionSite extends TestCase {
                         FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
+                                                m_txnState.timestamp,
                                                 m_txnState.isReadOnly(),
                                                 1,
                                                 localTask_outputDep,
                                                 paramBuf,
+                                                false,
                                                 false);
 
                     localTask.addInputDepId(0, localTask_startDep);
@@ -700,11 +706,13 @@ public class TestExecutionSite extends TestCase {
                         FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
+                                                m_txnState.timestamp,
                                                 m_txnState.isReadOnly(),
                                                 0,
                                                 localTask_startDep,
                                                 paramBuf,
-                                                finalTask);
+                                                finalTask,
+                                                false);
 
                     m_txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask);
                     m_txnState.createAllParticipatingFragmentWork(distributedTask);
@@ -872,7 +880,8 @@ public class TestExecutionSite extends TestCase {
 
         // site 1 is the coordinator
         final InitiateTaskMessage tx1_mn_1 =
-            new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+            new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE,
+                                    new long[] {siteId1});
 
         final MultiPartitionParticipantTxnState tx1_1 =
             new MultiPartitionParticipantTxnState(m_mboxes.get(siteId0), m_sites.get(siteId0), tx1_mn_1);
@@ -1002,7 +1011,8 @@ public class TestExecutionSite extends TestCase {
 
         // site 1 is the coordinator
         final InitiateTaskMessage tx1_mn_1 =
-            new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, txnid, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+            new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, txnid, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE,
+                                    new long[] {siteId1});
 
         final MultiPartitionParticipantTxnState tx1_1 =
             new MultiPartitionParticipantTxnState(m_mboxes.get(siteId0), m_sites.get(siteId0), tx1_mn_1);
@@ -1068,7 +1078,14 @@ public class TestExecutionSite extends TestCase {
         spi.setClientHandle(25);
         spi.setProcName("johnisgreat");
         spi.setParams("commit", 57, "gooniestoo");
-        InitiateTaskMessage mn = new InitiateTaskMessage(-1, 0, -1, false, false, spi, Long.MIN_VALUE);
+
+        long[] nonCoordinatorSites = new long[SITE_COUNT - 1];
+        for (int i = 0; i < SITE_COUNT - 1; i++) {
+            nonCoordinatorSites[i] = getHSIdForES(i + 1);
+        }
+
+        InitiateTaskMessage mn = new InitiateTaskMessage(-1, 0, -1, false, false, spi, Long.MIN_VALUE,
+                                                         nonCoordinatorSites);
 
         final long siteId0 = getHSIdForES(0);
         Mailbox m0 = m_mboxes.get(siteId0);
@@ -1145,7 +1162,8 @@ public class TestExecutionSite extends TestCase {
             new InitiateTaskMessage(getInitiatorIdForSiteId(0),
                                     0,
                                     DtxnConstants.DUMMY_LAST_SEEN_TXN_ID,
-                                    readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
+                                    readOnly, singlePartition, tx1_spi, Long.MAX_VALUE,
+                                    new long[] {getHSIdForES(1)});
 
         final long siteId0 = getHSIdForES(0);
         final Mailbox m0 = m_mboxes.get(siteId0);
@@ -1265,6 +1283,7 @@ public class TestExecutionSite extends TestCase {
 
         testLog.info("Creating MP proc, TXN ID: " + txn_id + ", participants: " + participants.toString());
 
+        assert(participants.size() == (SITE_COUNT - 1));
         final InitiateTaskMessage itm =
             new InitiateTaskMessage(initiator_id,
                                     coordinator_id,
@@ -1272,7 +1291,8 @@ public class TestExecutionSite extends TestCase {
                                     readOnly,
                                     false,         // multi-partition
                                     spi,
-                                    safe_txn_id);  // last safe txnid
+                                    safe_txn_id,  // last safe txnid
+                                    ArrayUtils.toPrimitive(participants.toArray(new Long[0])));
         itm.m_sourceHSId = initiator_id;
         m_mboxes.get(coordinator_id).deliver(itm);
 

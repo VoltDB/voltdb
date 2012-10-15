@@ -107,6 +107,13 @@ public class ReplayedTxnState extends TransactionState {
 
     @Override
     public StoredProcedureInvocation getInvocation() {
+        /*
+         * DR replicated txns need to access the original txnId in the
+         * invocation, so must return the invocation here.
+         */
+        if (m_notice instanceof InitiateTaskMessage) {
+            return ((InitiateTaskMessage) m_notice).getStoredProcedureInvocation();
+        }
         return null;
     }
 

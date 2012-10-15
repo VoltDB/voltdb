@@ -24,7 +24,6 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -32,6 +31,7 @@ import java.util.Random;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -142,7 +142,7 @@ public class TestProcedureAPISuite extends RegressionSuite {
         Client client = getClient();
         byte[][] data = new byte[10][];
         for (int i = 0; i < data.length; i++) {
-            data[i] = "Hello".getBytes(Charset.defaultCharset());
+            data[i] = "Hello".getBytes(VoltDB.UTF8ENCODING);
         }
         String[] data3 = new String[3];
         data3[0] = "AAbbff00";

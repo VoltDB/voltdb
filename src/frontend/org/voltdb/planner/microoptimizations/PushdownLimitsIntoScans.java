@@ -19,8 +19,11 @@ package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.plannodes.*;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 
 public class PushdownLimitsIntoScans implements MicroOptimization {
 
@@ -28,9 +31,9 @@ public class PushdownLimitsIntoScans implements MicroOptimization {
     public List<CompiledPlan> apply(CompiledPlan plan) {
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
-        AbstractPlanNode planGraph = plan.fragments.get(0).planGraph;
+        AbstractPlanNode planGraph = plan.rootPlanGraph;
         planGraph = recursivelyApply(planGraph);
-        plan.fragments.get(0).planGraph = planGraph;
+        plan.rootPlanGraph = planGraph;
 
         retval.add(plan);
         return retval;

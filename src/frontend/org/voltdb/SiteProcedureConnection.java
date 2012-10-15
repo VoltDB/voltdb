@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
@@ -29,6 +30,9 @@ import org.voltdb.exceptions.EEException;
  * manipulate or request services from an ExecutionSite.
  */
 public interface SiteProcedureConnection {
+
+    public long getLatestUndoToken();
+    public long getNextUndoToken();
 
     /**
      * Get the HSQL backend, if any.  Returns null if we're not configured
@@ -56,6 +60,9 @@ public interface SiteProcedureConnection {
      */
     public void updateBackendLogLevels();
 
+    /**
+     * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
+     */
     public void loadTable(
             long txnId,
             String clusterName,
@@ -64,12 +71,27 @@ public interface SiteProcedureConnection {
             VoltTable data)
     throws VoltAbortException;
 
+    /**
+     * loadTable method used internally by ExecutionSite/Site clients
+     */
+    public void loadTable(long txnId, int tableId, VoltTable data);
 
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
-            long[] planFragmentIds,
+    /**
+     * Get the EE's plan fragment ID for a given JSON plan.
+     * May pull from cache or load on the spot.
+     */
+    public long loadPlanFragment(byte[] plan) throws EEException;
+
+    /**
+     * Execute a set of plan fragments.
+     * Note: it's ok to pass null for inputDepIds if the fragments
+     * have no dependencies.
+     */
+    public VoltTable[] executePlanFragments(
             int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
             ParameterSet[] parameterSets,
-            int numParameterSets,
             long txnId,
             boolean readOnly) throws EEException;
 
@@ -85,26 +107,15 @@ public interface SiteProcedureConnection {
      */
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
 
+    /**
+     * Legacy recursable execution interface for MP transaction states.
+     */
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
 
     /**
      * IV2 commit / rollback interface to the EE
      */
-    public void truncateUndoLog(boolean rollback, long token, long txnId);
-
-    /**
-     * IV2: Run a plan fragment
-     * @param planFragmentId
-     * @param inputDepId
-     * @param parameterSet
-     * @param txnId
-     * @param readOnly
-     * @return
-     * @throws EEException
-     */
-    public VoltTable executePlanFragment(
-        long planFragmentId, int inputDepId, ParameterSet parameterSet,
-        long txnId, boolean readOnly) throws EEException;
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle);
 
     /**
      * IV2: send dependencies to the EE
@@ -114,17 +125,23 @@ public interface SiteProcedureConnection {
     /**
      * IV2: run a system procedure plan fragment
      */
-    public DependencyPair executePlanFragment(
+    public DependencyPair executeSysProcPlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params);
 
+    /**
+     * IV2: get the procedure runner for the named procedure
+     */
+    public ProcedureRunner getProcedureRunner(String procedureName);
+
+    public void setRejoinComplete();
+
     public long[] getUSOForExportTable(String signature);
 
-    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId, ParameterSet params, boolean readOnly);
-
     public void toggleProfiler(int toggle);
+
+    public void tick();
 
     public void quiesce();
 
@@ -136,4 +153,8 @@ public interface SiteProcedureConnection {
 
     public VoltTable[] getStats(SysProcSelector selector, int[] locators,
                                 boolean interval, Long now);
+
+    // Snapshot services provided by the site
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
 }

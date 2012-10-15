@@ -18,11 +18,16 @@ package org.voltdb.utils;
 
 import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.START_ACTION;
+
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
 // Extend that to include test-only parameters, the JVM parameters
@@ -56,8 +61,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_externalInterface = m_externalInterface;
         cl.m_internalInterface = m_internalInterface;
         cl.m_drAgentPortStart = m_drAgentPortStart;
-        cl.m_rejoinToHostAndPort = m_rejoinToHostAndPort;
-        cl.m_newRejoin = m_newRejoin;
         cl.m_httpPort = m_httpPort;
         // final in baseclass: cl.m_isEnterprise = m_isEnterprise;
         cl.m_deadHostTimeoutMS = m_deadHostTimeoutMS;
@@ -69,7 +72,7 @@ public class CommandLine extends VoltDB.Configuration
         // final in baseclass: cl.m_commitLogDir = new File("/tmp");
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
-        cl.m_leaderPort = m_leaderPort;
+        cl.m_enableIV2 = m_enableIV2;
         cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
 
@@ -113,14 +116,6 @@ public class CommandLine extends VoltDB.Configuration
     }
     public int port() {
         return m_port;
-    }
-
-    public int leaderPort() {
-        return m_leaderPort;
-    }
-
-    public void leaderPort(int leaderPort) {
-        m_leaderPort = leaderPort;
     }
 
     public int internalPort() {
@@ -188,13 +183,10 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    public CommandLine rejoinHostAndPort(String rejoinHostAndPort) {
-        this.m_rejoinToHostAndPort = rejoinHostAndPort;
-        return this;
-    }
-
-    public CommandLine isPauselessRejoin(boolean isPauseless) {
-        this.m_newRejoin = isPauseless;
+    public CommandLine leaderPort(int port)
+    {
+        String hostname = MiscUtils.getHostnameFromHostnameColonPort(m_leader);
+        m_leader = MiscUtils.getHostnameColonPortString(hostname, port);
         return this;
     }
 
@@ -348,6 +340,12 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine enableIV2(boolean enable)
+    {
+        m_enableIV2 = enable;
+        return this;
+    }
+
     // user-customizable string appeneded to commandline.
     // useful to allow customization of VEM/REST cmdlns.
     // Please don't abuse this by shoving lots of long-term
@@ -364,6 +362,7 @@ public class CommandLine extends VoltDB.Configuration
             FileWriter out = new FileWriter(filename);
             List<String> lns = createCommandLine();
             for (String l : lns) {
+                assert(l != null);
                 out.write(l.toCharArray());
                 out.write('\n');
             }
@@ -429,6 +428,13 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Xdebug");
             cmdline.add("-agentlib:jdwp=transport=dt_socket,address=" + debugPort + ",server=y,suspend=n");
         }
+        //
+        // Process JVM options passed through the VOLTDB_OPTS environment variable
+        //
+        List<String> additionalJvmOptions = new ArrayList<String>();
+        String nonJvmOptions = AdditionalJvmOptionsProcessor
+                .getJvmOptionsFromVoltDbOptsEnvironmentVariable(additionalJvmOptions);
+        cmdline.addAll(additionalJvmOptions);
 
         //
         // VOLTDB main() parameters
@@ -439,26 +445,21 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
 
+        if (m_startAction == START_ACTION.LIVE_REJOIN) {
+            // annoying, have to special case live rejoin
+            cmdline.add("live rejoin");
+        } else {
+            cmdline.add(m_startAction.toString().toLowerCase());
+        }
+
+        cmdline.add("host"); cmdline.add(m_leader);
         cmdline.add("catalog"); cmdline.add(jarFileName());
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
-        // rejoin has no startAction or replication role
-        if (m_rejoinToHostAndPort == null || m_rejoinToHostAndPort.isEmpty()) {
-            if (m_startAction != null) {
-                cmdline.add(m_startAction.toString().toLowerCase());
-            }
-            cmdline.add("leader"); cmdline.add(m_leader);
-            cmdline.add("leaderport"); cmdline.add(Integer.toString(m_leaderPort));
-
+        // rejoin has no replication role
+        if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
             if (m_replicationRole == ReplicationRole.REPLICA) {
                 cmdline.add("replica");
-            }
-        }
-        else {
-            cmdline.add("rejoinhost"); cmdline.add(m_rejoinToHostAndPort);
-
-            if (m_newRejoin) {
-                cmdline.add("newrejoin");
             }
         }
 
@@ -497,9 +498,27 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
 
-        if (customCmdLn != null && !customCmdLn.isEmpty())
+        if (m_enableIV2)
+        {
+            cmdline.add("enableiv2");
+        }
+
+        if (customCmdLn != null && !customCmdLn.trim().isEmpty())
         {
             cmdline.add(customCmdLn);
+        }
+        //
+        // append non JVM options from the value of the VOLTDB_OPTIONS
+        // environment variable to customCmdLn
+        //
+        if( nonJvmOptions != null && !nonJvmOptions.trim().isEmpty())
+        {
+            cmdline.add(nonJvmOptions);
+        }
+
+        if ((m_ipcPorts != null) && (m_ipcPorts.size() > 0)) {
+            cmdline.add("ipcports");
+            cmdline.add(org.apache.commons.lang3.StringUtils.join(m_ipcPorts, ","));
         }
 
         if (m_tag != null) {
@@ -508,4 +527,261 @@ public class CommandLine extends VoltDB.Configuration
 
         return cmdline;
     }
+
+    /**
+     * <p>A utility class to parse a command line contained in a single String into
+     * an array of argument tokens, much as the JVM (or more accurately, your
+     * operating system) does before calling your programs' <code>public static
+     * void main(String[] args)</code>
+     * methods.</p>
+     *
+     * <p>This class has been developed to parse the command line in the same way
+     * that MS Windows 2000 does.  Arguments containing spaces should be enclosed
+     * in quotes. Quotes that should be in the argument string should be escaped
+     * with a preceding backslash ('\') character.  Backslash characters that
+     * should be in the argument string should also be escaped with a preceding
+     * backslash character.</p>
+     *
+     * NB Adapted from J S A P implementation
+     *
+     */
+    public static class CommandLineTokenizer {
+
+        /**
+         * Hide the constructor.
+         */
+        private CommandLineTokenizer() {
+        }
+
+        /**
+         * If the specified StringBuilder is not empty, its contents are appended
+         * to the resulting array (temporarily stored in the specified ArrayList).
+         * The StringBuilder is then emptied in order to begin storing the next argument.
+         *
+         * @param resultBuffer the List temporarily storing the resulting
+         * argument array.
+         * @param buf the StringBuilder storing the current argument.
+         */
+        private static void moveToBuffer(
+            List<String> resultBuffer,
+            StringBuilder buf) {
+            if (buf.length() > 0) {
+                resultBuffer.add(buf.toString());
+                buf.delete(0, buf.length());
+            }
+        }
+
+        /**
+         * Parses the specified command line into an array of individual arguments.
+         * Arguments containing spaces should be enclosed in quotes.
+         * Quotes that should be in the argument string should be escaped with a
+         * preceding backslash ('\') character.  Backslash characters that should
+         * be in the argument string should also be escaped with a preceding
+         * backslash character.
+         * @param commandLine the command line to parse
+         * @return an argument array representing the specified command line.
+         */
+        public static String[] tokenize(String commandLine) {
+            List<String> resultBuffer = new java.util.ArrayList<String>();
+
+            if (commandLine != null) {
+                int z = commandLine.length();
+                Character openingQuote = null;
+                StringBuilder buf = new StringBuilder();
+
+                for (int i = 0; i < z; ++i) {
+                    char c = commandLine.charAt(i);
+                    if (c == '"' || c == '\'') {
+                        buf.append(c);
+                        if (openingQuote == null) {
+                            openingQuote = c;
+                        }
+                        else if (openingQuote == c ) {
+                            openingQuote = null;
+                        }
+                    }
+                    else if (c == '\\') {
+                        if ((z > i + 1)
+                            && ((commandLine.charAt(i + 1) == '"')
+                                || (commandLine.charAt(i + 1) == '\\'))) {
+                            buf.append(commandLine.charAt(i + 1));
+                            ++i;
+                        } else {
+                            buf.append("\\");
+                        }
+                    } else {
+                        if (openingQuote != null) {
+                            buf.append(c);
+                        } else {
+                            if (Character.isWhitespace(c)) {
+                                moveToBuffer(resultBuffer, buf);
+                            } else {
+                                buf.append(c);
+                            }
+                        }
+                    }
+                }
+                moveToBuffer(resultBuffer, buf);
+            }
+
+            String[] result = new String[resultBuffer.size()];
+            return resultBuffer.toArray(result);
+        }
+    }
+
+    /**
+     * Processes JVM options specified in the VOLTDB_OPTIONS environment variable
+     *
+     * @author ssantoro
+     *
+     */
+    static class AdditionalJvmOptionsProcessor {
+
+        static final String HEAP_SIZE_PREFIX = "-Xm";
+        static final String VOLTDB_OPTS_ENV = "VOLTDB_OPTS";
+        static final String VOLTDB_OPTION = "-voltdb:";
+        static final String DASH = "-";
+
+        /**
+         * Options which may not be specified in VOLTDB_OPTS
+         */
+        static final Set<String> mayNotSpecify = new HashSet<String>(
+                Arrays.<String>asList(
+                        "-cp",
+                        "-classpath",
+                        "-server",
+                        "-client",
+                        "-d32",
+                        "-jar",
+                        "-D" + VEM_TAG_PROPERTY,
+                        "-Djava.library.path"
+                        )
+                );
+
+        /**
+         * Options that may be otherwise specified though documented
+         * VoltDB options
+         */
+        static final Set<String> mayOtherwiseSpecify = new HashSet<String>(
+                Arrays.<String>asList(
+                        "-Dlog4j.configuration",
+                        "-Xm",
+                        "-Dvolt.rmi.agent.port",
+                        "-Dvolt.rmi.server.hostname"
+                        )
+                );
+
+        /**
+         * Options that have a follow up that needs to be also ignored
+         */
+        static final Set<String> requiresSkipNext = new HashSet<String>(
+                Arrays.<String>asList(
+                        "-cp",
+                        "-classpath"
+                        )
+                );
+
+        /**
+         * Truncate the option so that it may be looked up in
+         * {@link $mayOtherwiseSpecify} and {@link $mayNotSpecify}
+         *
+         * @param option an option token
+         * @return an optionally truncated option
+         */
+        static final String truncateUptoDelimiter( String option) {
+            if( option == null || option.trim().isEmpty())  {
+                return null;
+            }
+            int delimIndex = -1;
+            if( option.startsWith(HEAP_SIZE_PREFIX)) {
+                delimIndex = HEAP_SIZE_PREFIX.length();
+            }
+            if( delimIndex < 0)  {
+                int columnIndex = option.indexOf(":");
+                int equalIndex = option.indexOf("=");
+
+                delimIndex = Math.min(columnIndex, equalIndex);
+                if( delimIndex < 0) {
+                    delimIndex = Math.max(columnIndex, equalIndex);
+                }
+            }
+            if( delimIndex < 0) {
+                return option;
+            }
+            return option.substring(0, delimIndex);
+        }
+
+        /**
+         * Look for jvm options and voltdb options prefixed with -V:, ignore
+         * the ones that do conflict with VoltDB options, or the ones that
+         * may be other wise specified through other voltDB options.
+         *
+         * @param jvmOptions a {@code List<String>} that is augmented with
+         *        any jvm options defined in the environment variable
+         * @return a string containing non jvm options defined in the
+         *        environment variable
+         */
+        static String getJvmOptionsFromVoltDbOptsEnvironmentVariable(
+                final List<String> jvmOptions) {
+
+            String voltDbOpts = System.getenv(VOLTDB_OPTS_ENV);
+            if( voltDbOpts == null || voltDbOpts.trim().isEmpty()) {
+                return null;
+            }
+
+            boolean skipNext = false;
+            List<String> nonJvmOptions = new ArrayList<String>();
+
+            for( String option: CommandLineTokenizer.tokenize(voltDbOpts)) {
+                if( skipNext) {
+                    skipNext = false;
+                    continue;
+                }
+
+                if( option.startsWith(VOLTDB_OPTION)) {
+                    option = option.substring(VOLTDB_OPTION.length());
+                    nonJvmOptions.add(option);
+                    continue;
+                }
+
+                if( ! option.startsWith(DASH)) {
+                    nonJvmOptions.add(option);
+                    continue;
+                }
+
+                String truncated = truncateUptoDelimiter(option);
+
+                skipNext = requiresSkipNext.contains(truncated);
+
+                if( mayNotSpecify.contains(truncated)) {
+                    CommandLine.hostLog.warn(
+                            "Ignoring option \"" + option +
+                            "\" as it conflicts with VoltDB JVM options"
+                            );
+                    continue;
+                }
+                if( mayOtherwiseSpecify.contains(truncated)) {
+                    CommandLine.hostLog.warn(
+                            "Ignoring option \"" + option +
+                            "\" as it may be otherwise specified through VoltDB options");
+                    continue;
+                }
+                jvmOptions.add(option);
+            }
+
+            boolean separate = false;
+            StringBuilder sb = new StringBuilder(256);
+
+            for( String option: nonJvmOptions) {
+                if( separate) {
+                    sb.append( " ");
+                }
+                sb.append(option);
+                separate = true;
+            }
+
+            return sb.toString();
+        }
+    }
+
 }
