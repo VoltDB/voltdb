@@ -42,6 +42,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.VoltLogger;
+
 import jsr166y.LinkedTransferQueue;
 
 import com.google.common.collect.ImmutableList;
@@ -50,6 +52,8 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
 public class CoreUtils {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     /**
      * Create a bounded single threaded executor that rejects requests if more than capacity
      * requests are outstanding.
@@ -102,8 +106,19 @@ public class CoreUtils {
     public static ThreadFactory getThreadFactory(final String name, final int stackSize) {
         return new ThreadFactory() {
             @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(null, r, name, stackSize);
+            public Thread newThread(final Runnable r) {
+                Runnable runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            r.run();
+                        } catch (Throwable t) {
+                            hostLog.error("Exception thrown in thread " + name, t);
+                        }
+                    }
+                };
+
+                Thread t = new Thread(null, runnable, name, stackSize);
                 t.setDaemon(true);
                 return t;
             }
