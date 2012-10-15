@@ -361,7 +361,7 @@ public class ClientInterfaceHandleManager
 
     List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
             Long initiatorHSId) {
-        assert(m_expectedThreadId == Thread.currentThread().getId());
+        //assert(m_expectedThreadId == Thread.currentThread().getId());
         List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
 
         if (!m_partitionStuff.containsKey(partitionId)) return retval;

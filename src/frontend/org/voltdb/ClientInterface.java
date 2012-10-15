@@ -1260,6 +1260,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 });
             }
+            failOverConnection(partitionId, initiatorHSId, m_snapshotDaemonAdapter);
         } catch (Exception e) {
             hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
         }

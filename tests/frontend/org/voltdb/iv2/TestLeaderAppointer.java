@@ -114,7 +114,9 @@ public class TestLeaderAppointer extends ZKTestBase {
     void createAppointer(boolean enablePPD) throws JSONException
     {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
-                m_config.getReplicationFactor(), enablePPD, m_config.getTopology(m_hostIds), m_mpi);
+                m_config.getReplicationFactor(), enablePPD,
+                null, // XXX MAKE ME PASS!
+                m_config.getTopology(m_hostIds), m_mpi);
     }
 
     void addReplica(int partitionId, long HSId) throws KeeperException, InterruptedException, Exception
