@@ -106,7 +106,6 @@ public class LeaderAppointer implements Promotable
         Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("LeaderAppointer-Babysitters"));
     private final SnapshotSchedule m_partSnapshotSchedule;
 
-
     private final SnapshotResponseHandler m_snapshotHandler =
         new SnapshotResponseHandler() {
             public void handleResponse(ClientResponse resp)
@@ -427,18 +426,15 @@ public class LeaderAppointer implements Promotable
         return nodes;
     }
 
-    private void doPartitionDetectionActivities()
+    /**
+     * Given a set of the known host IDs before a fault, and the known host IDs in the
+     * post-fault cluster, determine whether or not we think a network partition may have happened.
+     * NOTE: this assumes that we have already done the k-safety validation for every partition and already failed
+     * if we weren't a viable cluster.
+     * ALSO NOTE: not private so it may be unit-tested.
+     */
+    static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts)
     {
-        // After everything is resolved, write the new surviving set to ZK
-        List<Integer> currentNodes = null;
-        try {
-            currentNodes = m_hostMessenger.getLiveHostIds();
-        } catch (Exception e) {
-
-        }
-        Set<Integer> currentHosts = new HashSet<Integer>(currentNodes);
-        Set<Integer> previousHosts = readPriorKnownLiveNodes();
-
         // Real partition detection stuff would go here
         // find the lowest hostId between the still-alive hosts and the
         // failed hosts. Which set contains the lowest hostId?
@@ -483,6 +479,23 @@ public class LeaderAppointer implements Promotable
                          "This minority survivor set is shutting down.");
             partitionDetectionTriggered = true;
         }
+
+        return partitionDetectionTriggered;
+    }
+
+    private void doPartitionDetectionActivities()
+    {
+        // After everything is resolved, write the new surviving set to ZK
+        List<Integer> currentNodes = null;
+        try {
+            currentNodes = m_hostMessenger.getLiveHostIds();
+        } catch (Exception e) {
+
+        }
+        Set<Integer> currentHosts = new HashSet<Integer>(currentNodes);
+        Set<Integer> previousHosts = readPriorKnownLiveNodes();
+
+        boolean partitionDetectionTriggered = makePPDDecision(previousHosts, currentHosts);
 
         if (partitionDetectionTriggered && !m_partitionSnapshotRequested) {
             SnapshotUtil.requestSnapshot(0L,

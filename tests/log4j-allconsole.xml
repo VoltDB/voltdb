@@ -62,7 +62,6 @@
 
     <logger name="TM">
         <level value="INFO"/>
-        <appender-ref ref="console"/>
     </logger>
 
     <root>
