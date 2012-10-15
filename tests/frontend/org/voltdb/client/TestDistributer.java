@@ -35,15 +35,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.TestCase;
 
 import org.junit.Test;
+import org.voltcore.network.Connection;
+import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltcore.network.Connection;
-import org.voltcore.network.QueueMonitor;
-import org.voltcore.network.VoltNetworkPool;
-import org.voltcore.network.VoltProtocolHandler;
 
 public class TestDistributer extends TestCase {
 
@@ -318,7 +318,8 @@ public class TestDistributer extends TestCase {
 
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                    ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS);
+                    ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
+                    false);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
@@ -405,7 +406,8 @@ public class TestDistributer extends TestCase {
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                1000 /* One second connection timeout */);
+                1000 /* One second connection timeout */,
+                false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000);
 
@@ -460,7 +462,8 @@ public class TestDistributer extends TestCase {
         // create distributer and connect it to the client
         Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                CONNECTION_TIMEOUT /* six second connection timeout */);
+                CONNECTION_TIMEOUT /* six second connection timeout */,
+                false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
         dist.createConnection("localhost", "", "", 20000);
@@ -504,12 +507,12 @@ public class TestDistributer extends TestCase {
 
            // this call blocks for a result!
            clt.callProcedure("Foo", new Integer(1));
-           assertEquals(1, volt.handler.roundTrips.get());
+           assertEquals(3, volt.handler.roundTrips.get());
 
            // this call doesn't block! (use drain)
            clt.callProcedure(new ProcCallback(), "Bar", new Integer(2));
            clt.drain();
-           assertEquals(2, volt.handler.roundTrips.get());
+           assertEquals(4, volt.handler.roundTrips.get());
        }
        finally {
            if (volt != null) {
@@ -530,7 +533,11 @@ public class TestDistributer extends TestCase {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
-            config.setMaxOutstandingTxns(5);
+            /*
+             * The library will immediately generate two transactions
+             * to init client affinity
+             */
+            config.setMaxOutstandingTxns(7);
             config.setConnectionResponseTimeout(2000);
 
             final Client client = ClientFactory.createClient(config);
@@ -544,7 +551,7 @@ public class TestDistributer extends TestCase {
                     try {
                         for (int ii = 0; ii < 6; ii++) {
                             client.callProcedure(new NullCallback(), "foo");
-                            counter.incrementAndGet();
+                            System.out.println(counter.incrementAndGet());
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -557,6 +564,7 @@ public class TestDistributer extends TestCase {
             loadThread.join(300);
             final long finish = System.currentTimeMillis();
             assertTrue(finish - start >= 300);
+            System.out.println("Counter " + counter.get());
             assertTrue(counter.get() == 5);
             loadThread.join();
         }

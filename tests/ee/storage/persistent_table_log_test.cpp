@@ -70,32 +70,24 @@ public:
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_VARCHAR);
 
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_primaryKeyIndexSchemaColumnSizes.push_back(voltdb::VALUE_TYPE_BIGINT);
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_TINYINT));
-        m_primaryKeyIndexSchemaColumnSizes.push_back(voltdb::VALUE_TYPE_TINYINT);
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_SMALLINT));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_DOUBLE));
         m_tableSchemaColumnSizes.push_back(300);
-        m_primaryKeyIndexSchemaColumnSizes.push_back(300);
         m_tableSchemaColumnSizes.push_back(16);
-        m_primaryKeyIndexSchemaColumnSizes.push_back(16);
         m_tableSchemaColumnSizes.push_back(500);
         m_tableSchemaColumnSizes.push_back(32);
 
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(true);
         m_tableSchemaAllowNull.push_back(true);
         m_tableSchemaAllowNull.push_back(true);
         m_tableSchemaAllowNull.push_back(true);
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
-        m_primaryKeyIndexSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(true);
         m_tableSchemaAllowNull.push_back(true);
 
@@ -110,7 +102,6 @@ public:
     ~PersistentTableLogTest() {
         delete m_engine;
         delete m_table;
-        voltdb::TupleSchema::freeTupleSchema(m_primaryKeyIndexSchema);
     }
 
     void initTable(bool allowInlineStrings) {
@@ -119,39 +110,34 @@ public:
                                                                m_tableSchemaAllowNull,
                                                                allowInlineStrings);
 
-        m_primaryKeyIndexSchema = voltdb::TupleSchema::createTupleSchema(m_primaryKeyIndexSchemaTypes,
-                                                                         m_primaryKeyIndexSchemaColumnSizes,
-                                                                         m_primaryKeyIndexSchemaAllowNull,
-                                                                         allowInlineStrings);
-
         voltdb::TableIndexScheme indexScheme = voltdb::TableIndexScheme("primaryKeyIndex",
                                                                         voltdb::BALANCED_TREE_INDEX,
                                                                         m_primaryKeyIndexColumns,
                                                                         m_primaryKeyIndexSchemaTypes,
                                                                         true, false, m_tableSchema);
-        indexScheme.keySchema = m_primaryKeyIndexSchema;
-
         std::vector<voltdb::TableIndexScheme> indexes;
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(voltdb::TableFactory::getPersistentTable
                                                          (0, m_engine->getExecutorContext(), "Foo",
-                                                          m_tableSchema, &m_columnNames[0], indexScheme, indexes, 0,
+                                                          m_tableSchema, &m_columnNames[0], 0,
                                                           false, false));
+
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        assert(pkeyIndex);
+        m_table->addIndex(pkeyIndex);
+        m_table->setPrimaryKeyIndex(pkeyIndex);
     }
 
 
 
     voltdb::VoltDBEngine *m_engine;
     voltdb::TupleSchema *m_tableSchema;
-    voltdb::TupleSchema *m_primaryKeyIndexSchema;
     voltdb::PersistentTable *m_table;
     std::vector<std::string> m_columnNames;
     std::vector<voltdb::ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<voltdb::ValueType> m_primaryKeyIndexSchemaTypes;
-    std::vector<int32_t> m_primaryKeyIndexSchemaColumnSizes;
-    std::vector<bool> m_primaryKeyIndexSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
 };
 
@@ -233,7 +219,7 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
     NValue oldStringValue = tupleCopy.getNValue(6);
     tupleCopy.setNValue(6, ValueFactory::getStringValue("bar"));
 
-    m_table->updateTuple(tupleCopy, tuple, true);
+    m_table->updateTuple(tuple, tupleCopy);
 
     ASSERT_TRUE( m_table->lookupTuple(tupleBackup).isNullTuple());
     ASSERT_FALSE( m_table->lookupTuple(tupleCopy).isNullTuple());

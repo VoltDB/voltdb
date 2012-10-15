@@ -19,6 +19,7 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.DependencyPair;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
@@ -53,9 +54,16 @@ public class Promote extends VoltSystemProcedure {
     {
         // Choose the lowest site ID on this host to actually flip the bit
         if (ctx.isLowestSiteId()) {
+            JSONStringer js = new JSONStringer();
+            js.object();
+            js.key("role").value(ReplicationRole.NONE.ordinal());
+            // Replication active state should the be same across the cluster
+            js.key("active").value(VoltDB.instance().getReplicationActive());
+            js.endObject();
+
             VoltDB.instance().getHostMessenger().getZK().setData(
-                    VoltZK.replicationrole,
-                    ReplicationRole.NONE.toString().getBytes("UTF-8"),
+                    VoltZK.replicationconfig,
+                    js.toString().getBytes("UTF-8"),
                     -1);
             VoltDB.instance().setReplicationRole(ReplicationRole.NONE);
         }

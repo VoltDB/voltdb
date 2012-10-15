@@ -17,9 +17,10 @@
 
 package org.voltdb.dtxn;
 
-import org.voltdb.StoredProcedureInvocation;
 import java.util.ArrayList;
 import java.util.Map;
+
+import org.voltdb.StoredProcedureInvocation;
 
 /**
  * <p>A <code>TransactionInitiator</code> is the center of the distributed
@@ -32,7 +33,7 @@ import java.util.Map;
  * systems with provide their own subclasses.</p>
  *
  */
-public abstract class TransactionInitiator {
+public abstract class TransactionInitiator implements TransactionCreator {
 
     /**
      * <p>Create a new transaction, which will result in one or more
@@ -52,6 +53,7 @@ public abstract class TransactionInitiator {
      * @param clientData Client data returned with the completed transaction
      * @param messageSize Size in bytes of the message that created this invocation
      */
+    @Override
     public abstract boolean createTransaction(
             long connectionId,
             final String connectionHostname,
@@ -99,11 +101,13 @@ public abstract class TransactionInitiator {
      * @param messageSize
      *            Size in bytes of the message that created this invocation
      */
+    @Override
     public abstract boolean createTransaction(
             long connectionId,
             final String connectionHostname,
             boolean adminConnection,
             long txnId,
+            long timestamp,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
             boolean isSinglePartition,
@@ -153,14 +157,17 @@ public abstract class TransactionInitiator {
      * @param val
      *            true to send, false to stop sending
      */
+    @Override
     public abstract void setSendHeartbeats(boolean val);
 
+    @Override
     public abstract void sendHeartbeat(long txnId);
 
     /**
      * Whether or not the initiator is on back pressure.
      * @return
      */
+    @Override
     public abstract boolean isOnBackPressure();
 
     /**

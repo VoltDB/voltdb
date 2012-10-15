@@ -194,10 +194,12 @@ public class QuerySpecification extends QueryExpression {
         isGrouped         = true;
     }
 
+    @Override
     void addSortAndSlice(SortAndSlice sortAndSlice) {
         this.sortAndSlice = sortAndSlice;
     }
 
+    @Override
     public void resolveReferences(Session session) {
 
         finaliseRangeVariables();
@@ -548,6 +550,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public boolean hasReference(RangeVariable range) {
 
         if (unresolvedExpressions == null) {
@@ -634,6 +637,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public boolean areColumnsResolved() {
         return unresolvedExpressions == null
                || unresolvedExpressions.isEmpty();
@@ -652,6 +656,7 @@ public class QuerySpecification extends QueryExpression {
 //        queryCondition = null;
     }
 
+    @Override
     public void resolveTypes(Session session) {
 
         if (isResolved) {
@@ -674,6 +679,7 @@ public class QuerySpecification extends QueryExpression {
         return;
     }
 
+    @Override
     void resolveTypesPartOne(Session session) {
 
         resolveExpressionTypes(session);
@@ -686,6 +692,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void resolveTypesPartTwo(Session session) {
 
         resolveGroups();
@@ -978,7 +985,9 @@ public class QuerySpecification extends QueryExpression {
                 (Integer) sortAndSlice.limitCondition.getRightNode().getValue(
                     session);
 
-            if (limit == null || limit.intValue() <= 0) {
+            // Tweaked by VoltDB to support LIMIT 0
+            // WAS: (limit == null || limit.intValue() <= 0)
+            if (limit == null || limit.intValue() < 0) {
                 throw Error.error(ErrorCode.X_2201W);
             }
 
@@ -1006,11 +1015,23 @@ public class QuerySpecification extends QueryExpression {
                 rowCount = limitCount;
             }
 
-            if (rowCount == 0 || rowCount > Integer.MAX_VALUE - limitStart) {
+            // Tweaked by VoltDB to support LIMIT 0
+            // WAS: (rowCount == 0 || ...) which had been testing for a never true case, anyway
+            if (rowCount > Integer.MAX_VALUE - limitStart) {
                 rowCount = Integer.MAX_VALUE;
             } else {
                 rowCount += limitStart;
             }
+        }
+        // Tweaked by VoltDB to support LIMIT 0
+        // limitCount == 0 can be enforced/optimized as rowCount == 0 regardless of offset
+        // even in non-simpleLimit cases (SELECT DISTINCT, GROUP BY, and/or ORDER BY).
+        // This is an optimal handling of a hard-coded LIMIT 0, but it really shouldn't be the ONLY enforcement
+        // for zero LIMITs -- what about "LIMIT ?" with 0 passed later as a parameter?
+        // The HSQL executor may still be missing some runtime enforcement of zero limits.
+        // The VoltDB executor has such enforcement.
+        else if (limitCount == 0) {
+            rowCount = 0;
         } else {
             rowCount = Integer.MAX_VALUE;
         }
@@ -1025,6 +1046,7 @@ public class QuerySpecification extends QueryExpression {
      * Positive values limit the size of the result set.
      * @return the result of executing this Select
      */
+    @Override
     Result getResult(Session session, int maxrows) {
 
         Result r;
@@ -1058,12 +1080,17 @@ public class QuerySpecification extends QueryExpression {
     private Result buildResult(Session session, int limitcount) {
 
         RowSetNavigatorData navigator = new RowSetNavigatorData(session,
-            (QuerySpecification) this);
+            this);
         Result result = Result.newResult(navigator);
 
         result.metaData = resultMetaData;
 
         result.setDataResultConcurrency(isUpdatable);
+
+        // Test for early return case added by VoltDB to support LIMIT 0 in "HSQL backend".
+        if (limitcount == 0) {
+            return result;
+        }
 
         int fullJoinIndex = 0;
         RangeIterator[] rangeIterators =
@@ -1197,7 +1224,7 @@ public class QuerySpecification extends QueryExpression {
 
         if (havingCondition != null) {
             while (navigator.hasNext()) {
-                Object[] data = (Object[]) navigator.getNext();
+                Object[] data = navigator.getNext();
 
                 if (!Boolean.TRUE.equals(
                         data[indexLimitVisible + groupByColumnCount])) {
@@ -1289,6 +1316,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void createTable(Session session) {
 
         createResultTable(session);
@@ -1325,6 +1353,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void createResultTable(Session session) {
 
         HsqlName       tableName;
@@ -1443,10 +1472,12 @@ public class QuerySpecification extends QueryExpression {
         return sb.toString();
     }
 
+    @Override
     public ResultMetaData getMetaData() {
         return resultMetaData;
     }
 
+    @Override
     public String describe(Session session) {
 
         StringBuffer sb;
@@ -1629,10 +1660,12 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public Table getBaseTable() {
         return baseTable;
     }
 
+    @Override
     public void collectAllExpressions(HsqlList set, OrderedIntHashSet typeSet,
                                       OrderedIntHashSet stopAtTypeSet) {
 
@@ -1647,6 +1680,7 @@ public class QuerySpecification extends QueryExpression {
                                          stopAtTypeSet);
     }
 
+    @Override
     public void collectObjectNames(Set set) {
 
         for (int i = 0; i < indexStartAggregates; i++) {
@@ -1748,6 +1782,7 @@ public class QuerySpecification extends QueryExpression {
     /**
      * Not for views. Only used on root node.
      */
+    @Override
     public void setAsTopLevel() {
 
         setReturningResultSet();
@@ -1756,15 +1791,18 @@ public class QuerySpecification extends QueryExpression {
         isTopLevel       = true;
     }
 
+    @Override
     void setReturningResultSet() {
         persistenceScope = TableBase.SCOPE_SESSION;
         columnMode       = TableBase.COLUMNS_UNREFERENCED;
     }
 
+    @Override
     public boolean isSingleColumn() {
         return indexLimitVisible == 1;
     }
 
+    @Override
     public String[] getColumnNames() {
 
         String[] names = new String[indexLimitVisible];
@@ -1776,6 +1814,7 @@ public class QuerySpecification extends QueryExpression {
         return names;
     }
 
+    @Override
     public Type[] getColumnTypes() {
 
         if (columnTypes.length == indexLimitVisible) {
@@ -1789,18 +1828,22 @@ public class QuerySpecification extends QueryExpression {
         return types;
     }
 
+    @Override
     public int getColumnCount() {
         return indexLimitVisible;
     }
 
+    @Override
     public int[] getBaseTableColumnMap() {
         return columnMap;
     }
 
+    @Override
     public Expression getCheckCondition() {
         return queryCondition;
     }
 
+    @Override
     void getBaseTableNames(OrderedHashSet set) {
 
         for (int i = 0; i < rangeVariables.length; i++) {

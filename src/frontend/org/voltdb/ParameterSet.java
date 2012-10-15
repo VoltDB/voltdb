@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 
@@ -798,5 +799,33 @@ import org.voltdb.types.VoltDecimalHelper;
             micros = ((TimestampType) obj).getTime();
         }
         return micros;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof ParameterSet)) {
+            return false;
+        }
+        ParameterSet other = (ParameterSet) obj;
+        return Arrays.deepEquals(m_params, other.m_params);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        assert false : "hashCode not designed";
+        return 42; // any arbitrary constant will do
+    }
+
+    public Integer getHashinatedParam(int index) {
+        if (m_params.length > 0) {
+            return TheHashinator.hashToPartition(m_params[index]);
+        }
+        return null;
     }
 }

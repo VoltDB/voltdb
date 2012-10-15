@@ -17,14 +17,15 @@
 
 package org.voltdb.rejoin;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.utils.CompressionService;
 
 /**
@@ -34,15 +35,19 @@ public class StreamSnapshotDataReceiver extends StreamSnapshotBase
 implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
-    private final SocketChannel m_sock;
-    private final LinkedBlockingQueue<BBContainer> m_queue =
-            new LinkedBlockingQueue<BBContainer>();
+    /*
+     * element is a pair of <sourceHSId, blockData>. The hsId should remain the
+     * same for the length of the data transfer process for this partition.
+     */
+    private final LinkedBlockingQueue<Pair<Long, BBContainer>> m_queue =
+            new LinkedBlockingQueue<Pair<Long, BBContainer>>();
 
+    private final Mailbox m_mb;
     private volatile boolean m_closed = false;
 
-    public StreamSnapshotDataReceiver(SocketChannel sock) {
+    public StreamSnapshotDataReceiver(Mailbox mb) {
         super();
-        m_sock = sock;
+        m_mb = mb;
     }
 
     public void close() {
@@ -54,7 +59,7 @@ implements Runnable {
      *
      * @return null if the queue is empty.
      */
-    public BBContainer poll() {
+    public Pair<Long, BBContainer> poll() {
         return m_queue.poll();
     }
 
@@ -64,7 +69,7 @@ implements Runnable {
      * @return
      * @throws InterruptedException
      */
-    public BBContainer take() throws InterruptedException {
+    public Pair<Long, BBContainer> take() throws InterruptedException {
         return m_queue.take();
     }
 
@@ -75,40 +80,32 @@ implements Runnable {
     @Override
     public void run() {
         try {
+
             final ByteBuffer compressionBuffer =
                     ByteBuffer.allocateDirect(
                             CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
             while (true) {
-                ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-                while (lengthBuffer.hasRemaining()) {
-                    int read = m_sock.read(lengthBuffer);
-                    if (read == -1) {
-                        return;
-                    }
-                }
-                lengthBuffer.flip();
-                final int length = lengthBuffer.getInt();
-
                 BBContainer container = m_buffers.take();
+                ByteBuffer messageBuffer = container.b;
+                messageBuffer.clear();
+                compressionBuffer.clear();
                 boolean success = false;
+
                 try {
-                    ByteBuffer messageBuffer = container.b;
-                    messageBuffer.clear();
-                    compressionBuffer.clear();
-                    compressionBuffer.limit(length);
-                    while(compressionBuffer.hasRemaining()) {
-                        int read = m_sock.read(compressionBuffer);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
+                    VoltMessage msg = m_mb.recvBlocking();
+                    assert(msg instanceof RejoinDataMessage);
+                    RejoinDataMessage dataMsg = (RejoinDataMessage) msg;
+                    byte[] data = dataMsg.getData();
+
+                    compressionBuffer.limit(data.length);
+                    compressionBuffer.put(data);
                     compressionBuffer.flip();
                     int uncompressedSize =
                             CompressionService.decompressBuffer(
                                     compressionBuffer,
                                     messageBuffer);
                     messageBuffer.limit(uncompressedSize);
-                    m_queue.offer(container);
+                    m_queue.offer(Pair.of(dataMsg.m_sourceHSId, container));
                     success = true;
                 } finally {
                     if (!success) {

@@ -144,8 +144,14 @@ class Table {
     // OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
-    virtual bool insertTuple(TableTuple &source) = 0;
-    virtual bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes) = 0;
+    virtual bool insertTuple(TableTuple &tuple) = 0;
+    virtual bool updateTuple(TableTuple &targetTupleToUpdate,
+                             TableTuple &sourceTupleWithNewValues);
+    // optimized version of update that only updates specific indexes
+    // if the caller knows which indexes need to be updated
+    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                TableTuple &sourceTupleWithNewValues,
+                                                std::vector<TableIndex*> &indexesToUpdate) = 0;
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
 
     // ------------------------------------------------------------------
@@ -215,12 +221,39 @@ class Table {
     // ------------------------------------------------------------------
     // INDEXES
     // ------------------------------------------------------------------
-    virtual int indexCount() const                      { return 0; }
-    virtual int uniqueIndexCount() const                { return 0; }
-    virtual std::vector<TableIndex*> allIndexes() const { return std::vector<TableIndex*>(); }
-    virtual TableIndex *index(std::string name)         { return NULL; }
-    virtual TableIndex *primaryKeyIndex()               { return NULL; }
-    virtual const TableIndex *primaryKeyIndex() const   { return NULL; }
+    virtual int indexCount() const {
+        return static_cast<int>(m_indexes.size());
+    }
+
+    virtual int uniqueIndexCount() const {
+        return static_cast<int>(m_uniqueIndexes.size());
+    }
+
+    virtual std::vector<TableIndex*> allIndexes() const {
+        std::vector<TableIndex*> retval;
+        retval.insert(retval.begin(), m_indexes.begin(), m_indexes.end());
+        return retval;
+    }
+
+    virtual TableIndex *index(std::string name);
+
+    virtual TableIndex *primaryKeyIndex() {
+        return m_pkeyIndex;
+    }
+    virtual const TableIndex *primaryKeyIndex() const {
+        return m_pkeyIndex;
+    }
+
+    void configureIndexStats(CatalogId hostId,
+                             std::string hostname,
+                             int64_t siteId,
+                             CatalogId partitionId,
+                             CatalogId databaseId);
+
+    // mutating indexes
+    virtual void addIndex(TableIndex *index);
+    virtual void removeIndex(TableIndex *index);
+    virtual void setPrimaryKeyIndex(TableIndex *index);
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -326,7 +359,7 @@ protected:
     virtual void processLoadedTuple(TableTuple &tuple) {
     };
 
-    virtual void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
+    virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {
         throwFatalException("Unsupported operation");
     }
 
@@ -393,6 +426,11 @@ protected:
 
     const int m_tableAllocationTargetSize;
     int m_tableAllocationSize;
+
+    // indexes
+    std::vector<TableIndex*> m_indexes;
+    std::vector<TableIndex*> m_uniqueIndexes;
+    TableIndex *m_pkeyIndex;
 
   private:
     int32_t m_refcount;

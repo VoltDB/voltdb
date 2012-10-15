@@ -17,9 +17,9 @@
 
 package org.voltdb;
 
-import java.util.HashMap;
-
 import org.voltdb.catalog.Procedure;
+
+import com.google.common.collect.ImmutableMap;
 
 
 /**
@@ -73,19 +73,19 @@ public class SystemProcedureCatalog {
             this.allowedInReplica = allowedInReplica;
         }
 
-        boolean getEverysite() {
+        public boolean getEverysite() {
             return everySite;
         }
 
-        boolean getReadonly() {
+        public boolean getReadonly() {
             return readOnly;
         }
 
-        boolean getSinglepartition() {
+        public boolean getSinglepartition() {
             return singlePartition;
         }
 
-        String getClassname() {
+        public String getClassname() {
             return className;
         }
 
@@ -105,32 +105,33 @@ public class SystemProcedureCatalog {
         }
     }
 
-    public static final HashMap<String, Config> listing =
-        new HashMap<String, Config>();
+    public static final ImmutableMap<String, Config> listing;
 
     static {                                                                                            // SP     RO     Every  Pro  (DR: kill, skip, replica-ok)
-        listing.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, false, false, false, true));
-        listing.put("@AdHoc_RW_SP",             new Config("org.voltdb.sysprocs.AdHoc_RW_SP",              true,  false, false, false, false, false, true));
-        listing.put("@AdHoc_RO_MP",             new Config("org.voltdb.sysprocs.AdHoc_RO_MP",              false, true,  false, false, false, false, true));
-        listing.put("@AdHoc_RO_SP",             new Config("org.voltdb.sysprocs.AdHoc_RO_SP",              true,  true,  false, false, false, false, true));
-        listing.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",                    false, false, true,  false, false, true, true));
-        listing.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",                   false, false, true,  false, false, true, true));
-        listing.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",                  false, false, false, false, false, true, true));
-        listing.put("@SnapshotSave",            new Config("org.voltdb.sysprocs.SnapshotSave",             false, false, false, false, false, true, true));
-        listing.put("@SnapshotRestore",         new Config("org.voltdb.sysprocs.SnapshotRestore",          false, false, false, false, true, true, false));
-        listing.put("@SnapshotStatus",          new Config("org.voltdb.sysprocs.SnapshotStatus",           false, false, false, false, false, true, true));
-        listing.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, false, false, true, true));
-        listing.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, false, false, true, true));
-        listing.put("@Shutdown",                new Config("org.voltdb.sysprocs.Shutdown",                 false, false, false, false, false, true, true));
-        listing.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",                  false, false, true, false, false, true, true));
-        listing.put("@Statistics",              new Config("org.voltdb.sysprocs.Statistics",               false, true,  false, false, false, true, true));
-        listing.put("@SystemCatalog",           new Config("org.voltdb.sysprocs.SystemCatalog",            true,  true,  false, false, false, true, true));
-        listing.put("@SystemInformation",       new Config("org.voltdb.sysprocs.SystemInformation",        false, true,  false, false, false, true, true));
-        listing.put("@UpdateLogging",           new Config("org.voltdb.sysprocs.UpdateLogging",            false, false, true,  false, false, true, true));
-        listing.put("@BalancePartitions",       new Config("org.voltdb.sysprocs.BalancePartitions",        false, false, false, true, true, true, false));
-        listing.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", true,  false, true,  false, true, true, false));
-        listing.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, false, false, false, false));
-        listing.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, false, false, false, false));
-        listing.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true, false, false, true, true));
+        ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
+        builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, false, false, false, true));
+        builder.put("@AdHoc_RW_SP",             new Config("org.voltdb.sysprocs.AdHoc_RW_SP",              true,  false, false, false, false, false, true));
+        builder.put("@AdHoc_RO_MP",             new Config("org.voltdb.sysprocs.AdHoc_RO_MP",              false, true,  false, false, false, false, true));
+        builder.put("@AdHoc_RO_SP",             new Config("org.voltdb.sysprocs.AdHoc_RO_SP",              true,  true,  false, false, false, false, true));
+        builder.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",                    false, false, true,  false, false, true, true));
+        builder.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",                   false, false, true,  false, false, true, true));
+        builder.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",                  false, false, false, false, false, true, true));
+        builder.put("@SnapshotSave",            new Config("org.voltdb.sysprocs.SnapshotSave",             false, false, false, false, false, true, true));
+        builder.put("@SnapshotRestore",         new Config("org.voltdb.sysprocs.SnapshotRestore",          false, false, false, false, true, true, false));
+        builder.put("@SnapshotStatus",          new Config("org.voltdb.sysprocs.SnapshotStatus",           false, false, false, false, false, true, true));
+        builder.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, false, false, true, true));
+        builder.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, false, false, true, true));
+        builder.put("@Shutdown",                new Config("org.voltdb.sysprocs.Shutdown",                 false, false, false, false, false, true, true));
+        builder.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",                  false, false, true, false, false, true, true));
+        builder.put("@Statistics",              new Config("org.voltdb.sysprocs.Statistics",               false, true,  false, false, false, true, true));
+        builder.put("@SystemCatalog",           new Config("org.voltdb.sysprocs.SystemCatalog",            true,  true,  false, false, false, true, true));
+        builder.put("@SystemInformation",       new Config("org.voltdb.sysprocs.SystemInformation",        false, true,  false, false, false, true, true));
+        builder.put("@UpdateLogging",           new Config("org.voltdb.sysprocs.UpdateLogging",            false, false, true,  false, false, true, true));
+        builder.put("@BalancePartitions",       new Config("org.voltdb.sysprocs.BalancePartitions",        false, false, false, true, true, true, false));
+        builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false,  false, true,  false, true, true, false));
+        builder.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, false, false, false, false));
+        builder.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, false, false, false, false));
+        builder.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true, false, false, true, true));
+        listing = builder.build();
     }
 }

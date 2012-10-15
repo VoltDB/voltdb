@@ -17,41 +17,28 @@
 
 package org.voltdb.iv2;
 
-import java.net.InetAddress;
-
 import java.nio.ByteBuffer;
-
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.Pair;
-
-import org.voltdb.client.ClientResponse;
-
 import org.voltdb.ClientResponseImpl;
-
-import org.voltdb.messaging.RejoinMessage;
-import org.voltdb.messaging.RejoinMessage.Type;
-
 import org.voltdb.PrivateVoltTableFactory;
-
-import org.voltdb.rejoin.RejoinSiteProcessor;
-import org.voltdb.rejoin.StreamSnapshotSink;
-
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
-
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
-
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.StreamSnapshotSink;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
@@ -162,14 +149,14 @@ public class RejoinProducer extends SiteTasker
     void doInitiation(RejoinMessage message)
     {
         m_rejoinCoordinatorHsId = message.m_sourceHSId;
-        m_rejoinSiteProcessor = new StreamSnapshotSink(m_mailbox.getHSId());
+        m_rejoinSiteProcessor = new StreamSnapshotSink();
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
-        Pair<List<byte[]>, Integer> endPoints = m_rejoinSiteProcessor.initialize();
+        long hsId = m_rejoinSiteProcessor.initialize();
 
         // Initiate a snapshot with stream snapshot target
-        String data = makeSnapshotRequest(endPoints, sourceSite);
+        String data = makeSnapshotRequest(hsId, sourceSite);
         String nonce = "Rejoin_" + m_mailbox.getHSId() + "_" + System.currentTimeMillis();
 
         // request a blocking snapshot.
@@ -202,21 +189,12 @@ public class RejoinProducer extends SiteTasker
         firstSnapshotBlock.start();
     }
 
-    private String makeSnapshotRequest(Pair<List<byte[]>, Integer> endPoints, long sourceSite)
+    private String makeSnapshotRequest(long hsId, long sourceSite)
     {
-        List<byte[]> addresses = endPoints.getFirst();
-        int port = endPoints.getSecond();
-
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-            jsStringer.key("addresses").array();
-            for (byte[] addr : addresses) {
-                InetAddress inetAddress = InetAddress.getByAddress(addr);
-                jsStringer.value(inetAddress.getHostAddress());
-            }
-            jsStringer.endArray();
-            jsStringer.key("port").value(port);
+            jsStringer.key("hsId").value(hsId);
             // make this snapshot only contain data from this site
             // m_recoveryLog.debug("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
             //                   " is " + CoreUtils.hsIdToString(sourceSite));
@@ -276,10 +254,5 @@ public class RejoinProducer extends SiteTasker
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection) {
         run(siteConnection);
-    }
-
-    @Override
-    public int priority() {
-        return 0;
     }
 }

@@ -42,6 +42,7 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of Statement for query expressions.<p>
@@ -190,18 +191,6 @@ public class StatementQuery extends StatementDMQL {
         }
 
         QuerySpecification select = (QuerySpecification) queryExpression;
-
-        try {
-            getResult(session);
-        }
-        catch (HsqlException e)
-        {
-            throw new HSQLParseException(e.getMessage());
-        }
-        catch (Exception e)
-        {
-            // XXX coward.
-        }
 
         // select
         VoltXMLElement query = new VoltXMLElement("select");
@@ -450,7 +439,10 @@ public class StatementQuery extends StatementDMQL {
             parameter.attributes.put("index", String.valueOf(i));
             ExpressionColumn param = parameters[i];
             parameter.attributes.put("id", param.getUniqueId(session));
-            parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
+            Type paramType = param.getDataType();
+            if (paramType != null) {
+                parameter.attributes.put("type", Types.getTypeName(paramType.typeCode));
+            }
         }
 
         // scans
@@ -510,9 +502,7 @@ public class StatementQuery extends StatementDMQL {
 
         // having
         if (select.havingCondition != null) {
-            VoltXMLElement condition = new VoltXMLElement("havingcondition");
-            query.children.add(condition);
-            condition.children.add(select.havingCondition.voltGetXML(session));
+            throw new HSQLParseException("VoltDB does not yet support the HAVING clause");
         }
 
         // groupby

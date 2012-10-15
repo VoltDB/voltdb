@@ -105,10 +105,14 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         client.callProcedure("InsertA", 0, 1);
         client.callProcedure("InsertA", 1, 1);
         client.callProcedure("InsertA", 2, 2);
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;")
-                                 .getResults()[0];
+        VoltTable result = null;
+
+        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;").getResults()[0];
         assertEquals(1, result.getRowCount());
-    }
+
+        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 0 OFFSET 1;").getResults()[0];
+        assertEquals(0, result.getRowCount());
+}
 
     public void testJoinAndLimitOffset() throws IOException, ProcCallException, InterruptedException {
         Client client = this.getClient();
@@ -140,6 +144,16 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
     }
 
+    public void testENG1808() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        client.callProcedure("A.insert", 1, 1);
+
+        VoltTable result = client.callProcedure("@AdHoc", "select I from A limit 0").getResults()[0];
+
+        assertEquals(0, result.getRowCount());
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
@@ -166,6 +180,10 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
+        // HSQL for baseline
+        config = new LocalCluster("testlimitoffset-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
         return builder;
     }
 }

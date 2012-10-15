@@ -24,17 +24,13 @@
 package org.voltdb;
 
 import java.net.InetSocketAddress;
-
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.runner.RunWith;
-
-import org.junit.runners.Parameterized;
-
-import org.junit.runners.Parameterized.Parameters;
-
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.client.Client;
@@ -78,7 +74,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             VoltProjectBuilder builder = getBuilderForTest();
             builder.setSecurityEnabled(true);
 
-            LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
+            LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, true, m_useIv2);
@@ -527,9 +523,119 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     }
 
     @Test
+    public void testRejoinWithExportWithActuallyExportedTables() throws Exception {
+        VoltProjectBuilder builder = getBuilderForTest();
+
+        builder.setTableAsExportOnly("export_ok_blah_with_no_pk");
+        builder.addExport("org.voltdb.export.processors.RawProcessor",
+                true,  // enabled
+                null);  // authGroups (off)
+
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
+                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
+        cluster.overrideAnyRequestForValgrind();
+        cluster.setMaxHeap(256);
+        boolean success = cluster.compile(builder);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
+        cluster.setHasLocalServer(false);
+
+        cluster.startUp();
+
+        ClientResponse response;
+        Client client;
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", cluster.port(0));
+
+        response = client.callProcedure("InsertSinglePartition", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 1);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 0);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        client.close();
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", cluster.port(1));
+        response = client.callProcedure("InsertSinglePartition", 2);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        client.close();
+
+        TrivialExportClient exportClient = new TrivialExportClient(cluster.port(0));
+        exportClient.work();
+        exportClient.work();
+
+        Thread.sleep(4000);
+
+        exportClient.work();
+
+        Thread.sleep(4000);
+
+        exportClient.work();
+
+        cluster.shutDownSingleHost(0);
+        Thread.sleep(100);
+
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+        config.m_enableIV2 = m_useIv2;
+        config.m_startAction = START_ACTION.REJOIN;
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
+        config.m_leader = ":" + cluster.internalPort(1);
+
+        config.m_isRejoinTest = true;
+        cluster.setPortsFromConfig(0, config);
+        ServerThread localServer = new ServerThread(config);
+
+        localServer.start();
+        localServer.waitForRejoin();
+
+        Thread.sleep(1000);
+        while (VoltDB.instance().rejoining()) {
+            Thread.sleep(100);
+        }
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", cluster.port(0));
+
+        response = client.callProcedure("InsertSinglePartition", 5);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 6);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 7);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        client.close();
+
+        client = ClientFactory.createClient(m_cconfig);
+        client.createConnection("localhost", cluster.port(1));
+        response = client.callProcedure("InsertSinglePartition", 8);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("Insert", 9);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        client.close();
+
+        exportClient = new TrivialExportClient(cluster.port(0));
+        exportClient.work();
+
+        Thread.sleep(4000);
+
+        exportClient.work();
+
+        Thread.sleep(4000);
+
+        exportClient.work();
+
+        localServer.shutdown();
+        cluster.shutDown();
+    }
+
+    @Test
     public void testRejoinWithExport() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
-        //builder.setTableAsExportOnly("blah", false);
+        //builder.setTableAsExportOnly("blah",false);
         //builder.setTableAsExportOnly("blah_replicated", false);
         //builder.setTableAsExportOnly("PARTITIONED", false);
         //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
@@ -644,7 +750,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);

@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
@@ -48,6 +47,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.rejoin.RejoinDataAckMessage;
+import org.voltdb.rejoin.RejoinDataMessage;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 
@@ -85,6 +86,16 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     private final Mailbox m_mailbox;
 
     /**
+     * Mailbox used to transfer snapshot data
+     */
+    private final Mailbox m_mb;
+
+    /**
+     * HSId of the destination mailbox
+     */
+    private final long m_destHSId;
+
+    /**
      * Generate unique identifiers for each block of table data sent over the wire
      */
     private int m_blockIndex = 0;
@@ -118,8 +129,6 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     private long m_destinationStoppedBeforeTxnId = Long.MAX_VALUE;
 
     private final long m_destinationSiteId;
-
-    private final SocketChannel m_sc;
 
     /*
      * Only send the response to the initiate request once in doRecoveryWork
@@ -165,31 +174,24 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
                     try {
                         if (message.b.isDirect()) {
-                            //Leave space for a new length prefix
-                            compressionBuffer.clear().position(4);
-                            //Skip length prefix, not useful before compression
                             message.b.position(message.b.position() + 4);
+                            compressionBuffer.clear();
                             final int compressedSize =
                                     CompressionService.compressBuffer( message.b, compressionBuffer);
-                            compressionBuffer.putInt(0, compressedSize);
-                            compressionBuffer.limit(4 + compressedSize);
+                            compressionBuffer.limit(compressedSize);
                             compressionBuffer.position(0);
-                            while (compressionBuffer.hasRemaining()) {
-                                m_sc.write(compressionBuffer);
-                            }
+
+                            byte[] data = new byte[compressedSize];
+                            compressionBuffer.get(data);
+                            RejoinDataMessage msg = new RejoinDataMessage(data);
+                            m_mb.send(m_destHSId, msg);
                         } else {
-                            ByteBuffer lengthPrefix = ByteBuffer.allocate(4);
                             byte compressedBytes[] =
                                     CompressionService.compressBytes(
                                             message.b.array(), message.b.position() + 4, message.b.remaining() - 4);
-                            ByteBuffer contents = ByteBuffer.wrap(compressedBytes);
-                            lengthPrefix.putInt(compressedBytes.length).flip();
-                            while (lengthPrefix.hasRemaining()) {
-                                m_sc.write(lengthPrefix);
-                            }
-                            while (contents.hasRemaining()) {
-                                m_sc.write(contents);
-                            }
+
+                            RejoinDataMessage msg = new RejoinDataMessage(compressedBytes);
+                            m_mb.send(m_destHSId, msg);
                         }
                     } catch (IOException e) {
                         recoveryLog.error("Error writing recovery message", e);
@@ -200,11 +202,6 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                 }
             } catch (InterruptedException e) {
                 return;
-            } finally {
-                try {
-                    m_sc.close();
-                } catch (IOException e) {
-                }
             }
         }
     };
@@ -212,55 +209,36 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     private final Thread m_inThread = new Thread() {
         @Override
         public void run() {
-            try {
-                while (true) {
-                    ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-                    while (lengthBuffer.hasRemaining()) {
-                        int read = m_sc.read(lengthBuffer);
-                        if (read == -1) {
-                            return;
-                        }
-                    }
-                    lengthBuffer.flip();
+            while (true) {
+                VoltMessage msg = m_mb.recvBlocking();
+                if (msg == null) {
+                    break;
+                }
+                assert(msg instanceof RejoinDataAckMessage);
+                RejoinDataAckMessage ackMsg = (RejoinDataAckMessage) msg;
+                final int blockIndex = ackMsg.getBlockIndex();
+                if (m_ackTracker.ackReceived(blockIndex)) {
+                    m_allowedBuffers.incrementAndGet();
 
-                    ByteBuffer messageBuffer = ByteBuffer.allocate(lengthBuffer.getInt());
-                    while(messageBuffer.hasRemaining()) {
-                        int read = m_sc.read(messageBuffer);
-                        if (read == -1) {
-                            return;
-                        }
-                    }
-                    messageBuffer.flip();
-                    messageBuffer.getLong();//drop source site id
-                    final int blockIndex = messageBuffer.getInt();
-                    if (m_ackTracker.ackReceived(blockIndex)) {
-                        m_allowedBuffers.incrementAndGet();
-
-                        /*
-                         * All recovery messages have been acked by the remote partition.
-                         * Recovery is really complete so run the handler
-                         */
-                        if (m_allowedBuffers.get() == m_numBuffers && m_tablesToStream.isEmpty()) {
-                            recoveryLog.info("Processor spent " +
-                                    (m_timeSpentSerializing.get() / 1000.0) + " seconds serializing");
-                            synchronized (RecoverySiteProcessorSource.this) {
-                                if (!m_ioclosed) {
-                                    closeIO();
-                                }
+                    /*
+                     * All recovery messages have been acked by the remote partition.
+                     * Recovery is really complete so run the handler
+                     */
+                    if (m_allowedBuffers.get() == m_numBuffers && m_tablesToStream.isEmpty()) {
+                        recoveryLog.info("Processor spent " +
+                                (m_timeSpentSerializing.get() / 1000.0) + " seconds serializing");
+                        synchronized (RecoverySiteProcessorSource.this) {
+                            if (!m_ioclosed) {
+                                closeIO();
                             }
-                        } else {
-                            RecoveryMessage rm = new RecoveryMessage();
-                            rm.m_sourceHSId = m_siteId;
-                            //Notify that a new buffer is available
-                            m_mailbox.deliver(rm);
                         }
+                    } else {
+                        RecoveryMessage rm = new RecoveryMessage();
+                        rm.m_sourceHSId = m_siteId;
+                        //Notify that a new buffer is available
+                        m_mailbox.deliver(rm);
                     }
                 }
-            } catch (IOException e) {
-                if (m_ioclosed) {
-                    return;
-                }
-                recoveryLog.error("Error reading a message from a recovery stream", e);
             }
         }
     };
@@ -279,7 +257,6 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      */
     private static class AckTracker {
         private final HashMap<Integer, Integer> m_acks = new HashMap<Integer, Integer>();
-        private boolean m_ignoreAcks = false;
 
         private synchronized void waitForAcks(int blockIndex, int acksExpected) {
             assert(!m_acks.containsKey(blockIndex));
@@ -298,21 +275,6 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             recoveryLog.trace("Ack received for block " + blockIndex + " with " + acksRemaining + " remaining");
             m_acks.put(blockIndex, acksRemaining);
             return false;
-        }
-
-        /*
-         * Don't bother expecting acks to come. Invoked by handle failure
-         * when the destination fails.
-         */
-        private synchronized void ignoreAcks() {
-            m_ignoreAcks = true;
-        }
-
-        private synchronized boolean hasOutstanding() {
-            if (m_ignoreAcks) {
-                return false;
-            }
-            return !m_acks.isEmpty();
         }
 
         @SuppressWarnings("unused")
@@ -373,7 +335,6 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         if (failedSites.contains(destinationSite)) {
             recoveryLog.error("Failing recovery of " + CoreUtils.hsIdToString(destinationSite) +
                     " at source site " + CoreUtils.hsIdToString(m_siteId));
-            m_ackTracker.ignoreAcks();
             final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_bufferLength);
             try {
                 long bufferAddress = 0;
@@ -446,17 +407,19 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             ExecutionSite site,
             long destinationTxnId,
             long destinationSiteId,
+            long destHSId, // HSId of the destination mailbox
             HashMap<Pair<String, Integer>, HashSet<Long>> tableToSites,
             ExecutionEngine engine,
             Mailbox mailbox,
+            Mailbox dataMailbox,
             final long siteId,
             Runnable onCompletion,
-            MessageHandler messageHandler,
-            SocketChannel sc) throws IOException {
+            MessageHandler messageHandler) {
         super();
         m_site = site;
-        m_sc = sc;
         m_mailbox = mailbox;
+        m_mb = dataMailbox;
+        m_destHSId = destHSId;
         m_engine = engine;
         m_siteId = siteId;
         m_destinationSiteId = destinationSiteId;
@@ -781,40 +744,19 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
 
         RecoverySiteProcessorSource source = null;
-        try {
-            SocketChannel sc = createRecoveryConnection(rm.addresses(), rm.port());
-
-            final long destinationTxnId = rm.txnId();
-            source = new RecoverySiteProcessorSource(
-                    site,
-                    destinationTxnId,
-                    destinationSiteId,
-                    tableToDestinationSite,
-                    engine,
-                    mailbox,
-                    siteId,
-                    onCompletion,
-                    messageHandler,
-                    sc);
-        } catch (IOException e) {
-            StringBuilder sb = new StringBuilder();
-            sb.append(" attempted addresses -> ");
-
-            for (byte address[] : rm.addresses()) {
-                String ip = "invalid";
-                try {
-                    InetAddress addr = InetAddress.getByAddress(address);
-                    ip = addr.getHostAddress();
-                } catch (UnknownHostException ignore) {}
-                sb.append(ip).append(',');
-            }
-            recoveryLog.error("Unable to create recovery connection, aborting. " +
-                              "The recovery message is: txnId -> " + rm.txnId() +
-                              ", " + sb.toString() +
-                              ", port -> " + rm.port() +
-                              ", source site -> " + CoreUtils.hsIdToString(rm.sourceSite()), e);
-            return null;
-        }
+        final long destinationTxnId = rm.txnId();
+        source = new RecoverySiteProcessorSource(
+                                                 site,
+                                                 destinationTxnId,
+                                                 destinationSiteId,
+                                                 rm.getHSId(),
+                                                 tableToDestinationSite,
+                                                 engine,
+                                                 mailbox,
+                                                 VoltDB.instance().getHostMessenger().createMailbox(),
+                                                 siteId,
+                                                 onCompletion,
+                                                 messageHandler);
         return source;
     }
 

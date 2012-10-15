@@ -44,6 +44,8 @@ public class SysProcFragmentId
     public static final long PF_ioDataAggregator = 19;
     public static final long PF_liveClientData = 20;
     public static final long PF_liveClientDataAggregator = 21;
+    public static final long PF_plannerData = 22;
+    public static final long PF_plannerAggregator = 23;
 
     // @Shutdown
     public static final long PF_shutdownCommand = 28;
@@ -96,8 +98,8 @@ public class SysProcFragmentId
     public static final long PF_restoreSendPartitionedTableResults = 70;
     public static final long PF_restoreDigestScan = 71;
     public static final long PF_restoreDigestScanResults = 72;
-    public static final long PF_restoreDistributeExportSequenceNumbers = 73;
-    public static final long PF_restoreDistributeExportSequenceNumbersResults = 74;
+    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbers = 73;
+    public static final long PF_restoreDistributeExportAndPartitionSequenceNumbersResults = 74;
     public static final long PF_restoreAsyncRunLoop = 75;
     public static final long PF_restoreAsyncRunLoopResults = 76;
 

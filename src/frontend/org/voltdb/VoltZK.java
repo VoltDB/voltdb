@@ -27,8 +27,8 @@ import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
@@ -45,10 +45,11 @@ public class VoltZK {
     public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String topology = "/db/topology";
-    public static final String replicationrole = "/db/replicationrole";
+    public static final String replicationconfig = "/db/replicationconfig";
     public static final String deploymentBytes = "/db/deploymentBytes";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";
+    public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
 
     // configuration (ports, interfaces, ...)
@@ -73,6 +74,7 @@ public class VoltZK {
     public static final String nodes_currently_snapshotting = "/db/nodes_currently_snapshotting";
     public static final String restore = "/db/restore";
     public static final String restore_barrier = "/db/restore_barrier";
+    public static final String restore_barrier2 = "/db/restore_barrier2";
     public static final String restore_snapshot_id = "/db/restore/snapshot_id";
     public static final String request_truncation_snapshot = "/db/request_truncation_snapshot";
     public static final String snapshot_truncation_master = "/db/snapshot_truncation_master";
@@ -89,6 +91,7 @@ public class VoltZK {
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
     public static final String leaders_globalservice = "/db/leaders/globalservice";
+    public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -101,7 +104,8 @@ public class VoltZK {
             iv2mpi,
             leaders,
             leaders_initiators,
-            leaders_globalservice
+            leaders_globalservice,
+            lastKnownLiveNodes
     };
 
     /**

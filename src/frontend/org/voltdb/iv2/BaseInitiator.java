@@ -20,18 +20,23 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
-
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.BackendTarget;
+
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
+import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.MemoryStats;
+import org.voltdb.StarvationTracker;
+import org.voltdb.StatsAgent;
+import org.voltdb.SysProcSelector;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -41,6 +46,9 @@ import org.voltdb.LoadedProcedureSet;
 public abstract class BaseInitiator implements Initiator
 {
     VoltLogger tmLog = new VoltLogger("TM");
+
+    public static final String JSON_PARTITION_ID = "partitionId";
+    public static final String JSON_INITIATOR_HSID = "initiatorHSId";
 
     // External references/config
     protected final HostMessenger m_messenger;
@@ -57,7 +65,7 @@ public abstract class BaseInitiator implements Initiator
     protected final RepairLog m_repairLog = new RepairLog();
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
@@ -76,6 +84,12 @@ public abstract class BaseInitiator implements Initiator
         m_messenger.createMailbox(null, m_initiatorMailbox);
         rejoinProducer.setMailbox(m_initiatorMailbox);
         m_scheduler.setMailbox(m_initiatorMailbox);
+        StarvationTracker st = new StarvationTracker(getInitiatorHSId());
+        m_scheduler.setStarvationTracker(st);
+        m_scheduler.setLock(m_initiatorMailbox);
+        agent.registerStatsSource(SysProcSelector.STARVATION,
+                                  getInitiatorHSId(),
+                                  st);
 
         String partitionString = " ";
         if (m_partitionId != -1) {
@@ -89,7 +103,10 @@ public abstract class BaseInitiator implements Initiator
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          StatsAgent agent,
+                          MemoryStats memStats,
+                          CommandLog cl)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -97,6 +114,7 @@ public abstract class BaseInitiator implements Initiator
                 snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
                     getSystemsettings().get("systemsettings").getSnapshotpriority();
             }
+
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -105,7 +123,10 @@ public abstract class BaseInitiator implements Initiator
                                        m_partitionId,
                                        numberOfPartitions,
                                        createForRejoin,
-                                       snapshotPriority);
+                                       snapshotPriority,
+                                       m_initiatorMailbox,
+                                       agent,
+                                       memStats);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -117,11 +138,10 @@ public abstract class BaseInitiator implements Initiator
                     numberOfPartitions);
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
-            m_scheduler.setProcedureSet(procSet);
+            m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
-
     }
 
     @Override
@@ -160,5 +180,21 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
+    }
+
+    protected void acceptPromotion() throws Exception {
+        /*
+         * Notify all known client interfaces that the mastership has changed
+         * for the specified partition and that no responses from previous masters will be forthcoming
+         */
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        stringer.key(JSON_PARTITION_ID).value(m_partitionId);
+        stringer.key(JSON_INITIATOR_HSID).value(m_initiatorMailbox.getHSId());
+        stringer.endObject();
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
+        for (Integer hostId : m_messenger.getLiveHostIds()) {
+            m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), bpm);
+        }
     }
 }

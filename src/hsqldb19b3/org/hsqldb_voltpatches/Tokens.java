@@ -763,7 +763,7 @@ public class Tokens {
     static final String        T_BITXOR           = "BITXOR";
     static final String        T_ROUNDMAGIC       = "ROUNDMAGIC";
     static final String        T_ASCII            = "ASCII";
-    static final String        T_CONCAT_WORD      = "CONCAT_WORD";
+    static final String        T_CONCAT_WORD      = "CONCAT";
     static final String        T_DIFFERENCE       = "DIFFERENCE";
     static final String        T_HEXTORAW         = "HEXTORAW";
     static final String        T_LCASE            = "LCASE";
@@ -1588,6 +1588,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_COLUMN, COLUMN);
         reservedKeys.put(Tokens.T_COMMIT, COMMIT);
         reservedKeys.put(Tokens.T_COMPARABLE, COMPARABLE);
+        reservedKeys.put(Tokens.T_CONCAT, CONCAT);
         reservedKeys.put(Tokens.T_CONDITION, CONDITION);
         reservedKeys.put(Tokens.T_CONNECT, CONNECT);
         reservedKeys.put(Tokens.T_CONSTRAINT, CONSTRAINT);
@@ -1802,6 +1803,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SIMILAR, SIMILAR);
         reservedKeys.put(Tokens.T_SMALLINT, SMALLINT);
         reservedKeys.put(Tokens.T_SOME, SOME);
+        reservedKeys.put(Tokens.T_SPACE, SPACE);
         reservedKeys.put(Tokens.T_SPECIFIC, SPECIFIC);
         reservedKeys.put(Tokens.T_SPECIFICTYPE, SPECIFICTYPE);
         reservedKeys.put(Tokens.T_SQL, SQL);

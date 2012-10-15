@@ -17,28 +17,22 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.atomic.AtomicLong;
-
-import java.util.concurrent.ExecutionException;
-
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
-
+import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
-
-import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -61,9 +55,6 @@ public class InitiatorMailbox implements Mailbox
     private long m_hsId;
     private RepairAlgo m_algo;
 
-    // hacky temp txnid
-    AtomicLong m_txnId = new AtomicLong(0);
-
     synchronized public void setRepairAlgo(RepairAlgo algo)
     {
         m_algo = algo;
@@ -72,8 +63,21 @@ public class InitiatorMailbox implements Mailbox
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
         m_repairLog.setLeaderState(true);
-        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
         m_scheduler.setLeaderState(true);
+        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
+    }
+
+    public synchronized void setMaxLastSeenMultipartTxnId(long txnId) {
+        m_repairLog.m_lastMpHandle = txnId;
+    }
+
+
+    synchronized public void setMaxLastSeenTxnId(long txnId) {
+        m_scheduler.setMaxSeenTxnId(txnId);
+    }
+
+    synchronized public void enableWritingIv2FaultLog() {
+        m_scheduler.enableWritingIv2FaultLog();
     }
 
     public InitiatorMailbox(int partitionId,

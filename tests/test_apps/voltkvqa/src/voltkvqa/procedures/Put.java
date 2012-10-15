@@ -45,6 +45,9 @@ public class Put extends VoltProcedure
     // Updates a key/value pair
     public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ? WHERE key = ?;");
 
+    // Logs update to export table
+    public final SQLStmt exportStmt = new SQLStmt("INSERT INTO store_export VALUES ( ?, ?, ?, ?, ?)");
+
     // Inserts a key/value pair
     public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
 
@@ -70,11 +73,13 @@ public class Put extends VoltProcedure
         else {
             // Get the old count from 1st 8 bytes, increment it, stuff it
             // back in
-            ByteBuffer bb = ByteBuffer.wrap(queryresults[0].fetchRow(0).getVarbinary(1));
+            queryresults[0].advanceRow();
+            ByteBuffer bb = ByteBuffer.wrap(queryresults[0].getVarbinary(1));
             putCounter = bb.getLong(0);
             putCounter++;
             bb.putLong(0, putCounter);
             voltQueueSQL(updateStmt, bb.array(), key);
+            voltQueueSQL(exportStmt, queryresults[0].getString(0), queryresults[0].getVarbinary(1), getTransactionTime(), getTransactionId(), getSeededRandomNumberGenerator().nextDouble());
         }
         voltExecuteSQL(true);
         VoltTable t[] = new VoltTable[1];

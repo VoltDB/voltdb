@@ -17,23 +17,25 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.ExecutionException;
-
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltcore.utils.Pair;
-
 import org.voltcore.zk.LeaderElector;
 
+import org.voltdb.MemoryStats;
+import org.voltdb.NodeDRGateway;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CommandLog;
 import org.voltdb.Promotable;
+import org.voltdb.SnapshotCompletionMonitor;
+import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -48,6 +50,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
+    private final TickProducer m_tickProducer;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -66,12 +69,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
     };
 
-    public SpInitiator(HostMessenger messenger, Integer partition)
+    public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
+            SnapshotCompletionMonitor snapMonitor)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(new SiteTaskerQueue()),
-                "SP");
+                new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
+                "SP", agent);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
+        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }
 
     @Override
@@ -79,7 +84,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          StatsAgent agent,
+                          MemoryStats memStats,
+                          CommandLog cl,
+                          NodeDRGateway nodeDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -89,12 +98,21 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable());
+                createForRejoin && isRejoinable(),
+                agent, memStats, cl);
+
+        m_tickProducer.start();
+
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+
+        // configure DR
+        ((SpScheduler) m_scheduler).setDRGateway(PartitionDRGateway.getInstance(m_partitionId,
+                                                                                nodeDRGateway,
+                                                                                true));
     }
 
     @Override
@@ -139,6 +157,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + "trying. Retrying.");
                 }
             }
+            super.acceptPromotion();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
@@ -164,6 +183,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
             String whoami)
     {
-        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
+        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami, m_partitionId);
+    }
+
+    @Override
+    public void enableWritingIv2FaultLog() {
+        m_initiatorMailbox.enableWritingIv2FaultLog();
     }
 }

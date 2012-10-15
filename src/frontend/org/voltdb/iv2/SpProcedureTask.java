@@ -20,19 +20,14 @@ package org.voltdb.iv2;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.client.ClientResponse;
-
 import org.voltdb.ClientResponseImpl;
-
-import org.voltdb.iv2.Site;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.ProcedureRunner;
-import org.voltdb.SiteProcedureConnection;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.utils.LogKeys;
-
-import org.voltdb.VoltTable;
 
 /**
  * Implements the single partition procedure ProcedureTask.
@@ -40,11 +35,14 @@ import org.voltdb.VoltTable;
  */
 public class SpProcedureTask extends ProcedureTask
 {
-    SpProcedureTask(Mailbox initiator, ProcedureRunner runner,
-                  long txnId, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg)
+    final private PartitionDRGateway m_drGateway;
+
+    SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
+                  Iv2InitiateTaskMessage msg,
+                  PartitionDRGateway drGateway)
     {
-       super(initiator, runner, new SpTransactionState(txnId, msg), queue);
+       super(initiator, procName, new SpTransactionState(msg), queue);
+       m_drGateway = drGateway;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -58,7 +56,7 @@ public class SpProcedureTask extends ProcedureTask
 
         // cast up here .. ugly.
         SpTransactionState txn = (SpTransactionState)m_txn;
-        final InitiateResponseMessage response = processInitiateTask(txn.m_task);
+        final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         if (!response.shouldCommit()) {
             m_txn.setNeedsRollback();
         }
@@ -67,6 +65,13 @@ public class SpProcedureTask extends ProcedureTask
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
+
+        // Log invocation to DR
+        if (m_drGateway != null && !m_txn.isReadOnly() && !m_txn.needsRollback()) {
+            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.timestamp,
+                                                  txn.getInvocation(),
+                                                  response.getClientResponseData());
+        }
     }
 
     @Override
@@ -102,20 +107,10 @@ public class SpProcedureTask extends ProcedureTask
             // legacy interaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
-            siteConnection.truncateUndoLog(m_txn.needsRollback(), m_txn.getBeginUndoToken(), m_txn.txnId);
+            siteConnection.truncateUndoLog(m_txn.needsRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
         }
         m_txn.setDone();
         m_queue.flush();
-    }
-
-    @Override
-    public long getMpTxnId()
-    {
-        // Return the txn id from the initiate message that
-        // originated this procedure call. In the case of an
-        // every-site sysproc, this will be a MPI txnid!
-        SpTransactionState sptxn = (SpTransactionState)m_txn;
-        return sptxn.m_task.getTxnId();
     }
 
     @Override
@@ -123,8 +118,8 @@ public class SpProcedureTask extends ProcedureTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("SpProcedureTask:");
-        sb.append("  MP TXN ID: ").append(getMpTxnId());
-        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+        sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }

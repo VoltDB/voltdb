@@ -18,7 +18,9 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
@@ -150,6 +152,18 @@ public class LimitPlanNode extends AbstractPlanNode {
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
+        m_offset = jobj.getInt( Members.OFFSET.name() );
+        m_limit = jobj.getInt( Members.LIMIT.name() );
+        m_limitParameterId = jobj.getLong( Members.LIMIT_PARAM_IDX.name() );
+        m_offsetParameterId = jobj.getLong( Members.OFFSET_PARAM_IDX.name() );
+        if( !jobj.isNull(Members.LIMIT_EXPRESSION.name()) ) {
+            m_limitExpression = AbstractExpression.fromJSONObject( jobj.getJSONObject(Members.LIMIT_EXPRESSION.name()), db);
+        }
     }
 
     @Override

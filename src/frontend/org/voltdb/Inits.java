@@ -38,16 +38,19 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -343,7 +346,13 @@ public class Inits {
             }
 
             try {
-                long catalogTxnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                long catalogTxnId;
+                if (m_rvdb.isIV2Enabled()) {
+                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+                } else {
+                    catalogTxnId =
+                            org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                }
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 zk.create(
                         VoltZK.initial_catalog_txnid,
@@ -534,32 +543,44 @@ public class Inits {
         @Override
         public void run() {
             try {
+                JSONStringer js = new JSONStringer();
+                js.object();
+                js.key("role").value(m_config.m_replicationRole.ordinal());
+                js.key("active").value(m_rvdb.getReplicationActive());
+                js.endObject();
+
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 // rejoining nodes figure out the replication role from other nodes
                 if (!m_isRejoin)
                 {
                     try {
                         zk.create(
-                                VoltZK.replicationrole,
-                                m_config.m_replicationRole.toString().getBytes("UTF-8"),
+                                VoltZK.replicationconfig,
+                                js.toString().getBytes("UTF-8"),
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
-                    String discoveredReplicationRole =
-                        new String(zk.getData(VoltZK.replicationrole, false, null), "UTF-8");
-                    if (!discoveredReplicationRole.equals(m_config.m_replicationRole.toString())) {
-                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredReplicationRole +
+                    String discoveredReplicationConfig =
+                        new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
+                    JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
+                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
+                    if (!discoveredRole.equals(m_config.m_replicationRole)) {
+                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredRole +
                                 " doesn't match locally specified replication role " + m_config.m_replicationRole,
                                 true, null);
                     }
 
                     // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(ReplicationRole.valueOf(discoveredReplicationRole));
+                    m_rvdb.setReplicationRole(discoveredRole);
                 } else {
-                    String discoveredReplicationRole =
-                        new String(zk.getData(VoltZK.replicationrole, false, null), "UTF-8");
+                    String discoveredReplicationConfig =
+                            new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
+                    JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
+                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
+                    boolean replicationActive = discoveredjsObj.getBoolean("active");
                     // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(ReplicationRole.valueOf(discoveredReplicationRole));
+                    m_rvdb.setReplicationRole(discoveredRole);
+                    m_rvdb.setReplicationActive(replicationActive);
                 }
             } catch (Exception e) {
                 VoltDB.crashGlobalVoltDB("Error discovering replication role", false, e);

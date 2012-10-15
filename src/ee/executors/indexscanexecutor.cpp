@@ -71,7 +71,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     VOLT_TRACE("init IndexScan Executor");
 
     m_projectionNode = NULL;
-    m_limitNode = NULL;
 
     m_node = dynamic_cast<IndexScanPlanNode*>(abstractNode);
     assert(m_node);
@@ -131,16 +130,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     //
-    // INLINE LIMIT
-    //
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT) != NULL)
-    {
-        m_limitNode =
-            static_cast<LimitPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
-    }
-
-    //
     // Make sure that we have search keys and that they're not null
     //
     m_numOfSearchkeys = (int)m_node->getSearchKeyExpressions().size();
@@ -151,6 +140,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_needsSubstituteSearchKeyPtr =
         boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
     m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
+
+    //printf ("<INDEX SCAN> num of seach key: %d\n", m_numOfSearchkeys);
     // if (m_numOfSearchkeys == 0)
     // {
     //     VOLT_ERROR("There are no search key expressions for PlanNode '%s'",
@@ -267,11 +258,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // INLINE LIMIT
     //
-    if (m_limitNode != NULL)
-    {
-        m_limitNode->getLimitAndOffsetByReference(params, m_limitSize, m_limitOffset);
-    }
-
+    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     //
     // SEARCH KEY
@@ -291,8 +278,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
 
-            // rethow if not an overflow - currently, it's expected to always be an overflow
-            if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+            // re-throw if not an overflow or underflow
+            // currently, it's expected to always be an overflow or underflow
+            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
                 throw e;
             }
 
@@ -346,7 +334,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
-
     //
     // END EXPRESSION
     //
@@ -372,9 +359,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
-
-    int tuples_written = 0;
-    int tuples_skipped = 0;     // for offset
 
     //
     // An index scan has three parts:
@@ -407,32 +391,39 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
 
+    //printf ("<INDEX SCAN> localSortDirection: %d\n", localSortDirection);
     if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
-        bool order_by_asc = true;
-
-        if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
-            // nothing now
-        }
-        else {
-            order_by_asc = false;
-        }
-
         if (activeNumOfSearchKeys == 0) {
+            bool order_by_asc = true;
+            if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
+                // nothing now
+            }
+            else {
+                order_by_asc = false;
+            }
             m_index->moveToEnd(order_by_asc);
         }
     }
     else if (localSortDirection == SORT_DIRECTION_TYPE_INVALID && activeNumOfSearchKeys == 0) {
-        return false;
+        m_index->moveToEnd(true);
+    }
+
+    int tuple_ctr = 0;
+    int tuples_skipped = 0;     // for offset
+    int limit = -1;
+    int offset = -1;
+    if (limit_node != NULL) {
+        limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
     //
     // We have to different nextValue() methods for different lookup types
     //
-    while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-            !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
+    while ((limit == -1 || tuple_ctr < limit) &&
+           ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
+             !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
-            !(m_tuple = m_index->nextValue()).isNullTuple()))
-    {
+            !(m_tuple = m_index->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
         //
         // First check whether the end_expression is now false
@@ -452,11 +443,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             //
             // INLINE OFFSET
             //
-            if (m_limitNode != NULL && tuples_skipped < m_limitOffset)
+            if (tuples_skipped < offset)
             {
                 tuples_skipped++;
                 continue;
             }
+            tuple_ctr++;
 
             if (m_projectionNode != NULL)
             {
@@ -479,7 +471,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     }
                 }
                 m_outputTable->insertTupleNonVirtual(temp_tuple);
-                tuples_written++;
             }
             else
                 //
@@ -490,15 +481,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 // Try to put the tuple into our output table
                 //
                 m_outputTable->insertTupleNonVirtual(m_tuple);
-                tuples_written++;
-            }
-
-            //
-            // INLINE LIMIT
-            //
-            if (m_limitNode != NULL && tuples_written >= m_limitSize)
-            {
-                break;
             }
         }
     }

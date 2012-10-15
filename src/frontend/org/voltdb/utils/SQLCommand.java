@@ -64,7 +64,7 @@ public class SQLCommand
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     private static final String readme = "SQLCommandReadme.txt";
 
@@ -81,16 +81,17 @@ public class SQLCommand
         if (query == null)
             return null;
 
-        String[] command = new String[] {"exec", "execute"};
+        String[] command = new String[] {"exec", "execute", "explain", "explainproc"};
         String[] keyword = new String[] {"select", "insert", "update", "delete"};
         for(int i = 0;i<command.length;i++)
         {
-            for(int j = 0;j<command.length;j++)
+            for(int j = 0;j<keyword.length;j++)
             {
                 Pattern r = Pattern.compile("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
                 query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
             }
         }
+
         query = SingleLineComments.matcher(query).replaceAll("");
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
         Matcher stringFragmentMatcher = Extract.matcher(query);
@@ -409,6 +410,10 @@ public class SQLCommand
 
     // Query Execution
     private static final Pattern ExecuteCall = Pattern.compile("^(exec|execute) ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    // Match queries that start with "explain" (case insensitive).  We'll convert them to @Explain invocations.
+    private static final Pattern ExplainCall = Pattern.compile("^explain ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
+    private static final Pattern ExplainProcCall = Pattern.compile("^explainProc ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern StripCRLF = Pattern.compile("[\r\n]+", Pattern.MULTILINE);
     private static final Pattern IsNull = Pattern.compile("null", Pattern.CASE_INSENSITIVE);
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -547,9 +552,14 @@ public class SQLCommand
                     else if (paramType.equals("timestamp"))
                     {
                         if (IsNull.matcher(param).matches())
+                        {
                             objectParams[i] = VoltType.NULL_TIMESTAMP;
+                        }
                         else
-                            objectParams[i] = DateParser.parse(param);
+                        {
+                            // Remove any quotes around the timestamp value.  ENG-2623
+                            objectParams[i] = DateParser.parse(param.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));
+                        }
                     }
                     else if (paramType.equals("statisticscomponent"))
                     {
@@ -593,13 +603,34 @@ public class SQLCommand
             {
                 printResponse(VoltDB.updateApplicationCatalog(new File((String) objectParams[0]),
                                                               new File((String) objectParams[1])));
+
+                // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
+                Procedures.clear();
+                loadSystemProcedures();
+                loadStoredProcedures(Procedures);
             }
             else
             {
                 printResponse(VoltDB.callProcedure(procedure, objectParams));
             }
         }
-        else
+        else if (ExplainCall.matcher(query).find())
+        {
+            // We've got a query that starts with "explain", pre-pend
+            // the @Explain sp invocatino ahead of the query (after stripping "explain").
+            query = query.substring("explain ".length());
+            query = StripCRLF.matcher(query).replaceAll(" ");
+            printResponse(VoltDB.callProcedure("@Explain", query));
+        }
+        else if (ExplainProcCall.matcher(query).find())
+        {
+            // We've got a query that starts with "explainplan", pre-pend
+            // the @ExplainPlan sp invocation ahead of the query (after stripping "explainplan").
+            query = query.substring("explainProc ".length());
+            query = StripCRLF.matcher(query).replaceAll(" ");
+            printResponse(VoltDB.callProcedure("@ExplainProc", query));
+        }
+        else  // Ad hoc query
         {
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@AdHoc", query));
@@ -804,7 +835,7 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO");
+    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO", "PLANNER");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
@@ -856,6 +887,10 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@AdHoc_RW_SP",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
+        Procedures.put("@Explain",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@ExplainProc",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
     }
 
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception

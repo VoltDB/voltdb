@@ -58,6 +58,15 @@ function server() {
         license $LICENSE host $HOST
 }
 
+function exportserver() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment_export.xml \
+        license $LICENSE host $HOST
+}
+
+
 # run the client that drives the example
 function client() {
     async-benchmark
@@ -87,6 +96,7 @@ function async-benchmark() {
         --entropy=127 \
         --usecompression=false \
         --ratelimit=100000 \
+        --autotune=true \
         --latencytarget=10
 }
 

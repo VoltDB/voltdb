@@ -287,7 +287,6 @@ public class FunctionSQL extends Expression {
                     Tokens.X_KEYSET, 2, Tokens.CHARACTERS, Tokens.OCTETS,
                     Tokens.CLOSEBRACKET
                 };
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_OCCURENCES_REGEX :
@@ -316,7 +315,6 @@ public class FunctionSQL extends Expression {
                     Tokens.USING, Tokens.X_KEYSET, 2, Tokens.CHARACTERS,
                     Tokens.OCTETS, Tokens.CLOSEBRACKET
                 };
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_BIT_LENGTH :
@@ -328,7 +326,6 @@ public class FunctionSQL extends Expression {
             case FUNC_OCTET_LENGTH :
                 name      = Tokens.T_OCTET_LENGTH;
                 parseList = singleParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_CARDINALITY :
@@ -434,7 +431,6 @@ public class FunctionSQL extends Expression {
                 break;
              */
             case FUNC_TRIM_BINARY :
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
             case FUNC_TRIM_CHAR :
                 name      = Tokens.T_TRIM;
                 parseList = new short[] {
@@ -445,7 +441,7 @@ public class FunctionSQL extends Expression {
                     Tokens.X_OPTION, 1, Tokens.QUESTION,        //
                     Tokens.FROM, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
+                //voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             /*
