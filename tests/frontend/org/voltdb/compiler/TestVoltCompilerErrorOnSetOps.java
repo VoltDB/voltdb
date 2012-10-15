@@ -29,6 +29,7 @@ public class TestVoltCompilerErrorOnSetOps extends VoltCompilerErrorTest {
     public void testNoErrorOnParens() throws Exception {
         statementNonErrorTest("PARENS", "(select ival from blah);");
     }
+/*
     public void testErrorOnUnion() throws Exception {
         statementErrorTest("UNION", "(select ival from blah) union (select ival from indexed_blah);");
         statementErrorTest("UNION", "select ival from blah union select ival from indexed_blah;");
@@ -43,4 +44,5 @@ public class TestVoltCompilerErrorOnSetOps extends VoltCompilerErrorTest {
         statementErrorTest("EXCEPT", "(select ival from blah) except (select ival from indexed_blah);");
         statementErrorTest("EXCEPT", "select ival from blah except select ival from indexed_blah;");
     }
+*/
 }

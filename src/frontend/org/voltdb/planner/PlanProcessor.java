@@ -57,13 +57,13 @@ public class PlanProcessor implements Cloneable{
     /** Hints to use for planning */
     ScalarValueHints[] m_paramHints;
     /** The best cost plan after the evaluation */
-    CompiledPlan m_bestPlan;
+    CompiledPlan m_bestPlan = null;
     /** The filename for the best plan */
-    String m_bestFilename;
+    String m_bestFilename = null;
     /** Plan statistics */
-    PlanStatistics m_stats;
+    PlanStatistics m_stats = null;
     /** The id of the plan under the evaluation */
-    int m_planId;
+    int m_planId = 0;
     /** Parameters to drive the output */
     boolean m_quietPlanner;
     boolean m_fullDebug = System.getProperties().contains("compilerdebug");
@@ -95,10 +95,6 @@ public class PlanProcessor implements Cloneable{
         m_sql = sql;
         m_costModel = costModel;
         m_paramHints = paramHints;
-        m_bestPlan = null;
-        m_bestFilename = null;
-        m_stats = null;
-        m_planId = 0;
         m_quietPlanner = quietPlanner;
         m_fullDebug = fullDebug;
     }
@@ -136,7 +132,6 @@ public class PlanProcessor implements Cloneable{
      * @param rawplan
      */
    public void processPlan(CompiledPlan rawplan) {
-        double minCost = Double.MAX_VALUE;
 
         // run the set of microptimizations, which may return many plans (or not)
         List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan);
@@ -165,8 +160,7 @@ public class PlanProcessor implements Cloneable{
             String filename = String.valueOf(m_planId++);
 
             // find the minimum cost plan
-            if (plan.cost < minCost) {
-                minCost = plan.cost;
+            if (m_bestPlan == null || plan.cost < m_bestPlan.cost) {
                 // free the PlanColumns held by the previous best plan
                 m_bestPlan = plan;
                 m_bestFilename = filename;

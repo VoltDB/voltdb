@@ -25,7 +25,6 @@ import java.util.Set;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.plannodes.SchemaColumn;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
