@@ -120,7 +120,7 @@ public class LeaderAppointer implements Promotable
                     tmLog.info("Retrying partition detection snapshot...");
                     SnapshotUtil.requestSnapshot(0L,
                             m_partSnapshotSchedule.getPath(),
-                            m_partSnapshotSchedule.getPrefix(),
+                            m_partSnapshotSchedule.getPrefix() + System.currentTimeMillis(),
                             true, SnapshotFormat.NATIVE, null, m_snapshotHandler,
                             true);
                 }
@@ -500,7 +500,7 @@ public class LeaderAppointer implements Promotable
         if (partitionDetectionTriggered && !m_partitionSnapshotRequested) {
             SnapshotUtil.requestSnapshot(0L,
                     m_partSnapshotSchedule.getPath(),
-                    m_partSnapshotSchedule.getPrefix(),
+                    m_partSnapshotSchedule.getPrefix() + System.currentTimeMillis(),
                     true, SnapshotFormat.NATIVE, null, m_snapshotHandler,
                     true);
             m_partitionSnapshotRequested = true;
