@@ -373,16 +373,16 @@ public class TestCatalogDiffs extends TestCase {
     }
 
 
-    public void testAddTableColumnRejected() throws IOException {
+    public void testAddTableColumn() throws IOException {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testRemoveTableColumnRejected() throws IOException {
+    public void testRemoveTableColumn() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumnrejected2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumnrejected1");
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testAddUniqueCoveringTableIndex() throws IOException {
@@ -518,7 +518,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testRemoveTableConstraintRejected() throws IOException {
+    public void testRemoveTableConstraint() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with the primary key
@@ -532,7 +532,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "dropconstraint2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dropconstraint2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testAddMaterializedViewRejected() throws IOException {

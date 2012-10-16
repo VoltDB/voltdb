@@ -20,6 +20,7 @@ package org.voltdb.catalog;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.voltdb.VoltType;
 import org.voltdb.types.ConstraintType;
 
 public class CatalogDiffEngine {
@@ -131,6 +132,61 @@ public class CatalogDiffEngine {
     }
 
     /**
+     * @param oldType The old type of the column.
+     * @param oldSize The old size of the column.
+     * @param newType The new type of the column.
+     * @param newSize The new size of the column.
+     *
+     * @return True if the change from one column type to another is possible
+     * to do live without failing or truncating any data.
+     */
+    private boolean checkIfColumnTypeChangeIsSupported(VoltType oldType, int oldSize,
+                                                       VoltType newType, int newSize)
+    {
+        // increases in size are cool; shrinks not so much
+        if (oldType == newType) {
+            return (oldSize <= newSize);
+        }
+
+        // allow people to convert timestamps to longs
+        // (this is useful if they accidentally put millis instead of micros in there)
+        if ((oldType == VoltType.TIMESTAMP) && (newType == VoltType.BIGINT)) {
+            return true;
+        }
+
+        // allow integer size increased
+        if (oldType == VoltType.INTEGER) {
+            if (newType == VoltType.BIGINT) {
+                return true;
+            }
+        }
+        if (oldType == VoltType.SMALLINT) {
+            if ((newType == VoltType.BIGINT) ||
+                (newType == VoltType.INTEGER)) {
+                return true;
+            }
+        }
+        if (oldType == VoltType.TINYINT) {
+            if ((newType == VoltType.BIGINT) ||
+                (newType == VoltType.INTEGER) ||
+                (newType == VoltType.SMALLINT)) {
+                return true;
+            }
+        }
+
+        // allow lossless conversion to double from ints < mantissa size
+        if (newType == VoltType.FLOAT) {
+            if ((newType == VoltType.INTEGER) ||
+                (newType == VoltType.SMALLINT) ||
+                (newType == VoltType.TINYINT)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @return true if the CatalogType can be dynamically added or removed
      * from a running system.
      */
@@ -194,6 +250,8 @@ public class CatalogDiffEngine {
                 return true;
             if (suspect instanceof SnapshotSchedule)
                 return true;
+            if (suspect instanceof Column)
+                return true;
 
             // refs are safe to add drop if the thing they reference is
             if (suspect instanceof ConstraintRef)
@@ -212,7 +270,7 @@ public class CatalogDiffEngine {
      * @return true if CatalogType can be dynamically modified
      * in a running system.
      */
-    boolean checkModifyWhitelist(CatalogType suspect, String field) {
+    boolean checkModifyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
         // should generate this from spec.txt
         CatalogType orig = suspect;
 
@@ -223,6 +281,36 @@ public class CatalogDiffEngine {
             return true;
         if (suspect instanceof Constraint && field.equals("index"))
             return true;
+        if (suspect instanceof Table && field.equals("signature"))
+            return true;
+
+        // whitelist certain column changes
+        if (suspect instanceof Column) {
+            if (field.equals("index"))
+                return true;
+            if (field.equals("defaultvalue"))
+                return true;
+            if (field.equals("defaulttype"))
+                return true;
+            if (field.equals("nullable")) {
+                Boolean nullable = (Boolean) suspect.getField(field);
+                assert(nullable != null);
+                if (nullable) return true;
+            }
+            if (field.equals("type") || field.equals("size")) {
+                int oldTypeInt = (Integer) prevType.getField("type");
+                int newTypeInt = (Integer) suspect.getField("type");
+                int oldSize = (Integer) prevType.getField("size");
+                int newSize = (Integer) suspect.getField("size");
+
+                VoltType oldType = VoltType.get((byte) oldTypeInt);
+                VoltType newType = VoltType.get((byte) newTypeInt);
+
+                if (checkIfColumnTypeChangeIsSupported(oldType, oldSize, newType, newSize)) {
+                    return true;
+                }
+            }
+        }
 
         // Support modification of these entire sub-trees
         do {
@@ -244,9 +332,9 @@ public class CatalogDiffEngine {
     /**
      * Add a modification
      */
-    private void writeModification(CatalogType newType, String field)
+    private void writeModification(CatalogType newType, CatalogType prevType, String field)
     {
-        checkModifyWhitelist(newType, field);
+        checkModifyWhitelist(newType, prevType, field);
         newType.writeCommandForField(m_sb, field, true);
     }
 
@@ -295,7 +383,7 @@ public class CatalogDiffEngine {
             Object prevValue = prevType.getField(field);
             Object newValue = newType.getField(field);
             if ((prevValue == null) != (newValue == null)) {
-                writeModification(newType, field);
+                writeModification(newType, prevType, field);
             }
             // if they're both not null (above/below ifs implies this)
             else if (prevValue != null) {
@@ -305,13 +393,13 @@ public class CatalogDiffEngine {
                     String prevPath = ((CatalogType) prevValue).getPath();
                     String newPath = ((CatalogType) newValue).getPath();
                     if (prevPath.compareTo(newPath) != 0) {
-                        writeModification(newType, field);
+                        writeModification(newType, prevType, field);
                     }
                 }
                 // if scalar types
                 else {
                     if (prevValue.equals(newValue) == false) {
-                        writeModification(newType, field);
+                        writeModification(newType, prevType, field);
                     }
                 }
             }
