@@ -65,6 +65,12 @@ public class EveryPartitionTask extends TransactionTask
     }
 
     @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException("MPI asked to execute everysite proc from task log while rejoining.");
+    }
+
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();

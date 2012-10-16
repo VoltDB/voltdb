@@ -82,6 +82,12 @@ public class SysprocFragmentTask extends TransactionTask
         m_initiator.deliver(response);
     }
 
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException("Not implemented: replay sysproc during live rejoin.");
+    }
+
 
     // Extracted the sysproc portion of ExecutionSite processFragmentTask(), then
     // modifed to work in the new world

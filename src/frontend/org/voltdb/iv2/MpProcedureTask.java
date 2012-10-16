@@ -92,6 +92,12 @@ public class MpProcedureTask extends ProcedureTask
     }
 
     @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException("MP procedure task asked to run from tasklog on rejoining site.");
+    }
+
+    @Override
     void completeInitiateTask(SiteProcedureConnection siteConnection)
     {
         CompleteTransactionMessage complete = new CompleteTransactionMessage(

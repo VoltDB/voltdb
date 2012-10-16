@@ -38,6 +38,16 @@ public class FragmentTask extends TransactionTask
     final FragmentTaskMessage m_task;
     final Map<Integer, List<VoltTable>> m_inputDeps;
 
+    // This constructor is used during live rejoin log replay.
+    FragmentTask(FragmentTaskMessage message, ParticipantTransactionState txnState) {
+        this(null,
+            txnState,
+            null,
+            message,
+            null);
+    }
+
+    // This constructor is used during normal operation.
     FragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
                  TransactionTaskQueue queue,
@@ -81,6 +91,24 @@ public class FragmentTask extends TransactionTask
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
         m_initiator.deliver(response);
+    }
+
+    /**
+     * Run for replay after a live rejoin snapshot transfer.
+     */
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        // Set the begin undo token if we haven't already
+        // In the future we could record a token per batch
+        // and do partial rollback
+        if (!m_txn.isReadOnly()) {
+            if (m_txn.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+            }
+        }
+        // ignore response.
+        processFragmentTask(siteConnection);
     }
 
 

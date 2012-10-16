@@ -95,6 +95,7 @@ public class SpProcedureTask extends ProcedureTask
     // This is an ugly copy/paste mix of run() and completeInitiateTask()
     // that avoids using the mailbox -- since no response should be
     // generated...
+    @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
         hostLog.fatal("START replaying txn: " + this);

@@ -44,6 +44,8 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 
+import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
@@ -523,7 +525,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     void replayFromTaskLog() throws IOException
     {
-        for (int i=0; i < 10 /* REJOIN::REAL RATIO */; ++i) {
+        ParticipantTransactionState mpTxn = null;
+        // replay 10::1 in favor of replay and never stop replaying
+        // in the middle of a multi-part transaction.
+        for (int i=1; mpTxn != null || i > 10; ++i) {
             if (m_rejoinTaskLog.isEmpty()) {
                 return;
             }
@@ -538,6 +543,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m, null);
                 t.runFromTaskLog(this);
+            }
+            else if (tibm instanceof FragmentTaskMessage) {
+                FragmentTaskMessage m = (FragmentTaskMessage)tibm;
+                mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
+                FragmentTask t = new FragmentTask(m, mpTxn);
+                t.runFromTaskLog(this);
+            }
+            else if (tibm instanceof CompleteTransactionMessage) {
+                CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
+                CompleteTransactionTask t = new CompleteTransactionTask(mpTxn, null, m, null);
+                t.runFromTaskLog(this);
+                mpTxn = null;
+            }
+            else {
+                VoltDB.crashLocalVoltDB("Can not replay message type " +
+                        tibm + " during live rejoin. Unexpected error.",
+                        false, null);
             }
         }
     }
@@ -830,6 +852,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // live rejoin, will transfer to kStateRunning as usual
         // as the rejoin task log will be empty.
         assert(m_rejoinState == kStateRejoining);
+
+        if (replayComplete == null) {
+            try {
+                throw new RuntimeException("Null Replay Complete Action!?");
+            }
+            catch (RuntimeException e) {
+                System.out.println("Null replay complete action !?");
+                e.printStackTrace();
+            }
+        }
+
         m_rejoinState = kStateReplayingRejoin;
         m_replayCompletionAction = replayComplete;
         if (m_rejoinTaskLog != null) {
