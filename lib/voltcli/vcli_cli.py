@@ -30,6 +30,7 @@ __author__ = 'scooper'
 import sys
 import optparse
 import shlex
+import copy
 
 import vcli_util
 
@@ -38,182 +39,239 @@ import vcli_util
 # Individual option variables are added by the option parser. They are available
 # externally as module attributes.
 
+#===============================================================================
 class ParsedCommand(object):
-    def __init__(self, outer_parser, outer_opts, inner_parser, inner_opts, inner_args, verb):
+#===============================================================================
+    """
+    Holds the result of parsing a CLI command.
+    """
+    def __init__(self, outer_parser, outer_opts, parser, opts, args, verb):
         self.outer_parser = outer_parser
         self.outer_opts   = outer_opts
-        self.inner_opts   = inner_opts
-        self.inner_args   = inner_args
-        self.inner_parser = inner_parser
+        self.opts         = opts
+        self.args         = args
+        self.parser       = parser
         self.verb         = verb
+    def __str__(self):
+        return 'ParsedCommand: %s | %s %s %s' % (self.outer_opts, self.verb.name,
+                                                 self.opts, self.args)
 
+#===============================================================================
+class VoltCLICommandPreprocessor(object):
+#===============================================================================
+    """
+    This class knows how to iterate the outer options and find the verb.
+    It can do simplistic parsing of the outer options to allow early option
+    checking before the full command line is parsed. This allows the parsing
+    process itself to display debug messages.
+    """
+    def __init__(self, cli_options):
+        """
+        Command line preprocessor constructor. Initializes metadata.
+        """
+        self.cli_options = cli_options
+        # Determine which options require arguments.
+        self.arg_opts = set()
+        for cli_option in cli_options:
+            if (not 'action' in cli_option.kwargs or cli_option.kwargs['action'] == 'store'):
+                for opt in cli_option.args:
+                    arg_opts.add(opt)
+        # Clear the parsed data.
+        self.clear()
+
+    def clear(self):
+        """
+        Clear the parsed data.
+        """
+        self.cmdargs       = []
+        self.iverb         = 0
+        self.option_values = []
+        self.outer_opts    = []
+        self.verb_cmdargs = []
+        self.verb          = None
+        
+    def preprocess(self, cmdargs):
+        """
+        Preprocess the command line. Populate verb and option data.
+        """
+        self.clear()
+        self.cmdargs = cmdargs
+        iopt = 0
+        while iopt < len(self.cmdargs):
+            if not self.cmdargs[iopt].startswith('-'):
+                # Found the verb - we're done.
+                break
+            if self.cmdargs[iopt] in self.arg_opts:
+                # Option with argument
+
+                self.option_values.append((self.cmdargs[iopt], self.cmdargs[iopt+1]))
+                iopt += 2
+            else:
+                # Boolean option
+                self.option_values.append((self.cmdargs[iopt], True))
+                iopt += 1
+        self.iverb = iopt
+        self.outer_opts = list(self.cmdargs[:self.iverb])
+        if iopt < len(cmdargs):
+            self.verb = self.cmdargs[self.iverb]
+            self.verb_cmdargs = list(self.cmdargs[self.iverb+1:])
+
+    def get_option(self, *names):
+        """
+        Get an option value or None if not set. Allow multiple option names.
+        When multiple values exist the last one wins.
+        """
+        ret_value = None
+        for name, value in self.option_values:
+            if name in names:
+                if value is not None:
+                    ret_value = value
+        return ret_value
+
+#===============================================================================
 class VoltCLICommandProcessor(optparse.OptionParser):
+#===============================================================================
     '''
     Bi-level argument/option parsing and validation class. Handles both global
     and verb-specific arguments and options.
     '''
 
-    def __init__(self, verbs, options_spec, aliases, usage, description, version):
-        self.verbs        = verbs
-        self.options_spec = options_spec
-        self.aliases      = aliases
-        full_usage        = '%s\n' % usage
-        for verb in verbs:
-            full_usage += '\n       %%prog %s %s' % (verb.name, verb.metadata.usage)
+    def __init__(self, verbs, cli_options, usage, description, version):
+        """
+        Command line processor constructor.
+        """
+        self.verbs       = verbs
+        self.verb_names  = verbs.keys()
+        self.cli_options = cli_options
+        self.preproc     = VoltCLICommandPreprocessor(self.cli_options)
+        full_usage       = '%s\n' % usage
+        self.verb_names.sort()
+        if verbs:
+            for verb_name in self.verb_names:
+                verb = self.verbs[verb_name]
+                full_usage += '\n       %%prog %s %s' % (verb.name, verb.cli_spec.usage)
         optparse.OptionParser.__init__(self,
             description = description,
             usage       = full_usage,
             version     = version)
-        for option_spec in self.options_spec:
-            self.add_option(*option_spec.args, **option_spec.kwargs)
+        for cli_option in self.cli_options:
+            self.add_option(*cli_option.args, **cli_option.kwargs)
+
+    def create_verb_parser(self, verb):
+        """
+        Create a CLI option parser for the verb command line.
+        """
+        # Parse the command-specific options.
+        parser = optparse.OptionParser(description = verb.cli_spec.description,
+                                       usage = '%%prog %s %s' % (verb.name, verb.cli_spec.usage))
+        if self.preproc.verb:
+            if verb.cli_spec.cli_options:
+                for cli_option in verb.cli_spec.cli_options:
+                    parser.add_option(*cli_option.args, **cli_option.kwargs)
+        return parser
 
     def parse(self, cmdargs):
+        """
+        Parse a command line.
+        """
 
         # Separate the global options preceding the command from
         # command-specific options that follow it.
-        iverb = 0
-        allow_no_command = False
-        while iverb < len(cmdargs):
-            # Skip options and any associated option arguments.
-            if cmdargs[iverb].startswith('-'):
-                # Special detection of help and version options allows a command
-                # line with no arguments to pass for those options.
-                if cmdargs[iverb] in ('-h', '--help', '--version'):
-                    allow_no_command = True
-                for option_spec in self.options_spec:
-                    if cmdargs[iverb] in option_spec.args:
-                        # Skip the argument of an option that takes one
-                        if (not 'action' in option_spec.kwargs or option_spec.kwargs['action'] == 'store'):
-                            iverb += 1
-            else:
-                # Found the command.
-                break
-            iverb += 1
-        if iverb == len(cmdargs) and not allow_no_command:
-            self._abort('Missing command.')
-
-        # Parse the global options. args should be empty
-        outer_opts, outer_args = optparse.OptionParser.parse_args(self, list(cmdargs[:iverb]))
-        assert len(outer_args) == 0
-
-        # Resolve an alias (not recursive).
-        verb_name = cmdargs[iverb].lower()
-        if verb_name in self.aliases:
-            # Use shell-style splitting to get mapped verb and arguments.
-            alias_tokens = shlex.split(self.aliases[verb_name])
-            if len(alias_tokens) == 0:
-                self._abort('Missing alias definition for "%s"' % verb_name)
-            # The first token is the mapped verb
-            verb_name = alias_tokens[0]
-            # Prepend the remaing arguments to the command line arguments.
-            if len(alias_tokens) > 1:
-                outer_args = alias_tokens[1:] + outer_args
+        # Allow no verb for help and version requests.
+        self.preproc.preprocess(cmdargs)
+        allow_no_verb = (self.preproc.get_option('-h', '--help', '--version') is not None)
+        if self.preproc.verb is None and not allow_no_verb:
+            self._abort('No verb was specified.')
 
         # See if we know about the verb.
-        verb = None
-        for verb_chk in self.verbs:
-            if verb_chk.name == verb_name:
-                verb = verb_chk
-                break
-        else:
-            self._abort('Unknown command: %s' % verb_name)
+        if self.preproc.verb not in self.verbs:
+            self._abort('Unknown command: %s' % self.preproc.verb)
+        verb = self.verbs[self.preproc.verb]
+
+        # Parse the global options. args should be empty
+        outer_opts, outer_args = optparse.OptionParser.parse_args(self, self.preproc.outer_opts)
+        assert len(outer_args) == 0
 
         # Parse the command-specific options.
-        inner_parser = optparse.OptionParser(
-                description = verb.metadata.description,
-                usage = '%%prog %s %s' % (verb.name, verb.metadata.usage))
-        if iverb < len(cmdargs):
-            if verb.metadata.options_spec:
-                for option_spec in verb.metadata.options_spec:
-                    inner_parser.add_option(*option_spec.args, **option_spec.kwargs)
-            if verb.metadata.passthrough:
+        verb_parser = self.create_verb_parser(verb)
+        if self.preproc.verb:
+            if verb.cli_spec.passthrough:
                 # Provide all options and arguments without processing the options.
                 # E.g. Java programs want to handle all the options without interference.
-                inner_args = cmdargs[iverb+1:]
-                inner_opts = None
+                verb_args = self.preproc.verb_cmdargs
+                verb_opts = None
             else:
-                # Parse the inner command line.
-                inner_opts, inner_args = inner_parser.parse_args(list(cmdargs[iverb+1:]))
+                # Parse the verb command line.
+                verb_opts, verb_args = verb_parser.parse_args(self.preproc.verb_cmdargs)
         else:
-            inner_opts = None
-            inner_args = []
+            verb_opts = None
+            args = []
 
-        return ParsedCommand(self, outer_opts, inner_parser, inner_opts, inner_args, verb)
+        return ParsedCommand(self, outer_opts, verb_parser, verb_opts, verb_args, verb)
+
+    def format_epilog(self, formatter):
+        """
+        OptionParser hook that allows us to append subcommand descriptions to
+        the help message.
+        """
+        rows = []
+        for verb_name in self.verb_names:
+            verb = self.verbs[verb_name]
+            rows.append((verb.name, verb.cli_spec.description))
+        return '\n%s' % vcli_util.format_table("Subcommand Descriptions", None, rows)
 
     def _abort(self, *msgs):
         vcli_util.error(*msgs)
         sys.stdout.write('\n')
         self.print_help()
-        sys.stdout.write('\n')
-        sys.stderr.write('\n')
+        sys.stdout.write('\n\n')
         vcli_util.abort()
 
-    def format_epilog(self, formatter):
-        rows = ((verb.name, verb.metadata.description) for verb in self.verbs)
-        return '\n%s' % vcli_util.format_table("Subcommand Descriptions", None, rows)
-
-#### CLI metadata class
-
+#===============================================================================
 class CLISpec(object):
+#===============================================================================
     def __init__(self, **kwargs):
-        if 'description' not in kwargs:
-            self.description = '(description missing)'
-        if 'usage' not in kwargs:
-            self.usage = ''
         self._kwargs = kwargs
+        # Provide a default description
+        if 'description' not in self._kwargs:
+            self._kwargs['description'] = '(description missing)'
+        # Make sure usage is a string, even if empty.
+        if 'usage' not in self._kwargs:
+            self._kwargs['usage'] = ''
+        # Make sure cli_options is a flat list.
+        if 'cli_options' in self._kwargs:
+            self._kwargs['cli_options'] = vcli_util.flatten_to_list(self._kwargs['cli_options'])
+        else:
+            self._kwargs['cli_options'] = []
     def __getattr__(self, name):
         return self._kwargs.get(name, None)
+    def __str__(self):
+        s = 'CLISpec: [\n'
+        keys = self._kwargs.keys()
+        keys.sort()
+        for key in keys:
+            s += '   %s: %s\n' % (key, vcli_util.to_display_string(self._kwargs[key]))
+        s += ']'
+        return s
 
-#### CLI option class
-
+#===============================================================================
 class CLIOption(object):
+#===============================================================================
+    """
+    General CLI option specification (uses optparse keywords for now).
+    """
     def __init__(self, *args, **kwargs):
         self.args   = args
         self.kwargs = kwargs
+    def __str__(self):
+        return '%s(%s %s)' % (self.__class__.__name__, self.args, self.kwargs)
 
-#### Verb class
-
-class Verb(object):
+#===============================================================================
+class CLIBoolean(CLIOption):
+#===============================================================================
     """
-    Base class for verb implementations that provide the available sub-commands.
+    Boolean CLI option.
     """
-    def __init__(self, name, **kwargs):
-        self.name     = name
-        self.metadata = CLISpec(**kwargs)
-    def execute(self, runner):
-        vcli_util.abort('%s "%s" object does not implement the required execute() method.'
-                            % (self.__class__.__name__, self.name))
-    def __cmp__(self, other):
-        return cmp(self.name, other.name)
-    def help(self, runner):
-        runner.help(self.name)
-
-#### FunctionVerb class
-
-class FunctionVerb(Verb):
-    """
-    Verb that wraps any function. Used by @VOLT.Command decorator.
-    """
-    def __init__(self, name, function, **kwargs):
-        Verb.__init__(self, name, **kwargs)
-        self.function = function
-    def execute(self, runner):
-        self.function(runner)
-
-#### JavaFunctionVerb class
-
-class JavaFunctionVerb(Verb):
-    """
-    Verb that wraps any function implemented in Java. Used by @JavaCommand decorator.
-    """
-    def __init__(self, name, java_class, function, **kwargs):
-        Verb.__init__(self, name, **kwargs)
-        self.java_class         = java_class
-        self.function           = function
-        self.java_opts_override = kwargs.get('java_opts_override', None)
-    def execute(self, runner):
-        runner.set_go_default(self.go)
-        self.function(runner)
-    def go(self, runner, *args):
-        java_args = list(args) + list(runner.args)
-        runner.java(self.java_class, self.java_opts_override, *java_args)
+    def __init__(self, short_opt, long_opt, dest, help_msg):
+        CLIOption.__init__(self, short_opt, long_opt, action = 'store_true', dest = dest,
+                                 help = help_msg)

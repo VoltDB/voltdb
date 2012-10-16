@@ -1,3 +1,7 @@
+# Bugs
+
+* -d debug display option doesn't seem to work, e.g. in Verb constructor.
+
 # TO-DO List for New Volt CLI
 
 * Daemon process management for servers.

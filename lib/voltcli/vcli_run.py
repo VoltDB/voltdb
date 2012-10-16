@@ -51,15 +51,15 @@ usually available by running the subcommand with no additional arguments or
 followed by the -h option.
 ''',
     usage = '%prog [OPTIONS] COMMAND [ARGUMENTS ...]',
-    options_spec = (
-        vcli_cli.CLIOption('-d', '--debug', action = 'store_true', dest = 'debug',
-                       help = 'display debug messages'),
-        vcli_cli.CLIOption('-n', '--dry-run', action = 'store_true', dest = 'dryrun',
-                       help = 'dry run displays actions without executing them'),
-        vcli_cli.CLIOption('-p', '--pause', action = 'store_true', dest = 'pause',
-                       help = 'pause before significant actions'),
-        vcli_cli.CLIOption('-v', '--verbose', action = 'store_true', dest = 'verbose',
-                       help = 'display verbose messages, including external command lines'),
+    cli_options = (
+        vcli_cli.CLIBoolean('-d', '--debug', 'debug',
+                            'display debug messages'),
+        vcli_cli.CLIBoolean('-n', '--dry-run', 'dryrun',
+                            'display actions without executing them'),
+        vcli_cli.CLIBoolean('-p', '--pause', 'pause',
+                            'pause before significant actions'),
+        vcli_cli.CLIBoolean('-v', '--verbose', 'verbose',
+                            'display verbose messages, including external command lines'),
     )
 )
 
@@ -124,23 +124,93 @@ class JavaRunner(object):
                           '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
 #===============================================================================
+class Verb(object):
+#===============================================================================
+    """
+    Base class for verb implementations that provide the available sub-commands.
+    """
+    def __init__(self, name, **kwargs):
+        self.name     = name
+        self.cli_spec = vcli_cli.CLISpec(**kwargs)
+        vcli_util.debug(str(self))
+    def execute(self, runner):
+        vcli_util.abort('%s "%s" object does not implement the required execute() method.'
+                            % (self.__class__.__name__, self.name))
+    def __cmp__(self, other):
+        return cmp(self.name, other.name)
+    def __str__(self):
+        return '%s: %s\n%s' % (self.__class__.__name__, self.name, self.cli_spec)
+
+#===============================================================================
+class FunctionVerb(Verb):
+#===============================================================================
+    """
+    Verb that wraps a function. Used by @VOLT.Command decorator.
+    """
+    def __init__(self, name, function, **kwargs):
+        Verb.__init__(self, name, **kwargs)
+        self.function = function
+    def execute(self, runner):
+        self.function(runner)
+
+#===============================================================================
+class JavaFunctionVerb(Verb):
+#===============================================================================
+    """
+    Verb that wraps a function implemented in Java. Used by @VOLT.Java_Command
+    decorator.
+    """
+    def __init__(self, name, java_class, function, **kwargs):
+        Verb.__init__(self, name, **kwargs)
+        self.java_class         = java_class
+        self.function           = function
+        self.java_opts_override = kwargs.get('java_opts_override', None)
+    def execute(self, runner):
+        runner.set_go_default(self.go)
+        self.function(runner)
+    def go(self, runner, *args):
+        java_args = list(args) + list(runner.args)
+        runner.java(self.java_class, self.java_opts_override, *java_args)
+
+#===============================================================================
+class HelpVerb(Verb):
+#===============================================================================
+    """
+    Verb to provide standard help. Used by @VOLT.Help decorator.
+    """
+    def __init__(self, name, function, **kwargs_in):
+        kwargs = copy.copy(kwargs_in)
+        if 'description' not in kwargs:
+            kwargs['description'] = 'Display command help'
+        if 'usage' not in kwargs:
+            kwargs['usage'] = '[COMMAND ...]'
+        Verb.__init__(self, name, **kwargs)
+        self.function = function
+    def execute(self, runner):
+        runner.set_go_default(self.go)
+        self.function(runner)
+    def go(self, runner, *args):
+        runner.help(*runner.args)
+
+#===============================================================================
 class VerbRunner(object):
 #===============================================================================
 
-    def __init__(self, command, verbspace, config):
+    def __init__(self, command, verbspace, config, cli_processor):
         """
         VerbRunner constructor.
         """
         # Unpack the command object for use by command implementations.
         self.verb   = command.verb
-        self.opts   = command.inner_opts
-        self.args   = command.inner_args
-        self.parser = command.inner_parser
+        self.opts   = command.opts
+        self.args   = command.args
+        self.parser = command.parser
         # The verbspace supports running nested commands.
-        self.verbspace    = verbspace
-        self.config       = config
-        self.go_default   = None
-        self.project_path = os.path.join(os.getcwd(), 'project.xml')
+        self.verbspace     = verbspace
+        self.config        = config
+        self.cli_processor = cli_processor
+        self.go_default    = None
+        self.project_path  = os.path.join(os.getcwd(), 'project.xml')
 
     def shell(self, *args):
         """
@@ -178,28 +248,30 @@ class VerbRunner(object):
         """
         Display help for command.
         """
-        for name in args:
-            for verb in self.verbspace.verbs:
-                if verb.name == name:
-                    print ''
-                    parser = optparse.OptionParser(
-                            description = verb.metadata.description,
-                            usage = '%%prog %s %s' % (verb.name, verb.metadata.usage))
-                    parser.print_help()
-                    print ''
-                    if verb.metadata.description2:
-                        print verb.metadata.description2.strip()
-                    break
-            else:
-                vcli_util.error('Verb "%s" was not found.' % verb.name)
+        if args:
+            for name in args:
+                for verb_name in self.verbspace.verb_names:
+                    if verb_name == name:
+                        verb = self.verbspace.verbs[name]
+                        parser = self.cli_processor.create_verb_parser(verb)
+                        sys.stdout.write('\n')
+                        parser.print_help()
+                        sys.stdout.write('\n')
+                        if verb.cli_spec.description2:
+                            sys.stdout.write('%s\n' % verb.cli_spec.description2.strip())
+                        break
+                else:
+                    vcli_util.error('Verb "%s" was not found.' % verb.name)
+        else:
+            self.usage()
 
     def usage(self, *args):
         """
         Display usage screen.
         """
-        print ''
-        self.parser.print_help()
-        print ''
+        sys.stdout.write('\n')
+        self.cli_processor.print_help()
+        sys.stdout.write('\n')
 
     def set_go_default(self, go_default):
         """
@@ -207,13 +279,13 @@ class VerbRunner(object):
         """
         self.go_default = go_default
 
-    def go(self, verb, *args):
+    def go(self, *args):
         """
         Default go action provided by Verb object.
         """
         if self.go_default is None:
             vcli_util.abort('Verb "%s" (class %s) does not provide a default go action.'
-                                % (verb.name, verb.__class__.__name__))
+                                % (self.verb.name, self.verb.__class__.__name__))
         else:
             self.go_default(self, *args)
 
@@ -228,21 +300,30 @@ class VerbDecorators(object):
     """
 
     def __init__(self, verbs):
+        """
+        Constructor. The verbs argument is the dictionary to populate with
+        discovered Verb objects. It maps verb name to Verb object.
+        """
         self.verbs = verbs
 
-    # @VOLT.Command decorator
-    # Decorator invocation must have an argument list, even if empty.
     def Command(self, *args, **kwargs):
+        """
+        @VOLT.Command decorator
+        Decorator invocation must have an argument list, even if empty.
+        """
         def inner_decorator(function):
             def wrapper(*args, **kwargs):
                 function(*args, **kwargs)
-            self.verbs.append(vcli_cli.FunctionVerb(function.__name__, wrapper, *args, **kwargs))
+            verb = FunctionVerb(function.__name__, wrapper, *args, **kwargs)
+            self.verbs[verb.name] = verb
             return wrapper
         return inner_decorator
 
-    # @VOLT.Java_Command decorator
-    # Decorator invocation must have an argument list, even if empty.
     def Java_Command(self, java_class, *args, **kwargs):
+        """
+        @VOLT.Java_Command decorator
+        Decorator invocation must have an argument list, even if empty.
+        """
         def inner_decorator(function):
             def wrapper(*args, **kwargs):
                 function(*args, **kwargs)
@@ -254,7 +335,21 @@ class VerbDecorators(object):
                 kwargs['description'] += ' %s' % extra_help
             else:
                 kwargs['description'] = extra_help
-            self.verbs.append(vcli_cli.JavaFunctionVerb(function.__name__, java_class, wrapper, *args, **kwargs))
+            verb = JavaFunctionVerb(function.__name__, java_class, wrapper, *args, **kwargs)
+            self.verbs[verb.name] = verb
+            return wrapper
+        return inner_decorator
+
+    def Help(self, *args, **kwargs):
+        """
+        @VOLT.Help decorator
+        Decorator invocation must have an argument list, even if empty.
+        """
+        def inner_decorator(function):
+            def wrapper(*args, **kwargs):
+                function(*args, **kwargs)
+            verb = HelpVerb(function.__name__, wrapper, *args, **kwargs)
+            self.verbs[verb.name] = verb
             return wrapper
         return inner_decorator
 
@@ -270,7 +365,8 @@ class VerbSpace(object):
         self.description = description
         self.VOLT        = VOLT
         self.verbs       = verbs
-        self.verbs.sort(cmp = lambda x, y: cmp(x.name, y.name))
+        self.verb_names  = self.verbs.keys()
+        self.verb_names.sort()
 
 #===============================================================================
 class VOLT(object):
@@ -283,37 +379,9 @@ class VOLT(object):
         for name, function in inspect.getmembers(verb_decorators, inspect.ismethod):
             if not name.startswith('_'):
                 setattr(self, name, function)
-        self.CLIOption = vcli_cli.CLIOption
-        self.java = java_runner
-
-#===============================================================================
-def main(version, description):
-#===============================================================================
-    """
-    Called by running script to execute command with command line arguments.
-    """
-    # Initialize the environment
-    vcli_env.initialize(version)
-
-    # Load the configuration and state
-    permanent_path = os.path.join(os.getcwd(), 'volt.cfg')
-    local_path     = os.path.join(os.getcwd(), 'volt_local.cfg')
-    config = VoltConfig(permanent_path, local_path)
-
-    # Search for modules based on both this file's and the calling script's location.
-    command_dir, command_name = os.path.split(os.path.realpath(sys.argv[0]))
-    verbspace = load_verbspace(command_name, command_dir, config, version, description)
-
-    # Make internal commands available to user commands via the VOLT namespace.
-    if command_name not in internal_commands:
-        for internal_command in internal_commands:
-            internal_verbspace = load_verbspace(internal_command, None, config, version,
-                                                'Internal "%s" command' % internal_command)
-            tool_runner = ToolRunner(internal_verbspace, config)
-            setattr(verbspace.VOLT, internal_command, tool_runner)
-
-    # Run the command
-    run_command(verbspace, config, *sys.argv[1:])
+        self.CLIOption  = vcli_cli.CLIOption
+        self.CLIBoolean = vcli_cli.CLIBoolean
+        self.java       = java_runner
 
 #===============================================================================
 def load_verbspace(command_name, command_dir, config, version, description):
@@ -334,16 +402,23 @@ def load_verbspace(command_name, command_dir, config, version, description):
         classpath = ':'.join((classpath, classpath_ext))
     java_runner = JavaRunner(classpath)
 
-    # Build the VOLT namespace to provide the limited set of classes, functions
-    # and decorators needed by command implementations.
-    verbs = []
+    # Build the VOLT namespace with the specific set of classes, functions and
+    # decorators we make available to command implementations.
+    verbs = {}
     verb_decorators = VerbDecorators(verbs)
     namespace_VOLT = VOLT(verb_decorators, java_runner)
 
     # Build the verbspace by executing modules found based on the calling
     # script location and the location of this module. The executed modules
-    # have decorator calls that populate the verbs list.
+    # have decorator calls that populate the verbs dictionary.
     vcli_util.search_and_execute(search_dirs, verbs_subdir, VOLT = namespace_VOLT)
+
+    # Add the standard help verb if it wasn't supplied.
+    if 'help' not in verbs:
+        def default_help(runner):
+            runner.go()
+        verbs['help'] = HelpVerb('help', default_help)
+
     return VerbSpace(command_name, version, description, namespace_VOLT, verbs)
 
 #===============================================================================
@@ -370,14 +445,8 @@ def run_command(verbspace, config, *cmdargs):
     Run a command after parsing the command line arguments provided.
     """
     # Parse the command line.
-    aliases = {}
-    alias_dict = config.query(filter = 'alias.')
-    for key in alias_dict:
-        name = key.split('.', 2)[1]
-        aliases[name] = alias_dict[key]
     processor = vcli_cli.VoltCLICommandProcessor(verbspace.verbs,
-                                                 base_cli_spec.options_spec,
-                                                 aliases,
+                                                 base_cli_spec.cli_options,
                                                  base_cli_spec.usage,
                                                  '\n'.join((verbspace.description,
                                                             base_cli_spec.description)),
@@ -389,5 +458,41 @@ def run_command(verbspace, config, *cmdargs):
     vcli_util.set_dryrun(command.outer_opts.dryrun)
 
     # Run the command.
-    runner = VerbRunner(command, verbspace, config)
+    runner = VerbRunner(command, verbspace, config, processor)
     runner.execute()
+
+#===============================================================================
+def main(version, description):
+#===============================================================================
+    """
+    Called by running script to execute command with command line arguments.
+    """
+    # Initialize the environment
+    vcli_env.initialize(version)
+
+    # Load the configuration and state
+    permanent_path = os.path.join(os.getcwd(), 'volt.cfg')
+    local_path     = os.path.join(os.getcwd(), 'volt_local.cfg')
+    config = VoltConfig(permanent_path, local_path)
+
+    # Pre-scan for debug and dry-run options so that early code can display
+    # debug messages and prevent execution appropriately.
+    preproc = vcli_cli.VoltCLICommandPreprocessor(base_cli_spec.cli_options)
+    preproc.preprocess(sys.argv[1:])
+    vcli_util.set_debug(preproc.get_option('-d', '--debug') == True)
+    vcli_util.set_dryrun(preproc.get_option('-n', '--dry-run') == True)
+
+    # Search for modules based on both this file's and the calling script's location.
+    command_dir, command_name = os.path.split(os.path.realpath(sys.argv[0]))
+    verbspace = load_verbspace(command_name, command_dir, config, version, description)
+
+    # Make internal commands available to user commands via the VOLT namespace.
+    if command_name not in internal_commands:
+        for internal_command in internal_commands:
+            internal_verbspace = load_verbspace(internal_command, None, config, version,
+                                                'Internal "%s" command' % internal_command)
+            tool_runner = ToolRunner(internal_verbspace, config)
+            setattr(verbspace.VOLT, internal_command, tool_runner)
+
+    # Run the command
+    run_command(verbspace, config, *sys.argv[1:])

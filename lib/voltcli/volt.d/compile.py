@@ -26,17 +26,13 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(description = 'Run the VoltDB compiler to build the catalog.',
-              usage       = 'CLASSPATH PROJECT JAR')
+              cli_options = VOLT.CLIBoolean('-c', '--conditional', 'conditional',
+                                            'only build when the catalog file is missing'))
 def compile(runner):
     # Run with the default Java options from vcli_env
-    VOLT.java.execute('org.voltdb.compiler.VoltCompiler',
-                       None,
-                       runner.project_path,
-                       runner.get_catalog(),
-                       *runner.args)
-
-@VOLT.Command(description = 'Build the catalog as needed.')
-def compile_as_needed(runner):
-    catalog_jar = runner.get_catalog()
-    if not os.path.exists(catalog_jar):
-        compile(runner)
+    if not runner.opts.conditional or not runner.catalog_exists():
+        VOLT.java.execute('org.voltdb.compiler.VoltCompiler',
+                           None,
+                           runner.project_path,
+                           runner.get_catalog(),
+                           *runner.args)

@@ -25,22 +25,23 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import sys
 import vcli_util
 
 def show_config(runner, *args):
     if not args:
         # All labels.
         for (key, value) in runner.config.query_pairs():
-            print '%s=%s' % (key, value)
+            sys.stdout.write('%s=%s\n' % (key, value))
     else:
         # Specific keys requested.
         for filter in args:
             n = 0
             for (key, value) in runner.config.query_pairs(filter = filter):
-                print '%s=%s' % (key, d[key])
+                sys.stdout.write('%s=%s\n' % (key, d[key]))
                 n += 1
             if n == 0:
-                print '%s *not found*' % filter
+                sys.stdout.write('%s *not found*\n' % filter)
 
 subcommands = dict(
     config = show_config,

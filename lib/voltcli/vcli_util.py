@@ -41,22 +41,21 @@ from xml.etree import ElementTree
 __author__ = 'scooper'
 
 # Runtime options
-debug_enabled = False
-dryrun_enabled = False
+class Global:
+    debug_enabled = False
+    dryrun_enabled = False
 
 def set_debug(debug):
     """
     Enable or disable debug messages.
     """
-    global debug_enabled
-    debug_enabled = debug
+    Global.debug_enabled = debug
 
 def set_dryrun(dryrun):
     """
     Enable or disable command dry run (display only/no execution).
     """
-    global dryrun_enabled
-    dryrun_enabled = dryrun
+    Global.dryrun_enabled = dryrun
 
 def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
     """
@@ -207,7 +206,7 @@ def debug(*msgs):
     """
     Display debug message(s) if debug is enabled.
     """
-    if debug_enabled:
+    if Global.debug_enabled:
         display_messages(msgs, tag = 'DEBUG')
 
 def parse_xml(xml_path):
@@ -230,8 +229,8 @@ def run_cmd(cmd, *args):
             fullcmd += ' "%s"' % arg
         else:
             fullcmd += ' %s' % arg
-    if dryrun_enabled:
-        print fullcmd
+    if Global.dryrun_enabled:
+        sys.stdout.write('%s\n' % fullcmd)
     else:
         retcode = os.system(fullcmd)
         if retcode != 0:
@@ -250,22 +249,40 @@ def pipe_cmd(*args):
     except Exception, e:
         warning('Exception running command: %s' % ' '.join(args), e)
 
+def is_string(item):
+    """
+    Return True if the item behaves like a string.
+    """
+    try:
+        test_string = item + ''
+        return True
+    except TypeError:
+        return False
+
+def is_sequence(item):
+    """
+    Return True if the item behaves like an iterable sequence.
+    """
+    if is_string(item):
+        return False
+    try:
+        for var in item:
+            break
+        return True
+    except TypeError:
+        return False
+
 def _flatten(*items):
+    """
+    Internal function to recursively iterate a potentially nested sequence.
+    """
     for item in items:
-        try:
-            test_string = item + ''
-            # It's a string
+        if is_sequence(item):
+            for subitem in item:
+                for subsubitem in _flatten(subitem):
+                    yield subsubitem
+        else:
             yield item
-        except TypeError:
-            try:
-                test_iter = iter(item)
-                # Use recursion in case it's nested further.
-                for subitem in item:
-                    for subsubitem in _flatten(subitem):
-                        yield subsubitem
-            except TypeError:
-                # It's a non-iterable non-string
-                yield item
 
 def flatten(*items):
     """
@@ -273,6 +290,26 @@ def flatten(*items):
     """
     for item in _flatten(*items):
         yield item
+
+def flatten_to_list(*items):
+    """
+    Flatten a potentially nested list or tuple to a simple list.
+    """
+    return [item for item in flatten(*items)]
+
+def to_display_string(item):
+    """
+    Recursively convert simple items and potentially nested sequences to a
+    string, using square brackets and commas to format sequences.
+    """
+    if not is_sequence(item):
+        return str(item)
+    s = ''
+    for subitem in item:
+        if s:
+            s += ', '
+        s += to_display_string(subitem)
+    return '[%s]' % s
 
 def merge_java_options(*opts):
     """

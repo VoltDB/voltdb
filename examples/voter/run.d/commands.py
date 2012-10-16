@@ -22,15 +22,16 @@
 
 # All the commands supported by the Voter application.
 
-@VOLT.Command(description = 'Build the Voter application and catalog.')
+@VOLT.Command(description = 'Build the Voter application and catalog.',
+              cli_options = VOLT.CLIBoolean('-c', '--conditional', 'conditional',
+                                            'only build when the catalog file is missing'))
 def build(runner):
-    VOLT.java.compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
-    VOLT.volt.compile()
-
-@VOLT.Command(description = 'Build the Voter application and catalog only as needed.')
-def build_as_needed(runner):
-    if not runner.catalog_exists():
-        build(runner)
+    if not runner.opts.conditional or not runner.catalog_exists():
+        VOLT.java.compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
+    if runner.opts.conditional:
+        VOLT.volt.compile('-c')
+    else:
+        VOLT.volt.compile()
 
 @VOLT.Command(description = 'Clean the Voter build output.')
 def clean(runner):
@@ -42,20 +43,20 @@ def server(runner):
 
 @VOLT.Java_Command('voter.JDBCBenchmark', description = 'Run the Voter JDBC benchmark.')
 def jdbc(runner):
-    VOLT.run.build_as_needed()
+    VOLT.run.build('-c')
     runner.go()
 
 @VOLT.Java_Command('voter.SimpleBenchmark', description = 'Run the Voter simple benchmark.')
 def simple(runner):
-    VOLT.run.build_as_needed()
+    VOLT.run.build('-c')
     runner.go()
 
 @VOLT.Java_Command('voter.AsyncBenchmark', description = 'Run the Voter asynchronous benchmark.')
 def async(runner):
-    VOLT.run.build_as_needed()
+    VOLT.run.build('-c')
     runner.go()
 
 @VOLT.Java_Command('voter.SyncBenchmark', description = 'Run the Voter synchronous benchmark.')
 def sync(runner):
-    VOLT.run.build_as_needed()
+    VOLT.run.build('-c')
     runner.go()
