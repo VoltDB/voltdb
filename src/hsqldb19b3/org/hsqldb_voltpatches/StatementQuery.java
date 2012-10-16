@@ -212,25 +212,15 @@ public class StatementQuery extends StatementDMQL {
     
     /**
      * VoltDB added method to transform VoltXMLElement representing tuple set expression.
-     * So far only expressions with a single distinct operation are supported. Such expressions
-     * can be reduced to a single node with multiple children instead of the expression tree 
+     * So far the only transformation is to merge parent and the child union nodes with identical set operation 
      * @param unionExpr The parent UNION element
      * @param childExpr The child expression
-     * @return VoltXMLElement representing UNION element having all of its grand children
-     * as promoted to the immediate children.
+     * @return VoltXMLElement transformed UNION expression.
      * @throws HSQLParseException
      */
     VoltXMLElement voltTransformUnionXMLExpression(VoltXMLElement unionExpr, VoltXMLElement childExpr)
     throws HSQLParseException
     {
-        // @TODO MIKE
-/*        if ("union".equalsIgnoreCase(childExpr.name)) {
-            if (!unionExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
-                throw new HSQLParseException("Union expressions with distinct tuple set operations are not supported.");
-            }
-            unionExpr.children.addAll(childExpr.children);
-        } else {
-*/     
         if ("union".equalsIgnoreCase(childExpr.name) &&
             unionExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
                 unionExpr.children.addAll(childExpr.children);
