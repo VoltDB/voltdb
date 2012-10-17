@@ -199,7 +199,7 @@ public class ClientInterfaceHandleManager
             boolean readOnly,
             boolean isShortCircuitRead)
     {
-        assert(shouldCheckThreadIdAssertion() && m_expectedThreadId == Thread.currentThread().getId());
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
         }
@@ -268,7 +268,7 @@ public class ClientInterfaceHandleManager
      */
     Iv2InFlight findHandle(long ciHandle)
     {
-        assert(shouldCheckThreadIdAssertion() && m_expectedThreadId == Thread.currentThread().getId());
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         //Check read only encoded bit
         final boolean readOnly = getReadBit(ciHandle);
         //Remove read only encoding so comparison works
@@ -347,7 +347,7 @@ public class ClientInterfaceHandleManager
      * does the mapping to the resources allocated to it.
      */
     void freeOutstandingTxns() {
-        assert(shouldCheckThreadIdAssertion() && m_expectedThreadId == Thread.currentThread().getId());
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         for (PartitionData pd : m_partitionStuff.values()) {
             for (Iv2InFlight inflight : pd.m_reads) {
                 m_outstandingTxns--;
@@ -366,7 +366,7 @@ public class ClientInterfaceHandleManager
 
     List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
             Long initiatorHSId) {
-        assert(shouldCheckThreadIdAssertion() && m_expectedThreadId == Thread.currentThread().getId());
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
 
         if (!m_partitionStuff.containsKey(partitionId)) return retval;
