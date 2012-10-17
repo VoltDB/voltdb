@@ -29,7 +29,6 @@
               cli_options = VOLT.CLIBoolean('-c', '--conditional', 'conditional',
                                             'only build when the catalog file is missing'))
 def compile(runner):
-    # Run with the default Java options from vcli_env
     if not runner.opts.conditional or not runner.catalog_exists():
         VOLT.java.execute('org.voltdb.compiler.VoltCompiler',
                            None,

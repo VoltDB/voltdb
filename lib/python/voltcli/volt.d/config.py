@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2012 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -26,19 +25,23 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-__author__ = 'scooper'
-version = '0.9'
-description = 'This is the command line interface to the Voter sample application.'
+from voltcli import utility
 
-import sys
-import os
-
-sys.path.insert(0, '../../lib/python')
-
-from voltcli import runner
-
-#### Command line main
-
-if __name__ == '__main__':
-    command_dir, command_name = os.path.split(sys.argv[0])
-    runner.main(command_name, command_dir, version, description, *sys.argv[1:])
+@VOLT.Command(description = 'Configure project settings.',
+         usage       = 'KEY=VALUE ...')
+def config(runner):
+    if not runner.args:
+        utility.abort('At least one argument is required.')
+    bad = []
+    for arg in runner.args:
+        if arg.find('=') == -1:
+            bad.append(arg)
+    if bad:
+        utility.abort('Bad arguments (must be KEY=VALUE format):', bad)
+    for arg in runner.args:
+        key, value = [s.strip() for s in arg.split('=', 1)]
+        # Default to 'volt.' if simple name is given.
+        if key.find('.') == -1:
+            key = 'volt.%s' % key
+        runner.config.set_local(key, value)
+        utility.info('Configuration: %s=%s' % (key, value))

@@ -35,23 +35,32 @@ import glob
 import re
 import shlex
 
-import vcli_util
+from voltcli import utility
 
-bin_dir, bin_name = os.path.split(os.path.realpath(sys.argv[0]))
+re_voltdb_jar = re.compile('^voltdb(client)?-2[.0-9]+[.]jar$')
 
-# Add the voltcli directory to the Python module load path so that verb modules
-# can import any module from that directory.
-vcli_lib_dir = os.path.dirname(__file__)
-if vcli_lib_dir not in sys.path:
-    sys.path.insert(0, vcli_lib_dir)
+# Filled in during startup.
+version      = None
+command_dir  = None
+command_name = None
+voltdb_jar   = None
+classpath    = None
+
+# Assume that we're in a subdirectory of the main volt Python library
+# directory.  Add the containing library directory to the Python module load
+# path so that verb modules can import any module here. E.g.:
+#   from voltcli import <module>...
+volt_python = os.path.dirname(os.path.dirname(__file__))
+if volt_python not in sys.path:
+    sys.path.insert(0, volt_python)
 
 # Java configuration
 if 'JAVA_HOME' in os.environ:
     java = os.path.join(os.environ['JAVA_HOME'], 'java')
 else:
-    java = vcli_util.find_in_path('java')
+    java = utility.find_in_path('java')
 if not java:
-    vcli_util.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
+    utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
 java_opts = []
 if 'JAVA_HEAP_MAX' in os.environ:
     java_opts.append(os.environ.get('JAVA_HEAP_MAX'))
@@ -62,26 +71,18 @@ if 'JAVA_OPTS' in os.environ:
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
     java_opts.append('-Xmx1024m')
 
-# VoltDB jar file (filled in during startup)
-re_voltdb_jar = re.compile('^voltdb-2[.0-9]+[.]jar$')
-voltdb_jar = None
-
-# Classpath (filled in during startup)
-classpath = None
-
-# Version (filled in during startup)
-version = None
-
-def initialize(version_arg):
+def initialize(command_name_arg, command_dir_arg, version_arg):
     """Set the VOLTDB_HOME, VOLTDB_LIB and VOLTDB_VOLTDB environment variables
     based on the location of this script."""
 
-    global version
+    global command_name, command_dir, version
+    command_name = command_name_arg
+    command_dir = command_dir_arg
     version = version_arg
 
     dirs = [os.getcwd()]
-    if bin_dir not in dirs:
-        dirs.append(bin_dir)
+    if command_dir not in dirs:
+        dirs.append(command_dir)
 
     for dir in dirs:
 
@@ -98,7 +99,7 @@ def initialize(version_arg):
         # Also locate the voltdb jar file.
         while (dir != '/' and not env_complete()):
 
-            vcli_util.debug('Checking potential VoltDB root directory: %s' % dir)
+            utility.debug('Checking potential VoltDB root directory: %s' % dir)
 
             # Try to set VOLTDB_HOME if not set.
             if not os.environ.get('VOLTDB_HOME', ''):
@@ -108,14 +109,14 @@ def initialize(version_arg):
                             break
                     else:
                         os.environ['VOLTDB_HOME'] = os.path.realpath(os.path.join(dir, subdir))
-                        vcli_util.debug('VOLTDB_HOME=>%s' % os.environ['VOLTDB_HOME'])
+                        utility.debug('VOLTDB_HOME=>%s' % os.environ['VOLTDB_HOME'])
 
             # Try to set VOLTDB_LIB if not set.
             if not os.environ.get('VOLTDB_LIB', ''):
                 for subdir in ('lib', os.path.join('lib', 'voltdb')):
                     if glob.glob(os.path.join(os.path.join(dir, subdir), 'zmq*.jar')):
                         os.environ['VOLTDB_LIB'] = os.path.realpath(os.path.join(dir, subdir))
-                        vcli_util.debug('VOLTDB_LIB=>%s' % os.environ['VOLTDB_LIB'])
+                        utility.debug('VOLTDB_LIB=>%s' % os.environ['VOLTDB_LIB'])
 
             # Try to set VOLTDB_VOLTDB if not set. Look for the voltdb jar file.
             global voltdb_jar
@@ -127,19 +128,19 @@ def initialize(version_arg):
                             voltdb_jar = os.path.realpath(voltdb_jar_chk)
                             if not os.environ.get('VOLTDB_VOLTDB', ''):
                                 os.environ['VOLTDB_VOLTDB'] = os.path.dirname(voltdb_jar)
-                                vcli_util.debug('VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
+                                utility.debug('VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
 
             dir = os.path.dirname(dir)
 
     if voltdb_jar is None:
-        vcli_util.abort('Failed to find the VoltDB jar file.')
+        utility.abort('Failed to find the VoltDB jar file.')
 
     missing = list(required_var_set.difference(os.environ.keys()))
     if missing:
         missing.sort()
-        vcli_util.abort('Failed to establish VoltDB environment.',
+        utility.abort('Failed to establish VoltDB environment.',
                             ('You may need to perform a build.',
-                             'Initial search directory: %s' % bin_dir,
+                             'Initial search directory: %s' % command_dir,
                              'Missing locations:', missing))
 
     # LOG4J configuration
@@ -150,10 +151,10 @@ def initialize(version_arg):
                 os.environ['LOG4J_CONFIG_PATH'] = path
                 break
         else:
-            vcli_util.abort('Could not find log4j configuration file or LOG4J_CONFIG_PATH variable.')
+            utility.abort('Could not find log4j configuration file or LOG4J_CONFIG_PATH variable.')
 
     for var in ('VOLTDB_HOME', 'VOLTDB_LIB', 'VOLTDB_VOLTDB', 'LOG4J_CONFIG_PATH'):
-        vcli_util.debug('%s=%s' % (var, os.environ[var]))
+        utility.debug('%s=%s' % (var, os.environ[var]))
 
     # Classpath is the voltdb jar and all the jars in VOLTDB_LIB.
     global classpath

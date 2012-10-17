@@ -32,7 +32,7 @@ import optparse
 import shlex
 import copy
 
-import vcli_util
+from voltcli import utility
 
 # Volt CLI command processor
 
@@ -103,7 +103,6 @@ class VoltCLICommandPreprocessor(object):
                 break
             if self.cmdargs[iopt] in self.arg_opts:
                 # Option with argument
-
                 self.option_values.append((self.cmdargs[iopt], self.cmdargs[iopt+1]))
                 iopt += 2
             else:
@@ -218,14 +217,14 @@ class VoltCLICommandProcessor(optparse.OptionParser):
         for verb_name in self.verb_names:
             verb = self.verbs[verb_name]
             rows.append((verb.name, verb.cli_spec.description))
-        return '\n%s' % vcli_util.format_table("Subcommand Descriptions", None, rows)
+        return '\n%s' % utility.format_table("Subcommand Descriptions", None, rows)
 
     def _abort(self, *msgs):
-        vcli_util.error(*msgs)
+        utility.error(*msgs)
         sys.stdout.write('\n')
         self.print_help()
         sys.stdout.write('\n\n')
-        vcli_util.abort()
+        utility.abort()
 
 #===============================================================================
 class CLISpec(object):
@@ -240,7 +239,7 @@ class CLISpec(object):
             self._kwargs['usage'] = ''
         # Make sure cli_options is a flat list.
         if 'cli_options' in self._kwargs:
-            self._kwargs['cli_options'] = vcli_util.flatten_to_list(self._kwargs['cli_options'])
+            self._kwargs['cli_options'] = utility.flatten_to_list(self._kwargs['cli_options'])
         else:
             self._kwargs['cli_options'] = []
     def __getattr__(self, name):
@@ -250,7 +249,7 @@ class CLISpec(object):
         keys = self._kwargs.keys()
         keys.sort()
         for key in keys:
-            s += '   %s: %s\n' % (key, vcli_util.to_display_string(self._kwargs[key]))
+            s += '   %s: %s\n' % (key, utility.to_display_string(self._kwargs[key]))
         s += ']'
         return s
 
@@ -272,6 +271,16 @@ class CLIBoolean(CLIOption):
     """
     Boolean CLI option.
     """
-    def __init__(self, short_opt, long_opt, dest, help_msg):
+    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
         CLIOption.__init__(self, short_opt, long_opt, action = 'store_true', dest = dest,
+                                 help = help_msg, **kwargs)
+
+#===============================================================================
+class CLIValue(CLIOption):
+#===============================================================================
+    """
+    CLI string value option.
+    """
+    def __init__(self, short_opt, long_opt, dest, help_msg):
+        CLIOption.__init__(self, short_opt, long_opt, type = 'string', dest = dest,
                                  help = help_msg)

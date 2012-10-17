@@ -1,5 +1,10 @@
 # This file is part of VoltDB.
+
 # Copyright (C) 2008-2012 VoltDB Inc.
+#
+# This file contains original code and/or modifications of original code.
+# Any modifications made by VoltDB Inc. are licensed under the following
+# terms and conditions:
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -11,7 +16,7 @@
 #
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-#
+
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -21,14 +26,17 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import vcli_util
 
-class VoterStart(Verb):
-    def __init__(self):
-        Verb.__init__(self, 'voter.start',
-                      description = 'Start the Voter server.')
-    def execute(self, runner):
-        catalog = runner.config.get_required('volt', 'catalog')
-        if not os.path.exists(catalog):
-            runner.run('voter.compile')
-        runner.run('start')
+java_ext_opts = (
+    '-server',
+    '-XX:+HeapDumpOnOutOfMemoryError',
+    '-XX:HeapDumpPath=/tmp',
+    '-XX:-ReduceInitialCardMarks'
+)
+
+@VOLT.Command(description = 'Resume paused VoltDB cluster that is in admin mode.')
+def resume(runner):
+    catalog = runner.config.get_required('volt.catalog')
+    if not os.path.exists(catalog):
+        runner.shell('volt', 'compile')
+    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)

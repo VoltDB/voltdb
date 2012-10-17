@@ -34,9 +34,9 @@ java_ext_opts = (
     '-XX:-ReduceInitialCardMarks'
 )
 
-@VOLT.Command(description = 'Start the VoltDB server.')
-def start(runner):
+@VOLT.Command(description = 'Load a VoltDB database snapshot.')
+def load(runner):
     catalog = runner.config.get_required('volt.catalog')
     if not os.path.exists(catalog):
         runner.shell('volt', 'compile')
-    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, 'create', 'catalog', catalog, *runner.args)
+    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)

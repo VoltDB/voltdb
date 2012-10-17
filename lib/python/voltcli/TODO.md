@@ -16,3 +16,4 @@
   replacement), e.g. as aliases. Not sure this is practical.
 * Interactive shell with command recall and auto-completion.
 * Log tailing (with colorizing).
+* Is java_ext_opts needed in existing modules?

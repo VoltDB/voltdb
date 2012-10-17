@@ -25,23 +25,18 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import vcli_util
+import os
 
-@VOLT.Command(description = 'Configure project settings.',
-         usage       = 'KEY=VALUE ...')
-def config(runner):
-    if not runner.args:
-        vcli_util.abort('At least one argument is required.')
-    bad = []
-    for arg in runner.args:
-        if arg.find('=') == -1:
-            bad.append(arg)
-    if bad:
-        vcli_util.abort('Bad arguments (must be KEY=VALUE format):', bad)
-    for arg in runner.args:
-        key, value = [s.strip() for s in arg.split('=', 1)]
-        # Default to 'volt.' if simple name is given.
-        if key.find('.') == -1:
-            key = 'volt.%s' % key
-        runner.config.set_local(key, value)
-        vcli_util.info('Configuration: %s=%s' % (key, value))
+java_ext_opts = (
+    '-server',
+    '-XX:+HeapDumpOnOutOfMemoryError',
+    '-XX:HeapDumpPath=/tmp',
+    '-XX:-ReduceInitialCardMarks'
+)
+
+@VOLT.Command(description = 'Start the VoltDB server and create the database.')
+def create(runner):
+    catalog = runner.config.get_required('volt.catalog')
+    if not os.path.exists(catalog):
+        runner.shell('volt', 'compile')
+    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, 'create', 'catalog', catalog, *runner.args)

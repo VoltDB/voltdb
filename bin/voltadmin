@@ -29,14 +29,13 @@
 # The VoltDB administrative command script
 
 __author__ = 'scooper'
-
-import sys
-import os
-
 version = "0.9"
 description = '''\
 This is the command line interface to VoltDB administrative functions.
 '''
+
+import sys
+import os
 
 # Look for and add the voltcli library directory to the Python system path.
 base_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -44,10 +43,10 @@ test_dir = base_dir
 test_dirs = []
 lib_dir = None
 while test_dir != '/':
-    for sub_dir in ('', 'voltcli', 'lib/voltcli'):
+    for sub_dir in ('', 'lib/python'):
         test_lib_dir = os.path.join(test_dir, sub_dir)
         test_dirs.append(test_lib_dir)
-        if os.path.exists(os.path.join(test_lib_dir, 'vcli_run.py')):
+        if os.path.exists(os.path.join(test_lib_dir, 'voltcli', 'runner.py')):
             lib_dir = os.path.join(test_dir, sub_dir)
             break
     if lib_dir is None:
@@ -61,11 +60,12 @@ ERROR: Could not find voltcli libraries starting from "%s"
 %s
 ''' % (base_dir, '\n'.join(['         %s' % d for d in test_dirs])))
     sys.exit(1)
-sys.path.insert(0, os.path.join(lib_dir))
+sys.path.insert(0, lib_dir)
 
-import vcli_run
+from voltcli import runner
 
 #### Command line main
 
 if __name__ == '__main__':
-    vcli_run.main(version, description)
+    command_dir, command_name = os.path.split(sys.argv[0])
+    runner.main(command_name, command_dir, version, description, *sys.argv[1:])

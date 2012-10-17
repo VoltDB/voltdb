@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
-import vcli_util
+from voltcli import utility
 
 def show_config(runner, *args):
     if not args:
@@ -58,7 +58,7 @@ Sub-Commands:
 ''')
 def show(runner):
     if not runner.args:
-        vcli_util.error('No sub-command specified for "show".')
+        utility.error('No sub-command specified for "show".')
         runner.help()
     else:
         subcommand = runner.args[0].lower()
@@ -66,5 +66,5 @@ def show(runner):
         if subcommand in subcommands:
             subcommands[subcommand](runner, *subargs)
         else:
-            vcli_util.error('Invalid sub-command "%s" specified.' % subcommand)
+            utility.error('Invalid sub-command "%s" specified.' % subcommand)
             runner.help()

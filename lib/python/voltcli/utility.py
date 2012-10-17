@@ -27,7 +27,7 @@
 
 # Volt CLI utility functions.
 
-# IMPORTANT: This depends on no other vcli_... modules. Please keep it that way.
+# IMPORTANT: This depends on no other voltcli modules. Please keep it that way.
 
 import sys
 import os
@@ -36,28 +36,40 @@ import glob
 import copy
 import inspect
 import ConfigParser
+import zipfile
+import re
 from xml.etree import ElementTree
 
 __author__ = 'scooper'
 
-# Runtime options
+#===============================================================================
 class Global:
+#===============================================================================
+    """
+    Global data for utilities.
+    """
     debug_enabled = False
     dryrun_enabled = False
 
+#===============================================================================
 def set_debug(debug):
+#===============================================================================
     """
     Enable or disable debug messages.
     """
     Global.debug_enabled = debug
 
+#===============================================================================
 def set_dryrun(dryrun):
+#===============================================================================
     """
     Enable or disable command dry run (display only/no execution).
     """
     Global.dryrun_enabled = dryrun
 
+#===============================================================================
 def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
+#===============================================================================
     """
     Low level message display.
     """
@@ -94,25 +106,33 @@ def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
                     else:
                         f.write('%s%s%s\n' % (stag, sindent, str(msg)))
 
+#===============================================================================
 def info(*msgs):
+#===============================================================================
     """
     Display INFO level messages.
     """
     display_messages(msgs, tag = 'INFO')
 
+#===============================================================================
 def warning(*msgs):
+#===============================================================================
     """
     Display WARNING level messages.
     """
     display_messages(msgs, tag = 'WARNING')
 
+#===============================================================================
 def error(*msgs):
+#===============================================================================
     """
     Display ERROR level messages.
     """
     display_messages(msgs, tag = 'ERROR')
 
+#===============================================================================
 def abort(*msgs):
+#===============================================================================
     """
     Display ERROR messages and then abort.
     """
@@ -120,7 +140,9 @@ def abort(*msgs):
     display_messages('Exiting.', f = sys.stderr, tag = 'FATAL')
     sys.exit(1)
 
+#===============================================================================
 def find_in_path(name):
+#===============================================================================
     """
     Find program in the system path.
     """
@@ -130,7 +152,9 @@ def find_in_path(name):
             return os.path.join(dir, name)
     return None
 
-def search_and_execute(base_dirs, sub_dir, **syms):
+#===============================================================================
+def search_and_execute(scan_dirs, **syms):
+#===============================================================================
     """
     Look for python source files in a named subdirectory of a set of base
     directories. Execute all discovered source files and pass in the symbols
@@ -141,8 +165,7 @@ def search_and_execute(base_dirs, sub_dir, **syms):
     the discovered functions.
     """
     processed_dirs = set()
-    for base_dir in base_dirs:
-        scan_dir = os.path.realpath(os.path.join(base_dir, sub_dir))
+    for scan_dir in scan_dirs:
         if scan_dir not in processed_dirs:
             processed_dirs.add(scan_dir)
             if os.path.exists(scan_dir):
@@ -150,7 +173,9 @@ def search_and_execute(base_dirs, sub_dir, **syms):
                     debug('Executing module "%s"...' % modpath)
                     execfile(modpath, syms)
 
+#===============================================================================
 def normalize_list(items, width, filler = None):
+#===============================================================================
     """
     Normalize list to a specified width, truncating or filling as needed.
     Filler data can be supplied by caller. The filler will be copied to each
@@ -167,7 +192,9 @@ def normalize_list(items, width, filler = None):
         output += filler * (width - len(output))
     return tuple(output)
 
+#===============================================================================
 def format_table(caption, headings, data_rows):
+#===============================================================================
     """
     Format a tabular display including an optional caption, optional column
     headings, and rows of data cells. Aligns the headings and data cells.
@@ -202,14 +229,19 @@ def format_table(caption, headings, data_rows):
     for row in rows:
         output.append(fmt % normalize_list(row, len(widths), ''))
     return '\n'.join(output)
+
+#===============================================================================
 def debug(*msgs):
+#===============================================================================
     """
     Display debug message(s) if debug is enabled.
     """
     if Global.debug_enabled:
         display_messages(msgs, tag = 'DEBUG')
 
+#===============================================================================
 def parse_xml(xml_path):
+#===============================================================================
     """
     Parses XML and returns an ElementTree object to provide access to element data.
     """
@@ -219,7 +251,9 @@ def parse_xml(xml_path):
     except (OSError, IOError), e:
         abort('Failed to parse XML file.', (xml_path, e))
 
+#===============================================================================
 def run_cmd(cmd, *args):
+#===============================================================================
     """
     Run external program without capturing or suppressing output and check return code.
     """
@@ -236,7 +270,9 @@ def run_cmd(cmd, *args):
         if retcode != 0:
             abort('Command "%s ..." failed with return code %d.' % (cmd, retcode))
 
+#===============================================================================
 def pipe_cmd(*args):
+#===============================================================================
     """
     Run an external program, capture its output, and yield each output line for
     iteration.
@@ -249,7 +285,9 @@ def pipe_cmd(*args):
     except Exception, e:
         warning('Exception running command: %s' % ' '.join(args), e)
 
+#===============================================================================
 def is_string(item):
+#===============================================================================
     """
     Return True if the item behaves like a string.
     """
@@ -259,7 +297,9 @@ def is_string(item):
     except TypeError:
         return False
 
+#===============================================================================
 def is_sequence(item):
+#===============================================================================
     """
     Return True if the item behaves like an iterable sequence.
     """
@@ -272,32 +312,43 @@ def is_sequence(item):
     except TypeError:
         return False
 
+#===============================================================================
 def _flatten(*items):
+#===============================================================================
     """
     Internal function to recursively iterate a potentially nested sequence.
+    None items are filtered out.
     """
     for item in items:
         if is_sequence(item):
             for subitem in item:
                 for subsubitem in _flatten(subitem):
-                    yield subsubitem
+                    if subitem is not None:
+                        yield subsubitem
         else:
-            yield item
+            if item is not None:
+                yield item
 
+#===============================================================================
 def flatten(*items):
+#===============================================================================
     """
     Flatten and yield individual items from a potentially nested list or tuple.
     """
     for item in _flatten(*items):
         yield item
 
+#===============================================================================
 def flatten_to_list(*items):
+#===============================================================================
     """
     Flatten a potentially nested list or tuple to a simple list.
     """
     return [item for item in flatten(*items)]
 
+#===============================================================================
 def to_display_string(item):
+#===============================================================================
     """
     Recursively convert simple items and potentially nested sequences to a
     string, using square brackets and commas to format sequences.
@@ -311,7 +362,76 @@ def to_display_string(item):
         s += to_display_string(subitem)
     return '[%s]' % s
 
+#===============================================================================
+class Zipper(object):
+#===============================================================================
+    """
+    The Zipper class creates a zip file using the directories, strings, and
+    exclusion regular expresions provided.
+    """
+    def __init__(self, *excludes):
+        self.output_zip = None
+        self.output_path = None
+        self.re_excludes = [re.compile(exclude) for exclude in excludes]
+
+    def open(self, output_path):
+        self.output_path = output_path
+        if not Global.dryrun_enabled:
+            try:
+                self.output_zip = zipfile.ZipFile(self.output_path, 'w', zipfile.ZIP_DEFLATED)
+            except (IOError, OSError), e:
+                self._abort('Failed to open for writing.', e)
+
+    def close(self):
+        if self.output_zip:
+            self.output_zip.close()
+
+    def add_file(self, path_in, path_out):
+        for re_exclude in self.re_excludes:
+            path_in_full = os.path.realpath(path_in)
+            if re_exclude.search(path_in):
+                self._debug('skip "%s"' % path_in_full)
+                break
+        else:
+            self._debug('add "%s" as "%s"' % (path_in_full, path_out))
+            try:
+                if self.output_zip:
+                    self.output_zip.write(path_in, path_out)
+            except (IOError, OSError), e:
+                self._abort('Failed to write file "%s" to output zip file "%s".', path_out, e)
+
+    def add_string(self, s, path_out):
+        self._debug('write string to "%s"' % path_out)
+        if self.output_zip:
+            try:
+                self.output_zip.writestr(path_out, s)
+            except (IOError, OSError), e:
+                self._abort('Failed to write string to file "%s".' % path_out, e)
+
+    def add_directory(self, path_in, dst, excludes = []):
+        if not os.path.isdir(path_in):
+            self._abort('Zip source directory "%s" does not exist.' % path_in)
+        savedir = os.getcwd()
+        # Get nice relative paths by temporarily switching directories.
+        os.chdir(path_in)
+        try:
+            for basedir, subdirs, filenames in os.walk('.'):
+                for filename in filenames:
+                    file_path_in = os.path.join(basedir, filename)[2:]
+                    file_path_out = os.path.join(dst, basedir[2:], filename)
+                    self.add_file(file_path_in, file_path_out)
+        finally:
+            os.chdir(savedir)
+
+    def _debug(self, msg):
+        debug('%s: %s' % (self.output_path, msg))
+
+    def _abort(self, *msgs):
+        abort('Fatal error writing zip file "%s".' % self.output_path, msgs)
+
+#===============================================================================
 def merge_java_options(*opts):
+#===============================================================================
     """
     Merge redundant -X... java command line options. Keep others intact.
     Arguments can be lists or individual arguments. Returns the reduced list.
@@ -331,8 +451,59 @@ def merge_java_options(*opts):
                 ret_opts.append(opt)
     return ret_opts
 
+#===============================================================================
+def choose(prompt, *choices):
+#===============================================================================
+    """
+    Prompt the user for multiple choice input. Keep prompting until a valid
+    choice is received. Choice shortcuts require unique first letters. The user
+    can either respond with a single letter or an entire word.
+    """
+    letters = set()
+    choice_list = []
+    for choice in choices:
+        if not choice:
+            abort('Empty choice passed to choose().')
+        if choice[0] in letters:
+            abort('Non-unique choices %s passed to choose().' % str(choices))
+        letters.add(choice[0])
+        choice_list.append('[%s]%s' % (choice[0], choice[1:]))
+    while True:
+        sys.stdout.write('%s (%s) ' % (prompt, '/'.join(choice_list)))
+        sys.stdout.flush()
+        response = sys.stdin.readline().strip()
+        if response in letters or response in choices:
+            return response[0]
+
+#===============================================================================
+class FileWriter(object):
+#===============================================================================
+    """
+    File writing object that aborts on any error. Must explicitly call close().
+    """
+    def __init__(self, path):
+        self.path = path
+        self.f    = None
+    def open(self):
+        try:
+            self.f = open(path, 'w')
+        except (IOError, OSError), e:
+            abort('%s: Error opening "%s"' % (self.__class__.__name__, self.path), e)
+    def write(self, s):
+        try:
+            parser.write(self.f, s)
+        except (IOError, OSError), e:
+            abort('%s: Error writing to "%s"' % (self.__class__.__name__, self.path), e)
+    def close(self):
+        if self.f:
+            self.f.close()
+
+#===============================================================================
 class XMLConfigManager(object):
-    """Loads/saves XML format configuration to and from a dictionary."""
+#===============================================================================
+    """
+    Loads/saves XML format configuration to and from a dictionary.
+    """
 
     def load(self, path):
         parser = ConfigParser.SafeConfigParser()
@@ -354,11 +525,18 @@ class XMLConfigManager(object):
                 parser.add_section(section)
                 cur_section = section
             parser.set(cur_section, name, d[name])
-        with open(path, 'w') as f:
-            parser.write(f)
+            f = FileWriter(path)
+            try:
+                parser.write(f)
+            finally:
+                f.close()
 
+#===============================================================================
 class INIConfigManager(object):
-    """Loads/saves INI format configuration to and from a dictionary."""
+#===============================================================================
+    """
+    Loads/saves INI format configuration to and from a dictionary.
+    """
 
     def load(self, path):
         parser = ConfigParser.SafeConfigParser()
@@ -383,12 +561,19 @@ class INIConfigManager(object):
                 parser.add_section(section)
                 cur_section = section
             parser.set(cur_section, name, d[key])
-        with open(path, 'w') as f:
+        f = FileWriter(path)
+        try:
             parser.write(f)
+        finally:
+            f.close()
 
+#===============================================================================
 class PersistentConfig(object):
-    """Persistent access to configuration data. Manages two configuration
-    files, one for permanent configuration and the other for local state."""
+#===============================================================================
+    """
+    Persistent access to configuration data. Manages two configuration
+    files, one for permanent configuration and the other for local state.
+    """
 
     def __init__(self, format, permanent_path, local_path):
         """
