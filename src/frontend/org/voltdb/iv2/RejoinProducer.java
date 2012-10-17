@@ -55,7 +55,8 @@ public class RejoinProducer extends SiteTasker
     private static final VoltLogger HOSTLOG = new VoltLogger("HOST");
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
-    private final CountDownLatch m_replayActionAwait;
+    private final CountDownLatch m_snapshotAdapterAwait;
+    private final CountDownLatch m_completionMonitorAwait;
     private final SiteTaskerQueue m_taskQueue;
     private final int m_partitionId;
     private final String m_snapshotNonce;
@@ -108,11 +109,15 @@ public class RejoinProducer extends SiteTasker
     // In both cases, the site is responding with REJOINING to
     // all incoming tasks.
     //
-    // There are two conditions to complete RejoinProducer and
-    // transition the Site controlled portion of rejoin.
+    // There are three conditions to complete RejoinProducer and
+    // transition the Site controlled portion of rejoin. The last
+    // two are controlled by CountDown monitors and block the
+    // site thread until complete.
     // 1. Snapshot must be fully transfered (sink EOF reached)
     // 2. The replay complete action must be ready, meaning the
     // snapshot handler has responded with the snapshot txnid.
+    // 3. The snapshot completion monitor callback must have been
+    // triggered.
     //
     // When both of these events have been observed, the Site
     // is handed a ReplayCompletionAction and instructed to
@@ -144,12 +149,9 @@ public class RejoinProducer extends SiteTasker
                 long[] partitionTxnIds, boolean truncationSnapshot)
         {
             if (nonce.equals(m_snapshotNonce)) {
-                REJOINLOG.debug(m_whoami + "informing rejoinCoordinator " +
-                        CoreUtils.hsIdToString(m_rejoinCoordinatorHsId) + " of SNAPSHOT_FINISHED");
-                RejoinMessage snap_complete =
-                    new RejoinMessage(m_rejoinCoordinatorHsId, Type.SNAPSHOT_FINISHED);
-                m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
+                REJOINLOG.debug(m_whoami + "counting down snapshot monitor completion.");
                 deregister();
+                m_completionMonitorAwait.countDown();
             }
             else {
                 REJOINLOG.debug(m_whoami + " observed completion of irrelevant nonce: " + nonce);
@@ -193,7 +195,8 @@ public class RejoinProducer extends SiteTasker
         m_partitionId = partitionId;
         m_taskQueue = taskQueue;
         m_snapshotNonce = "Rejoin_" + m_partitionId + "_" + System.currentTimeMillis();
-        m_replayActionAwait = new CountDownLatch(1);
+        m_completionMonitorAwait = new CountDownLatch(1);
+        m_snapshotAdapterAwait = new CountDownLatch(1);
         m_whoami = "Rejoin producer:" + m_partitionId + " ";
         REJOINLOG.debug(m_whoami + "created.");
     }
@@ -357,8 +360,7 @@ public class RejoinProducer extends SiteTasker
 
         m_replayCompleteAction =
             new ReplayCompletionAction(message.getSnapshotTxnId(), action);
-
-        m_replayActionAwait.countDown();
+        m_snapshotAdapterAwait.countDown();
     }
 
     /**
@@ -425,8 +427,16 @@ public class RejoinProducer extends SiteTasker
             // Block until the snapshot interest triggers.
             try {
                 REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
-                m_replayActionAwait.await();
-                REJOINLOG.debug(m_whoami + "received snapshot completion monitor. Handing off to site.");
+                m_completionMonitorAwait.await();
+                REJOINLOG.debug(m_whoami + "waiting on snapshot response adapter.");
+                m_snapshotAdapterAwait.await();
+                REJOINLOG.debug(m_whoami + "snapshot monitor and adapter complete. " +
+                        "Sending SNAPSHOT_FINISHED and Handing off to site.");
+                // Send snapshot finished message once both monitor and adapter complete.
+                RejoinMessage snap_complete =
+                    new RejoinMessage(m_rejoinCoordinatorHsId, Type.SNAPSHOT_FINISHED);
+                m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
+
             } catch (InterruptedException crashme) {
                 VoltDB.crashLocalVoltDB("Interrupted awaiting snapshot completion.", true, crashme);
             }
@@ -471,8 +481,14 @@ public class RejoinProducer extends SiteTasker
         // is an indication that a non-blocking wait is necesary.
         try {
             REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
-            m_replayActionAwait.await();
-            REJOINLOG.debug(m_whoami + "received snapshot completion monitor. Handing off to site.");
+            m_completionMonitorAwait.await();
+            REJOINLOG.debug(m_whoami + "waiting on snapshot response adapter.");
+            m_snapshotAdapterAwait.await();
+            REJOINLOG.debug(m_whoami + "snapshot monitor and adapter complete. Handing off to site.");
+            // Send snapshot finished message once both monitor and adapter complete.
+            RejoinMessage snap_complete =
+                new RejoinMessage(m_rejoinCoordinatorHsId, Type.SNAPSHOT_FINISHED);
+            m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
         } catch (InterruptedException crashme) {
             VoltDB.crashLocalVoltDB("Interrupted awaiting snapshot completion.", true, crashme);
         }
