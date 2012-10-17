@@ -83,6 +83,7 @@ import com.google.common.collect.ImmutableMap;
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     // Set to false trigger shutdown.
     volatile boolean m_shouldContinue = true;
@@ -506,7 +507,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (task != null) {
             if (m_rejoinTaskLog != null && task instanceof TransactionTask) {
                 TransactionInfoBaseMessage tibm = ((TransactionTask)task).m_txn.getNotice();
-                m_rejoinTaskLog.logTask(tibm);
+                if (!filter(tibm)) {
+                    m_rejoinTaskLog.logTask(tibm);
+                }
             }
             task.runForRejoin(getSiteProcedureConnection());
         }
@@ -523,21 +526,46 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
 
+    private boolean filter(TransactionInfoBaseMessage tibm)
+    {
+        // don't log sysproc fragments or iv2 intiiate task messages.
+        // this is all jealously; should be refactored to ask tibm
+        // if it wants to be logged for rejoin and eliminate this
+        // horrible introspection. This implementation mimics the
+        // original live rejoin code for ExecutionSite...
+        if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
+            return true;
+        }
+        else if (tibm instanceof Iv2InitiateTaskMessage) {
+            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
+            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
+                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    ParticipantTransactionState global_replay_mpTxn = null;
     void replayFromTaskLog() throws IOException
     {
-        ParticipantTransactionState mpTxn = null;
         // replay 10::1 in favor of replay and never stop replaying
         // in the middle of a multi-part transaction.
-        for (int i=1; mpTxn != null || i > 10; ++i) {
+        for (int i=1; global_replay_mpTxn != null || i < 10; ++i) {
             if (m_rejoinTaskLog.isEmpty()) {
+                assert(global_replay_mpTxn == null);
                 return;
             }
             TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
             if (tibm == null) {
                 // asynchronous fetch - queue temporarily unavailable
+                rejoinLog.debug("Site " + m_siteId + ": rejoin log unavailable. Async fetch.");
                 return;
             }
-            if (tibm instanceof Iv2InitiateTaskMessage) {
+            else if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
@@ -546,15 +574,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             else if (tibm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage m = (FragmentTaskMessage)tibm;
-                mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
-                FragmentTask t = new FragmentTask(m, mpTxn);
+                rejoinLog.debug("Replaying frag: " + m);
+                global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
+                FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
                 t.runFromTaskLog(this);
             }
             else if (tibm instanceof CompleteTransactionMessage) {
                 CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                CompleteTransactionTask t = new CompleteTransactionTask(mpTxn, null, m, null);
+                rejoinLog.debug("Replaying complete msg: " + m);
+                CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
                 t.runFromTaskLog(this);
-                mpTxn = null;
+                global_replay_mpTxn = null;
             }
             else {
                 VoltDB.crashLocalVoltDB("Can not replay message type " +

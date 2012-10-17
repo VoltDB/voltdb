@@ -39,8 +39,11 @@ public class FragmentTask extends TransactionTask
     final Map<Integer, List<VoltTable>> m_inputDeps;
 
     // This constructor is used during live rejoin log replay.
-    FragmentTask(FragmentTaskMessage message, ParticipantTransactionState txnState) {
-        this(null,
+    FragmentTask(Mailbox mailbox,
+            FragmentTaskMessage message,
+            ParticipantTransactionState txnState)
+    {
+        this(mailbox,
             txnState,
             null,
             message,
