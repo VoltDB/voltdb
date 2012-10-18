@@ -150,7 +150,11 @@ public class FunctionExpression extends AbstractExpression {
         }
         FunctionExpression expr = (FunctionExpression) obj;
 
+        assert(m_name != null);
         if (m_name == null) {
+            // This is most unpossible. BUT...
+            // better to fail the equality test than to embarrass ourselves in production mode
+            // (when asserts are turned off) with an NPE on the next line.
             return false;
         }
         if (m_name.equals(expr.m_name) == false) {
