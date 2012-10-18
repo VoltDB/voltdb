@@ -45,6 +45,9 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.Pair;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
+
 public class ZKUtil {
 
      /** Prevents class from being inherited or instantiated **/
@@ -226,6 +229,43 @@ public class ZKUtil {
         return zk;
     }
 
+    public static final void mkdirs(ZooKeeper zk, String dirDN) {
+        ZKUtil.StringCallback callback = asyncMkdirs(zk, dirDN );
+        try {
+            callback.get();
+        } catch (Throwable t) {
+            Throwables.propagate(t);
+        }
+    }
+
+    public static ZKUtil.StringCallback asyncMkdirs( ZooKeeper zk, String dirDN) {
+        Preconditions.checkArgument(
+                dirDN != null &&
+                ! dirDN.trim().isEmpty() &&
+                ! "/".equals(dirDN) &&
+                dirDN.startsWith("/")
+                );
+
+        StringBuilder dsb = new StringBuilder(128);
+        ZKUtil.StringCallback lastCallback = null;
+        try {
+            for (String dirPortion: dirDN.substring(1).split("/")) {
+                lastCallback = new ZKUtil.StringCallback();
+                dsb.append('/').append(dirPortion);
+                zk.create(
+                        dsb.toString(),
+                        null,
+                        Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT,
+                        lastCallback,
+                        null);
+            }
+        }
+        catch (Throwable t) {
+            Throwables.propagate(t);
+        }
+        return lastCallback;
+    }
     /**
      * Sorts the sequential nodes based on their sequence numbers.
      * @param nodes

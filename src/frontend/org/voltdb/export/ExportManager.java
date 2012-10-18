@@ -39,6 +39,8 @@ import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
+import com.google.common.base.Preconditions;
+
 /**
  * Bridges the connection to an OLAP system and the buffers passed
  * between the OLAP connection and the execution engine. Each processor
@@ -184,6 +186,11 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
+        Preconditions.checkArgument(
+                m_masterOfPartitions.add(partitionId),
+                "can't acquire mastership twice for partition id: " + partitionId
+                );
+
         if (m_masterOfPartitions.add(partitionId)) {
           for( ExportGeneration gen: m_generations.get().values()) {
               gen.acceptMastershipTask(partitionId);
@@ -268,7 +275,7 @@ public class ExportManager
                         catalogContext.m_transactionId,
                         m_onGenerationDrained,
                         exportOverflowDirectory);
-            currentGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId, messenger);
+            currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, messenger);
             m_generations.get().put( catalogContext.m_transactionId, currentGeneration);
             newProcessor.setExportGeneration(m_generations.get().firstEntry().getValue());
             newProcessor.readyForData();
@@ -345,7 +352,7 @@ public class ExportManager
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB(e1.getMessage(), true, e1);
         }
-        newGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId, m_messenger);
+        newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger);
 
         while (true) {
             TreeMap<Long, ExportGeneration> oldGenerations = m_generations.get();

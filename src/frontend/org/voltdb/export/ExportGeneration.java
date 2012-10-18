@@ -24,16 +24,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
-import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -44,7 +41,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Connector;
@@ -57,7 +53,6 @@ import org.voltdb.utils.VoltFile;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -108,8 +103,6 @@ public class ExportGeneration {
 
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
-    private volatile ImmutableMap<Integer, ImmutableList<Long>> m_ackableMailboxes =
-            ImmutableMap.<Integer, ImmutableList<Long>>builder().build();
 
     /**
      * Constructor to create a new generation of export data
@@ -120,7 +113,7 @@ public class ExportGeneration {
         m_onAllSourcesDrained = onAllSourcesDrained;
         m_timestamp = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId) );
-        if (!m_directory.mkdir()) {
+        if (!m_directory.mkdirs()) {
             throw new IOException("Could not create " + m_directory);
         }
         exportLog.info("Creating new export generation " + m_timestamp);
@@ -179,7 +172,6 @@ public class ExportGeneration {
 
 
     void initializeGenerationFromCatalog(
-            CatalogContext catalogContext,
             final Connector conn,
             int hostId,
             HostMessenger messenger)
@@ -193,7 +185,7 @@ public class ExportGeneration {
         while (tableInfoIt.hasNext()) {
             ConnectorTableInfo next = tableInfoIt.next();
             Table table = next.getTable();
-            partitions.addAll(addDataSources(table, hostId, catalogContext));
+            partitions.addAll(addDataSources(table, hostId));
         }
 
         createAndRegisterAckMailboxes(partitions, messenger);
@@ -201,32 +193,7 @@ public class ExportGeneration {
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
         m_zk = messenger.getZK();
-
-        //Intentionally ignoring return values of all but the last operation
-        m_zk.create(
-                VoltZK.exportGenerations,
-                null,
-                Ids.OPEN_ACL_UNSAFE,
-                CreateMode.PERSISTENT,
-                new ZKUtil.StringCallback(),
-                null);
         m_zkPath = VoltZK.exportGenerations + "/" + m_timestamp;
-        m_zk.create(
-                m_zkPath,
-                null,
-                Ids.OPEN_ACL_UNSAFE,
-                CreateMode.PERSISTENT,
-                new ZKUtil.StringCallback(),
-                null);
-        for (Integer partition : localPartitions) {
-            m_zk.create(
-                    m_zkPath + "/" + partition,
-                    null,
-                    Ids.OPEN_ACL_UNSAFE,
-                    CreateMode.PERSISTENT,
-                    new ZKUtil.StringCallback(),
-                    null);
-        }
 
         m_mbox = new LocalMailbox(messenger) {
             @Override
@@ -265,15 +232,7 @@ public class ExportGeneration {
 
         List<ZKUtil.StringCallback> callbacks = new ArrayList<ZKUtil.StringCallback>();
         for (Integer partition : localPartitions) {
-            ZKUtil.StringCallback callback = new ZKUtil.StringCallback();
-            m_zk.create(
-                    m_zkPath + "/" + partition + "/" + m_mbox.getHSId(),
-                    null,
-                    Ids.OPEN_ACL_UNSAFE,
-                    CreateMode.EPHEMERAL,
-                    callback,
-                    null);
-            callbacks.add(callback);
+            callbacks.add(ZKUtil.asyncMkdirs(m_zk, m_zkPath + "/" + partition + "/" + m_mbox.getHSId()));
         }
 
         for (ZKUtil.StringCallback cb : callbacks) {
@@ -298,8 +257,6 @@ public class ExportGeneration {
                             null);
                     callbacks.add(Pair.of(partition, callback));
                 }
-                ImmutableMap.Builder<Integer, ImmutableList<Long>> mapBuilder =
-                        ImmutableMap.builder();
                 for (Pair<Integer, ZKUtil.ChildrenCallback> p : callbacks) {
                     final Integer partition = p.getFirst();
                     List<String> children = null;
@@ -316,9 +273,11 @@ public class ExportGeneration {
                         if (child.equals(Long.toString(m_mbox.getHSId()))) continue;
                         mailboxes.add(Long.valueOf(child));
                     }
-                    mapBuilder.put(partition, mailboxes.build());
+                    ImmutableList<Long> mailboxHsids = mailboxes.build();
+                    for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
+                        eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
+                    }
                 }
-                m_ackableMailboxes = mapBuilder.build();
             }
         });
         try {
@@ -369,19 +328,15 @@ public class ExportGeneration {
 
                             final String split[] = path.split("/");
                             final int partition = Integer.valueOf(split[split.length - 1]);
-                            ImmutableMap.Builder<Integer, ImmutableList<Long>> mapBuilder =
-                                    ImmutableMap.builder();
                             ImmutableList.Builder<Long> mailboxes = ImmutableList.builder();
                             for (String child : children) {
                                 if (child.equals(Long.toString(m_mbox.getHSId()))) continue;
                                 mailboxes.add(Long.valueOf(child));
                             }
-                            mapBuilder.put(partition, mailboxes.build());
-                            for (Map.Entry<Integer, ImmutableList<Long>> entry : m_ackableMailboxes.entrySet()) {
-                                if (entry.getKey() == partition) continue;
-                                mapBuilder.put(entry.getKey(), entry.getValue());
+                            ImmutableList<Long> mailboxHsids = mailboxes.build();
+                            for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
+                                eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
                             }
-                            m_ackableMailboxes = mapBuilder.build();
                         } catch (Throwable t) {
                             VoltDB.crashLocalVoltDB("Error in export ack handling", false, t);
                         }
@@ -456,7 +411,7 @@ public class ExportGeneration {
 
     // silly helper to add datasources for a table catalog object
     private Set<Integer> addDataSources(
-            Table table, int hostId, CatalogContext catalogContext)
+            Table table, int hostId)
     {
         SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
         List<Long> sites = siteTracker.getSitesForHost(hostId);
