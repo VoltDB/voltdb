@@ -72,20 +72,6 @@ final public class TxnEgo {
     private final long m_wallClock;
 
     /**
-     * Static helper: given an array of txnids, return the first
-     * txnId belonging to partitionId.
-     */
-    public static Long extractTxnIdForPartition(long[] txnIds, int partitionId)
-    {
-        for (int i=0; i < txnIds.length; i++) {
-            if (getPartitionId(txnIds[i]) == partitionId) {
-                return txnIds[i];
-            }
-        }
-        return null;
-    }
-
-    /**
      * Make the zero-valued (initial) TxnEgo for a partition
      */
     public static TxnEgo makeZero(final long partitionId)
