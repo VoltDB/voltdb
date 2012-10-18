@@ -241,13 +241,26 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (obj instanceof AbstractExpression == false) return false;
         AbstractExpression expr = (AbstractExpression) obj;
 
-        // check that the presence, or lack thereof, of children is the same
-        if ((expr.m_left == null) != (m_left == null))
+        if (m_type != expr.m_type) {
             return false;
-        if ((expr.m_right == null) != (m_right == null))
+        }
+        if ( ! hasEqualAttributes(expr)) {
             return false;
+        }
+        // The derived classes have verified that any added attributes are identical.
 
-        // check that the children identify themselves as the same
+        // Check that the presence, or lack, of children is the same
+        if ((m_left == null) != (expr.m_left == null)) {
+            return false;
+        }
+        if ((m_right == null) != (expr.m_right == null)) {
+            return false;
+        }
+        if ((m_args == null) != (expr.m_args == null)) {
+            return false;
+        }
+
+        // Check that the children identify themselves as equal
         if (expr.m_left != null)
             if (expr.m_left.equals(m_left) == false)
                 return false;
@@ -260,10 +273,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 return false;
         }
 
-        if (m_type != expr.m_type)
-            return false;
+        return true;
+    }
 
-        // this abstract base class gets here if the children verify local members
+    // Derived classes that define attributes should compare them in their refinements of this method.
+    // This implementation is provided as a convenience for Operators et. al. that have no attributes that could differ.
+    protected boolean hasEqualAttributes(AbstractExpression expr) {
         return true;
     }
 
