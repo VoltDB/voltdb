@@ -40,9 +40,9 @@ import java.util.TreeMap;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
@@ -58,7 +58,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
  * added to each new rolling file}
  *
  */
-public class ExportToFileClient extends ExportClientBase {
+public class ExportToFileClient extends ExportClientBase2 {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     // These get put in from of the batch folders
@@ -70,21 +70,21 @@ public class ExportToFileClient extends ExportClientBase {
     //  export a bigint representing microseconds since an epoch
     protected static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
     // use thread-local to avoid SimpleDateFormat thread-safety issues
-    protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat;
-    protected final char m_delimiter;
-    protected final char[] m_fullDelimiters;
-    protected final String m_extension;
-    protected final String m_nonce;
+    protected ThreadLocal<SimpleDateFormat> m_ODBCDateformat;
+    protected char m_delimiter;
+    protected char[] m_fullDelimiters;
+    protected String m_extension;
+    protected String m_nonce;
     // outDir is the folder that will contain the raw files or batch folders
-    protected final File m_outDir;
+    protected File m_outDir;
     // the set of active decoders
-    protected final HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
+    protected HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
     // how often to roll batches / files
-    protected final int m_period;
+    protected int m_period;
     // use thread-local to avoid SimpleDateFormat thread-safety issues
-    protected final ThreadLocal<SimpleDateFormat> m_dateformat;
-    protected final String m_dateFormatOriginalString;
-    protected final int m_firstfield;
+    protected ThreadLocal<SimpleDateFormat> m_dateformat;
+    protected String m_dateFormatOriginalString;
+    protected int m_firstfield;
 
     // timer used to roll batches
     protected final Timer m_timer = new Timer();
@@ -96,8 +96,8 @@ public class ExportToFileClient extends ExportClientBase {
 
     protected PeriodicExportContext m_current = null;
 
-    protected final boolean m_batched;
-    protected final boolean m_withSchema;
+    protected boolean m_batched;
+    protected boolean m_withSchema;
 
     protected final Object m_batchLock = new Object();
 
@@ -288,6 +288,7 @@ public class ExportToFileClient extends ExportClientBase {
             // is closed, it will be the next file temporally in the export stream
             FileHandle[] keys = m_writers.keySet().toArray(new FileHandle[] {});
             Arrays.sort(keys, new Comparator<FileHandle>(){
+                @Override
                 public int compare(FileHandle f1, FileHandle f2)
                 {
                     long first_txnid = Long.parseLong(f1.getPath("").split("-")[1]);
@@ -617,6 +618,10 @@ public class ExportToFileClient extends ExportClientBase {
                 firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod, true);
     }
 
+    public ExportToFileClient() {
+        super(false, 0, false);
+    }
+
     public ExportToFileClient(char delimiter,
                               String nonce,
                               File outdir,
@@ -630,55 +635,16 @@ public class ExportToFileClient extends ExportClientBase {
                               int throughputMonitorPeriod,
                               boolean autodiscoverTopolgy) {
         super(useAdminPorts, throughputMonitorPeriod, autodiscoverTopolgy);
-        m_delimiter = delimiter;
-        m_extension = (delimiter == ',') ? ".csv" : ".tsv";
-        m_nonce = nonce;
-        m_outDir = outdir;
-        m_tableDecoders = new HashMap<Long, HashMap<String, ExportToFileDecoder>>();
-        m_period = period;
-        m_dateFormatOriginalString = dateformatString;
-        // SimpleDateFormat isn't threadsafe
-        // ThreadLocal variables should protect them, lamely.
-        m_dateformat = new ThreadLocal<SimpleDateFormat>() {
-            @Override
-            protected SimpleDateFormat initialValue() {
-                return new SimpleDateFormat(m_dateFormatOriginalString);
-            }
-        };
-        m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
-            @Override
-            protected SimpleDateFormat initialValue() {
-                return new SimpleDateFormat(ODBC_DATE_FORMAT_STRING);
-            }
-        };
-        m_firstfield = firstfield;
-        m_batched = batched;
-        m_withSchema = withSchema;
-
-        if (fullDelimiters != null) {
-            fullDelimiters = StringEscapeUtils.unescapeHtml4(fullDelimiters);
-            m_fullDelimiters = new char[4];
-            for (int i = 0; i < 4; i++) {
-                m_fullDelimiters[i] = fullDelimiters.charAt(i);
-                //System.out.printf("FULL DELIMETER %d: %c\n", i, m_fullDelimiters[i]);
-            }
-        }
-        else {
-            m_fullDelimiters = null;
-        }
-
-        // init the batch system with the first batch
-        assert(m_current == null);
-        m_current = new PeriodicExportContext(new Date());
-
-        // schedule rotations every m_period minutes
-        TimerTask rotateTask = new TimerTask() {
-            @Override
-            public void run() {
-                roll(new Date());
-            }
-        };
-        m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
+        configureInternal(
+                delimiter,
+                nonce,
+                outdir,
+                period,
+                dateformatString,
+                fullDelimiters,
+                firstfield,
+                batched,
+                withSchema);
     }
 
     PeriodicExportContext getCurrentContextAndAddref(ExportToFileDecoder decoder) {
@@ -1027,5 +993,140 @@ public class ExportToFileClient extends ExportClientBase {
     public void run() throws ExportClientException {
         logConfigurationInfo();
         super.run();
+    }
+
+    @Override
+    public void configure(byte[] config) throws Exception {
+        JSONObject conf = new JSONObject(new String( config, "UTF-8"));
+
+        String nonce = conf.getString("nonce");
+
+        char delimiter = '\0';
+        String type = conf.optString("type", null).trim();
+        if (type != null) {
+            if (type.equalsIgnoreCase("csv")) {
+                delimiter = ',';
+            } else if (type.equalsIgnoreCase("tsv")) {
+                delimiter = '\t';
+            } else {
+                throw new IllegalArgumentException("Error: --type must be one of CSV or TSV");
+            }
+        }
+        if (delimiter == '\0') {
+            throw new IllegalArgumentException("ExportToFile: must provide an output type");
+        }
+
+        if (delimiter == '\0') {
+            System.err.println("ExportToFile: must provide an output type");
+            printHelpAndQuit(-1);
+        }
+
+        File outdir = new File(conf.optString("outdir", "."));
+        if (!outdir.exists()) {
+            if (!outdir.mkdir()) {
+                throw new IllegalArgumentException("Error: " + outdir.getPath() + " cannot be created");
+            }
+        }
+        if (!outdir.canRead()) {
+            throw new IllegalArgumentException("Error: " + outdir.getPath() + " does not have read permission set");
+        }
+        if (!outdir.canExecute()) {
+            throw new IllegalArgumentException("Error: " + outdir.getPath() + " does not have execute permission set");
+        }
+        if (!outdir.canWrite()) {
+            throw new IllegalArgumentException("Error: " + outdir.getPath() + " does not have write permission set");
+        }
+
+        int firstfield = conf.optBoolean("skipinternals") ? 6 : 0;
+
+        int period = conf.optInt("period", 60);
+        if (period < 1) {
+            throw new IllegalArgumentException("Error: Specified value for --period must be >= 1.");
+        }
+
+        String dateformatString = conf.optString("dateformat", "yyyyMMddHHmmss").trim();
+        boolean batched = conf.optBoolean("batched", false);
+        boolean withSchema = conf.optBoolean("with-schema", false);
+
+        String fullDelimiters = conf.optString("delimeters", null);
+        if (fullDelimiters != null) {
+            fullDelimiters = fullDelimiters.trim();
+            String charsAsStr = StringEscapeUtils.unescapeHtml4(fullDelimiters.trim());
+            if (charsAsStr.length() != 4) {
+                throw new IllegalArgumentException("The delimiter set must contain exactly 4 characters (after any html escaping).");
+            }
+        }
+
+        configureInternal(
+                delimiter,
+                nonce,
+                outdir,
+                period,
+                dateformatString,
+                fullDelimiters,
+                firstfield,
+                batched,
+                withSchema);
+    }
+
+    private void configureInternal(
+                              char delimiter,
+                              String nonce,
+                              File outdir,
+                              int period,
+                              String dateformatString,
+                              String fullDelimiters,
+                              int firstfield,
+                              boolean batched,
+                              boolean withSchema) {
+        m_delimiter = delimiter;
+        m_extension = (delimiter == ',') ? ".csv" : ".tsv";
+        m_nonce = nonce;
+        m_outDir = outdir;
+        m_tableDecoders = new HashMap<Long, HashMap<String, ExportToFileDecoder>>();
+        m_period = period;
+        m_dateFormatOriginalString = dateformatString;
+        // SimpleDateFormat isn't threadsafe
+        // ThreadLocal variables should protect them, lamely.
+        m_dateformat = new ThreadLocal<SimpleDateFormat>() {
+            @Override
+            protected SimpleDateFormat initialValue() {
+                return new SimpleDateFormat(m_dateFormatOriginalString);
+            }
+        };
+        m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
+            @Override
+            protected SimpleDateFormat initialValue() {
+                return new SimpleDateFormat(ODBC_DATE_FORMAT_STRING);
+            }
+        };
+        m_firstfield = firstfield;
+        m_batched = batched;
+        m_withSchema = withSchema;
+
+        if (fullDelimiters != null) {
+            fullDelimiters = StringEscapeUtils.unescapeHtml4(fullDelimiters);
+            m_fullDelimiters = new char[4];
+            for (int i = 0; i < 4; i++) {
+                m_fullDelimiters[i] = fullDelimiters.charAt(i);
+                //System.out.printf("FULL DELIMETER %d: %c\n", i, m_fullDelimiters[i]);
+            }
+        }
+        else {
+            m_fullDelimiters = null;
+        }
+
+        // init the batch system with the first batch
+        assert(m_current == null);
+        m_current = new PeriodicExportContext(new Date());
+
+        // schedule rotations every m_period minutes
+        TimerTask rotateTask = new TimerTask() {
+            @Override
+            public void run() {
+                roll(new Date());
+            }
+        };
+        m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
     }
 }

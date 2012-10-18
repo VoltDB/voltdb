@@ -62,21 +62,18 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof ParameterValueExpression == false) return false;
+        if (obj instanceof ParameterValueExpression == false) {
+            return false;
+        }
         ParameterValueExpression expr = (ParameterValueExpression) obj;
 
-        if (expr.m_paramIndex != m_paramIndex)
-            return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
+        return m_paramIndex == expr.m_paramIndex;
     }
 
     @Override
     public int hashCode() {
         // based on implementation of equals
-        int result = m_paramIndex;
-        return result += super.hashCode();
+        return m_paramIndex;
     }
 
     @Override

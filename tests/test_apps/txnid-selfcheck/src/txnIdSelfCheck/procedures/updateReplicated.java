@@ -21,16 +21,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package voter.procedures;
+package txnIdSelfCheck.procedures;
 
-import org.voltdb.ProcInfo;
+import java.util.Random;
+
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
 public class updateReplicated extends VoltProcedure
 {
     // Different reasons for abort
@@ -40,32 +38,36 @@ public class updateReplicated extends VoltProcedure
     public final SQLStmt deleteStmt = new SQLStmt("DELETE FROM replicated;");
 
     // Insert into the replicated table
-    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?);");
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?, ?, ?);");
 
     // Get top 10 from the replicated table
-    public final SQLStmt selectStmt = new SQLStmt("SELECT * FROM replicated ORDER BY id LIMIT 10;");
+    public final SQLStmt selectStmt = new SQLStmt("SELECT * FROM replicated ORDER BY txnid LIMIT 10;");
 
-    public VoltTable run() {
-        // initialize the data using the txnId as a base
-        long txnId = this.getTransactionId();
+    public VoltTable run(long rid) {
+        final long txnId = this.getTransactionId();
+        final long ts = getTransactionTime().getTime();
+        final Random rand = getSeededRandomNumberGenerator();
 
         voltQueueSQL(selectStmt);
         voltQueueSQL(deleteStmt, EXPECT_SCALAR_LONG);
-        VoltTable[] previousResults = voltExecuteSQL();
+        VoltTable previousResult = voltExecuteSQL()[0];
+        previousResult.advanceRow();
 
         // some percent of this will rollback
-        if (txnId % 10 < 1) {
+        if (rand.nextDouble() < 0.1) {
             setAppStatusCode((byte) AbortStatus.NORMAL.ordinal());
             throw new VoltAbortException("Normal abort");
         }
 
-        // txnId in the table should be smaller than the current txnId
-        if (previousResults[0].asScalarLong() >= txnId) {
+        // rid in the table should be smaller than the current rid
+        if (previousResult.getLong("rid") >= rid) {
             setAppStatusCode((byte) AbortStatus.OUT_OF_ORDER.ordinal());
-            throw new VoltAbortException("updateReplicated executed out of order");
+            throw new VoltAbortException("updateReplicated may be executed out of order, " +
+                                         "previous rid " + previousResult.getLong("rid") +
+                                         " >= current rid " + rid);
         }
 
-        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId);
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, ts, rid);
         voltQueueSQL(selectStmt);
         VoltTable[] results = voltExecuteSQL(true);
 

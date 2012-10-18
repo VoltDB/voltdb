@@ -140,23 +140,28 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof TupleValueExpression == false) return false;
+        if (obj instanceof TupleValueExpression == false) {
+            return false;
+        }
         TupleValueExpression expr = (TupleValueExpression) obj;
 
-        if ((expr.m_tableName == null) != (m_tableName == null))
+        if ((m_tableName == null) != (expr.m_tableName == null)) {
             return false;
-        if ((expr.m_columnName == null) != (m_columnName == null))
+        }
+        if ((m_columnName == null) != (expr.m_columnName == null)) {
             return false;
-
-        if (expr.m_tableName != null)
-            if (expr.m_tableName.equals(m_tableName) == false)
+        }
+        if (m_tableName != null) { // Implying both sides non-null
+            if (m_tableName.equals(expr.m_tableName) == false) {
                 return false;
-        if (expr.m_columnName != null)
-            if (expr.m_columnName.equals(m_columnName) == false)
+            }
+        }
+        if (m_columnName != null) { // Implying both sides non-null
+            if (m_columnName.equals(expr.m_columnName) == false) {
                 return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
+            }
+        }
+        return true;
     }
 
     @Override
