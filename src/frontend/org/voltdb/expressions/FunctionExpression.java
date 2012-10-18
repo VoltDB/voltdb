@@ -144,31 +144,38 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof FunctionExpression == false) return false;
+    public boolean hasEqualAttributes(AbstractExpression obj) {
+        if (obj instanceof FunctionExpression == false) {
+            return false;
+        }
         FunctionExpression expr = (FunctionExpression) obj;
 
-        if (expr.m_name == null)
+        assert(m_name != null);
+        if (m_name == null) {
+            // This is most unpossible. BUT...
+            // better to fail the equality test than to embarrass ourselves in production mode
+            // (when asserts are turned off) with an NPE on the next line.
             return false;
-        if (expr.m_name.equals(m_name) == false)
+        }
+        if (m_name.equals(expr.m_name) == false) {
             return false;
-
-        if (expr.m_alias == null) {
-            if (m_alias != null) {
+        }
+        if (m_alias == null) {
+            if (expr.m_alias != null) {
                 return false;
             }
         } else {
-            if (expr.m_alias.equals(m_alias) == false) {
+            if (m_alias.equals(expr.m_alias) == false) {
                 return false;
             }
         }
-        if (expr.m_functionId != m_functionId)
+        if (m_functionId != expr.m_functionId) {
             return false;
-        if (expr.m_parameterArg != m_parameterArg)
+        }
+        if (m_parameterArg != expr.m_parameterArg) {
             return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
+        }
+        return true;
     }
 
     @Override
