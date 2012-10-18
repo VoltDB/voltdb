@@ -17,6 +17,9 @@
 
 package org.voltdb.expressions;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -38,6 +41,18 @@ public abstract class AbstractValueExpression extends AbstractExpression {
     // Force AbstractValueExpression derived classes to fend for themselves.
     @Override
     public abstract boolean equals(Object obj);
+
+    // Except for ParameterValueExpression, which takes care of itself, binding to value expressions
+    // amounts to an equality test. If the values expressions are identical, the binding is trivially
+    // possible, indicated by returning an empty list of binding requirements.
+    // Otherwise, there is no binding possible, indicated by a null return.
+    @Override
+    public List<AbstractExpression> bindingToIndexedExpression(AbstractExpression expr) {
+        if (equals(expr)) {
+            return new ArrayList<AbstractExpression>();
+        }
+        return null;
+    }
 
     @Override
     public void normalizeOperandTypes_recurse()

@@ -219,6 +219,7 @@ public abstract class AbstractParsedStmt {
     private static AbstractExpression parseValueExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
         String type = exprNode.attributes.get("type");
         String isParam = exprNode.attributes.get("isparam");
+        String isPlannerGenerated = exprNode.attributes.get("isplannergenerated");
 
         VoltType vt = VoltType.typeFromString(type);
         int size = VoltType.MAX_VALUE_LENGTH;
@@ -228,7 +229,26 @@ public abstract class AbstractParsedStmt {
             if (vt == VoltType.NULL) size = 0;
             else size = vt.getLengthInBytesForFixedTypes();
         }
-        if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
+        // A ParameterValueExpression is needed to represent any user-provided or planner-injected parameter.
+        boolean needParameter = (isParam != null) && (isParam.equalsIgnoreCase("true"));
+
+        // A ConstantValueExpression is needed to represent a constant in the statement,
+        // EVEN if that constant has been "parameterized" by the plan caching code.
+        ConstantValueExpression cve = null;
+        boolean needConstant = (needParameter == false) ||
+            ((isPlannerGenerated != null) && (isPlannerGenerated.equalsIgnoreCase("true")));
+
+        if (needConstant) {
+            cve = new ConstantValueExpression();
+            cve.setValueType(vt);
+            cve.setValueSize(size);
+            String valueStr = null;
+            if (vt != VoltType.NULL) {
+                valueStr = exprNode.attributes.get("value");
+            }
+              cve.setValue(valueStr);
+        }
+        if (needParameter) {
             ParameterValueExpression expr = new ParameterValueExpression();
             long id = Long.parseLong(exprNode.attributes.get("id"));
             int paramIndex = paramIndexById(paramsById, id);
@@ -236,19 +256,12 @@ public abstract class AbstractParsedStmt {
             expr.setValueType(vt);
             expr.setValueSize(size);
             expr.setParameterIndex(paramIndex);
-
+            if (needConstant) {
+                expr.setOriginalValue(cve);
+            }
             return expr;
         }
-        else {
-            ConstantValueExpression expr = new ConstantValueExpression();
-            expr.setValueType(vt);
-            expr.setValueSize(size);
-            if (vt == VoltType.NULL)
-                expr.setValue(null);
-            else
-                expr.setValue(exprNode.attributes.get("value"));
-            return expr;
-        }
+        return cve;
     }
 
     /**

@@ -101,7 +101,7 @@ public class TestExpressionUtil extends TestCase {
     //       /   \
     //    EQUAL  NOT
     //    /   \   |
-    //   P   T  C
+    //   P     T  C
     //
     protected static final AbstractExpression ROOT_EXP = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND);
     protected static final AbstractExpression CHILD_EXPS[] = { new ComparisonExpression(ExpressionType.COMPARE_EQUAL),
@@ -500,5 +500,292 @@ public class TestExpressionUtil extends TestCase {
         ExpressionUtil.setOutputTypeForInsertExpression(cve, VoltType.TIMESTAMP, 8, override_map);
         assertEquals(VoltType.TIMESTAMP, cve.getValueType());
         assertEquals("999999999", cve.m_value);
+    }
+
+    // Test interesting cases of indexable expressions and the query expressions they might match.
+    // Technically, this tests AbstractExpression methods, not ExpressionUtil methods,
+    // but do we really need to launch yet another JUnit suite? I think not.
+    public void testIndexedExpressionBindings() throws Exception
+    {
+        List<AbstractExpression> arguments;
+
+        TupleValueExpression extraColumn = new TupleValueExpression();
+        extraColumn.setTableName("T1");
+        extraColumn.setColumnName("extra");
+
+        ConstantValueExpression constant = new ConstantValueExpression();
+        constant.setValue("42");
+
+        ConstantValueExpression otherConstant = new ConstantValueExpression();
+        otherConstant.setValue("44");
+
+        // Interesting indexable expressions include:
+        // A) simple column, T1.A
+        TupleValueExpression exprA = new TupleValueExpression();
+        exprA.setTableName("T1");
+        exprA.setColumnName("A");
+
+        // B) math with columns, (T1.extra * T1.A)
+        OperatorExpression exprB = new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY, extraColumn, exprA);
+
+       // C) a function of a column, ( functionName(T1.A) )
+        FunctionExpression exprC = new FunctionExpression();
+        exprC.setAttributes("functionName", "yesFunctionName", 42);
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        exprC.setArgs(arguments);
+
+        // D) math with a column and a constant ( 42 * T1.A )
+        OperatorExpression exprD = new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY, constant, exprA);
+
+        // E) a function of a column and constants, ( anotherFunctionName( T1.A, 42, 44 ) )
+        FunctionExpression exprE = new FunctionExpression();
+        exprE.setAttributes("anotherFunctionName", "yesAnotherWhyNot", 44); // not 42, not that it much matters
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        arguments.add(constant);
+        arguments.add(otherConstant);
+        exprE.setArgs(arguments);
+
+        List<AbstractExpression> result;
+        //
+        // Interesting matches for these include:
+        //
+        // Each of A through E should match an identical "cloned" expression,
+        // with no "parameter binding" caveat.
+        AbstractExpression likeA = (AbstractExpression) exprA.clone();
+        result = likeA.bindingToIndexedExpression(exprA);
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        AbstractExpression likeB = (AbstractExpression) exprB.clone();
+        result = likeB.bindingToIndexedExpression(exprB);
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        AbstractExpression likeC = (AbstractExpression) exprC.clone();
+        result = likeC.bindingToIndexedExpression(exprC);
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        AbstractExpression likeD = (AbstractExpression) exprD.clone();
+        result = likeD.bindingToIndexedExpression(exprD);
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        AbstractExpression likeE = (AbstractExpression) exprE.clone();
+        result = likeE.bindingToIndexedExpression(exprE);
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        // Each of D and E should match one-off expressions, differing only in that one or more
+        // of their constants are replaced with Parameters having those identical constants as
+        // their "original values".
+        // Said parameters should (all) be listed in the resulting "parameter binding" caveats.
+
+        ParameterValueExpression paramifiedConstant = new ParameterValueExpression();
+        paramifiedConstant.setOriginalValue(constant);
+
+        ParameterValueExpression otherParamifiedConstant = new ParameterValueExpression();
+        otherParamifiedConstant.setOriginalValue(otherConstant);
+
+        // D) math with a column and a constant ( 42 * T1.A ) works for ( ? * T1.A ) w/ ? == 42
+        AbstractExpression paramifiedD = (AbstractExpression) exprD.clone();
+        paramifiedD.setLeft(paramifiedConstant);
+        result = paramifiedD.bindingToIndexedExpression(exprD);
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+        assertEquals(result.get(0), paramifiedConstant);
+
+        // E) a function of a column and constants, ( anotherFunctionName( T1.A, 42, 44 ) )
+        // works for ( anotherFunctionName( T1.A, ?, 44 ) ) where ? = 42 ...
+        FunctionExpression paramifiedE = (FunctionExpression) exprE.clone();
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        arguments.add(paramifiedConstant);
+        arguments.add(otherConstant);
+        paramifiedE.setArgs(arguments);
+        result = paramifiedE.bindingToIndexedExpression(exprE);
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+        assertEquals(result.get(0), paramifiedConstant);
+
+        // works for ( anotherFunctionName( T1.A, 42, ? ) ) where ? = 44
+        FunctionExpression reparamifiedE = (FunctionExpression) exprE.clone();
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        arguments.add(constant);
+        arguments.add(otherParamifiedConstant);
+        reparamifiedE.setArgs(arguments);
+        result = reparamifiedE.bindingToIndexedExpression(exprE);
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+        assertEquals(result.get(0), otherParamifiedConstant);
+
+        // works for ( anotherFunctionName( T1.A, ?, ? ) ) where ?, ? = 42, 44
+        FunctionExpression everSoParamifiedE = (FunctionExpression) exprE.clone();
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        arguments.add(paramifiedConstant);
+        arguments.add(otherParamifiedConstant);
+        everSoParamifiedE.setArgs(arguments);
+        result = everSoParamifiedE.bindingToIndexedExpression(exprE);
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+        assertEquals(result.size(), 2);
+        assertEquals(result.get(0), paramifiedConstant);
+        assertEquals(result.get(1), otherParamifiedConstant);
+
+        // Done positive match testing.
+
+        ConstantValueExpression neitherConstant = new ConstantValueExpression();
+        neitherConstant.setValue("86");
+
+        ParameterValueExpression paramifiedNeitherConstant = new ParameterValueExpression();
+        paramifiedNeitherConstant.setOriginalValue(neitherConstant);
+
+        ParameterValueExpression actualUserProvidedParameter = new ParameterValueExpression();
+        ParameterValueExpression otherUserProvidedParameter = new ParameterValueExpression();
+
+        //
+        // Interesting non-matches for these indexable expressions include:
+        //
+        // Each of A through E should fail to match a "clone" of any of the others,
+        // all way too dissimilar.
+        result = likeA.bindingToIndexedExpression(exprB);
+        assertNull(result);
+        result = likeA.bindingToIndexedExpression(exprC);
+        assertNull(result);
+        result = likeA.bindingToIndexedExpression(exprD);
+        assertNull(result);
+        result = likeA.bindingToIndexedExpression(exprE);
+        assertNull(result);
+
+        result = likeB.bindingToIndexedExpression(exprA);
+        assertNull(result);
+        result = likeB.bindingToIndexedExpression(exprC);
+        assertNull(result);
+        result = likeB.bindingToIndexedExpression(exprD);
+        assertNull(result);
+        result = likeB.bindingToIndexedExpression(exprE);
+        assertNull(result);
+
+        result = likeC.bindingToIndexedExpression(exprA);
+        assertNull(result);
+        result = likeC.bindingToIndexedExpression(exprB);
+        assertNull(result);
+        result = likeC.bindingToIndexedExpression(exprD);
+        assertNull(result);
+        result = likeC.bindingToIndexedExpression(exprE);
+        assertNull(result);
+
+        result = likeD.bindingToIndexedExpression(exprA);
+        assertNull(result);
+        result = likeD.bindingToIndexedExpression(exprB);
+        assertNull(result);
+        result = likeD.bindingToIndexedExpression(exprC);
+        assertNull(result);
+        result = likeD.bindingToIndexedExpression(exprE);
+        assertNull(result);
+
+        result = likeE.bindingToIndexedExpression(exprA);
+        assertNull(result);
+        result = likeE.bindingToIndexedExpression(exprB);
+        assertNull(result);
+        result = likeE.bindingToIndexedExpression(exprC);
+        assertNull(result);
+        result = likeE.bindingToIndexedExpression(exprD);
+        assertNull(result);
+
+        // Each of D and E should fail to match "near misses", one-offs of their parameterized selves,
+        // specifically when the parameter has a different "original value" than the constant in the
+        // indexable expression OR has no "original value" -- like a user-provided parameter to a
+        // compiled statement.
+
+        // D) math with a column and a constant ( 42 * T1.A ) for ( ? * T1.A ) w/ ? == 86
+        AbstractExpression crossParamifiedD = (AbstractExpression) exprD.clone();
+        crossParamifiedD.setLeft(paramifiedNeitherConstant);
+        result = crossParamifiedD.bindingToIndexedExpression(exprD);
+        assertNull(result);
+
+        // D) math with a column and a constant ( 42 * T1.A ) for ( ? * T1.A ) w/ ? == ???!
+        AbstractExpression userParamifiedD = (AbstractExpression) exprD.clone();
+        userParamifiedD.setLeft(actualUserProvidedParameter);
+        result = userParamifiedD.bindingToIndexedExpression(exprD);
+        assertNull(result);
+
+        // E) a function of a column and constants, ( anotherFunctionName( T1.A, 42, 44 ) )
+        // for ( anotherFunctionName( T1.A, ?, ? ) ) where ?, ? = 42, 86
+        FunctionExpression crossParamifiedE = (FunctionExpression) exprE.clone();
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        arguments.add(paramifiedConstant);
+        arguments.add(paramifiedNeitherConstant);
+        crossParamifiedE.setArgs(arguments);
+        result = crossParamifiedE.bindingToIndexedExpression(exprE);
+        assertNull(result);
+
+        // for ( anotherFunctionName( T1.A, ?, ? ) ) where ?, ? = ???, ??? ...
+        FunctionExpression userParamifiedE = (FunctionExpression) exprE.clone();
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        arguments.add(actualUserProvidedParameter);
+        arguments.add(otherUserProvidedParameter);
+        userParamifiedE.setArgs(arguments);
+        result = userParamifiedE.bindingToIndexedExpression(exprE);
+        assertNull(result);
+
+        // Each of A through E should fail to match other one-offs of themselves
+        // (i.e. wrong column, wrong constant, wrong function, wrong math op).
+
+        // A) wrong column
+        TupleValueExpression notTheColumn = new TupleValueExpression();
+        notTheColumn.setTableName("T1");
+        notTheColumn.setColumnName("notA");
+
+        result = notTheColumn.bindingToIndexedExpression(exprA);
+        assertNull(result);
+
+        // B) wrong math with columns
+        OperatorExpression notTheOperator = new OperatorExpression(ExpressionType.OPERATOR_DIVIDE, extraColumn, exprA);
+
+        result = notTheOperator.bindingToIndexedExpression(exprB);
+        assertNull(result);
+
+        // C) wrong function of a column
+        FunctionExpression neitherFunction = new FunctionExpression();
+        neitherFunction.setAttributes("notTheFunctionName", "noNotTheFunctionName", 86); // 86 is neither 42 nor 44.
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        neitherFunction.setArgs(arguments);
+
+        result = neitherFunction.bindingToIndexedExpression(exprC);
+        assertNull(result);
+
+        // D) right math op with a wrong column and a right constant
+        notTheOperator = new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY, constant, extraColumn);
+
+        result = notTheOperator.bindingToIndexedExpression(exprD);
+        assertNull(result);
+
+        // E) a right function of a column but not enough arguments.
+        FunctionExpression notTheArgs = (FunctionExpression) exprE.clone();
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        arguments.add(constant);
+        notTheArgs.setArgs(arguments);
+
+        result = notTheArgs.bindingToIndexedExpression(exprE);
+        assertNull(result);
+
+        // E) or too many arguments.
+        arguments = new ArrayList<AbstractExpression>();
+        arguments.add(exprA);
+        arguments.add(constant);
+        arguments.add(exprA);
+        arguments.add(constant);
+        notTheArgs.setArgs(arguments);
+        result = notTheArgs.bindingToIndexedExpression(exprE);
+        assertNull(result);
     }
 }
