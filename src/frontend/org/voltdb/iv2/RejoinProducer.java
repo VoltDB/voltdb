@@ -61,10 +61,14 @@ public class RejoinProducer extends SiteTasker
     private final int m_partitionId;
     private final String m_snapshotNonce;
     private final String m_whoami;
-    private InitiatorMailbox m_mailbox;
-    private long m_rejoinCoordinatorHsId;
-    private RejoinSiteProcessor m_rejoinSiteProcessor;
-    private ReplayCompletionAction m_replayCompleteAction;
+    private volatile InitiatorMailbox m_mailbox;
+    private volatile RejoinSiteProcessor m_rejoinSiteProcessor;
+
+    // set in mailbox thread and then read from monitor thread.
+    private volatile long m_rejoinCoordinatorHsId;
+
+    // set in the monitor thread; read in the site thread.
+    private volatile ReplayCompletionAction m_replayCompleteAction;
 
     // True: use live rejoin; false use community blocking implementation.
     private boolean m_liveRejoin;
@@ -104,7 +108,6 @@ public class RejoinProducer extends SiteTasker
     // Non-blocking rejoin will release the queue and reschedule
     // the producer with the site to incrementally transfer
     // snapshot data.
-
     //
     // In both cases, the site is responding with REJOINING to
     // all incoming tasks.
@@ -115,7 +118,7 @@ public class RejoinProducer extends SiteTasker
     // site thread until complete.
     // 1. Snapshot must be fully transfered (sink EOF reached)
     // 2. The replay complete action must be ready, meaning the
-    // snapshot handler has responded with the snapshot txnid.
+    // monitor returned with the per-partition sphandles.
     // 3. The snapshot completion monitor callback must have been
     // triggered.
     //
@@ -125,8 +128,8 @@ public class RejoinProducer extends SiteTasker
 
     /**
      * SnapshotCompletionAction waits for the completion
-     * notice of m_snapshotNonce and instructs the replay agent
-     * that the snapshot completed.
+     * notice of m_snapshotNonce and creates a ReplayCompleteAction
+     * to inform the replay agent that the snapshot completed.
      *
      * Inner class references m_mailbox, m_nonce, m_rejoinCoordinatorHsId.
      */
@@ -149,8 +152,24 @@ public class RejoinProducer extends SiteTasker
                 long[] partitionTxnIds, boolean truncationSnapshot)
         {
             if (nonce.equals(m_snapshotNonce)) {
-                REJOINLOG.debug(m_whoami + "counting down snapshot monitor completion.");
                 deregister();
+
+                Long snapshotSpHandle = TxnEgo.extractTxnIdForPartition(
+                        partitionTxnIds, m_partitionId);
+
+                Runnable action = new Runnable() {
+                    public void run() {
+                        REJOINLOG.debug(m_whoami + "informing rejoinCoordinator " +
+                                CoreUtils.hsIdToString(m_rejoinCoordinatorHsId) + " of REPLAY_FINISHED");
+                        RejoinMessage replay_complete =
+                            new RejoinMessage(m_rejoinCoordinatorHsId, Type.REPLAY_FINISHED);
+                        m_mailbox.send(m_rejoinCoordinatorHsId, replay_complete);
+                    }
+                };
+                m_replayCompleteAction =
+                    new ReplayCompletionAction(snapshotSpHandle, action);
+
+                REJOINLOG.debug(m_whoami + "counting down snapshot monitor completion.");
                 m_completionMonitorAwait.countDown();
             }
             else {
@@ -213,9 +232,6 @@ public class RejoinProducer extends SiteTasker
         }
         else if (message.getType() == RejoinMessage.Type.INITIATION_COMMUNITY) {
             doInitiation(message);
-        }
-        else if (message.getType() == RejoinMessage.Type.REQUEST_RESPONSE) {
-            doRequestResponse(message);
         }
         else {
             VoltDB.crashLocalVoltDB("Unknown rejoin message type: " +
@@ -331,37 +347,13 @@ public class RejoinProducer extends SiteTasker
                 REJOINLOG.debug(m_whoami + "received Snapshotresponse handler callback." +
                        " Snapshot txnId is: " + txnId);
 
-                // Send a RequestResponse message to self to avoid synchronization
-                RejoinMessage msg = new RejoinMessage(txnId);
-                m_mailbox.send(m_mailbox.getHSId(), msg);
+                m_snapshotAdapterAwait.countDown();
             } else {
                 VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
                         false, null);
             }
         }
     };
-
-    // m_handler sends this message to communicate the snapshot txnid after
-    // the snapshot has been initiated. Setup the ReplayCompleteAction
-    // that the Site will need.
-    void doRequestResponse(RejoinMessage message)
-    {
-        REJOINLOG.debug(m_whoami + "SnapshotResponse forwarded to RejoinProducer mbox.");
-
-        Runnable action = new Runnable() {
-            public void run() {
-                REJOINLOG.debug(m_whoami + "informing rejoinCoordinator " +
-                        CoreUtils.hsIdToString(m_rejoinCoordinatorHsId) + " of REPLAY_FINISHED");
-                RejoinMessage replay_complete =
-                    new RejoinMessage(m_rejoinCoordinatorHsId, Type.REPLAY_FINISHED);
-                m_mailbox.send(m_rejoinCoordinatorHsId, replay_complete);
-            }
-        };
-
-        m_replayCompleteAction =
-            new ReplayCompletionAction(message.getSnapshotTxnId(), action);
-        m_snapshotAdapterAwait.countDown();
-    }
 
     /**
      * SiteTasker run -- load this site!
