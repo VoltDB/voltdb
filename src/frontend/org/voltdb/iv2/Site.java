@@ -507,9 +507,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (task != null) {
             if (m_rejoinTaskLog != null && task instanceof TransactionTask) {
                 TransactionInfoBaseMessage tibm = ((TransactionTask)task).m_txn.getNotice();
-                if (!filter(tibm)) {
-                    m_rejoinTaskLog.logTask(tibm);
-                }
+                m_rejoinTaskLog.logTask(tibm);
             }
             task.runForRejoin(getSiteProcedureConnection());
         }
@@ -565,7 +563,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 rejoinLog.debug("Site " + m_siteId + ": rejoin log unavailable. Async fetch.");
                 return;
             }
-            else if (tibm instanceof Iv2InitiateTaskMessage) {
+
+            // Apply the readonly / sysproc filter. This filter is applied on replay
+            // to make truncating the task log header easier -- having the snapshot
+            // message in the log is helpful.
+            if (filter(tibm)) {
+                continue;
+            }
+
+            if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
