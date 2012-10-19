@@ -473,7 +473,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     task.run(getSiteProcedureConnection());
                 }
                 else {
-                    rejoinRunLoop();
+                    // During live rejoin, the site takes responsibility for
+                    // the deferred transaction info base message.
+                    // (Cleaner to pass m_rejoinTaskLog to runForRejoin()?)
+                    SiteTasker task = m_scheduler.poll();
+                    if (task != null) {
+                        if (m_rejoinTaskLog != null && task instanceof TransactionTask) {
+                            TransactionInfoBaseMessage tibm = ((TransactionTask)task).m_txn.getNotice();
+                            m_rejoinTaskLog.logTask(tibm);
+                        }
+                        task.runForRejoin(getSiteProcedureConnection());
+                    }
+                    // try to do some catch-up work.
+                    replayFromTaskLog();
                 }
             }
         }
@@ -498,29 +510,85 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         shutdown();
     }
 
-    void rejoinRunLoop() throws InterruptedException, IOException
+    ParticipantTransactionState global_replay_mpTxn = null;
+    void replayFromTaskLog() throws IOException
     {
-        // During live rejoin, the site takes responsibility for
-        // the deferred transaction info base message.
-        // (Cleaner to pass m_rejoinTaskLog to runForRejoin()?)
-        SiteTasker task = m_scheduler.poll();
-        if (task != null) {
-            if (m_rejoinTaskLog != null && task instanceof TransactionTask) {
-                TransactionInfoBaseMessage tibm = ((TransactionTask)task).m_txn.getNotice();
-                m_rejoinTaskLog.logTask(tibm);
-            }
-            task.runForRejoin(getSiteProcedureConnection());
+        // not yet time to catch-up.
+        if (m_rejoinState != kStateReplayingRejoin) {
+            return;
         }
 
-        // During the rejoin-catchup period, run some transactions
-        // from the task back log.
-        if (m_rejoinState == kStateReplayingRejoin) {
+        // replay 10:1 in favor of replay
+        for (int i=0; i < 10; ++i) {
             if (m_rejoinTaskLog == null || m_rejoinTaskLog.isEmpty()) {
-                setReplayRejoinComplete();
+                break;
+            }
+
+            TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
+            if (tibm == null) {
+                rejoinLog.debug("Site " + m_siteId + ": rejoin log unavailable. Async fetch.");
+                while (tibm == null) {
+                    try {
+                        Thread.sleep(10);
+                    } catch (Exception fuckyou) {}
+                    tibm = m_rejoinTaskLog.getNextMessage();
+                }
+            }
+
+            // Apply the readonly / sysproc filter. With Iv2 read optimizations,
+            // reads should not reach here; the cost of post-filtering shouldn't
+            // be particularly high (vs pre-filtering).
+            if (filter(tibm)) {
+                continue;
+            }
+
+            if (tibm instanceof Iv2InitiateTaskMessage) {
+                Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
+                SpProcedureTask t = new SpProcedureTask(
+                        m_initiatorMailbox, m.getStoredProcedureName(),
+                        null, m, null);
+                t.runFromTaskLog(this);
+            }
+            else if (tibm instanceof FragmentTaskMessage) {
+                FragmentTaskMessage m = (FragmentTaskMessage)tibm;
+                if (global_replay_mpTxn == null) {
+                    global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
+                }
+                else if (global_replay_mpTxn.txnId != m.getTxnId()) {
+                    System.out.println("Old global: " + global_replay_mpTxn.txnId);
+                    System.out.println("New txnId: " + m.getTxnId());
+                    VoltDB.crashLocalVoltDB("Started a MP transaction during replay before completing " +
+                            " open transaction.", false, null);
+                }
+                FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+                t.runFromTaskLog(this);
+            }
+            else if (tibm instanceof CompleteTransactionMessage) {
+                CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
+                CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
+                global_replay_mpTxn = null;
+                System.out.println("COMPLETING: " + m.getTxnId());
+                t.runFromTaskLog(this);
             }
             else {
-                replayFromTaskLog();
+                VoltDB.crashLocalVoltDB("Can not replay message type " +
+                        tibm + " during live rejoin. Unexpected error.",
+                        false, null);
             }
+        }
+
+        // exit replay being careful not to exit in the middle of a multi-partititon
+        // transaction. The SPScheduler doesn't have a valid transaction state for a
+        // partially replayed MP txn and in case of rollback the scheduler's undo token
+        // is wrong. Run MP txns fully kStateRejoining or fully kStateRunning.
+        if (m_rejoinTaskLog == null) {
+            setReplayRejoinComplete();
+        }
+        else if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
+            setReplayRejoinComplete();
+        }
+        else if (m_rejoinTaskLog.isEmpty()) {
+            System.out.println("EMPTY TASK LOG. GLOBAL_MP: " + global_replay_mpTxn);
         }
     }
 
@@ -528,7 +596,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         // don't log sysproc fragments or iv2 intiiate task messages.
         // this is all jealously; should be refactored to ask tibm
-        // if it wants to be logged for rejoin and eliminate this
+        // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the
         // original live rejoin code for ExecutionSite...
         if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
@@ -545,57 +613,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         }
         return false;
-    }
-
-    ParticipantTransactionState global_replay_mpTxn = null;
-    void replayFromTaskLog() throws IOException
-    {
-        // replay 10::1 in favor of replay and never stop replaying
-        // in the middle of a multi-part transaction.
-        for (int i=1; global_replay_mpTxn != null || i < 10; ++i) {
-            if (m_rejoinTaskLog.isEmpty()) {
-                assert(global_replay_mpTxn == null);
-                return;
-            }
-            TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
-            if (tibm == null) {
-                // asynchronous fetch - queue temporarily unavailable
-                rejoinLog.debug("Site " + m_siteId + ": rejoin log unavailable. Async fetch.");
-                return;
-            }
-
-            // Apply the readonly / sysproc filter. With Iv2 read optimizations,
-            // reads really should be here; the cost of post-filtering shouldn't
-            // be particularly high.
-            if (filter(tibm)) {
-                continue;
-            }
-
-            if (tibm instanceof Iv2InitiateTaskMessage) {
-                Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
-                SpProcedureTask t = new SpProcedureTask(
-                        m_initiatorMailbox, m.getStoredProcedureName(),
-                        null, m, null);
-                t.runFromTaskLog(this);
-            }
-            else if (tibm instanceof FragmentTaskMessage) {
-                FragmentTaskMessage m = (FragmentTaskMessage)tibm;
-                global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
-                FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
-                t.runFromTaskLog(this);
-            }
-            else if (tibm instanceof CompleteTransactionMessage) {
-                CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
-                t.runFromTaskLog(this);
-                global_replay_mpTxn = null;
-            }
-            else {
-                VoltDB.crashLocalVoltDB("Can not replay message type " +
-                        tibm + " during live rejoin. Unexpected error.",
-                        false, null);
-            }
-        }
     }
 
     public void startShutdown()
