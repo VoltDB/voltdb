@@ -98,7 +98,9 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        hostLog.fatal("START replaying txn: " + this);
+        if (hostLog.isTraceEnabled()) {
+            hostLog.trace("START replaying txn: " + this);
+        }
         if (!m_txn.isReadOnly()) {
             m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         }
@@ -125,7 +127,9 @@ public class SpProcedureTask extends ProcedureTask
         }
         m_txn.setDone();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        hostLog.debug("COMPLETE replaying txn: " + this);
+        if (hostLog.isTraceEnabled()) {
+            hostLog.trace("COMPLETE replaying txn: " + this);
+        }
     }
 
 

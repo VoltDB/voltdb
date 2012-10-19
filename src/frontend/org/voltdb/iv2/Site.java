@@ -564,9 +564,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 return;
             }
 
-            // Apply the readonly / sysproc filter. This filter is applied on replay
-            // to make truncating the task log header easier -- having the snapshot
-            // message in the log is helpful.
+            // Apply the readonly / sysproc filter. With Iv2 read optimizations,
+            // reads really should be here; the cost of post-filtering shouldn't
+            // be particularly high.
             if (filter(tibm)) {
                 continue;
             }
@@ -580,14 +580,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             else if (tibm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage m = (FragmentTaskMessage)tibm;
-                rejoinLog.debug("Replaying frag: " + m);
                 global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
                 FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
                 t.runFromTaskLog(this);
             }
             else if (tibm instanceof CompleteTransactionMessage) {
                 CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                rejoinLog.debug("Replaying complete msg: " + m);
                 CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
                 t.runFromTaskLog(this);
                 global_replay_mpTxn = null;
