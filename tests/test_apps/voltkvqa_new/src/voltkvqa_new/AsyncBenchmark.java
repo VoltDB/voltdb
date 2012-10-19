@@ -965,7 +965,7 @@ public class AsyncBenchmark {
                 msg = "In main..try block after runBenchmark. totalConnections = '" + totalConnections.get() + "'\n";
                 prt(msg);
             }
-            benchmark.closeClient();
+            benchmark.readyToExit();
         }
         catch(org.voltdb.client.NoConnectionsException x) {
             benchmark.closeClient();
