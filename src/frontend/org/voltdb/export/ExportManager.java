@@ -128,7 +128,6 @@ public class ExportManager
                         exportLog.info("Creating connector " + m_loaderClass);
                         try {
                             final Class<?> loaderClass = Class.forName(m_loaderClass);
-                            //TODO may set master ship here
                             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
                             newProcessor.addLogger(exportLog);
                             newProcessor.setExportGeneration(generations.firstEntry().getValue());
@@ -191,10 +190,8 @@ public class ExportManager
                 "can't acquire mastership twice for partition id: " + partitionId
                 );
 
-        if (m_masterOfPartitions.add(partitionId)) {
-          for( ExportGeneration gen: m_generations.get().values()) {
-              gen.acceptMastershipTask(partitionId);
-          }
+        for( ExportGeneration gen: m_generations.get().values()) {
+           gen.acceptMastershipTask(partitionId);
         }
     }
 
