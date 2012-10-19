@@ -217,7 +217,7 @@ public class AsyncBenchmark {
             if ((currentTime - benchmarkStartTS) < (config.duration * 1000)) {
                 if(debug) {
                     long diff = currentTime - benchmarkStartTS;
-                    String msg = "Time remaining in seconds " + diff/1000l +
+                    String msg = "Time remaining in seconds: " + diff/1000l +
                         ", connectionsLeft: " + connectionsLeft +
                         ", Total Connections detected by this client: " + totalConnections.get();
                     prt(msg);
@@ -737,7 +737,7 @@ public class AsyncBenchmark {
         String msg = "";
         while (benchmarkEndTime > currentTime) {
             if(debug && diff != 0 && diff%5000.00 == 0 && i%5 == 0) {
-                msg = "i = " + i + ", Time remaining in seconds = " + diff/1000l +
+                msg = "i = " + i + ", Time remaining in seconds: " + diff/1000l +
                       ", totalConnections = " + totalConnections.get();
                 prt(msg);
                 i++;
@@ -747,7 +747,7 @@ public class AsyncBenchmark {
                     msg = "i = " + i + ", diff = '" + diff +
                            ", totalConnections = " + totalConnections.get() + "\n";
                 }
-                msg += "VoltDB could be down!!";
+                msg += "All connections are lost! VoltDB could be down!!";
                 prt(msg);
             }
 
@@ -894,6 +894,7 @@ public class AsyncBenchmark {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+        System.out.println("\n-------------------\nTest Results:\n-------------------\n");
         System.out.printf("\n\t%10d\tKV Rows Checked\n", hashMap.size());
         System.out.printf("\t%10d\tKV Rows Found in database\n", successfulPutCount.get());
         System.out.printf("\t%10d\tKV Rows Missing in database\n", hashMap.size() - successfulPutCount.get());
@@ -990,13 +991,13 @@ public class AsyncBenchmark {
 
                 Thread.sleep(5000); // sleep 5 seconds
 
-                msg = "In main..catch block after sleep, re-connecting these severs: " + config.servers;
+                msg = "Reconnecting to these severs: " + config.servers;
                 prt(msg);
 
                 benchmark.connect(config.servers, "In catch Second Time");
                 totalConnections = benchmark.get_totalConnections();
-                msg = "In main..catch block after benchmark.connect(), re-connecting these severs: '"
-                    + config.servers + "', totalConnections = " + totalConnections.get();
+                msg = "Reconnected to these severs: '" + config.servers +
+                      "', totalConnections = " + totalConnections.get();
                 prt(msg);
                 if(numOfHosts != totalConnections.get() && fatalLevel.get() > 0) {
                     msg = "Error!! We expect to connect " + numOfHosts + " hosts, which are " + config.servers + "\n";
@@ -1014,14 +1015,18 @@ public class AsyncBenchmark {
                     msg += "totalConnections = '" + totalConnections.get() + "'\n";
                     prt(msg);
                 }
-            }
-            //Thread.sleep(120000);
-            if(benchmark.debug) {
-                totalConnections = benchmark.get_totalConnections();
-                msg = "In main..catch block Ready To Exit, totalConnections = " + totalConnections.get();
+                //Thread.sleep(120000);
+                if(benchmark.debug) {
+                    totalConnections = benchmark.get_totalConnections();
+                    msg = "In main..catch block Ready To Exit, totalConnections = " + totalConnections.get();
+                    prt(msg);
+                }
+                benchmark.readyToExit();
+            } // if(config.recover)
+            else {
+                msg = "Lost all connections without recover. Exit...";
                 prt(msg);
             }
-            benchmark.readyToExit();
-        }
+        } // catch(org.voltdb.client.NoConnectionsException x)
     }
 }
