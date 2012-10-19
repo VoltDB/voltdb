@@ -87,8 +87,8 @@ function async-benchmark() {
         --entropy=127 \
         --usecompression=false \
         --ratelimit=100000 \
-        --autotune=true \
-        --mpratio=0.5 \
+        --autotune=false \
+        --mpratio=0.9 \
         --latencytarget=6
 }
 
