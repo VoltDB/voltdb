@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -32,6 +34,8 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.iv2.RejoinProducer;
 import org.voltdb.iv2.RejoinProducer;
 import org.voltdb.PrivateVoltTableFactory;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotFormat;
@@ -381,7 +385,9 @@ public class RejoinProducer extends SiteTasker
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection) {
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog m_taskLog)
+    throws IOException
+    {
         if (useLiveRejoin()) {
             runForLiveRejoin(siteConnection);
         }

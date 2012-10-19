@@ -376,7 +376,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         },
         m_snapshotPriority,
         new SnapshotSiteProcessor.IdlePredicate() {
-
             @Override
             public boolean idle(long now) {
                 return (now - 5) > m_lastTxnTime;
@@ -386,7 +385,36 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (m_startAction == VoltDB.START_ACTION.LIVE_REJOIN) {
             initializeForLiveRejoin();
         }
+
+        if (m_rejoinTaskLog == null) {
+            m_rejoinTaskLog = new TaskLog() {
+                @Override
+                public void logTask(TransactionInfoBaseMessage message)
+                        throws IOException {
+                }
+
+                @Override
+                public TransactionInfoBaseMessage getNextMessage()
+                        throws IOException {
+                    return null;
+                }
+
+                @Override
+                public void setEarliestTxnId(long txnId) {
+                }
+
+                @Override
+                public boolean isEmpty() throws IOException {
+                    return true;
+                }
+
+                @Override
+                public void close() throws IOException {
+                }
+            };
+        }
     }
+
 
     void initializeForLiveRejoin()
     {
@@ -473,18 +501,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     task.run(getSiteProcedureConnection());
                 }
                 else {
-                    // During live rejoin, the site takes responsibility for
-                    // the deferred transaction info base message.
-                    // (Cleaner to pass m_rejoinTaskLog to runForRejoin()?)
+                    // Rejoin operation poll and try to do some catchup work. Tasks
+                    // are responsible for logging any rejoin work they might have.
                     SiteTasker task = m_scheduler.poll();
                     if (task != null) {
-                        if (m_rejoinTaskLog != null && task instanceof TransactionTask) {
-                            TransactionInfoBaseMessage tibm = ((TransactionTask)task).m_txn.getNotice();
-                            m_rejoinTaskLog.logTask(tibm);
-                        }
-                        task.runForRejoin(getSiteProcedureConnection());
+                        task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                     }
-                    // try to do some catch-up work.
                     replayFromTaskLog();
                 }
             }
@@ -520,7 +542,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         // replay 10:1 in favor of replay
         for (int i=0; i < 10; ++i) {
-            if (m_rejoinTaskLog == null || m_rejoinTaskLog.isEmpty()) {
+            if (m_rejoinTaskLog.isEmpty()) {
                 break;
             }
 
@@ -581,10 +603,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // transaction. The SPScheduler doesn't have a valid transaction state for a
         // partially replayed MP txn and in case of rollback the scheduler's undo token
         // is wrong. Run MP txns fully kStateRejoining or fully kStateRunning.
-        if (m_rejoinTaskLog == null) {
-            setReplayRejoinComplete();
-        }
-        else if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
+        if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
             setReplayRejoinComplete();
         }
         else if (m_rejoinTaskLog.isEmpty()) {

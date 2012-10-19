@@ -17,10 +17,14 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
@@ -75,8 +79,10 @@ public class SpProcedureTask extends ProcedureTask
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
+        taskLog.logTask(m_txn.getNotice());
         SpTransactionState txn = (SpTransactionState)m_txn;
         final InitiateResponseMessage response =
             new InitiateResponseMessage(txn.m_task);
