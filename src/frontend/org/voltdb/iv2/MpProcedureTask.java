@@ -79,7 +79,6 @@ public class MpProcedureTask extends ProcedureTask
         // call m_txn.setDone() somehow
         final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         if (!response.shouldCommit()) {
-            System.out.println("MP ROLLBACK: " + m_txn.txnId);
             txn.setNeedsRollback();
         }
         completeInitiateTask(siteConnection);

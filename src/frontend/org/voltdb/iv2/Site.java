@@ -83,7 +83,6 @@ import com.google.common.collect.ImmutableMap;
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     // Set to false trigger shutdown.
     volatile boolean m_shouldContinue = true;
@@ -571,8 +570,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
                 }
                 else if (global_replay_mpTxn.txnId != m.getTxnId()) {
-                    System.out.println("Old global: " + global_replay_mpTxn.txnId);
-                    System.out.println("New txnId: " + m.getTxnId());
                     VoltDB.crashLocalVoltDB("Started a MP transaction during replay before completing " +
                             " open transaction.", false, null);
                 }
@@ -586,7 +583,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
                     CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
                     global_replay_mpTxn = null;
-                    System.out.println("COMPLETING: " + m.getTxnId());
                     t.runFromTaskLog(this);
                 }
             }
@@ -605,7 +601,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             setReplayRejoinComplete();
         }
         else if (m_rejoinTaskLog.isEmpty()) {
-            System.out.println("EMPTY TASK LOG. GLOBAL_MP: " + global_replay_mpTxn);
         }
     }
 
@@ -922,13 +917,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         assert(m_rejoinState == kStateRejoining);
 
         if (replayComplete == null) {
-            try {
-                throw new RuntimeException("Null Replay Complete Action!?");
-            }
-            catch (RuntimeException e) {
-                System.out.println("Null replay complete action !?");
-                e.printStackTrace();
-            }
+            throw new RuntimeException("Null Replay Complete Action.");
         }
 
         m_rejoinState = kStateReplayingRejoin;
