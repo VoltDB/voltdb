@@ -1486,7 +1486,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
-                                                                   -1,
+                                                                   ts,
                                                                    invocation,
                                                                    txnState.getResults());
                 }
