@@ -41,22 +41,22 @@ def clean(runner):
 def server(runner):
     VOLT.voltadmin.start()
 
-@VOLT.Java_Command('voter.JDBCBenchmark', description = 'Run the Voter JDBC benchmark.')
+@VOLT.Java('voter.JDBCBenchmark', description = 'Run the Voter JDBC benchmark.')
 def jdbc(runner):
     VOLT.run.build('-c')
     runner.go()
 
-@VOLT.Java_Command('voter.SimpleBenchmark', description = 'Run the Voter simple benchmark.')
+@VOLT.Java('voter.SimpleBenchmark', description = 'Run the Voter simple benchmark.')
 def simple(runner):
     VOLT.run.build('-c')
     runner.go()
 
-@VOLT.Java_Command('voter.AsyncBenchmark', description = 'Run the Voter asynchronous benchmark.')
+@VOLT.Java('voter.AsyncBenchmark', description = 'Run the Voter asynchronous benchmark.')
 def async(runner):
     VOLT.run.build('-c')
     runner.go()
 
-@VOLT.Java_Command('voter.SyncBenchmark', description = 'Run the Voter synchronous benchmark.')
+@VOLT.Java('voter.SyncBenchmark', description = 'Run the Voter synchronous benchmark.')
 def sync(runner):
     VOLT.run.build('-c')
     runner.go()

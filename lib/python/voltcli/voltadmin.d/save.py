@@ -25,18 +25,26 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-
-java_ext_opts = (
-    '-server',
-    '-XX:+HeapDumpOnOutOfMemoryError',
-    '-XX:HeapDumpPath=/tmp',
-    '-XX:-ReduceInitialCardMarks'
+@VOLT.Client(
+    description = 'Save a VoltDB database snapshot.',
+    cli_options = (
+        VOLT.CLIBoolean('-b', '--block', 'block',
+                        'block database activity during snapshot save',
+                        default = False),
+        VOLT.CLIValue('-d', '--directory', 'directory',
+                      'the local snapshot directory path',
+                      required = True),
+        VOLT.CLIValue('-f', '--format', 'format',
+                      'snapshot format: "native" or "csv"',
+                      default = 'native'),
+        VOLT.CLIValue('-i', '--id', 'unique_id',
+                      'the unique snapshot identifier',
+                      required = True),
+    )
 )
-
-@VOLT.Command(description = 'Save a VoltDB database snapshot.')
 def save(runner):
-    catalog = runner.config.get_required('volt.catalog')
-    if not os.path.exists(catalog):
-        runner.shell('volt', 'compile')
-    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)
+    proc = VOLT.VoltProcedure(runner.client, '@SnapshotRestore', [
+                                    VOLT.FastSerializer.VOLTTYPE_STRING,
+                                    VOLT.FastSerializer.VOLTTYPE_STRING])
+    response = proc.call(params = (runner.opts.directory, runner.opts.unique_id))
+    print response

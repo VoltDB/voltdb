@@ -22,8 +22,7 @@
 
 # All the tests for the Voter application.
 
-@VOLT.Java_Command('voter.AsyncBenchmark',
-                   description = 'Run test 1.',
-                   depends = 'build_as_needed')
+@VOLT.Java('voter.AsyncBenchmark', description = 'Run test 1.')
 def test1(runner):
+    VOLT.run.build('-c')
     runner.go()

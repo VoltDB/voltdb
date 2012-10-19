@@ -25,18 +25,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-
-java_ext_opts = (
-    '-server',
-    '-XX:+HeapDumpOnOutOfMemoryError',
-    '-XX:HeapDumpPath=/tmp',
-    '-XX:-ReduceInitialCardMarks'
-)
-
-@VOLT.Command(description = 'Resume paused VoltDB cluster that is in admin mode.')
+@VOLT.Client(description = 'Resume a paused VoltDB cluster that is in admin mode.')
 def resume(runner):
-    catalog = runner.config.get_required('volt.catalog')
-    if not os.path.exists(catalog):
-        runner.shell('volt', 'compile')
-    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)
+    proc = VOLT.VoltProcedure(runner.client, '@Resume')
+    response = proc.call()
+    print response

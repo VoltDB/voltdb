@@ -25,18 +25,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-
-java_ext_opts = (
-    '-server',
-    '-XX:+HeapDumpOnOutOfMemoryError',
-    '-XX:HeapDumpPath=/tmp',
-    '-XX:-ReduceInitialCardMarks'
-)
-
-@VOLT.Command(description = 'Start the VoltDB server and create the database.')
+@VOLT.Server('create',
+             description = 'Start the VoltDB server and create the database.')
 def create(runner):
-    catalog = runner.config.get_required('volt.catalog')
-    if not os.path.exists(catalog):
-        runner.shell('volt', 'compile')
-    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, 'create', 'catalog', catalog, *runner.args)
+    runner.go()

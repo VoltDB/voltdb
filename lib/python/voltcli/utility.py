@@ -38,6 +38,8 @@ import inspect
 import ConfigParser
 import zipfile
 import re
+import pkgutil
+import binascii
 from xml.etree import ElementTree
 
 __author__ = 'scooper'
@@ -48,16 +50,10 @@ class Global:
     """
     Global data for utilities.
     """
-    debug_enabled = False
-    dryrun_enabled = False
-
-#===============================================================================
-def set_debug(debug):
-#===============================================================================
-    """
-    Enable or disable debug messages.
-    """
-    Global.debug_enabled = debug
+    verbose_enabled = False
+    debug_enabled   = False
+    dryrun_enabled  = False
+    manifest_path   = 'MANIFEST'
 
 #===============================================================================
 def set_dryrun(dryrun):
@@ -66,6 +62,48 @@ def set_dryrun(dryrun):
     Enable or disable command dry run (display only/no execution).
     """
     Global.dryrun_enabled = dryrun
+
+#===============================================================================
+def set_verbose(verbose):
+#===============================================================================
+    """
+    Enable or disable verbose messages. Increases the number of INFO messages.
+    """
+    Global.verbose_enabled = verbose
+
+#===============================================================================
+def set_debug(debug):
+#===============================================================================
+    """
+    Enable or disable DEBUG messages. Also enables verbose INFO messages.
+    """
+    Global.debug_enabled = debug
+    if debug:
+        Global.verbose_enabled = True
+
+#===============================================================================
+def is_dryrun():
+#===============================================================================
+    """
+    Return True if dry-run is enabled.
+    """
+    return Global.dryrun_enabled
+
+#===============================================================================
+def is_verbose():
+#===============================================================================
+    """
+    Return True if verbose messages are enabled.
+    """
+    return Global.verbose_enabled
+
+#===============================================================================
+def is_debug():
+#===============================================================================
+    """
+    Return True if debug messages are enabled.
+    """
+    return Global.debug_enabled
 
 #===============================================================================
 def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
@@ -115,6 +153,24 @@ def info(*msgs):
     display_messages(msgs, tag = 'INFO')
 
 #===============================================================================
+def verbose_info(*msgs):
+#===============================================================================
+    """
+    Display verbose INFO level messages if enabled.
+    """
+    if Global.verbose_enabled:
+        display_messages(msgs, tag = 'INFO2')
+
+#===============================================================================
+def debug(*msgs):
+#===============================================================================
+    """
+    Display DEBUG level message(s) if debug is enabled.
+    """
+    if Global.debug_enabled:
+        display_messages(msgs, tag = 'DEBUG')
+
+#===============================================================================
 def warning(*msgs):
 #===============================================================================
     """
@@ -153,25 +209,63 @@ def find_in_path(name):
     return None
 
 #===============================================================================
-def search_and_execute(scan_dirs, **syms):
+class PythonSourceFinder(object):
 #===============================================================================
     """
-    Look for python source files in a named subdirectory of a set of base
-    directories. Execute all discovered source files and pass in the symbols
-    provided.
-    A typical usage will be to supply decorators among the symbols which can
-    mark discoverable functions in user code. The decorator will be called when
-    the source file is executed which serves as an opportunity to keep track of
-    the discovered functions.
+    Find and invoke python source files in a set of directories and resource
+    subdirectories (for searching in zip packages).  Execute all discovered
+    source files and pass in the symbols provided.
+    A typical usage relies on decorators to mark discoverable functions in user
+    code. The decorator is called when the source file is executed which serves
+    as an opportunity to keep track of discovered functions.
     """
-    processed_dirs = set()
-    for scan_dir in scan_dirs:
-        if scan_dir not in processed_dirs:
-            processed_dirs.add(scan_dir)
-            if os.path.exists(scan_dir):
-                for modpath in glob.glob(os.path.join(scan_dir, '*.py')):
+    class Scan(object):
+        def __init__(self, package, path):
+            self.package = package
+            self.path    = path
+
+    def __init__(self):
+        self.scan_locs = []
+        self.manifests = {}
+
+    def add_path(self, path):
+        # Use the absolute path to avoid visiting the same directory more than once.
+        full_path = os.path.realpath(path)
+        for scan_loc in self.scan_locs:
+            if scan_loc.path == full_path:
+                break
+        else:
+            self.scan_locs.append(PythonSourceFinder.Scan(None, full_path))
+
+    def add_resource(self, package, path):
+        self.scan_locs.append(PythonSourceFinder.Scan(package, path))
+
+    def search_and_execute(self, **syms):
+        for scan_loc in self.scan_locs:
+            if scan_loc.package:
+                # Load the manifest as needed so that individual files can be
+                # found in package directories. There doesn't seem to be an
+                # easy way to search for resource files, e.g. by glob pattern.
+                if scan_loc.package not in self.manifests:
+                    try:
+                        manifest_raw = pkgutil.get_data(scan_loc.package, Global.manifest_path)
+                        self.manifests[scan_loc.package] = manifest_raw.split('\n')
+                    except (IOError, OSError), e:
+                        abort('Failed to load package %s.' % Global.manifest_path, e)
+                for path in self.manifests[scan_loc.package]:
+                    if os.path.dirname(path) == scan_loc.path and path.endswith('.py'):
+                        debug('Executing package module "%s"...' % path)
+                        try:
+                            code = pkgutil.get_data(scan_loc.package, path)
+                        except (IOError, OSError), e:
+                            abort('Failed to load package resource "%s".' % path, e)
+                        syms_tmp = copy.copy(syms)
+                        exec(code, syms_tmp)
+            elif os.path.exists(scan_loc.path):
+                for modpath in glob.glob(os.path.join(scan_loc.path, '*.py')):
                     debug('Executing module "%s"...' % modpath)
-                    execfile(modpath, syms)
+                    syms_tmp = copy.copy(syms)
+                    execfile(modpath, syms_tmp)
 
 #===============================================================================
 def normalize_list(items, width, filler = None):
@@ -231,15 +325,6 @@ def format_table(caption, headings, data_rows):
     return '\n'.join(output)
 
 #===============================================================================
-def debug(*msgs):
-#===============================================================================
-    """
-    Display debug message(s) if debug is enabled.
-    """
-    if Global.debug_enabled:
-        display_messages(msgs, tag = 'DEBUG')
-
-#===============================================================================
 def parse_xml(xml_path):
 #===============================================================================
     """
@@ -259,13 +344,16 @@ def run_cmd(cmd, *args):
     """
     fullcmd = cmd
     for arg in args:
-        if len(arg.split()) > 1:
-            fullcmd += ' "%s"' % arg
+        sarg = str(arg)
+        if len(sarg.split()) > 1:
+            fullcmd += ' "%s"' % sarg
         else:
-            fullcmd += ' %s' % arg
+            fullcmd += ' %s' % sarg
     if Global.dryrun_enabled:
         sys.stdout.write('%s\n' % fullcmd)
     else:
+        if Global.verbose_enabled:
+            verbose_info('Run: %s' % fullcmd)
         retcode = os.system(fullcmd)
         if retcode != 0:
             abort('Command "%s ..." failed with return code %d.' % (cmd, retcode))
@@ -370,8 +458,9 @@ class Zipper(object):
     exclusion regular expresions provided.
     """
     def __init__(self, *excludes):
-        self.output_zip = None
+        self.output_zip  = None
         self.output_path = None
+        self.manifest    = []
         self.re_excludes = [re.compile(exclude) for exclude in excludes]
 
     def open(self, output_path):
@@ -384,6 +473,11 @@ class Zipper(object):
 
     def close(self):
         if self.output_zip:
+            # Write the manifest.
+            try:
+                self.output_zip.writestr(Global.manifest_path, '\n'.join(self.manifest))
+            except (IOError, OSError), e:
+                self._abort('Failed to write %s.' % Global.manifest_path, e)
             self.output_zip.close()
 
     def add_file(self, path_in, path_out):
@@ -397,6 +491,7 @@ class Zipper(object):
             try:
                 if self.output_zip:
                     self.output_zip.write(path_in, path_out)
+                    self.manifest.append(path_out)
             except (IOError, OSError), e:
                 self._abort('Failed to write file "%s" to output zip file "%s".', path_out, e)
 
@@ -405,6 +500,7 @@ class Zipper(object):
         if self.output_zip:
             try:
                 self.output_zip.writestr(path_out, s)
+                self.manifest.append(path_out)
             except (IOError, OSError), e:
                 self._abort('Failed to write string to file "%s".' % path_out, e)
 
@@ -452,6 +548,22 @@ def merge_java_options(*opts):
     return ret_opts
 
 #===============================================================================
+def kwargs_merge_list(kwargs, name, *args):
+#===============================================================================
+    """
+    Merge and flatten kwargs list with additional items.
+    """
+    kwargs[name] = flatten_to_list(kwargs.get(name, None), *args)
+
+#===============================================================================
+def kwargs_merge_java_options(kwargs, name, *args):
+#===============================================================================
+    """
+    Merge and flatten kwargs Java options list with additional options.
+    """
+    kwargs[name] = merge_java_options(kwargs.get(name, None), *args)
+
+#===============================================================================
 def choose(prompt, *choices):
 #===============================================================================
     """
@@ -476,27 +588,99 @@ def choose(prompt, *choices):
             return response[0]
 
 #===============================================================================
-class FileWriter(object):
+def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = None):
 #===============================================================================
     """
-    File writing object that aborts on any error. Must explicitly call close().
+    Split host string on commas, extract optional port for each and return list
+    of host objects. Check against minimum/maximum quantities if specified.
     """
-    def __init__(self, path):
+    class Host(object):
+        def __init__(self, host, port):
+            self.host = host
+            self.port = port
+    hosts = []
+    for host_port in host_string.split(','):
+        split_host = host_port.split(':')
+        host = split_host[0]
+        if len(split_host) > 2:
+            abort('Bad HOST:PORT format "%s" - too many colons.' % host_port)
+        if len(split_host) == 1:
+            # Add the default port if specified.
+            if default_port:
+                port = default_port
+            else:
+                port = None
+        else:
+            try:
+                port = int(split_host[1])
+            except ValueError, e:
+                abort('Bad port value "%s".' % split_host[1], e)
+        hosts.append(Host(host, port))
+    if min_hosts is not None and len(hosts) < min_hosts:
+        abort('Too few hosts in host string "%s". The minimum is %d.'
+                    % (host_string, min_hosts))
+    if max_hosts is not None and len(hosts) < max_hosts:
+        abort('Too many hosts in host string "%s". The maximum is %d.'
+                    % (host_string, max_hosts))
+    return hosts
+
+#===============================================================================
+class File(object):
+#===============================================================================
+    """
+    File reader/writer object that aborts on any error. Must explicitly call
+    close(). The main point is to standardize the error-handling.
+    """
+    def __init__(self, path, mode = 'r'):
+        if mode not in ('r', 'w'):
+            abort('Invalid file mode "%s".' % mode)
         self.path = path
+        self.mode = mode
         self.f    = None
     def open(self):
+        self.close()
+        self.f = self._open()
+    def read(self):
+        if self.mode != 'r':
+            self._abort('File is not open for reading in call to read().')
+        # Reading the entire file, so we can automatically open and close here.
+        if self.f is None:
+            f = self._open()
+        else:
+            f = self.f
         try:
-            self.f = open(path, 'w')
-        except (IOError, OSError), e:
-            abort('%s: Error opening "%s"' % (self.__class__.__name__, self.path), e)
+            try:
+                return f.read()
+            except (IOError, OSError), e:
+                abort('Read error.', e)
+        finally:
+            # Close locally-opened file.
+            if self.f is None:
+                f.close()
+    def read_hex(self):
+        return binascii.hexlify(self.read())
     def write(self, s):
+        if self.mode != 'w':
+            self._abort('File is not open for writing in call to write().')
+        if self.f is None:
+            self._abort('File was not opened in call to write().')
         try:
-            parser.write(self.f, s)
+            self.f.write(s)
         except (IOError, OSError), e:
-            abort('%s: Error writing to "%s"' % (self.__class__.__name__, self.path), e)
+            abort('Write error.', e)
     def close(self):
         if self.f:
             self.f.close()
+    def _open(self):
+        try:
+            return open(self.path, self.mode)
+        except (IOError, OSError), e:
+            self._abort('File open error.', e)
+    def _abort(self, msg, e = None):
+        msgs = ['''File("%s",'%s'): %s''' % (self.path, self.mode, msg)]
+        if e:
+            msgs.append(str(e))
+        abort(*msgs)
 
 #===============================================================================
 class XMLConfigManager(object):

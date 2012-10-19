@@ -25,18 +25,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-
-java_ext_opts = (
-    '-server',
-    '-XX:+HeapDumpOnOutOfMemoryError',
-    '-XX:HeapDumpPath=/tmp',
-    '-XX:-ReduceInitialCardMarks'
+@VOLT.Client(
+    description = 'Load (restore) a VoltDB database snapshot.',
+    cli_options = (
+        VOLT.CLIValue('-c', '--catalog', 'catalog',
+                      'the application catalog jar file path',
+                      required = True),
+        VOLT.CLIValue('-i', '--id', 'unique_id',
+                      'the unique snapshot identifier',
+                      required = True)
+    )
 )
-
-@VOLT.Command(description = 'Load a VoltDB database snapshot.')
 def load(runner):
-    catalog = runner.config.get_required('volt.catalog')
-    if not os.path.exists(catalog):
-        runner.shell('volt', 'compile')
-    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)
+    proc = VOLT.VoltProcedure(runner.client, '@SnapshotRestore', [
+                                    VOLT.FastSerializer.VOLTTYPE_STRING,
+                                    VOLT.FastSerializer.VOLTTYPE_STRING])
+    response = proc.call(params = (runner.opts.directory, runner.opts.unique_id))
+    print response

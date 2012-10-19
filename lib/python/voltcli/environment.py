@@ -122,7 +122,7 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
             global voltdb_jar
             if not os.environ.get('VOLTDB_VOLTDB', '') or voltdb_jar is None:
                 for subdir in ('voltdb', os.path.join('lib', 'voltdb')):
-                    glob_chk = os.path.join(os.path.join(dir, subdir), 'voltdb*.jar')
+                    glob_chk = os.path.join(os.path.join(dir, subdir), 'voltdb-*.jar')
                     for voltdb_jar_chk in glob.glob(glob_chk):
                         if re_voltdb_jar.match(os.path.basename(voltdb_jar_chk)):
                             voltdb_jar = os.path.realpath(voltdb_jar_chk)
@@ -153,11 +153,13 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
         else:
             utility.abort('Could not find log4j configuration file or LOG4J_CONFIG_PATH variable.')
 
-    for var in ('VOLTDB_HOME', 'VOLTDB_LIB', 'VOLTDB_VOLTDB', 'LOG4J_CONFIG_PATH'):
-        utility.debug('%s=%s' % (var, os.environ[var]))
+    if utility.is_verbose():
+        for var in ('VOLTDB_HOME', 'VOLTDB_LIB', 'VOLTDB_VOLTDB', 'LOG4J_CONFIG_PATH'):
+            utility.verbose_info('Environment: %s=%s' % (var, os.environ[var]))
 
     # Classpath is the voltdb jar and all the jars in VOLTDB_LIB.
     global classpath
     classpath = [voltdb_jar]
     for path in glob.glob(os.path.join(os.environ['VOLTDB_LIB'], '*.jar')):
         classpath.append(path)
+    utility.verbose_info('Classpath: %s' % ':'.join(classpath))

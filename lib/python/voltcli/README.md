@@ -1,13 +1,13 @@
 # Goals
 
-## Single command to run any Volt-related subcommand
+## Single command to run any Volt-related verb
 
 Provide a git/subversion-like UI.
 
 ## Full command-line help
 
-Require minimal effort of each subcommand implementation, e.g. just some
-constructor arguments.
+Require minimal effort of each verb implementation, e.g. just some constructor
+arguments.
 
 ## Modularity
 

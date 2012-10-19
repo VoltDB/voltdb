@@ -40,6 +40,47 @@ from voltcli import utility
 # externally as module attributes.
 
 #===============================================================================
+class CLIOption(object):
+#===============================================================================
+    """
+    General CLI option specification (uses optparse keywords for now).
+    """
+    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
+        self.args   = (short_opt, long_opt)
+        if 'required' in kwargs:
+            self.required = kwargs.pop('required')
+        else:
+            self.required = False
+        self.kwargs = kwargs
+        self.kwargs['dest'] = dest
+        self.kwargs['help'] = help_msg
+        if 'default' in self.kwargs:
+            self.kwargs['help'] += ' (default=%s)' % self.kwargs['default']
+        if self.required:
+            self.kwargs['help'] += ' (required)'
+    def __str__(self):
+        return '%s(%s %s)' % (self.__class__.__name__, self.args, self.kwargs)
+
+#===============================================================================
+class CLIBoolean(CLIOption):
+#===============================================================================
+    """
+    Boolean CLI option.
+    """
+    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
+        CLIOption.__init__(self, short_opt, long_opt, dest, help_msg,
+                           action = 'store_true', **kwargs)
+
+#===============================================================================
+class CLIValue(CLIOption):
+#===============================================================================
+    """
+    CLI string value option.
+    """
+    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
+        CLIOption.__init__(self, short_opt, long_opt, dest, help_msg, type = 'string', **kwargs)
+
+#===============================================================================
 class ParsedCommand(object):
 #===============================================================================
     """
@@ -87,9 +128,9 @@ class VoltCLICommandPreprocessor(object):
         self.iverb         = 0
         self.option_values = []
         self.outer_opts    = []
-        self.verb_cmdargs = []
+        self.verb_cmdargs  = []
         self.verb          = None
-        
+
     def preprocess(self, cmdargs):
         """
         Preprocess the command line. Populate verb and option data.
@@ -158,7 +199,7 @@ class VoltCLICommandProcessor(optparse.OptionParser):
 
     def create_verb_parser(self, verb):
         """
-        Create a CLI option parser for the verb command line.
+        Create CLI option parser for verb command line.
         """
         # Parse the command-specific options.
         parser = optparse.OptionParser(description = verb.cli_spec.description,
@@ -166,14 +207,39 @@ class VoltCLICommandProcessor(optparse.OptionParser):
         if self.preproc.verb:
             if verb.cli_spec.cli_options:
                 for cli_option in verb.cli_spec.cli_options:
-                    parser.add_option(*cli_option.args, **cli_option.kwargs)
+                    try:
+                        parser.add_option(*cli_option.args, **cli_option.kwargs)
+                    except Exception, e:
+                        utility.abort('Exception initializing options for verb "%s".'
+                                            % verb.name, e)
         return parser
+
+    def check_verb_options(self, verb, opts):
+        """
+        Validate the verb options, e.g. check that required options are present.
+        """
+        max_width = 0
+        missing = []
+        if self.preproc.verb:
+            if verb.cli_spec.cli_options:
+                for cli_option in verb.cli_spec.cli_options:
+                    if cli_option.required and getattr(opts, cli_option.kwargs['dest']) is None:
+                        missing_opt = ', '.join(cli_option.args)
+                        max_width = max(len(missing_opt), max_width)
+                        missing.append((missing_opt, cli_option.kwargs['help']))
+        if missing:
+            if len(missing) > 1:
+                plural = 's'
+            else:
+                plural = ''
+            fmt = '%%-%ds  %%s' % max_width
+            utility.abort('Missing required option%s:' % plural,
+                          (fmt % (o, h) for (o, h) in missing))
 
     def parse(self, cmdargs):
         """
-        Parse a command line.
+        Parse command line.
         """
-
         # Separate the global options preceding the command from
         # command-specific options that follow it.
         # Allow no verb for help and version requests.
@@ -183,9 +249,12 @@ class VoltCLICommandProcessor(optparse.OptionParser):
             self._abort('No verb was specified.')
 
         # See if we know about the verb.
-        if self.preproc.verb not in self.verbs:
-            self._abort('Unknown command: %s' % self.preproc.verb)
-        verb = self.verbs[self.preproc.verb]
+        if self.preproc.verb is None:
+            verb = None
+        else:
+            if self.preproc.verb not in self.verbs:
+                self._abort('Unknown command: %s' % self.preproc.verb)
+            verb = self.verbs[self.preproc.verb]
 
         # Parse the global options. args should be empty
         outer_opts, outer_args = optparse.OptionParser.parse_args(self, self.preproc.outer_opts)
@@ -202,6 +271,8 @@ class VoltCLICommandProcessor(optparse.OptionParser):
             else:
                 # Parse the verb command line.
                 verb_opts, verb_args = verb_parser.parse_args(self.preproc.verb_cmdargs)
+                # Check for required options.
+                self.check_verb_options(verb, verb_opts)
         else:
             verb_opts = None
             args = []
@@ -210,14 +281,14 @@ class VoltCLICommandProcessor(optparse.OptionParser):
 
     def format_epilog(self, formatter):
         """
-        OptionParser hook that allows us to append subcommand descriptions to
-        the help message.
+        OptionParser hook that allows us to append verb descriptions to the
+        help message.
         """
         rows = []
         for verb_name in self.verb_names:
             verb = self.verbs[verb_name]
             rows.append((verb.name, verb.cli_spec.description))
-        return '\n%s' % utility.format_table("Subcommand Descriptions", None, rows)
+        return '\n%s' % utility.format_table("Verb Descriptions", None, rows)
 
     def _abort(self, *msgs):
         utility.error(*msgs)
@@ -252,35 +323,3 @@ class CLISpec(object):
             s += '   %s: %s\n' % (key, utility.to_display_string(self._kwargs[key]))
         s += ']'
         return s
-
-#===============================================================================
-class CLIOption(object):
-#===============================================================================
-    """
-    General CLI option specification (uses optparse keywords for now).
-    """
-    def __init__(self, *args, **kwargs):
-        self.args   = args
-        self.kwargs = kwargs
-    def __str__(self):
-        return '%s(%s %s)' % (self.__class__.__name__, self.args, self.kwargs)
-
-#===============================================================================
-class CLIBoolean(CLIOption):
-#===============================================================================
-    """
-    Boolean CLI option.
-    """
-    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
-        CLIOption.__init__(self, short_opt, long_opt, action = 'store_true', dest = dest,
-                                 help = help_msg, **kwargs)
-
-#===============================================================================
-class CLIValue(CLIOption):
-#===============================================================================
-    """
-    CLI string value option.
-    """
-    def __init__(self, short_opt, long_opt, dest, help_msg):
-        CLIOption.__init__(self, short_opt, long_opt, type = 'string', dest = dest,
-                                 help = help_msg)

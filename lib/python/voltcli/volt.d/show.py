@@ -43,14 +43,14 @@ def show_config(runner, *args):
             if n == 0:
                 sys.stdout.write('%s *not found*\n' % filter)
 
-subcommands = dict(
+targets = dict(
     config = show_config,
 )
 
 @VOLT.Command(description = 'Display various types of information.',
-              usage = 'SUB_COMMAND [ARGUMENT ...]',
+              usage = 'TARGET [ARGUMENT ...]',
               description2 = '''
-Sub-Commands:
+Targets:
 
     Display all or specific configuration key/value pairs.
 
@@ -58,13 +58,13 @@ Sub-Commands:
 ''')
 def show(runner):
     if not runner.args:
-        utility.error('No sub-command specified for "show".')
+        utility.error('No target specified for "show".')
         runner.help()
     else:
-        subcommand = runner.args[0].lower()
-        subargs = runner.args[1:]
-        if subcommand in subcommands:
-            subcommands[subcommand](runner, *subargs)
+        target = runner.args[0].lower()
+        tgtargs = runner.args[1:]
+        if target in targets:
+            targets[target](runner, *tgtargs)
         else:
-            utility.error('Invalid sub-command "%s" specified.' % subcommand)
+            utility.error('Invalid target "%s" specified.' % target)
             runner.help()

@@ -25,18 +25,22 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-
-java_ext_opts = (
-    '-server',
-    '-XX:+HeapDumpOnOutOfMemoryError',
-    '-XX:HeapDumpPath=/tmp',
-    '-XX:-ReduceInitialCardMarks'
+@VOLT.Client(
+    description = 'Update the schema of a running database.',
+    cli_options = (
+        VOLT.CLIValue('-c', '--catalog', 'catalog',
+                      'the new application catalog jar file path',
+                      required = True),
+        VOLT.CLIValue('-d', '--deployment', 'deployment',
+                      'the deployment configuration file path',
+                      default = 'deployment.xml'),
+    )
 )
-
-@VOLT.Command(description = 'Update schema of running database.')
 def update(runner):
-    catalog = runner.config.get_required('volt.catalog')
-    if not os.path.exists(catalog):
-        runner.shell('volt', 'compile')
-    VOLT.java.execute('org.voltdb.VoltDB', java_ext_opts, catalog, *runner.args)
+    proc = VOLT.VoltProcedure(runner.client, '@UpdateApplicationCatalog', [
+                                    VOLT.FastSerializer.VOLTTYPE_STRING,
+                                    VOLT.FastSerializer.VOLTTYPE_STRING])
+    catalog    = VOLT.utility.File(runner.opts.catalog).read_hex()
+    deployment = VOLT.utility.File(runner.opts.deployment).read()
+    response = proc.call(params = (catalog, deployment))
+    print response
