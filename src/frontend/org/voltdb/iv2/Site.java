@@ -548,13 +548,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
             TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
             if (tibm == null) {
-                rejoinLog.debug("Site " + m_siteId + ": rejoin log unavailable. Async fetch.");
-                while (tibm == null) {
-                    try {
-                        Thread.sleep(10);
-                    } catch (Exception fuckyou) {}
-                    tibm = m_rejoinTaskLog.getNextMessage();
-                }
+                break;
             }
 
             // Apply the readonly / sysproc filter. With Iv2 read optimizations,
@@ -586,11 +580,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 t.runFromTaskLog(this);
             }
             else if (tibm instanceof CompleteTransactionMessage) {
-                CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
-                global_replay_mpTxn = null;
-                System.out.println("COMPLETING: " + m.getTxnId());
-                t.runFromTaskLog(this);
+                // Needs improvement: completes for sysprocs aren't filterable as sysprocs.
+                // Only complete transactions that are open...
+                if (global_replay_mpTxn != null) {
+                    CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
+                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
+                    global_replay_mpTxn = null;
+                    System.out.println("COMPLETING: " + m.getTxnId());
+                    t.runFromTaskLog(this);
+                }
             }
             else {
                 VoltDB.crashLocalVoltDB("Can not replay message type " +
