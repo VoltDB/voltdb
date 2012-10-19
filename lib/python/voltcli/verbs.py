@@ -76,9 +76,13 @@ class JavaVerb(CommandVerb):
     the @VOLT.Java decorator.
     """
     def __init__(self, name, function, java_class, **kwargs):
-        CommandVerb.__init__(self, name, function, **kwargs)
         self.java_class         = java_class
         self.java_opts_override = kwargs.get('java_opts_override', None)
+        if 'classpath' in kwargs:
+            self.classpath = kwargs.pop('classpath')
+        else:
+            self.classpath = None
+        CommandVerb.__init__(self, name, function, **kwargs)
     def go(self, runner, *args):
         java_args = list(args) + list(runner.args)
         runner.java.execute(self.java_class, self.java_opts_override, *java_args)

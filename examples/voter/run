@@ -35,10 +35,9 @@ import os
 
 sys.path.insert(0, '../../lib/python')
 
-from voltcli import runner
-
 #### Command line main
 
 if __name__ == '__main__':
     command_dir, command_name = os.path.split(sys.argv[0])
+    from voltcli import runner
     runner.main(command_name, command_dir, version, description, *sys.argv[1:])

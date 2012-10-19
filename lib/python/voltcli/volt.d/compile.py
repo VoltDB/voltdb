@@ -25,13 +25,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import os
+
 @VOLT.Command(description = 'Run the VoltDB compiler to build the catalog.',
-              cli_options = VOLT.CLIBoolean('-c', '--conditional', 'conditional',
-                                            'only build when the catalog file is missing'))
+              cli_options = (
+                  VOLT.CLIBoolean('-C', '--conditional', 'conditional',
+                                  'build only when the catalog file is missing'),
+                  VOLT.CLIValue('-c', '--catalog', 'catalog',
+                                'the application catalog jar file path',
+                                required = True)))
 def compile(runner):
-    if not runner.opts.conditional or not runner.catalog_exists():
+    if not runner.opts.conditional or not os.path.exists(runner.opts.catalog):
         VOLT.java.execute('org.voltdb.compiler.VoltCompiler',
                            None,
                            runner.project_path,
-                           runner.get_catalog(),
+                           runner.opts.catalog,
                            *runner.args)

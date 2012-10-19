@@ -146,7 +146,10 @@ class VerbRunner(object):
         classpath_ext = config.get('volt.classpath')
         if classpath_ext:
             classpath = ':'.join((classpath, classpath_ext))
+        if hasattr(self.verb, 'classpath') and self.verb.classpath:
+            classpath = ':'.join((self.verb.classpath, classpath))
         self.java = JavaRunner(classpath)
+        self.call = ToolRunner(self.verbspace, self.config)
 
     def shell(self, *args):
         """

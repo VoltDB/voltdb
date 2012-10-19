@@ -22,7 +22,7 @@
 
 # All the tests for the Voter application.
 
-@VOLT.Java('voter.AsyncBenchmark', description = 'Run test 1.')
+@VOLT.Java('voter.AsyncBenchmark', classpath = 'obj', description = 'Run test 1.')
 def test1(runner):
-    VOLT.run.build('-c')
+    runner.call.build('-C')
     runner.go()
