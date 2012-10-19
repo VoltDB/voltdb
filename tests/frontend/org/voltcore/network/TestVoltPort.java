@@ -39,7 +39,7 @@ public class TestVoltPort extends TestCase {
     private static class MockVoltNetwork extends VoltNetwork {
 
         public MockVoltNetwork() {
-            super(0, null);
+            super(0);
         }
     }
 
