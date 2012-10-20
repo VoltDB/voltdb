@@ -113,11 +113,28 @@ public class TestUnion  extends TestCase {
             fail();
         }
         catch (Exception ex) {}
+    }
+
+    public void testUniqueTables() {
         try {
             aide.compile("select A from T1 UNION select A from T1", 0, false, null);
             fail();
         }
         catch (Exception ex) {}
+
+        try {
+            aide.compile("(select A from T1 UNION select B from T2) EXCEPT select A from T1", 0, false, null);
+            fail();
+        }
+        catch (Exception ex) {}
+
+        try {
+            aide.compile("select A from T1 UNION (select B from T2 EXCEPT select A from T1)", 0, false, null);
+            fail();
+        }
+        catch (Exception ex) {}
+
+
     }
 
     public void testMultipleSetOperations() {

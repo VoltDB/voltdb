@@ -44,7 +44,6 @@
  */
 
 #include <sstream>
-#include <string>
 
 #include "unionnode.h"
 #include "common/common.h"
@@ -84,8 +83,6 @@ void UnionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
         m_unionType = UNION_TYPE_EXCEPT;
     } else if (unionTypeStr == "EXCEPT_ALL") {
         m_unionType = UNION_TYPE_EXCEPT_ALL;
-    } else if (unionTypeStr == "UNION_TERM") {
-        m_unionType = UNION_TYPE_UNION_TERM;
     } else if (unionTypeStr == "NOUNION") {
         m_unionType = UNION_TYPE_NOUNION;
     } else {

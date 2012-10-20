@@ -35,10 +35,10 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         INTERSECT,
         INTERSECT_ALL,
         EXCEPT_ALL,
-        EXCEPT,
-        UNION_TERM
+        EXCEPT
     };
-
+    /** Hash Set to enforce table uniqueness across ALL the children statements */
+    public HashSet<String> m_uniqueTables = new HashSet<String>();
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     public UnionType m_unionType = UnionType.NOUNION;
 
@@ -66,21 +66,14 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         assert(stmtNode.children.size() > 1);
         tableList.clear();
         for (VoltXMLElement childSQL : stmtNode.children) {
-            // @TODO MIKE
-            //if (!childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-            //    throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
-            //}
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 AbstractParsedStmt childStmt = new ParsedSelectStmt();
                 childStmt.parseTablesAndParams(childSQL, db);
                 m_children.add(childStmt);
 
-
                 // So far T UNION T (as well as T JOIN T) are not handled properly
-                // by the fragmentizer. Need to give an error if any table mentioned
-                // in a UNION's (UNION TREE's) children occurs more than once.
-                HashSet<String> uniqueTables = new HashSet<String>();
-
+                // by the fragmentizer. Need to give an error if any table is mentioned
+                // in the UNION TREE more than once.
                 if (childStmt.scanColumns != null)
                 {
                     Set<String> tableNames = childStmt.scanColumns.keySet();
@@ -94,25 +87,29 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                         String tableName = it.next().getTypeName();
                         if (!tableNames.contains(tableName)) {
                             it.remove();
-                        } else if (uniqueTables.contains(tableName)) {
-                            // Is this table 'unique' across the union?
+                        } else if (m_uniqueTables.contains(tableName)) {
+                            // The table is not 'unique' across the union
                             throw new PlanningErrorException("Table " + tableName +
                                     " appears more than once in the union statement");
                         } else {
-                            uniqueTables.add(tableName);
+                            m_uniqueTables.add(tableName);
                         }
                     }
                 } else {
-                    throw new PlanningErrorException("Select * is not supported within the UNION statement");
+                    throw new PlanningErrorException("Scan columns are NULL the UNION statement");
                 }
                 // Add statement's tables to the consolidated list
                 tableList.addAll(childStmt.tableList);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-                AbstractParsedStmt childStmt = new ParsedUnionStmt();
+                ParsedUnionStmt childStmt = new ParsedUnionStmt();
+                // Pass already accumulated unique tables to the child union
+                childStmt.m_uniqueTables = m_uniqueTables;
                 childStmt.parseTablesAndParams(childSQL, db);
                 m_children.add(childStmt);
                 // Add statement's tables to the consolidated list
                 tableList.addAll(childStmt.tableList);
+                // Child's unique tables now contains the consolidated list
+                m_uniqueTables = childStmt.m_uniqueTables;
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }

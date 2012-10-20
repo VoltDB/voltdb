@@ -62,8 +62,6 @@ class UnionPlanNode : public AbstractPlanNode {
             // Do nothing
         }
 
-        void setUnionType(UnionType unionType) { m_unionType = unionType; }
-
         PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UNION); }
 
         UnionType getUnionType() const { return m_unionType; }

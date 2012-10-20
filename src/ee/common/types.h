@@ -156,8 +156,7 @@ enum UnionType {
     UNION_TYPE_INTERSECT        = 3,
     UNION_TYPE_INTERSECT_ALL    = 4,
     UNION_TYPE_EXCEPT_ALL       = 5,
-    UNION_TYPE_EXCEPT           = 6,
-    UNION_TYPE_UNION_TERM       = 7
+    UNION_TYPE_EXCEPT           = 6
 };
 
 // ------------------------------------------------------------------
