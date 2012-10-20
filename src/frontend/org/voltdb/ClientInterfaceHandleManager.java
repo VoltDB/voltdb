@@ -42,7 +42,6 @@ import com.google.common.collect.ImmutableMap.Builder;
  */
 public class ClientInterfaceHandleManager
 {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
 
     static final long READ_BIT = 1L << 63;
@@ -173,6 +172,12 @@ public class ClientInterfaceHandleManager
                     Long initiatorHSId) {
                 return super.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
             }
+
+            @Override
+            synchronized boolean shouldCheckThreadIdAssertion()
+            {
+                return false;
+            }
         };
     }
 
@@ -194,7 +199,7 @@ public class ClientInterfaceHandleManager
             boolean readOnly,
             boolean isShortCircuitRead)
     {
-        assert(m_expectedThreadId == Thread.currentThread().getId());
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
         }
@@ -263,11 +268,11 @@ public class ClientInterfaceHandleManager
      */
     Iv2InFlight findHandle(long ciHandle)
     {
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         //Check read only encoded bit
         final boolean readOnly = getReadBit(ciHandle);
         //Remove read only encoding so comparison works
         ciHandle = unsetReadBit(ciHandle);
-        assert(m_expectedThreadId == Thread.currentThread().getId());
 
         /*
          * Check for a short circuit read
@@ -342,7 +347,7 @@ public class ClientInterfaceHandleManager
      * does the mapping to the resources allocated to it.
      */
     void freeOutstandingTxns() {
-        assert(m_expectedThreadId == Thread.currentThread().getId());
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         for (PartitionData pd : m_partitionStuff.values()) {
             for (Iv2InFlight inflight : pd.m_reads) {
                 m_outstandingTxns--;
@@ -361,7 +366,7 @@ public class ClientInterfaceHandleManager
 
     List<Iv2InFlight> removeHandlesForPartitionAndInitiator(Integer partitionId,
             Long initiatorHSId) {
-        assert(m_expectedThreadId == Thread.currentThread().getId());
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
         List<Iv2InFlight> retval = new ArrayList<Iv2InFlight>();
 
         if (!m_partitionStuff.containsKey(partitionId)) return retval;
@@ -397,5 +402,12 @@ public class ClientInterfaceHandleManager
             }
         }
         return retval;
+    }
+
+    // Coward's way out...the thread-safe override of this class will return false for this,
+    // which will enable us to keep the thread ID assertions in all of the method calls and
+    // not bomb when using the thread-safe version.
+    boolean shouldCheckThreadIdAssertion() {
+        return true;
     }
 }

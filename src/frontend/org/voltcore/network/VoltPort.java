@@ -26,11 +26,11 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Connection
 {
@@ -49,12 +49,7 @@ public class VoltPort implements Connection
     private static final ThreadPoolExecutor m_es =
             new ThreadPoolExecutor(0, 16, 1, TimeUnit.SECONDS,
                                    new LinkedBlockingQueue<Runnable>(),
-                                   new ThreadFactory() {
-                @Override
-                public Thread newThread(Runnable r) {
-                    return new Thread(r, "VoltPort DNS Reverse Lookup");
-                }
-            });
+                                   CoreUtils.getThreadFactory("VoltPort DNS Reverse Lookup"));
 
     /** The currently selected operations on this port. */
     private int m_readyOps = 0;
