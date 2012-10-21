@@ -212,25 +212,22 @@ class VerbRunner(object):
             output_dir = ''
         else:
             output_dir = output_dir_in
-        output_path = os.path.join(output_dir, '%s.zip' % environment.command_name)
-        utility.info('Creating Python-runnable zip file: %s' % output_path)
-        if os.path.exists(output_path) and not force:
-            if utility.choose('Overwrite "%s"?' % output_path, 'yes', 'no') == 'n':
-                utility.abort()
-        zipper = utility.Zipper('\.pyc$')
-        zipper.open(output_path)
+        output_path = os.path.join(output_dir, '%s' % environment.command_name)
+        utility.info('Creating compressed Python-runnable file: %s' % output_path)
+        zipper = utility.Zipper(excludes = ['[.]pyc$'])
+        zipper.open(output_path, force = force, preamble = '#!/usr/bin/env python\n')
         try:
             # Generate the __main__.py module for automatic execution from the zip file.
             main_script = ('''\
 import sys
 from voltcli import runner
-runner.main('%(name)s', '', '%(version)s', '%(description)s', *sys.argv[1:])'''
+runner.main('%(name)s', '', '%(version)s', '%(description)s', package = True, *sys.argv[1:])'''
                     % self.verbspace.__dict__)
-            zipper.add_string(main_script, '__main__.py')
+            zipper.add_file_from_string(main_script, '__main__.py')
             # Recursively package lib/python as lib in the zip file.
             zipper.add_directory(environment.volt_python, '')
         finally:
-            zipper.close()
+            zipper.close(make_executable = True)
 
     def usage(self):
         """
@@ -285,7 +282,7 @@ class VOLT(object):
         self.utility = utility
 
 #===============================================================================
-def load_verbspace(command_name, command_dir, config, version, description):
+def load_verbspace(command_name, command_dir, config, version, description, package):
 #===============================================================================
     """
     Build a verb space by searching for source files with verbs in this source
@@ -314,8 +311,7 @@ def load_verbspace(command_name, command_dir, config, version, description):
     for scan_dir in scan_base_dirs:
         finder.add_path(os.path.join(scan_dir, verbs_subdir))
     # If running from a zip package add resource locations.
-    pkg_dir = sys.modules['__main__'].__file__.split('/', 1)[0]
-    if pkg_dir.endswith('.zip'):
+    if package:
         finder.add_resource('__main__', os.path.join('voltcli', verbs_subdir))
     finder.search_and_execute(VOLT = namespace_VOLT)
 
@@ -370,11 +366,19 @@ def run_command(verbspace, config, *cmdargs):
     runner.execute()
 
 #===============================================================================
-def main(command_name, command_dir, version, description, *args):
+def main(command_name, command_dir, version, description, *args, **kwargs):
 #===============================================================================
     """
     Called by running script to execute command with command line arguments.
     """
+    # For now "package" is the only valid keyword to flag when running from a
+    # package zip __main__.py.
+    package = False
+    for key in kwargs:
+        if key == 'package':
+            package = True
+        else:
+            utility.abort('Bad main() keyword: %s' % key)
     try:
         # Pre-scan for verbose, debug, and dry-run options so that early code
         # can display verbose and debug messages, and obey dry-run.
@@ -393,13 +397,15 @@ def main(command_name, command_dir, version, description, *args):
         environment.initialize(command_name, command_dir, version)
 
         # Search for modules based on both this file's and the calling script's location.
-        verbspace = load_verbspace(command_name, command_dir, config, version, description)
+        verbspace = load_verbspace(command_name, command_dir, config, version,
+                                   description, package)
 
         # Make internal commands available to user commands via the VOLT namespace.
         if command_name not in internal_commands:
             for internal_command in internal_commands:
                 internal_verbspace = load_verbspace(internal_command, None, config, version,
-                                                    'Internal "%s" command' % internal_command)
+                                                    'Internal "%s" command' % internal_command,
+                                                    package)
                 tool_runner = ToolRunner(internal_verbspace, config)
                 setattr(verbspace.VOLT, internal_command, tool_runner)
 

@@ -40,6 +40,7 @@ import zipfile
 import re
 import pkgutil
 import binascii
+import stat
 from xml.etree import ElementTree
 
 __author__ = 'scooper'
@@ -455,23 +456,32 @@ class Zipper(object):
 #===============================================================================
     """
     The Zipper class creates a zip file using the directories, strings, and
-    exclusion regular expresions provided.
+    exclusion regular expresions provided. It can also add a preamble and make
+    the resulting file executable in order to support making a self-executable
+    compressed Python program.
     """
-    def __init__(self, *excludes):
+    def __init__(self, excludes = []):
+        self.output_file = None
         self.output_zip  = None
         self.output_path = None
         self.manifest    = []
         self.re_excludes = [re.compile(exclude) for exclude in excludes]
 
-    def open(self, output_path):
+    def open(self, output_path, preamble = None, force = False):
+        if os.path.exists(output_path) and not force:
+            if choose('Overwrite "%s"?' % output_path, 'yes', 'no') == 'n':
+                abort()
         self.output_path = output_path
         if not Global.dryrun_enabled:
             try:
-                self.output_zip = zipfile.ZipFile(self.output_path, 'w', zipfile.ZIP_DEFLATED)
+                self.output_file = open(output_path, 'w');
+                if preamble:
+                    self.output_file.write(preamble)
+                self.output_zip = zipfile.ZipFile(self.output_file, 'w', zipfile.ZIP_DEFLATED)
             except (IOError, OSError), e:
                 self._abort('Failed to open for writing.', e)
 
-    def close(self):
+    def close(self, make_executable = False):
         if self.output_zip:
             # Write the manifest.
             try:
@@ -479,6 +489,10 @@ class Zipper(object):
             except (IOError, OSError), e:
                 self._abort('Failed to write %s.' % Global.manifest_path, e)
             self.output_zip.close()
+            self.output_file.close()
+            if make_executable:
+                mode = os.stat(self.output_path).st_mode
+                os.chmod(self.output_path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def add_file(self, path_in, path_out):
         for re_exclude in self.re_excludes:
@@ -495,7 +509,7 @@ class Zipper(object):
             except (IOError, OSError), e:
                 self._abort('Failed to write file "%s" to output zip file "%s".', path_out, e)
 
-    def add_string(self, s, path_out):
+    def add_file_from_string(self, s, path_out):
         self._debug('write string to "%s"' % path_out)
         if self.output_zip:
             try:
