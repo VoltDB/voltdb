@@ -20,6 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package org.voltdb.export;
 
 package org.voltdb.export;
 
@@ -54,7 +55,7 @@ public class ExportMatchers {
             @Override
             protected boolean matchesSafely(VoltMessage m) {
                 return instanceOf(BinaryPayloadMessage.class).matches(m)
-                    && payloadMatcher.matches(BinaryPayloadMessage.class.cast(m));
+                        && payloadMatcher.matches(BinaryPayloadMessage.class.cast(m));
             }
         };
     }
@@ -103,8 +104,8 @@ public class ExportMatchers {
             @Override
             protected boolean matchesSafely(AckPayloadMessage m) {
                 return equalTo(partitionId).matches(m.getPartitionId())
-                    && equalTo(signature).matches(m.getSignature())
-                    && equalTo(uso).matches(m.getUso());
+                        && equalTo(signature).matches(m.getSignature())
+                        && equalTo(uso).matches(m.getUso());
             }
         };
     }

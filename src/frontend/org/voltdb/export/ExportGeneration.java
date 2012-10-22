@@ -20,17 +20,21 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -67,10 +71,11 @@ public class ExportGeneration {
      */
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
-    public final Long m_timestamp;
+    public Long m_timestamp;
     public final File m_directory;
 
-    private String m_zkPath;
+    private String m_leadersZKPath;
+    private String m_mailboxesZKPath;
 
     /**
      * Data sources, one per table per site, provide the interface to
@@ -104,6 +109,15 @@ public class ExportGeneration {
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
 
+    private final Map<Integer, String> m_partitionLeaderZKName = new HashMap<Integer, String>();
+    private final Set<Integer> m_partitionsIKnowIAmTheLeader = new HashSet<Integer>();
+
+    /*
+     * Set to true if this export generation was initialized from disk
+     * instead of being fed data from the current live system
+     */
+    private boolean m_diskBased = false;
+
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
@@ -127,16 +141,17 @@ public class ExportGeneration {
      */
     public ExportGeneration(
             Runnable onAllSourcesDrained,
-            File generationDirectory,
-            long generationTimestamp) throws IOException {
+            File generationDirectory) throws IOException {
         m_onAllSourcesDrained = onAllSourcesDrained;
-        m_timestamp = generationTimestamp;
         m_directory = generationDirectory;
-        exportLog.info("Restoring export generation " + generationTimestamp);
     }
 
-    void initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
+    public boolean isDiskBased() {
+        return m_diskBased;
+    }
 
+    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
+        m_diskBased = true;
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -144,6 +159,7 @@ public class ExportGeneration {
          * and check for any data files related to the advertisement. If no data files
          * exist ignore the advertisement.
          */
+        boolean hadValidAd = false;
         for (File f : m_directory.listFiles()) {
             if (f.getName().endsWith(".ad")) {
                 boolean haveDataFiles = false;
@@ -158,6 +174,7 @@ public class ExportGeneration {
                 if (haveDataFiles) {
                     try {
                         addDataSource(f, partitions);
+                        hadValidAd = true;
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                     }
@@ -168,8 +185,132 @@ public class ExportGeneration {
             }
         }
         createAndRegisterAckMailboxes(partitions, messenger);
+        exportLog.info("Restoring export generation " + m_timestamp);
+        return hadValidAd;
     }
 
+
+    /*
+     * Run a leader election for every partition to determine who will
+     * start consuming the export data.
+     *
+     */
+    public void kickOffLeaderElection() {
+        m_childUpdatingThread.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    /*
+                     * The path where leaders will register for this generation
+                     */
+                    m_leadersZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "leaders";
+
+                    /*
+                     * Create a directory for each partition
+                     */
+                    for (Integer partition : m_dataSourcesByPartition.keySet()) {
+                        ZKUtil.asyncMkdirs(m_zk, m_leadersZKPath + "/" + partition);
+                    }
+
+                    /*
+                     * Queue the creation of our ephemeral sequential and then queue
+                     * a task to retrieve the children to find the result of the election
+                     */
+                    List<ZKUtil.ChildrenCallback> callbacks = new ArrayList<ZKUtil.ChildrenCallback>();
+                    for (final Integer partition : m_dataSourcesByPartition.keySet()) {
+                        m_zk.create(
+                                m_leadersZKPath + "/" + partition + "/leader",
+                                null,
+                                Ids.OPEN_ACL_UNSAFE,
+                                CreateMode.EPHEMERAL_SEQUENTIAL,
+                                new org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback() {
+                                    @Override
+                                    public void processResult(int rc, String path,
+                                            Object ctx, String name) {
+                                        KeeperException.Code code = KeeperException.Code.get(rc);
+                                        if (code != KeeperException.Code.OK) {
+                                            VoltDB.crashLocalVoltDB(
+                                                    "Error in export leader election",
+                                                    false,
+                                                    KeeperException.create(code));
+                                        }
+                                        String splitName[] = name.split("/");
+                                        m_partitionLeaderZKName.put(partition,  splitName[splitName.length - 1]);
+                                    }
+
+                                },
+                                null);
+                        ZKUtil.ChildrenCallback cb = new ZKUtil.ChildrenCallback();
+                        callbacks.add(cb);
+                        m_zk.getChildren(
+                                m_leadersZKPath + "/" + partition,
+                                constructLeaderChildWatcher(partition),
+                                cb,
+                                null);
+                    }
+
+                    /*
+                     * Process the result of the per partition elections.
+                     * No worries about ordering with the watcher because the watcher tasks
+                     * all get funneled through this thread
+                     */
+                    Iterator<ZKUtil.ChildrenCallback> iter = callbacks.iterator();
+                    for (Integer partition : m_dataSourcesByPartition.keySet()) {
+                        ZKUtil.ChildrenCallback cb = iter.next();
+                        handleLeaderChildrenUpdate(partition,  cb.getChildren());
+                    }
+                } catch (Throwable t) {
+                    VoltDB.crashLocalVoltDB("Error in export leader election", false, t);
+                }
+            }
+        });
+    }
+
+    private Watcher constructLeaderChildWatcher(final Integer partition) {
+        return new Watcher() {
+            @Override
+            public void process(final WatchedEvent event) {
+                m_zk.getChildren(
+                        m_leadersZKPath + "/" + partition,
+                        constructLeaderChildWatcher(partition),
+                        new org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback() {
+
+                            @Override
+                            public void processResult(final int rc, final String path, Object ctx,
+                                    final List<String> children) {
+                                KeeperException.Code code = KeeperException.Code.get(rc);
+                                if (code != KeeperException.Code.OK) {
+                                    VoltDB.crashLocalVoltDB(
+                                            "Error in export leader election",
+                                            false,
+                                            KeeperException.create(code));
+                                }
+                                m_childUpdatingThread.execute(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        try {
+                                            handleLeaderChildrenUpdate(partition, children);
+                                        } catch (Throwable t) {
+                                            VoltDB.crashLocalVoltDB("Error in export leader election", false, t);
+                                        }
+                                    }
+                                });
+                            }
+                        }, null);
+            }
+        };
+    }
+
+    private void handleLeaderChildrenUpdate(Integer partition, List<String> children) {
+        String leader = Collections.min(children);
+        if (m_partitionLeaderZKName.get(partition).equals(leader)) {
+            if (m_partitionsIKnowIAmTheLeader.add(partition)) {
+                for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
+                    eds.acceptMastership();
+                }
+            }
+        }
+    }
 
     void initializeGenerationFromCatalog(
             final Connector conn,
@@ -193,7 +334,7 @@ public class ExportGeneration {
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
         m_zk = messenger.getZK();
-        m_zkPath = VoltZK.exportGenerations + "/" + m_timestamp;
+        m_mailboxesZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "mailboxes";
 
         m_mbox = new LocalMailbox(messenger) {
             @Override
@@ -230,17 +371,8 @@ public class ExportGeneration {
         };
         messenger.createMailbox(null, m_mbox);
 
-        List<ZKUtil.StringCallback> callbacks = new ArrayList<ZKUtil.StringCallback>();
         for (Integer partition : localPartitions) {
-            callbacks.add(ZKUtil.asyncMkdirs(m_zk, m_zkPath + "/" + partition + "/" + m_mbox.getHSId()));
-        }
-
-        for (ZKUtil.StringCallback cb : callbacks) {
-            try {
-                cb.get();
-            } catch (Throwable t) {
-                Throwables.propagate(t);
-            }
+            ZKUtil.asyncMkdirs(m_zk, m_mailboxesZKPath + "/" + partition + "/" + m_mbox.getHSId());
         }
 
         ListenableFuture<?> fut = m_childUpdatingThread.submit(new Runnable() {
@@ -251,8 +383,8 @@ public class ExportGeneration {
                 for (Integer partition : localPartitions) {
                     ZKUtil.ChildrenCallback callback = new ZKUtil.ChildrenCallback();
                     m_zk.getChildren(
-                            m_zkPath + "/" + partition,
-                            constructChildWatcher(),
+                            m_mailboxesZKPath + "/" + partition,
+                            constructMailboxChildWatcher(),
                             callback,
                             null);
                     callbacks.add(Pair.of(partition, callback));
@@ -274,7 +406,8 @@ public class ExportGeneration {
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
-                    for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
+                    for( ExportDataSource eds:
+                        m_dataSourcesByPartition.get( partition).values()) {
                         eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
                     }
                 }
@@ -288,7 +421,7 @@ public class ExportGeneration {
 
     }
 
-    private Watcher constructChildWatcher() {
+    private Watcher constructMailboxChildWatcher() {
         return new Watcher() {
 
             @Override
@@ -309,7 +442,7 @@ public class ExportGeneration {
     }
 
     private void handleChildUpdate(final WatchedEvent event) {
-        m_zk.getChildren(event.getPath(), constructChildWatcher(), constructChildRetrievalCallback(), null);
+        m_zk.getChildren(event.getPath(), constructMailboxChildWatcher(), constructChildRetrievalCallback(), null);
     }
 
     private AsyncCallback.ChildrenCallback constructChildRetrievalCallback() {
@@ -384,6 +517,7 @@ public class ExportGeneration {
         m_numSources++;
         ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile);
         partitions.add(source.getPartitionId());
+        m_timestamp = source.getGeneration();
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());

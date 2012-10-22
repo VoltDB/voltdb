@@ -1220,7 +1220,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             assert(depCRC != -1);
 
             m_catalogContext = new CatalogContext(
-                    isIV2Enabled() ? TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId() : 0,
+                    isIV2Enabled() ? TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId() : 0,//txnid
+                            0,//timestamp
                             catalog, null, depCRC, 0, -1);
 
             int numberOfNodes = m_deployment.getCluster().getHostcount();
@@ -1787,6 +1788,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             byte[] newCatalogBytes,
             int expectedCatalogVersion,
             long currentTxnId,
+            long currentTxnTimestamp,
             long deploymentCRC)
     {
         synchronized(m_catalogUpdateLock) {
@@ -1811,7 +1813,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             // 0. A new catalog! Update the global context and the context tracker
             m_catalogContext =
-                m_catalogContext.update(currentTxnId, newCatalogBytes, diffCommands, true, deploymentCRC);
+                m_catalogContext.update(
+                        currentTxnId,
+                        currentTxnTimestamp,
+                        newCatalogBytes,
+                        diffCommands,
+                        true,
+                        deploymentCRC);
             final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
             m_txnIdToContextTracker.put(currentTxnId,
                     new ContextTracker(

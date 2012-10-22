@@ -37,6 +37,9 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.json_voltpatches.JSONObject;
@@ -48,6 +51,8 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+
+import com.google.common.base.Throwables;
 
 /**
  * Uses the Export feature of VoltDB to write exported tables to files.
@@ -100,7 +105,7 @@ public class ExportToFileClient extends ExportClientBase2 {
     protected boolean m_batched;
     protected boolean m_withSchema;
 
-    protected final Object m_batchLock = new Object();
+    protected final ReentrantReadWriteLock m_batchLock = new ReentrantReadWriteLock();
 
     /**
     *
@@ -113,7 +118,6 @@ public class ExportToFileClient extends ExportClientBase2 {
         boolean m_hasClosed = false;
         protected final Date start;
         protected Date end = null;
-        protected HashSet<ExportToFileDecoder> m_decoders = new HashSet<ExportToFileDecoder>();
         protected final Set<String> m_batchSchemasWritten = new HashSet<String>();
 
         class FileHandle implements Comparable<FileHandle> {
@@ -201,20 +205,6 @@ public class ExportToFileClient extends ExportClientBase2 {
         String getPathOfBatchDir(String prefix) {
             assert(m_batched);
             return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.get().format(start);
-        }
-
-        /**
-         * Release a hold on the batch. When all holds are done
-         * and the roll time has passed, the batch can move out
-         * of the active state.
-         */
-        void decref(ExportToFileDecoder decoder) {
-            synchronized (m_batchLock) {
-                m_decoders.remove(decoder);
-                if ((end != null) && (m_decoders.size() == 0)) {
-                    closeAllWriters();
-                }
-            }
         }
 
         /**
@@ -374,35 +364,38 @@ public class ExportToFileClient extends ExportClientBase2 {
             FileHandle handle = new FileHandle(tableName, generation);
             String path = handle.getPathForSchema();
 
-            // only write the schema once per batch
-            if (m_batched) {
-                if (m_batchSchemasWritten.contains(path)) {
-                    return;
-                }
-            }
-            else {
-                if (m_globalSchemasWritten.contains(path)) {
-                    return;
-                }
-            }
-
-            File newFile = new File(path);
-            try {
-                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
-                BufferedWriter writer = new BufferedWriter(osw, 1048576);
-                writer.write(schema);
-                writer.flush();
-                writer.close();
+            Set<String> targetSet = m_batched ? m_batchSchemasWritten : m_globalSchemasWritten;
+            synchronized (targetSet) {
+                // only write the schema once per batch
                 if (m_batched) {
-                    m_batchSchemasWritten.add(path);
+                    if (m_batchSchemasWritten.contains(path)) {
+                        return;
+                    }
                 }
                 else {
-                    m_globalSchemasWritten.add(path);
+                    if (m_globalSchemasWritten.contains(path)) {
+                        return;
+                    }
                 }
-            } catch (Exception e) {
-                m_logger.error(e.getMessage());
-                m_logger.error("Error: Failed to create output file: " + path);
-                throw new RuntimeException();
+
+                File newFile = new File(path);
+                try {
+                    OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
+                    BufferedWriter writer = new BufferedWriter(osw, 1048576);
+                    writer.write(schema);
+                    writer.flush();
+                    writer.close();
+                    if (m_batched) {
+                        m_batchSchemasWritten.add(path);
+                    }
+                    else {
+                        m_globalSchemasWritten.add(path);
+                    }
+                } catch (Exception e) {
+                    m_logger.error(e.getMessage());
+                    m_logger.error("Error: Failed to create output file: " + path);
+                    throw new RuntimeException();
+                }
             }
         }
 
@@ -413,9 +406,7 @@ public class ExportToFileClient extends ExportClientBase2 {
          */
         @Override
         protected void finalize() throws Throwable {
-            synchronized (m_batchLock) {
-                closeAllWriters();
-            }
+            closeAllWriters();
             super.finalize();
         }
     }
@@ -427,17 +418,26 @@ public class ExportToFileClient extends ExportClientBase2 {
         private final String m_tableName;
         protected String m_schemaString = "ERROR SERIALIZING SCHEMA";
         private final HashSet<AdvertisedDataSource> m_sources = new HashSet<AdvertisedDataSource>();
+        private FutureTask<CSVWriter> m_firstBlockTask;
+        private CSVWriter m_writer;
 
-        // transient per-block state
-        protected PeriodicExportContext m_context = null;
-        protected CSVWriter m_writer = null;
-
-        public ExportToFileDecoder(AdvertisedDataSource source, String tableName, long generation) {
+        public ExportToFileDecoder(
+                AdvertisedDataSource source,
+                String tableName,
+                long generation) {
             super(source);
             m_generation = generation;
             m_tableName = tableName;
 
             setSchemaForSource(source);
+            m_firstBlockTask = new FutureTask<CSVWriter>(new Callable<CSVWriter>() {
+                @Override
+                public CSVWriter call() throws Exception {
+                    CSVWriter writer = m_current.getWriter(m_tableName, m_generation);
+                    m_current.writeSchema(m_tableName, m_generation, m_schemaString);
+                    return writer;
+                }
+            });
         }
 
         /**
@@ -517,23 +517,13 @@ public class ExportToFileClient extends ExportClientBase2 {
          */
         @Override
         public void onBlockStart() {
-            // get the current batch
-            m_context = getCurrentContextAndAddref(this);
-            if (m_context == null) {
-                m_logger.error("NULL context object found.");
-                throw new RuntimeException("NULL context object found.");
+            m_batchLock.readLock().lock();
+            m_firstBlockTask.run();
+            try {
+                m_writer = m_firstBlockTask.get();
+            } catch (Throwable e) {
+                Throwables.propagate(e);
             }
-
-            // prevent us from trying to get a writer in the middle of a roll
-            synchronized (m_batchLock) {
-                m_writer = m_context.getWriter(m_tableName, m_generation);
-            }
-            if (m_writer == null) {
-                m_logger.error("NULL writer object from context.");
-                throw new RuntimeException("NULL writer object from context.");
-            }
-
-            m_context.writeSchema(m_tableName, m_generation, m_schemaString);
         }
 
         /**
@@ -541,65 +531,22 @@ public class ExportToFileClient extends ExportClientBase2 {
          */
         @Override
         public void onBlockCompletion() {
-            try {
-                if (m_writer != null)
-                    m_writer.flush();
-            }
-            catch (Exception e) {
-                m_logger.error(e.getMessage());
-                throw new RuntimeException();
-            }
-            finally {
-                if (m_context != null) {
-                    m_context.decref(this);
-                }
-                m_context = null;
-            }
-        }
-
-        @Override
-        protected void finalize() throws Throwable {
-            try {
-                if (m_writer != null) {
-                    m_writer.flush();
-                    m_writer.close();
-                    m_writer = null;
-                }
-            }
-            catch (Exception e) {
-                m_logger.error(e.getMessage());
-                throw new RuntimeException();
-            }
-            finally {
-                if (m_context != null)
-                    m_context.decref(this);
-            }
-            super.finalize();
+            m_batchLock.readLock().unlock();
         }
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
+            m_batchLock.writeLock().lock();
             try {
-                if (m_writer != null) {
-                    m_writer.flush();
-                    m_writer.close();
-                    m_writer = null;
+                HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
+                if (decoders != null) {
+                    decoders.remove(m_tableName);
+                    if (decoders.isEmpty()) {
+                        m_tableDecoders.remove(m_generation);
+                    }
                 }
-            }
-            catch (Exception e) {
-                m_logger.error(e.getMessage());
-                throw new RuntimeException();
-            }
-            finally {
-                if (m_context != null)
-                    m_context.decref(this);
-            }
-            HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
-            if (decoders != null) {
-                decoders.remove(m_tableName);
-                if (decoders.isEmpty()) {
-                    m_tableDecoders.remove(m_generation);
-                }
+            } finally {
+                m_batchLock.writeLock().unlock();
             }
         }
     }
@@ -648,30 +595,28 @@ public class ExportToFileClient extends ExportClientBase2 {
                 withSchema);
     }
 
-    PeriodicExportContext getCurrentContextAndAddref(ExportToFileDecoder decoder) {
-        synchronized(m_batchLock) {
-            m_current.m_decoders.add(decoder);
-            return m_current;
-        }
-    }
-
     @Override
     public ExportToFileDecoder constructExportDecoder(AdvertisedDataSource source) {
-        // For every source that provides part of a table, use the same
-        // export decoder.
-        String table_name = source.tableName;
-        HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(source.m_generation);
-        if (decoders == null) {
-            decoders = new HashMap<String, ExportToFileDecoder>();
-            m_tableDecoders.put(source.m_generation, decoders);
+        m_batchLock.writeLock().lock();
+        try {
+            // For every source that provides part of a table, use the same
+            // export decoder.
+            String table_name = source.tableName;
+            HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(source.m_generation);
+            if (decoders == null) {
+                decoders = new HashMap<String, ExportToFileDecoder>();
+                m_tableDecoders.put(source.m_generation, decoders);
+            }
+            ExportToFileDecoder decoder = decoders.get(table_name);
+            if (decoder == null) {
+                decoder = new ExportToFileDecoder(source, table_name, source.m_generation);
+                decoders.put(table_name, decoder);
+            }
+            decoder.m_sources.add(source);
+            return decoders.get(table_name);
+        } finally {
+            m_batchLock.writeLock().unlock();
         }
-        ExportToFileDecoder decoder = decoders.get(table_name);
-        if (decoder == null) {
-            decoder = new ExportToFileDecoder(source, table_name, source.m_generation);
-            decoders.put(table_name, decoder);
-        }
-        decoder.m_sources.add(source);
-        return decoders.get(table_name);
     }
 
     /**
@@ -679,13 +624,24 @@ public class ExportToFileClient extends ExportClientBase2 {
      * be active until all writers have finished writing their current blocks
      * to it.
      */
-    void roll(Date rollTime) {
-        synchronized(m_batchLock) {
+    void roll(final Date rollTime) {
+        m_batchLock.writeLock().lock();
+        try {
             m_logger.trace("Rolling batch.");
-            m_current.end = rollTime;
-            if (m_current.m_decoders.size() == 0)
-                m_current.closeAllWriters();
-            m_current = new PeriodicExportContext(rollTime);
+            new Thread("Rolling batch " + rollTime) {
+                @Override
+                public void run() {
+                    m_current.end = rollTime;
+                    m_current = new PeriodicExportContext(rollTime);
+                    try {
+                        m_current.closeAllWriters();
+                    } catch (Throwable t) {
+                        m_logger.error("Error rolling batch", t);
+                    }
+                }
+            }.start();
+        } finally {
+            m_batchLock.writeLock().unlock();
         }
     }
 

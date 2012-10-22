@@ -77,7 +77,7 @@ public class MockVoltDB implements VoltDBInterface
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
-        new HashMap<MailboxType, List<MailboxNodeContent>>();
+            new HashMap<MailboxType, List<MailboxNodeContent>>();
     private final MailboxPublisher m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes + "/0");
 
     public MockVoltDB() {
@@ -107,7 +107,7 @@ public class MockVoltDB implements VoltDBInterface
             m_catalog = new Catalog();
             m_catalog.execute("add / clusters " + m_clusterName);
             m_catalog.execute("add " + m_catalog.getClusters().get(m_clusterName).getPath() + " databases " +
-                              m_databaseName);
+                    m_databaseName);
             Cluster cluster = m_catalog.getClusters().get(m_clusterName);
             // Set a sane default for TestMessaging (at least)
             cluster.setHeartbeattimeout(10000);
@@ -151,7 +151,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     private final Hashtable<Long, ExecutionSite> m_localSites =
-        new Hashtable<Long, ExecutionSite>();
+            new Hashtable<Long, ExecutionSite>();
 
     public void addSite(long siteId, MailboxType type) {
         m_mailboxMap.get(type).add(new MailboxNodeContent(siteId, null));
@@ -203,9 +203,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     public void addColumnToTable(String tableName, String columnName,
-                                    VoltType columnType,
-                                    boolean isNullable, String defaultValue,
-                                    VoltType defaultType)
+            VoltType columnType,
+            boolean isNullable, String defaultValue,
+            VoltType defaultType)
     {
         int index = getTable(tableName).getColumns().size();
         getTable(tableName).getColumns().add(columnName);
@@ -246,7 +246,8 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public CatalogContext getCatalogContext()
     {
-        m_context = new CatalogContext( System.currentTimeMillis(), m_catalog, null, 0, 0, 0) {
+        long now = System.currentTimeMillis();
+        m_context = new CatalogContext( now, now, m_catalog, null, 0, 0, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -376,10 +377,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, int expectedCatalogVersion,
-            long currentTxnId, long deploymentCRC)
-    {
+            long currentTxnId, long currentTxnTimestamp, long deploymentCRC)
+            {
         throw new UnsupportedOperationException("unimplemented");
-    }
+            }
 
     @Override
     public BackendTarget getBackendTargetType() {
@@ -433,7 +434,7 @@ public class MockVoltDB implements VoltDBInterface
         return m_startMode;
     }
 
-        @Override
+    @Override
     public void setReplicationRole(ReplicationRole role)
     {
         m_replicationRole = role;

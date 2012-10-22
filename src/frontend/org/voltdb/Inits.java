@@ -271,11 +271,15 @@ public class Inits {
                     } finally {
                         fin.close();
                     }
+                    //Export needs a cluster global timestamp for the initial catalog version
+                    long catalogTimestamp = System.currentTimeMillis();
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
+                    buffer = null;
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
-                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 4);
+                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 12);
                     versionAndBytes.putInt(0);
+                    versionAndBytes.putLong(catalogTimestamp);
                     versionAndBytes.put(catalogBytes);
                     // publish the catalog bytes to ZK
                     m_rvdb.getHostMessenger().getZK().create(VoltZK.catalogbytes,
@@ -305,11 +309,13 @@ public class Inits {
         public void run() {
             byte[] catalogBytes = null;
             int version = 0;
+            long catalogTimestamp = 0;
             do {
                 try {
                     ByteBuffer versionAndBytes =
                         ByteBuffer.wrap(m_rvdb.getHostMessenger().getZK().getData(VoltZK.catalogbytes, false, null));
                     version = versionAndBytes.getInt();
+                    catalogTimestamp = versionAndBytes.getLong();
                     catalogBytes = new byte[versionAndBytes.remaining()];
                     versionAndBytes.get(catalogBytes);
                     versionAndBytes = null;
@@ -351,7 +357,7 @@ public class Inits {
                     catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
                 } else {
                     catalogTxnId =
-                            org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                            org.voltdb.TransactionIdManager.makeIdFromComponents(catalogTimestamp, 0, 0);
                 }
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 zk.create(
@@ -364,6 +370,7 @@ public class Inits {
                 m_rvdb.m_serializedCatalog = catalog.serialize();
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogTxnId,
+                        catalogTimestamp,
                         catalog, catalogBytes, m_rvdb.m_depCRC, version, -1);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", false, e);

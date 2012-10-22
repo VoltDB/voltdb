@@ -131,14 +131,17 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                     try {
                         edb.onBlockStart();
-                        cont.b.order(ByteOrder.LITTLE_ENDIAN);
-                        while (cont.b.hasRemaining()) {
-                            int length = cont.b.getInt();
-                            byte[] rowdata = new byte[length];
-                            cont.b.get(rowdata, 0, length);
-                            edb.processRow(length, rowdata);
+                        try {
+                            cont.b.order(ByteOrder.LITTLE_ENDIAN);
+                            while (cont.b.hasRemaining()) {
+                                int length = cont.b.getInt();
+                                byte[] rowdata = new byte[length];
+                                cont.b.get(rowdata, 0, length);
+                                edb.processRow(length, rowdata);
+                            }
+                        } finally {
+                            edb.onBlockCompletion();
                         }
-                        edb.onBlockCompletion();
                     } finally {
                         cont.discard();
                     }
