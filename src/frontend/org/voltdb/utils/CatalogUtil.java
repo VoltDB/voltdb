@@ -56,6 +56,7 @@ import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
@@ -73,18 +74,25 @@ import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ExportOnServerType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.export.processors.GuestProcessor;
+import org.voltdb.export.processors.RawProcessor;
+import org.voltdb.exportclient.ExportToFileClient;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
@@ -710,6 +718,39 @@ public abstract class CatalogUtil {
             }
         }
 
+        sb.append(" EXPORT ");
+        ExportType export = deployment.getExport();
+        if( export != null) {
+            sb.append(" ENABLE ").append(export.isEnabled());
+            // mimic what is done when the catalog is built, which
+            // ignores anything else within the export XML stanza
+            // when enabled is false
+            ExportOnServerType onServer = export.getOnserver();
+            if (onServer != null && export.isEnabled()) {
+                sb.append(" ONSERVER ");
+                ServerExportEnum exportTo = onServer.getExportto();
+                if (exportTo != null) {
+                    sb.append( "EXPORTTO ").append(exportTo.name());
+                }
+                ExportConfigurationType config = onServer.getConfiguration();
+                if (config != null) {
+                    List<PropertyType> props = config.getProperty();
+                    if( props != null && !props.isEmpty()) {
+                        sb.append(" CONFIGURATION");
+                        int propCnt = 0;
+                        for( PropertyType prop: props) {
+                            if( propCnt++ > 0) {
+                                sb.append(",");
+                            }
+                            sb.append(" ").append(prop.getName());
+                            sb.append(": ").append(prop.getValue());
+                        }
+                    }
+                }
+            }
+            sb.append("\n");
+        }
+
         byte[] data = null;
         try {
             data = sb.toString().getBytes("UTF-8");
@@ -1015,9 +1056,9 @@ public abstract class CatalogUtil {
         }
 
         boolean adminstate = exportType.isEnabled();
-        String connector = "org.voltdb.export.processors.RawProcessor";
-        if (exportType.getClazz() != null) {
-            connector = exportType.getClazz();
+        String connector = RawProcessor.class.getName();
+        if (exportType.getOnserver() != null) {
+            connector = GuestProcessor.class.getName();
         }
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -1032,6 +1073,32 @@ public abstract class CatalogUtil {
 
         catconn.setLoaderclass(connector);
         catconn.setEnabled(adminstate);
+
+        ExportOnServerType exportOnServer = exportType.getOnserver();
+        if (exportOnServer != null) {
+
+            // this is OK as the deployment file XML schema does not allow for
+            // export configuration property names that begin with underscores
+            ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
+            prop.setName(GuestProcessor.EXPORT_TO_TYPE);
+            switch( exportOnServer.getExportto()) {
+            case FILE: prop.setValue(ExportToFileClient.class.getName()); break;
+            }
+
+            ExportConfigurationType exportConfiguration = exportOnServer.getConfiguration();
+            if (exportConfiguration != null) {
+
+                List<PropertyType> configProperties = exportConfiguration.getProperty();
+                if (configProperties != null && ! configProperties.isEmpty()) {
+
+                    for( PropertyType configProp: configProperties) {
+                        prop = catconn.getConfig().add(configProp.getName());
+                        prop.setName(configProp.getName());
+                        prop.setValue(configProp.getValue());
+                    }
+                }
+            }
+        }
 
         if (!adminstate) {
             hostLog.info("Export configuration is present and is " +

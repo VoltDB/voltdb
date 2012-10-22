@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -996,13 +997,11 @@ public class ExportToFileClient extends ExportClientBase2 {
     }
 
     @Override
-    public void configure(byte[] config) throws Exception {
-        JSONObject conf = new JSONObject(new String( config, "UTF-8"));
-
-        String nonce = conf.getString("nonce");
+    public void configure( Properties conf) throws Exception {
+        String nonce = conf.getProperty("nonce");
 
         char delimiter = '\0';
-        String type = conf.optString("type", null).trim();
+        String type = conf.getProperty("type", "").trim();
         if (type != null) {
             if (type.equalsIgnoreCase("csv")) {
                 delimiter = ',';
@@ -1016,12 +1015,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             throw new IllegalArgumentException("ExportToFile: must provide an output type");
         }
 
-        if (delimiter == '\0') {
-            System.err.println("ExportToFile: must provide an output type");
-            printHelpAndQuit(-1);
-        }
-
-        File outdir = new File(conf.optString("outdir", "."));
+        File outdir = new File(conf.getProperty("outdir", "."));
         if (!outdir.exists()) {
             if (!outdir.mkdir()) {
                 throw new IllegalArgumentException("Error: " + outdir.getPath() + " cannot be created");
@@ -1037,23 +1031,23 @@ public class ExportToFileClient extends ExportClientBase2 {
             throw new IllegalArgumentException("Error: " + outdir.getPath() + " does not have write permission set");
         }
 
-        int firstfield = conf.optBoolean("skipinternals") ? 6 : 0;
+        int firstfield = Boolean.parseBoolean(conf.getProperty("skipinternals","false")) ? 6 : 0;
 
-        int period = conf.optInt("period", 60);
+        int period = Integer.parseInt(conf.getProperty("period", "60"));
         if (period < 1) {
             throw new IllegalArgumentException("Error: Specified value for --period must be >= 1.");
         }
 
-        String dateformatString = conf.optString("dateformat", "yyyyMMddHHmmss").trim();
-        boolean batched = conf.optBoolean("batched", false);
-        boolean withSchema = conf.optBoolean("with-schema", false);
+        String dateformatString = conf.getProperty("dateformat", "yyyyMMddHHmmss").trim();
+        boolean batched = Boolean.parseBoolean(conf.getProperty("batched", "false"));
+        boolean withSchema = Boolean.parseBoolean(conf.getProperty("with-schema", "false"));
 
-        String fullDelimiters = conf.optString("delimeters", null);
+        String fullDelimiters = conf.getProperty("delimeters");
         if (fullDelimiters != null) {
             fullDelimiters = fullDelimiters.trim();
-            String charsAsStr = StringEscapeUtils.unescapeHtml4(fullDelimiters.trim());
+            String charsAsStr = StringEscapeUtils.unescapeJava(fullDelimiters.trim());
             if (charsAsStr.length() != 4) {
-                throw new IllegalArgumentException("The delimiter set must contain exactly 4 characters (after any html escaping).");
+                throw new IllegalArgumentException("The delimiter set must contain exactly 4 characters (after any string escaping).");
             }
         }
 

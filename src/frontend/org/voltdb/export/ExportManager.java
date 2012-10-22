@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -35,6 +37,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
@@ -252,6 +255,16 @@ public class ExportManager
             return;
         }
 
+        Properties processorConfig = new Properties();
+
+        if (conn.getConfig() != null) {
+            Iterator<ConnectorProperty> connPropIt = conn.getConfig().iterator();
+            while (connPropIt.hasNext()) {
+                ConnectorProperty prop = connPropIt.next();
+                processorConfig.put(prop.getName(), prop.getValue());
+            }
+        }
+
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
         m_loaderClass = conn.getLoaderclass();
@@ -275,6 +288,7 @@ public class ExportManager
             currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, messenger);
             m_generations.get().put( catalogContext.m_transactionId, currentGeneration);
             newProcessor.setExportGeneration(m_generations.get().firstEntry().getValue());
+            newProcessor.setProcessorConfig(processorConfig);
             newProcessor.readyForData();
         }
         catch (final ClassNotFoundException e) {
@@ -285,8 +299,6 @@ public class ExportManager
             throw new ExportManager.SetupException(e);
         }
     }
-
-
 
     private void initializePersistedGenerations(
             File exportOverflowDirectory, CatalogContext catalogContext,

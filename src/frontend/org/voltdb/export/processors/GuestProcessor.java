@@ -20,6 +20,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.InputHandler;
@@ -33,28 +34,25 @@ import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase2;
 import org.voltdb.exportclient.ExportDecoderBase;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 
 public class GuestProcessor implements ExportDataProcessor {
 
+    public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
+
     private ExportGeneration m_generation;
     private ExportClientBase2 m_client;
-    private String m_exportClientClass = "org.voltdb.exportclient.ExportToFileClient";
-    private String m_guestConfig = "{\"type\":\"tsv\",\"batched\":true,\"with-schema\":true,\"nonce\":\"zorag\"}";
     private VoltLogger m_logger;
 
     private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders =
             new ArrayList<Pair<ExportDecoderBase, AdvertisedDataSource>>();
 
+
+    // Instantiated at ExportManager
     public GuestProcessor() {
-        try {
-            final Class<?> clientClass = Class.forName(m_exportClientClass);
-            m_client = (ExportClientBase2)clientClass.newInstance();
-            m_client.configure(m_guestConfig.getBytes("UTF-8"));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     @Override
@@ -63,9 +61,22 @@ public class GuestProcessor implements ExportDataProcessor {
     }
 
     @Override
+    public void setProcessorConfig( Properties config) {
+        String exportClientClass = config.getProperty(EXPORT_TO_TYPE);
+        Preconditions.checkNotNull(exportClientClass, "export to type is undefined");
+
+        try {
+            final Class<?> clientClass = Class.forName(exportClientClass);
+            m_client = (ExportClientBase2)clientClass.newInstance();
+            m_client.configure(config);
+        } catch( Throwable t) {
+            Throwables.propagate(t);
+        }
+    }
+
+    @Override
     public void setExportGeneration(ExportGeneration generation) {
         m_generation = generation;
-
     }
 
     @Override
