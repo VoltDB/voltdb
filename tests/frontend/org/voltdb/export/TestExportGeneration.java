@@ -1,5 +1,3 @@
-package org.voltdb.export;
-
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2012 VoltDB Inc.
  *
@@ -22,6 +20,8 @@ package org.voltdb.export;
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+package org.voltdb.export;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
