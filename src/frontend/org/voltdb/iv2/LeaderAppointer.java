@@ -129,7 +129,7 @@ public class LeaderAppointer implements Promotable
                         resp.getResults()[0], false, null);
                 }
                 else {
-                    VoltDB.crashGlobalVoltDB("Partition detection snapshot completed.  Shutting down.",
+                    VoltDB.crashGlobalVoltDB("Partition detection snapshot completed. Shutting down.",
                             false, null);
                 }
             }
