@@ -23,8 +23,6 @@
 
 package org.voltdb.regressionsuites;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
@@ -59,7 +57,7 @@ public class TestPartitionDetection extends TestCase
     }
 
     // stolen from TestSaveRestoreSysproc
-    private void validateSnapshot(boolean expectSuccess) {
+    private void validateSnapshot(boolean expectSuccess, String root) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
         PrintStream original = System.out;
@@ -67,7 +65,7 @@ public class TestPartitionDetection extends TestCase
             System.setOut(ps);
             String args[] = new String[] {
                     "--dir",
-                    TMPDIR
+                    root
             };
             SnapshotVerifier.main(args);
             ps.flush();
@@ -90,7 +88,7 @@ public class TestPartitionDetection extends TestCase
                 fail(reportString);
             }
         } catch (UnsupportedEncodingException e) {}
-          finally {
+        finally {
             System.setOut(original);
         }
     }
@@ -147,25 +145,6 @@ public class TestPartitionDetection extends TestCase
         final Semaphore rateLimit = new Semaphore(10);
         final Client client = ClientFactory.createClient();
 
-        // clean up from any previous test execution.
-        try {
-            File dir = new File(TMPDIR);
-            File[] files = dir.listFiles(new FilenameFilter() {
-                @Override
-                public boolean accept(File arg0, String arg1) {
-                    if (arg1.startsWith(TESTNONCE))
-                        return true;
-                    return false;
-                }
-            });
-            for (File file : files) {
-                file.delete();
-            }
-        } catch (Exception ignored) {
-            ignored.printStackTrace();
-        }
-
-
         try {
             VoltProjectBuilder builder = getBuilderForTest();
             // choose a partitionable cluster: 2 sites / 2 hosts / k-factor 1.
@@ -221,7 +200,13 @@ public class TestPartitionDetection extends TestCase
             }
 
             // now verify the snapshot.
-            validateSnapshot(true);
+            for (int i = 0; i < cluster.getNodeCount(); i++) {
+                if (i == blessed) {
+                    // skip the blessed node, only verify the non-blessed one
+                    continue;
+                }
+                validateSnapshot(true, cluster.getSubRoots().get(i).getAbsolutePath());
+            }
         }
         finally {
             client.close();
