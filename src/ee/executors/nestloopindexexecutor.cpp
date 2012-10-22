@@ -462,24 +462,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 else {
                     return false;
                 }
-            }
-
-            if (m_sortDirection != SORT_DIRECTION_TYPE_INVALID) {
-                bool order_by_asc = true;
-
-                if (m_sortDirection == SORT_DIRECTION_TYPE_ASC) {
-                    // nothing now
-                }
-                else {
-                    order_by_asc = false;
-                }
-
-                if (num_of_searchkeys == 0) {
-                    index->moveToEnd(order_by_asc);
-                }
-            }
-            else if (m_sortDirection == SORT_DIRECTION_TYPE_INVALID && num_of_searchkeys == 0) {
-                index->moveToEnd(true);
+            } else {
+                bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+                index->moveToEnd(toStartActually);
             }
 
             while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&

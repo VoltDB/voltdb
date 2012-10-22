@@ -130,15 +130,10 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     // Need to move GTE to find (x,_) when doing a partial covering search.
-    // the planner sometimes lies in this case: index_lookup_type_eq is incorrect.
-    // Index_lookup_type_gte is necessary. Make the change here.
-    if (m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
-        m_searchKey.getSchema()->columnCount() > m_numOfSearchkeys)
-    {
-        VOLT_TRACE("Setting lookup type to GTE for partial covering key.");
-        m_lookupType = INDEX_LOOKUP_TYPE_GTE;
-    }
-
+    // The planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
+    // Index_lookup_type_gte is necessary.
+    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+           m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
     return true;
 }
 

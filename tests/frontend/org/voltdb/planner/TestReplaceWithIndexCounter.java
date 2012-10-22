@@ -123,7 +123,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar03() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC", 0, false);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 ORDER BY POINTS DESC", 0, false);
         checkIndexCounter(pn, false);
     }
 
@@ -236,6 +236,12 @@ public class TestReplaceWithIndexCounter extends TestCase {
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexCountPlanNode);
+    }
+
+    public void testCountStar23() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC", 0, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof IndexCountPlanNode);
     }
 

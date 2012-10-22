@@ -376,8 +376,7 @@ public abstract class CatalogUtil {
             // Primary Keys / Unique Constraints
             if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
                 Index catalog_idx = catalog_const.getIndex();
-                IndexType idx_type = IndexType.get(catalog_idx.getType());
-                String idx_suffix = idx_type.getSQLSuffix();
+                String idx_suffix = IndexType.getSQLSuffix(catalog_idx.getType());
 
                 ret += add + spacer +
                        (!idx_suffix.isEmpty() ? "CONSTRAINT " + catalog_const.getTypeName() + " " : "") +
@@ -913,9 +912,6 @@ public abstract class CatalogUtil {
                 // Default partition detection on for IV2
                 if (VoltDB.instance().isIV2Enabled()) {
                     catCluster.setNetworkpartition(true);
-                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix("partition_detection");
                     if (printLog) {
                         hostLog.info("Detection of network partitions in the cluster is enabled.");
                     }
