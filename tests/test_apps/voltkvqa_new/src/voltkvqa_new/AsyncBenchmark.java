@@ -151,7 +151,7 @@ public class AsyncBenchmark {
 
         @Option(desc = "Fraction of ops that are gets (singlePartition vs multiPartition) " +
                 "and puts (singlePartition vs multiPartition).")
-        double mpratio = 1;
+        double mpratio = 0; // By default, don't run multi-partition
 
 
         @Option(desc = "Size of keys in bytes.")
@@ -563,7 +563,7 @@ public class AsyncBenchmark {
                             processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
                                                         pairData.fetchRow(0).getVarbinary(1));
                     successfulGets.incrementAndGet();
-                    if(rand > config.mpratio)
+                    if(rand < config.mpratio)
                         successfulGetsMPT.incrementAndGet();
                     else
                         successfulGetsMPF.incrementAndGet();
@@ -596,7 +596,7 @@ public class AsyncBenchmark {
             // Track the result of the operation (Success, Failure, Payload traffic...)
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 successfulPuts.incrementAndGet();
-                if(rand > config.mpratio)
+                if(rand < config.mpratio)
                     successfulPutsMPT.incrementAndGet();
                 else
                     successfulPutsMPF.incrementAndGet();
@@ -644,8 +644,8 @@ public class AsyncBenchmark {
                         incorrectPutCount.addAndGet(hashMapCount - dbCount);
                         System.out.printf("ERROR: Key %s: count in db '%d' is less than client expected '%d'\n",
                                           key.replaceAll("\\s", ""), dbCount, hashMapCount);
-                        System.out.print("ERROR 1!\n");
-                        System.exit(1);
+                        //System.out.print("ERROR 1!\n");
+                        //System.exit(1);
                     }
                 }
             }
@@ -723,7 +723,7 @@ public class AsyncBenchmark {
 
         if(totalConnections.get() == 1)
             // If Volt is running on one node only, no need to run this test on multi-partition
-            config.mpratio = 1;
+            config.mpratio = 0;
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -755,7 +755,7 @@ public class AsyncBenchmark {
             if (rand.nextDouble() < config.getputratio) {
                 // Get a key/value pair, asynchronously
                 mpRand = rand.nextDouble();
-                if(mpRand > config.mpratio) {
+                if(mpRand < config.mpratio) {
                     if(totalConnections.get() > 1 && config.poolsize > 10000) {
                         slow = true;
                         debug = true;
@@ -772,8 +772,8 @@ public class AsyncBenchmark {
                 // Put a key/value pair, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
                 mpRand = rand.nextDouble();
-                if(rand.nextDouble() > config.mpratio) {
-                    if(totalConnections.get() > 1 && config.poolsize > 10000 && config.mpratio < 1) {
+                if(rand.nextDouble() < config.mpratio) {
+                    if(totalConnections.get() > 1 && config.poolsize > 10000) {
                         slow = true;
                         debug = true;
                     }
@@ -847,6 +847,7 @@ public class AsyncBenchmark {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+        System.exit(0);
     }
 
     public void summary4qa() {
@@ -870,7 +871,6 @@ public class AsyncBenchmark {
 
 //                if(debug && c%printInterval == 0)
 //                    System.out.printf("in summary4qa() count = %d, key = '%s'\n", c, key);
-
                 client.callProcedure(new SumCallback(key, c, printInterval), "Get", key);
                 lastkey = key;
                 c++;
