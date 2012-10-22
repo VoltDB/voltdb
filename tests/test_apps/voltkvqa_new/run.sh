@@ -34,7 +34,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
+    javac -classpath $CLASSPATH -d obj \
         src/voltkvqa_new/*.java \
         src/voltkvqa_new/procedures/*.java
     # stop if compilation fails
@@ -58,6 +58,14 @@ function server() {
         license $LICENSE host $HOST
 }
 
+function exportserver() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment_export.xml \
+        license $LICENSE host $HOST
+}
+
 # run the client that drives the example
 function client() {
     async-benchmark
@@ -76,11 +84,11 @@ function async-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkvqa_new.AsyncBenchmark \
         --displayinterval=5 \
-        --duration=120 \
+        --duration=60 \
         --servers=localhost \
         --poolsize=100000 \
         --preload=false \
-        --getputratio=0.50 \
+        --getputratio=0.9 \
         --keysize=32 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
@@ -89,7 +97,8 @@ function async-benchmark() {
         --ratelimit=100000 \
         --autotune=false \
         --mpratio=0.9 \
-        --latencytarget=6
+        --recover=false \
+        --latencytarget=10
 }
 
 # Multi-threaded synchronous benchmark sample

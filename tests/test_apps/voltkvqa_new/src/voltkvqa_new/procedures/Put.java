@@ -29,6 +29,7 @@
 package voltkvqa_new.procedures;
 
 import org.voltdb.*;
+import java.nio.ByteBuffer;
 
 @ProcInfo
 (
@@ -39,24 +40,51 @@ import org.voltdb.*;
 public class Put extends VoltProcedure
 {
     // Checks if key exists
-    public final SQLStmt checkStmt = new SQLStmt("SELECT key FROM store WHERE key = ?;");
+    public final SQLStmt checkStmt = new SQLStmt("SELECT key,value FROM store WHERE key = ?;");
 
     // Updates a key/value pair
     public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ? WHERE key = ?;");
+
+    // Logs update to export table
+    public final SQLStmt exportStmt = new SQLStmt("INSERT INTO store_export VALUES ( ?, ?, ?, ?, ?)");
 
     // Inserts a key/value pair
     public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
 
     public VoltTable[] run(String key, byte[] value)
     {
+        long putCounter = 0;
+
         // Check whether the pair exists
         voltQueueSQL(checkStmt, key);
+        VoltTable[] queryresults = voltExecuteSQL();
+
+        //Stuff an incrementing putCounter into the 1st long of the payload
+        //This is clearly going to mess up compressed data.
 
         // Insert new or update existing key depending on result
-        if (voltExecuteSQL()[0].getRowCount() == 0)
+        if (queryresults[0].getRowCount() == 0) {
+            //New key gets putCounter  set to 0
+            for (int i = 0; i < 8; i++) {
+                value[i] = 0;
+            }
             voltQueueSQL(insertStmt, key, value);
-        else
-            voltQueueSQL(updateStmt, value, key);
-        return voltExecuteSQL(true);
+        }
+        else {
+            // Get the old count from 1st 8 bytes, increment it, stuff it
+            // back in
+            queryresults[0].advanceRow();
+            ByteBuffer bb = ByteBuffer.wrap(queryresults[0].getVarbinary(1));
+            putCounter = bb.getLong(0);
+            putCounter++;
+            bb.putLong(0, putCounter);
+            voltQueueSQL(updateStmt, bb.array(), key);
+            voltQueueSQL(exportStmt, queryresults[0].getString(0), queryresults[0].getVarbinary(1), getTransactionTime(), getTransactionId(), getSeededRandomNumberGenerator().nextDouble());
+        }
+        voltExecuteSQL(true);
+        VoltTable t[] = new VoltTable[1];
+        t[0] = new VoltTable(new VoltTable.ColumnInfo("counter",VoltType.BIGINT));
+        t[0].addRow(putCounter);
+        return t ;
     }
 }
