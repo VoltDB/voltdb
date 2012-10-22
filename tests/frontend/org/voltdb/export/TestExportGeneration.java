@@ -20,6 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package org.voltdb.export;
 
 package org.voltdb.export;
 
@@ -84,18 +85,18 @@ public class TestExportGeneration {
 
         String schemaDDL =
                 "create table e1 (id integer, f1 varchar(16)); " +
-                "export table e1;";
+                        "export table e1;";
 
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schemaDDL.toString());
         String schemaPath = schemaFile.getPath();
 
         String projectXML =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "</database>" +
-            "</project>";
+                "<?xml version=\"1.0\"?>\n" +
+                        "<project>" +
+                        "<database name='database'>" +
+                        "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+                        "</database>" +
+                        "</project>";
 
         File projectFile = VoltProjectBuilder.writeStringToTempFile(projectXML);
         String projectPath = projectFile.getPath();
