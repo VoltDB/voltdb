@@ -70,6 +70,12 @@ public interface ClientResponse {
     public static final byte RESPONSE_UNKNOWN = -7;
 
     /**
+     * Status code indicating that the transaction is being restarted.  These are used internally to Volt
+     * and shouldn't leak out to actual clients.
+     */
+    public static final byte TXN_RESTART = -8;
+
+    /**
      * Default value for the user specified app status code field
      */
     public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;
