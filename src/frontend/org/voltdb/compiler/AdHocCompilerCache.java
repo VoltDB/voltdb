@@ -48,6 +48,10 @@ public class AdHocCompilerCache implements Serializable {
 
     private static WeakHashMap<Integer, AdHocCompilerCache> m_catalogVersionMatch = new WeakHashMap<Integer, AdHocCompilerCache>();
 
+    public static void clearVersionCache() {
+        m_catalogVersionMatch.clear();
+    }
+
     /**
      * Get the global cache for a given version of the catalog. Note that there can be only
      * one cache per catalogVersion at a time.

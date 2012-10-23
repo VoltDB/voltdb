@@ -72,6 +72,12 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+
+import org.voltdb.compiler.AdHocCompilerCache;
+
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -1734,6 +1740,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_siteTracker = null;
                 m_catalogContext = null;
                 m_mailboxPublisher = null;
+
+                AdHocCompilerCache.clearVersionCache();
 
                 // probably unnecessary
                 System.gc();
