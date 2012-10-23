@@ -74,9 +74,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
@@ -93,12 +90,6 @@ class VoltNetwork implements Runnable
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
 
-    /*
-     * Thread pool used for the reverse DNS lookup triggers. If not provided, it
-     * will trigger the lookup immediately. Otherwise, it delays for 5 seconds.
-     */
-    private final ScheduledExecutorService m_es;
-
     private final int m_networkId;
     /**
      * Start this VoltNetwork's thread;
@@ -112,12 +103,10 @@ class VoltNetwork implements Runnable
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    VoltNetwork(int networkId,
-                       ScheduledExecutorService es) {
+    VoltNetwork(int networkId) {
         m_thread = new Thread(this, "Volt Network - " + networkId);
         m_networkId = networkId;
         m_thread.setDaemon(true);
-        m_es = es;
 
         try {
             m_selector = Selector.open();
@@ -130,7 +119,6 @@ class VoltNetwork implements Runnable
     VoltNetwork( Selector s) {
         m_thread = null;
         m_networkId = 0;
-        m_es = null;
         m_selector = s;
     }
 
@@ -169,25 +157,10 @@ class VoltNetwork implements Runnable
                 port.registering();
 
                 /*
-                 * If no thread pool was given, VoltNetwork is probably used by client.
-                 * So trigger the reverse DNS lookup immediately. Otherwise, check if
-                 * the port is still alive 5 seconds later. If it is alive,start a
-                 * background thread to do reverse DNS lookup.
+                 * This means we are used by a client. No need to wait then, trigger
+                 * the reverse DNS lookup now.
                  */
-                if (m_es != null) {
-                    m_es.schedule(new Runnable() {
-                        @Override
-                        public void run() {
-                            port.resolveHostname();
-                        }
-                    }, 5, TimeUnit.SECONDS);
-                } else {
-                    /*
-                     * This means we are used by a client. No need to wait then, trigger
-                     * the reverse DNS lookup now.
-                     */
-                    port.resolveHostname();
-                }
+                port.resolveHostname();
 
                 try {
                     SelectionKey key = channel.register (m_selector, interestOps, null);
