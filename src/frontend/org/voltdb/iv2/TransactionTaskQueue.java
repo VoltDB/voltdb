@@ -101,6 +101,12 @@ public class TransactionTaskQueue
     // faking an unsuccessful FragmentResponseMessage.
     synchronized void repair(SiteTasker task, List<Long> masters)
     {
+        // At the MPI's TransactionTaskQueue, we know that there can only be
+        // one transaction in the SiteTaskerQueue at a time, because the
+        // TransactionTaskQueue will only release one MP transaction to the
+        // SiteTaskerQueue at a time.  So, when we offer this repair task, we
+        // know it will be the next thing to run once we poison the current
+        // TXN.
         m_taskQueue.offer(task);
         Iterator<TransactionTask> iter = m_backlog.iterator();
         if (iter.hasNext()) {
