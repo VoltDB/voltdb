@@ -23,7 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.TransactionRestartException;
+
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -120,12 +121,12 @@ public class TransactionTaskQueue
             FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
             FragmentResponseMessage poison =
                 new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
-            // Provide a serializable exception so that the procedure runner sees
-            // this as an Expected (allowed) exception and doesn't take the crash-
-            // cluster-path.
-            SerializableException forcedTermination = new SerializableException(
-                    "Transaction rolled back by fault recovery or shutdown.");
-            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, forcedTermination);
+            // Provide a TransactionRestartException which will be converted
+            // into a ClientResponse.RESTART, so that the MpProcedureTask can
+            // detect the restart and take the appropriate actions.
+            TransactionRestartException restart = new TransactionRestartException(
+                    "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
             txn.offerReceivedFragmentResponse(poison);
             // Now, iterate through the rest of the data structure and update the partition masters
             // for all MpProcedureTasks not at the head of the TransactionTaskQueue
