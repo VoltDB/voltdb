@@ -40,7 +40,6 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google.common.base.Preconditions;
@@ -134,20 +133,22 @@ public class ExportManager
                         exportLog.info("Creating connector " + m_loaderClass);
                         try {
                             final Class<?> loaderClass = Class.forName(m_loaderClass);
+                            //Make it so
+                            ExportGeneration nextGeneration = generations.firstEntry().getValue();
                             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
                             newProcessor.addLogger(exportLog);
-                            newProcessor.setExportGeneration(generations.firstEntry().getValue());
+                            newProcessor.setExportGeneration(nextGeneration);
                             newProcessor.setProcessorConfig(m_processorConfig);
                             newProcessor.readyForData();
 
-                            if (generation.isDiskBased()) {
+                            if (nextGeneration.isDiskBased()) {
                                 /*
                                  * Changes in partition count can make the load balancing strategy not capture
                                  * all partitions for data that was from a previously larger cluster.
                                  * For those use a naive leader election strategy that is implemented
                                  * by export generation.
                                  */
-                                generations.firstEntry().getValue().kickOffLeaderElection();
+                                nextGeneration.kickOffLeaderElection();
                             } else {
                                 /*
                                  * This strategy is the one that piggy backs on
@@ -157,7 +158,7 @@ public class ExportManager
                                  * in m_masterOfPartitions
                                  */
                                 for( Integer partitionId: m_masterOfPartitions) {
-                                    generation.acceptMastershipTask(partitionId);
+                                    nextGeneration.acceptMastershipTask(partitionId);
                                 }
                             }
                         } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
@@ -341,7 +342,8 @@ public class ExportManager
             if (generation.initializeGenerationFromDisk(conn, m_messenger)) {
                 m_generations.get().put( generation.m_timestamp, generation);
             } else {
-                MiscUtils.deleteRecursively(generationDirectory);
+                exportLog.error("Invalid export generation in overflow directory " + generationDirectory +
+                        " this will have to be cleaned up manually.");
             }
         }
     }
