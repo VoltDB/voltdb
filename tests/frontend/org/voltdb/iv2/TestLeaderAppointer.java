@@ -25,7 +25,9 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -84,9 +86,15 @@ public class TestLeaderAppointer extends ZKTestBase {
     @After
     public void tearDown() throws Exception
     {
-        m_dut.shutdown();
-        m_cache.shutdown();
-        m_zk.close();
+        if (m_dut != null) {
+            m_dut.shutdown();
+        }
+        if (m_cache != null) {
+            m_cache.shutdown();
+        }
+        if (m_zk != null) {
+            m_zk.close();
+        }
         tearDownZK();
     }
 
@@ -114,7 +122,9 @@ public class TestLeaderAppointer extends ZKTestBase {
     void createAppointer(boolean enablePPD) throws JSONException
     {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
-                m_config.getReplicationFactor(), enablePPD, m_config.getTopology(m_hostIds), m_mpi);
+                m_config.getReplicationFactor(), enablePPD,
+                null, // XXX MAKE ME PASS!
+                m_config.getTopology(m_hostIds), m_mpi);
     }
 
     void addReplica(int partitionId, long HSId) throws KeeperException, InterruptedException, Exception
@@ -345,111 +355,55 @@ public class TestLeaderAppointer extends ZKTestBase {
         assertEquals(1L, (long)m_cache.pointInTimeCache().get(0));
     }
 
-    // These can only test that there was a crash, but since there's only one
-    // test instance of VoltDB, there's not a good way to determine what
-    // "survived".
     @Test
     public void testPartitionDetectionMinoritySet() throws Exception
     {
-        configure(3, 1, 2, true);
-        VoltDB.ignoreCrash = true;
-        Thread dutthread = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    m_dut.acceptPromotion();
-                } catch (Exception e) {
-                }
-            }
-        };
-        dutthread.start();
-        // Need to sleep so we don't write to ZK before the LeaderAppointer appears or we'll crash
-        Thread.sleep(1000);
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
 
-        // Add replicas for partitions 0 and 1 at each host.
-        addReplica(0, CoreUtils.getHSIdFromHostAndSite(0, 0));
-        addReplica(0, CoreUtils.getHSIdFromHostAndSite(1, 0));
-        addReplica(0, CoreUtils.getHSIdFromHostAndSite(2, 0));
-        waitForAppointee(0);
-        registerLeader(0, m_cache.pointInTimeCache().get(0));
-        dutthread.join();
-        // Get rid of host 0 and 1 from what the host messenger will report.
-        m_hostIds.clear();
-        m_hostIds.add(2);
-        // Then kill host 0 and 1's replicas
-        deleteReplica(0, CoreUtils.getHSIdFromHostAndSite(0, 0));
-        deleteReplica(0, CoreUtils.getHSIdFromHostAndSite(1, 0));
-        while (!VoltDB.wasCrashCalled) {
-            Thread.sleep(1);
-        }
+        // current cluster has 2 hosts
+        current.add(0);
+        current.add(1);
+        // the pre-fail cluster had 5 hosts.
+        previous.addAll(current);
+        previous.add(2);
+        previous.add(3);
+        previous.add(4);
+        // this should trip partition detection
+        assertTrue(LeaderAppointer.makePPDDecision(previous, current));
     }
 
     @Test
     public void testPartitionDetection5050KillBlessed() throws Exception
     {
-        configure(2, 1, 1, true);
-        VoltDB.ignoreCrash = true;
-        Thread dutthread = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    m_dut.acceptPromotion();
-                } catch (Exception e) {
-                }
-            }
-        };
-        dutthread.start();
-        // Need to sleep so we don't write to ZK before the LeaderAppointer appears or we'll crash
-        Thread.sleep(1000);
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
 
-        // Add replicas for partitions 0 and 1 at each host.
-        addReplica(0, CoreUtils.getHSIdFromHostAndSite(0, 0));
-        addReplica(0, CoreUtils.getHSIdFromHostAndSite(1, 0));
-        waitForAppointee(0);
-        registerLeader(0, m_cache.pointInTimeCache().get(0));
-        dutthread.join();
-        // Get rid of host 0 from what the host messenger will report.
-        m_hostIds.clear();
-        m_hostIds.add(1);
-        // Then kill host 0's replicas, host 1 should crash
-        deleteReplica(0, CoreUtils.getHSIdFromHostAndSite(0, 0));
-        while (!VoltDB.wasCrashCalled) {
-            Thread.sleep(1);
-        }
+        // current cluster has 2 hosts
+        current.add(2);
+        current.add(3);
+        // the pre-fail cluster had 4 hosts and the lowest host ID
+        previous.addAll(current);
+        previous.add(0);
+        previous.add(1);
+        // this should trip partition detection
+        assertTrue(LeaderAppointer.makePPDDecision(previous, current));
     }
 
     @Test
     public void testPartitionDetection5050KillNonBlessed() throws Exception
     {
-        configure(2, 1, 1, true);
-        VoltDB.ignoreCrash = true;
-        Thread dutthread = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    m_dut.acceptPromotion();
-                } catch (Exception e) {
-                }
-            }
-        };
-        dutthread.start();
-        // Need to sleep so we don't write to ZK before the LeaderAppointer appears or we'll crash
-        Thread.sleep(1000);
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
 
-        // Add replicas for partitions 0 and 1 at each host.
-        addReplica(0, CoreUtils.getHSIdFromHostAndSite(0, 0));
-        addReplica(0, CoreUtils.getHSIdFromHostAndSite(1, 0));
-        waitForAppointee(0);
-        registerLeader(0, m_cache.pointInTimeCache().get(0));
-        dutthread.join();
-        // Get rid of host 1 from what the host messenger will report.
-        m_hostIds.clear();
-        m_hostIds.add(0);
-        // Then kill host 1's replicas, host 0 should not crash
-        deleteReplica(0, CoreUtils.getHSIdFromHostAndSite(1, 0));
-        // Ugly, but there's not a condition we can really sleep on to see if partition detection is done
-        // Sleep for a couple of seconds, then check that crash wasn't called on the global instance
-        Thread.sleep(2000);
-        assertFalse(VoltDB.wasCrashCalled);
+        // current cluster has 2 hosts
+        current.add(0);
+        current.add(1);
+        // the pre-fail cluster had 4 hosts but not the lowest host ID
+        previous.addAll(current);
+        previous.add(2);
+        previous.add(3);
+        // this should not trip partition detection
+        assertFalse(LeaderAppointer.makePPDDecision(previous, current));
     }
 }

@@ -17,27 +17,14 @@
 
 package org.voltdb.expressions;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONString;
-import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
 /**
  *
  */
 public class InComparisonExpression extends ComparisonExpression {
-
-    public enum Members {
-        VALUES;
-    }
-
-    protected List<AbstractExpression> m_values = new ArrayList<AbstractExpression>();
 
     public InComparisonExpression() {
         super(ExpressionType.COMPARE_IN);
@@ -49,10 +36,10 @@ public class InComparisonExpression extends ComparisonExpression {
         //
         // We need at least one value defined
         //
-        if (m_values.isEmpty()) {
-            throw new Exception("ERROR: There we no values defined for '" + this + "'");
+        if (m_args.isEmpty()) {
+            throw new Exception("ERROR: There were no values defined for '" + this + "'");
         }
-        for (AbstractExpression exp : m_values) {
+        for (AbstractExpression exp : m_args) {
             exp.validate();
         }
         //
@@ -66,70 +53,15 @@ public class InComparisonExpression extends ComparisonExpression {
     }
 
     /**
-     * @return the values
+     * @return the values to be matched by the lhs expression
      */
     public List<AbstractExpression> getValues() {
-        return m_values;
+        return m_args;
     }
     /**
-     * @param values the values to set
+     * @param values the values to be matched by the lhs expression
      */
     public void setValues(List<AbstractExpression> values) {
-        m_values = values;
+        m_args = values;
     }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof InComparisonExpression == false) return false;
-        InComparisonExpression expr = (InComparisonExpression) obj;
-
-        // make sure the expressions in the list are the same
-        for (int i = 0; i < m_values.size(); i++) {
-            AbstractExpression left = m_values.get(i);
-            AbstractExpression right = expr.m_values.get(i);
-            if (left.equals(right) == false)
-                return false;
-        }
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
-    }
-
-    @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException {
-        super.toJSONString(stringer);
-
-        stringer.key(Members.VALUES.name()).array();
-        for (AbstractExpression expr : m_values) {
-            assert (expr instanceof JSONString);
-            stringer.value(expr);
-        }
-        stringer.endArray();
-    }
-
-    @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
-        super.loadFromJSONObject(obj, db);
-        JSONArray valuesArray = obj.getJSONArray(Members.VALUES.name());
-        for (int ii = 0; ii < valuesArray.length(); ii++) {
-            if (valuesArray.isNull(ii)) {
-                m_values.add(null);
-            } else {
-                m_values.add( AbstractExpression.fromJSONObject(valuesArray.getJSONObject(ii), db));
-            }
-        }
-    }
-
-    @Override
-    public void finalizeValueTypes()
-    {
-        super.finalizeValueTypes();
-        // This is probably no-op overkill since values are constants and should have no bearing?
-        for (AbstractExpression exp : m_values) {
-            exp.finalizeValueTypes();
-        }
-    }
-
-
-
 }

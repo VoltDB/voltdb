@@ -232,7 +232,7 @@ public class TestVoltNetwork extends TestCase {
 
     public void testInstallInterests() throws InterruptedException {
         new MockSelector();
-        VoltNetwork vn = new VoltNetwork( 0, null);
+        VoltNetwork vn = new VoltNetwork( 0);
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
         MockSelectionKey selectionKey = new MockSelectionKey();
         vp.m_selectionKey = selectionKey;
