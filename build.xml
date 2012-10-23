@@ -1223,7 +1223,7 @@ TEST CASES
 <!--                <exclude name="**/TestMaterializedViewSuite.class" /> -->
 <!--                <exclude name="**/TestMultiPartitionSuite.class" /> -->
 <!--                <exclude name="**/TestOrderBySuite.class" /> -->
-                <exclude name="**/TestPartitionDetection.class" />
+<!--                <exclude name="**/TestPartitionDetection.class" /> -->
 <!--                <exclude name="**/TestPlansGroupBySuite.class" /> -->
 <!--                <exclude name="**/TestReplicationSuite.class" /> -->
 <!--                <exclude name="**/TestRollbackSuite.class" /> -->

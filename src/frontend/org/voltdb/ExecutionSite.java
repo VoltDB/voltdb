@@ -1485,7 +1485,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
-                                                                   -1,
+                                                                   ts,
                                                                    invocation,
                                                                    txnState.getResults());
                 }
@@ -1780,7 +1780,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       CoreUtils.getHostnameOrAddress());
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
                 snapshotMsg.crash) {
-                String msg = "Executing local snapshot. Finished final snapshot. Shutting down. " +
+                String msg = "Partition detection snapshot completed. Shutting down. " +
                         "Result: " + startSnapshotting.toString();
                 VoltDB.crashLocalVoltDB(msg, false, null);
             }

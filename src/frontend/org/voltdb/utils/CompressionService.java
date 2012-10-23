@@ -24,8 +24,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -58,16 +56,8 @@ public final class CompressionService {
      * The executor service is only used if the VoltDB computation service is not available.
      */
     private static final ExecutorService m_executor =
-            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()), new ThreadFactory() {
-                private int threadIndex = 0;
-                @Override
-                public synchronized Thread  newThread(Runnable r) {
-                    Thread t = new Thread(r, "Compression service thread - " + threadIndex++);
-                    t.setDaemon(true);
-                    return t;
-                }
-
-            });
+            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()),
+                                         CoreUtils.getThreadFactory("Compression service thread"));
 
     private static IOBuffers getBuffersForCompression(int length, boolean inputNotUsed) {
         IOBuffers buffers = m_buffers.get();

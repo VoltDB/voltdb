@@ -72,6 +72,12 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+
+import org.voltdb.compiler.AdHocCompilerCache;
+
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -154,7 +160,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.8.3";
+    private static final String m_defaultVersionString = "2.8.3.1";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -370,8 +376,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_faultManager.registerFaultHandler(SiteFailureFault.SITE_FAILURE_CATALOG,
                     m_faultHandler,
                     FaultType.SITE_FAILURE);
-            // This doesn't happen/work for IV2 yet:
-            if (!isIV2Enabled() && !m_faultManager.testPartitionDetectionDirectory(
+            if (!m_faultManager.testPartitionDetectionDirectory(
                     m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
                 VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at" +
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"), false, null);
@@ -606,6 +611,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             clusterConfig.getPartitionCount(),
                             m_deployment.getCluster().getKfactor(),
                             m_catalogContext.cluster.getNetworkpartition(),
+                            m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
                             topo, m_MPI);
                     m_globalServiceElector.registerService(m_leaderAppointer);
 
@@ -1734,6 +1740,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_siteTracker = null;
                 m_catalogContext = null;
                 m_mailboxPublisher = null;
+
+                AdHocCompilerCache.clearVersionCache();
 
                 // probably unnecessary
                 System.gc();
