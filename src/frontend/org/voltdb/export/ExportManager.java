@@ -103,6 +103,8 @@ public class ExportManager
 
     private String m_loaderClass;
 
+    private volatile Properties m_processorConfig = new Properties();
+
     private final Runnable m_onGenerationDrained = new Runnable() {
         @Override
         public void run() {
@@ -135,6 +137,7 @@ public class ExportManager
                             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
                             newProcessor.addLogger(exportLog);
                             newProcessor.setExportGeneration(generations.firstEntry().getValue());
+                            newProcessor.setProcessorConfig(m_processorConfig);
                             newProcessor.readyForData();
 
                             if (generation.isDiskBased()) {
@@ -279,15 +282,7 @@ public class ExportManager
             return;
         }
 
-        Properties processorConfig = new Properties();
-
-        if (conn.getConfig() != null) {
-            Iterator<ConnectorProperty> connPropIt = conn.getConfig().iterator();
-            while (connPropIt.hasNext()) {
-                ConnectorProperty prop = connPropIt.next();
-                processorConfig.put(prop.getName(), prop.getValue());
-            }
-        }
+        updateProcessorConfig(conn);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
@@ -312,7 +307,7 @@ public class ExportManager
             currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, messenger);
             m_generations.get().put( catalogContext.m_timestamp, currentGeneration);
             newProcessor.setExportGeneration(m_generations.get().firstEntry().getValue());
-            newProcessor.setProcessorConfig(processorConfig);
+            newProcessor.setProcessorConfig(m_processorConfig);
             newProcessor.readyForData();
         }
         catch (final ClassNotFoundException e) {
@@ -364,6 +359,19 @@ public class ExportManager
         proc.bootClient();
     }
 
+    private void updateProcessorConfig(final Connector conn) {
+        Properties newConfig = new Properties();
+
+        if (conn.getConfig() != null) {
+            Iterator<ConnectorProperty> connPropIt = conn.getConfig().iterator();
+            while (connPropIt.hasNext()) {
+                ConnectorProperty prop = connPropIt.next();
+                newConfig.put(prop.getName(), prop.getValue());
+            }
+        }
+        m_processorConfig = newConfig;
+    }
+
     public void updateCatalog(CatalogContext catalogContext)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
@@ -375,6 +383,7 @@ public class ExportManager
         }
 
         m_loaderClass = conn.getLoaderclass();
+        updateProcessorConfig(conn);
 
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 

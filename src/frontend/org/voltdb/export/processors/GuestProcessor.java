@@ -81,6 +81,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     @Override
     public void readyForData() {
+        Preconditions.checkState(m_client != null, "processor was not configured with setProcessorConfig()");
 
         for (HashMap<String, ExportDataSource> sources : m_generation.m_dataSourcesByPartition.values()) {
 
