@@ -36,8 +36,8 @@ import os
                                 required = True)))
 def compile(runner):
     if not runner.opts.conditional or not os.path.exists(runner.opts.catalog):
-        VOLT.java.execute('org.voltdb.compiler.VoltCompiler',
-                           None,
-                           runner.project_path,
-                           runner.opts.catalog,
-                           *runner.args)
+        runner.java.execute('org.voltdb.compiler.VoltCompiler',
+                            None,
+                            runner.project_path,
+                            runner.opts.catalog,
+                            *runner.args)

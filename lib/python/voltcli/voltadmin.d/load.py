@@ -28,11 +28,11 @@
 @VOLT.Client(
     description = 'Load (restore) a VoltDB database snapshot.',
     cli_options = (
-        VOLT.CLIValue('-c', '--catalog', 'catalog',
-                      'the application catalog jar file path',
+        VOLT.CLIValue('-d', '--directory', 'directory',
+                      'the local snapshot directory path',
                       required = True),
-        VOLT.CLIValue('-i', '--id', 'unique_id',
-                      'the unique snapshot identifier',
+        VOLT.CLIValue('-i', '--id', 'nonce',
+                      'the unique snapshot identifier (nonce)',
                       required = True)
     )
 )
@@ -40,5 +40,5 @@ def load(runner):
     proc = VOLT.VoltProcedure(runner.client, '@SnapshotRestore', [
                                     VOLT.FastSerializer.VOLTTYPE_STRING,
                                     VOLT.FastSerializer.VOLTTYPE_STRING])
-    response = proc.call(params = (runner.opts.directory, runner.opts.unique_id))
+    response = proc.call(params = (runner.opts.directory, runner.opts.nonce))
     print response

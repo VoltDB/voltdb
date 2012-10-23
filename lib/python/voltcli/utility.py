@@ -41,7 +41,6 @@ import re
 import pkgutil
 import binascii
 import stat
-from xml.etree import ElementTree
 
 __author__ = 'scooper'
 
@@ -326,18 +325,6 @@ def format_table(caption, headings, data_rows):
     return '\n'.join(output)
 
 #===============================================================================
-def parse_xml(xml_path):
-#===============================================================================
-    """
-    Parses XML and returns an ElementTree object to provide access to element data.
-    """
-    et = ElementTree.ElementTree()
-    try:
-        return et.parse(xml_path)
-    except (OSError, IOError), e:
-        abort('Failed to parse XML file.', (xml_path, e))
-
-#===============================================================================
 def run_cmd(cmd, *args):
 #===============================================================================
     """
@@ -600,6 +587,47 @@ def choose(prompt, *choices):
         response = sys.stdin.readline().strip()
         if response in letters or response in choices:
             return response[0]
+
+#===============================================================================
+def kwargs_extract(kwargs, defaults, remove = True, check_extras = False):
+#===============================================================================
+    """
+    Extract and optionally remove valid keyword arguments and convert to an
+    object with attributes.  The defaults argument specifies both the list of
+    valid keywords and their default values. Abort on any invalid keyword.
+    """
+    class O(object):
+        pass
+    o = O()
+    if check_extras:
+        bad = list(set(kwargs.keys()).difference(set(defaults.keys())))
+        if bad:
+            bad.sort()
+            abort('Bad keywords passed to kwargs_extract():', bad)
+    for name in defaults:
+        if name in kwargs:
+            if remove:
+                value = kwargs.pop(name)
+            else:
+                value = kwargs[name]
+        else:
+            value = defaults[name]
+        setattr(o, name, value)
+    return o
+
+#===============================================================================
+def kwargs_get(kwargs, name, remove = True, default = None):
+#===============================================================================
+    defaults = {name: default}
+    args = kwargs_extract(kwargs, defaults, remove = remove, check_extras = False)
+    return getattr(args, name)
+
+#===============================================================================
+def kwargs_set_defaults(kwargs, **defaults):
+#===============================================================================
+    for name in defaults:
+        if name not in kwargs:
+            kwargs[name] = defaults[name]
 
 #===============================================================================
 def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = None):

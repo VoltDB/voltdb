@@ -25,7 +25,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Client(description = 'Resume a paused VoltDB cluster that is in admin mode.')
+@VOLT.Admin_Client(description = 'Resume a paused VoltDB cluster that is in admin mode.')
 def resume(runner):
     proc = VOLT.VoltProcedure(runner.client, '@Resume')
     response = proc.call()

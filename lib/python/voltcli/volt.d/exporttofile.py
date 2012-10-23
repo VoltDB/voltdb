@@ -27,4 +27,4 @@
 
 @VOLT.Command(description = 'Export to file. Run without arguments for usage.')
 def exporttofile(runner):
-    VOLT.java.execute('org.voltdb.exportclient.ExportToFileClient', None, *runner.args)
+    runner.java.execute('org.voltdb.exportclient.ExportToFileClient', None, *runner.args)

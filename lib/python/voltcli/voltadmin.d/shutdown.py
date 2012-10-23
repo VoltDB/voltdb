@@ -25,7 +25,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Client(description = 'Shut down the running VoltDB cluster.')
+@VOLT.Admin_Client(description = 'Shut down the running VoltDB cluster.')
 def shutdown(runner):
     proc = VOLT.VoltProcedure(runner.client, '@Shutdown')
     response = proc.call()

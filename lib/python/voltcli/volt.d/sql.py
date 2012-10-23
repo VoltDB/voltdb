@@ -27,4 +27,4 @@
 
 @VOLT.Command(description = 'Run SQL interpreter.')
 def sql(runner):
-    VOLT.java.execute('org.voltdb.utils.SQLCommand', None, *runner.args)
+    runner.java.execute('org.voltdb.utils.SQLCommand', None, *runner.args)

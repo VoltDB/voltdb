@@ -24,16 +24,30 @@
 
 import os
 
+def get_license_opts(runner):
+    """
+    Get license options from verb option or from hard-coded path if applicable.
+    """
+    opts = []
+    path = getattr(runner.opts, 'license', None)
+    if path:
+        opts = ['-l', path]
+    else:
+        if os.path.exists('../../voltdb/license.xml'):
+            opts = ['-l', '../../voltdb/license.xml']
+    return opts
+
 @VOLT.Command(description = 'Build the Voter application and catalog.',
               cli_options = VOLT.CLIBoolean('-C', '--conditional', 'conditional',
-                                            'only build when the catalog file is missing'))
+                                            'only build when the catalog file is missing'),
+              classpath   = 'obj')
 def build(runner):
     if not runner.opts.conditional or not os.path.exists('voter.jar'):
-        VOLT.java.compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
+        runner.java.compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
     if runner.opts.conditional:
-        VOLT.volt.compile('-C', '-c', 'voter.jar')
+        runner.call('volt.compile', '-C', '-c', 'voter.jar', classpath = runner.verb.classpath)
     else:
-        VOLT.volt.compile('-c', 'voter.jar')
+        runner.call('volt.compile', '-c', 'voter.jar', classpath = runner.verb.classpath)
 
 @VOLT.Command(description = 'Clean the Voter build output.')
 def clean(runner):
@@ -41,28 +55,28 @@ def clean(runner):
 
 @VOLT.Command(description = 'Start the Voter VoltDB server.')
 def server(runner):
-    VOLT.voltadmin.start()
+    runner.call('volt.start', '-c', 'voter.jar', '-H', 'localhost', *get_license_opts(runner))
 
 @VOLT.Java('voter.JDBCBenchmark', classpath = 'obj',
            description = 'Run the Voter JDBC benchmark.')
 def jdbc(runner):
-    runner.call.build('-C')
+    runner.call('build', '-C')
     runner.go()
 
 @VOLT.Java('voter.SimpleBenchmark', classpath = 'obj',
            description = 'Run the Voter simple benchmark.')
 def simple(runner):
-    runner.call.build('-C')
+    runner.call('build', '-C')
     runner.go()
 
 @VOLT.Java('voter.AsyncBenchmark', classpath = 'obj',
            description = 'Run the Voter asynchronous benchmark.')
 def async(runner):
-    runner.call.build('-C')
+    runner.call('build', '-C')
     runner.go()
 
 @VOLT.Java('voter.SyncBenchmark', classpath = 'obj',
            description = 'Run the Voter synchronous benchmark.')
 def sync(runner):
-    runner.call.build('-C')
+    runner.call('build', '-C')
     runner.go()

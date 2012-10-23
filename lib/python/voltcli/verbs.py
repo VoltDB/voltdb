@@ -41,7 +41,11 @@ class BaseVerb(object):
     Base class for verb implementations. Used by the @Volt.Command decorator.
     """
     def __init__(self, name, **kwargs):
-        self.name     = name
+        self.name = name
+        # The baseverb flag is used for common verbs like package and help so
+        # that they can be kept separate from application-specific verbs.
+        self.baseverb  = utility.kwargs_get(kwargs, 'baseverb', default = False)
+        self.classpath = utility.kwargs_get(kwargs, 'classpath', default = None)
         self.cli_spec = cli.CLISpec(**kwargs)
         utility.debug(str(self))
     def execute(self, runner):
@@ -77,11 +81,7 @@ class JavaVerb(CommandVerb):
     """
     def __init__(self, name, function, java_class, **kwargs):
         self.java_class         = java_class
-        self.java_opts_override = kwargs.get('java_opts_override', None)
-        if 'classpath' in kwargs:
-            self.classpath = kwargs.pop('classpath')
-        else:
-            self.classpath = None
+        self.java_opts_override = utility.kwargs_get(kwargs, 'java_opts_override')
         CommandVerb.__init__(self, name, function, **kwargs)
     def go(self, runner, *args):
         java_args = list(args) + list(runner.args)
@@ -102,10 +102,11 @@ class ServerVerb(CommandVerb):
                                 'the application catalog jar file path',
                                 required = True),
                    cli.CLIValue('-d', '--deployment', 'deployment',
-                                'the deployment configuration file path'),
+                                'the deployment configuration file path',
+                                default = 'deployment.xml'),
                    cli.CLIValue('-H', '--host', 'host',
                                 'the coordinating host as HOST[:PORT]',
-                                required = True),
+                                default = 'localhost'),
                    cli.CLIValue('-l', '--license', 'license',
                                 'the license file path'))
 
@@ -113,7 +114,7 @@ class ServerVerb(CommandVerb):
         utility.kwargs_merge_list(kwargs, 'cli_options', *ServerVerb.cli_options)
         utility.kwargs_merge_java_options(kwargs, 'java_opts_override', ServerVerb.server_opts)
         self.server_subcommand = server_subcommand
-        self.java_opts_override = kwargs.pop('java_opts_override')
+        self.java_opts_override = utility.kwargs_get(kwargs, 'java_opts_override', default = [])
         CommandVerb.__init__(self, name, function, **kwargs)
 
     def go(self, runner, *args):
@@ -149,15 +150,25 @@ class ClientVerb(CommandVerb):
         utility.kwargs_merge_list(kwargs, 'cli_options',
             cli.CLIValue('-H', '--host', 'host',
                          'the target host as HOST[:PORT]',
-                         required = True),
+                         default = 'localhost'),
+            cli.CLIValue('-p', '--password', 'password',
+                         "the user's connection password",
+                         default = ''),
+            cli.CLIValue('-u', '--user', 'username',
+                         'the connection user name',
+                         default = ''),
         )
+        self.default_port = utility.kwargs_get(kwargs, 'default_port', default = 21212)
         CommandVerb.__init__(self, name, function, **kwargs)
     def execute(self, runner):
         host = utility.parse_hosts(runner.opts.host,
-                                   min_hosts = 1, max_hosts = 1, default_port = 21212)[0]
+                                   min_hosts = 1, max_hosts = 1,
+                                   default_port = self.default_port)[0]
         # Connect the client.
         try:
-            runner.client = FastSerializer(host.host, host.port)
+            runner.client = FastSerializer(host.host, host.port,
+                                           username = runner.opts.username,
+                                           password = runner.opts.password)
         except Exception, e:
             utility.abort('Client connection failed.', e)
         try:
@@ -175,13 +186,16 @@ class HelpVerb(CommandVerb):
     """
     def __init__(self, name, function, **kwargs_in):
         kwargs = copy.copy(kwargs_in)
-        if 'description' not in kwargs:
-            kwargs['description'] = 'Display command help.'
-        if 'usage' not in kwargs:
-            kwargs['usage'] = '[COMMAND ...]'
+        utility.kwargs_set_defaults(kwargs, description = 'Display command help.',
+                                            usage       = '[COMMAND ...]',
+                                            baseverb    = True)
+        utility.kwargs_merge_list(kwargs, 'cli_options',
+            cli.CLIBoolean('-a', '--all', 'all',
+                           'display all available help, including verb usage', default = False),
+        )
         CommandVerb.__init__(self, name, function, **kwargs)
     def go(self, runner, *args):
-        runner.help(*runner.args)
+        runner.help(all = runner.opts.all, *runner.args)
 
 #===============================================================================
 class PackageVerb(CommandVerb):
@@ -191,20 +205,23 @@ class PackageVerb(CommandVerb):
     """
     def __init__(self, name, function, **kwargs_in):
         kwargs = copy.copy(kwargs_in)
-        if 'description' not in kwargs:
-            kwargs['description'] = ('Create Python-runnable package for "%s".'
-                                        % environment.command_name)
+        utility.kwargs_set_defaults(kwargs,
+                                    description = 'Create a Python-runnable program package.',
+                                    usage = '[NAME ...]',
+                                    description2 = '''\
+The optional NAME argument(s) allow package generation for base commands other
+than the current one. If no NAME is provided the current base command is
+packaged.''')
         utility.kwargs_merge_list(kwargs, 'cli_options',
             cli.CLIBoolean('-f', '--force', 'force',
                            'overwrite existing file without asking', default = False),
             cli.CLIValue('-o', '--output_dir', 'outdir',
                          'specify output directory (defaults to working directory)'),
         )
+        kwargs['baseverb'] = True
         CommandVerb.__init__(self, name, function, **kwargs)
     def go(self, runner, *args):
-        if args:
-            utility.abort('Unsupported arguments were supplied to the package command.')
-        runner.package(runner.opts.outdir, runner.opts.force)
+        runner.package(runner.opts.outdir, runner.opts.force, *args)
 
 #===============================================================================
 class VerbDecorators(object):
@@ -213,7 +230,7 @@ class VerbDecorators(object):
     Provide decorators used by command implementations to declare commands.
     NB: All decorators assume they are being called.  E.g. @VOLT.Command() is
     valid, but @VOLT.Command is not, even though Python won't catch the latter
-    as compile-time error.
+    as a compile-time error.
     """
 
     def __init__(self, verbs):
@@ -269,9 +286,18 @@ class VerbDecorators(object):
 
     def Client(self, *args, **kwargs):
         """
-        @VOLT.Command_Client decorator for declaring commands that run as
-        VoltDB clients.
+        @VOLT.Client decorator for declaring commands that run as VoltDB
+        clients.
         """
+        return self._get_decorator(ClientVerb, *args, **kwargs)
+
+    def Admin_Client(self, *args, **kwargs):
+        """
+        @VOLT.Admin_Client decorator for declaring commands that run as
+        administrative VoltDB clients.
+        """
+        # Use the admin port if none is specified.
+        utility.kwargs_set_defaults(kwargs, default_port = 21211)
         return self._get_decorator(ClientVerb, *args, **kwargs)
 
     def Help(self, *args, **kwargs):

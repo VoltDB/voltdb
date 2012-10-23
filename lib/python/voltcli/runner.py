@@ -45,11 +45,9 @@ from voltcli import utility
 base_cli_spec = cli.CLISpec(
     description = '''\
 Specific actions are provided by verbs.  Run "%prog help VERB" to display full
-usage for a verb, including its options and arguments.  Note that some verbs
-are fully handled in Java.  For these verbs help is usually available by
-running the verb with no additional arguments or followed by the -h option.
+usage for a verb, including its options and arguments.
 ''',
-    usage = '%prog [OPTIONS] COMMAND [ARGUMENTS ...]',
+    usage = '%prog [OPTIONS] VERB [ARGUMENTS ...]',
     cli_options = (
         cli.CLIBoolean('-d', '--debug', 'debug',
                        'display debug messages'),
@@ -66,28 +64,6 @@ running the verb with no additional arguments or followed by the -h option.
 internal_commands = ['volt', 'voltadmin']
 
 #===============================================================================
-# ToolRunner and ToolCallable classes
-#
-# Supports running internal tools from user scripts through the VOLT namespace.
-#   Syntax: VOLT.<tool>.command(args...)
-#===============================================================================
-
-class ToolCallable(object):
-    def __init__(self, tool_runner, verb_name):
-        self.tool_runner = tool_runner
-        self.verb_name   = verb_name
-    def __call__(self, *cmdargs):
-        args = [self.verb_name] + list(cmdargs)
-        run_command(self.tool_runner.verbspace, self.tool_runner.config, *args)
-
-class ToolRunner(object):
-    def __init__(self, verbspace, config):
-        self.verbspace = verbspace
-        self.config    = config
-    def __getattr__(self, verb_name):
-        return ToolCallable(self, verb_name)
-
-#===============================================================================
 class JavaRunner(object):
 #===============================================================================
     """
@@ -97,16 +73,19 @@ class JavaRunner(object):
     def __init__(self, classpath):
         self.classpath = classpath
 
-    def execute(self, java_class, java_opts_override, *args):
+    def execute(self, java_class, java_opts_override, *args, **kwargs):
         """
         Run a Java command line with option overrides.
         """
+        classpath = self.classpath
+        if 'classpath' in kwargs:
+            classpath = ':'.join((kwargs['classpath'], classpath))
         java_args = [environment.java]
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
         java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
         java_args.append('-Djava.library.path="%s"' % os.environ['VOLTDB_VOLTDB'])
-        java_args.extend(('-classpath', self.classpath))
+        java_args.extend(('-classpath', classpath))
         java_args.append(java_class)
         for arg in args:
             if arg is not None:
@@ -126,30 +105,36 @@ class JavaRunner(object):
 class VerbRunner(object):
 #===============================================================================
 
-    def __init__(self, command, verbspace, config, cli_processor):
+    def __init__(self, command, verbspace, internal_verbspaces, config, cli_processor, **kwargs):
         """
         VerbRunner constructor.
         """
         # Unpack the command object for use by command implementations.
-        self.verb   = command.verb
-        self.opts   = command.opts
-        self.args   = command.args
-        self.parser = command.parser
+        self.verb       = command.verb
+        self.opts       = command.opts
+        self.args       = command.args
+        self.parser     = command.parser
+        self.outer_opts = command.outer_opts
         # The verbspace supports running nested commands.
         self.verbspace     = verbspace
         self.config        = config
         self.cli_processor = cli_processor
         self.go_default    = None
         self.project_path  = os.path.join(os.getcwd(), 'project.xml')
-        # Build the Java classpath and create a Java runner.
+        # The internal verbspaces are just used for packaging other verbspaces.
+        self.internal_verbspaces = internal_verbspaces
+        # Build the Java classpath using environment variable, config file,
+        # verb attribute, and kwargs.
         classpath = ':'.join(environment.classpath)
         classpath_ext = config.get('volt.classpath')
         if classpath_ext:
             classpath = ':'.join((classpath, classpath_ext))
         if hasattr(self.verb, 'classpath') and self.verb.classpath:
             classpath = ':'.join((self.verb.classpath, classpath))
+        if 'classpath' in kwargs:
+            classpath = ':'.join((kwargs['classpath'], classpath))
+        # Create a Java runner.
         self.java = JavaRunner(classpath)
-        self.call = ToolRunner(self.verbspace, self.config)
 
     def shell(self, *args):
         """
@@ -183,28 +168,38 @@ class VerbRunner(object):
         self.help()
         utility.abort()
 
-    def help(self, *args):
+    def help(self, *args, **kwargs):
         """
         Display help for command.
         """
-        if args:
-            for name in args:
-                for verb_name in self.verbspace.verb_names:
-                    if verb_name == name:
-                        verb = self.verbspace.verbs[name]
-                        parser = self.cli_processor.create_verb_parser(verb)
-                        sys.stdout.write('\n')
-                        parser.print_help()
-                        sys.stdout.write('\n')
-                        if verb.cli_spec.description2:
-                            sys.stdout.write('%s\n' % verb.cli_spec.description2.strip())
-                        break
-                else:
-                    utility.error('Verb "%s" was not found.' % verb.name)
-        else:
+        # The only valid keyword argument is 'all' for now.
+        context = '%s.help()' % self.__class__.__name__
+        all = utility.kwargs_get(kwargs, 'all', default = False)
+        if all:
+            sys.stdout.write('\n===== Full Help =====\n')
             self.usage()
+            for verb_name in self.verbspace.verb_names:
+                if not self.verbspace.verbs[verb_name].baseverb:
+                    sys.stdout.write('\n===== Verb: %s =====\n' % verb_name)
+                    self._help_verb(verb_name)
+            for verb_name in self.verbspace.verb_names:
+                if self.verbspace.verbs[verb_name].baseverb:
+                    sys.stdout.write('\n===== Common Verb: %s =====\n' % verb_name)
+                    self._help_verb(verb_name)
+        else:
+            if args:
+                for name in args:
+                    for verb_name in self.verbspace.verb_names:
+                        if verb_name == name:
+                            self._help_verb(verb_name)
+                            break
+                    else:
+                        utility.error('Verb "%s" was not found.' % name)
+                        self.usage()
+            else:
+                self.usage()
 
-    def package(self, output_dir_in, force):
+    def package(self, output_dir_in, force, *args):
         """
         Create python-runnable package/zip file.
         """
@@ -212,22 +207,24 @@ class VerbRunner(object):
             output_dir = ''
         else:
             output_dir = output_dir_in
-        output_path = os.path.join(output_dir, '%s' % environment.command_name)
-        utility.info('Creating compressed Python-runnable file: %s' % output_path)
-        zipper = utility.Zipper(excludes = ['[.]pyc$'])
-        zipper.open(output_path, force = force, preamble = '#!/usr/bin/env python\n')
-        try:
-            # Generate the __main__.py module for automatic execution from the zip file.
-            main_script = ('''\
-import sys
-from voltcli import runner
-runner.main('%(name)s', '', '%(version)s', '%(description)s', package = True, *sys.argv[1:])'''
-                    % self.verbspace.__dict__)
-            zipper.add_file_from_string(main_script, '__main__.py')
-            # Recursively package lib/python as lib in the zip file.
-            zipper.add_directory(environment.volt_python, '')
-        finally:
-            zipper.close(make_executable = True)
+        if args:
+            # Package other verbspaces.
+            for name in args:
+                if name not in self.internal_verbspaces:
+                    utility.abort('Unknown base command "%s" specified for packaging.' % name)
+                verbspace = self.internal_verbspaces[name]
+                self._create_package(output_dir, verbspace.name, verbspace.version,
+                                     verbspace.description, force)
+        else:
+            # Package the active verbspace.
+            self._create_package(output_dir, self.verbspace.name, self.verbspace.version,
+                                 self.verbspace.description, force)
+        # Warn for Python version < 2.6.
+        if sys.version_info[0] == 2 and sys.version_info[1] < 6:
+            utility.warning(
+                    'Generated program packages require Python version 2.6 or greater.',
+                    'The running Python version is %d.%d.%d' % sys.version_info[:3],
+                    "It will crash with Python versions that can't detect and run zip packages.")
 
     def usage(self):
         """
@@ -254,7 +251,68 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s', package = True, *s
             self.go_default(self, *args)
 
     def execute(self):
+        """
+        Execute the verb function.
+        """
         self.verb.execute(self)
+
+    def call(self, *args, **kwargs):
+        if not args:
+            utility.abort('No arguments were passed to VerbRunner.call().')
+        if args[0].find('.') == -1:
+            self._run_command(self.verbspace, *args, **kwargs)
+        else:
+            verbspace_name, verb_name = args[0].split('.', 1)
+            if verbspace_name not in self.internal_verbspaces:
+                utility.abort('Unknown name passed to VerbRunner.call(): %s' % verbspace_name)
+            verbspace = self.internal_verbspaces[verbspace_name]
+            if verb_name not in verbspace.verb_names:
+                utility.abort('Unknown verb passed to VerbRunner.call(): %s' % args[0],
+                              'Available verbs in "%s":' % verbspace_name,
+                              verbspace.verb_names)
+            args2 = [verb_name] + list(args[1:])
+            self._run_command(self.internal_verbspaces[verbspace_name], *args2, **kwargs)
+
+    def _help_verb(self, name):
+        # Internal method to display help for a verb
+        verb = self.verbspace.verbs[name]
+        parser = self.cli_processor.create_verb_parser(verb)
+        sys.stdout.write('\n')
+        parser.print_help()
+        if verb.cli_spec.description2:
+            sys.stdout.write('\n')
+            sys.stdout.write('%s\n' % verb.cli_spec.description2.strip())
+
+    def _create_package(self, output_dir, name, version, description, force):
+        output_path = os.path.join(output_dir, '%s' % name)
+        utility.info('Creating compressed executable Python program: %s' % output_path)
+        zipper = utility.Zipper(excludes = ['[.]pyc$'])
+        zipper.open(output_path, force = force, preamble = '#!/usr/bin/env python\n')
+        try:
+            # Generate the __main__.py module for automatic execution from the zip file.
+            main_script = ('''\
+import sys
+from voltcli import runner
+runner.main('%(name)s', '', '%(version)s', '%(description)s', package = True, *sys.argv[1:])'''
+                    % locals())
+            zipper.add_file_from_string(main_script, '__main__.py')
+            # Recursively package lib/python as lib in the zip file.
+            zipper.add_directory(environment.volt_python, '')
+        finally:
+            zipper.close(make_executable = True)
+
+    def _run_command(self, verbspace, *args, **kwargs):
+        processor = cli.VoltCLICommandProcessor(verbspace.verbs,
+                                                base_cli_spec.cli_options,
+                                                base_cli_spec.usage,
+                                                '\n'.join((verbspace.description,
+                                                           base_cli_spec.description)),
+                                                '%%prog version %s' % verbspace.version)
+        command = processor.parse(args)
+        command.outer_opts = self.outer_opts
+        runner = VerbRunner(command, verbspace, self.internal_verbspaces, self.config,
+                            processor, **kwargs)
+        runner.execute()
 
 #===============================================================================
 class VOLT(object):
@@ -342,7 +400,7 @@ class VoltConfig(utility.PersistentConfig):
         return value
 
 #===============================================================================
-def run_command(verbspace, config, *cmdargs):
+def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
 #===============================================================================
     """
     Run a command after parsing the command line arguments provided.
@@ -354,15 +412,16 @@ def run_command(verbspace, config, *cmdargs):
                                             '\n'.join((verbspace.description,
                                                        base_cli_spec.description)),
                                             '%%prog version %s' % verbspace.version)
-    command = processor.parse(cmdargs)
+    command = processor.parse(args)
 
     # Initialize utility function options according to parsed options.
     utility.set_verbose(command.outer_opts.verbose)
     utility.set_debug(  command.outer_opts.debug)
     utility.set_dryrun( command.outer_opts.dryrun)
 
-    # Run the command.
-    runner = VerbRunner(command, verbspace, config, processor)
+    # Run the command. Pass along kwargs. This allows verbs calling other verbs
+    # to add keyword arguments like "classpath".
+    runner = VerbRunner(command, verbspace, internal_verbspaces, config, processor, **kwargs)
     runner.execute()
 
 #===============================================================================
@@ -373,12 +432,7 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
     """
     # For now "package" is the only valid keyword to flag when running from a
     # package zip __main__.py.
-    package = False
-    for key in kwargs:
-        if key == 'package':
-            package = True
-        else:
-            utility.abort('Bad main() keyword: %s' % key)
+    package = utility.kwargs_get(kwargs, 'package', default = False)
     try:
         # Pre-scan for verbose, debug, and dry-run options so that early code
         # can display verbose and debug messages, and obey dry-run.
@@ -400,17 +454,17 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
         verbspace = load_verbspace(command_name, command_dir, config, version,
                                    description, package)
 
-        # Make internal commands available to user commands via the VOLT namespace.
+        # Make internal commands available to user commands via runner.verbspace().
+        internal_verbspaces = {}
         if command_name not in internal_commands:
             for internal_command in internal_commands:
                 internal_verbspace = load_verbspace(internal_command, None, config, version,
                                                     'Internal "%s" command' % internal_command,
                                                     package)
-                tool_runner = ToolRunner(internal_verbspace, config)
-                setattr(verbspace.VOLT, internal_command, tool_runner)
+                internal_verbspaces[internal_command] = internal_verbspace
 
         # Run the command
-        run_command(verbspace, config, *args)
+        run_command(verbspace, internal_verbspaces, config, *args)
 
     except KeyboardInterrupt:
         sys.stderr.write('\n')

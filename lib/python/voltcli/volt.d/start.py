@@ -25,35 +25,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-from voltcli import utility
-
-@VOLT.Client(
-    description = 'Save a VoltDB database snapshot.',
-    cli_options = (
-        VOLT.CLIBoolean('-b', '--block', 'block',
-                        'block database activity during snapshot save',
-                        default = False),
-        VOLT.CLIValue('-d', '--directory', 'directory',
-                      'the local snapshot directory path',
-                      required = True),
-        VOLT.CLIValue('-f', '--format', 'format',
-                      'snapshot format: "native" or "csv"',
-                      default = 'native'),
-        VOLT.CLIValue('-i', '--id', 'nonce',
-                      'the unique snapshot identifier (nonce)',
-                      required = True),
-    )
-)
-def save(runner):
-    uri = 'file://%s' % os.path.realpath(runner.opts.directory)
-    if runner.opts.block:
-        block = 'true'
-    else:
-        block = 'false'
-    json_opts = '{uripath:"%s",nonce:"%s",block:%s,format:"%s"}' % (
-                    uri, runner.opts.nonce, block, runner.opts.format)
-    utility.debug('@SnapshotSave "%s"' % json_opts)
-    proc = VOLT.VoltProcedure(runner.client, '@SnapshotSave', [VOLT.FastSerializer.VOLTTYPE_STRING])
-    response = proc.call(params = [json_opts])
-    print response
+@VOLT.Server('start',
+             description = 'Start the VoltDB server.')
+def start(runner):
+    runner.go()

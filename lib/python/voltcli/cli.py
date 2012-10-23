@@ -55,7 +55,10 @@ class CLIOption(object):
         self.kwargs['dest'] = dest
         self.kwargs['help'] = help_msg
         if 'default' in self.kwargs:
-            self.kwargs['help'] += ' (default=%s)' % self.kwargs['default']
+            if utility.is_string(kwargs['default']):
+                self.kwargs['help'] += ' (default="%s")' % self.kwargs['default']
+            else:
+                self.kwargs['help'] += ' (default=%s)' % self.kwargs['default']
         if self.required:
             self.kwargs['help'] += ' (required)'
     def __str__(self):
@@ -189,7 +192,13 @@ class VoltCLICommandProcessor(optparse.OptionParser):
         if verbs:
             for verb_name in self.verb_names:
                 verb = self.verbs[verb_name]
-                full_usage += '\n       %%prog %s %s' % (verb.name, verb.cli_spec.usage)
+                if not verb.baseverb:
+                    full_usage += '\n       %%prog %s %s' % (verb.name, verb.cli_spec.usage)
+            full_usage += '\n'
+            for verb_name in self.verb_names:
+                verb = self.verbs[verb_name]
+                if verb.baseverb:
+                    full_usage += '\n       %%prog %s %s' % (verb.name, verb.cli_spec.usage)
         optparse.OptionParser.__init__(self,
             description = description,
             usage       = full_usage,
@@ -284,11 +293,18 @@ class VoltCLICommandProcessor(optparse.OptionParser):
         OptionParser hook that allows us to append verb descriptions to the
         help message.
         """
-        rows = []
-        for verb_name in self.verb_names:
-            verb = self.verbs[verb_name]
-            rows.append((verb.name, verb.cli_spec.description))
-        return '\n%s' % utility.format_table("Verb Descriptions", None, rows)
+        self.format_epilog_called = True
+        return self._format_verb_list()
+
+    def print_help(self):
+        """
+        OptionParser override that works around Python 2.4 optparse not
+        supporting format_epilog().
+        """
+        self.format_epilog_called = False
+        optparse.OptionParser.print_help(self)
+        if not self.format_epilog_called:
+            sys.stdout.write(self._format_verb_list())
 
     def _abort(self, *msgs):
         utility.error(*msgs)
@@ -296,6 +312,19 @@ class VoltCLICommandProcessor(optparse.OptionParser):
         self.print_help()
         sys.stdout.write('\n\n')
         utility.abort()
+
+    def _format_verb_list(self):
+        rows1 = []
+        rows2 = []
+        for verb_name in self.verb_names:
+            verb = self.verbs[verb_name]
+            if verb.baseverb:
+                rows2.append((verb.name, verb.cli_spec.description))
+            else:
+                rows1.append((verb.name, verb.cli_spec.description))
+        table1 = utility.format_table('Verb Descriptions', None, rows1)
+        table2 = utility.format_table('Common Verbs', None, rows2)
+        return '\n%s\n\n%s' % (table1, table2)
 
 #===============================================================================
 class CLISpec(object):
