@@ -127,6 +127,16 @@ class ParameterizationInfo {
             // user-provided parameters were barred from being (further) parameterized.
             node.attributes.put("isparam", "true");
             node.attributes.put("isplannergenerated", "true");
+
+            // Remove the "value" attribute -- this is the critical step to folding
+            // different raw VoltXML trees into the same parameterized VoltXML tree.
+            // The value differences are extracted into paramValues for future reference by:
+            //     the execution engine which needs to substitute actual values for all parameters
+            //         to run the query
+            //     the index scan planner which may need to "bind" the parameters to their original
+            //     values to apply indexes on expressions like "(colA + 2 * colB)" when used in a query
+            //     like "... WHERE t2.colA + 2 * t2.colB > 3*t1.colC".
+            node.attributes.remove("value");
         }
 
         for (VoltXMLElement child : node.children) {
