@@ -29,6 +29,26 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_requiresAck;
     boolean m_rollbackForFault;
 
+    int m_flags = 0;
+    static final int ISROLLBACK = 0;
+    static final int REQUIRESACK = 1;
+    static final int ROLLBACKFORFAULT = 2;
+
+    private void setBit(int position, boolean value)
+    {
+        if (value) {
+            m_flags |= (1 << position);
+        }
+        else {
+            m_flags &= ~(1 << position);
+        }
+    }
+
+    private boolean getBit(int position)
+    {
+        return (((m_flags >> position) & 0x1) == 1);
+    }
+
     /** Empty constructor for de-serialization */
     CompleteTransactionMessage() {
         super();
@@ -51,31 +71,31 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
                                       boolean rollbackForFault, boolean isForReplay)
     {
         super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, isForReplay);
-        m_isRollback = isRollback;
-        m_requiresAck = requiresAck;
-        m_rollbackForFault = rollbackForFault;
+        setBit(ISROLLBACK, isRollback);
+        setBit(REQUIRESACK, requiresAck);
+        setBit(ROLLBACKFORFAULT, rollbackForFault);
     }
 
     public boolean isRollback()
     {
-        return m_isRollback;
+        return getBit(ISROLLBACK);
     }
 
     public boolean requiresAck()
     {
-        return m_requiresAck;
+        return getBit(REQUIRESACK);
     }
 
     public boolean isRollbackForFault()
     {
-        return m_rollbackForFault;
+        return getBit(ROLLBACKFORFAULT);
     }
 
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 1 + 1 + 1;
+        msgsize += 4;
         return msgsize;
     }
 
@@ -84,9 +104,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     {
         buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_ID);
         super.flattenToBuffer(buf);
-        buf.put(m_isRollback ? (byte) 1 : (byte) 0);
-        buf.put(m_requiresAck ? (byte) 1 : (byte) 0);
-        buf.put(m_rollbackForFault ? (byte) 1 : (byte) 0);
+        buf.putInt(m_flags);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -95,9 +113,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         super.initFromBuffer(buf);
-        m_isRollback = buf.get() == 1;
-        m_requiresAck = buf.get() == 1;
-        m_rollbackForFault = buf.get() == 1;
+        m_flags = buf.getInt();
         assert(buf.capacity() == buf.position());
     }
 
@@ -109,14 +125,15 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
+        sb.append("\n  FLAGS: ").append(m_flags);
 
-        if (m_isRollback)
+        if (isRollback())
             sb.append("\n  THIS IS AN ROLLBACK REQUEST");
 
-        if (m_requiresAck)
+        if (requiresAck())
             sb.append("\n  THIS MESSAGE REQUIRES AN ACK");
 
-        if (m_rollbackForFault) {
+        if (isRollbackForFault()) {
             sb.append("\n  THIS ROLLBACK IS FOR FAULT REPAIR");
         }
 
