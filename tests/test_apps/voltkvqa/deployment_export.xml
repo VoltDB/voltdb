@@ -11,6 +11,7 @@
                 <property name="with-schema">true</property>
                 <property name="batched">true</property>
                 <property name="nonce">zohan</property>
+                <property name="period">10</property>
             </configuration>
         </onserver>
     </export>

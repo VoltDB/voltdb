@@ -24,4 +24,5 @@ public abstract class ExportClientBase2 extends ExportClientBase {
     }
 
     public abstract void configure( Properties config) throws Exception;
+    public abstract void shutdown( );
 }

@@ -159,9 +159,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             super.acceptPromotion();
             // Tag along and become the export master too
-            if (ExportManager.instance() == null) {
-                System.out.println("Export manager was null");
-            }
             ExportManager.instance().acceptMastership(m_partitionId);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);

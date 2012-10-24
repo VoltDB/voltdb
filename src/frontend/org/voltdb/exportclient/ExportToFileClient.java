@@ -34,17 +34,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.types.TimestampType;
@@ -92,9 +93,6 @@ public class ExportToFileClient extends ExportClientBase2 {
     protected String m_dateFormatOriginalString;
     protected int m_firstfield;
 
-    // timer used to roll batches
-    protected final Timer m_timer = new Timer();
-
     // record the original command line args for servers
     protected final List<String> m_commandLineServerArgs = new ArrayList<String>();
 
@@ -107,6 +105,8 @@ public class ExportToFileClient extends ExportClientBase2 {
 
     protected final ReentrantReadWriteLock m_batchLock = new ReentrantReadWriteLock();
 
+    // timer used to roll batches
+    protected ScheduledExecutorService m_ses;
     /**
     *
     */
@@ -230,7 +230,6 @@ public class ExportToFileClient extends ExportClientBase2 {
                     writer.flush();
                     writer.close();
                 } catch (IOException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
             }
@@ -411,6 +410,7 @@ public class ExportToFileClient extends ExportClientBase2 {
         }
     }
 
+
     // This class outputs exported rows converted to CSV or TSV values
     // for the table named in the constructor's AdvertisedDataSource
     class ExportToFileDecoder extends ExportDecoderBase {
@@ -421,6 +421,17 @@ public class ExportToFileClient extends ExportClientBase2 {
         private FutureTask<CSVWriter> m_firstBlockTask;
         private CSVWriter m_writer;
 
+        private void resetWriter() {
+            m_firstBlockTask = new FutureTask<CSVWriter>(new Callable<CSVWriter>() {
+                @Override
+                public CSVWriter call() throws Exception {
+                    CSVWriter writer = m_current.getWriter(m_tableName, m_generation);
+                    m_current.writeSchema(m_tableName, m_generation, m_schemaString);
+                    return writer;
+                }
+            });;
+        }
+
         public ExportToFileDecoder(
                 AdvertisedDataSource source,
                 String tableName,
@@ -430,14 +441,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             m_tableName = tableName;
 
             setSchemaForSource(source);
-            m_firstBlockTask = new FutureTask<CSVWriter>(new Callable<CSVWriter>() {
-                @Override
-                public CSVWriter call() throws Exception {
-                    CSVWriter writer = m_current.getWriter(m_tableName, m_generation);
-                    m_current.writeSchema(m_tableName, m_generation, m_schemaString);
-                    return writer;
-                }
-            });
+            resetWriter();
         }
 
         /**
@@ -619,6 +623,18 @@ public class ExportToFileClient extends ExportClientBase2 {
         }
     }
 
+    @Override
+    public void shutdown() {
+        m_ses.shutdown();
+        try {
+            m_ses.awaitTermination(365, TimeUnit.DAYS);
+        } catch( InterruptedException iex) {
+            Throwables.propagate(iex);
+        }
+        m_batchLock.writeLock().lock();
+        m_current.closeAllWriters();
+    }
+
     /**
      * Deprecate the current batch and create a new one. The old one will still
      * be active until all writers have finished writing their current blocks
@@ -626,23 +642,24 @@ public class ExportToFileClient extends ExportClientBase2 {
      */
     void roll(final Date rollTime) {
         m_batchLock.writeLock().lock();
+        final PeriodicExportContext previous = m_current;
         try {
+            m_current.end = rollTime;
+
+            m_current = new PeriodicExportContext(rollTime);
+
             m_logger.trace("Rolling batch.");
-            new Thread("Rolling batch " + rollTime) {
-                @Override
-                public void run() {
-                    m_current.end = rollTime;
-                    m_current = new PeriodicExportContext(rollTime);
-                    try {
-                        m_current.closeAllWriters();
-                    } catch (Throwable t) {
-                        m_logger.error("Error rolling batch", t);
-                    }
+
+            for( Map<String, ExportToFileDecoder> genDecoders: m_tableDecoders.values()) {
+                for( ExportToFileDecoder decoder: genDecoders.values()) {
+                    decoder.resetWriter();
                 }
-            }.start();
+            }
+
         } finally {
             m_batchLock.writeLock().unlock();
         }
+        previous.closeAllWriters();
     }
 
     protected void logConfigurationInfo() {
@@ -1059,7 +1076,6 @@ public class ExportToFileClient extends ExportClientBase2 {
             m_fullDelimiters = new char[4];
             for (int i = 0; i < 4; i++) {
                 m_fullDelimiters[i] = fullDelimiters.charAt(i);
-                //System.out.printf("FULL DELIMETER %d: %c\n", i, m_fullDelimiters[i]);
             }
         }
         else {
@@ -1070,13 +1086,19 @@ public class ExportToFileClient extends ExportClientBase2 {
         assert(m_current == null);
         m_current = new PeriodicExportContext(new Date());
 
+
         // schedule rotations every m_period minutes
-        TimerTask rotateTask = new TimerTask() {
+        Runnable rotator = new Runnable() {
             @Override
             public void run() {
-                roll(new Date());
+                try {
+                    roll(new Date());
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
             }
         };
-        m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
+        m_ses = CoreUtils.getScheduledThreadPoolExecutor("Export file rotate timer for nonce " + nonce, 1, 131072);
+        m_ses.scheduleWithFixedDelay(rotator, m_period, m_period, TimeUnit.MINUTES);
     }
 }

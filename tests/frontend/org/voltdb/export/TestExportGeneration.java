@@ -30,7 +30,6 @@ import static org.junit.Assert.assertTrue;
 import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +56,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportMatchers.AckPayloadMessage;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.utils.MiscUtils;
 
 import com.google.common.base.Throwables;
 
@@ -146,7 +146,7 @@ public class TestExportGeneration {
     @Before
     public void setUp() throws Exception {
 
-        rmMinusRf(m_tempRoot);
+        MiscUtils.deleteRecursively(m_tempRoot);
 
         m_dataDirectory = new File(
                 m_tempRoot,
@@ -180,7 +180,7 @@ public class TestExportGeneration {
         for (Long site : siteTracker.getSitesForHost(m_mockVoltDB.m_hostId)) {
             Integer partition = siteTracker.getPartitionForSite(site);
             String zkPath = VoltZK.exportGenerations +
-                    "/0" +
+                    "/0/mailboxes" +
                     "/" + partition +
                     "/" + m_mbox.getHSId()
                     ;
@@ -191,20 +191,7 @@ public class TestExportGeneration {
         }
 
         m_expDs = m_exportGeneration.m_dataSourcesByPartition.get(m_part).get(m_tableSignature);
-        m_zkPartitionDN =  VoltZK.exportGenerations + "/0" + "/" + m_part;
-    }
-
-    private void rmMinusRf( File directory) throws IOException {
-        if( directory == null || ! directory.exists()) return;
-        for( File f: directory.listFiles()) {
-            if (f.isDirectory() && f.canRead() && f.canExecute() && f.canWrite()) {
-                rmMinusRf(f);
-                f.delete();
-            }
-            else if (f.canWrite() && f.canRead()) {
-                f.delete();
-            }
-        }
+        m_zkPartitionDN =  VoltZK.exportGenerations + "/0/mailboxes" + "/" + m_part;
     }
 
     @After

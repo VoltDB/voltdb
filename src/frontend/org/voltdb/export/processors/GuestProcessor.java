@@ -172,6 +172,7 @@ public class GuestProcessor implements ExportDataProcessor {
                 p.getFirst().sourceNoLongerAdvertised(p.getSecond());
             }
         }
+        m_client.shutdown();
     }
 
     @Override

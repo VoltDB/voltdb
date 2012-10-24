@@ -703,6 +703,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             if (mbox != null) {
                 mbox.deliver(message);
                 return null;
+            } else {
+                hostLog.warn("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
+                return null;
             }
         }
 
