@@ -153,7 +153,7 @@ public class FunctionExpression extends AbstractExpression {
         assert(m_name != null);
         if (m_name == null) {
             // This is most unpossible. BUT...
-            // better to fail the equality test than to embarrass ourselves in production mode
+            // better to fail the equality test than to embarrass ourselves in production
             // (when asserts are turned off) with an NPE on the next line.
             return false;
         }

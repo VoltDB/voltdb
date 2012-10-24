@@ -57,12 +57,10 @@ public abstract class SubPlanAssembler {
     /** Describes the specified and inferred partition context. */
     final PartitioningForStatement m_partitioning;
 
-    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<AbstractExpression>();
-
     // This works on the assumption that it is only used to return final "leaf node" bindingLists that
     // are never updated "in place", but just get their contents dumped into a summary List that was created
     // inline and NOT initialized here.
-    private static List<AbstractExpression> theEmptyBindingList() { return s_reusableImmutableEmptyBinding; }
+    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<AbstractExpression>();
 
     SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
@@ -172,12 +170,11 @@ public abstract class SubPlanAssembler {
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
         filtersToCover.addAll(exprs);
 
-        List<ColumnRef> sortedColumns = null;
-
         String exprsjson = index.getExpressionsjson();
         // This list remains null if the index is just on simple columns.
         List<AbstractExpression> indexedExprs = null;
         // This vector of indexed columns remains null if indexedExprs is in use.
+        List<ColumnRef> sortedColumns = null;
         int[] colIds = null;
         int keyComponentCount;
         if (exprsjson.isEmpty()) {
@@ -509,7 +506,7 @@ public abstract class SubPlanAssembler {
                 // EXACTLY why we can't have nice things like self-joins.
                 (table.getTypeName().equals(tve.getTableName()))) {
                 // A column match never requires parameter binding. Return an empty list.
-                return theEmptyBindingList();
+                return s_reusableImmutableEmptyBinding;
             }
             return null;
         }

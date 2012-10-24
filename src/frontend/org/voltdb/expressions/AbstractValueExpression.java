@@ -29,12 +29,10 @@ import org.voltdb.types.ExpressionType;
  */
 public abstract class AbstractValueExpression extends AbstractExpression {
 
-    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<AbstractExpression>();
-
     // This works on the assumption that it is only used to return final "leaf node" bindingLists that
     // are never updated "in place", but just get their contents dumped into a summary List that was created
     // inline and NOT initialized here.
-    private static List<AbstractExpression> theEmptyBindingList() { return s_reusableImmutableEmptyBinding; }
+    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<AbstractExpression>();
 
     public AbstractValueExpression() {
         // This is needed for serialization
@@ -56,7 +54,7 @@ public abstract class AbstractValueExpression extends AbstractExpression {
     @Override
     public List<AbstractExpression> bindingToIndexedExpression(AbstractExpression expr) {
         if (equals(expr)) {
-            return theEmptyBindingList();
+            return s_reusableImmutableEmptyBinding;
         }
         return null;
     }
