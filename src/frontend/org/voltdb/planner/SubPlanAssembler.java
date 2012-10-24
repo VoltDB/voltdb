@@ -287,7 +287,7 @@ public abstract class SubPlanAssembler {
             // Equality filters get first priority.
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
-                coveringColId, table, filtersToCover);
+                coveringExpr, coveringColId, table, filtersToCover);
             if (eqExpr == null) {
                 break;
             }
