@@ -51,29 +51,42 @@ public class CompleteTransactionTask extends TransactionTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
         }
-        m_txn.setDone();
-        m_queue.flush();
-        hostLog.debug("COMPLETE: " + this);
+        if (!m_msg.isRollbackForFault()) {
+            m_txn.setDone();
+            m_queue.flush();
 
-        // Log invocation to DR
-        if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
-            FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
-            Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
-            assert(initiateTask != null);
-            StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
-            invocation.setOriginalTxnId(m_txn.txnId);
-            invocation.setOriginalTimestamp(m_txn.timestamp);
-            m_drGateway.onSuccessfulProcedureCall(m_txn.spHandle, m_txn.timestamp, true,
-                                                  invocation, m_txn.getResults());
+            // Log invocation to DR
+            if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
+                FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
+                Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
+                assert(initiateTask != null);
+                StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
+                invocation.setOriginalTxnId(m_txn.txnId);
+                invocation.setOriginalTimestamp(m_txn.timestamp);
+                m_drGateway.onSuccessfulProcedureCall(m_txn.spHandle, m_txn.timestamp, true,
+                        invocation, m_txn.getResults());
+            }
+            hostLog.debug("COMPLETE: " + this);
+        }
+        else
+        {
+            // If we're going to restart the transaction, then reset the begin undo token so the
+            // first FragmentTask will set it correctly.  Otherwise, don't set the Done state or
+            // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
+            // for the restarted fragments.
+            m_txn.setBeginUndoToken(Site.kInvalidUndoToken);
+            hostLog.debug("RESTART: " + this);
         }
     }
 
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection)
     {
-        // future: offer to siteConnection.IBS for replay.
-        m_txn.setDone();
-        m_queue.flush();
+        if (!m_msg.isRollbackForFault()) {
+            // future: offer to siteConnection.IBS for replay.
+            m_txn.setDone();
+            m_queue.flush();
+        }
     }
 
     @Override

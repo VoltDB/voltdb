@@ -656,7 +656,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
                     replmsg);
         }
-        TransactionState txn = m_outstandingTxns.remove(message.getTxnId());
+        TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
         // now, fix that later.
@@ -665,11 +665,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
             m_pendingTasks.offer(task);
-        }
-
-        if (message.isRollbackForFault()) {
-            // Log the TXN ID of this MP to the command log fault loog.
-            m_cl.logIv2MPFault(message.getTxnId());
+            // If this is a restart, then we need to leave the transaction state around
+            if (!message.isRollbackForFault()) {
+                m_outstandingTxns.remove(message.getTxnId());
+            }
         }
     }
 
