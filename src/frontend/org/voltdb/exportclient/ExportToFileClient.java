@@ -336,15 +336,15 @@ public class ExportToFileClient extends ExportClientBase2 {
             try {
                 OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
                 if (m_fullDelimiters != null) {
-                    writer = new CSVWriter(new BufferedWriter(osw, 1048576),
+                    writer = new CSVWriter(new BufferedWriter(osw, 4096 * 4),
                             m_fullDelimiters[0], m_fullDelimiters[1], m_fullDelimiters[2], String.valueOf(m_fullDelimiters[3]));
                 }
                 else if (m_delimiter == ',')
                     // CSV
-                    writer = new CSVWriter(new BufferedWriter(osw, 1048576), m_delimiter);
+                    writer = new CSVWriter(new BufferedWriter(osw, 4096 * 4), m_delimiter);
                 else {
                     // TSV
-                    writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 1048576));
+                    writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 4096 * 4));
                 }
             }
             catch (Exception e) {
@@ -535,7 +535,13 @@ public class ExportToFileClient extends ExportClientBase2 {
          */
         @Override
         public void onBlockCompletion() {
-            m_batchLock.readLock().unlock();
+            try {
+                m_writer.flush();
+            } catch (Throwable t) {
+                Throwables.propagate(t);
+            } finally {
+                m_batchLock.readLock().unlock();
+            }
         }
 
         @Override
