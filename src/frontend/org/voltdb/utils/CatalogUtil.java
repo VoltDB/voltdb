@@ -355,8 +355,11 @@ public abstract class CatalogUtil {
                             }
 
                             assert(catalog_fkey_col != null);
-                            ret += " REFERENCES " + catalog_fkey_tbl.getTypeName() + " (" + catalog_fkey_col.getTypeName() + ")";
-                            skip_constraints.add(catalog_const);
+                            // Warning avoidance
+                            if (catalog_fkey_col != null) {
+                                ret += " REFERENCES " + catalog_fkey_tbl.getTypeName() + " (" + catalog_fkey_col.getTypeName() + ")";
+                                skip_constraints.add(catalog_const);
+                            }
                             break;
                         }
                         default:
@@ -681,7 +684,7 @@ public abstract class CatalogUtil {
             for (User u : users) {
                 sb.append(" USER ");
                 sb.append(u.getName()).append(",");
-                sb.append(u.getGroups()).append(",");
+                sb.append(CatalogUtil.getUserRoles(u)).append(",");
                 sb.append(u.getPassword()).append(",");
             }
         }
@@ -832,10 +835,10 @@ public abstract class CatalogUtil {
         }
 
         for (UsersType.User user : deployment.getUsers().getUser()) {
-            if (user.getGroups() == null)
+            if (CatalogUtil.getUserRoles(user) == null)
                 continue;
 
-            for (String group : user.getGroups().split(",")) {
+            for (String group : CatalogUtil.getUserRoles(user).split(",")) {
                 group = group.trim();
                 if (!validGroups.contains(group)) {
                     hostLog.error("Cannot assign user \"" + user.getName() + "\" to non-existent group \"" + group +
@@ -1219,7 +1222,7 @@ public abstract class CatalogUtil {
         }
         else {
             // dumb defaults if you ask for logging in community version
-            commandLogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");;
+            commandLogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");
         }
 
         //Set the volt root in the catalog
@@ -1294,8 +1297,9 @@ public abstract class CatalogUtil {
             catUser.setShadowpassword(hashedPW);
 
             // process the @groups comma separated list
-            if (user.getGroups() != null) {
-                String grouplist[] = user.getGroups().split(",");
+            String groups = CatalogUtil.getUserRoles(user);
+            if (groups != null) {
+                String grouplist[] = groups.split(",");
                 for (final String group : grouplist) {
                     final GroupRef groupRef = catUser.getGroups().add(group);
                     final Group catalogGroup = db.getGroups().get(group);
@@ -1305,6 +1309,25 @@ public abstract class CatalogUtil {
                 }
             }
         }
+    }
+
+    /**
+     * Merge the user roles and the deprecated groups for backward compatibility.
+     * @param user  parsed user
+     * @return  comma-separated roles/groups list or null if neither was specified
+     */
+    public static String getUserRoles(UsersType.User user) {
+        // Shouldn't happen, but support both roles and groups on the same user.
+        String userGroups = user.getGroups();
+        String userRoles = user.getRoles();
+        if (userGroups == null || userGroups.isEmpty()) {
+            return userRoles;
+        }
+        if (userRoles == null || userRoles.isEmpty()) {
+            return userGroups;
+        }
+        // Can't get here unless both strings are non-null and non-empty.
+        return String.format("%s,%s", userGroups, userRoles);
     }
 
     private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
@@ -1338,6 +1361,10 @@ public abstract class CatalogUtil {
         } catch (final NoSuchAlgorithmException e) {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);
+        }
+        // Warning avoidance
+        if (md == null) {
+            return null;
         }
         final byte passwordHash[] = md.digest(password.getBytes());
         return Encoder.hexEncode(passwordHash);
