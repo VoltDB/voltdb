@@ -80,9 +80,16 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
     command_dir = command_dir_arg
     version = version_arg
 
-    dirs = [os.getcwd()]
-    if command_dir not in dirs:
-        dirs.append(command_dir)
+    # Add the working directory, the command directory, and VOLTCORE as
+    # starting points for the scan.
+    dirs = []
+    def add_dir(dir):
+        if dir and dir not in dirs:
+            dirs.append(os.path.realpath(dir))
+    add_dir(os.getcwd())
+    add_dir(command_dir)
+    add_dir(os.environ.get('VOLTCORE', None))
+    utility.verbose_info('Base directories for scan:', dirs)
 
     for dir in dirs:
 
@@ -97,9 +104,9 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
         # They may be the same directory when installed by a Linux installer.
         # Set the VOLTDB_... environment variables accordingly.
         # Also locate the voltdb jar file.
-        while (dir != '/' and not env_complete()):
+        while (dir != '/' and dir != '' and not env_complete()):
 
-            utility.debug('Checking potential VoltDB root directory: %s' % dir)
+            utility.verbose_info('Checking for VoltDB root: %s' % dir)
 
             # Try to set VOLTDB_HOME if not set.
             if not os.environ.get('VOLTDB_HOME', ''):
@@ -109,14 +116,14 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
                             break
                     else:
                         os.environ['VOLTDB_HOME'] = os.path.realpath(os.path.join(dir, subdir))
-                        utility.debug('VOLTDB_HOME=>%s' % os.environ['VOLTDB_HOME'])
+                        utility.verbose_info('VOLTDB_HOME=>%s' % os.environ['VOLTDB_HOME'])
 
             # Try to set VOLTDB_LIB if not set.
             if not os.environ.get('VOLTDB_LIB', ''):
                 for subdir in ('lib', os.path.join('lib', 'voltdb')):
                     if glob.glob(os.path.join(os.path.join(dir, subdir), 'zmq*.jar')):
                         os.environ['VOLTDB_LIB'] = os.path.realpath(os.path.join(dir, subdir))
-                        utility.debug('VOLTDB_LIB=>%s' % os.environ['VOLTDB_LIB'])
+                        utility.verbose_info('VOLTDB_LIB=>%s' % os.environ['VOLTDB_LIB'])
 
             # Try to set VOLTDB_VOLTDB if not set. Look for the voltdb jar file.
             global voltdb_jar
@@ -128,7 +135,8 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
                             voltdb_jar = os.path.realpath(voltdb_jar_chk)
                             if not os.environ.get('VOLTDB_VOLTDB', ''):
                                 os.environ['VOLTDB_VOLTDB'] = os.path.dirname(voltdb_jar)
-                                utility.debug('VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
+                                utility.verbose_info(
+                                        'VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
 
             dir = os.path.dirname(dir)
 

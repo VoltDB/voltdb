@@ -28,12 +28,12 @@
 @VOLT.Client(
     description = 'Restore a VoltDB database snapshot.',
     cli_options = (
-        VOLT.CLIValue('-d', '--directory', 'directory',
-                      'the local snapshot directory path',
-                      required = True),
-        VOLT.CLIValue('-i', '--id', 'nonce',
-                      'the unique snapshot identifier (nonce)',
-                      required = True)
+        VOLT.StringOption('-d', '--directory', 'directory',
+                          'the local snapshot directory path',
+                          required = True),
+        VOLT.StringOption('-i', '--id', 'nonce',
+                          'the unique snapshot identifier (nonce)',
+                          required = True)
     )
 )
 def restore(runner):

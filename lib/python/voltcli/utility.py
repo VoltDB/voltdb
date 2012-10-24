@@ -242,6 +242,7 @@ class PythonSourceFinder(object):
 
     def search_and_execute(self, **syms):
         for scan_loc in self.scan_locs:
+            verbose_info('Scanning "%s" for modules to run...' % scan_loc.path)
             if scan_loc.package:
                 # Load the manifest as needed so that individual files can be
                 # found in package directories. There doesn't seem to be an

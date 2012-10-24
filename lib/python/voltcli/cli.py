@@ -40,7 +40,7 @@ from voltcli import utility
 # externally as module attributes.
 
 #===============================================================================
-class CLIOption(object):
+class BaseOption(object):
 #===============================================================================
     """
     General CLI option specification (uses optparse keywords for now).
@@ -61,27 +61,52 @@ class CLIOption(object):
                 self.kwargs['help'] += ' (default=%s)' % self.kwargs['default']
         if self.required:
             self.kwargs['help'] += ' (required)'
+
     def __str__(self):
         return '%s(%s %s)' % (self.__class__.__name__, self.args, self.kwargs)
 
+    def __cmp__(self, other):
+        if self.args[0]:
+            if other.args[0]:
+                return cmp(self.args[0].lower(), other.args[0].lower())
+            return 1
+        if other.args[0]:
+            return -1
+        if self.args[1]:
+            if other.args[1]:
+                return cmp(self.args[1].lower(), other.args[1].lower())
+            return 1
+        if other.args[1]:
+            return -1
+        return 0
+
 #===============================================================================
-class CLIBoolean(CLIOption):
+class BooleanOption(BaseOption):
 #===============================================================================
     """
     Boolean CLI option.
     """
     def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
-        CLIOption.__init__(self, short_opt, long_opt, dest, help_msg,
+        BaseOption.__init__(self, short_opt, long_opt, dest, help_msg,
                            action = 'store_true', **kwargs)
 
 #===============================================================================
-class CLIValue(CLIOption):
+class StringOption(BaseOption):
 #===============================================================================
     """
     CLI string value option.
     """
     def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
-        CLIOption.__init__(self, short_opt, long_opt, dest, help_msg, type = 'string', **kwargs)
+        BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, type = 'string', **kwargs)
+
+#===============================================================================
+class IntegerOption(BaseOption):
+#===============================================================================
+    """
+    Integer CLI option.
+    """
+    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
+        BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, type = 'int', **kwargs)
 
 #===============================================================================
 class ParsedCommand(object):
@@ -96,6 +121,7 @@ class ParsedCommand(object):
         self.args         = args
         self.parser       = parser
         self.verb         = verb
+
     def __str__(self):
         return 'ParsedCommand: %s | %s %s %s' % (self.outer_opts, self.verb.name,
                                                  self.opts, self.args)
@@ -192,17 +218,18 @@ class VoltCLICommandProcessor(optparse.OptionParser):
         if verbs:
             for verb_name in self.verb_names:
                 verb = self.verbs[verb_name]
-                if not verb.baseverb:
+                if not verb.cli_spec.baseverb:
                     full_usage += '\n       %%prog %s %s' % (verb.name, verb.cli_spec.usage)
             full_usage += '\n'
             for verb_name in self.verb_names:
                 verb = self.verbs[verb_name]
-                if verb.baseverb:
+                if verb.cli_spec.baseverb:
                     full_usage += '\n       %%prog %s %s' % (verb.name, verb.cli_spec.usage)
         optparse.OptionParser.__init__(self,
             description = description,
             usage       = full_usage,
             version     = version)
+        self.cli_options.sort()
         for cli_option in self.cli_options:
             self.add_option(*cli_option.args, **cli_option.kwargs)
 
@@ -215,6 +242,7 @@ class VoltCLICommandProcessor(optparse.OptionParser):
                                        usage = '%%prog %s %s' % (verb.name, verb.cli_spec.usage))
         if self.preproc.verb:
             if verb.cli_spec.cli_options:
+                verb.cli_spec.cli_options.sort()
                 for cli_option in verb.cli_spec.cli_options:
                     try:
                         parser.add_option(*cli_option.args, **cli_option.kwargs)
@@ -318,7 +346,7 @@ class VoltCLICommandProcessor(optparse.OptionParser):
         rows2 = []
         for verb_name in self.verb_names:
             verb = self.verbs[verb_name]
-            if verb.baseverb:
+            if verb.cli_spec.baseverb:
                 rows2.append((verb.name, verb.cli_spec.description))
             else:
                 rows1.append((verb.name, verb.cli_spec.description))
@@ -331,19 +359,15 @@ class CLISpec(object):
 #===============================================================================
     def __init__(self, **kwargs):
         self._kwargs = kwargs
-        # Provide a default description
-        if 'description' not in self._kwargs:
-            self._kwargs['description'] = '(description missing)'
-        # Make sure usage is a string, even if empty.
-        if 'usage' not in self._kwargs:
-            self._kwargs['usage'] = ''
         # Make sure cli_options is a flat list.
         if 'cli_options' in self._kwargs:
             self._kwargs['cli_options'] = utility.flatten_to_list(self._kwargs['cli_options'])
         else:
             self._kwargs['cli_options'] = []
+
     def __getattr__(self, name):
         return self._kwargs.get(name, None)
+
     def __str__(self):
         s = 'CLISpec: [\n'
         keys = self._kwargs.keys()
@@ -352,3 +376,18 @@ class CLISpec(object):
             s += '   %s: %s\n' % (key, utility.to_display_string(self._kwargs[key]))
         s += ']'
         return s
+
+    def add_cli_options(self, *cli_options):
+        utility.kwargs_merge_list(self._kwargs, 'cli_options', *cli_options)
+
+    def get_option(self, name, default = None):
+        return utility.kwargs_get(self._kwargs, name, default = default, remove = False)
+
+    def pop_option(self, name, default = None):
+        return utility.kwargs_get(self._kwargs, name, default = default, remove = True)
+
+    def merge_java_options(self, name, *options):
+        utility.kwargs_merge_java_options(self._kwargs, name, options)
+
+    def set_defaults(self, **kwargs):
+        utility.kwargs_set_defaults(self._kwargs, **kwargs)

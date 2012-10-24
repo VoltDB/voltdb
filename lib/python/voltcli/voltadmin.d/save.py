@@ -31,18 +31,18 @@ from voltcli import utility
 @VOLT.Client(
     description = 'Save a VoltDB database snapshot.',
     cli_options = (
-        VOLT.CLIBoolean('-b', '--block', 'block',
-                        'block database activity during snapshot save',
-                        default = False),
-        VOLT.CLIValue('-d', '--directory', 'directory',
-                      'the local snapshot directory path',
-                      required = True),
-        VOLT.CLIValue('-f', '--format', 'format',
-                      'snapshot format: "native" or "csv"',
-                      default = 'native'),
-        VOLT.CLIValue('-i', '--id', 'nonce',
-                      'the unique snapshot identifier (nonce)',
-                      required = True),
+        VOLT.BooleanOption('-b', '--block', 'block',
+                           'block database activity during snapshot save',
+                           default = False),
+        VOLT.StringOption('-d', '--directory', 'directory',
+                          'the local snapshot directory path',
+                          required = True),
+        VOLT.StringOption('-f', '--format', 'format',
+                          'snapshot format: "native" or "csv"',
+                          default = 'native'),
+        VOLT.StringOption('-i', '--id', 'nonce',
+                          'the unique snapshot identifier (nonce)',
+                          required = True),
     )
 )
 def save(runner):
