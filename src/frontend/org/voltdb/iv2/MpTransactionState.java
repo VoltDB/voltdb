@@ -80,6 +80,15 @@ public class MpTransactionState extends TransactionState
         m_useHSIds.addAll(masters);
     }
 
+    /**
+     * Used to reset the internal state of this transaction so it can be successfully restarted
+     */
+    void restart()
+    {
+        // The poisoning path will, unfortunately, set this to true.  Need to undo that.
+        m_needsRollback = false;
+    }
+
     @Override
     public boolean isSinglePartition()
     {
@@ -130,6 +139,7 @@ public class MpTransactionState extends TransactionState
         m_localWork = null;
         m_remoteWork = null;
         m_remoteDeps = null;
+        m_newDeps.clear();
         m_remoteDepTables.clear();
     }
 

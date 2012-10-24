@@ -111,7 +111,8 @@ public class TransactionTaskQueue
         m_taskQueue.offer(task);
         Iterator<TransactionTask> iter = m_backlog.iterator();
         if (iter.hasNext()) {
-            TransactionTask next = iter.next();
+            MpProcedureTask next = (MpProcedureTask)iter.next();
+            next.doRestart(masters);
             // get head
             // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
             // that the TransactionTasks we pull out of it have to be MP transactions, so this
@@ -132,8 +133,8 @@ public class TransactionTaskQueue
             // for all MpProcedureTasks not at the head of the TransactionTaskQueue
             while (iter.hasNext())
             {
-                next = iter.next();
-                ((MpProcedureTask)next).updateMasters(masters);
+                next = (MpProcedureTask)iter.next();
+                next.updateMasters(masters);
             }
         }
     }
@@ -197,6 +198,16 @@ public class TransactionTaskQueue
             }
         }
         return offered;
+    }
+
+    /**
+     * Restart the current task at the head of the queue.  This will be called
+     * instead of flush by the currently blocking MP transaction in the event a
+     * restart is necessary.
+     */
+    synchronized void restart()
+    {
+        taskQueueOffer(m_backlog.getFirst());
     }
 
     /**
