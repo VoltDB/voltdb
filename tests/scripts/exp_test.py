@@ -38,11 +38,11 @@ from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement
 # add the path to the volt python client, just based on knowing
 # where we are now
-sys.path.append('../../src/py_client')
+sys.path.append('../../lib/python')
 try:
     from voltdbclient import *
 except ImportError:
-    sys.path.append('./src/py_client')
+    sys.path.append('./lib/python')
     from voltdbclient import *
 from Query import VoltQueryClient
 from XMLUtils import prettify # To create a human readable xml file

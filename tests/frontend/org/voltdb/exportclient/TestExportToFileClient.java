@@ -145,14 +145,14 @@ public class TestExportToFileClient extends TestCase {
             @Override
             public void run() {
                 try {
-                    exportClient1.run(10000);
+                    exportClient1.run(5000);
                 } catch (ExportClientException e) {
                     e.printStackTrace();
                 }
             }
         };
         other.start();
-        exportClient2.run(10000);
+        exportClient2.run(5000);
         other.join();
 
         cluster.shutDown();
