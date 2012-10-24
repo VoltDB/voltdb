@@ -39,6 +39,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Database;
+import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
@@ -141,24 +142,26 @@ public class ExportManager
                             newProcessor.setProcessorConfig(m_processorConfig);
                             newProcessor.readyForData();
 
-                            if (nextGeneration.isDiskBased()) {
-                                /*
-                                 * Changes in partition count can make the load balancing strategy not capture
-                                 * all partitions for data that was from a previously larger cluster.
-                                 * For those use a naive leader election strategy that is implemented
-                                 * by export generation.
-                                 */
-                                nextGeneration.kickOffLeaderElection();
-                            } else {
-                                /*
-                                 * This strategy is the one that piggy backs on
-                                 * regular partition mastership distribution to determine
-                                 * who will process export data for different partitions.
-                                 * We stashed away all the ones we have mastership of
-                                 * in m_masterOfPartitions
-                                 */
-                                for( Integer partitionId: m_masterOfPartitions) {
-                                    nextGeneration.acceptMastershipTask(partitionId);
+                            if (!m_loaderClass.equals(RawProcessor.class.getName())) {
+                                if (nextGeneration.isDiskBased()) {
+                                    /*
+                                     * Changes in partition count can make the load balancing strategy not capture
+                                     * all partitions for data that was from a previously larger cluster.
+                                     * For those use a naive leader election strategy that is implemented
+                                     * by export generation.
+                                     */
+                                    nextGeneration.kickOffLeaderElection();
+                                } else {
+                                    /*
+                                     * This strategy is the one that piggy backs on
+                                     * regular partition mastership distribution to determine
+                                     * who will process export data for different partitions.
+                                     * We stashed away all the ones we have mastership of
+                                     * in m_masterOfPartitions
+                                     */
+                                    for( Integer partitionId: m_masterOfPartitions) {
+                                        nextGeneration.acceptMastershipTask(partitionId);
+                                    }
                                 }
                             }
                         } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
@@ -211,7 +214,7 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        if (m_loaderClass.equals("org.voltdb.export.processors.RawProcessor")) return;
+        if (m_loaderClass.equals(RawProcessor.class.getName())) return;
         Preconditions.checkArgument(
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
