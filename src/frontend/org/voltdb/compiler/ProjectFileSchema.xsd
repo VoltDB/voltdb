@@ -45,8 +45,6 @@
       <xsd:element name="name" type="xsd:string"/>
       <xsd:element name="version" type="xsd:string"/>
       <xsd:element name="description" type="xsd:string"/>
-      <xsd:element name="catalog" minOccurs='0' maxOccurs='1' type="xsd:string"/>
-      <xsd:element name="classpath" minOccurs='0' maxOccurs='1' type="xsd:string"/>
     </xsd:all>
   </xsd:complexType>
 
