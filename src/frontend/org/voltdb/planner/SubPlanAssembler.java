@@ -172,7 +172,7 @@ public abstract class SubPlanAssembler {
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
         filtersToCover.addAll(exprs);
 
-        List<ColumnRef> sortedColumns = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+        List<ColumnRef> sortedColumns = null;
 
         String exprsjson = index.getExpressionsjson();
         // This list remains null if the index is just on simple columns.
@@ -182,6 +182,7 @@ public abstract class SubPlanAssembler {
         int keyComponentCount;
         if (exprsjson.isEmpty()) {
             // Don't bother to build a dummy indexedExprs list -- just leave it null and deal with that.
+            sortedColumns = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
             keyComponentCount = sortedColumns.size();
             colIds = new int[keyComponentCount];
             int ii = 0;
@@ -286,7 +287,7 @@ public abstract class SubPlanAssembler {
             // Equality filters get first priority.
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
-                coveringExpr, coveringColId, table, filtersToCover);
+                coveringColId, table, filtersToCover);
             if (eqExpr == null) {
                 break;
             }
@@ -482,7 +483,7 @@ public abstract class SubPlanAssembler {
         AbstractExpression coveringExpr, int coveringColId)
     {
         // Do some preliminary disqualifications.
-        
+
         VoltType keyType = indexableExpr.getValueType();
         VoltType otherType = otherExpr.getValueType();
         // EE index key comparator should not lose precision when casting keys to indexed type.

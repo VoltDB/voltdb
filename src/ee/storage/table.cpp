@@ -498,10 +498,13 @@ TableIndex *Table::index(std::string name) {
         }
     }
     std::stringstream errorString;
-    errorString << "Could not find Index with name " << name << std::endl;
+    errorString << "Could not find Index with name " << name << " among {";
+    const char* sep = "";
     BOOST_FOREACH(TableIndex *index, m_indexes) {
-        errorString << index->getName() << std::endl;
+        errorString << sep << index->getName();
+        sep = ", ";
     }
+    errorString << "}";
     throwFatalException("%s", errorString.str().c_str());
 }
 
