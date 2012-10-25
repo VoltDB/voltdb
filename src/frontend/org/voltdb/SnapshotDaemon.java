@@ -33,7 +33,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -87,13 +86,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
-    private final ScheduledThreadPoolExecutor m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(null, r, "SnapshotDaemon", 131072);
-            }
-        },
-        new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
+    private final ScheduledThreadPoolExecutor m_es =
+            new ScheduledThreadPoolExecutor(1, CoreUtils.getThreadFactory("SnapshotDaemon"),
+                                            new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
 
     private ZooKeeper m_zk;
     private DaemonInitiator m_initiator;
@@ -1714,7 +1709,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
          * If the caller wants to be notified of final results for the snapshot
          * request, set up a watcher only if the snapshot is queued.
          */
-        if (notifyChanges && SnapshotUtil.isSnapshotQueued(response.getResults())) {
+        if (notifyChanges && (response.getStatus() == ClientResponse.SUCCESS) &&
+            SnapshotUtil.isSnapshotQueued(response.getResults())) {
             Watcher watcher = new Watcher() {
                 @Override
                 public void process(final WatchedEvent event) {

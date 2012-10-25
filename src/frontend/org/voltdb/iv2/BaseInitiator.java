@@ -27,18 +27,17 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.MemoryStats;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -65,7 +64,6 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
-    private final TickProducer m_tickProducer;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
@@ -82,8 +80,6 @@ public abstract class BaseInitiator implements Initiator
                 m_messenger,
                 m_repairLog,
                 rejoinProducer);
-
-        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
@@ -104,19 +100,13 @@ public abstract class BaseInitiator implements Initiator
             CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
     }
 
-    private boolean isExportEnabled(CatalogContext catalogContext)
-    {
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
-        return (conn != null && conn.getEnabled() == true);
-    }
-
     protected void configureCommon(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
+                          VoltDB.START_ACTION startAction,
+                          StatsAgent agent,
+                          MemoryStats memStats,
                           CommandLog cl)
         throws KeeperException, ExecutionException, InterruptedException
     {
@@ -126,6 +116,11 @@ public abstract class BaseInitiator implements Initiator
                     getSystemsettings().get("systemsettings").getSnapshotpriority();
             }
 
+            // demote rejoin to create for initiators that aren't rejoinable.
+            if (VoltDB.createForRejoin(startAction) && !isRejoinable()) {
+                startAction = VoltDB.START_ACTION.CREATE;
+            }
+
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -133,9 +128,11 @@ public abstract class BaseInitiator implements Initiator
                                        catalogContext.m_transactionId,
                                        m_partitionId,
                                        numberOfPartitions,
-                                       createForRejoin,
+                                       startAction,
                                        snapshotPriority,
-                                       m_initiatorMailbox);
+                                       m_initiatorMailbox,
+                                       agent,
+                                       memStats);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -148,10 +145,6 @@ public abstract class BaseInitiator implements Initiator
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);
-
-            if (isExportEnabled(catalogContext)) {
-                m_tickProducer.start();
-            }
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();

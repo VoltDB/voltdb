@@ -14,14 +14,8 @@
 #  grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}'  | xargs kill -9
 
 # a little more error friendly when no pids are found
-javapids=$(ps cx -o pid -o command  | grep java | awk '{print $1}')
-for javapid in ${javapids}
+voltdbpid=$(jps -l | grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}')
+for victim in ${voltdbpid}
 do
-  voltdbpid=$(ps -w -w -o pid -o args -p $javapid | grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}')
-  for victim in ${voltdbpid}
-  do
     kill -9 $victim
-  done
 done
-
-

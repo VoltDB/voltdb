@@ -41,11 +41,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -325,16 +323,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /**
          * Used a cached thread pool to accept new connections.
          */
-        private final ExecutorService m_executor = Executors.newCachedThreadPool(new ThreadFactory() {
-            private final AtomicLong m_createdThreadCount = new AtomicLong(0);
-            private final ThreadGroup m_group =
-                new ThreadGroup(Thread.currentThread().getThreadGroup(), "Client authentication threads");
-
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(m_group, r, "Client authenticator " + m_createdThreadCount.getAndIncrement(), 131072);
-            }
-        });
+        private final ExecutorService m_executor =
+                Executors.newCachedThreadPool(CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
         ClientAcceptor(int port, VoltNetworkPool network, boolean isAdmin)
         {
@@ -1260,6 +1250,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 });
             }
+            failOverConnection(partitionId, initiatorHSId, m_snapshotDaemonAdapter);
         } catch (Exception e) {
             hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
         }
@@ -2285,8 +2276,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_iv2Masters != null) {
             m_iv2Masters.shutdown();
         }
+        if (m_localReplicasBuilder != null) {
+            m_localReplicasBuilder.join(10000);
+            hostLog.error("Local replica map builder took more than ten seconds, probably hung");
+            m_localReplicasBuilder.join();
+        }
     }
 
+    private volatile Thread m_localReplicasBuilder = null;
     public void startAcceptingConnections() throws IOException {
         if (m_isIV2Enabled) {
             /*
@@ -2297,7 +2294,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Populate the map in the background and it will be used to route
              * requests to local replicas once the info is available
              */
-            new Thread() {
+            m_localReplicasBuilder = new Thread() {
                 @Override
                 public void run() {
                     /*
@@ -2315,7 +2312,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                     m_localReplicas = localReplicas.build();
                 }
-            }.start();
+            };
+            m_localReplicasBuilder.start();
         }
 
         /*

@@ -26,6 +26,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 
+import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.BackendTarget;
@@ -49,6 +50,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
+    private final TickProducer m_tickProducer;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -74,6 +76,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
                 "SP", agent);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
+        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }
 
     @Override
@@ -81,7 +84,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
+                          VoltDB.START_ACTION startAction,
+                          StatsAgent agent,
+                          MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
@@ -93,8 +98,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable(),
-                cl);
+                startAction,
+                agent, memStats, cl);
+
+        m_tickProducer.start();
+
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),

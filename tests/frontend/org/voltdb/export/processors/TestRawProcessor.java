@@ -30,6 +30,10 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import junit.framework.TestCase;
 
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.MockVoltDB;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
@@ -39,11 +43,10 @@ import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.utils.VoltFile;
-import org.voltcore.utils.DeferredSerialization;
+
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 
 public class TestRawProcessor extends TestCase {
 
@@ -112,7 +115,7 @@ public class TestRawProcessor extends TestCase {
         }
 
         @Override
-        public void exportAction(RawProcessor.ExportInternalMessage m) {
+        public ListenableFuture<?> exportAction(RawProcessor.ExportInternalMessage m) {
             // Simulate what ExecutionEngineJNI and ExecutionSite do.
             if (m.m_m.isPoll()) {
                 ExportProtoMessage r =
@@ -123,6 +126,7 @@ public class TestRawProcessor extends TestCase {
                 r.pollResponse(2000, data);
                 eequeue.add(r);
             }
+            return Futures.immediateFuture(null);
         }
     }
 

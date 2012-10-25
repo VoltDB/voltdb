@@ -32,7 +32,6 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -53,13 +52,15 @@ public class TestLiveSchemaChanges extends RegressionSuite {
 
     static String m_globalDeploymentURL = null;
 
-    static String makeTable(String name, boolean pkey, boolean replicated, boolean oolString) {
+    static String makeTable(String name, boolean pkey, boolean replicated, boolean oolString, boolean uniqueConstraint) {
         name = name.toUpperCase().trim();
 
         // CREATE TABLE
         StringBuilder sb = new StringBuilder();
         sb.append("CREATE TABLE ").append(name).append(" (");
-        sb.append("ID INTEGER NOT NULL, TINY TINYINT, SMALL SMALLINT, BIG BIGINT, ");
+        sb.append("ID INTEGER NOT NULL, TINY TINYINT, SMALL SMALLINT, BIG BIGINT");
+        if (uniqueConstraint) sb.append(" UNIQUE");
+        sb.append(", ");
         if (oolString) sb.append("STRVAL VARCHAR(250)");
         else sb.append("STRVAL VARCHAR(60)");
         if (pkey) sb.append(", PRIMARY KEY (ID)");
@@ -148,6 +149,84 @@ public class TestLiveSchemaChanges extends RegressionSuite {
     }
 
     /**
+     * Pretty weak sauce test for now that verifies adding a table with a pkey in the middle of
+     * two other tables with pkey. This fails on 2.8.2.
+     */
+    public void testAddDropConstraint() throws IOException, ProcCallException, InterruptedException
+    {
+        Client client = getClient();
+        loadSomeData(client, "P1", 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // drop a unique constraint
+        String newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-dropconstraint.jar");
+        VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        loadSomeData(client, "P1", 10, 2000);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // add a constraint back in, supported by a unique index
+        newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-addconstraint.jar");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        loadSomeData(client, "P1", 2010, 100);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // assume we can't revert to the base catalog, as it makes a unique constraint out of whole cloth
+        newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-base.jar");
+        try {
+            client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL));
+            fail();
+        }
+        catch (Exception e) {
+            // assume this fails
+        }
+    }
+
+    /**
+     * Pretty weak sauce test for now that verifies adding a table with a pkey in the middle of
+     * two other tables with pkey. This fails on 2.8.2.
+     * @throws Exception
+     */
+    public void testRenameIndex() throws Exception
+    {
+        Client client = getClient();
+        loadSomeData(client, "P1", 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        long tupleCount = TestCatalogUpdateSuite.indexEntryCountFromStats(client, "P1", "RLTY");
+        assertTrue(tupleCount > 0);
+
+        // rename the one user-created index in the table
+        String newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-renamedindex.jar");
+        VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        long newTupleCount = TestCatalogUpdateSuite.indexEntryCountFromStats(client, "P1", "RLTYX");
+        assertTrue(tupleCount > 0);
+        assertEquals(newTupleCount, tupleCount);
+
+        loadSomeData(client, "P1", 10, 2000);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // rename the index back for fun
+        newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-base.jar");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        loadSomeData(client, "P1", 2010, 100);
+        client.drain();
+        assertTrue(callbackSuccess);
+    }
+
+    /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
      */
@@ -175,9 +254,10 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         ((LocalCluster) config).setHasLocalServer(true);
 
         // build up a project builder for the workload
-        VoltProjectBuilder project = new TPCCProjectBuilder();
-        project.addLiteralSchema(makeTable("P1", true, false, false));
-        project.addLiteralSchema(makeTable("R1", true, true, false));
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addLiteralSchema(makeTable("P1", true, false, false, true));
+        project.addLiteralSchema(makeTable("R1", true, true, false, true));
+        project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
         // build the jarfile
         boolean basecompile = config.compile(project);
         assertTrue(basecompile);
@@ -192,11 +272,35 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("liveschema-newtableinmiddle.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addLiteralSchema(makeTable("P1", true, false, false));
-        project.addLiteralSchema(makeTable("P2", true, false, false));
-        project.addLiteralSchema(makeTable("R1", true, true, false));
+        project = new VoltProjectBuilder();
+        project.addLiteralSchema(makeTable("P1", true, false, false, true));
+        project.addLiteralSchema(makeTable("P2", true, false, false, false));
+        project.addLiteralSchema(makeTable("R1", true, true, false, true));
         boolean compile = config.compile(project);
+        assertTrue(compile);
+
+        config = new LocalCluster("liveschema-dropconstraint.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new VoltProjectBuilder();
+        project.addLiteralSchema(makeTable("P1", true, false, false, false));
+        project.addLiteralSchema(makeTable("R1", true, true, false, false));
+        project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
+        compile = config.compile(project);
+        assertTrue(compile);
+
+        config = new LocalCluster("liveschema-addconstraint.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new VoltProjectBuilder();
+        project.addLiteralSchema(makeTable("P1", true, false, false, true));
+        project.addLiteralSchema(makeTable("R1", true, true, false, false));
+        project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
+        compile = config.compile(project);
+        assertTrue(compile);
+
+        config = new LocalCluster("liveschema-renamedindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new VoltProjectBuilder();
+        project.addLiteralSchema(makeTable("P1", true, false, false, true));
+        project.addLiteralSchema(makeTable("R1", true, true, false, true));
+        project.addLiteralSchema("CREATE UNIQUE INDEX RLTYX ON P1 (BIG);");
+        compile = config.compile(project);
         assertTrue(compile);
 
         return builder;

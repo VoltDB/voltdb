@@ -81,6 +81,12 @@ public class VoltDB {
         CREATE, RECOVER, START, REJOIN, LIVE_REJOIN
     }
 
+    public static boolean createForRejoin(VoltDB.START_ACTION startAction)
+    {
+        return startAction == VoltDB.START_ACTION.REJOIN ||
+               startAction == VoltDB.START_ACTION.LIVE_REJOIN;
+    }
+
     public static Charset UTF8ENCODING = Charset.forName("UTF-8");
 
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone

@@ -44,6 +44,7 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
@@ -1694,6 +1695,36 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), true);
     }
 
+    public void testDDLCompilerTwoSwappedOrderIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum_a on t(num,id);\n" +
+                "create index idx_t_idnum_b on t(id,num);";
+
+        final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertEquals(false, c.hasErrorsOrWarnings());
+    }
+
+    public void testDDLCompilerDropOneOfThreeIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum_a on t(num,id);\n" +
+                "create index idx_t_idnum_b on t(id,num);\n" +
+                "create index idx_t_idnum_c on t(id,num);\n";
+
+        final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertEquals(true, c.hasErrorsOrWarnings());
+        int foundCount = 0;
+        for (VoltCompiler.Feedback f : c.m_warnings) {
+            if (f.message.contains("Dropping index")) {
+                foundCount++;
+            }
+        }
+        assertEquals(1, foundCount);
+    }
+
     public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
     {
         final String s =
@@ -2238,6 +2269,7 @@ public class TestVoltCompiler extends TestCase {
         boolean adhoc = false;
         boolean sysproc = false;
         boolean defaultproc = false;
+        boolean export = false;
 
         public TestRole(String name) {
             this.name = name;
@@ -2248,6 +2280,14 @@ public class TestVoltCompiler extends TestCase {
             this.adhoc = adhoc;
             this.sysproc = sysproc;
             this.defaultproc = defaultproc;
+        }
+
+        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc, boolean export) {
+            this.name = name;
+            this.adhoc = adhoc;
+            this.sysproc = sysproc;
+            this.defaultproc = defaultproc;
+            this.export = export;
         }
     }
 
@@ -2280,16 +2320,27 @@ public class TestVoltCompiler extends TestCase {
         if (errorRegex == null) {
             assertTrue(String.format("Expected success\nXML: %s\nDDL: %s\nERR: %s", rolesElem, ddl, error), success);
 
-            Catalog cat = compiler.getCatalog();
-            CatalogMap<Group> groups = cat.getClusters().get("cluster").getDatabases().get("database").getGroups();
+            Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
+            CatalogMap<Group> groups = db.getGroups();
+            CatalogMap<Connector> connectors = db.getConnectors();
+            if (connectors.get("0") == null ) {
+                connectors.add("0");
+            }
+            CatalogMap<GroupRef> authGroups = connectors.get("0").getAuthgroups();
+
             assertNotNull(groups);
+            assertNotNull(authGroups);
             assertEquals(roles.length, groups.size());
+
             for (TestRole role : roles) {
                 Group group = groups.get(role.name);
                 assertNotNull(String.format("Missing role \"%s\"", role.name), group);
                 assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
                 assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
+
+                boolean allowedToExport = authGroups.get(role.name) != null;
+                assertEquals(String.format("Role \"%s\" export flag mismatch:", role.name), role.export, allowedToExport);
             }
         }
         else {
@@ -2320,13 +2371,14 @@ public class TestVoltCompiler extends TestCase {
     public void testRoleDDL() throws Exception {
         goodRoleDDL("create role r1;", new TestRole("r1"));
         goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
-        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false));
-        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false));
-        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true));
-        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true));
-        goodRoleDDL("create role r1 with adhoc ,sysproc, defaultproc;", new TestRole("r1", true, true, true));
-        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false,false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false,false));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true, false));
+        goodRoleDDL("create role r1 with export;", new TestRole("r1", false, false, false, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc,export;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc ,sysproc, defaultproc, export;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false,false));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,Export;", new TestRole("r1", true, true, true, true));
     }
 
     public void testBadRoleDDL() throws Exception {
@@ -2448,6 +2500,76 @@ public class TestVoltCompiler extends TestCase {
                 "create role r1;",
                 "create procedure p1 allow r1, rx as select * from books;");
     }
+
+    private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
+        Connector connector =  db.getConnectors().get("0");
+        if( connector == null) return null;
+        return connector.getTableinfo().getIgnoreCase(tableName);
+    }
+
+    public void testGoodExportTable() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "export table e1;"
+                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "create table e2 (id integer, f1 varchar(16));",
+                "export table e1;",
+                "eXpOrt TABle E2;"
+                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2"));
+    }
+
+    public void testBadExportTable() throws Exception {
+
+        badDDLAgainstSimpleSchema(".+\\sexport, table non_existant was not present in the catalog.*",
+                "export table non_existant;"
+                );
+
+        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
+                "export table 1table_name_not_valid;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+                "export table one, two, three;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+                "export export table one;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+                "export table table one;"
+                );
+
+        badDDLAgainstSimpleSchema("Table with indexes configured as an export table.*",
+                "export table books;"
+                );
+
+        badDDLAgainstSimpleSchema("Export table configured with materialized view.*",
+                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
+                "export table view_source;"
+                );
+
+        badDDLAgainstSimpleSchema("View configured as an export table.*",
+                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
+                "export table my_view;"
+                );
+
+        badDDLAgainstSimpleSchema("Table \"E1\" is already exported.*",
+                "create table e1( id integer, f1 varchar(16), f2 varchar(12));",
+                "export table e1;",
+                "export table E1;"
+                );
+}
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;

@@ -23,6 +23,8 @@
 
 package org.voltdb.dtxn;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import java.util.List;
 import java.util.Map;
 
@@ -30,30 +32,43 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.voltcore.zk.ZKTestBase;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 
-import static org.mockito.Mockito.*;
 import static org.junit.Assert.*;
 
 public class TestMailboxTracker extends ZKTestBase {
-    private final MailboxUpdateHandler handler = mock(MailboxUpdateHandler.class);
+    class MockMailboxUpdateHandler implements MailboxUpdateHandler
+    {
+        Map<MailboxType, List<MailboxNodeContent>> m_mailboxes;
+        AtomicInteger m_handleCount;
+        public MockMailboxUpdateHandler()
+        {
+            m_handleCount = new AtomicInteger(0);
+        }
+
+        public void handleMailboxUpdate(Map<MailboxType, List<MailboxNodeContent>> mailboxes)
+        {
+            m_mailboxes = mailboxes;
+            m_handleCount.incrementAndGet();
+        }
+    }
+
+    MockMailboxUpdateHandler handler;
 
     @Before
     public void setUp() throws Exception {
         setUpZK(1);
+        handler = new MockMailboxUpdateHandler();
     }
 
     @After
     public void tearDown() throws Exception {
         tearDownZK();
-        reset(handler);
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     public void testMailboxTracker() throws Exception {
         ZooKeeper zk = getClient(0);
@@ -68,10 +83,10 @@ public class TestMailboxTracker extends ZKTestBase {
 
         // start the mailbox tracker and watch all the changes
         tracker.start();
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
-        verify(handler).handleMailboxUpdate(captor.capture());
-        Map<MailboxType, List<MailboxNodeContent>> value = captor.getValue();
+        while (handler.m_handleCount.get() == 0) {
+            Thread.sleep(1);
+        }
+        Map<MailboxType, List<MailboxNodeContent>> value = handler.m_mailboxes;
         assertTrue(value.containsKey(MailboxType.ExecutionSite));
         List<MailboxNodeContent> list = value.get(MailboxType.ExecutionSite);
         assertEquals(2, list.size());
@@ -84,7 +99,6 @@ public class TestMailboxTracker extends ZKTestBase {
         tracker.shutdown();
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Test
     public void testUpdate() throws Exception {
         ZooKeeper zk = getClient(0);
@@ -105,14 +119,12 @@ public class TestMailboxTracker extends ZKTestBase {
 
         // The ephemaral node just created will disappear and we should get an update
         zk2.close();
-        // wait for the update
-        Thread.sleep(50);
+        while (handler.m_handleCount.get() < 2)
+        {
+            Thread.sleep(1);
+        }
 
-        ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
-        // should be called twice, once on start() and once on update
-        verify(handler, times(2)).handleMailboxUpdate(captor.capture());
-        List<Map> values = captor.getAllValues();
-        Map<MailboxType, List<MailboxNodeContent>> value = values.get(1);
+        Map<MailboxType, List<MailboxNodeContent>> value = handler.m_mailboxes;
         assertTrue(value.containsKey(MailboxType.ExecutionSite));
         List<MailboxNodeContent> list = value.get(MailboxType.ExecutionSite);
         assertEquals(1, list.size());
