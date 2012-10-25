@@ -96,7 +96,7 @@ function async-benchmark() {
         --usecompression=false \
         --ratelimit=100000 \
         --autotune=false \
-        --mpratio=0.9 \
+        --multisingleratio=0.1 \
         --recover=false \
         --latencytarget=10
 }

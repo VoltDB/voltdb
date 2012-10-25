@@ -151,7 +151,7 @@ public class AsyncBenchmark {
 
         @Option(desc = "Fraction of ops that are gets (singlePartition vs multiPartition) " +
                 "and puts (singlePartition vs multiPartition).")
-        double mpratio = 0; // By default, don't run multi-partition
+        double multisingleratio = 0; // By default, don't run multi-partition
 
 
         @Option(desc = "Size of keys in bytes.")
@@ -190,8 +190,8 @@ public class AsyncBenchmark {
             if (getputratio < 0) exitWithMessageAndUsage("getputratio must be >= 0");
             if (getputratio > 1) exitWithMessageAndUsage("getputratio must be <= 1");
 
-            if (mpratio < 0) exitWithMessageAndUsage("mpratio must be >= 0");
-            if (mpratio > 1) exitWithMessageAndUsage("mpratio must be <= 1");
+            if (multisingleratio < 0) exitWithMessageAndUsage("multisingleratio must be >= 0");
+            if (multisingleratio > 1) exitWithMessageAndUsage("multisingleratio must be <= 1");
 
             if (keysize <= 0) exitWithMessageAndUsage("keysize must be > 0");
             if (keysize > 250) exitWithMessageAndUsage("keysize must be <= 250");
@@ -320,7 +320,7 @@ public class AsyncBenchmark {
                 try {
                     Thread.sleep(sleep);
                 } catch (Exception interruted) {
-                    msg = "A possible hick-up, seriously?? Exception: '" + interruted.getMessage() +
+                    msg = "A possible hiccup, seriously?? Exception: '" + interruted.getMessage() +
                           "'.\nStop trying to reconnect to this host: " + server;
                     prt(msg);
                     fatalLevel.incrementAndGet();
@@ -563,7 +563,7 @@ public class AsyncBenchmark {
                             processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
                                                         pairData.fetchRow(0).getVarbinary(1));
                     successfulGets.incrementAndGet();
-                    if(rand < config.mpratio)
+                    if(rand < config.multisingleratio)
                         successfulGetsMPT.incrementAndGet();
                     else
                         successfulGetsMPF.incrementAndGet();
@@ -596,7 +596,7 @@ public class AsyncBenchmark {
             // Track the result of the operation (Success, Failure, Payload traffic...)
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 successfulPuts.incrementAndGet();
-                if(rand < config.mpratio)
+                if(rand < config.multisingleratio)
                     successfulPutsMPT.incrementAndGet();
                 else
                     successfulPutsMPF.incrementAndGet();
@@ -626,14 +626,7 @@ public class AsyncBenchmark {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-//            if(debug && c%i == 0)
-//                System.out.printf("In SumCallback..clientCallback() count = %d, key = '%s'\n", c, key);
-            // TODO Auto-generated method stub
             if (response.getStatus() == ClientResponse.SUCCESS) {
-//                if(debug && c%i == 0) {
-//                    System.out.printf("In clientCallback() Status: '%s', count = %d, key = '%s'\n",
-//                            response.getStatus(), c, key);
-//                }
                 final VoltTable pairData = response.getResults()[0];
                 if (pairData.getRowCount() != 0) {
                     successfulPutCount.incrementAndGet();
@@ -644,8 +637,6 @@ public class AsyncBenchmark {
                         incorrectPutCount.addAndGet(hashMapCount - dbCount);
                         System.out.printf("ERROR: Key %s: count in db '%d' is less than client expected '%d'\n",
                                           key.replaceAll("\\s", ""), dbCount, hashMapCount);
-                        //System.out.print("ERROR 1!\n");
-                        //System.exit(1);
                     }
                 }
             }
@@ -723,7 +714,7 @@ public class AsyncBenchmark {
 
         if(totalConnections.get() == 1)
             // If Volt is running on one node only, no need to run this test on multi-partition
-            config.mpratio = 0;
+            config.multisingleratio = 0;
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -755,7 +746,7 @@ public class AsyncBenchmark {
             if (rand.nextDouble() < config.getputratio) {
                 // Get a key/value pair, asynchronously
                 mpRand = rand.nextDouble();
-                if(mpRand < config.mpratio) {
+                if(mpRand < config.multisingleratio) {
                     if(totalConnections.get() > 1 && config.poolsize > 10000) {
                         slow = true;
                         debug = true;
@@ -772,7 +763,7 @@ public class AsyncBenchmark {
                 // Put a key/value pair, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
                 mpRand = rand.nextDouble();
-                if(rand.nextDouble() < config.mpratio) {
+                if(rand.nextDouble() < config.multisingleratio) {
                     if(totalConnections.get() > 1 && config.poolsize > 10000) {
                         slow = true;
                         debug = true;
@@ -852,6 +843,8 @@ public class AsyncBenchmark {
 
     public void summary4qa() {
         // Put a key/value pair, asynchronously
+
+        System.out.printf("Checking put count in the database against expected data");
         Iterator<String> it = hashMap.keySet().iterator();
         if(debug) {
             System.out.printf("HashMap Size: %10d\n", hashMap.size());
@@ -869,8 +862,8 @@ public class AsyncBenchmark {
             while (it.hasNext()) {
                 String key = it.next().toString();
 
-//                if(debug && c%printInterval == 0)
-//                    System.out.printf("in summary4qa() count = %d, key = '%s'\n", c, key);
+                if(debug && c%printInterval == 0)
+                    System.out.printf("in summary4qa() count = %d, key = '%s'\n", c, key);
                 client.callProcedure(new SumCallback(key, c, printInterval), "Get", key);
                 lastkey = key;
                 c++;
