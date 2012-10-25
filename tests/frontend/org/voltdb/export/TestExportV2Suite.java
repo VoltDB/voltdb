@@ -47,7 +47,6 @@ public class TestExportV2Suite extends TestExportBase {
     private void quiesceAndVerify(final Client client, ExportToFileVerifier tester)
             throws Exception
             {
-                tester.loadGenerations();
                 quiesce(client);
                 assertTrue(tester.verifyRows());
     }
@@ -66,7 +65,6 @@ public class TestExportV2Suite extends TestExportBase {
                 getServerConfig().getPathInSubroots(
                         new File("/tmp/" + System.getProperty("user.name"))),
                 "zorag");
-        m_verifier.loadGenerations();
     }
 
     @Override
@@ -85,14 +83,14 @@ public class TestExportV2Suite extends TestExportBase {
         for (int i=0; i < 10; i++) {
             // add data to a first (persistent) table
             Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow( 0L,
+            m_verifier.addRow(
                     "ALLOW_NULLS", i, convertValsToRow(i, 'I', rowdata));
             Object[] params = convertValsToParams("ALLOW_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
 
             // add data to a second (streaming) table.
             rowdata = TestSQLTypesSuite.m_defaultValues;
-            m_verifier.addRow( 0L,
+            m_verifier.addRow(
                     "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
