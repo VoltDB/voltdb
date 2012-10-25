@@ -127,7 +127,7 @@ public class RepairLog
         else if (msg instanceof CompleteTransactionMessage) {
             // a CompleteTransactionMessage which indicates restart is not the end of the
             // transaction.  We don't want to log it in the repair log.
-            if (!((CompleteTransactionMessage)msg).isRollbackForFault()) {
+            if (!((CompleteTransactionMessage)msg).isRestart()) {
                 final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
                 truncate(m.getTruncationHandle(), Long.MIN_VALUE);
                 m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));

@@ -672,7 +672,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
             m_pendingTasks.offer(task);
             // If this is a restart, then we need to leave the transaction state around
-            if (!message.isRollbackForFault()) {
+            if (!message.isRestart()) {
                 m_outstandingTxns.remove(message.getTxnId());
             }
         }

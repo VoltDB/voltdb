@@ -51,7 +51,7 @@ public class CompleteTransactionTask extends TransactionTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
         }
-        if (!m_msg.isRollbackForFault()) {
+        if (!m_msg.isRestart()) {
             m_txn.setDone();
             m_queue.flush();
 
@@ -82,7 +82,7 @@ public class CompleteTransactionTask extends TransactionTask
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection)
     {
-        if (!m_msg.isRollbackForFault()) {
+        if (!m_msg.isRestart()) {
             // future: offer to siteConnection.IBS for replay.
             m_txn.setDone();
             m_queue.flush();

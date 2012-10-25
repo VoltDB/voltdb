@@ -32,7 +32,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     int m_flags = 0;
     static final int ISROLLBACK = 0;
     static final int REQUIRESACK = 1;
-    static final int ROLLBACKFORFAULT = 2;
+    static final int ISRESTART = 2;
 
     private void setBit(int position, boolean value)
     {
@@ -64,16 +64,17 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
      * @param isRollback  Should the recipient rollback this transaction to complete it?
      * @param requiresAck  Does the recipient need to respond to this message
      *                     with a CompleteTransactionResponseMessage?
+     * @param isRestart   Does this CompleteTransactionMessage indicate a restart of this transaction?
      */
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId,
                                       long txnId, boolean isReadOnly,
                                       boolean isRollback, boolean requiresAck,
-                                      boolean rollbackForFault, boolean isForReplay)
+                                      boolean isRestart, boolean isForReplay)
     {
         super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, isForReplay);
         setBit(ISROLLBACK, isRollback);
         setBit(REQUIRESACK, requiresAck);
-        setBit(ROLLBACKFORFAULT, rollbackForFault);
+        setBit(ISRESTART, isRestart);
     }
 
     public boolean isRollback()
@@ -86,9 +87,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         return getBit(REQUIRESACK);
     }
 
-    public boolean isRollbackForFault()
+    public boolean isRestart()
     {
-        return getBit(ROLLBACKFORFAULT);
+        return getBit(ISRESTART);
     }
 
     @Override
@@ -133,8 +134,8 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         if (requiresAck())
             sb.append("\n  THIS MESSAGE REQUIRES AN ACK");
 
-        if (isRollbackForFault()) {
-            sb.append("\n  THIS ROLLBACK IS FOR FAULT REPAIR");
+        if (isRestart()) {
+            sb.append("\n  THIS IS A TRANSACTION RESTART");
         }
 
         return sb.toString();
