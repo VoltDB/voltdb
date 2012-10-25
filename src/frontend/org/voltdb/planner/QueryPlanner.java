@@ -177,6 +177,9 @@ public class QueryPlanner {
     }
 
     public String[] extractedParamLiteralValues() {
+        if (m_paramzInfo == null) {
+            return null;
+        }
         return m_paramzInfo.paramLiteralValues;
     }
 

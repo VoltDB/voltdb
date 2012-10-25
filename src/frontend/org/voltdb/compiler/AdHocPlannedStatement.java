@@ -202,7 +202,7 @@ public class AdHocPlannedStatement {
         if (boundParamStrings != null) {
             return boundParamStrings;
         }
-        if (extractedParamValues == null) {
+        if (extractedParamStrings == null) {
             return null;
         }
         if (boundParamIndexes == null || boundParamIndexes.length == 0) {

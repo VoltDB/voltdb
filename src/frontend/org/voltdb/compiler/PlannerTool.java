@@ -184,11 +184,11 @@ public class PlannerTool {
                             return ahps;
                         }
                     }
-
-                    // if not cacheable or no cach hit, do the expensive full planning
-                    plan = planner.plan();
-                    assert(plan != null);
                 }
+
+                // if not cacheable or no cach hit, do the expensive full planning
+                plan = planner.plan();
+                assert(plan != null);
             } catch (Exception e) {
                 throw new RuntimeException("Error compiling query: " + e.toString(), e);
             }
