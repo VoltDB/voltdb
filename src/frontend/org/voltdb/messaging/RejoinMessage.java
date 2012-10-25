@@ -29,7 +29,8 @@ import org.voltcore.messaging.VoltMessage;
  */
 public class RejoinMessage extends VoltMessage {
     public static enum Type {
-        INITIATION, // sent by the coordinator to a local site
+        INITIATION,           // start live rejoin.
+        INITIATION_COMMUNITY, // start community rejoin.
 
         // The following are response types
         REQUEST_RESPONSE, // sent from the rejoining site to itself

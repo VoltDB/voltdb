@@ -17,11 +17,15 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.LogKeys;
@@ -59,9 +63,16 @@ public class EveryPartitionTask extends TransactionTask
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
         throw new RuntimeException("MPI asked to execute everysite proc. while rejoining.");
+    }
+
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException("MPI asked to execute everysite proc from task log while rejoining.");
     }
 
     @Override
