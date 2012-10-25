@@ -27,8 +27,6 @@
 
 __author__ = 'scooper'
 
-import copy
-
 from voltdbclient import *
 from voltcli import cli
 from voltcli import environment
@@ -46,20 +44,28 @@ class BaseVerb(object):
         # that they can be kept separate from application-specific verbs.
         self.classpath = utility.kwargs_get(kwargs, 'classpath', default = None)
         self.cli_spec = cli.CLISpec(**kwargs)
+        self.dirty_opts = False
+        self.dirty_args = False
+        self.command_arguments = utility.flatten_to_list(kwargs.get('command_arguments', None))
         utility.debug(str(self))
 
     def execute(self, runner):
         utility.abort('%s "%s" object does not implement the required execute() method.'
                             % (self.__class__.__name__, self.name))
 
-    def add_cli_options(self, *cli_options):
-        self.cli_spec.add_cli_options(*cli_options)
+    def add_options(self, *args):
+        self.cli_spec.add_to_list('options', *args)
+        self.dirty_opts = True
 
-    def get_option(self, name, default = None):
-        return self.cli_spec.get_option(name)
+    def add_arguments(self, *args):
+        self.cli_spec.add_to_list('arguments', *args)
+        self.dirty_args = True
 
-    def pop_option(self, name, default = None):
-        return self.cli_spec.pop_option(name)
+    def get_attr(self, name, default = None):
+        return self.cli_spec.get_attr(name)
+
+    def pop_attr(self, name, default = None):
+        return self.cli_spec.pop_attr(name)
 
     def merge_java_options(self, name, *options):
         return self.cli_spec.merge_java_options(name, *options)
@@ -73,6 +79,39 @@ class BaseVerb(object):
     def __str__(self):
         return '%s: %s\n%s' % (self.__class__.__name__, self.name, self.cli_spec)
 
+    def get_options(self, required_only = False):
+        return (o for o in self.iter_options(required_only = required_only))
+
+    def get_arguments(self):
+        return (o for o in self.iter_arguments())
+
+    def get_option_count(self):
+        if not self.cli_spec.options:
+            return 0
+        return len(self.cli_spec.options)
+
+    def get_argument_count(self):
+        if not self.cli_spec.arguments:
+            return 0
+        return len(self.cli_spec.arguments)
+
+    def iter_options(self, required_only = False):
+        if self.cli_spec.options:
+            if self.dirty_opts:
+                self.cli_spec.options.sort()
+                self.dirty_opts = False
+            for o in self.cli_spec.options:
+                if not required_only or (o.required and getattr(opts, o.kwargs['dest']) is None):
+                    yield o
+
+    def iter_arguments(self):
+        if self.cli_spec.arguments:
+            if self.dirty_args:
+                self.cli_spec.arguments.sort()
+                self.dirty_args = False
+            for o in self.cli_spec.arguments:
+                yield o
+
 #===============================================================================
 class CommandVerb(BaseVerb):
 #===============================================================================
@@ -84,7 +123,7 @@ class CommandVerb(BaseVerb):
         self.function = function
 
     def execute(self, runner):
-        runner.set_go_default(self.go)
+        runner.set_default_func(self.go)
         self.function(runner)
 
     def go(self, runner, *args):
@@ -101,17 +140,18 @@ class JavaVerb(CommandVerb):
     def __init__(self, name, function, java_class, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
         self.java_class = java_class
-        self.add_cli_options(
-               cli.IntegerOption('-R', '--remotedebug', 'remotedebug',
-                                 'enable remote debugging on specified port, e.g. 9090'))
+        self.add_options(
+           cli.IntegerOption('-D', '--debugport', 'debugport',
+                             'enable remote debugging on the specified port'))
 
     def go(self, runner, *args):
-        self.run_java(runner, list(args) + list(runner.args))
+        final_args = list(args) + list(runner.args)
+        self.run_java(runner, *final_args)
 
     def run_java(self, runner, *args):
-        opts_override = self.get_option('java_opts_override', default = [])
-        if runner.opts.remotedebug:
-            kw = {'remotedebug': runner.opts.remotedebug}
+        opts_override = self.get_attr('java_opts_override', default = [])
+        if runner.opts.debugport:
+            kw = {'debugport': runner.opts.debugport}
         else:
             kw = {}
         runner.java.execute(self.java_class, opts_override, *args, **kw)
@@ -127,21 +167,21 @@ class ServerVerb(JavaVerb):
         JavaVerb.__init__(self, name, function, 'org.voltdb.VoltDB', **kwargs)
         self.server_subcommand = server_subcommand
         # Add common server-ish options.
-        self.add_cli_options(
-                cli.StringOption('-c', '--catalog', 'catalog',
-                                 'the application catalog jar file path',
-                                 required = True),
-                cli.StringOption('-d', '--deployment', 'deployment',
-                                 'the deployment configuration file path',
-                                 default = 'deployment.xml'),
-                cli.StringOption('-H', '--host', 'host',
-                                 'the coordinating host as HOST[:PORT]',
-                                 default = 'localhost'),
-                cli.StringOption('-l', '--license', 'license',
-                                 'the license file path'))
+        self.add_options(
+            cli.StringOption('-d', '--deployment', 'deployment',
+                             'the deployment configuration file path',
+                             default = 'deployment.xml'),
+            cli.StringOption('-H', '--host', 'host',
+                             'the coordinating host as HOST[:PORT]',
+                             default = 'localhost'),
+            cli.StringOption('-l', '--license', 'license',
+                             'the license file path'))
+        self.add_arguments(
+            cli.StringArgument('catalog',
+                               'the application catalog jar file path'))
         # Add appropriate server-ish Java options.
         self.merge_java_options('java_opts_override',
-                'server',
+                '-server',
                 '-XX:+HeapDumpOnOutOfMemoryError',
                 '-XX:HeapDumpPath=/tmp',
                 '-XX:-ReduceInitialCardMarks')
@@ -178,7 +218,7 @@ class ClientVerb(CommandVerb):
     def __init__(self, name, function, default_port, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
         self.default_port = default_port
-        self.add_cli_options(
+        self.add_options(
             cli.StringOption('-H', '--host', 'host',
                              'the target host as HOST[:PORT]',
                              default = 'localhost'),
@@ -214,11 +254,10 @@ class HelpVerb(CommandVerb):
     """
     def __init__(self, name, function, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
-        print 'HelpVerb: %s' % self.cli_spec.description
         self.set_defaults(description = 'Display command help.',
                           usage       = '[COMMAND ...]',
                           baseverb    = True)
-        self.add_cli_options(
+        self.add_options(
             cli.BooleanOption('-a', '--all', 'all',
                               'display all available help, including verb usage'))
 
@@ -229,26 +268,26 @@ class HelpVerb(CommandVerb):
 class PackageVerb(CommandVerb):
 #===============================================================================
     """
-    Verb to create a Python-runnable package. Used by @VOLT.Package decorator.
+    Verb to create a runnable Python package. Used by @VOLT.Package decorator.
     """
     def __init__(self, name, function, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
-        kwargs = copy.copy(kwargs)
-        self.set_defaults(description  = 'Create a Python-runnable program package.',
+        self.set_defaults(description  = 'Create a runnable Python program package.',
                           usage        = '[NAME ...]',
                           baseverb     = True,
                           description2 = '''\
 The optional NAME argument(s) allow package generation for base commands other
 than the current one. If no NAME is provided the current base command is
 packaged.''')
-        self.add_cli_options(
+        self.add_options(
             cli.BooleanOption('-f', '--force', 'force',
-                              'overwrite existing file without asking', default = False),
-            cli.StringOption('-o', '--output_dir', 'outdir',
-                             'specify output directory (defaults to working directory)'))
+                              'overwrite existing file without asking',
+                              default = False),
+            cli.StringOption('-o', '--output_dir', 'output_dir',
+                             'specify the output directory (defaults to the working directory)'))
 
     def go(self, runner, *args):
-        runner.package(runner.opts.outdir, runner.opts.force, *args)
+        runner.package(runner.opts.output_dir, runner.opts.force, *args)
 
 #===============================================================================
 class VerbDecorators(object):
@@ -282,8 +321,6 @@ class VerbDecorators(object):
         return inner_decorator
 
     def _get_java_decorator(self, verb_class, java_class, *args, **kwargs):
-        # Automatically set passthrough to True.
-        kwargs['passthrough'] = True
         # Add extra message to description.
         extra_help = '(use --help for full usage)'
         if 'description' in kwargs:

@@ -46,7 +46,8 @@ class BaseOption(object):
     General CLI option specification (uses optparse keywords for now).
     """
     def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
-        self.args   = (short_opt, long_opt)
+        self.short_opt = short_opt
+        self.long_opt  = long_opt
         if 'required' in kwargs:
             self.required = kwargs.pop('required')
         else:
@@ -62,21 +63,26 @@ class BaseOption(object):
         if self.required:
             self.kwargs['help'] += ' (required)'
 
+    def get_option_names(self):
+        return [a for a in (self.short_opt, self.long_opt) if a is not None]
+
     def __str__(self):
-        return '%s(%s %s)' % (self.__class__.__name__, self.args, self.kwargs)
+        return '%s(%s/%s %s)' % (self.__class__.__name__,
+                                 self.short_opt, self.long_opt, self.kwargs)
 
     def __cmp__(self, other):
-        if self.args[0]:
-            if other.args[0]:
-                return cmp(self.args[0].lower(), other.args[0].lower())
+        # Sort options by lowercase letter or word, depending on which is available.
+        if self.short_opt:
+            if other.short_opt:
+                return cmp(self.short_opt.lower(), other.short_opt.lower())
             return 1
-        if other.args[0]:
+        if other.short_opt:
             return -1
-        if self.args[1]:
-            if other.args[1]:
-                return cmp(self.args[1].lower(), other.args[1].lower())
+        if self.long_opt:
+            if other.long_opt:
+                return cmp(self.long_opt.lower(), other.long_opt.lower())
             return 1
-        if other.args[1]:
+        if other.long_opt:
             return -1
         return 0
 
@@ -109,6 +115,35 @@ class IntegerOption(BaseOption):
         BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, type = 'int', **kwargs)
 
 #===============================================================================
+class BaseArgument(object):
+#===============================================================================
+    def __init__(self, name, help):
+        self.name = name
+        self.help = help
+    def get(self):
+        utility.abort('BaseArgument subclass must implement a get() method: %s'
+                            % self.__class__.__name__)
+
+#===============================================================================
+class StringArgument(BaseArgument):
+#===============================================================================
+    def __init__(self, name, help):
+        BaseArgument.__init__(self, name, help)
+    def get(self, value):
+        return str(value)
+
+#===============================================================================
+class IntegerArgument(BaseArgument):
+#===============================================================================
+    def __init__(self, name, help):
+        BaseArgument.__init__(self, name, help)
+    def get(self, value):
+        try:
+            return int(value)
+        except ValueError, e:
+            utility.abort('"%s" argument is not a valid integer: %s' % value)
+
+#===============================================================================
 class ParsedCommand(object):
 #===============================================================================
     """
@@ -135,16 +170,16 @@ class VoltCLICommandPreprocessor(object):
     checking before the full command line is parsed. This allows the parsing
     process itself to display debug messages.
     """
-    def __init__(self, cli_options):
+    def __init__(self, options):
         """
         Command line preprocessor constructor. Initializes metadata.
         """
-        self.cli_options = cli_options
+        self.options = options
         # Determine which options require arguments.
         self.arg_opts = set()
-        for cli_option in cli_options:
-            if (not 'action' in cli_option.kwargs or cli_option.kwargs['action'] == 'store'):
-                for opt in cli_option.args:
+        for option in options:
+            if (not 'action' in option.kwargs or option.kwargs['action'] == 'store'):
+                for opt in option.args:
                     arg_opts.add(opt)
         # Clear the parsed data.
         self.clear()
@@ -198,57 +233,103 @@ class VoltCLICommandPreprocessor(object):
         return ret_value
 
 #===============================================================================
-class VoltCLICommandProcessor(optparse.OptionParser):
+class ExtendedHelpOptionParser(optparse.OptionParser):
 #===============================================================================
     '''
+    Extends OptionParser in order to support extended help.
+    '''
+    def __init__(self, *args, **kwargs):
+        self.format_epilog_called = False
+        optparse.OptionParser.__init__(self, *args, **kwargs)
+
+    def format_epilog(self, formatter):
+        """
+        OptionParser hook that allows us to append verb descriptions to the
+        help message.
+        """
+        self.format_epilog_called = True
+        return self.on_format_epilog()
+
+    def print_help(self):
+        """
+        Override OptionParser.print_help() to work around Python 2.4 optparse
+        not supporting format_epilog().
+        """
+        self.format_epilog_called = False
+        optparse.OptionParser.print_help(self)
+        if not self.format_epilog_called:
+            sys.stdout.write(self.on_format_epilog())
+
+    def on_format_epilog(self):
+        utility.abort('ExtendedHelpOptionParser subclass must override on_format_epilog(): %s'
+                            % self.__class__.__name__)
+
+#===============================================================================
+class VerbOptionParser(ExtendedHelpOptionParser):
+#===============================================================================
+    """
+    Option parser to extend the help displayed for verbs to include arguments.
+    """
+    def __init__(self, verb):
+        self.verb = verb
+        ExtendedHelpOptionParser.__init__(self, description = verb.cli_spec.description,
+                                                usage       = get_verb_usage(verb))
+
+    def on_format_epilog(self):
+        if self.verb.get_argument_count() == 0:
+            return ''
+        rows = [(a.name.upper(), a.help) for a in self.verb.iter_arguments()]
+        return '\nArguments:\n%s\n' % utility.format_table(rows, indent = 2)
+
+#===============================================================================
+class VoltCLICommandProcessor(ExtendedHelpOptionParser):
+#===============================================================================
+    """
     Bi-level argument/option parsing and validation class. Handles both global
     and verb-specific arguments and options.
-    '''
+    """
 
-    def __init__(self, verbs, cli_options, usage, description, version):
+    def __init__(self, verbs, options, usage, description, version):
         """
         Command line processor constructor.
         """
-        self.verbs       = verbs
-        self.verb_names  = verbs.keys()
-        self.cli_options = cli_options
-        self.preproc     = VoltCLICommandPreprocessor(self.cli_options)
-        full_usage       = '%s\n' % usage
+        self.verbs      = verbs
+        self.verb_names = verbs.keys()
+        self.options    = options
+        self.preproc    = VoltCLICommandPreprocessor(self.options)
+        full_usage      = '%s\n' % usage
         self.verb_names.sort()
         if verbs:
             for verb_name in self.verb_names:
                 verb = self.verbs[verb_name]
                 if not verb.cli_spec.baseverb:
-                    full_usage += '\n       %%prog %s %s' % (verb.name, verb.cli_spec.usage)
+                    full_usage += '\n       %s' % get_verb_usage(verb)
             full_usage += '\n'
             for verb_name in self.verb_names:
                 verb = self.verbs[verb_name]
                 if verb.cli_spec.baseverb:
-                    full_usage += '\n       %%prog %s %s' % (verb.name, verb.cli_spec.usage)
+                    full_usage += '\n       %s' % get_verb_usage(verb)
         optparse.OptionParser.__init__(self,
             description = description,
             usage       = full_usage,
             version     = version)
-        self.cli_options.sort()
-        for cli_option in self.cli_options:
-            self.add_option(*cli_option.args, **cli_option.kwargs)
+        self.options.sort()
+        for option in self.options:
+            self.add_option(*option.get_option_names(), **option.kwargs)
 
     def create_verb_parser(self, verb):
         """
         Create CLI option parser for verb command line.
         """
         # Parse the command-specific options.
-        parser = optparse.OptionParser(description = verb.cli_spec.description,
-                                       usage = '%%prog %s %s' % (verb.name, verb.cli_spec.usage))
+        parser = VerbOptionParser(verb)
         if self.preproc.verb:
-            if verb.cli_spec.cli_options:
-                verb.cli_spec.cli_options.sort()
-                for cli_option in verb.cli_spec.cli_options:
-                    try:
-                        parser.add_option(*cli_option.args, **cli_option.kwargs)
-                    except Exception, e:
-                        utility.abort('Exception initializing options for verb "%s".'
-                                            % verb.name, e)
+            for option in verb.iter_options():
+                try:
+                    parser.add_option(*option.get_option_names(), **option.kwargs)
+                except Exception, e:
+                    utility.abort('Exception initializing options for verb "%s".'
+                                        % verb.name, e)
         return parser
 
     def check_verb_options(self, verb, opts):
@@ -257,21 +338,34 @@ class VoltCLICommandProcessor(optparse.OptionParser):
         """
         max_width = 0
         missing = []
-        if self.preproc.verb:
-            if verb.cli_spec.cli_options:
-                for cli_option in verb.cli_spec.cli_options:
-                    if cli_option.required and getattr(opts, cli_option.kwargs['dest']) is None:
-                        missing_opt = ', '.join(cli_option.args)
-                        max_width = max(len(missing_opt), max_width)
-                        missing.append((missing_opt, cli_option.kwargs['help']))
-        if missing:
-            if len(missing) > 1:
-                plural = 's'
+        for o in verb.iter_options(required_only = True):
+            missing_opt = ', '.join(o.get_option_names())
+            max_width = max(len(missing_opt), max_width)
+            missing.append((missing_opt, o.kwargs['help']))
+        # Abort if required options are missing.
+        check_missing_items('option', missing)
+
+    def process_verb_arguments(self, verb, verb_args, verb_opts):
+        """
+        Validate the verb arguments. Check that required arguments are present.
+        Set option values for required arguments and remove them from the
+        argument list.
+        """
+        # Add fixed arguments passed in through the decorator to the verb object.
+        args = copy.copy(verb_args) + verb.command_arguments
+        # Set attributes for required arguments.
+        missing = []
+        iarg = 0
+        for o in verb.iter_arguments():
+            if iarg < len(args):
+                setattr(verb_opts, o.name, args[iarg])
             else:
-                plural = ''
-            fmt = '%%-%ds  %%s' % max_width
-            utility.abort('Missing required option%s:' % plural,
-                          (fmt % (o, h) for (o, h) in missing))
+                missing.append((o.name, o.help))
+            iarg += 1
+        # Abort if arguments are missing.
+        check_missing_items('argument', missing)
+        # Return the argument list with the required arguments removed.
+        return args[iarg:]
 
     def parse(self, cmdargs):
         """
@@ -310,29 +404,16 @@ class VoltCLICommandProcessor(optparse.OptionParser):
                 verb_opts, verb_args = verb_parser.parse_args(self.preproc.verb_cmdargs)
                 # Check for required options.
                 self.check_verb_options(verb, verb_opts)
+                # Post-process expected arguments.
+                verb_args = self.process_verb_arguments(verb, verb_args, verb_opts)
         else:
             verb_opts = None
             args = []
 
         return ParsedCommand(self, outer_opts, verb_parser, verb_opts, verb_args, verb)
 
-    def format_epilog(self, formatter):
-        """
-        OptionParser hook that allows us to append verb descriptions to the
-        help message.
-        """
-        self.format_epilog_called = True
+    def on_format_epilog(self):
         return self._format_verb_list()
-
-    def print_help(self):
-        """
-        OptionParser override that works around Python 2.4 optparse not
-        supporting format_epilog().
-        """
-        self.format_epilog_called = False
-        optparse.OptionParser.print_help(self)
-        if not self.format_epilog_called:
-            sys.stdout.write(self._format_verb_list())
 
     def _abort(self, *msgs):
         utility.error(*msgs)
@@ -350,8 +431,8 @@ class VoltCLICommandProcessor(optparse.OptionParser):
                 rows2.append((verb.name, verb.cli_spec.description))
             else:
                 rows1.append((verb.name, verb.cli_spec.description))
-        table1 = utility.format_table('Verb Descriptions', None, rows1)
-        table2 = utility.format_table('Common Verbs', None, rows2)
+        table1 = utility.format_table(rows1, caption = 'Verb Descriptions')
+        table2 = utility.format_table(rows2, caption = 'Common Verbs')
         return '\n%s\n\n%s' % (table1, table2)
 
 #===============================================================================
@@ -359,11 +440,15 @@ class CLISpec(object):
 #===============================================================================
     def __init__(self, **kwargs):
         self._kwargs = kwargs
-        # Make sure cli_options is a flat list.
-        if 'cli_options' in self._kwargs:
-            self._kwargs['cli_options'] = utility.flatten_to_list(self._kwargs['cli_options'])
+        # Make sure options and arguments are flat lists.
+        if 'options' in self._kwargs:
+            self._kwargs['options'] = utility.flatten_to_list(self._kwargs['options'])
         else:
-            self._kwargs['cli_options'] = []
+            self._kwargs['options'] = []
+        if 'arguments' in self._kwargs:
+            self._kwargs['arguments'] = utility.flatten_to_list(self._kwargs['arguments'])
+        else:
+            self._kwargs['arguments'] = []
 
     def __getattr__(self, name):
         return self._kwargs.get(name, None)
@@ -377,13 +462,13 @@ class CLISpec(object):
         s += ']'
         return s
 
-    def add_cli_options(self, *cli_options):
-        utility.kwargs_merge_list(self._kwargs, 'cli_options', *cli_options)
+    def add_to_list(self, name, *args):
+        utility.kwargs_merge_list(self._kwargs, name, *args)
 
-    def get_option(self, name, default = None):
+    def get_attr(self, name, default = None):
         return utility.kwargs_get(self._kwargs, name, default = default, remove = False)
 
-    def pop_option(self, name, default = None):
+    def pop_attr(self, name, default = None):
         return utility.kwargs_get(self._kwargs, name, default = default, remove = True)
 
     def merge_java_options(self, name, *options):
@@ -391,3 +476,32 @@ class CLISpec(object):
 
     def set_defaults(self, **kwargs):
         utility.kwargs_set_defaults(self._kwargs, **kwargs)
+
+#===============================================================================
+def check_missing_items(type_name, missing_items):
+#===============================================================================
+    """
+    Look at item list with (name, description) pairs and abort with a useful
+    error message if the list isn't empty.
+    """
+    if missing_items:
+        if len(missing_items) > 1:
+            plural = 's'
+        else:
+            plural = ''
+        fmt = '%%-%ds  %%s' % max([len(o) for (o, h) in missing_items])
+        utility.abort('Missing required %s%s:' % (type_name, plural),
+                      (fmt % (o.upper(), h) for (o, h) in missing_items))
+
+#===============================================================================
+def get_verb_usage(verb):
+#===============================================================================
+    """
+    Provide the full usage string, including argument names, for a verb.
+    """
+    usage = '%%prog %s' % verb.name
+    if verb.cli_spec.usage:
+        usage += ' %s' % verb.cli_spec.usage
+    for o in verb.iter_arguments():
+        usage += ' %s' % o.name.upper()
+    return usage

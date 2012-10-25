@@ -27,15 +27,11 @@
 
 @VOLT.Client(
     description = 'Restore a VoltDB database snapshot.',
-    cli_options = (
-        VOLT.StringOption('-d', '--directory', 'directory',
-                          'the local snapshot directory path',
-                          required = True),
-        VOLT.StringOption('-i', '--id', 'nonce',
-                          'the unique snapshot identifier (nonce)',
-                          required = True)
-    )
-)
+    arguments = (
+        VOLT.StringArgument('directory',
+                            'the local snapshot directory path'),
+        VOLT.StringArgument('nonce',
+                            'the unique snapshot identifier (nonce)')))
 def restore(runner):
     proc = VOLT.VoltProcedure(runner.client, '@SnapshotRestore', [
                                     VOLT.FastSerializer.VOLTTYPE_STRING,
