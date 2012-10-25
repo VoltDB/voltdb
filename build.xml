@@ -1178,10 +1178,11 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <!-- pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
+                <exclude name="**/TestCommandLogReinitiator.class"/>
+                <exclude name="**/TestLogReader.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestVoltLicense.class" />
-                <exclude name="**/TestLogReader.class"/>
                 <exclude name="**/TestPauselessRejoinEndToEnd" />
                 <exclude name="**/TestPauselessRejoinFuzz" />
                 <exclude name="**/TestSecondaryRejoin.class" />
@@ -1197,6 +1198,7 @@ TEST CASES
                 <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <!-- <exclude name="**/TestHSQLBackend.class" /> -->
                 <!-- <exclude name="**/TestAdHocQueries.class" /> -->
                 <!-- <exclude name="**/TestJSONInterface.class" /> -->
@@ -1239,7 +1241,6 @@ TEST CASES
                 <!-- <exclude name="**/TestSystemProcedureSuite.class" /> -->
                 <!-- <exclude name="**/TestTPCCSuite.class" /> -->
                 <!-- <exclude name="**/TestBlobType.class" /> -->
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
             </fileset>
         </tests>
     </run_junit>
