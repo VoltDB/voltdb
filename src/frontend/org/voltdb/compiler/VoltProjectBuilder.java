@@ -1085,7 +1085,7 @@ public class VoltProjectBuilder {
 
         if (m_elOnServer) {
             ExportOnServerType onServer = factory.createExportOnServerType();
-            ServerExportEnum exportTo = ServerExportEnum.valueOf(m_elExportTo);
+            ServerExportEnum exportTo = ServerExportEnum.fromValue(m_elExportTo.toLowerCase());
             onServer.setExportto(exportTo);
             export.setOnserver(onServer);
             if( m_elConfig != null && m_elConfig.size() > 0) {

@@ -50,6 +50,7 @@ import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltFile;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
@@ -189,7 +190,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             start = batchStart;
 
             if (m_batched) {
-                m_dirContainingFiles = new File(getPathOfBatchDir(ACTIVE_PREFIX));
+                m_dirContainingFiles = new VoltFile(getPathOfBatchDir(ACTIVE_PREFIX));
                 m_logger.trace(String.format("Creating dir for batch at %s", m_dirContainingFiles.getPath()));
                 m_dirContainingFiles.mkdirs();
                 if (m_dirContainingFiles.exists() == false) {
@@ -253,13 +254,13 @@ public class ExportToFileClient extends ExportClientBase2 {
             String oldPath = getPathOfBatchDir(ACTIVE_PREFIX);
             String newPath = getPathOfBatchDir("");
 
-            File oldDir = new File(oldPath);
+            File oldDir = new VoltFile(oldPath);
             assert(oldDir.exists());
             assert(oldDir.isDirectory());
             assert(oldDir.canWrite());
 
             if (oldDir.listFiles().length > 0) {
-                File newDir = new File(newPath);
+                File newDir = new VoltFile(newPath);
                 oldDir.renameTo(newDir);
                 notifyRollIsComplete(new File[] { newDir });
             }
@@ -269,7 +270,7 @@ public class ExportToFileClient extends ExportClientBase2 {
         }
 
         void closeFiles() {
-            File[] notifySet = new File[m_writers.size()];
+            File[] notifySet = new VoltFile[m_writers.size()];
 
             int i = 0;
             // Sort the open files by TXN ID so that we can close and rename
@@ -303,12 +304,12 @@ public class ExportToFileClient extends ExportClientBase2 {
                 String oldPath = handle.getPath(ACTIVE_PREFIX);
                 String newPath = handle.getPath("");
 
-                File oldFile = new File(oldPath);
+                File oldFile = new VoltFile(oldPath);
                 assert(oldFile.exists());
                 assert(oldFile.isFile());
                 assert(oldFile.canWrite());
 
-                File newFile = new File(newPath);
+                File newFile = new VoltFile(newPath);
                 assert(!newFile.exists());
                 oldFile.renameTo(newFile);
 
@@ -326,7 +327,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                 return writer;
 
             String path = handle.getPath(ACTIVE_PREFIX);
-            File newFile = new File(path);
+            File newFile = new VoltFile(path);
             if (newFile.exists()) {
                 m_logger.error("Error: Output file for next period already exists at path: " + newFile.getPath());
                 m_logger.error("Consider using a more specific timestamp in your filename or cleaning up your export data directory.");
@@ -377,10 +378,10 @@ public class ExportToFileClient extends ExportClientBase2 {
                     }
                 }
 
-                File newFile = new File(path);
+                File newFile = new VoltFile(path);
                 try {
                     OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
-                    BufferedWriter writer = new BufferedWriter(osw, 1048576);
+                    BufferedWriter writer = new BufferedWriter(osw);
                     writer.write(schema);
                     writer.flush();
                     writer.close();
@@ -804,7 +805,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                     printHelpAndQuit(-1);
                 }
                 boolean invalidDir = false;
-                outdir = new File(args[ii + 1]);
+                outdir = new VoltFile(args[ii + 1]);
                 if (!outdir.exists()) {
                     if (!outdir.mkdir()) {
                         System.err.println("Error: " + outdir.getPath() + " cannot be created");
@@ -928,7 +929,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             printHelpAndQuit(-1);
         }
         if (outdir == null) {
-            outdir = new File(".");
+            outdir = new VoltFile(".");
         }
         if (delimiter == '\0') {
             System.err.println("ExportToFile: must provide an output type");
@@ -994,7 +995,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             throw new IllegalArgumentException("ExportToFile: must provide an output type");
         }
 
-        File outdir = new File(conf.getProperty("outdir", "."));
+        File outdir = new VoltFile(conf.getProperty("outdir", "."));
         if (!outdir.exists()) {
             if (!outdir.mkdir()) {
                 throw new IllegalArgumentException("Error: " + outdir.getPath() + " cannot be created");
