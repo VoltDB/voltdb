@@ -57,7 +57,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = { Insert.class };
 
     public void testNumericExpressionIndex() throws Exception {
-        System.out.println("STARTING testAbsWithLimit_ENG3572");
+        System.out.println("STARTING testNumericExpressionIndex");
         Client client = getClient();
         initialLoad(client, "R1");
 
@@ -86,11 +86,54 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) ); " +
                 // Test unique generalized index on a function of an already indexed column.
                 "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
+                // Test generalized expression index with a constant argument.
+                "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
         */
         cr = client.callProcedure("@AdHoc", "select ID from R1 where ABS(ID) > 9 order by NUM, ID");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(5, result.getRowCount());
+
+        VoltTable r;
+        long resultA;
+        long resultB;
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where (ID+ID) / 6 = -3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // Here's some hard-won functionality -- matching expression indexes with only the right constants in them.
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where ID / 3 = -3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where (ID+ID) / 6 = -2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // Expecting to use the cached index plan and still get a correct result.
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where ID / 3 = -2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where (ID+ID) / 4 = -3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // Not expecting to use the index -- that's the whole point.
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where ID / 2 = -3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
     }
 
     public void testAbsWithLimit_ENG3572() throws Exception
@@ -868,6 +911,9 @@ public class TestFunctionsSuite extends RegressionSuite {
 
                 // Test unique generalized index on a function of an already indexed column.
                 "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
+
+                // Test generalized expression index with a constant argument.
+                "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -918,7 +964,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
-        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);

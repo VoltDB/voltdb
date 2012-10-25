@@ -303,6 +303,8 @@ public class TestClientInterface {
                                                                          new VoltType[0],
                                                                          0),
                                                             new ParameterSet(),
+                                                            null,
+                                                            null,
                                                             null);
         plannedStmtBatch.addStatement(s);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();

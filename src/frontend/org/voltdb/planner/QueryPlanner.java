@@ -176,6 +176,10 @@ public class QueryPlanner {
         return m_xmlSQL.toMinString();
     }
 
+    public String[] extractedParamLiteralValues() {
+        return m_paramzInfo.paramLiteralValues;
+    }
+
     /**
      * Get the best plan for the SQL statement given, assuming the given costModel.
      *

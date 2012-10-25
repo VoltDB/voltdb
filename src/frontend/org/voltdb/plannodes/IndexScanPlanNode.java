@@ -423,4 +423,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     public void setBindings(ArrayList<AbstractExpression> bindings) {
         m_bindings  = bindings;
     }
+
+    public ArrayList<AbstractExpression> getBindings() {
+        return m_bindings;
+    }
 }
