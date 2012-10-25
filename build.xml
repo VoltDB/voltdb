@@ -1179,6 +1179,7 @@ TEST CASES
                 <!-- pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
                 <exclude name="**/TestCommandLogReinitiator.class"/>
+                <exclude name="**/TestCommandLog.class"/>
                 <exclude name="**/TestLogReader.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
