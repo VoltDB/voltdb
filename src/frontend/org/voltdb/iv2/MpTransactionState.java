@@ -87,6 +87,9 @@ public class MpTransactionState extends TransactionState
     {
         // The poisoning path will, unfortunately, set this to true.  Need to undo that.
         m_needsRollback = false;
+        // Also need to make sure that we get the original invocation in the first fragment
+        // since some masters may not have seen it.
+        m_haveDistributedInitTask = false;
     }
 
     @Override

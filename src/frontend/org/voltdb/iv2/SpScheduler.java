@@ -593,12 +593,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
+        boolean logThis = false;
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
             txn = new ParticipantTransactionState(newSpHandle, msg);
             m_outstandingTxns.put(msg.getTxnId(), txn);
+            // Only want to send things to the command log if it satisfies this predicate
+            // AND we've never seen anything for this transaction before.  We can't
+            // actually log until we create a TransactionTask, though, so just keep track
+            // of whether it needs to be done.
+            logThis = (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly());
         }
 
         TransactionTask task;
@@ -612,7 +618,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                                  m_pendingTasks, msg, null);
         }
-        if (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly()) {
+        if (logThis) {
             if (!m_cl.log(msg.getInitiateTask(), newSpHandle, m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
             }
