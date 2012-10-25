@@ -1646,9 +1646,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     ci.shutdown();
                 }
 
-                // shut down Export and its connectors.
-                ExportManager.instance().shutdown();
-
                 if (!isIV2Enabled()) {
                     // tell all m_sites to stop their runloops
                     if (m_localSites != null) {
@@ -1689,6 +1686,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         }
                     }
                 }
+
+                // shut down Export and its connectors.
+                ExportManager.instance().shutdown();
+
                 // After sites are terminated, shutdown the InvocationBufferServer.
                 // The IBS is shared by all sites; don't kill it while any site is active.
                 if (m_nodeDRGateway != null) {
