@@ -67,6 +67,8 @@ import com.google.common.base.Throwables;
  *
  */
 public class ExportToFileClient extends ExportClientBase2 {
+    public static final int INTERNAL_FIELD_COUNT = 6;
+
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     // These get put in from of the batch folders
@@ -76,7 +78,7 @@ public class ExportToFileClient extends ExportClientBase2 {
     // ODBC Datetime Format
     // if you need microseconds, you'll have to change this code or
     //  export a bigint representing microseconds since an epoch
-    protected static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
+    public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
     // use thread-local to avoid SimpleDateFormat thread-safety issues
     protected ThreadLocal<SimpleDateFormat> m_ODBCDateformat;
     protected char m_delimiter;
@@ -757,7 +759,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                 printHelpAndQuit(-1);
             }
             else if (arg.equals("--skipinternals")) {
-                firstfield = 6;
+                firstfield = INTERNAL_FIELD_COUNT;
             }
             else if (arg.equals("--connect")) {
                 if (args.length < ii + 1) {
@@ -1011,7 +1013,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             throw new IllegalArgumentException("Error: " + outdir.getPath() + " does not have write permission set");
         }
 
-        int firstfield = Boolean.parseBoolean(conf.getProperty("skipinternals","false")) ? 6 : 0;
+        int firstfield = Boolean.parseBoolean(conf.getProperty("skipinternals","false")) ? INTERNAL_FIELD_COUNT : 0;
 
         int period = Integer.parseInt(conf.getProperty("period", "60"));
         if (period < 1) {

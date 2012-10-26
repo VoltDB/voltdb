@@ -29,7 +29,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.exportclient.ExportToFileVerifier;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
@@ -48,7 +47,7 @@ public class TestExportV2Suite extends TestExportBase {
             throws Exception
             {
                 quiesce(client);
-                assertTrue(tester.verifyRows());
+                tester.verifyRows();
     }
 
     @Override
@@ -80,7 +79,7 @@ public class TestExportV2Suite extends TestExportBase {
         System.out.println("testExportMultiTable");
         final Client client = getClient();
 
-        for (int i=0; i < 10; i++) {
+        for (int i=0; i < 100; i++) {
             // add data to a first (persistent) table
             Object[] rowdata = TestSQLTypesSuite.m_midValues;
             m_verifier.addRow(

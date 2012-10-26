@@ -20,7 +20,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.voltdb.exportclient;
+package org.voltdb.export;
+
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -33,14 +35,13 @@ import java.util.TreeMap;
 
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
-import org.voltdb.export.ExportTestVerifier;
 
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 public class ExportToFileVerifier {
     // hash table name + partition to verifier
-    public final HashMap<String, ExportTestVerifier> m_verifiers =
-        new HashMap<String, ExportTestVerifier>();
+    public final HashMap<String, ExportToFileTestVerifier> m_verifiers =
+        new HashMap<String, ExportToFileTestVerifier>();
 
     private final File m_paths[];
     private final String m_nonce;
@@ -53,16 +54,16 @@ public class ExportToFileVerifier {
     public void addRow(String tableName, Object partitionHash, Object[] data)
     {
         int partition = TheHashinator.hashToPartition(partitionHash);
-        ExportTestVerifier verifier = m_verifiers.get(tableName + partition);
+        ExportToFileTestVerifier verifier = m_verifiers.get(tableName + partition);
         if (verifier == null)
         {
-            verifier = new ExportTestVerifier();
+            verifier = new ExportToFileTestVerifier();
             m_verifiers.put(tableName + partition, verifier);
         }
-        //verifier.addRow(data);
+        verifier.addRow(data);
     }
 
-    public boolean verifyRows() throws Exception {
+    public void verifyRows() throws Exception {
         TreeMap<Long, List<File>> generations = new TreeMap<Long, List<File>>();
         /*
          * Get all the files for each generation so we process them in the right order
@@ -91,9 +92,9 @@ public class ExportToFileVerifier {
             for (File f : generationFiles) {
                 String tableName;
                 if (f.getName().startsWith("active")) {
-                    tableName = f.getName().split("-")[1];
+                    tableName = f.getName().split("-")[3];
                 } else {
-                    tableName = f.getName().split("-")[0];
+                    tableName = f.getName().split("-")[2];
                 }
 
 
@@ -109,11 +110,10 @@ public class ExportToFileVerifier {
                         sb.append(s).append(", ");
                     }
                     System.out.println(sb);
-                    m_verifiers.get(tableName + partitionId).processRow(next);
+                    ExportToFileTestVerifier verifier = m_verifiers.get(tableName + partitionId);
+                    assertThat( next, verifier.isExpectedRow());
                 }
             }
         }
-
-        return false;
     }
 }
