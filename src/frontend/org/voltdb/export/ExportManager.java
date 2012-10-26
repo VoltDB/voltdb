@@ -115,7 +115,7 @@ public class ExportManager
              */
             ExportDataProcessor proc = m_processor.get();
             if (proc == null) {
-                VoltDB.crashLocalVoltDB("No export data processor found", false, null);
+                VoltDB.crashLocalVoltDB("No export data processor found", true, null);
             }
             proc.queueWork(new Runnable() {
                 @Override
@@ -222,7 +222,7 @@ public class ExportManager
          * makes it safe to accept mastership.
          */
         ExportGeneration gen = m_generations.firstEntry().getValue();
-        if (gen != null) {
+        if (gen != null && !gen.isDiskBased()) {
             gen.acceptMastershipTask(partitionId);
         }
     }
@@ -397,7 +397,7 @@ public class ExportManager
                     m_onGenerationDrained,
                     exportOverflowDirectory);
         } catch (IOException e1) {
-            VoltDB.crashLocalVoltDB(e1.getMessage(), true, e1);
+            VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
         newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger);
 

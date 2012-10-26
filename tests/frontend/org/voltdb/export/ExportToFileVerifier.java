@@ -90,6 +90,7 @@ public class ExportToFileVerifier {
          */
         for (List<File> generationFiles : generations.values()) {
             for (File f : generationFiles) {
+                System.out.println("Processing " + f);
                 String tableName;
                 if (f.getName().startsWith("active")) {
                     tableName = f.getName().split("-")[3];

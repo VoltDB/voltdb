@@ -31,6 +31,7 @@ import java.util.Arrays;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
+import org.junit.Assert;
 import org.voltdb.exportclient.ExportToFileClient;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
@@ -39,7 +40,7 @@ import com.google.common.base.Preconditions;
 
 public class ExportToFileTestVerifier {
     private final ArrayDeque<String[]> m_data = new ArrayDeque<String[]>();
-
+    private int m_sequenceNumber = 0;
     protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
         @Override
         protected SimpleDateFormat initialValue() {
@@ -101,8 +102,13 @@ public class ExportToFileTestVerifier {
                 }
                 if( match) {
                    String [] atHead = m_data.poll();
+                   Assert.assertEquals(
+                           "Sequence number mismatch",
+                           new Integer(m_sequenceNumber),
+                           Integer.valueOf(gotten[2]));
+                   m_sequenceNumber++;
                    String [] toBeMatched = Arrays.copyOfRange(
-                           gotten, ExportToFileClient.INTERNAL_FIELD_COUNT,
+                           gotten, ExportToFileClient.INTERNAL_FIELD_COUNT - 1,
                            gotten.length
                            );
                    match = arrayContaining(atHead).matches(toBeMatched);

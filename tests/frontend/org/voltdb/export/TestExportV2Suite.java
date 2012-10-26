@@ -28,6 +28,7 @@ import java.util.Properties;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -47,6 +48,7 @@ public class TestExportV2Suite extends TestExportBase {
             throws Exception
             {
                 quiesce(client);
+                Thread.sleep(2000);
                 tester.verifyRows();
     }
 
@@ -94,6 +96,91 @@ public class TestExportV2Suite extends TestExportBase {
             params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
+        quiesceAndVerify(client, m_verifier);
+    }
+
+    public void testExportSnapshotPreservesSequenceNumber() throws Exception {
+        System.out.println("testExportSnapshotPreservesSequenceNumber");
+        Thread.sleep(5000);
+        Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow( "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        quiesce(client);
+
+        client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
+
+        m_config.shutDown();
+        m_config.startUp(false);
+
+        client = getClient();
+
+        client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
+
+        for (int i=10; i < 20; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow( "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+        client.drain();
+
+        // must still be able to verify the export data.
+        quiesceAndVerify(client, m_verifier);
+    }
+
+    // Test Export of an ADDED table.
+    //
+    public void testExportAndAddedTable() throws Exception {
+        System.out.println("testExportAndAddedTable");
+        final Client client = getClient();
+
+        // add a new table
+        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.jar");
+        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml");
+        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
+                                                                             new File(deploymentURL));
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        // verify that it exports
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow( "ADDED_TABLE", i, convertValsToRow(i, 'I', rowdata));
+            final Object[]  params = convertValsToParams("ADDED_TABLE", i, rowdata);
+            client.callProcedure("InsertAddedTable", params);
+        }
+
+        quiesceAndVerify(client, m_verifier);
+    }
+
+    //  Test Export of a DROPPED table.  Queues some data to a table.
+    //  Then drops the table and verifies that Export can successfully
+    //  drain the dropped table. IE, drop table doesn't lose Export data.
+    //
+    public void testExportAndDroppedTable() throws Exception {
+        System.out.println("testExportAndDroppedTable");
+        Client client = getClient();
+        for (int i=0; i < 10; i++) {
+            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
+            m_verifier.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
+            client.callProcedure("Insert", params);
+        }
+
+        // now drop the no-nulls table
+        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
+        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
+        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
+                                                                             new File(deploymentURL));
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        client = getClient();
+
+        // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);
     }
 
@@ -166,9 +253,7 @@ public class TestExportV2Suite extends TestExportBase {
         project.addGroups(GROUPS);
         project.addUsers(USERS);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
-        project.addExport("org.voltdb.export.processors.RawProcessor",
-                true,  //enabled
-                java.util.Arrays.asList(new String[]{"export"}));
+        project.addOnServerExport(true, java.util.Arrays.asList(new String[]{"export"}), "file", props);
         // "WITH_DEFAULTS" is a non-exported persistent table
         project.setTableAsExportOnly("ALLOW_NULLS");
 
@@ -196,9 +281,7 @@ public class TestExportV2Suite extends TestExportBase {
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl.sql"));
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-addedtable-export-ddl.sql"));
-        project.addExport("org.voltdb.export.processors.RawProcessor",
-                true  /*enabled*/,
-                java.util.Arrays.asList(new String[]{"export"}));
+        project.addOnServerExport(true, java.util.Arrays.asList(new String[]{"export"}), "file", props);
         // "WITH_DEFAULTS" is a non-exported persistent table
         project.setTableAsExportOnly("ALLOW_NULLS");   // persistent table
         project.setTableAsExportOnly("ADDED_TABLE");   // persistent table

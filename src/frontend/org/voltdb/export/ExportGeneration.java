@@ -176,7 +176,7 @@ public class ExportGeneration {
                         addDataSource(f, partitions);
                         hadValidAd = true;
                     } catch (IOException e) {
-                        VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                        VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
                     }
                 } else {
                     //Delete ads that have no data
@@ -231,7 +231,7 @@ public class ExportGeneration {
                                         if (code != KeeperException.Code.OK) {
                                             VoltDB.crashLocalVoltDB(
                                                     "Error in export leader election",
-                                                    false,
+                                                    true,
                                                     KeeperException.create(code));
                                         }
                                         String splitName[] = name.split("/");
@@ -260,7 +260,7 @@ public class ExportGeneration {
                         handleLeaderChildrenUpdate(partition,  cb.getChildren());
                     }
                 } catch (Throwable t) {
-                    VoltDB.crashLocalVoltDB("Error in export leader election", false, t);
+                    VoltDB.crashLocalVoltDB("Error in export leader election", true, t);
                 }
             }
         });
@@ -282,7 +282,7 @@ public class ExportGeneration {
                                 if (code != KeeperException.Code.OK) {
                                     VoltDB.crashLocalVoltDB(
                                             "Error in export leader election",
-                                            false,
+                                            true,
                                             KeeperException.create(code));
                                 }
                                 m_childUpdatingThread.execute(new Runnable() {
@@ -291,7 +291,7 @@ public class ExportGeneration {
                                         try {
                                             handleLeaderChildrenUpdate(partition, children);
                                         } catch (Throwable t) {
-                                            VoltDB.crashLocalVoltDB("Error in export leader election", false, t);
+                                            VoltDB.crashLocalVoltDB("Error in export leader election", true, t);
                                         }
                                     }
                                 });
@@ -432,7 +432,7 @@ public class ExportGeneration {
                         try {
                             handleChildUpdate(event);
                         } catch (Throwable t) {
-                            VoltDB.crashLocalVoltDB("Error in export ack handling", false, t);
+                            VoltDB.crashLocalVoltDB("Error in export ack handling", true, t);
                         }
                     }
                 });
@@ -471,7 +471,7 @@ public class ExportGeneration {
                                 eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
                             }
                         } catch (Throwable t) {
-                            VoltDB.crashLocalVoltDB("Error in export ack handling", false, t);
+                            VoltDB.crashLocalVoltDB("Error in export ack handling", true, t);
                         }
                     }
                 });
@@ -580,7 +580,9 @@ public class ExportGeneration {
                         " signature " + table.getSignature() + " partition id " + partition);
                 dataSourcesForPartition.put(table.getSignature(), exportDataSource);
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                VoltDB.crashLocalVoltDB(
+                        "Error creating datasources for table " +
+                        table.getTypeName() + " host id " + hostId, true, e);
             }
         }
         return partitions;
@@ -665,7 +667,7 @@ public class ExportGeneration {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
                                     "You can back up export overflow data and start the " +
-                                    "DB without it to get past this error", false, e);
+                                    "DB without it to get past this error", true, e);
         }
     }
 

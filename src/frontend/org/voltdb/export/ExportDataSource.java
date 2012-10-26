@@ -366,7 +366,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     } catch (Exception e) {
                         exportLog.error("Error processing export action", e);
                     } catch (Error e) {
-                        VoltDB.crashLocalVoltDB("Error processing export action", false, e);
+                        VoltDB.crashLocalVoltDB("Error processing export action", true, e);
                     }
                 }
         });
@@ -564,7 +564,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (Exception e) {
                     exportLog.error("Error pushing export buffer", e);
                 } catch (Error e) {
-                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", false, e);
+                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, e);
                 }
             }
         });
@@ -600,13 +600,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 m_pollFuture.set(null);
                                 m_pollFuture = null;
                             }
-                            m_onDrain.run();
+                            if (m_onDrain != null) {
+                                m_onDrain.run();
+                            }
                         } finally {
                             m_onDrain = null;
                         }
                     }
                 } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                    VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, e);
                 }
             }
         });
@@ -764,7 +766,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
                 } catch (Error e) {
-                    VoltDB.crashLocalVoltDB("Error acking export buffer", false, e);
+                    VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
                 }
             }
         });
@@ -790,6 +792,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 sb.deleteContent();
             }
         }
+        System.out.println("After ack had " + m_committedBuffers.peek());
     }
 
     /**
