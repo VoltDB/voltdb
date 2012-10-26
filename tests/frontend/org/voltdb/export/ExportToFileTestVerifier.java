@@ -101,9 +101,13 @@ public class ExportToFileTestVerifier {
                 }
                 if( match) {
                    String [] atHead = m_data.poll();
-                   match = arrayContaining(expected).matches(atHead);
+                   String [] toBeMatched = Arrays.copyOfRange(
+                           gotten, ExportToFileClient.INTERNAL_FIELD_COUNT,
+                           gotten.length
+                           );
+                   match = arrayContaining(atHead).matches(toBeMatched);
                    if( ! match) {
-                       d.appendValueList("", ", ", "", Arrays.asList(atHead));
+                       d.appendValueList("", ", ", "", Arrays.asList(toBeMatched));
                    }
                 }
                 d.appendText("]");
