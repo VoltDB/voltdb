@@ -28,7 +28,7 @@
 import os
 from voltcli import utility
 
-@VOLT.Client(
+@VOLT.Admin_Client(
     description = 'Save a VoltDB database snapshot.',
     options = (
         VOLT.BooleanOption(None, '--blocking', 'blocking',
