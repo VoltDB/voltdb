@@ -17,7 +17,11 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import org.voltdb.PartitionDRGateway;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 
 /**
@@ -38,7 +42,9 @@ public class DRTask extends SiteTasker {
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection) {
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
+    {
         // no-op during rejoin
     }
 

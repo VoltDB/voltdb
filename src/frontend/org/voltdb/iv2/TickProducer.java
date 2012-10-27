@@ -17,7 +17,11 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import java.util.concurrent.TimeUnit;
+
+import org.voltdb.rejoin.TaskLog;
 
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
@@ -58,7 +62,8 @@ public class TickProducer extends SiteTasker implements Runnable
     }
 
     @Override
-    public void runForRejoin(final SiteProcedureConnection siteConnection)
+    public void runForRejoin(final SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
         siteConnection.tick();
     }
