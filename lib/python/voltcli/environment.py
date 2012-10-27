@@ -72,8 +72,10 @@ if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
     java_opts.append('-Xmx1024m')
 
 def initialize(command_name_arg, command_dir_arg, version_arg):
-    """Set the VOLTDB_HOME, VOLTDB_LIB and VOLTDB_VOLTDB environment variables
-    based on the location of this script."""
+    """
+    Set the VOLTDB_LIB and VOLTDB_VOLTDB environment variables based on the
+    script location and the working directory.
+    """
 
     global command_name, command_dir, version
     command_name = command_name_arg
@@ -84,86 +86,75 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
     # starting points for the scan.
     dirs = []
     def add_dir(dir):
-        if dir and dir not in dirs:
+        if dir and os.path.isdir(dir) and dir not in dirs:
             dirs.append(os.path.realpath(dir))
     add_dir(os.getcwd())
     add_dir(command_dir)
     add_dir(os.environ.get('VOLTCORE', None))
     utility.verbose_info('Base directories for scan:', dirs)
 
+    lib_search_globs    = []
+    voltdb_search_globs = []
     for dir in dirs:
 
-        required_var_set = set(['VOLTDB_HOME', 'VOLTDB_LIB', 'VOLTDB_VOLTDB'])
-
-        # Return true if all needed VOLTDB_... environment variables are set
-        # and the VoltDB jar file was found.
-        def env_complete():
-            return (voltdb_jar is not None and set(os.environ.keys()).issuperset(required_var_set))
-
-        # Crawl upward and look for the home, lib and voltdb directories.
+        # Crawl upward and look for the lib and voltdb directories.
         # They may be the same directory when installed by a Linux installer.
         # Set the VOLTDB_... environment variables accordingly.
         # Also locate the voltdb jar file.
-        while (dir != '/' and dir != '' and not env_complete()):
-
-            utility.verbose_info('Checking for VoltDB root: %s' % dir)
-
-            # Try to set VOLTDB_HOME if not set.
-            if not os.environ.get('VOLTDB_HOME', ''):
-                for subdir in ('', os.path.join('share', 'voltdb')):
-                    for chk in ('Click Here to Start.html', 'examples', 'third_party'):
-                        if not os.path.exists(os.path.join(dir, subdir, chk)):
-                            break
-                    else:
-                        os.environ['VOLTDB_HOME'] = os.path.realpath(os.path.join(dir, subdir))
-                        utility.verbose_info('VOLTDB_HOME=>%s' % os.environ['VOLTDB_HOME'])
+        global voltdb_jar
+        while (dir and dir != '/' and ('VOLTDB_LIB' not in os.environ or not voltdb_jar)):
+            utility.debug('Checking potential VoltDB root directory: %s' % os.path.realpath(dir))
 
             # Try to set VOLTDB_LIB if not set.
             if not os.environ.get('VOLTDB_LIB', ''):
                 for subdir in ('lib', os.path.join('lib', 'voltdb')):
-                    if glob.glob(os.path.join(os.path.join(dir, subdir), 'zmq*.jar')):
-                        os.environ['VOLTDB_LIB'] = os.path.realpath(os.path.join(dir, subdir))
-                        utility.verbose_info('VOLTDB_LIB=>%s' % os.environ['VOLTDB_LIB'])
+                    glob_chk = os.path.join(os.path.realpath(os.path.join(dir, subdir)),
+                                            'zmq*.jar')
+                    lib_search_globs.append(glob_chk)
+                    if glob.glob(glob_chk):
+                        os.environ['VOLTDB_LIB'] = os.path.join(dir, subdir)
+                        utility.debug('VOLTDB_LIB=>%s' % os.environ['VOLTDB_LIB'])
 
             # Try to set VOLTDB_VOLTDB if not set. Look for the voltdb jar file.
-            global voltdb_jar
             if not os.environ.get('VOLTDB_VOLTDB', '') or voltdb_jar is None:
                 for subdir in ('voltdb', os.path.join('lib', 'voltdb')):
-                    glob_chk = os.path.join(os.path.join(dir, subdir), 'voltdb-*.jar')
+                    glob_chk = os.path.join(os.path.realpath(os.path.join(dir, subdir)),
+                                            'voltdb-*.jar')
+                    voltdb_search_globs.append(glob_chk)
                     for voltdb_jar_chk in glob.glob(glob_chk):
                         if re_voltdb_jar.match(os.path.basename(voltdb_jar_chk)):
                             voltdb_jar = os.path.realpath(voltdb_jar_chk)
+                            utility.debug('VoltDB jar: %s' % voltdb_jar)
                             if not os.environ.get('VOLTDB_VOLTDB', ''):
                                 os.environ['VOLTDB_VOLTDB'] = os.path.dirname(voltdb_jar)
-                                utility.verbose_info(
-                                        'VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
+                                utility.debug('VOLTDB_VOLTDB=>%s' % os.environ['VOLTDB_VOLTDB'])
 
             dir = os.path.dirname(dir)
 
+    # If the VoltDB jar was found then VOLTDB_VOLTDB will also be set.
     if voltdb_jar is None:
-        utility.abort('Failed to find the VoltDB jar file.')
+        utility.abort('Failed to find the VoltDB jar file.',
+                        ('You may need to perform a build.',
+                         'Searched the following:', voltdb_search_globs))
 
-    missing = list(required_var_set.difference(os.environ.keys()))
-    if missing:
-        missing.sort()
-        utility.abort('Failed to establish VoltDB environment.',
-                            ('You may need to perform a build.',
-                             'Initial search directory: %s' % command_dir,
-                             'Missing locations:', missing))
+    if not os.environ.get('VOLTDB_LIB', ''):
+        utility.abort('Failed to find the VoltDB library directory.',
+                        ('You may need to perform a build.',
+                         'Searched the following:', lib_search_globs))
 
     # LOG4J configuration
     if 'LOG4J_CONFIG_PATH' not in os.environ:
-        for subdirs in (('$VOLTDB_HOME', 'src', 'frontend'), ('$VOLTDB_HOME', 'voltdb')):
-            path = os.path.join(os.path.expandvars(os.path.join(*subdirs)), 'log4j.xml')
+        for chk_dir in ('$VOLTDB_LIB/../src/frontend', '$VOLTDB_VOLTDB'):
+            path = os.path.join(os.path.realpath(os.path.expandvars(*chk_dir)), 'log4j.xml')
             if os.path.exists(path):
                 os.environ['LOG4J_CONFIG_PATH'] = path
+                utility.debug('LOG4J_CONFIG_PATH=>%s' % os.environ['LOG4J_CONFIG_PATH'])
                 break
         else:
             utility.abort('Could not find log4j configuration file or LOG4J_CONFIG_PATH variable.')
 
-    if utility.is_verbose():
-        for var in ('VOLTDB_HOME', 'VOLTDB_LIB', 'VOLTDB_VOLTDB', 'LOG4J_CONFIG_PATH'):
-            utility.verbose_info('Environment: %s=%s' % (var, os.environ[var]))
+    for var in ('VOLTDB_LIB', 'VOLTDB_VOLTDB', 'LOG4J_CONFIG_PATH'):
+        utility.verbose_info('Environment: %s=%s' % (var, os.environ[var]))
 
     # Classpath is the voltdb jar and all the jars in VOLTDB_LIB.
     global classpath
