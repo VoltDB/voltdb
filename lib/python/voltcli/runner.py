@@ -84,7 +84,7 @@ class JavaRunner(object):
         java_args = [environment.java]
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
-        debug_port = kwargs.get('remotedebug', None)
+        debug_port = kwargs.get('debugport', None)
         if debug_port:
             java_args.extend((
                 '-Xdebug',
