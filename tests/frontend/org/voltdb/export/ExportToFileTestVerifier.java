@@ -23,6 +23,7 @@
 package org.voltdb.export;
 
 import static org.hamcrest.Matchers.arrayContaining;
+import static org.hamcrest.Matchers.equalTo;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -31,7 +32,6 @@ import java.util.Arrays;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
-import org.junit.Assert;
 import org.voltdb.exportclient.ExportToFileClient;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
@@ -83,14 +83,20 @@ public class ExportToFileTestVerifier {
 
     Matcher<String[]> isExpectedRow() {
         return new TypeSafeDiagnosingMatcher<String[]>() {
-            String [] expected = m_data.peek();
+            String [] expected = ( m_data.peek() == null ? null : m_data.poll() );
+            Matcher<Integer> seqMatcher = equalTo(m_sequenceNumber);
 
             @Override
             public void describeTo(Description d) {
-                d.appendText("row [");
+                d.appendText("row [ {sequence ")
+                 .appendValue(m_sequenceNumber)
+                 .appendText("}");
+
                 if (expected != null) {
-                    d.appendValueList("", ", ", "", Arrays.<String>asList(expected));
+                    d.appendValueList(", ", ", ", "", Arrays.<String>asList(expected));
                 }
+
+                d.appendText("]");
             }
 
             @Override
@@ -100,20 +106,23 @@ public class ExportToFileTestVerifier {
                 if( ! match) {
                     d.appendText("{ EOD exhausted expected rows }");
                 }
-                if( match) {
-                   String [] atHead = m_data.poll();
-                   Assert.assertEquals(
-                           "Sequence number mismatch",
-                           new Integer(m_sequenceNumber),
-                           Integer.valueOf(gotten[2]));
-                   m_sequenceNumber++;
+                if (match) {
+                    int rowSeq = Integer.valueOf(gotten[2]);
+                    if (! (match = seqMatcher.matches(rowSeq))) {
+                        d.appendText("{ expected sequence " ).appendDescriptionOf(seqMatcher);
+                        seqMatcher.describeMismatch(rowSeq, d);
+                        d.appendText(" }");
+                    }
+                    m_sequenceNumber++;
+                }
+                if (match) {
                    String [] toBeMatched = Arrays.copyOfRange(
                            gotten, ExportToFileClient.INTERNAL_FIELD_COUNT - 1,
                            gotten.length
                            );
-                   match = arrayContaining(atHead).matches(toBeMatched);
-                   if( ! match) {
-                       d.appendValueList("", ", ", "", Arrays.asList(toBeMatched));
+                   Matcher<String[]> rowMatcher = arrayContaining(expected);
+                   if( ! (match = rowMatcher.matches(toBeMatched))) {
+                       rowMatcher.describeMismatch(toBeMatched, d);
                    }
                 }
                 d.appendText("]");
