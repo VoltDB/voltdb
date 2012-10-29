@@ -28,31 +28,28 @@
 import os
 from voltcli import utility
 
-@VOLT.Client(
+@VOLT.Admin_Client(
     description = 'Save a VoltDB database snapshot.',
-    cli_options = (
-        VOLT.CLIBoolean('-b', '--block', 'block',
-                        'block database activity during snapshot save',
-                        default = False),
-        VOLT.CLIValue('-d', '--directory', 'directory',
-                      'the local snapshot directory path',
-                      required = True),
-        VOLT.CLIValue('-f', '--format', 'format',
-                      'snapshot format: "native" or "csv"',
-                      default = 'native'),
-        VOLT.CLIValue('-i', '--id', 'nonce',
-                      'the unique snapshot identifier (nonce)',
-                      required = True),
-    )
-)
+    options = (
+        VOLT.BooleanOption(None, '--blocking', 'blocking',
+                           'blocking mode stops database activity during the snapshot',
+                           default = False),
+        VOLT.StringOption('-f', '--format', 'format',
+                          'snapshot format: "native" or "csv"',
+                          default = 'native')),
+    arguments = (
+        VOLT.StringArgument('directory',
+                            'the local snapshot directory path'),
+        VOLT.StringArgument('nonce',
+                            'the unique snapshot identifier (nonce)')))
 def save(runner):
     uri = 'file://%s' % os.path.realpath(runner.opts.directory)
-    if runner.opts.block:
-        block = 'true'
+    if runner.opts.blocking:
+        blocking = 'true'
     else:
-        block = 'false'
+        blocking = 'false'
     json_opts = '{uripath:"%s",nonce:"%s",block:%s,format:"%s"}' % (
-                    uri, runner.opts.nonce, block, runner.opts.format)
+                    uri, runner.opts.nonce, blocking, runner.opts.format)
     utility.debug('@SnapshotSave "%s"' % json_opts)
     proc = VOLT.VoltProcedure(runner.client, '@SnapshotSave', [VOLT.FastSerializer.VOLTTYPE_STRING])
     response = proc.call(params = [json_opts])

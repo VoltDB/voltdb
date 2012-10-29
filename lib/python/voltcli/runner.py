@@ -48,14 +48,14 @@ Specific actions are provided by verbs.  Run "%prog help VERB" to display full
 usage for a verb, including its options and arguments.
 ''',
     usage = '%prog [OPTIONS] VERB [ARGUMENTS ...]',
-    cli_options = (
-        cli.CLIBoolean('-d', '--debug', 'debug',
+    options = (
+        cli.BooleanOption('-d', '--debug', 'debug',
                        'display debug messages'),
-        cli.CLIBoolean('-n', '--dry-run', 'dryrun',
+        cli.BooleanOption('-n', '--dry-run', 'dryrun',
                        'display actions without executing them'),
-        cli.CLIBoolean('-p', '--pause', 'pause',
+        cli.BooleanOption('-p', '--pause', 'pause',
                        'pause before significant actions'),
-        cli.CLIBoolean('-v', '--verbose', 'verbose',
+        cli.BooleanOption('-v', '--verbose', 'verbose',
                        'display verbose messages, including external command lines'),
     )
 )
@@ -78,11 +78,19 @@ class JavaRunner(object):
         Run a Java command line with option overrides.
         """
         classpath = self.classpath
-        if 'classpath' in kwargs:
-            classpath = ':'.join((kwargs['classpath'], classpath))
+        kwargs_classpath = kwargs.get('classpath', None)
+        if kwargs_classpath:
+            classpath = ':'.join((kwargs_classpath, classpath))
         java_args = [environment.java]
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
+        debug_port = kwargs.get('remotedebug', None)
+        if debug_port:
+            java_args.extend((
+                '-Xdebug',
+                '-Xnoagent',
+                '-Djava.compiler=NONE',
+                '-Xrunjdwp:transport=dt_socket,address=%d,server=y,suspend=y' % debug_port))
         java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
         java_args.append('-Djava.library.path="%s"' % os.environ['VOLTDB_VOLTDB'])
         java_args.extend(('-classpath', classpath))
@@ -119,7 +127,7 @@ class VerbRunner(object):
         self.verbspace     = verbspace
         self.config        = config
         self.cli_processor = cli_processor
-        self.go_default    = None
+        self.default_func  = None
         self.project_path  = os.path.join(os.getcwd(), 'project.xml')
         # The internal verbspaces are just used for packaging other verbspaces.
         self.internal_verbspaces = internal_verbspaces
@@ -179,11 +187,11 @@ class VerbRunner(object):
             sys.stdout.write('\n===== Full Help =====\n')
             self.usage()
             for verb_name in self.verbspace.verb_names:
-                if not self.verbspace.verbs[verb_name].baseverb:
+                if not self.verbspace.verbs[verb_name].cli_spec.baseverb:
                     sys.stdout.write('\n===== Verb: %s =====\n' % verb_name)
                     self._help_verb(verb_name)
             for verb_name in self.verbspace.verb_names:
-                if self.verbspace.verbs[verb_name].baseverb:
+                if self.verbspace.verbs[verb_name].cli_spec.baseverb:
                     sys.stdout.write('\n===== Common Verb: %s =====\n' % verb_name)
                     self._help_verb(verb_name)
         else:
@@ -234,21 +242,21 @@ class VerbRunner(object):
         self.cli_processor.print_help()
         sys.stdout.write('\n')
 
-    def set_go_default(self, go_default):
+    def set_default_func(self, default_func):
         """
-        Called by Verb to set the default go action.
+        Called by a Verb object to set the default function.
         """
-        self.go_default = go_default
+        self.default_func = default_func
 
     def go(self, *args):
         """
-        Default go action provided by Verb object.
+        Invoke the default function provided by a Verb object.
         """
-        if self.go_default is None:
-            utility.abort('Verb "%s" (class %s) does not provide a default go action.'
+        if self.default_func is None:
+            utility.abort('Verb "%s" (class %s) does not provide a default go() function.'
                                 % (self.verb.name, self.verb.__class__.__name__))
         else:
-            self.go_default(self, *args)
+            self.default_func(self, *args)
 
     def execute(self):
         """
@@ -257,6 +265,9 @@ class VerbRunner(object):
         self.verb.execute(self)
 
     def call(self, *args, **kwargs):
+        """
+        Call a verbspace verb with arguments.
+        """
         if not args:
             utility.abort('No arguments were passed to VerbRunner.call().')
         if args[0].find('.') == -1:
@@ -284,6 +295,7 @@ class VerbRunner(object):
             sys.stdout.write('%s\n' % verb.cli_spec.description2.strip())
 
     def _create_package(self, output_dir, name, version, description, force):
+        # Internal method to create a runnable Python package.
         output_path = os.path.join(output_dir, '%s' % name)
         utility.info('Creating compressed executable Python program: %s' % output_path)
         zipper = utility.Zipper(excludes = ['[.]pyc$'])
@@ -302,8 +314,9 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s', package = True, *s
             zipper.close(make_executable = True)
 
     def _run_command(self, verbspace, *args, **kwargs):
+        # Internal method to run a command.
         processor = cli.VoltCLICommandProcessor(verbspace.verbs,
-                                                base_cli_spec.cli_options,
+                                                base_cli_spec.options,
                                                 base_cli_spec.usage,
                                                 '\n'.join((verbspace.description,
                                                            base_cli_spec.description)),
@@ -326,15 +339,18 @@ class VOLT(object):
             if not name.startswith('_'):
                 setattr(self, name, function)
         # For declaring options in command decorators.
-        self.CLIBoolean = cli.CLIBoolean
-        self.CLIValue   = cli.CLIValue
+        self.BooleanOption   = cli.BooleanOption
+        self.StringOption    = cli.StringOption
+        self.IntegerOption   = cli.IntegerOption
+        self.StringArgument  = cli.StringArgument
+        self.IntegerArgument = cli.IntegerArgument
         # Expose voltdbclient symbols for Volt client commands.
-        self.VoltProcedure  = voltdbclient.VoltProcedure
-        self.VoltResponse   = voltdbclient.VoltResponse
-        self.VoltException  = voltdbclient.VoltException
-        self.VoltTable      = voltdbclient.VoltTable
-        self.VoltColumn     = voltdbclient.VoltColumn
-        self.FastSerializer = voltdbclient.FastSerializer
+        self.VoltProcedure   = voltdbclient.VoltProcedure
+        self.VoltResponse    = voltdbclient.VoltResponse
+        self.VoltException   = voltdbclient.VoltException
+        self.VoltTable       = voltdbclient.VoltTable
+        self.VoltColumn      = voltdbclient.VoltColumn
+        self.FastSerializer  = voltdbclient.FastSerializer
         # As a convenience expose the utility module so that commands don't
         # need to import it.
         self.utility = utility
@@ -407,7 +423,7 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
     """
     # Parse the command line.
     processor = cli.VoltCLICommandProcessor(verbspace.verbs,
-                                            base_cli_spec.cli_options,
+                                            base_cli_spec.options,
                                             base_cli_spec.usage,
                                             '\n'.join((verbspace.description,
                                                        base_cli_spec.description)),
@@ -436,7 +452,7 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
     try:
         # Pre-scan for verbose, debug, and dry-run options so that early code
         # can display verbose and debug messages, and obey dry-run.
-        preproc = cli.VoltCLICommandPreprocessor(base_cli_spec.cli_options)
+        preproc = cli.VoltCLICommandPreprocessor(base_cli_spec.options)
         preproc.preprocess(args)
         utility.set_verbose(preproc.get_option('-v', '--verbose') == True)
         utility.set_debug(  preproc.get_option('-d', '--debug'  ) == True)

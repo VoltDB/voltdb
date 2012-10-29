@@ -242,6 +242,7 @@ class PythonSourceFinder(object):
 
     def search_and_execute(self, **syms):
         for scan_loc in self.scan_locs:
+            verbose_info('Scanning "%s" for modules to run...' % scan_loc.path)
             if scan_loc.package:
                 # Load the manifest as needed so that individual files can be
                 # found in package directories. There doesn't seem to be an
@@ -287,7 +288,7 @@ def normalize_list(items, width, filler = None):
     return tuple(output)
 
 #===============================================================================
-def format_table(caption, headings, data_rows):
+def format_table(data_rows, caption = None, headings = None, indent = 0):
 #===============================================================================
     """
     Format a tabular display including an optional caption, optional column
@@ -297,9 +298,10 @@ def format_table(caption, headings, data_rows):
     alignment. Returns the table-formatted string.
     """
     output = []
+    sindent = ' ' * indent
     # Display the caption, if supplied.
     if caption:
-        output.append('-- %s --\n' % caption)
+        output.append('%s-- %s --\n' % (sindent, caption))
     # Add a row for headings, if supplied.
     rows = []
     if headings:
@@ -319,7 +321,7 @@ def format_table(caption, headings, data_rows):
                 widths[icolumn] = max(widths[icolumn], width)
             icolumn += 1
     # Generate the format string and then format the headings and rows.
-    fmt = '  '.join(['%%-%ds' % width for width in widths])
+    fmt = '%s%s' % (sindent, '  '.join(['%%-%ds' % width for width in widths]))
     for row in rows:
         output.append(fmt % normalize_list(row, len(widths), ''))
     return '\n'.join(output)

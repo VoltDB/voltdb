@@ -25,23 +25,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from voltcli import utility
-
-@VOLT.Command(description = 'Configure project settings.',
-              usage       = 'KEY=VALUE ...')
-def config(runner):
-    if not runner.args:
-        utility.abort('At least one argument is required.')
-    bad = []
-    for arg in runner.args:
-        if arg.find('=') == -1:
-            bad.append(arg)
-    if bad:
-        utility.abort('Bad arguments (must be KEY=VALUE format):', bad)
-    for arg in runner.args:
-        key, value = [s.strip() for s in arg.split('=', 1)]
-        # Default to 'volt.' if simple name is given.
-        if key.find('.') == -1:
-            key = 'volt.%s' % key
-        runner.config.set_local(key, value)
-        utility.info('Configuration: %s=%s' % (key, value))
+@VOLT.Server('rejoin',
+             description = 'Rejoin host to the VoltDB cluster.')
+def rejoin(runner):
+    runner.go()

@@ -27,15 +27,13 @@
 
 @VOLT.Client(
     description = 'Update the schema of a running database.',
-    cli_options = (
-        VOLT.CLIValue('-c', '--catalog', 'catalog',
-                      'the new application catalog jar file path',
-                      required = True),
-        VOLT.CLIValue('-d', '--deployment', 'deployment',
-                      'the deployment configuration file path',
-                      default = 'deployment.xml'),
-    )
-)
+    options = (
+        VOLT.StringOption('-d', '--deployment', 'deployment',
+                          'the deployment configuration file path',
+                          default = 'deployment.xml')),
+    arguments = (
+        VOLT.StringArgument('catalog',
+                            'the new application catalog jar file path')))
 def update(runner):
     proc = VOLT.VoltProcedure(runner.client, '@UpdateApplicationCatalog', [
                                     VOLT.FastSerializer.VOLTTYPE_STRING,

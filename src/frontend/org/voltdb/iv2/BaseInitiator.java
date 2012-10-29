@@ -37,6 +37,7 @@ import org.voltdb.MemoryStats;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -103,7 +104,7 @@ public abstract class BaseInitiator implements Initiator
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
+                          VoltDB.START_ACTION startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl)
@@ -115,6 +116,11 @@ public abstract class BaseInitiator implements Initiator
                     getSystemsettings().get("systemsettings").getSnapshotpriority();
             }
 
+            // demote rejoin to create for initiators that aren't rejoinable.
+            if (VoltDB.createForRejoin(startAction) && !isRejoinable()) {
+                startAction = VoltDB.START_ACTION.CREATE;
+            }
+
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -122,7 +128,7 @@ public abstract class BaseInitiator implements Initiator
                                        catalogContext.m_transactionId,
                                        m_partitionId,
                                        numberOfPartitions,
-                                       createForRejoin,
+                                       startAction,
                                        snapshotPriority,
                                        m_initiatorMailbox,
                                        agent,

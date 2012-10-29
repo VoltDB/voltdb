@@ -27,17 +27,21 @@
 
 import os
 
-@VOLT.Command(description = 'Run the VoltDB compiler to build the catalog.',
-              cli_options = (
-                  VOLT.CLIBoolean('-C', '--conditional', 'conditional',
-                                  'build only when the catalog file is missing'),
-                  VOLT.CLIValue('-c', '--catalog', 'catalog',
-                                'the application catalog jar file path',
-                                required = True)))
+@VOLT.Command(
+    description = 'Run the VoltDB compiler to build the catalog.',
+    options = (
+        VOLT.BooleanOption('-C', '--conditional', 'conditional',
+                           'build only when the catalog file is missing')),
+    arguments = (
+        VOLT.StringArgument('classpath',
+                            'additional colon-separated Java CLASSPATH directories'),
+        VOLT.StringArgument('catalog',
+                            'the application catalog jar file path')))
 def compile(runner):
     if not runner.opts.conditional or not os.path.exists(runner.opts.catalog):
         runner.java.execute('org.voltdb.compiler.VoltCompiler',
                             None,
                             runner.project_path,
                             runner.opts.catalog,
-                            *runner.args)
+                            *runner.args,
+                            classpath = runner.opts.classpath)
