@@ -25,6 +25,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from voltcli import utility
+
 @VOLT.Admin_Client(
     description = 'Restore a VoltDB database snapshot.',
     arguments = (
@@ -33,8 +35,7 @@
         VOLT.StringArgument('nonce',
                             'the unique snapshot identifier (nonce)')))
 def restore(runner):
-    proc = VOLT.VoltProcedure(runner.client, '@SnapshotRestore', [
-                                    VOLT.FastSerializer.VOLTTYPE_STRING,
-                                    VOLT.FastSerializer.VOLTTYPE_STRING])
-    response = proc.call(params = (runner.opts.directory, runner.opts.nonce))
-    print response
+    runner.call_sysproc('@SnapshotRestore', [VOLT.FastSerializer.VOLTTYPE_STRING,
+                                             VOLT.FastSerializer.VOLTTYPE_STRING],
+                                            [runner.opts.directory, runner.opts.nonce])
+    utility.info('The snapshot was restored.')

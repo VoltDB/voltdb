@@ -25,8 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from voltcli import utility
+
 @VOLT.Admin_Client(description = 'Pause the VoltDB cluster and switch it to admin mode.')
 def pause(runner):
-    proc = VOLT.VoltProcedure(runner.client, '@Pause')
-    response = proc.call()
-    print response
+    runner.call_sysproc('@Pause', [], [])
+    utility.info('The cluster is paused.')

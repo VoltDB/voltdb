@@ -51,6 +51,5 @@ def save(runner):
     json_opts = '{uripath:"%s",nonce:"%s",block:%s,format:"%s"}' % (
                     uri, runner.opts.nonce, blocking, runner.opts.format)
     utility.debug('@SnapshotSave "%s"' % json_opts)
-    proc = VOLT.VoltProcedure(runner.client, '@SnapshotSave', [VOLT.FastSerializer.VOLTTYPE_STRING])
-    response = proc.call(params = [json_opts])
-    print response
+    runner.call_sysproc('@SnapshotSave', [VOLT.FastSerializer.VOLTTYPE_STRING], [json_opts])
+    utility.info('The snapshot was saved.')

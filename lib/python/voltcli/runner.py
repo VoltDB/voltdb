@@ -285,6 +285,13 @@ class VerbRunner(object):
             args2 = [verb_name] + list(args[1:])
             self._run_command(self.internal_verbspaces[verbspace_name], *args2, **kwargs)
 
+    def call_sysproc(self, name, types, args):
+        proc = voltdbclient.VoltProcedure(self.client, name, types)
+        response = proc.call(params = args)
+        if response.status != 1:
+            utility.abort('@Pause system procedure call failed.', (response,))
+        utility.verbose_info(response)
+
     def _help_verb(self, name):
         # Internal method to display help for a verb
         verb = self.verbspace.verbs[name]

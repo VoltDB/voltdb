@@ -142,7 +142,8 @@ def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
                     if hasattr(msg, '__iter__'):
                         display_messages(msg, f = f, tag = tag, level = level + 1)
                     else:
-                        f.write('%s%s%s\n' % (stag, sindent, str(msg)))
+                        for msg2 in str(msg).split('\n'):
+                            f.write('%s%s%s\n' % (stag, sindent, msg2))
 
 #===============================================================================
 def info(*msgs):

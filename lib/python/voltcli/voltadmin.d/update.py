@@ -25,6 +25,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from voltcli import utility
+
 @VOLT.Client(
     description = 'Update the schema of a running database.',
     options = (
@@ -35,10 +37,9 @@
         VOLT.StringArgument('catalog',
                             'the new application catalog jar file path')))
 def update(runner):
-    proc = VOLT.VoltProcedure(runner.client, '@UpdateApplicationCatalog', [
-                                    VOLT.FastSerializer.VOLTTYPE_STRING,
-                                    VOLT.FastSerializer.VOLTTYPE_STRING])
     catalog    = VOLT.utility.File(runner.opts.catalog).read_hex()
     deployment = VOLT.utility.File(runner.opts.deployment).read()
-    response = proc.call(params = (catalog, deployment))
-    print response
+    runner.call_sysproc('@UpdateApplicationCatalog', [VOLT.FastSerializer.VOLTTYPE_STRING,
+                                                      VOLT.FastSerializer.VOLTTYPE_STRING],
+                                                     [catalog, deployment])
+    utility.info('The catalog update succeeded.')
