@@ -67,14 +67,6 @@ function rejoin() {
         license $LICENSE host $HOST
 }
 
-function serverlegacy() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
-}
-
 # run the client that drives the example
 function client() {
     async-benchmark
