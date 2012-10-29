@@ -217,7 +217,7 @@ class VoltCLICommandPreprocessor(object):
         self.iverb = iopt
         self.outer_opts = list(self.cmdargs[:self.iverb])
         if iopt < len(cmdargs):
-            self.verb = self.cmdargs[self.iverb]
+            self.verb = self.cmdargs[self.iverb].lower()
             self.verb_cmdargs = list(self.cmdargs[self.iverb+1:])
 
     def get_option(self, *names):

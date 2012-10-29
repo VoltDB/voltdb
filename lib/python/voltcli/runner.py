@@ -198,7 +198,7 @@ class VerbRunner(object):
             if args:
                 for name in args:
                     for verb_name in self.verbspace.verb_names:
-                        if verb_name == name:
+                        if verb_name == name.lower():
                             self._help_verb(verb_name)
                             break
                     else:
@@ -274,6 +274,7 @@ class VerbRunner(object):
             self._run_command(self.verbspace, *args, **kwargs)
         else:
             verbspace_name, verb_name = args[0].split('.', 1)
+            verb_name = verb_name.lower()
             if verbspace_name not in self.internal_verbspaces:
                 utility.abort('Unknown name passed to VerbRunner.call(): %s' % verbspace_name)
             verbspace = self.internal_verbspaces[verbspace_name]
