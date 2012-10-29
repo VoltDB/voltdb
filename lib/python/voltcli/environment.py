@@ -145,7 +145,7 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
     # LOG4J configuration
     if 'LOG4J_CONFIG_PATH' not in os.environ:
         for chk_dir in ('$VOLTDB_LIB/../src/frontend', '$VOLTDB_VOLTDB'):
-            path = os.path.join(os.path.realpath(os.path.expandvars(*chk_dir)), 'log4j.xml')
+            path = os.path.join(os.path.realpath(os.path.expandvars(chk_dir)), 'log4j.xml')
             if os.path.exists(path):
                 os.environ['LOG4J_CONFIG_PATH'] = path
                 utility.debug('LOG4J_CONFIG_PATH=>%s' % os.environ['LOG4J_CONFIG_PATH'])
