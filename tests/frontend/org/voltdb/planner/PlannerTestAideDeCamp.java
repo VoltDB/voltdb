@@ -41,7 +41,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
-import org.voltdb.compiler.PartitionMap;
+import org.voltdb.compiler.VoltDDLElementTracker;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -81,8 +81,8 @@ public class PlannerTestAideDeCamp {
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
         //hsql.runDDLFile(schemaPath);
-        PartitionMap partitionMap = new PartitionMap(compiler);
-        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap);
+        VoltDDLElementTracker partitionMap = new VoltDDLElementTracker(compiler);
+        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap, db);
         ddl_compiler.loadSchema(schemaPath);
         ddl_compiler.compileToCatalog(catalog, db);
     }

@@ -343,6 +343,21 @@ public:
         return m_scheme.name;
     }
 
+    void rename(std::string name) {
+        if (m_scheme.name.compare(name) != 0) {
+            m_scheme.name = name;
+            IndexStats *stats = getIndexStats();
+            if (stats) {
+                stats->rename(name);
+            }
+        }
+    }
+
+    const std::string& getId() const
+    {
+        return m_id;
+    }
+
     const TupleSchema *getKeySchema() const
     {
         return m_keySchema;
@@ -369,8 +384,9 @@ protected:
 
     TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme);
 
-    const TableIndexScheme m_scheme;
+    TableIndexScheme m_scheme;
     const TupleSchema * const m_keySchema;
+    const std::string m_id;
 
     // counters
     int m_lookups;

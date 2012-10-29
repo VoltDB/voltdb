@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +29,8 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -70,11 +74,14 @@ public class MpScheduler extends Scheduler
         // never run; the site thread is expected to be told to stop.
         SiteTasker nullTask = new SiteTasker() {
             @Override
-            public void run(SiteProcedureConnection siteConnection) {
+            public void run(SiteProcedureConnection siteConnection)
+            {
             }
 
             @Override
-            public void runForRejoin(SiteProcedureConnection siteConnection) {
+            public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+            throws IOException
+            {
             }
         };
         m_pendingTasks.repair(nullTask, m_iv2Masters);
@@ -85,9 +92,9 @@ public class MpScheduler extends Scheduler
     public void updateReplicas(final List<Long> replicas)
     {
         // Handle startup and promotion semi-gracefully
+        m_iv2Masters.clear();
+        m_iv2Masters.addAll(replicas);
         if (!m_isLeader) {
-            m_iv2Masters.clear();
-            m_iv2Masters.addAll(replicas);
             return;
         }
 
@@ -112,13 +119,6 @@ public class MpScheduler extends Scheduler
                     boolean success = result.getFirst();
                     if (success) {
                         tmLog.info(whoami + "finished repair.");
-                        // We need to update the replicas with the InitiatorMailbox's
-                        // deliver() lock held.  Since we're not calling
-                        // InitiatorMailbox.updateReplicas() here, grab the lock manually
-                        synchronized (initiatorMailbox) {
-                            m_iv2Masters.clear();
-                            m_iv2Masters.addAll(replicaCopy);
-                        }
                     }
                     else {
                         tmLog.info(whoami + "interrupted during repair.  Retrying.");
@@ -131,7 +131,8 @@ public class MpScheduler extends Scheduler
             }
 
             @Override
-            public void runForRejoin(SiteProcedureConnection siteConnection)
+            public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+            throws IOException
             {
                 throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
             }

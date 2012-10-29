@@ -244,6 +244,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     @Override
     public boolean callProcedure(long originalTxnId,
+                                 long originalTimestamp,
                                  ProcedureCallback callback,
                                  String procName,
                                  Object... parameters) throws IOException,
@@ -281,8 +282,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public ClientResponse callProcedure(long originalTxnId, String procName,
-                                        Object... parameters)
+    public ClientResponse callProcedure(long originalTxnId, long originalTimestamp,
+                                        String procName, Object... parameters)
     throws IOException, NoConnectionsException, ProcCallException
     {
         numCalls += 1;

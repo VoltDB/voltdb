@@ -82,14 +82,14 @@ public class TestExportToFileClient extends TestCase {
 
         String simpleSchema =
             "create table blah (" +
-            "ival bigint default 0 not null);";
+            "ival bigint default 0 not null);" +
+            "export table blah;";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
         builder.addPartitionInfo("blah", "ival");
         builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
-        builder.setTableAsExportOnly("blah");
 
         LocalCluster cluster = new LocalCluster("exportAuto.jar",
                 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
@@ -145,14 +145,14 @@ public class TestExportToFileClient extends TestCase {
             @Override
             public void run() {
                 try {
-                    exportClient1.run(5000);
+                    exportClient1.run(10000);
                 } catch (ExportClientException e) {
                     e.printStackTrace();
                 }
             }
         };
         other.start();
-        exportClient2.run(5000);
+        exportClient2.run(10000);
         other.join();
 
         cluster.shutDown();

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME="voter"
+APPNAME="txnid"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -35,8 +35,8 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
-        src/voter/*.java \
-        src/voter/procedures/*.java
+        src/txnIdSelfCheck/*.java \
+        src/txnIdSelfCheck/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -67,24 +67,23 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voter.AsyncBenchmark --help
+    java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.AsyncBenchmark --help
 }
 
 function async-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voter.AsyncBenchmark \
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        txnIdSelfCheck.AsyncBenchmark \
         --displayinterval=1 \
-        --warmup=5 \
         --duration=120 \
-        --servers=localhost:21212 \
-        --multisingleratio=0.01 \
+        --servers=localhost \
+        --multisingleratio=0.001 \
         --windowsize=100000 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --entropy=127 \
         --usecompression=false \
-        --ratelimit=100000 \
+        --ratelimit=20000 \
         --autotune=false \
         --latencytarget=6
 }

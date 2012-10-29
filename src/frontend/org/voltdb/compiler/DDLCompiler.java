@@ -24,12 +24,16 @@ import java.io.IOException;
 import java.io.LineNumberReader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -37,10 +41,12 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
@@ -157,62 +163,80 @@ public class DDLCompiler {
             "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+TABLE\\s+" +
             "([\\w$]+)\\s+COLUMN\\s+([\\w$]+)(?:\\s+PARAMETER\\s+(\\d+))?\\s*;\\z"
             );
+
     /**
+     * CREATE PROCEDURE from Java class statement regex
      * NB supports only unquoted table and column names
-     *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * CREATE -- token
-     * \\s+ -- one or more spaces
-     * PROCEDURE -- token
-     * \\s+ -- one or more spaces
-     * FROM -- token
-     * \\s+ -- one or more spaces
-     * CLASS -- token
-     * \\s+ -- one or more spaces
-     * ([\\w$.]+) -- [class name capture group 1]
-     *    [\\w$]+ -- one or more identifier character
-     *        (letters, numbers, dollar sign ($), underscore (_) or period (.))
-     * \\s* -- 0 or more spaces
-     * ; -- a semicolon
-     * \\z -- end of string
-     * </pre>
+     * Capture groups are tagged as (1) and (2) in comments below.
      */
     static final Pattern procedureClassPattern = Pattern.compile(
-            "(?i)\\ACREATE\\s+PROCEDURE\\s+FROM\\s+CLASS\\s+([\\w$.]+)\\s*;\\z"
+            "(?i)" +                                // ignore case
+            "\\A" +                                 // beginning of statement
+            "CREATE" +                              // CREATE token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "(?:" +                                 // begin optional ALLOW clause
+            "\\s+" +                                //   one or more spaces
+            "ALLOW" +                               //   ALLOW token
+            "\\s+" +                                //   one or more spaces
+            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (1) comma-separated role list
+            ")?" +                                  // end optional ALLOW clause
+            "\\s+" +                                // one or more spaces
+            "FROM" +                                // FROM token
+            "\\s+" +                                // one or more spaces
+            "CLASS" +                               // CLASS token
+            "\\s+" +                                // one or more spaces
+            "([\\w$.]+)" +                          // (2) class name
+            "\\s*" +                                // zero or more spaces
+            ";" +                                   // semi-colon terminator
+            "\\z"                                   // end of statement
             );
 
     /**
+     * CREATE PROCEDURE with single SELECT or DML statement regex
      * NB supports only unquoted table and column names
-     *
-     * Regex Description:
-     * <pre>
-     * (?i) -- ignore case
-     * \\A -- beginning of statement
-     * CREATE -- token
-     * \\s+ -- one or more spaces
-     * PROCEDURE -- token
-     * \\s+ -- one or more spaces
-     * AS -- token
-     * \\s+ -- one or more spaces
-     * ((?:SELECT|INSERT|UPDATE|DELETE)\\s+.+) -- [select/dml statement capture group 1]
-     *     (?:SELECT|INSERT|UPDATE|DELETE) -- select/dml start token [not captured]
-     *         SELECT -- token
-     *         | -- or
-     *         INSERT -- token
-     *         | -- or
-     *         UPDATE -- token
-     *         | -- or
-     *         DELETE -- token
-     *     \\s+ -- one or more spaces
-     *     .+ -- one of more of any characters
-     * ; -- a semicolon
-     * \\z -- end of string
+     * Capture groups are tagged as (1) and (2) in comments below.
      */
     static final Pattern procedureSingleStatementPattern = Pattern.compile(
-            "(?i)\\ACREATE\\s+PROCEDURE\\s+([\\w.$]+)\\s+AS\\s+((?:SELECT|INSERT|UPDATE|DELETE)\\s+.+);\\z"
+            "(?i)" +                                // ignore case
+            "\\A" +                                 // beginning of DDL statement
+            "CREATE" +                              // CREATE token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "\\s+" +                                // one or more spaces
+            "([\\w.$]+)" +                          // (1) procedure name
+            "(?:" +                                 // begin optional ALLOW clause
+            "\\s+" +                                //   one or more spaces
+            "ALLOW" +                               //   ALLOW token
+            "\\s+" +                                //   one or more spaces
+            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (2) comma-separated role list
+            ")?" +                                  // end optional ALLOW clause
+            "\\s+" +                                // one or more spaces
+            "AS" +                                  // AS token
+            "\\s+" +                                // one or more spaces
+            "(" +                                   // (3) begin SELECT or DML statement
+            "(?:SELECT|INSERT|UPDATE|DELETE)" +     //   valid DML start tokens (not captured)
+            "\\s+" +                                //   one or more spaces
+            ".+)" +                                 //   end SELECT or DML statement
+            ";" +                                   // semi-colon terminator
+            "\\z"                                   // end of DDL statement
+            );
+
+    /**
+     * Regex to parse the CREATE ROLE statement with optional WITH clause.
+     * Leave the WITH clause argument as a single group because regexes
+     * aren't capable of producing a variable number of groups.
+     * Capture groups are tagged as (1) and (2) in comments below.
+     */
+    static final Pattern createRolePattern = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "CREATE\\s+ROLE\\s+" +              // CREATE ROLE
+            "([\\w.$]+)" +                      // (1) <role name>
+            "(?:\\s+WITH\\s+" +                 // (start optional WITH clause block)
+                "(\\w+(?:\\s*,\\s*\\w+)*)" +    //   (2) <comma-separated argument string>
+            ")?" +                              // (end optional WITH clause block)
+            ";\\z"                              // (end statement)
             );
 
     /**
@@ -236,39 +260,68 @@ public class DDLCompiler {
     static final Pattern replicatePattern = Pattern.compile(
             "(?i)\\AREPLICATE\\s+TABLE\\s+([\\w$]+)\\s*;\\z"
             );
+
+    /**
+     * EXPORT TABLE statement regex
+     * NB supports only unquoted table names
+     * Capture groups are tagged as (1) in comments below.
+     */
+    static final Pattern exportPattern = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A"  +                            // start statement
+            "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
+            "([\\w.$]+)" +                      // (1) <table name>
+            "\\s*;\\z"                          // (end statement)
+            );
     /**
      * Regex Description:
      *
-     *  if the statement starts with either create procedure, partition, or
-     *  replicate the first match group is set to respectively procedure,
-     *  partition, or replicate
+     *  if the statement starts with either create procedure, partition,
+     *  replicate, or role the first match group is set to respectively procedure,
+     *  partition, replicate, or role.
      * <pre>
      * (?i) -- ignore case
-     * ((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE) -- voltdb ddl
+     * ((?<=\\ACREATE\\s{0,1024})(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE\\AEXPORT) -- voltdb ddl
      *    [capture group 1]
-     *      (?<=\\ACREATE\\s{1,1024})PROCEDURE -- create procedure ddl
+     *      (?<=\\ACREATE\\s{1,1024})(?:PROCEDURE|ROLE) -- create procedure or role ddl
      *          (?<=\\ACREATE\\s{0,1024}) -- CREATE zero-width positive lookbehind
      *              \\A -- beginning of statement
      *              CREATE -- token
      *              \\s{1,1024} -- one or up to 1024 spaces
-     *              PROCEDURE -- procedure token
+     *              (?:PROCEDURE|ROLE) -- procedure or role token
      *      | -- or
      *      \\A -- beginning of statement
      *      -- PARTITION token
      *      | -- or
      *      \\A -- beginning of statement
      *      REPLICATE -- token
+     *      | -- or
+     *      \\A -- beginning of statement
+     *      EXPORT -- token
      * \\s -- one space
      * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE)\\s"
+            "(?i)((?<=\\ACREATE\\s{0,1024})(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT)\\s"
             );
 
     static final String TABLE = "TABLE";
     static final String PROCEDURE = "PROCEDURE";
     static final String PARTITION = "PARTITION";
     static final String REPLICATE = "REPLICATE";
+    static final String EXPORT = "EXPORT";
+    static final String ROLE = "ROLE";
+
+    enum Permission {
+        adhoc,
+        sysproc,
+        defaultproc,
+        export;
+
+        static String toListString() {
+            return Arrays.asList(values()).toString();
+        }
+    }
 
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
@@ -276,7 +329,10 @@ public class DDLCompiler {
     int m_currLineNo = 1;
 
     /// Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
-    final PartitionMap m_partitionMap;
+    final VoltDDLElementTracker m_tracker;
+
+    /// Database Catalog
+    final Database m_database;
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
@@ -289,14 +345,14 @@ public class DDLCompiler {
         int lineNo;
     }
 
-    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, PartitionMap partitionMap) {
+    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker, Database catDB) {
         assert(compiler != null);
         assert(hsql != null);
-        assert(partitionMap != null);
+        assert(tracker != null);
         this.m_hsql = hsql;
         this.m_compiler = compiler;
-        this.m_partitionMap = partitionMap;
-
+        this.m_tracker = tracker;
+        this.m_database = catDB;
     }
 
     /**
@@ -305,7 +361,7 @@ public class DDLCompiler {
      * @throws VoltCompiler.VoltCompilerException
      */
     public void loadSchema(String path)
-    throws VoltCompiler.VoltCompilerException {
+            throws VoltCompiler.VoltCompilerException {
         File inputFile = new File(path);
         FileReader reader = null;
         try {
@@ -378,7 +434,7 @@ public class DDLCompiler {
         int loc = 0;
         do {
             if( ! Character.isJavaIdentifierStart(identifier.charAt(loc))) {
-                String msg = "Bad indentifier in DDL: \"" +
+                String msg = "Unknown indentifier in DDL: \"" +
                         statement.substring(0,statement.length()-1) +
                         "\" contains invalid identifier \"" + identifier + "\"";
                 throw m_compiler.new VoltCompilerException(msg);
@@ -391,8 +447,8 @@ public class DDLCompiler {
     }
 
     /**
-     * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE, and
-     * CREATE PROCEDURE
+     * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
+     * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException
@@ -405,38 +461,56 @@ public class DDLCompiler {
         statement = statement.trim();
 
         // matches if it is the beginning of a voltDB statement
-        Matcher statementMatcher = voltdbStatementPrefixPattern.matcher(statement);;
+        Matcher statementMatcher = voltdbStatementPrefixPattern.matcher(statement);
         if( ! statementMatcher.find()) {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, or PARTITION
+        // either PROCEDURE, REPLICATE, PARTITION, ROLE, or EXPORT
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
-        // matches if it is CREATE PROCEDURE FROM CLASS <class-name>;
+        // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
         statementMatcher = procedureClassPattern.matcher(statement);
         if( statementMatcher.matches()) {
-            String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
+            String clazz = checkIdentifierStart(statementMatcher.group(2), statement);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), clazz);
 
+            // Add roles if specified.
+            if (statementMatcher.group(1) != null) {
+                for (String roleName : StringUtils.split(statementMatcher.group(1), ',')) {
+                    // Don't put the same role in the list more than once.
+                    String roleNameFixed = roleName.trim().toLowerCase();
+                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
+                        descriptor.m_authGroups.add(roleNameFixed);
+                    }
+                }
+            }
+
             // track the defined procedure
-            m_partitionMap.add(descriptor);
+            m_tracker.add(descriptor);
 
             return true;
         }
 
-        // matches if it is CREATE PROCEDURE <proc-name> AS <select-or-dml-statement>
+        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS <select-or-dml-statement>
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
         if( statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
-            String sqlStatement = statementMatcher.group(2);
+            String sqlStatement = statementMatcher.group(3);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), clazz, sqlStatement, null, null, false);
 
-            m_partitionMap.add(descriptor);
+            // Add roles if specified.
+            if (statementMatcher.group(2) != null) {
+                for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
+                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
+                }
+            }
+
+            m_tracker.add(descriptor);
 
             return true;
         }
@@ -454,12 +528,12 @@ public class DDLCompiler {
 
                 if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
-                            "Bad PARTITION DDL statement: \"%s\", " +
+                            "Invalid PARTITION statement: \"%s\", " +
                             "expected syntax: PARTITION TABLE <table> ON COLUMN <column>",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
                 // group(1) -> table, group(2) -> column
-                m_partitionMap.put(
+                m_tracker.put(
                         checkIdentifierStart(statementMatcher.group(1),statement),
                         checkIdentifierStart(statementMatcher.group(2),statement)
                         );
@@ -474,7 +548,7 @@ public class DDLCompiler {
 
                 if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
-                            "Bad PARTITION DDL statement: \"%s\", " +
+                            "Invalid PARTITION statement: \"%s\", " +
                             "expected syntax: PARTITION PROCEDURE <procedure> ON "+
                             "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
@@ -495,7 +569,7 @@ public class DDLCompiler {
                 String partitionInfo = String.format("%s.%s: %s", tableName, columnName, parameterNo);
 
                 // procedureName -> group(1), partitionInfo -> group(2)
-                m_partitionMap.addProcedurePartitionInfoTo(
+                m_tracker.addProcedurePartitionInfoTo(
                         checkIdentifierStart(statementMatcher.group(1), statement),
                         partitionInfo
                         );
@@ -509,10 +583,66 @@ public class DDLCompiler {
         statementMatcher = replicatePattern.matcher(statement);
         if( statementMatcher.matches()) {
             // group(1) -> table
-            m_partitionMap.put(
+            m_tracker.put(
                     checkIdentifierStart(statementMatcher.group(1), statement),
                     null
                     );
+            return true;
+        }
+
+        // matches if it is CREATE ROLE [WITH <permission> [, <permission> ...]]
+        // group 1 is role name
+        // group 2 is comma-separated permission list or null if there is no WITH clause
+        statementMatcher = createRolePattern.matcher(statement);
+        if( statementMatcher.matches()) {
+            String roleName = statementMatcher.group(1);
+            CatalogMap<Group> groupMap = m_database.getGroups();
+            if (groupMap.get(roleName) != null) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Role name \"%s\" in CREATE ROLE statement already exists.",
+                        roleName));
+            }
+            org.voltdb.catalog.Group catGroup = groupMap.add(roleName);
+            if (statementMatcher.group(2) != null) {
+                for (String tokenRaw : StringUtils.split(statementMatcher.group(2), ',')) {
+                    String token = tokenRaw.trim().toLowerCase();
+                    Permission permission;
+                    try {
+                        permission = Permission.valueOf(token);
+                    }
+                    catch (IllegalArgumentException iaex) {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                                "Invalid permission \"%s\" in CREATE ROLE statement: \"%s\", " +
+                                "available permissions: %s", token,
+                                statement.substring(0,statement.length()-1), // remove trailing semicolon
+                                Permission.toListString()));
+                    }
+                    switch( permission) {
+                    case adhoc:
+                        catGroup.setAdhoc(true);
+                        break;
+                    case sysproc:
+                        catGroup.setSysproc(true);
+                        break;
+                    case defaultproc:
+                        catGroup.setDefaultproc(true);
+                        break;
+                    case export:
+                        m_compiler.grantExportToGroup(roleName, m_database);
+                        break;
+                    }
+                }
+            }
+            return true;
+        }
+
+        statementMatcher = exportPattern.matcher(statement);
+        if( statementMatcher.matches()) {
+
+            // check the table portion
+            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            m_tracker.addExportedTable(tableName);
+
             return true;
         }
 
@@ -523,7 +653,7 @@ public class DDLCompiler {
 
         if( PARTITION.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Bad PARTITION DDL statement: \"%s\", " +
+                    "Invalid PARTITION statement: \"%s\", " +
                     "expected syntax: \"PARTITION TABLE <table> ON COLUMN <column>\" or " +
                     "\"PARTITION PROCEDURE <procedure> ON " +
                     "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]\"",
@@ -532,16 +662,30 @@ public class DDLCompiler {
 
         if( REPLICATE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Bad REPLICATE DDL statement: \"%s\", " +
+                    "Invalid REPLICATE statement: \"%s\", " +
                     "expected syntax: REPLICATE TABLE <table>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
         if( PROCEDURE.equals(commandPrefix)) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Bad CREATE PROCEDURE DDL statement: \"%s\", " +
-                    "expected syntax: \"CREATE PROCEDURE FROM CLASS <class-name>\" " +
-                    "or: \"CREATE PROCEDURE <name> AS <single-select-or-dml-statement>\"",
+                    "Invalid CREATE PROCEDURE statement: \"%s\", " +
+                    "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
+                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
+        if( ROLE.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid CREATE ROLE statement: \"%s\", " +
+                    "expected syntax: CREATE ROLE <role>",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
+        if( EXPORT.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid EXPORT TABLE statement: \"%s\", " +
+                    "expected syntax: EXPORT TABLE <table>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
@@ -812,6 +956,9 @@ public class DDLCompiler {
         //  then this is reversed
         table.setIsreplicated(true);
 
+        // map of index replacements for later constraint fixup
+        Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+
         ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
         for (VoltXMLElement subNode : node.children) {
 
@@ -830,16 +977,30 @@ public class DDLCompiler {
             }
 
             if (subNode.name.equals("indexes")) {
+                // do non-system indexes first so they get priority when the compiler
+                // starts throwing out duplicate indexes
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index"))
-                        addIndexToCatalog(table, indexNode);
+                    if (indexNode.name.equals("index") == false) continue;
+                    String indexName = indexNode.attributes.get("name");
+                    if (indexName.startsWith("SYS_IDX_SYS_") == false) {
+                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                    }
+                }
+
+                // now do system indexes
+                for (VoltXMLElement indexNode : subNode.children) {
+                    if (indexNode.name.equals("index") == false) continue;
+                    String indexName = indexNode.attributes.get("name");
+                    if (indexName.startsWith("SYS_IDX_SYS_") == true) {
+                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                    }
                 }
             }
 
             if (subNode.name.equals("constraints")) {
                 for (VoltXMLElement constraintNode : subNode.children) {
                     if (constraintNode.name.equals("constraint"))
-                        addConstraintToCatalog(table, constraintNode);
+                        addConstraintToCatalog(table, constraintNode, indexReplacementMap);
                 }
             }
         }
@@ -948,7 +1109,48 @@ public class DDLCompiler {
         columnMap.put(name, column);
     }
 
-    void addIndexToCatalog(Table table, VoltXMLElement node) throws VoltCompilerException {
+    /**
+     * Return true if the two indexes are identical with a different name.
+     */
+    boolean indexesAreDups(Index idx1, Index idx2) {
+        // same attributes?
+        if (idx1.getType() != idx2.getType()) {
+            return false;
+        }
+        if (idx1.getCountable() != idx2.getCountable()) {
+            return false;
+        }
+        if (idx1.getUnique() != idx2.getUnique()) {
+            return false;
+        }
+
+        // same column count?
+        if (idx1.getColumns().size() != idx2.getColumns().size()) {
+            return false;
+        }
+
+        // comute the base table order for idx1
+        int[] idx1baseTableOrder = new int[idx1.getColumns().size()];
+        for (ColumnRef cref : idx1.getColumns()) {
+            int index = cref.getIndex();
+            int baseTableIndex = cref.getColumn().getIndex();
+            idx1baseTableOrder[index] = baseTableIndex;
+        }
+
+        // comute the base table order for idx2
+        int[] idx2baseTableOrder = new int[idx2.getColumns().size()];
+        for (ColumnRef cref : idx2.getColumns()) {
+            int index = cref.getIndex();
+            int baseTableIndex = cref.getColumn().getIndex();
+            idx2baseTableOrder[index] = baseTableIndex;
+        }
+
+        return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
+    }
+
+    void addIndexToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+            throws VoltCompilerException
+    {
         assert node.name.equals("index");
 
         String name = node.attributes.get("name");
@@ -1062,6 +1264,32 @@ public class DDLCompiler {
 
         index.setUnique(unique);
 
+        // check if an existing index duplicates another index (if so, drop it)
+        // note that this is an exact dup... uniqueness, counting-ness and type
+        // will make two indexes different
+        for (Index existingIndex : table.getIndexes()) {
+            // skip thineself
+            if (existingIndex == index) {
+                 continue;
+            }
+
+            if (indexesAreDups(existingIndex, index)) {
+                // replace any constraints using one index with the other
+                //for () TODO
+                // get ready for replacements from constraints created later
+                indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
+
+                // add a warning but don't fail
+                String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
+                        index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
+                m_compiler.addWarn(msg);
+
+                // drop the index and GTFO
+                table.getIndexes().delete(index.getTypeName());
+                return;
+            }
+        }
+
         String msg = "Created index: " + name + " on table: " +
                     table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
 
@@ -1088,7 +1316,9 @@ public class DDLCompiler {
      * @param node
      * @throws VoltCompilerException
      */
-    void addConstraintToCatalog(Table table, VoltXMLElement node) throws VoltCompilerException {
+    void addConstraintToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+            throws VoltCompilerException
+    {
         assert node.name.equals("constraint");
 
         String name = node.attributes.get("name");
@@ -1132,6 +1362,12 @@ public class DDLCompiler {
         Constraint catalog_const = null;
         if (node.attributes.get("index") != null) {
             String indexName = node.attributes.get("index");
+
+            // handle replacements from duplicate index pruning
+            if (indexReplacementMap.containsKey(indexName)) {
+                indexName = indexReplacementMap.get(indexName);
+            }
+
             Index catalog_index = indexMap.get(indexName);
 
             // if the constraint name contains index type hints, exercise them (giant hack)

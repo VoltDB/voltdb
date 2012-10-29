@@ -21,21 +21,15 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * This samples uses the native asynchronous request processing protocol
- * to post requests to the VoltDB server, thus leveraging to the maximum
- * VoltDB's ability to run requests in parallel on multiple database
- * partitions, and multiple servers.
+ * This samples uses multiple threads to post synchronous requests to the
+ * VoltDB server, simulating multiple client application posting
+ * synchronous requests to the database, using the native VoltDB client
+ * library.
  *
- * While asynchronous processing is (marginally) more convoluted to work
- * with and not adapted to all workloads, it is the preferred interaction
- * model to VoltDB as it guarantees blazing performance.
- *
- * Because there is a risk of 'firehosing' a database cluster (if the
- * cluster is too slow (slow or too few CPUs), this sample performs
- * auto-tuning to target a specific latency (5ms by default).
- * This tuning process, as demonstrated here, is important and should be
- * part of your pre-launch evaluation so you can adequately provision your
- * VoltDB cluster with the number of servers required for your needs.
+ * While synchronous processing can cause performance bottlenecks (each
+ * caller waits for a transaction answer before calling another
+ * transaction), the VoltDB cluster at large is still able to perform at
+ * blazing speeds when many clients are connected to it.
  */
 
 package voter;
@@ -43,6 +37,7 @@ package voter;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
@@ -54,11 +49,16 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
-import org.voltdb.client.ProcedureCallback;
 
-import voter.procedures.updateReplicated;
+import voter.procedures.Vote;
 
-public class AsyncBenchmark {
+public class AdHocBenchmark {
+
+    // Initialize some common constants and variables
+    static final String CONTESTANT_NAMES_CSV =
+            "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway," +
+            "Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster," +
+            "Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
@@ -69,16 +69,24 @@ public class AsyncBenchmark {
     final VoterConfig config;
     // Reference to the database connection we will use
     final Client client;
+    // Phone number generator
+    PhoneCallGenerator switchboard;
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
     long benchmarkStartTS;
+    // Flags to tell the worker threads to stop or go
+    AtomicBoolean warmupComplete = new AtomicBoolean(false);
+    AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
-    final PayloadProcessor processor;
 
-    final AtomicLong previousReplicated = new AtomicLong(0);
+    // voter benchmark state
+    AtomicLong acceptedVotes = new AtomicLong(0);
+    AtomicLong badContestantVotes = new AtomicLong(0);
+    AtomicLong badVoteCountVotes = new AtomicLong(0);
+    AtomicLong failedVotes = new AtomicLong(0);
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -90,59 +98,35 @@ public class AsyncBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 20;
+        int duration = 120;
 
         @Option(desc = "Warmup duration in seconds.")
-        int warmup = 2;
+        int warmup = 5;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
-        @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 100000;
+        @Option(desc = "Number of contestants in the voting contest (from 1 to 10).")
+        int contestants = 6;
 
-        @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = false;
-
-        @Option(desc = "Server-side latency target for auto-tuning.")
-        int latencytarget = 5;
-
-        @Option(desc = "Multi/single ratio.")
-        double multisingleratio = 0.1;
-
-        @Option(desc = "Number of rows to keep in the database as a moving window")
-        long windowsize = 100000;
-
-        @Option(desc = "Minimum value size in bytes.")
-        int minvaluesize = 1024;
-
-        @Option(desc = "Maximum value size in bytes.")
-        int maxvaluesize = 1024;
-
-        @Option(desc = "Number of values considered for each value byte.")
-        int entropy = 127;
-
-        @Option(desc = "Compress values on the client side.")
-        boolean usecompression= false;
+        @Option(desc = "Maximum number of votes cast per voter.")
+        int maxvotes = 2;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
+
+        @Option(desc = "Number of concurrent threads synchronously calling procedures.")
+        int threads = 40;
 
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
+            if (duration < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
-            if (multisingleratio < 0) exitWithMessageAndUsage("multisingleratio must be within [0, 1]");
-            if (multisingleratio > 1) exitWithMessageAndUsage("multisingleratio must be within [0, 1]");
-            if (windowsize <= 0) exitWithMessageAndUsage("windowsize must be > 0");
-
-            if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
-            if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
-            if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
-            if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
+            if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
+            if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
+            if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
         }
     }
 
@@ -154,7 +138,7 @@ public class AsyncBenchmark {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
-            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
+            if (benchmarkComplete.get() == false) {
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
             }
         }
@@ -166,24 +150,16 @@ public class AsyncBenchmark {
      *
      * @param config Parsed & validated CLI options.
      */
-    public AsyncBenchmark(VoterConfig config) {
+    public AdHocBenchmark(VoterConfig config) {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-        if (config.autotune) {
-            clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
-        }
-        else {
-            clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
-        }
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
-        processor = new PayloadProcessor(config.minvaluesize, config.maxvaluesize,
-                                         config.entropy, config.usecompression);
+        switchboard = new PhoneCallGenerator(config.contestants);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
@@ -287,8 +263,23 @@ public class AsyncBenchmark {
                          HORIZONTAL_RULE +
                          " Voting Results\n" +
                          HORIZONTAL_RULE +
-                         "\nA total of %d votes were received...\n\n";
-        System.out.printf(display, stats.getInvocationsCompleted());
+                         "\nA total of %d votes were received...\n" +
+                         " - %,9d Accepted\n" +
+                         " - %,9d Rejected (Invalid Contestant)\n" +
+                         " - %,9d Rejected (Maximum Vote Count Reached)\n" +
+                         " - %,9d Failed (Transaction Error)\n\n";
+        System.out.printf(display, stats.getInvocationsCompleted(),
+                acceptedVotes.get(), badContestantVotes.get(),
+                badVoteCountVotes.get(), failedVotes.get());
+
+        // 2. Voting results
+        VoltTable result = client.callProcedure("Results").getResults()[0];
+
+        System.out.println("Contestant Name\t\tVotes Received");
+        while(result.advanceRow()) {
+            System.out.printf("%s\t\t%,14d\n", result.getString(0), result.getLong(2));
+        }
+        System.out.printf("\nThe Winner is: %s\n\n", result.fetchRow(0).getString(0));
 
         // 3. Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -296,7 +287,7 @@ public class AsyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
+        System.out.printf("Average latency:               %,9.2fd ms\n", stats.getAverageLatency());
         System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
         System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
 
@@ -304,53 +295,90 @@ public class AsyncBenchmark {
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        if (config.autotune) {
-            System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
-        }
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
     }
 
-    private static void crash(String msg) {
-        System.err.println(msg);
-        System.exit(-1);
-    }
-
     /**
-     * Callback to handle the response to a stored procedure call.
-     * Tracks response types.
+     * While <code>benchmarkComplete</code> is set to false, run as many
+     * Ad Hoc SQL statements as possible and record the results.
      *
      */
-    class updateReplicatedCallback implements ProcedureCallback {
+    class VoterThread implements Runnable {
+        public static final long VOTE_SUCCESSFUL = 0;
+        public static final long ERR_INVALID_CONTESTANT = 1;
+        public static final long ERR_VOTER_OVER_VOTE_LIMIT = 2;
+
+        private long doVote(PhoneCallGenerator.PhoneCall call)
+        {
+            // Issue the voting logic via ad hoc queries vs stored procedure invocations.
+            try {
+                // Make sure the contestant exists  TODO: cache contestants on client startup.
+                String sql = "SELECT contestant_number FROM contestants WHERE contestant_number = "+call.contestantNumber+";";
+                ClientResponse resp = client.callProcedure("@AdHoc", sql);
+                VoltTable result = resp.getResults()[0];
+                if (result.getRowCount() == 0)
+                    return ERR_INVALID_CONTESTANT;
+
+                sql = "SELECT state FROM area_code_state WHERE area_code = " + (call.phoneNumber / 10000000l) + ";";
+                resp = client.callProcedure("@AdHoc", sql);
+                result = resp.getResults()[0];
+                String state = (result.getRowCount() > 0) ? result.fetchRow(0).getString(0) : "XX";
+
+                // Validate that the phone number hasn't voted too many times.  The assumption here is that a phonenumber (the device) can only vote serially, not in parallel.
+                // This logic should be performed in a stored procedure (e.g. within a transaction) to prevent multiple votes concurrently from the same device (phone number).
+
+                sql = "SELECT num_votes FROM v_votes_by_phone_number WHERE phone_number = "+call.phoneNumber+";";
+                resp = client.callProcedure("@AdHoc", sql);
+                result = resp.getResults()[0];
+                if ((result.getRowCount() == 1) && (result.asScalarLong() >= config.maxvotes))
+                    return ERR_VOTER_OVER_VOTE_LIMIT;
+
+                // TODO: Batch the prior 2 (or 3, if we don't cache contestants) SQL statements.
+
+                // Log the vote.
+                sql = "INSERT INTO votes (phone_number, state, contestant_number) VALUES ("+call.phoneNumber+", '"+state+"', "+call.contestantNumber+");";
+                resp = client.callProcedure("@AdHoc", sql);
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+            }
+
+            // Set the return value to 0: successful vote
+            return VOTE_SUCCESSFUL;
+        }
+
         @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            if (response.getStatus() == ClientResponse.SUCCESS) {
-                long txnId = response.getResults()[0].asScalarLong();
-                long previous = previousReplicated.getAndSet(txnId);
-                if (txnId <= previous) {
-                    crash("updateReplicated executed out of order");
+        public void run() {
+            while (warmupComplete.get() == false) {
+               doVote(switchboard.receive());
+            }
+
+            while (benchmarkComplete.get() == false) {
+                try {
+                    long resultCode = doVote(switchboard.receive());
+
+                    if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
+                        badContestantVotes.incrementAndGet();
+                    }
+                    else if (resultCode == Vote.ERR_VOTER_OVER_VOTE_LIMIT) {
+                        badVoteCountVotes.incrementAndGet();
+                    }
+                    else {
+                        assert(resultCode == Vote.VOTE_SUCCESSFUL);
+                        acceptedVotes.incrementAndGet();
+                    }
+                }
+                catch (Exception e) {
+                    failedVotes.incrementAndGet();
                 }
             }
-            else if (response.getAppStatus() != updateReplicated.AbortStatus.NORMAL.ordinal()) {
-                crash(response.getStatusString());
-            }
-        }
-    }
 
-    /**
-     * Callback to handle the response to a stored procedure call.
-     * Tracks response types.
-     *
-     */
-    class doTxnCallback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            if (response.getStatus() != ClientResponse.SUCCESS) {
-                crash(response.getStatusString());
-            }
         }
+
     }
 
     /**
@@ -368,38 +396,26 @@ public class AsyncBenchmark {
         connect(config.servers);
 
         // initialize using synchronous call
-        System.out.println("\nPopulating Static Table\n");
-        client.callProcedure("Initialize");
-
-        ClientResponse rowResp = client.callProcedure("getLastRow");
-        VoltTable[] rowResults = rowResp.getResults();
-        assert(rowResp.getStatus() == ClientResponse.SUCCESS);
-        assert(rowResults.length == 1);
-        long count = 0;
-        if (rowResults[0].getRowCount() == 1) {
-            count = rowResults[0].asScalarLong() + 1;
-        }
+        System.out.println("\nPopulating Static Tables\n");
+        client.callProcedure("Initialize", config.contestants, CONTESTANT_NAMES_CSV);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
-        java.util.Random r = new java.util.Random(2);
+        // create/start the requested number of threads
+        Thread[] voterThreads = new Thread[config.threads];
+        for (int i = 0; i < config.threads; ++i) {
+            voterThreads[i] = new Thread(new VoterThread());
+            voterThreads[i].start();
+        }
 
         // Run the benchmark loop for the requested warmup time
-        // The throughput may be throttled depending on client configuration
         System.out.println("Warming up...");
-        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-        while (warmupEndTime > System.currentTimeMillis()) {
-            // asynchronously call the "Vote" procedure
-            client.callProcedure(new doTxnCallback(),
-                                 "doTxn",
-                                 (byte)r.nextInt(127),
-                                 count,
-                                 count > config.windowsize ? count - config.windowsize : 0,
-                                 processor.generateForStore().getStoreValue());
-            count++;
-        }
+        Thread.sleep(1000l * config.warmup);
+
+        // signal to threads to end the warmup phase
+        warmupComplete.set(true);
 
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
@@ -409,32 +425,23 @@ public class AsyncBenchmark {
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
 
-        // Run the benchmark loop for the requested duration
-        // The throughput may be throttled depending on client configuration
+        // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");
-        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-        while (benchmarkEndTime > System.currentTimeMillis()) {
-            if (r.nextDouble() < config.multisingleratio) {
-                // update the replicated table
-                client.callProcedure(new updateReplicatedCallback(),
-                                     "updateReplicated");
-            } else {
-                // asynchronously call the "doTxn" procedure
-                client.callProcedure(new doTxnCallback(),
-                                     "doTxn",
-                                     (byte)r.nextInt(127),
-                                     count,
-                                     count > config.windowsize ? count - config.windowsize : 0,
-                                     processor.generateForStore().getStoreValue());
-                count++;
-            }
-        }
+        Thread.sleep(1000l * config.duration);
+
+        // stop the threads
+        benchmarkComplete.set(true);
 
         // cancel periodic stats printing
         timer.cancel();
 
         // block until all outstanding txns return
         client.drain();
+
+        // join on the threads
+        for (Thread t : voterThreads) {
+            t.join();
+        }
 
         // print the summary results
         printResults();
@@ -453,9 +460,9 @@ public class AsyncBenchmark {
     public static void main(String[] args) throws Exception {
         // create a configuration from the arguments
         VoterConfig config = new VoterConfig();
-        config.parse(AsyncBenchmark.class.getName(), args);
+        config.parse(SyncBenchmark.class.getName(), args);
 
-        AsyncBenchmark benchmark = new AsyncBenchmark(config);
+        AdHocBenchmark benchmark = new AdHocBenchmark(config);
         benchmark.runBenchmark();
     }
 }

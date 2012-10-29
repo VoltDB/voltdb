@@ -439,7 +439,11 @@ class Distributer {
                     ") was lost before a response was received");
                 for (final CallbackBookeeping callBk : m_callbacks.values()) {
                     try {
-                        callBk.callback.clientCallback(r);
+                        //Client affinity doesn't register callbacks so you can have an entry
+                        //with a null callback
+                        if (callBk.callback != null) {
+                            callBk.callback.clientCallback(r);
+                        }
                     } catch (Exception e) {
                         uncaughtException(callBk.callback, r, e);
                     }
@@ -526,8 +530,7 @@ class Distributer {
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1,
-                        null);
+                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;

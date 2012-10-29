@@ -187,6 +187,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public ClientResponse callProcedure(
             long originalTxnId,
+            long originalTimestamp,
             String procName,
             Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException
@@ -194,7 +195,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
+            new ProcedureInvocation(originalTxnId, originalTimestamp,
+                                    m_handle.getAndIncrement(),
                                     procName, parameters);
         return callProcedure(cb, invocation);
     }
@@ -250,6 +252,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * then it will return immediately. Check
      * the return value to determine if queuing actually took place.
      *
+     * @param originalTxnId The original txnId generated for this invocation.
+     * @param originalTimestamp The original timestamp associated with this invocation.
      * @param callback ProcedureCallback that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
@@ -259,6 +263,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(
             long originalTxnId,
+            long originalTimestamp,
             ProcedureCallback callback,
             String procName,
             Object... parameters)
@@ -267,7 +272,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             ((ProcedureArgumentCacher)callback).setArgs(parameters);
         }
         ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
+            new ProcedureInvocation(originalTxnId, originalTimestamp,
+                                    m_handle.getAndIncrement(),
                                     procName, parameters);
         return private_callProcedure(callback, 0, invocation);
     }

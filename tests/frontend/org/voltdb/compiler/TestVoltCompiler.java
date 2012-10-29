@@ -32,15 +32,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.ProcInfoData;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
@@ -1652,6 +1659,92 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
+    public void testDDLCompilerTwoIdenticalIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum1 on t(id,num);\n" +
+                "create index idx_t_idnum2 on t(id,num);";
+
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.hasErrorsOrWarnings());
+    }
+
+    public void testDDLCompilerSameNameIndexesOnTwoTables()
+    {
+        final String s =
+                "create table t1(id integer not null, num integer not null);\n" +
+                "create table t2(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum on t1(id,num);\n" +
+                "create index idx_t_idnum on t2(id,num);";
+
+        // if this test ever fails, it's worth figuring out why
+        // When written, HSQL wouldn't allow two indexes with the same name,
+        //  even across tables.
+        compileForDDLTest(getPathForSchema(s), false);
+    }
+
+    public void testDDLCompilerTwoCoveringIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum_hash on t(id,num);\n" +
+                "create index idx_t_idnum_tree on t(id,num);";
+
+        compileForDDLTest(getPathForSchema(s), true);
+    }
+
+    public void testDDLCompilerTwoSwappedOrderIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum_a on t(num,id);\n" +
+                "create index idx_t_idnum_b on t(id,num);";
+
+        final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertEquals(false, c.hasErrorsOrWarnings());
+    }
+
+    public void testDDLCompilerDropOneOfThreeIndexes()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum_a on t(num,id);\n" +
+                "create index idx_t_idnum_b on t(id,num);\n" +
+                "create index idx_t_idnum_c on t(id,num);\n";
+
+        final VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertEquals(true, c.hasErrorsOrWarnings());
+        int foundCount = 0;
+        for (VoltCompiler.Feedback f : c.m_warnings) {
+            if (f.message.contains("Dropping index")) {
+                foundCount++;
+            }
+        }
+        assertEquals(1, foundCount);
+    }
+
+    public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create unique index idx_t_idnum_unique on t(id,num);\n" +
+                "create index idx_t_idnum on t(id,num);";
+
+        compileForDDLTest(getPathForSchema(s), true);
+    }
+
+    public void testDDLCompilerTwoIndexesWithSameName()
+    {
+        final String s =
+                "create table t(id integer not null, num integer not null);\n" +
+                "create index idx_t_idnum on t(id);\n" +
+                "create index idx_t_idnum on t(id,num);";
+
+        compileForDDLTest(getPathForSchema(s), false);
+    }
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
@@ -1837,9 +1930,9 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+        expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
-                ", expected syntax: \"CREATE PROCEDURE FROM CLASS <class-name>\"";
+                ", expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -1848,7 +1941,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
+        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
@@ -1860,7 +1953,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0;"
                 );
-        expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
+        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
@@ -1872,7 +1965,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello;"
                 );
-        expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
+        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
@@ -1884,7 +1977,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROGEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello;"
                 );
-        expectedError = "Bad PARTITION DDL statement: " +
+        expectedError = "Invalid PARTITION statement: " +
                 "\"PARTITION PROGEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER " +
                 "COLUMN PKEY PARAMETER hello\", expected syntax: \"PARTITION TABLE <table> " +
                 "ON COLUMN <column>\" or \"PARTITION PROCEDURE <procedure> ON " +
@@ -1897,9 +1990,9 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
                 );
-        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+        expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
-                ", expected syntax: \"CREATE PROCEDURE FROM CLASS <class-name>\"";
+                ", expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -1917,7 +2010,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN;"
                 );
-        expectedError = "Bad indentifier in DDL: \"PARTITION TABLE 1PKEY_INTEGER ON COLUMN PKEY\" " +
+        expectedError = "Unknown indentifier in DDL: \"PARTITION TABLE 1PKEY_INTEGER ON COLUMN PKEY\" " +
                 "contains invalid identifier \"1PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -1927,7 +2020,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \"PARTITION TABLE PKEY_INTEGER ON COLUMN 2PKEY\" " +
+        expectedError = "Unknown indentifier in DDL: \"PARTITION TABLE PKEY_INTEGER ON COLUMN 2PKEY\" " +
                 "contains invalid identifier \"2PKEY\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -1937,7 +2030,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS 0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS 0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger" +
                 "\" contains invalid identifier \"0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1948,7 +2041,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger" +
                 "\" contains invalid identifier \"org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1959,7 +2052,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger" +
                 "\" contains invalid identifier \"org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1970,7 +2063,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE 5NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE 5NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY" +
                 "\" contains invalid identifier \"5NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1981,7 +2074,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE 6PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE 6PKEY_INTEGER COLUMN PKEY" +
                 "\" contains invalid identifier \"6PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1992,7 +2085,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN 7PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN 7PKEY" +
                 "\" contains invalid identifier \"7PKEY\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -2003,7 +2096,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
+        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
@@ -2020,7 +2113,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+        expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -2030,7 +2123,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 0;"
                 );
-        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+        expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -2067,7 +2160,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
                 "PARTITION PROCEDURE 7Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Bad indentifier in DDL: \""+
+        expectedError = "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?" +
                 "\" contains invalid identifier \"7Foo\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -2170,6 +2263,313 @@ public class TestVoltCompiler extends TestCase {
             final Procedure addBook = db.getProcedures().get("NotAnnotatedAddBook");
             assertEquals(true, addBook.getSinglepartition());
     }
+
+    class TestRole {
+        final String name;
+        boolean adhoc = false;
+        boolean sysproc = false;
+        boolean defaultproc = false;
+        boolean export = false;
+
+        public TestRole(String name) {
+            this.name = name;
+        }
+
+        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc) {
+            this.name = name;
+            this.adhoc = adhoc;
+            this.sysproc = sysproc;
+            this.defaultproc = defaultproc;
+        }
+
+        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc, boolean export) {
+            this.name = name;
+            this.adhoc = adhoc;
+            this.sysproc = sysproc;
+            this.defaultproc = defaultproc;
+            this.export = export;
+        }
+    }
+
+    private void checkRoleXMLAndDDL(String rolesElem, String ddl, String errorRegex, TestRole... roles) throws Exception {
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl != null ? ddl : "");
+        final String schemaPath = schemaFile.getPath();
+        String rolesBlock = (rolesElem != null ? String.format("<roles>%s</roles>", rolesElem) : "");
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas>" +
+            "<schema path='" + schemaPath + "' />" +
+            "</schemas>" +
+            rolesBlock +
+            "<procedures/>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compile(projectPath, testout_jar);
+        String error = (success || compiler.m_errors.size() == 0
+                            ? ""
+                            : compiler.m_errors.get(compiler.m_errors.size()-1).message);
+        if (errorRegex == null) {
+            assertTrue(String.format("Expected success\nXML: %s\nDDL: %s\nERR: %s", rolesElem, ddl, error), success);
+
+            Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
+            CatalogMap<Group> groups = db.getGroups();
+            CatalogMap<Connector> connectors = db.getConnectors();
+            if (connectors.get("0") == null ) {
+                connectors.add("0");
+            }
+            CatalogMap<GroupRef> authGroups = connectors.get("0").getAuthgroups();
+
+            assertNotNull(groups);
+            assertNotNull(authGroups);
+            assertEquals(roles.length, groups.size());
+
+            for (TestRole role : roles) {
+                Group group = groups.get(role.name);
+                assertNotNull(String.format("Missing role \"%s\"", role.name), group);
+                assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
+                assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
+                assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
+
+                boolean allowedToExport = authGroups.get(role.name) != null;
+                assertEquals(String.format("Role \"%s\" export flag mismatch:", role.name), role.export, allowedToExport);
+            }
+        }
+        else {
+            assertFalse(String.format("Expected error (\"%s\")\nXML: %s\nDDL: %s", errorRegex, rolesElem, ddl), success);
+            assertFalse("Expected at least one error message.", error.isEmpty());
+            Matcher m = Pattern.compile(errorRegex).matcher(error);
+            assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
+        }
+    }
+
+    private void goodRoleDDL(String ddl, TestRole... roles) throws Exception {
+        checkRoleXMLAndDDL(null, ddl, null, roles);
+    }
+
+    private void badRoleDDL(String ddl, String errorRegex) throws Exception {
+        checkRoleXMLAndDDL(null, ddl, errorRegex);
+    }
+
+    public void testRoleXML() throws Exception {
+        checkRoleXMLAndDDL("<role name='r1'/>", null, null, new TestRole("r1"));
+    }
+
+    public void testBadRoleXML() throws Exception {
+        checkRoleXMLAndDDL("<rolex name='r1'/>", null, ".*rolex.*[{]role[}].*expected.*");
+        checkRoleXMLAndDDL("<role name='r1'/>", "create role r1;", ".*already exists.*");
+    }
+
+    public void testRoleDDL() throws Exception {
+        goodRoleDDL("create role r1;", new TestRole("r1"));
+        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false,false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false,false));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true, false));
+        goodRoleDDL("create role r1 with export;", new TestRole("r1", false, false, false, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc,export;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc ,sysproc, defaultproc, export;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false,false));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,Export;", new TestRole("r1", true, true, true, true));
+    }
+
+    public void testBadRoleDDL() throws Exception {
+        badRoleDDL("create role r1", ".*no semicolon.*");
+        badRoleDDL("create role r1;create role r1;", ".*already exists.*");
+        badRoleDDL("create role r1 with ;", ".*Invalid CREATE ROLE statement.*");
+        badRoleDDL("create role r1 with blah;", ".*Invalid permission \"blah\".*");
+        badRoleDDL("create role r1 with adhoc sysproc;", ".*Invalid CREATE ROLE statement.*");
+        badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"blah\".*");
+    }
+
+    private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
+        String schemaDDL =
+            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash)); " +
+            "partition table books on column cash;" +
+            StringUtils.join(ddl, " ");
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schemaDDL.toString());
+        String schemaPath = schemaFile.getPath();
+
+        String projectXML =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "</database>" +
+            "</project>";
+
+        File projectFile = VoltProjectBuilder.writeStringToTempFile(projectXML);
+        String projectPath = projectFile.getPath();
+
+        VoltCompiler compiler = new VoltCompiler();
+
+        boolean success = compiler.compile(projectPath, testout_jar);
+        String error = (success || compiler.m_errors.size() == 0
+                ? ""
+                : compiler.m_errors.get(compiler.m_errors.size()-1).message);
+        if (errorRegex == null) {
+            assertTrue(String.format("Expected success\nDDL: %s\n%s", ddl, error), success);
+            Catalog cat = compiler.getCatalog();
+            return cat.getClusters().get("cluster").getDatabases().get("database");
+        }
+        else {
+            assertFalse(String.format("Expected error (\"%s\")\nDDL: %s", errorRegex, ddl), success);
+            assertFalse("Expected at least one error message.", error.isEmpty());
+            Matcher m = Pattern.compile(errorRegex).matcher(error);
+            assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
+            return null;
+        }
+    }
+
+    private Database goodDDLAgainstSimpleSchema(String... ddl) throws Exception {
+        return checkDDLAgainstSimpleSchema(null, ddl);
+    }
+
+    private void badDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
+        checkDDLAgainstSimpleSchema(errorRegex, ddl);
+    }
+
+    public void testGoodCreateProcedureWithAllow() throws Exception {
+        Database db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create procedure p1 allow r1 as select * from books;");
+        Procedure proc = db.getProcedures().get("p1");
+        assertNotNull(proc);
+        CatalogMap<GroupRef> groups = proc.getAuthgroups();
+        assertEquals(1, groups.size());
+        assertNotNull(groups.get("r1"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create role r2;",
+                "create procedure p1 allow r1, r2 as select * from books;");
+        proc = db.getProcedures().get("p1");
+        assertNotNull(proc);
+        groups = proc.getAuthgroups();
+        assertEquals(2, groups.size());
+        assertNotNull(groups.get("r1"));
+        assertNotNull(groups.get("r2"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create procedure allow r1 from class org.voltdb.compiler.procedures.AddBook;");
+        proc = db.getProcedures().get("AddBook");
+        assertNotNull(proc);
+        groups = proc.getAuthgroups();
+        assertEquals(1, groups.size());
+        assertNotNull(groups.get("r1"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create role r2;",
+                "create procedure allow r1,r2 from class org.voltdb.compiler.procedures.AddBook;");
+        proc = db.getProcedures().get("AddBook");
+        assertNotNull(proc);
+        groups = proc.getAuthgroups();
+        assertEquals(2, groups.size());
+        assertNotNull(groups.get("r1"));
+        assertNotNull(groups.get("r2"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "create procedure allow r1,r1 from class org.voltdb.compiler.procedures.AddBook;");
+        proc = db.getProcedures().get("AddBook");
+        assertNotNull(proc);
+        groups = proc.getAuthgroups();
+        assertEquals(1, groups.size());
+        assertNotNull(groups.get("r1"));
+    }
+
+    public void testBadCreateProcedureWithAllow() throws Exception {
+        badDDLAgainstSimpleSchema(".*expected syntax.*",
+                "create procedure p1 allow as select * from books;");
+        badDDLAgainstSimpleSchema(".*expected syntax.*",
+                "create procedure p1 allow a b as select * from books;");
+        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+                "create procedure p1 allow rx as select * from books;");
+        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+                "create role r1;",
+                "create procedure p1 allow r1, rx as select * from books;");
+    }
+
+    private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
+        Connector connector =  db.getConnectors().get("0");
+        if( connector == null) return null;
+        return connector.getTableinfo().getIgnoreCase(tableName);
+    }
+
+    public void testGoodExportTable() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "export table e1;"
+                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "create table e2 (id integer, f1 varchar(16));",
+                "export table e1;",
+                "eXpOrt TABle E2;"
+                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2"));
+    }
+
+    public void testBadExportTable() throws Exception {
+
+        badDDLAgainstSimpleSchema(".+\\sexport, table non_existant was not present in the catalog.*",
+                "export table non_existant;"
+                );
+
+        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
+                "export table 1table_name_not_valid;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+                "export table one, two, three;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+                "export export table one;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+                "export table table one;"
+                );
+
+        badDDLAgainstSimpleSchema("Table with indexes configured as an export table.*",
+                "export table books;"
+                );
+
+        badDDLAgainstSimpleSchema("Export table configured with materialized view.*",
+                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
+                "export table view_source;"
+                );
+
+        badDDLAgainstSimpleSchema("View configured as an export table.*",
+                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
+                "export table my_view;"
+                );
+
+        badDDLAgainstSimpleSchema("Table \"E1\" is already exported.*",
+                "create table e1( id integer, f1 varchar(16), f2 varchar(12));",
+                "export table e1;",
+                "export table E1;"
+                );
+}
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;

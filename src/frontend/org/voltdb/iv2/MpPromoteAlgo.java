@@ -265,7 +265,9 @@ public class MpPromoteAlgo implements RepairAlgo
                         ftm.isReadOnly(),
                         true,   // Force rollback as our repair operation.
                         false,  // no acks in iv2.
-                        true);  // Indicate rollback for repair.
+                        true,   // Indicate rollback for repair.
+                        ftm.isForReplay());
+            rollback.setOriginalTxnId(ftm.getOriginalTxnId());
             return rollback;
         }
     }

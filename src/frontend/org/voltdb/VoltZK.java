@@ -45,7 +45,7 @@ public class VoltZK {
     public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String topology = "/db/topology";
-    public static final String replicationrole = "/db/replicationrole";
+    public static final String replicationconfig = "/db/replicationconfig";
     public static final String deploymentBytes = "/db/deploymentBytes";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";
@@ -91,6 +91,7 @@ public class VoltZK {
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
     public static final String leaders_globalservice = "/db/leaders/globalservice";
+    public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -103,7 +104,8 @@ public class VoltZK {
             iv2mpi,
             leaders,
             leaders_initiators,
-            leaders_globalservice
+            leaders_globalservice,
+            lastKnownLiveNodes
     };
 
     /**

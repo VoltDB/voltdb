@@ -30,7 +30,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
@@ -100,31 +99,9 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final Condition m_noMoreOutstandingWriteTasksCondition =
             m_outstandingWriteTasksLock.newCondition();
 
-    private static final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(
-                Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-
-                return new Thread(
-                        Thread.currentThread().getThreadGroup(),
-                        r,
-                        "Snapshot write service ",
-                        131072);
-            }
-        }));
-
+    private static final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("Snapshot write service ");
     private static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
-            Executors.newSingleThreadScheduledExecutor(
-                new ThreadFactory() {
-                    @Override
-                    public Thread newThread(Runnable r) {
-                        return new Thread(
-                                Thread.currentThread().getThreadGroup(),
-                                r,
-                                "Snapshot sync service ",
-                                131072);
-                    }
-                }));
+            Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
 
     public DefaultSnapshotDataTarget(
             final File file,

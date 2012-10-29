@@ -34,6 +34,11 @@ public abstract class AbstractValueExpression extends AbstractExpression {
         super(type);
     }
 
+    // Disable all the structural equality checking overhead of AbstractExpression.
+    // Force AbstractValueExpression derived classes to fend for themselves.
+    @Override
+    public abstract boolean equals(Object obj);
+
     @Override
     public void normalizeOperandTypes_recurse()
     {

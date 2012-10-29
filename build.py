@@ -323,6 +323,10 @@ CTX.THIRD_PARTY_INPUT['json_spirit'] = """
  json_spirit_value.cpp
 """
 
+CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
+ jsoncpp.cpp
+"""
+
 ###############################################################################
 # SPECIFY THE TESTS
 ###############################################################################

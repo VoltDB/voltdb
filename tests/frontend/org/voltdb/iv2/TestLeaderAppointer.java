@@ -25,7 +25,9 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -36,6 +38,10 @@ import org.json_voltpatches.JSONException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import org.voltcore.messaging.HostMessenger;
+
+import org.voltcore.utils.CoreUtils;
 
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
@@ -54,6 +60,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     private ClusterConfig m_config = null;
     private List<Integer> m_hostIds;
     private MpInitiator m_mpi = null;
+    private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
     private LeaderCache m_cache = null;
     private AtomicBoolean m_newAppointee = new AtomicBoolean(false);
@@ -72,21 +79,31 @@ public class TestLeaderAppointer extends ZKTestBase {
     public void setUp() throws Exception
     {
         VoltDB.ignoreCrash = false;
+        VoltDB.wasCrashCalled = false;
         setUpZK(NUM_AGREEMENT_SITES);
     }
 
     @After
     public void tearDown() throws Exception
     {
-        m_dut.shutdown();
-        m_cache.shutdown();
-        m_zk.close();
+        if (m_dut != null) {
+            m_dut.shutdown();
+        }
+        if (m_cache != null) {
+            m_cache.shutdown();
+        }
+        if (m_zk != null) {
+            m_zk.close();
+        }
         tearDownZK();
     }
 
-    void configure(int hostCount, int sitesPerHost, int replicationFactor) throws JSONException, Exception
+    void configure(int hostCount, int sitesPerHost, int replicationFactor,
+            boolean enablePPD) throws JSONException, Exception
     {
+        m_hm = mock(HostMessenger.class);
         m_zk = getClient(0);
+        when(m_hm.getZK()).thenReturn(m_zk);
         VoltZK.createPersistentZKNodes(m_zk);
 
         m_config = new ClusterConfig(hostCount, sitesPerHost, replicationFactor);
@@ -94,17 +111,20 @@ public class TestLeaderAppointer extends ZKTestBase {
         for (int i = 0; i < hostCount; i++) {
             m_hostIds.add(i);
         }
+        when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
         m_mpi = mock(MpInitiator.class);
-        createAppointer();
+        createAppointer(enablePPD);
 
         m_cache = new LeaderCache(m_zk, VoltZK.iv2appointees, m_changeCallback);
         m_cache.start(true);
     }
 
-    void createAppointer() throws JSONException
+    void createAppointer(boolean enablePPD) throws JSONException
     {
-        m_dut = new LeaderAppointer(m_zk, m_config.getPartitionCount(),
-                m_config.getReplicationFactor(), m_config.getTopology(m_hostIds), m_mpi);
+        m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
+                m_config.getReplicationFactor(), enablePPD,
+                null, // XXX MAKE ME PASS!
+                m_config.getTopology(m_hostIds), m_mpi);
     }
 
     void addReplica(int partitionId, long HSId) throws KeeperException, InterruptedException, Exception
@@ -142,7 +162,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testBasicStartup() throws Exception
     {
-        configure(2, 2, 0);
+        configure(2, 2, 0, false);
 
         Thread dutthread = new Thread() {
             @Override
@@ -180,7 +200,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testStartupFailure() throws Exception
     {
-        configure(2, 2, 1);
+        configure(2, 2, 1, false);
         // Write an appointee before we start to simulate a failure during startup
         m_cache.put(0, 0L);
         VoltDB.ignoreCrash = true;
@@ -198,7 +218,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testStartupFailure2() throws Exception
     {
-        configure(2, 2, 1);
+        configure(2, 2, 1, false);
         // Write the appointees and one master before we start to simulate a failure during startup
         m_cache.put(0, 0L);
         m_cache.put(1, 1L);
@@ -219,7 +239,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testWaitsForAllReplicasAndLeaders() throws Exception
     {
-        configure(2, 2, 1);
+        configure(2, 2, 1, false);
         Thread dutthread = new Thread() {
             @Override
             public void run() {
@@ -260,7 +280,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     public void testPromotesOnReplicaDeathAndDiesOnKSafety() throws Exception
     {
         // run once to get to a startup state
-        configure(2, 2, 1);
+        configure(2, 2, 1, false);
         VoltDB.ignoreCrash = true;
         Thread dutthread = new Thread() {
             @Override
@@ -300,7 +320,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     public void testAppointerPromotion() throws Exception
     {
         // run once to get to a startup state
-        configure(2, 2, 1);
+        configure(2, 2, 1, false);
         VoltDB.ignoreCrash = true;
         Thread dutthread = new Thread() {
             @Override
@@ -326,12 +346,64 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut.shutdown();
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up
-        createAppointer();
+        createAppointer(false);
         m_newAppointee.set(false);
         m_dut.acceptPromotion();
         while (!m_newAppointee.get()) {
             Thread.sleep(0);
         }
         assertEquals(1L, (long)m_cache.pointInTimeCache().get(0));
+    }
+
+    @Test
+    public void testPartitionDetectionMinoritySet() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(0);
+        current.add(1);
+        // the pre-fail cluster had 5 hosts.
+        previous.addAll(current);
+        previous.add(2);
+        previous.add(3);
+        previous.add(4);
+        // this should trip partition detection
+        assertTrue(LeaderAppointer.makePPDDecision(previous, current));
+    }
+
+    @Test
+    public void testPartitionDetection5050KillBlessed() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(2);
+        current.add(3);
+        // the pre-fail cluster had 4 hosts and the lowest host ID
+        previous.addAll(current);
+        previous.add(0);
+        previous.add(1);
+        // this should trip partition detection
+        assertTrue(LeaderAppointer.makePPDDecision(previous, current));
+    }
+
+    @Test
+    public void testPartitionDetection5050KillNonBlessed() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(0);
+        current.add(1);
+        // the pre-fail cluster had 4 hosts but not the lowest host ID
+        previous.addAll(current);
+        previous.add(2);
+        previous.add(3);
+        // this should not trip partition detection
+        assertFalse(LeaderAppointer.makePPDDecision(previous, current));
     }
 }

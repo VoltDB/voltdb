@@ -90,8 +90,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         // That leaves new VoltDB-specific functions free to use values in the 20000s.
         private static final int FUNC_VOLT_SQL_ERROR = 20000;
         private static final int FUNC_VOLT_DECODE = 20001;
-
+        private static final int FUNC_VOLT_FIELD = 20002;
         private static final FunctionId[] instances = {
+
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0, new Type[] { null, Type.SQL_VARCHAR }, new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("decode", null, FUNC_VOLT_DECODE, 2, new Type[] { null, null },
@@ -99,6 +100,12 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET }),
+
+            new FunctionId("field", Type.SQL_VARCHAR, FUNC_VOLT_FIELD, -1,  new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET}),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -184,9 +191,107 @@ public class FunctionForVoltDB extends FunctionSQL {
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
                 nodes[i].resolveTypes(session, this);
+            }
+        }
+
+        switch(funcType) {
+        /*
+         * The types to the FIELD functions parameters are VARCHAR
+         */
+        case FunctionId.FUNC_VOLT_FIELD:
+            if (nodes[0].dataType == null && nodes[0].isParam) {
+                nodes[0].dataType = Type.SQL_VARCHAR;
+            }
+            if (nodes[1].dataType == null && nodes[1].isParam) {
+                nodes[1].dataType = Type.SQL_VARCHAR;
+            }
+            break;
+
+            /*
+             * Infer parameter types to make the types of the 1st, 2nd, and (if not the last) 4th, 6th, etc.
+             * arguments to DECODE as consistent as possible,
+             * and the types of the 3rd, 5th, 7th, etc. and LAST arguments as consistent as possible.
+             * Punt to inferring VARCHAR if the other arguments give no clue or are inconsistent
+             * -- the VoltDB EE complains about NULL-typed parameters but is somewhat forgiving about
+             * mixed argument types.
+             */
+        case FunctionId.FUNC_VOLT_DECODE:
+            // Track whether parameter type hinting is needed for either key or value arguments.
+            // For simplicity(?), parameters are not tracked explicitly (by position)
+            // or even by category (key vs. value). So, if any parameter hinting is required at all,
+            // all arguments get re-checked.
+            boolean needParamType = false;
+            Type inputTypeInferred = null;
+            Type resultTypeInferred = null;
+
+            for (int ii = 0; ii < nodes.length; ii++) {
+                Type argType = nodes[ii].dataType;
+                if (argType == null) {
+                    // A param here means work to do, below.
+                    if (nodes[ii].isParam) {
+                        needParamType = true;
+                    }
+                    continue;
+                }
+                // Except for the first and the optional last/"default" argument,
+                // the arguments alternate between candidate inputs and candidate results.
+                if ((((ii % 2) == 0) || ii == nodes.length-1) && (ii != 0)) {
+                    // These arguments represent candidate result values
+                    // that may hint at the result type or require hinting from the other result values.
+                    if (resultTypeInferred == null) {
+                        resultTypeInferred = argType; // Take the first result type hint.
+                    } else if (resultTypeInferred != argType) {
+                        resultTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints.
+                    }
+                } else {
+                    // These arguments represent candidate input keys
+                    // that may hint at the input type or may require hinting from the other input keys.
+                    if (inputTypeInferred == null) {
+                        inputTypeInferred = argType; // Take the first input type hint.
+                    } else if (inputTypeInferred != argType) {
+                        inputTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints, falling back to string type.
+                    }
+                }
+            }
+
+            // With any luck, there are no parameter "?" arguments to worry about.
+            if ( ! needParamType) {
+                break;
+            }
+
+            // No luck, try to infer the parameters' types.
+            // Punt to guessing VARCHAR for lack of better information.
+            if (inputTypeInferred == null) {
+                inputTypeInferred = Type.SQL_VARCHAR;
+            }
+            if (resultTypeInferred == null) {
+                resultTypeInferred = Type.SQL_VARCHAR;
+            }
+
+            for (int ii = 0; ii < nodes.length; ii++) {
+                Type argType = nodes[ii].dataType;
+                if ((argType != null) || ! nodes[ii].isParam) {
+                    continue;
+                }
+                // This is the same test as above for determining that the argument 
+                // is a candidate result vs. a candidate input.
+                if ((((ii % 2) == 0) || ii == nodes.length-1) && (ii != 0)) {
+                    nodes[ii].dataType = resultTypeInferred;
+                } else {
+                    nodes[ii].dataType = inputTypeInferred;
+                }
+            }
+            break;
+
+        default:
+            break;
+        }
+
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] != null) {
                 if (i >= paramTypes.length) {
                  // TODO support type checking for variadic functions
-                    continue;
+                    break;
                 }
                 if (paramTypes[i] == null) {
                     continue; // accept all argument types
@@ -200,7 +305,10 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         dataType = m_def.getDataType();
         if (dataType == null && nodes.length > 0) {
-            Expression like_child = nodes[0];
+            if (parameterArg < 0 || parameterArg >= nodes.length) {
+                throw Error.error(ErrorCode.X_42565); // incompatible data type (so says the error -- we're missing one, actually)
+            }
+            Expression like_child = nodes[parameterArg];
             if (like_child != null) {
                 dataType = like_child.dataType;
             }

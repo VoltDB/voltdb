@@ -31,6 +31,7 @@ import java.io.FileWriter;
 
 import junit.framework.TestCase;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -48,9 +49,27 @@ public class TestCSVLoader extends TestCase {
     private VoltDB.Configuration config;
     private VoltProjectBuilder builder;
     private Client client;
+    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
-    private final String reportDir = "/tmp/";
-    String path_csv = reportDir + "/" + "test.csv";
+    private String userName = System.getProperty("user.name");
+    private String reportDir = String.format("/tmp/%s_csv", userName);
+    private String path_csv = String.format("%s/%s", reportDir, "test.csv");
+    private String dbName = String.format("mydb_%s", userName);
+
+    public void prepare() {
+        if (!reportDir.endsWith("/"))
+            reportDir += "/";
+        File dir = new File(reportDir);
+        try {
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+
+        } catch (Exception x) {
+            m_log.error(x.getMessage(), x);
+            System.exit(-1);
+        }
+    }
 
     @Override
     protected void setUp() throws Exception
@@ -105,12 +124,12 @@ public class TestCSVLoader extends TestCase {
             client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (4,4,4,444444, 'fourth' ,4.40 ,4.44);" );
             client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (5,5,5,5555555, 'fifth', 5.50, 5.55);" );
 
-            client.callProcedure("@SnapshotSave", "{uripath:\"file:///tmp\",nonce:\"mydb\",block:true,format:\"csv\"}" );
+            client.callProcedure("@SnapshotSave", String.format("{uripath:\"file:///tmp\",nonce:\"%s\",block:true,format:\"csv\"}", dbName) );
 
             //clear the table then try to load the csv file
             client.callProcedure("@AdHoc", "DELETE FROM BLAH;");
             String []my_options = {
-                    "-f" + "/tmp/mydb-BLAH-host_0.csv",
+                    "-f" + "/tmp/" + dbName + "-BLAH-host_0.csv",
                     //"--procedure=BLAH.insert",
                     //"--reportdir=" + reportdir,
                     //"--table=BLAH",
@@ -127,8 +146,9 @@ public class TestCSVLoader extends TestCase {
                     //"--strictquotes",
                     "BLAH"
             };
+            prepare();
             CSVLoader.main( my_options );
-            File file = new File( "/tmp/mydb-BLAH-host_0.csv" );
+            File file = new File( String.format("/tmp/%s-BLAH-host_0.csv", dbName) );
             file.delete();
 
             // do the test
@@ -172,7 +192,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_timestamp timestamp default null " +
                 "); ";
         String []myOptions = {
-                "-f" + reportDir + "/test.csv",
+                "-f" + path_csv,
                 //"--procedure=blah.insert",
                 "--reportdir=" + reportDir,
                 //"--table=BLAH",
@@ -225,7 +245,7 @@ public class TestCSVLoader extends TestCase {
                 //"clm_varinary varbinary default null" +
                 "); ";
         String []myOptions = {
-                "-f" + reportDir + "/test.csv",
+                "-f" + path_csv,
                 //"--procedure=BLAH.insert",
                 "--reportdir=" + reportDir,
                 "--maxerrors=50",
@@ -269,7 +289,7 @@ public class TestCSVLoader extends TestCase {
                         "clm_varinary varbinary default null" +
                         "); ";
         String []myOptions = {
-                "-f" + reportDir + "/test.csv",
+                "-f" + path_csv,
                 "--reportdir=" + reportDir,
                 "--blank=" + "null",
                 "BLAH"
@@ -297,7 +317,7 @@ public class TestCSVLoader extends TestCase {
                         "clm_varinary varbinary default null" +
                         "); ";
         String []myOptions = {
-                "-f" + reportDir + "/test.csv",
+                "-f" + path_csv,
                 "--reportdir=" + reportDir,
                 "--blank=" + "empty",
                 "BLAH"
@@ -325,7 +345,7 @@ public class TestCSVLoader extends TestCase {
                         "clm_varinary varbinary default null" +
                         "); ";
         String []myOptions = {
-                "-f" + reportDir + "/test.csv",
+                "-f" + path_csv,
                 "--reportdir=" + reportDir,
                 "--blank=" + "error",
                 "BLAH"
@@ -374,6 +394,7 @@ public class TestCSVLoader extends TestCase {
             client = ClientFactory.createClient();
             client.createConnection("localhost");
 
+            prepare();
             CSVLoader.main( my_options );
             // do the test
 
