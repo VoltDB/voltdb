@@ -1210,7 +1210,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // create groups as needed for users
             if (m_deployment.getUsers() != null) {
                 for (UsersType.User user : m_deployment.getUsers().getUser()) {
-                    String groupsCSV = user.getGroups();
+                    String groupsCSV = CatalogUtil.getUserRoles(user);
                     if (groupsCSV == null || groupsCSV.isEmpty()) {
                         continue;
                     }
