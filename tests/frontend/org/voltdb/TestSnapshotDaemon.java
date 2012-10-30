@@ -136,7 +136,7 @@ public class TestSnapshotDaemon {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         m_initiator = new Initiator();
         m_daemon = new SnapshotDaemon();
-        m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK(), null);
+        m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK(), null, null);
         return m_daemon;
     }
 
