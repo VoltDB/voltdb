@@ -212,7 +212,7 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        if (m_loaderClass.equals(RawProcessor.class.getName())) return;
+        if (m_loaderClass == null || m_loaderClass.equals(RawProcessor.class.getName())) return;
         Preconditions.checkArgument(
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
