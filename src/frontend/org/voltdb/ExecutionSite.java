@@ -57,6 +57,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -1792,7 +1793,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       CoreUtils.getHostnameOrAddress());
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
                 snapshotMsg.crash) {
-                String msg = "Executing local snapshot. Finished final snapshot. Shutting down. " +
+                String msg = "Partition detection snapshot completed. Shutting down. " +
                         "Result: " + startSnapshotting.toString();
                 VoltDB.crashLocalVoltDB(msg, false, null);
             }
@@ -2908,7 +2909,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     @Override
-    public void setRejoinComplete() {
+    public void setRejoinComplete(org.voltdb.iv2.RejoinProducer.ReplayCompletionAction ignored) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 

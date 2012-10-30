@@ -84,7 +84,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
+                          VoltDB.START_ACTION startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
@@ -98,7 +98,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable(),
+                startAction,
                 agent, memStats, cl);
 
         m_tickProducer.start();
