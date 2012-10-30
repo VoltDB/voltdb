@@ -792,7 +792,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 sb.deleteContent();
             }
         }
-        System.out.println("After ack had " + m_committedBuffers.peek());
     }
 
     /**
