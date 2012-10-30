@@ -1311,7 +1311,7 @@ public abstract class CatalogUtil {
      * @param user an instance of {@link UsersType.User}
      * @return a {@link Set} of role name
      */
-    private static Set<String> mergeUserRoles(final UsersType.User user) {
+    public static Set<String> mergeUserRoles(final UsersType.User user) {
         Set<String> roles = new TreeSet<String>();
         if (user == null) return roles;
 
