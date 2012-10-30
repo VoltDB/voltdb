@@ -26,6 +26,7 @@ import java.io.File;
 import java.util.Properties;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -47,8 +48,8 @@ public class TestExportV2Suite extends TestExportBase {
     private void quiesceAndVerify(final Client client, ExportToFileVerifier tester)
             throws Exception
             {
-                quiesce(client);
                 Thread.sleep(2000);
+                quiesce(client);
                 tester.verifyRows();
     }
 
@@ -101,7 +102,6 @@ public class TestExportV2Suite extends TestExportBase {
 
     public void testExportSnapshotPreservesSequenceNumber() throws Exception {
         System.out.println("testExportSnapshotPreservesSequenceNumber");
-        Thread.sleep(5000);
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -109,7 +109,7 @@ public class TestExportV2Suite extends TestExportBase {
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
-
+        Thread.sleep(2000);
         quiesce(client);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
@@ -190,7 +190,8 @@ public class TestExportV2Suite extends TestExportBase {
 
     static public junit.framework.Test suite() throws Exception
     {
-        VoltServerConfig config;
+        TheHashinator.initialize(3);
+        LocalCluster config;
 
         final MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestExportV2Suite.class);
@@ -241,6 +242,8 @@ public class TestExportV2Suite extends TestExportBase {
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, true);
         boolean compile = config.compile(project);
         assertTrue(compile);
+        config.setHasLocalServer(false);
+        config.setMaxHeap(256);
         builder.addServerConfig(config);
 
 
