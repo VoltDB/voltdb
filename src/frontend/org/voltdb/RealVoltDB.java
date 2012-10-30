@@ -486,7 +486,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
 
                     m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, hsidsToRejoin,
-                            m_catalogContext.cluster.getVoltroot());
+                            m_catalogContext.cluster.getVoltroot(),
+                            m_config.m_startAction == START_ACTION.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
                     hostLog.info("Using iv2 community rejoin");
                 }
@@ -500,7 +501,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
 
                     m_rejoinCoordinator =
-                        new SequentialRejoinCoordinator(m_messenger, sites, m_catalogContext.cluster.getVoltroot());
+                        new SequentialRejoinCoordinator(m_messenger, sites, m_catalogContext.cluster.getVoltroot(),
+                                m_config.m_startAction == START_ACTION.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
                     m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
                                                        new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
@@ -623,7 +625,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_deployment.getCluster().getKfactor(),
                                 csp,
                                 clusterConfig.getPartitionCount(),
-                                m_rejoining,
+                                m_config.m_startAction,
                                 m_statsAgent,
                                 m_memoryStats,
                                 m_commandLog,
@@ -860,7 +862,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             assert(m_clientInterfaces.size() > 0);
             ClientInterface ci = m_clientInterfaces.get(0);
-            ci.initializeSnapshotDaemon(m_messenger.getZK());
+            ci.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {

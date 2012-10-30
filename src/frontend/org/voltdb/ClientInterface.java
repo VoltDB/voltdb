@@ -17,12 +17,12 @@
 
 package org.voltdb;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -539,9 +539,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                     @Override
                                                     public void run() {
                                                         try {
-                                                            authLog.warn("Timing out login attempt from " +
-                                                                         socket.socket().getRemoteSocketAddress() +
-                                                                         " after 1600 milliseconds");
                                                             socket.close();
                                                         } catch (IOException e) {
                                                             //Don't care
@@ -549,12 +546,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                     }
                                                 }, 1600, 0, TimeUnit.MILLISECONDS);
 
-            while (lengthBuffer.hasRemaining()) {
-                int read = socket.read(lengthBuffer);
-                if (read == -1) {
-                    throw new EOFException();
+            try {
+                while (lengthBuffer.hasRemaining()) {
+                    int read = socket.read(lengthBuffer);
+                    if (read == -1) {
+                        socket.close();
+                        timeoutFuture.cancel(false);
+                        return null;
+                    }
                 }
-            }
+            } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
 
             //Didn't get the value. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
@@ -589,21 +590,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
               }
 
             final ByteBuffer message = ByteBuffer.allocate(messageLength);
-            //Do non-blocking I/O to retrieve the login message
-            for (int ii = 0; ii < 4; ii++) {
-                socket.read(message);
-                if (!message.hasRemaining()) {
-                    break;
+
+            try {
+                while (message.hasRemaining()) {
+                    int read = socket.read(message);
+                    if (read == -1) {
+                        socket.close();
+                        timeoutFuture.cancel(false);
+                        return null;
+                    }
                 }
-                try {
-                    Thread.sleep(20);
-                } catch (InterruptedException e) {
-                    throw new IOException(e);
-                }
-            }
+            } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
 
             //Didn't get the whole message. Client isn't going to get anymore time.
-            if (lengthBuffer.hasRemaining()) {
+            if (message.hasRemaining()) {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
                              "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
@@ -1371,13 +1371,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
-    public void initializeSnapshotDaemon(ZooKeeper zk) {
+    public void initializeSnapshotDaemon(ZooKeeper zk, GlobalServiceElector gse) {
         m_snapshotDaemon.init(this, zk, new Runnable() {
             @Override
             public void run() {
                 bindAdapter(m_snapshotDaemonAdapter);
             }
-        });
+        },
+        gse);
     }
 
     /**
@@ -1887,6 +1888,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             // the shared dispatch for sysprocs
             int[] involvedPartitions = m_allPartitions;
+            if (sysProc.getSinglepartition()) {
+                //Fix a bug where SystemCatalog was sent to all partitions
+                //and catalog changes caused result mismatches
+                //Pick a random partition to be the source of the catalog info
+                involvedPartitions = new int[] { new java.util.Random().nextInt(involvedPartitions.length) };
+            }
+
             createTransaction(handler.connectionId(), handler.m_hostname,
                     handler.isAdmin(),
                     task,
