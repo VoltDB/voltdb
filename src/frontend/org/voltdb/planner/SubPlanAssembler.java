@@ -361,12 +361,12 @@ public abstract class SubPlanAssembler {
             AbstractExpression comparator = endingBoundExpr.getFilter();
             retval.endExprs.add(comparator);
             retval.bindings.addAll(endingBoundExpr.getBindings());
-            //TODO: work out logic for retval.lookupType;
-            // including the descending order case ???
             retval.use = IndexUseType.INDEX_SCAN;
             if (retval.lookupType == IndexLookupType.EQ) {
                 // This does not need to be that accurate;
-                // anything OTHER IndexLookupType.EQ is enough to enable a multi-key scan.
+                // anything OTHER than IndexLookupType.EQ is enough to enable a multi-key scan.
+                //TODO: work out whether there is any possible use for more precise settings of
+                // retval.lookupType, including for descending order cases ???
                 retval.lookupType = IndexLookupType.GTE;
             }
         }
@@ -376,15 +376,28 @@ public abstract class SubPlanAssembler {
             return null;
         }
 
-        // If IndexUseType is the default of COVERING_UNIQUE_EQUALITY, and not
-        // all columns are covered (but some are) with equality comparisons,
-        // then it is possible to scan using GTE. The columns not covered will have
-        // null supplied. This will not execute if there is already a GT or LT lookup
-        // type set because those also change the IndexUseType to INDEX_SCAN
-        if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY && retval.indexExprs.size() < keyComponentCount)
-        {
-            retval.use = IndexUseType.INDEX_SCAN;
-            retval.lookupType = IndexLookupType.GTE;
+        // If all of the index key components are not covered by comparisons (but SOME are),
+        // then the scan may need to be reconfigured to account for the scan key being padded
+        // with null values for the components that are not being filtered.
+        //
+        if (retval.indexExprs.size() < keyComponentCount) {
+            // If IndexUseType has the default value of COVERING_UNIQUE_EQUALITY, then the
+            // scan can use GTE instead to match all values, not only the null values, for the
+            // unfiltered components -- assuming that any value is considered >= null.
+            if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY) {
+                retval.use = IndexUseType.INDEX_SCAN;
+                retval.lookupType = IndexLookupType.GTE;
+            }
+            // GTE scans can have any number of null key components appended without changing
+            // the effective value. So, that leaves GT scans.
+            else if (retval.lookupType == IndexLookupType.GT) {
+                // GT scans pose a problem in that any compound key in the index that was an exact
+                // equality match on the filtered key component(s) and had a non-null value for any
+                // remaining component(s) would be mistaken for a match.
+                //TODO: Various workarounds for this issue are possible. See ENG-3913.
+                // For now, disqualify use of this index.
+                return null;
+            }
         }
 
         // All remaining filters get covered as post-filters
