@@ -57,7 +57,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -470,7 +469,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             }
         }
 
-        m_snapshotter.shutdown();
+        try {
+            m_snapshotter.shutdown();
+        } catch (InterruptedException e) {
+            hostLog.warn("Interrupted during shutdown", e);
+        }
     }
 
     /**
@@ -615,6 +618,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     };
 
+    @Override
     public void tick() {
         /*
          * poke the PartitionDRGateway regularly even if we are not idle. In the
