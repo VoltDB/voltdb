@@ -30,11 +30,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.zip.CRC32;
 
 import javax.xml.bind.JAXBContext;
@@ -680,8 +682,8 @@ public abstract class CatalogUtil {
             for (User u : users) {
                 sb.append(" USER ");
                 sb.append(u.getName()).append(",");
-                sb.append(u.getGroups()).append(",");
-                sb.append(u.getPassword()).append(",");
+                sb.append(Arrays.toString(mergeUserRoles(u).toArray()));
+                sb.append(",").append(u.getPassword()).append(",");
             }
         }
         sb.append("\n");
@@ -831,11 +833,10 @@ public abstract class CatalogUtil {
         }
 
         for (UsersType.User user : deployment.getUsers().getUser()) {
-            if (user.getGroups() == null)
+            if (user.getGroups() == null && user.getRoles() == null)
                 continue;
 
-            for (String group : user.getGroups().split(",")) {
-                group = group.trim();
+            for (String group : mergeUserRoles(user)) {
                 if (!validGroups.contains(group)) {
                     hostLog.error("Cannot assign user \"" + user.getName() + "\" to non-existent group \"" + group +
                             "\"");
@@ -1292,18 +1293,44 @@ public abstract class CatalogUtil {
                             BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
             catUser.setShadowpassword(hashedPW);
 
-            // process the @groups comma separated list
-            if (user.getGroups() != null) {
-                String grouplist[] = user.getGroups().split(",");
-                for (final String group : grouplist) {
-                    final GroupRef groupRef = catUser.getGroups().add(group);
-                    final Group catalogGroup = db.getGroups().get(group);
-                    if (catalogGroup != null) {
-                        groupRef.setGroup(catalogGroup);
-                    }
+            // process the @groups and @roles comma separated list
+            for (final String role : mergeUserRoles(user)) {
+                final GroupRef groupRef = catUser.getGroups().add(role);
+                final Group catalogGroup = db.getGroups().get(role);
+                if (catalogGroup != null) {
+                    groupRef.setGroup(catalogGroup);
                 }
             }
         }
+    }
+
+    /**
+     * Takes the list of roles specified in the groups, and roles user
+     * attributes and merges the into one set that contains no duplicates
+     * @param user an instance of {@link UsersType.User}
+     * @return a {@link Set} of role name
+     */
+    public static Set<String> mergeUserRoles(final UsersType.User user) {
+        Set<String> roles = new TreeSet<String>();
+        if (user == null) return roles;
+
+        if (user.getGroups() != null && !user.getGroups().trim().isEmpty()) {
+            String [] grouplist = user.getGroups().trim().split(",");
+            for (String group: grouplist) {
+                if( group == null || group.trim().isEmpty()) continue;
+                roles.add(group.trim());
+            }
+        }
+
+        if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
+            String [] rolelist = user.getRoles().trim().split(",");
+            for (String role: rolelist) {
+                if( role == null || role.trim().isEmpty()) continue;
+                roles.add(role.trim());
+            }
+        }
+
+        return roles;
     }
 
     private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {

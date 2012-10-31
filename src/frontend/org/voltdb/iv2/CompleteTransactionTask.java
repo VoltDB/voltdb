@@ -17,7 +17,11 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import org.voltdb.PartitionDRGateway;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
@@ -69,11 +73,25 @@ public class CompleteTransactionTask extends TransactionTask
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
-        // future: offer to siteConnection.IBS for replay.
+        taskLog.logTask(m_msg);
         m_txn.setDone();
         m_queue.flush();
+    }
+
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        if (!m_txn.isReadOnly()) {
+            // the truncation point token SHOULD be part of m_txn. However, the
+            // legacy interaces don't work this way and IV2 hasn't changed this
+            // ownership yet. But truncateUndoLog is written assuming the right
+            // eventual encapsulation.
+            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
+        }
+        m_txn.setDone();
     }
 
     @Override
