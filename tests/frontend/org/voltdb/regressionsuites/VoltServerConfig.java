@@ -129,4 +129,6 @@ public interface VoltServerConfig {
      * aggregate the list of files, and then return them.
      */
     public List<File> listFiles(File path) throws IOException;
+
+    public File[] getPathInSubroots(File path) throws IOException;
 }

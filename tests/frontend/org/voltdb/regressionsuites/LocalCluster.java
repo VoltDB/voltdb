@@ -1132,5 +1132,14 @@ public class LocalCluster implements VoltServerConfig {
         return files;
     }
 
+    @Override
+    public File[] getPathInSubroots(File path) throws IOException {
+        File retval[] = new File[m_subRoots.size()];
+        for (int ii = 0; ii < m_subRoots.size(); ii++) {
+            retval[ii] = new File(m_subRoots.get(ii), path.getPath());
+        }
+        return retval;
+    }
+
 
 }
