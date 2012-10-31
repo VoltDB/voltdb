@@ -66,6 +66,11 @@ class BaseOption(object):
     def get_option_names(self):
         return [a for a in (self.short_opt, self.long_opt) if a is not None]
 
+    def get_dest(self):
+        if 'dest' not in self.kwargs:
+            utility.abort('%s must specify a "dest" property.' % self.__class__.__name__)
+        return self.kwargs['dest']
+
     def __str__(self):
         return '%s(%s/%s %s)' % (self.__class__.__name__,
                                  self.short_opt, self.long_opt, self.kwargs)
@@ -476,6 +481,18 @@ class CLISpec(object):
 
     def set_defaults(self, **kwargs):
         utility.kwargs_set_defaults(self._kwargs, **kwargs)
+
+    def find_option(self, dest_name):
+        for o in self._kwargs['options']:
+            if o.get_dest() == dest_name:
+                return o
+        return None
+
+    def find_argument(self, dest_name):
+        for a in self._kwargs['arguments']:
+            if a.name == dest_name:
+                return a
+        return None
 
 #===============================================================================
 def check_missing_items(type_name, missing_items):

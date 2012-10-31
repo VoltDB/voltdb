@@ -54,8 +54,16 @@ class BaseVerb(object):
                             % (self.__class__.__name__, self.name))
 
     def add_options(self, *args):
-        self.cli_spec.add_to_list('options', *args)
-        self.dirty_opts = True
+        """
+        Add options if not already present as an option or argument.
+        """
+        for o in args:
+            dest_name = o.get_dest()
+            if self.cli_spec.find_option(dest_name):
+                utility.debug('Not adding "%s" option more than once.' % dest_name)
+            else:
+                self.cli_spec.add_to_list('options', o)
+                self.dirty_opts = True
 
     def add_arguments(self, *args):
         self.cli_spec.add_to_list('arguments', *args)

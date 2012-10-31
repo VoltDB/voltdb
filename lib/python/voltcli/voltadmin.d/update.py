@@ -29,13 +29,11 @@ from voltcli import utility
 
 @VOLT.Client(
     description = 'Update the schema of a running database.',
-    options = (
-        VOLT.StringOption('-d', '--deployment', 'deployment',
-                          'the deployment configuration file path',
-                          default = 'deployment.xml')),
     arguments = (
         VOLT.StringArgument('catalog',
-                            'the new application catalog jar file path')))
+                            'the new application catalog jar file path'),
+        VOLT.StringArgument('deployment',
+                            'the deployment configuration file path')))
 def update(runner):
     catalog    = VOLT.utility.File(runner.opts.catalog).read_hex()
     deployment = VOLT.utility.File(runner.opts.deployment).read()
