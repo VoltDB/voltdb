@@ -67,6 +67,9 @@ public:
     static AbstractExpression* comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
     static AbstractExpression* conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
 
+    static void loadIndexedExprsFromJson(std::vector<voltdb::AbstractExpression*>& indexed_exprs,
+                                         const std::string& jsonarraystring);
+
     /** If the passed vector contains only TupleValueExpression, it
      * returns ColumnIds of them, otherwise NULL.*/
     static boost::shared_array<int>

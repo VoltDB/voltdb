@@ -67,7 +67,7 @@ namespace voltdb {
 Table::Table(int tableAllocationTargetSize) :
     m_tempTuple(),
     m_schema(NULL),
-    m_columnNames(NULL),
+    m_columnNames(),
     m_columnHeaderData(NULL),
     m_columnHeaderSize(-1),
     m_tupleCount(0),
@@ -101,8 +101,6 @@ Table::~Table() {
     }
 
     m_schema = NULL;
-    delete[] m_columnNames;
-    m_columnNames = NULL;
     m_tempTuple.m_data = NULL;
 
     // clear any cached column serializations
@@ -111,7 +109,7 @@ Table::~Table() {
     m_columnHeaderData = NULL;
 }
 
-void Table::initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema) {
+void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema) {
 
     // copy the tuple schema
     if (m_ownsTupleSchema) {
@@ -146,8 +144,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 #endif
 
     // initialize column names
-    delete[] m_columnNames;
-    m_columnNames = new std::string[m_columnCount];
+    m_columnNames.resize(m_columnCount);
     for (int i = 0; i < m_columnCount; ++i)
         m_columnNames[i] = columnNames[i];
 
@@ -404,14 +401,6 @@ voltdb::TableStats* Table::getTableStats() {
     return NULL;
 }
 
-std::vector<std::string> Table::getColumnNames() {
-    std::vector<std::string> columnNames;
-    for (int ii = 0; ii < m_columnCount; ii++) {
-        columnNames.push_back(m_columnNames[ii]);
-    }
-    return columnNames;
-}
-
 void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
                                    Pool *stringPool) {
     int tupleCount = serialize_io.readInt();
@@ -509,10 +498,13 @@ TableIndex *Table::index(std::string name) {
         }
     }
     std::stringstream errorString;
-    errorString << "Could not find Index with name " << name << std::endl;
+    errorString << "Could not find Index with name " << name << " among {";
+    const char* sep = "";
     BOOST_FOREACH(TableIndex *index, m_indexes) {
-        errorString << index->getName() << std::endl;
+        errorString << sep << index->getName();
+        sep = ", ";
     }
+    errorString << "}";
     throwFatalException("%s", errorString.str().c_str());
 }
 
@@ -581,20 +573,12 @@ void Table::setPrimaryKeyIndex(TableIndex *index) {
     m_pkeyIndex = index;
 }
 
-void Table::configureIndexStats(CatalogId hostId,
-                                std::string hostname,
-                                int64_t siteId,
-                                CatalogId partitionId,
-                                CatalogId databaseId)
+void Table::configureIndexStats(CatalogId databaseId)
 {
     // initialize stats for all the indexes for the table
     BOOST_FOREACH(TableIndex *index, m_indexes) {
         index->getIndexStats()->configure(index->getName() + " stats",
                                           name(),
-                                          hostId,
-                                          hostname,
-                                          siteId,
-                                          partitionId,
                                           databaseId);
     }
 

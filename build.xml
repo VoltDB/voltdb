@@ -145,7 +145,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="licensecheck, compile, voltdbipc, ee"
+    depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
@@ -163,7 +163,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_noclustering"
-    depends="licensecheck, compile, voltdbipc, ee"
+    depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
@@ -982,6 +982,18 @@ NATIVE EE STUFF
 </target>
 
 <target name='ee' depends="catalog, jnicompile, buildinfo"
+    description="Build C++ JNI library and copy it to production folder.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="build.py ${build}" />
+    </exec>
+    <copy todir='voltdb'>
+        <fileset dir="${build.dir}/nativelibs">
+            <include name="libvoltdb-${dist.version}.*"/>
+        </fileset>
+    </copy>
+</target>
+
+<target name='recompile_ee_nodepends'
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <arg line="build.py ${build}" />

@@ -176,6 +176,13 @@ public class QueryPlanner {
         return m_xmlSQL.toMinString();
     }
 
+    public String[] extractedParamLiteralValues() {
+        if (m_paramzInfo == null) {
+            return null;
+        }
+        return m_paramzInfo.paramLiteralValues;
+    }
+
     /**
      * Get the best plan for the SQL statement given, assuming the given costModel.
      *
@@ -194,7 +201,8 @@ public class QueryPlanner {
         if (m_paramzInfo != null) {
             try {
                 // compile the plan with new parameters
-                CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL);
+                CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
+                                                   m_paramzInfo.paramLiteralValues);
 
                 plan.partitioningKeyIndex =
                         buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
@@ -218,7 +226,7 @@ public class QueryPlanner {
         m_recentErrorMsg = null;
 
         // if parameterization isn't requested or if it failed, plan here
-        CompiledPlan plan = compileFromXML(m_xmlSQL);
+        CompiledPlan plan = compileFromXML(m_xmlSQL, null);
         if (plan == null) {
             throw new PlanningErrorException(m_recentErrorMsg);
         }
@@ -273,10 +281,10 @@ public class QueryPlanner {
         return m_wasParameterizedPlan;
     }
 
-    private CompiledPlan compileFromXML(VoltXMLElement xmlSQL) {
+    private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, m_db, m_joinOrder);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
         if (parsedStmt == null)
         {
             m_recentErrorMsg = "Failed to parse SQL statement: " + m_sql;

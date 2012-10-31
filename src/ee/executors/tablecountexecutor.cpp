@@ -36,23 +36,13 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init Table Count Executor");
 
-    TableCountPlanNode* node = dynamic_cast<TableCountPlanNode*>(abstract_node);
-    assert(node);
-    assert(node->getTargetTable());
+    assert(dynamic_cast<TableCountPlanNode*>(abstract_node));
+    assert(dynamic_cast<TableCountPlanNode*>(abstract_node)->getTargetTable());
 
-    TupleSchema* schema = node->generateTupleSchema(true);
-    int column_count = static_cast<int>(node->getOutputSchema().size());
-    assert(column_count == 1);
+    assert(abstract_node->getOutputSchema().size() == 1);
 
-    std::string* column_names = new std::string[column_count];
-    column_names[0] = node->getOutputSchema()[0]->getColumnName();
-
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-            node->getTargetTable()->name(),
-            schema,
-            column_names,
-            limits));
-    delete[] column_names;
+    // Create output table based on output schema from the plan
+    setTempOutputTable(limits);
     return true;
 }
 

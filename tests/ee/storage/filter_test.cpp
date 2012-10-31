@@ -76,7 +76,7 @@ public:
         }
         CatalogId database_id = 1000;
 
-        std::string *columnNames = new std::string[5];
+        std::vector<std::string> columnNames(5);
         std::vector<voltdb::ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
@@ -91,10 +91,7 @@ public:
         }
         TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
 
-        table = TableFactory::getTempTable(database_id, "test_table", schema,
-                                           columnNames, NULL);
-
-        delete[] columnNames;
+        table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);
 
         //::printf("making a test table...\n");
         for (int64_t i = 1; i <= TUPLES; ++i) {
