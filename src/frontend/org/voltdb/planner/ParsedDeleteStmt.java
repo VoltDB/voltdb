@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -31,28 +30,28 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     Table table = null;
 
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode) {
         String tableName = stmtNode.attributes.get("table");
         assert(tableName != null);
         tableName = tableName.trim();
-        table = db.getTables().getIgnoreCase(tableName);
+        table = getTableFromDB(tableName);
         tableList.add(table);
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("condition"))
-                parseCondition(child, db);
+                parseCondition(child);
         }
     }
 
     //XXX: This looks a lot like it might be a slightly more verbose duplicate of AbstractParsedStmt.parseConditions
-    private void parseCondition(VoltXMLElement conditionNode, Database db) {
+    private void parseCondition(VoltXMLElement conditionNode) {
         AbstractExpression tempWhere = null;
         for (VoltXMLElement exprNode : conditionNode.children) {
             if (tempWhere == null) {
-                tempWhere = parseExpressionTree(exprNode, db);
+                tempWhere = parseExpressionTree(exprNode);
             }
             else {
-                tempWhere = ExpressionUtil.combine(tempWhere, parseExpressionTree(exprNode, db));
+                tempWhere = ExpressionUtil.combine(tempWhere, parseExpressionTree(exprNode));
             }
         }
         assert(where == null); // Should be non-reentrant -- never overwriting a previous value!

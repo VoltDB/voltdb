@@ -60,27 +60,11 @@ bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
 {
     VOLT_TRACE("init Receive Executor");
-    assert(limits);
 
-    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(abstract_node);
-    assert(node);
+    assert(dynamic_cast<ReceivePlanNode*>(abstract_node));
 
-    //
-    // Construct the output table
-    //
-    TupleSchema* schema = node->generateTupleSchema(true);
-    int num_of_columns = static_cast<int>(node->getOutputSchema().size());
-    std::string* column_names = new std::string[num_of_columns];
-    for (int ctr = 0; ctr < num_of_columns; ctr++)
-    {
-        column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
-    }
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                    "temp",
-                                                    schema,
-                                                    column_names,
-                                                    limits));
-    delete[] column_names;
+    // Create output table based on output schema from the plan
+    setTempOutputTable(limits);
     return true;
 }
 

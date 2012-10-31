@@ -526,4 +526,17 @@ ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractEx
     return ret;
 }
 
+void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring)
+{
+    json_spirit::Value jValue;
+    json_spirit::read( jsonarraystring, jValue );
+    json_spirit::Array expressionsArray = jValue.get_array();
+    for (int ii = 0; ii < expressionsArray.size(); ii++) {
+        json_spirit::Object expressionObject = expressionsArray[ii].get_obj();
+        AbstractExpression *expr = AbstractExpression::buildExpressionTree(expressionObject);
+        indexed_exprs.push_back(expr);
+    }
+}
+
+
 }
