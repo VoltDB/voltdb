@@ -32,6 +32,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
@@ -44,6 +45,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+    private List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -190,6 +192,12 @@ public class MpPromoteAlgo implements RepairAlgo
         return true;
     }
 
+    public List<Iv2InitiateTaskMessage> getInterruptedTxns()
+    {
+        assert(m_interruptedTxns.isEmpty() || m_interruptedTxns.size() == 1);
+        return m_interruptedTxns;
+    }
+
     /** Send missed-messages to survivors. Exciting! */
     public void repairSurvivors()
     {
@@ -204,7 +212,7 @@ public class MpPromoteAlgo implements RepairAlgo
         tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             // send the repair log union to all the survivors. SPIs will ignore
-            // CompleteTransactionMessages for transcations which have already
+            // CompleteTransactionMessages for transactions which have already
             // completed, so this has the effect of making sure that any holes
             // in the repair log are filled without explicitly having to
             // discover and track them.
@@ -257,6 +265,8 @@ public class MpPromoteAlgo implements RepairAlgo
         }
         else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();
+            assert(ftm.getInitiateTask() != null);
+            m_interruptedTxns.add(ftm.getInitiateTask());
             CompleteTransactionMessage rollback =
                 new CompleteTransactionMessage(
                         ftm.getInitiatorHSId(),
