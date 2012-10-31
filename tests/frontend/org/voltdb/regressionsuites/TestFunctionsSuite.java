@@ -56,6 +56,81 @@ public class TestFunctionsSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+
+    public void testStringExpressionIndex() throws Exception {
+        System.out.println("STARTING testStringExpressionIndex");
+        Client client = getClient();
+        initialLoad(client, "P1");
+
+        ClientResponse cr = null;
+        VoltTable result = null;
+        /*
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                // Test generalized indexes on a string function and combos.
+                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE INDEX P1_SUBSTRING_WITH_COL_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), DESC ); " +
+                "CREATE INDEX P1_NUM_EXPR_WITH_STRING_COL ON P1 ( DESC, ABS(ID) ); " +
+                "CREATE INDEX P1_MIXED_TYPE_EXPRS1 ON P1 ( ABS(ID+2), SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) ); " +
+        */
+
+        // Do some rudimentary indexed queries -- the real challenge to string expression indexes is defining and loading/maintaining them.
+        // TODO: For that reason, it might make sense to break them out into their own suite to make their specific issues easier to isolate.
+        cr = client.callProcedure("@AdHoc", "select ID from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 order by NUM, ID");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(5, result.getRowCount());
+
+        VoltTable r;
+        long resultA;
+        long resultB;
+
+        // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7 order by NUM, ID");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 and ABS(ID+2) < 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        // Do some updates intended to be non-corrupting and inconsequential to the test query results.
+        cr = client.callProcedure("@AdHoc", "delete from P1 where ABS(ID+3) <> 7");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        long killCount = r.asScalarLong();
+        assertEquals(7, killCount);
+
+        // Repeat the queries on updated indexes.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 and ABS(ID+2) < 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+}
+
     public void testNumericExpressionIndex() throws Exception {
         System.out.println("STARTING testNumericExpressionIndex");
         Client client = getClient();
@@ -164,10 +239,18 @@ public class TestFunctionsSuite extends RegressionSuite {
         ClientResponse cr = null;
         VoltTable r = null;
 
+        // The next two queries used to fail due to ENG-3913,
+        // abuse of compound indexes for partial GT filters.
+        // An old issue only brought to light by the addition of a compound index to this suite.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) > 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong()); // used to get 6, matching like >=
+
         cr = client.callProcedure("WHERE_ABS");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        assertEquals(5, r.asScalarLong());
+        assertEquals(5, r.asScalarLong()); // used to get 6, matching like >=
 
         try {
             // test decimal support and non-column expressions
@@ -898,8 +981,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 // Test generalized index on an expression of multiple columns.
                 "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
 
-                // Test generalized index on a string function.
-                //"CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                // Test generalized indexes on a string function and various combos.
+                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE INDEX P1_SUBSTRING_WITH_COL_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), DESC ); " +
+                "CREATE INDEX P1_NUM_EXPR_WITH_STRING_COL ON P1 ( ABS(ID), DESC ); " +
+                "CREATE INDEX P1_MIXED_TYPE_EXPRS1 ON P1 ( ABS(ID+2), SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) ); " +
 
                 "CREATE TABLE R1 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
