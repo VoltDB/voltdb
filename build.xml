@@ -1172,11 +1172,18 @@ TEST CASES
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
+                <!-- Standard junit fileset -->
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
-                <include name='org/voltdb/**/Iv2Test*.class'/>
+                <include name='org/voltdb/network/**/Test*.class'/>
+                <include name='org/voltdb/messaging/**/*Test.class'/>
+                <include name='org/voltdb/network/**/*Test.class'/>
+                <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
-                <!-- pro tests -->
+                <exclude name="**/TestMaliciousClientSuite.class" />
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <!-- Excluded pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
                 <exclude name="**/TestCommandLogReinitiator.class"/>
                 <exclude name="**/TestCommandLog.class"/>
@@ -1188,10 +1195,7 @@ TEST CASES
                 <exclude name="**/TestPauselessRejoinFuzz" />
                 <exclude name="**/TestSecondaryRejoin.class" />
                 <exclude name="**/TestSnapshotSaveTruncation.class" />
-                <!-- <exclude name="**/TestInvocationBufferServer.class" /> -->
-                <!-- <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" /> -->
-                <!-- <exclude name="**/TestPrimary.class" /> -->
-                <!-- community tests -->
+                <!-- Exclude community tests -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
@@ -1199,49 +1203,6 @@ TEST CASES
                 <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <!-- <exclude name="**/TestHSQLBackend.class" /> -->
-                <!-- <exclude name="**/TestAdHocQueries.class" /> -->
-                <!-- <exclude name="**/TestJSONInterface.class" /> -->
-                <!-- <exclude name="**/TestRejoinEndToEnd.class" /> -->
-                <!-- <exclude name="**/TestRejoinWithCatalogUpdates.class" /> -->
-                <!-- <exclude name="**/TestReplicatedInvocation.class" /> -->
-                <!-- <exclude name="**/TestRestoreAgent.class" -->
-                <!-- <exclude name="**/TestSimpleCJK.class" /> -->
-                <!-- <exclude name="**/TestClientTimeouts.class" /> -->
-                <!-- <exclude name="**/TestExportToFileClient.class" /> -->
-                <!-- <exclude name="**/TestJDBCDriver.class" />-->
-                <!-- <exclude name="**/TestAdminMode.class" />-->
-                <!-- <exclude name="**/TestCatalogUpdateSuite.class" /> -->
-                <!-- <exclude name="**/TestCRUDSuite.class" /> -->
-                <!-- <exclude name="**/TestFailureDetectSuite.class" /> -->
-                <!-- <exclude name="**/TestExecutionSiteDeath.class" /> -->
-                <!-- <exclude name="**/TestFailuresSuite.class" /> -->
-                <!-- <exclude name="**/TestFixedSQLSuite.class" /> -->
-                <!-- <exclude name="**/TestFunctionsSuite.class" /> -->
-                <!-- <exclude name="**/TestGiantDeleteSuite.class" /> -->
-                <!-- <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
-                <!-- <exclude name="**/TestIndexesSuite.class" /> -->
-                <!-- <exclude name="**/TestLimitOffsetSuite.class" /> -->
-                <!-- <exclude name="**/TestLoadingSuite.class" /> -->
-                <!-- <exclude name="**/TestMaterializedViewSuite.class" /> -->
-                <!-- <exclude name="**/TestMultiPartitionSuite.class" /> -->
-                <!-- <exclude name="**/TestOrderBySuite.class" /> -->
-                <!-- <exclude name="**/TestPartitionDetection.class" /> -->
-                <!-- <exclude name="**/TestPlansGroupBySuite.class" /> -->
-                <!-- <exclude name="**/TestReplicationSuite.class" /> -->
-                <!-- <exclude name="**/TestRollbackSuite.class" /> -->
-                <!-- <exclude name="**/TestSQLFeaturesSuite.class" /> -->
-                <!-- <exclude name="**/TestSQLTypesSuite.class" /> -->
-                <!-- <exclude name="**/TestSecuritySuite.class" /> -->
-                <!-- <exclude name="**/TestSqlAggregateSuite.class" /> -->
-                <!-- <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
-                <!-- <exclude name="**/TestSqlUpdateSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemCatalogSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemInformationSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemProcedureSuite.class" /> -->
-                <!-- <exclude name="**/TestTPCCSuite.class" /> -->
-                <!-- <exclude name="**/TestBlobType.class" /> -->
             </fileset>
         </tests>
     </run_junit>
