@@ -1418,7 +1418,7 @@ public class DDLCompiler {
             // parse the xml like any other sql statement
             ParsedSelectStmt stmt = null;
             try {
-                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(query, xmlquery, db, null);
+                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(query, xmlquery, null, db, null);
             }
             catch (Exception e) {
                 throw m_compiler.new VoltCompilerException(e.getMessage());

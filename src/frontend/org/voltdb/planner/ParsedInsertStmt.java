@@ -23,7 +23,6 @@ import java.util.Map.Entry;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -41,11 +40,11 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     }
 
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode) {
         assert(tableList.size() <= 1);
 
         String tableName = stmtNode.attributes.get("table");
-        Table table = db.getTables().getIgnoreCase(tableName);
+        Table table = getTableFromDB(tableName);
 
         // if the table isn't in the list add it
         // if it's there, good
@@ -59,14 +58,14 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
             if (node.name.equalsIgnoreCase("columns")) {
                 for (VoltXMLElement colNode : node.children) {
                     if (colNode.name.equalsIgnoreCase("column")) {
-                         parseInsertColumn(colNode, db, table);
+                         parseInsertColumn(colNode, table);
                     }
                 }
             }
         }
     }
 
-    void parseInsertColumn(VoltXMLElement columnNode, Database db, Table table) {
+    void parseInsertColumn(VoltXMLElement columnNode, Table table) {
         String tableName = columnNode.attributes.get("table");
         String columnName = columnNode.attributes.get("name");
 
@@ -75,7 +74,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         AbstractExpression expr = null;
         for (VoltXMLElement node : columnNode.children) {
-            expr = parseExpressionTree(node, db);
+            expr = parseExpressionTree(node);
             expr.refineValueType(VoltType.get((byte)column.getType()));
             ExpressionUtil.finalizeValueTypes(expr);
         }
