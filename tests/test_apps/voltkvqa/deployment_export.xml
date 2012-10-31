@@ -4,5 +4,15 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="true" class="org.voltdb.export.processors.GuestProcessor"/>
+    <export enabled="true">
+        <onserver exportto="file">
+            <configuration>
+                <property name="type">tsv</property>
+                <property name="with-schema">true</property>
+                <property name="batched">true</property>
+                <property name="nonce">zohan</property>
+                <property name="period">10</property>
+            </configuration>
+        </onserver>
+    </export>
 </deployment>
