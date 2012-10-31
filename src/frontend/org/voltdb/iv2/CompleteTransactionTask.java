@@ -90,6 +90,12 @@ public class CompleteTransactionTask extends TransactionTask
     }
 
     @Override
+    public long getSpHandle()
+    {
+        return m_msg.getSpHandle();
+    }
+
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();

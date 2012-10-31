@@ -69,6 +69,11 @@ public class FragmentTask extends TransactionTask
         hostLog.debug("COMPLETE: " + this);
     }
 
+    @Override
+    public long getSpHandle()
+    {
+        return m_task.getSpHandle();
+    }
 
     /**
      * Produce a rejoining response.
