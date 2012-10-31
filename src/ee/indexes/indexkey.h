@@ -501,6 +501,12 @@ struct GenericPersistentKey : public GenericKey<keySize>
     }
 
     // Both copy constructor and assignment operator are apparently required by CompactingMap.
+    // It is now VERY IMPORTANT to only extract keys OUT of a map by const reference AND avoid
+    // using these constructor/assignment functions in that scenario
+    // -- with a local variable as the lhs and an in-map key as the rhs.
+    // That would effectively corrupt the map entry when the local variable goes out of scope
+    // and/or prevent the in-map key from properly freeing its referenced objects when it got
+    // deleted from the map.
     GenericPersistentKey( const GenericPersistentKey& other )
         : GenericKey<keySize>() // Copying the inherited member explicitly.
         , m_keySchema(other.m_keySchema)
@@ -512,6 +518,8 @@ struct GenericPersistentKey : public GenericKey<keySize>
 
     const GenericPersistentKey& operator=( const GenericPersistentKey& other )
     {
+        // Should not be overwriting an actively-in-use persistent key -- this will leak!
+        assert( ! m_keySchema);
         m_keySchema = other.m_keySchema;
         ::memcpy(this->data, other.data, keySize);
         // Only one key, this, can own the tuple and its objects.
