@@ -15,6 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
+
+#include "common/debuglog.h"
+
 #include <pthread.h>
 
 using namespace std;
@@ -38,15 +41,21 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 CatalogId hostId) :
     m_topEnd(topend), m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum), m_txnId(0),
+    m_lastCommittedTxnId(0),
     m_siteId(siteId), m_partitionId(partitionId),
     m_hostname(hostname), m_hostId(hostId),
     m_exportEnabled(exportEnabled), m_epoch(0) // set later
 {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);
+    bindToThread();
+}
+
+void ExecutorContext::bindToThread()
+{
     // There can be only one (per thread).
     assert(pthread_getspecific( static_key) == NULL);
     pthread_setspecific( static_key, this);
-    m_lastCommittedTxnId = 0;
+    VOLT_DEBUG("Installing EC(%ld)", (long)this);
 }
 
 ExecutorContext::~ExecutorContext() {
@@ -55,6 +64,8 @@ ExecutorContext::~ExecutorContext() {
     // There can be only one (per thread).
     assert(pthread_getspecific( static_key) == this);
     // ... or none, now that the one is going away.
+    VOLT_DEBUG("De-installing EC(%ld)", (long)this);
+
     pthread_setspecific( static_key, NULL);
 }
 

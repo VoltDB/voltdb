@@ -49,8 +49,7 @@
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
 
-#include "boost/array.hpp"
-#include "boost/unordered_map.hpp"
+#include "expressions/abstractexpression.h"
 
 #include <cassert>
 #include <iostream>
@@ -268,11 +267,47 @@ struct IntsKey
         }
     }
 
-    IntsKey(const TableTuple *tuple, const std::vector<int> &indices, const TupleSchema *keySchema) {
+    IntsKey(const TableTuple *tuple, const std::vector<int> &indices,
+            const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
         int intraKeyOffset = sizeof(uint64_t) - 1;
+        if (indexed_expressions.size() != 0) {
+            for (int ii = 0; ii < columnCount; ii++) {
+                AbstractExpression* ae = indexed_expressions[ii];
+                switch(ae->getValueType()) {
+                case voltdb::VALUE_TYPE_BIGINT: {
+                    const int64_t value = ValuePeeker::peekBigInt(ae->eval(tuple, NULL));
+                    const uint64_t keyValue = convertSignedValueToUnsignedValue<INT64_MAX, int64_t, uint64_t>(value);
+                    insertKeyValue<uint64_t>( keyOffset, intraKeyOffset, keyValue);
+                    break;
+                }
+                case voltdb::VALUE_TYPE_INTEGER: {
+                    const int32_t value = ValuePeeker::peekInteger(ae->eval(tuple, NULL));
+                    const uint32_t keyValue = convertSignedValueToUnsignedValue<INT32_MAX, int32_t, uint32_t>(value);
+                    insertKeyValue<uint32_t>( keyOffset, intraKeyOffset, keyValue);
+                    break;
+                }
+                case voltdb::VALUE_TYPE_SMALLINT: {
+                    const int16_t value = ValuePeeker::peekSmallInt(ae->eval(tuple, NULL));
+                    const uint16_t keyValue = convertSignedValueToUnsignedValue<INT16_MAX, int16_t, uint16_t>(value);
+                    insertKeyValue<uint16_t>( keyOffset, intraKeyOffset, keyValue);
+                    break;
+                }
+                case voltdb::VALUE_TYPE_TINYINT: {
+                    const int8_t value = ValuePeeker::peekTinyInt(ae->eval(tuple, NULL));
+                    const uint8_t keyValue = convertSignedValueToUnsignedValue<INT8_MAX, int8_t, uint8_t>(value);
+                    insertKeyValue<uint8_t>( keyOffset, intraKeyOffset, keyValue);
+                    break;
+                }
+                default:
+                    throwFatalException( "We currently only support a specific set of column index types/sizes for IntsKeys {%s}", getTypeName(keySchema->columnType(ii)).c_str());
+                    break;
+                }
+            }
+            return;
+        }
         for (int ii = 0; ii < columnCount; ii++) {
             switch(keySchema->columnType(ii)) {
             case voltdb::VALUE_TYPE_BIGINT: {
@@ -400,12 +435,21 @@ struct GenericKey
         ::memcpy(data, tuple->m_data + TUPLE_HEADER_SIZE, tuple->getSchema()->tupleLength());
     }
 
-    GenericKey(const TableTuple *tuple, const std::vector<int> &indices, const TupleSchema *keySchema) {
+    GenericKey(const TableTuple *tuple, const std::vector<int> &indices,
+               const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
         assert(tuple);
         TableTuple keyTuple(keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(data));
-        for (int i = 0; i < keySchema->columnCount(); i++) {
-            keyTuple.setNValue(i, tuple->getNValue(indices[i]));
+        const int columnCount = keySchema->columnCount();
+        if (indexed_expressions.size() > 0) {
+            for (int ii = 0; ii < columnCount; ++ii) {
+                AbstractExpression* ae = indexed_expressions[ii];
+                keyTuple.setNValue(ii, ae->eval(tuple, NULL));
+            }
+            return;
+        } // else take advantage og columns-only optimization
+        for (int ii = 0; ii < columnCount; ++ii) {
+            keyTuple.setNValue(ii, tuple->getNValue(indices[ii]));
         }
     }
 
@@ -472,8 +516,6 @@ private:
     const TupleSchema *m_keySchema;
 };
 
-
-struct TupleKeyEqualityChecker;
 struct TupleKeyComparator;
 
 /*
@@ -500,12 +542,13 @@ struct TupleKeyComparator;
  */
 struct TupleKey
 {
-    typedef TupleKeyEqualityChecker KeyEqualityChecker;
+    // typedef TupleKeyEqualityChecker KeyEqualityChecker; // Required by (future?) support for CompactingHash...
     typedef TupleKeyComparator KeyComparator;
-    // typedef TupleKeyHasher KeyHasher; // Future?
+    // typedef TupleKeyHasher KeyHasher; // Required by (future?) support for CompactingHash...
 
     inline TupleKey() {
         m_columnIndices = NULL;
+        m_indexedExprs = NULL;
         m_keyTuple = NULL;
         m_keyTupleSchema = NULL;
     }
@@ -517,22 +560,24 @@ struct TupleKey
     TupleKey(const TableTuple *tuple) {
         assert(tuple);
         m_columnIndices = NULL;
+        m_indexedExprs = NULL;
         m_keyTuple = tuple->address();
         m_keyTupleSchema = tuple->getSchema();
     }
 
     // Set a key from a table-schema tuple.
-    TupleKey(const TableTuple *tuple, const std::vector<int> &indices, const TupleSchema *unused_keySchema) {
+    TupleKey(const TableTuple *tuple, const std::vector<int> &indices,
+             const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *unused_keySchema) {
         assert(tuple);
         assert(indices.size() > 0);
         m_columnIndices = &indices;
+        if (indexed_expressions.size() != 0) {
+            m_indexedExprs = &indexed_expressions;
+        } else {
+            m_indexedExprs = NULL;
+        }
         m_keyTuple = tuple->address();
         m_keyTupleSchema = tuple->getSchema();
-    }
-
-    // Return true if the TupleKey references an ephemeral index key.
-    bool isKeySchema() const {
-        return m_columnIndices == NULL;
     }
 
     // Return a table tuple that is valid for comparison
@@ -541,18 +586,26 @@ struct TupleKey
     }
 
     // Return the indexColumn'th key-schema column.
-    int columnForIndexColumn(int indexColumn) const {
-        if (isKeySchema())
-            return indexColumn;
-        else
-            return (*m_columnIndices)[indexColumn];
+    NValue indexedValue(const TableTuple &tuple, int indexColumn) const {
+        if (m_columnIndices == NULL) {
+            // Pass through the values from an ephemeral index key "tuple".
+            return tuple.getNValue(indexColumn);
+        }
+        if (m_indexedExprs == NULL) {
+            // Project key column values from a column index's persistent tuple
+            return tuple.getNValue((*m_columnIndices)[indexColumn]);
+        }
+        // Evaluate more complicated key expressions on a persistent tuple.
+        return (*m_indexedExprs)[indexColumn]->eval(&tuple, NULL);
     }
 
 private:
-    // TableIndex owns this array - NULL if an ephemeral key
+    // TableIndex owns these vectors which are used to extract key values from a persistent tuple
+    // - both are NULL for an ephemeral key
     const std::vector<int> *m_columnIndices;
+    const std::vector<AbstractExpression*> *m_indexedExprs;
 
-    // Pointer a persistent tuple in non-ephemeral case.
+    // Pointer to a persistent tuple in the non-ephemeral case.
     char *m_keyTuple;
     const TupleSchema *m_keyTupleSchema;
 };
@@ -570,9 +623,10 @@ struct TupleKeyComparator
         TableTuple rhTuple = rhs.getTupleForComparison();
         NValue lhValue, rhValue;
 
-        for (int ii=0; ii < m_keySchema->columnCount(); ++ii) {
-            lhValue = lhTuple.getNValue(lhs.columnForIndexColumn(ii));
-            rhValue = rhTuple.getNValue(rhs.columnForIndexColumn(ii));
+        const int columnCount = m_keySchema->columnCount();
+        for (int ii=0; ii < columnCount; ++ii) {
+            lhValue = lhs.indexedValue(lhTuple, ii);
+            rhValue = rhs.indexedValue(rhTuple, ii);
 
             int comparison = lhValue.compare(rhValue);
 

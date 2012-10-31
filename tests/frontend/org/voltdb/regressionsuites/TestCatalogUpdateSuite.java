@@ -545,6 +545,86 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(callbackSuccess);
     }
 
+    public void testAddDropExpressionIndex() throws Exception
+    {
+        ClientResponse callProcedure;
+        String explanation;
+        VoltTable result;
+
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // check that no index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertFalse(explanation.contains("INDEX SCAN"));
+
+        // add index to NEW_ORDER
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addexpressindex.jar");
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addexpressindex.xml");
+        VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        // check the index for non-zero size
+
+        long tupleCount = indexEntryCountFromStats(client, "NEW_ORDER", "NEWEXPRESSINDEX");
+        assertTrue(tupleCount > 0);
+
+        // verify that the new table(s) support an insert
+        callProcedure = client.callProcedure("@AdHoc", "insert into NEW_ORDER values (-1, -1, -1);");
+        assertTrue(callProcedure.getResults().length == 1);
+        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
+
+        // do a call that uses the index
+        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
+        result = callProcedure.getResults()[0];
+        result.advanceRow();
+        assertEquals(5, result.getLong("NO_O_ID"));
+
+        // check that an index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertTrue(explanation.contains("INDEX SCAN"));
+
+        // tables can still be accessed
+        loadSomeData(client, 20, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // check the index for even biggerer size from stats
+        long newTupleCount = indexEntryCountFromStats(client, "NEW_ORDER", "NEWEXPRESSINDEX");
+        assertTrue(newTupleCount > tupleCount);
+
+        // check table for the right number of tuples
+        callProcedure = client.callProcedure("@AdHoc", "select count(*) from NEW_ORDER;");
+        long rowCount = callProcedure.getResults()[0].asScalarLong();
+        assertEquals(newTupleCount, rowCount * (K + 1)); // index count is double for k=1
+
+        // revert to the original schema
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        // do a call that uses the index
+        callProcedure = client.callProcedure("@AdHoc", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
+        result = callProcedure.getResults()[0];
+        result.advanceRow();
+        assertEquals(5, result.getLong("NO_O_ID"));
+
+        // check that no index was used by checking the plan itself
+        callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
+        explanation = callProcedure.getResults()[0].fetchRow(0).getString(0);
+        assertFalse(explanation.contains("INDEX SCAN"));
+
+        // and loading still succeeds
+        loadSomeData(client, 30, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+    }
+
     public void testAddDropTable() throws IOException, ProcCallException, InterruptedException
     {
         Client client = getClient();
@@ -845,6 +925,23 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml"));
+
+        config = new LocalCluster("catalogupdate-cluster-addexpressindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX ON NEW_ORDER ((NO_O_ID+NO_O_ID)-NO_O_ID);");
+        // history is good because this new index is the only one (no pkey)
+        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX2 ON HISTORY ((H_C_ID+H_C_ID)-H_C_ID);");
+        // unique index
+        // This needs to wait until the test for unique index coverage for indexed expressions can parse out any simple column expressions
+        // and discover a unique index on some subset.
+        //TODO: project.addLiteralSchema("CREATE UNIQUE INDEX NEWEXPRESSINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY+S_QUANTITY-S_QUANTITY);");
+
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addexpressindex.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-expanded.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);

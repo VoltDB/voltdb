@@ -81,11 +81,11 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
+PersistentTable::PersistentTable(int partitionColumn) :
     Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
-    m_executorContext(ctx),
-    m_allowNulls(NULL),
+    m_allowNulls(),
+    m_partitionColumn(partitionColumn),
     stats_(this),
     m_COWContext(NULL),
     m_failedCompactionCount(0)
@@ -112,8 +112,6 @@ PersistentTable::~PersistentTable() {
         tuple.freeObjectColumns();
         tuple.setActiveFalse();
     }
-
-    if (m_allowNulls) delete[] m_allowNulls;
 
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
@@ -266,7 +264,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     /*
      * Create and register an undo action.
      */
-    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
@@ -340,7 +338,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
      * Create and register an undo action and then use the copy of
      * the target (old value with no updates)
      */
-    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
@@ -494,7 +492,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     /*
      * Create and register an undo action.
      */
-    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
@@ -673,8 +671,7 @@ std::string PersistentTable::debug() {
 }
 
 void PersistentTable::onSetColumns() {
-    if (m_allowNulls != NULL) delete[] m_allowNulls;
-    m_allowNulls = new bool[m_columnCount];
+    m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
         m_allowNulls[i] = m_schema->columnAllowNull(i);
     }
