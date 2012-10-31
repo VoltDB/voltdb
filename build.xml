@@ -1162,13 +1162,8 @@ TEST CASES
 </target>
 
 <target
-    name="junit_iv2"
-    description="Tests exclusive to IV2 functionality.">
-
-    <condition property="enableiv2" value="${enableiv2}" else="true">
-        <isset property="enableiv2"/>
-    </condition>
-
+    name="junit"
+    description="Execute JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1248,46 +1243,11 @@ TEST CASES
     </sequential>
 </macrodef>
 
-<!-- Junit tests that run quickly -->
-<target name="junit_quick" description="Tests and suites that run in under 3 minutes under memcheck">
-    <run_junit>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-                <include name='org/voltdb/**/Test*.class'/>
-                <exclude name="**/*$*.class"/>
-                <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/TestExportSuite.class" />
-                <exclude name="**/TestFailuresSuite.class" />
-                <exclude name="**/TestFixedSQLSuite.class" />
-                <exclude name="**/TestPlansGroupBySuite.class" />
-                <exclude name="**/TestRejoin*.class" />
-                <exclude name="**/TestRollbackSuite.class" />
-                <exclude name="**/TestSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestSQLFeaturesSuite.class" />
-                <exclude name="**/TestSQLTypesSuite.class" />
-                <exclude name="**/TestSqlUpdateSuite.class" />
-                <exclude name="**/TestIndexesSuite.class" />
-                <exclude name="**/TestExportSuite.class" />
-                <exclude name="**/TestFailureDetectSuite.class" />
-                <exclude name="**/TestReplicationSuite.class" />
-                <exclude name="**/TestSqlAggregateSuite.class" />
-                <exclude name="**/TestOrderBySuite.class" />
-                <exclude name="**/TestTPCCSuite.class" />
-                <exclude name="**/TestCatalogUpdateSuite.class" />
-                <exclude name="**/TestGiantDeleteSuite.class"  />
-                <exclude name="**/TestMultiPartitionSuite.class"  />
-                <exclude name="**/TestReplicatedSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestAdminMode.class" />
-                <exclude name="**/TestPartitionDetection.class"  />
-                <exclude name="**/TestSystemProcedureSuite.class"  />
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-            </fileset>
-        </tests>
-    </run_junit>
-</target>
+<target name="junit_legacy" description="Run JUnit in pre-iv2 mode.">
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
+    </condition>
 
-<target name="junit" description="Run testcases for Java classes.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1322,9 +1282,9 @@ TEST CASES
         depends="with.emma, junit, emma-report"
 />
 
-<target name='emma_junit_iv2'
-        description="run junit_iv2 target and generate coverage report"
-        depends="with.emma, junit_iv2, emma-report"
+<target name='emma_junit_legacy'
+        description="run junit_legacy target and generate coverage report"
+        depends="with.emma, junit_legacy, emma-report"
 />
 
 <target name='with.emma' description="enable code coverage analysis" >
@@ -1539,7 +1499,8 @@ TEST CASES
     <condition property="verbosereport" value="${verbosereport}" else="true">
         <isset property="verbosereport"/>
     </condition>
-    <condition property="enableiv2" value="${enableiv2}" else="false">
+    <!-- run iv2 by default. -Denableiv2=false to get legacy -->
+    <condition property="enableiv2" value="${enableiv2}" else="true">
         <isset property="enableiv2"/>
     </condition>
 
