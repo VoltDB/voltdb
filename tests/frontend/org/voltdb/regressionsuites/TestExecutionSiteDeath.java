@@ -23,14 +23,13 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-
 import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.executionsitekillers.*;
+import org.voltdb_testprocs.regressionsuites.executionsitekillers.SinglePartitionKiller;
 import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionJavaError;
 
 public class TestExecutionSiteDeath extends RegressionSuite {
@@ -48,7 +47,7 @@ public class TestExecutionSiteDeath extends RegressionSuite {
         super(name);
     }
 
-    public void testSinglePartitionKiller() throws IOException {
+    public void testSinglePartitionKiller() throws Exception {
         Client client = getClient();
         LocalCluster lc_config = (LocalCluster)m_config;
 
@@ -63,6 +62,13 @@ public class TestExecutionSiteDeath extends RegressionSuite {
         {
             // Expected result if we cap the server out from under the client.
             // keep on keeping on
+        }
+        //In Jenkins you will occasionally see lc_config.getLiveNodeCount() return 2
+        //I am assuming this is because the process has closed sockets but not propagated a return
+        //value yet. Spin a bit to see if giving it some time makes it better.
+        for (int ii = 0; ii < 5000; ii++) {
+            if (lc_config.getLiveNodeCount() == 1) return;
+            Thread.sleep(1);
         }
         // And now we should only have 1 local cluster node.
         assertEquals(1, lc_config.getLiveNodeCount());
