@@ -1186,7 +1186,6 @@ TEST CASES
                 <exclude name="**/TestTaskLog.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
-                <exclude name="**/TestVoltLicense.class" />
                 <exclude name="**/TestPauselessRejoinEndToEnd.class" />
                 <exclude name="**/TestPauselessRejoinFuzz.class" />
                 <exclude name="**/TestSecondaryRejoin.class" />
