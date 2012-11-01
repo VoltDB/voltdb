@@ -68,13 +68,28 @@ class JavaRunner(object):
     Execute or compile Java programs.
     """
 
-    def __init__(self, classpath):
-        self.classpath = classpath
+    def __init__(self, verb_classpath):
+        self.classpath = None
+        self.verb_classpath = verb_classpath
+
+    def initialize(self):
+        if self.classpath is None:
+            # Build the Java classpath using environment variable, config file,
+            # verb attribute, and kwargs.
+            self.classpath = ':'.join(environment.classpath)
+            classpath_ext = config.get('volt.classpath')
+            if classpath_ext:
+                self.classpath = ':'.join((self.classpath, classpath_ext))
+            if self.verb_classpath:
+                self.classpath = ':'.join((self.verb_classpath, self.classpath))
+            if 'classpath' in kwargs:
+                self.classpath = ':'.join((kwargs['classpath'], self.classpath))
 
     def execute(self, java_class, java_opts_override, *args, **kwargs):
         """
         Run a Java command line with option overrides.
         """
+        self.initialize()
         classpath = self.classpath
         kwargs_classpath = kwargs.get('classpath', None)
         if kwargs_classpath:
@@ -102,6 +117,7 @@ class JavaRunner(object):
         """
         Compile Java source using javac.
         """
+        self.initialize()
         if not os.path.exists(outdir):
             os.makedirs(outdir)
         utility.run_cmd('javac', '-target', '1.6', '-source', '1.6',
@@ -127,18 +143,9 @@ class VerbRunner(object):
         self.project_path  = os.path.join(os.getcwd(), 'project.xml')
         # The internal verbspaces are just used for packaging other verbspaces.
         self.internal_verbspaces = internal_verbspaces
-        # Build the Java classpath using environment variable, config file,
-        # verb attribute, and kwargs.
-        classpath = ':'.join(environment.classpath)
-        classpath_ext = config.get('volt.classpath')
-        if classpath_ext:
-            classpath = ':'.join((classpath, classpath_ext))
-        if hasattr(self.verb, 'classpath') and self.verb.classpath:
-            classpath = ':'.join((self.verb.classpath, classpath))
-        if 'classpath' in kwargs:
-            classpath = ':'.join((kwargs['classpath'], classpath))
         # Create a Java runner.
-        self.java = JavaRunner(classpath)
+        verb_classpath = getattr(self.verb, 'classpath', None)
+        self.java = JavaRunner(verb_classpath)
 
     def shell(self, *args):
         """
@@ -211,6 +218,8 @@ class VerbRunner(object):
             output_dir = ''
         else:
             output_dir = output_dir_in
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
         if args:
             # Package other verbspaces.
             for name in args:
@@ -224,11 +233,23 @@ class VerbRunner(object):
             self._create_package(output_dir, self.verbspace.name, self.verbspace.version,
                                  self.verbspace.description, force)
         # Warn for Python version < 2.6.
+        compat_msg = ('''\
+The program package requires Python version 2.6 or greater.  It will
+crash with older Python versions that can't detect and run zip
+packages. If a newer Python is not the default you can run by passing
+the package file to an explicit python version, e.g.
+
+    python2.6 %s''' % self.verbspace.name)
         if sys.version_info[0] == 2 and sys.version_info[1] < 6:
-            utility.warning(
-                    'Generated program packages require Python version 2.6 or greater.',
-                    'The running Python version is %d.%d.%d' % sys.version_info[:3],
-                    "It will crash with Python versions that can't detect and run zip packages.")
+            utility.warning(compat_msg)
+        # Generate README.<tool> file.
+        readme_path = os.path.join(output_dir, 'README.%s' % self.verbspace.name)
+        readme_file = utility.File(readme_path, mode = 'w')
+        readme_file.open()
+        try:
+            readme_file.write('%s\n\nWARNING: %s\n' % (self.get_usage(), compat_msg))
+        finally:
+            readme_file.close()
 
     def usage(self):
         """
@@ -238,6 +259,12 @@ class VerbRunner(object):
         sys.stdout.write('\n')
         parser.print_help()
         sys.stdout.write('\n')
+
+    def get_usage(self):
+        """
+        Get usage string.
+        """
+        return VoltCLIParser(self.verbspace).get_usage_string()
 
     def set_default_func(self, default_func):
         """
@@ -308,10 +335,12 @@ class VerbRunner(object):
         zipper.open(output_path, force = force, preamble = '#!/usr/bin/env python\n')
         try:
             # Generate the __main__.py module for automatic execution from the zip file.
+            standalone = str(environment.standalone)
             main_script = ('''\
 import sys
 from voltcli import runner
-runner.main('%(name)s', '', '%(version)s', '%(description)s', package = True, *sys.argv[1:])'''
+runner.main('%(name)s', '', '%(version)s', '%(description)s',
+            package = True, standalone = %(standalone)s, *sys.argv[1:])'''
                     % locals())
             zipper.add_file_from_string(main_script, '__main__.py')
             # Recursively package lib/python as lib in the zip file.
@@ -453,9 +482,10 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
     """
     Called by running script to execute command with command line arguments.
     """
-    # For now "package" is the only valid keyword to flag when running from a
-    # package zip __main__.py.
+    # The "package" keyword flags when running from a package zip __main__.py.
     package = utility.kwargs_get(kwargs, 'package', default = False)
+    # The "standalone" keyword allows environment.py to skip the library search.
+    standalone = utility.kwargs_get(kwargs, 'standalone', default = False)
     try:
         # Pre-scan for verbose, debug, and dry-run options so that early code
         # can display verbose and debug messages, and obey dry-run.
@@ -469,7 +499,7 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
         config = VoltConfig(permanent_path, local_path)
 
         # Initialize the environment
-        environment.initialize(command_name, command_dir, version)
+        environment.initialize(standalone, command_name, command_dir, version)
 
         # Search for modules based on both this file's and the calling script's location.
         verbspace = load_verbspace(command_name, command_dir, config, version,

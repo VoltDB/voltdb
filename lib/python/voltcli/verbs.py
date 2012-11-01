@@ -262,8 +262,8 @@ class HelpVerb(CommandVerb):
     """
     def __init__(self, name, function, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
-        self.set_defaults(description = 'Display command help.',
-                          usage       = '[COMMAND ...]',
+        self.set_defaults(description = 'Display general or verb-specific help.',
+                          usage       = '[VERB ...]',
                           baseverb    = True)
         self.add_options(
             cli.BooleanOption('-a', '--all', 'all',

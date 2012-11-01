@@ -29,7 +29,6 @@
 # The VoltDB administrative command script
 
 __author__ = 'scooper'
-version = "0.9"
 description = '''\
 This is the command line interface to VoltDB administrative functions.
 '''
@@ -37,35 +36,45 @@ This is the command line interface to VoltDB administrative functions.
 import sys
 import os
 
-# Look for and add the voltcli library directory to the Python system path.
+# Find version.xml and add the lib/python subdirectory to the Python system path.
+version  = None
 base_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
 test_dir = base_dir
-test_dirs = []
-lib_dir = None
+lib_dir  = None
 while test_dir != '/':
-    for sub_dir in ('', 'lib/python'):
-        test_lib_dir = os.path.join(test_dir, sub_dir)
-        test_dirs.append(test_lib_dir)
-        if os.path.exists(os.path.join(test_lib_dir, 'voltcli', 'runner.py')):
-            lib_dir = os.path.join(test_dir, sub_dir)
-            break
-    if lib_dir is None:
-        test_dir = os.path.dirname(test_dir)
-    else:
+    version_path = os.path.join(test_dir, 'version.txt')
+    if os.path.exists(version_path):
+        try:
+            f = open(version_path)
+            try:
+                try:
+                    version = f.read().strip()
+                except (IOError, OSError), e:
+                    sys.stderr.write('ERROR: Failed to read "%s": %s\n' % (version_path, str(e)))
+                    sys.exit(1)
+            finally:
+                f.close()
+        except (IOError, OSError), e:
+            sys.stderr.write('ERROR: Failed to open "%s": %s\n' % (version_path, str(e)))
+            sys.exit(1)
+        lib_dir = os.path.join(test_dir, 'lib', 'python')
+        sys.path.insert(0, lib_dir)
         break
+    test_dir = os.path.dirname(test_dir)
 else:
-    sys.stderr.write('''
-ERROR: Could not find voltcli libraries starting from "%s"
-       Checked the following locations:
-%s
-''' % (base_dir, '\n'.join(['         %s' % d for d in test_dirs])))
+    sys.stderr.write('ERROR: Could not find version.xml starting from the script location.\n')
     sys.exit(1)
-sys.path.insert(0, lib_dir)
 
-from voltcli import runner
+try:
+    # Should be able to import if the version.txt directory has lib/python/voltcli.
+    from voltcli import runner
+except ImportError:
+    sys.stderr.write('ERROR: Unable to import voltcli.runner from "%s".\n' % lib_dir)
+    sys.exit(1)
 
 #### Command line main
 
 if __name__ == '__main__':
     command_dir, command_name = os.path.split(sys.argv[0])
-    runner.main(command_name, command_dir, version, description, *sys.argv[1:])
+    runner.main(command_name, command_dir, version, description, *sys.argv[1:],
+                standalone = True)

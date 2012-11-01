@@ -329,6 +329,26 @@ class CLIParser(ExtendedHelpOptionParser):
 
         return ParsedCommand(self, verb_opts, verb_args, self.verb)
 
+    def get_usage_string(self):
+        """
+        Get usage string.
+        """
+        # Swap stdout with UsageScraper pseudo-file object so that output is captured.
+        # Necessary because optparse only sends help to stdout.
+        class UsageScraper(object):
+            def __init__(self):
+                self.usage = []
+            def write(self, s):
+                self.usage.append(s)
+        scraper = UsageScraper()
+        stdout_save = sys.stdout
+        try:
+            sys.stdout = scraper
+            self.print_help()
+        finally:
+            sys.stdout = stdout_save
+        return ''.join(scraper.usage)
+
     def on_format_epilog(self):
         if not self.verb:# or self.verb.get_argument_count() == 0:
             return self._format_verb_list()
