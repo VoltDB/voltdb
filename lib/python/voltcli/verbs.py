@@ -40,8 +40,6 @@ class BaseVerb(object):
     """
     def __init__(self, name, **kwargs):
         self.name = name
-        # The baseverb flag is used for common verbs like package and help so
-        # that they can be kept separate from application-specific verbs.
         self.classpath = utility.kwargs_get(kwargs, 'classpath', default = None)
         self.cli_spec = cli.CLISpec(**kwargs)
         self.dirty_opts = False
@@ -150,7 +148,9 @@ class JavaVerb(CommandVerb):
         self.java_class = java_class
         self.add_options(
            cli.IntegerOption('-D', '--debugport', 'debugport',
-                             'enable remote debugging on the specified port'))
+                             'enable remote debugging on the specified port'),
+           cli.BooleanOption('-n', '--dry-run', 'dryrun',
+                             'display actions without executing them'))
 
     def go(self, runner, *args):
         final_args = list(args) + list(runner.args)
@@ -283,6 +283,7 @@ class PackageVerb(CommandVerb):
         self.set_defaults(description  = 'Create a runnable Python program package.',
                           usage        = '[NAME ...]',
                           baseverb     = True,
+                          hideverb     = True,
                           description2 = '''\
 The optional NAME argument(s) allow package generation for base commands other
 than the current one. If no NAME is provided the current base command is

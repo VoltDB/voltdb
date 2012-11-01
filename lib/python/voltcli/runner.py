@@ -47,16 +47,14 @@ base_cli_spec = cli.CLISpec(
 Specific actions are provided by verbs.  Run "%prog help VERB" to display full
 usage for a verb, including its options and arguments.
 ''',
-    usage = '%prog [OPTIONS] VERB [ARGUMENTS ...]',
+    usage = '%prog VERB [ARGUMENTS ...]',
     options = (
         cli.BooleanOption('-d', '--debug', 'debug',
-                       'display debug messages'),
-        cli.BooleanOption('-n', '--dry-run', 'dryrun',
-                       'display actions without executing them'),
-        cli.BooleanOption('-p', '--pause', 'pause',
-                       'pause before significant actions'),
+                          'display debug messages'),
+        cli.BooleanOption(None, '--pause', 'pause',
+                          'pause before significant actions'),
         cli.BooleanOption('-v', '--verbose', 'verbose',
-                       'display verbose messages, including external command lines'),
+                          'display verbose messages, including external command lines'),
     )
 )
 
@@ -113,20 +111,18 @@ class JavaRunner(object):
 class VerbRunner(object):
 #===============================================================================
 
-    def __init__(self, command, verbspace, internal_verbspaces, config, cli_processor, **kwargs):
+    def __init__(self, command, verbspace, internal_verbspaces, config, **kwargs):
         """
         VerbRunner constructor.
         """
         # Unpack the command object for use by command implementations.
-        self.verb       = command.verb
-        self.opts       = command.opts
-        self.args       = command.args
-        self.parser     = command.parser
-        self.outer_opts = command.outer_opts
+        self.verb   = command.verb
+        self.opts   = command.opts
+        self.args   = command.args
+        self.parser = command.parser
         # The verbspace supports running nested commands.
         self.verbspace     = verbspace
         self.config        = config
-        self.cli_processor = cli_processor
         self.default_func  = None
         self.project_path  = os.path.join(os.getcwd(), 'project.xml')
         # The internal verbspaces are just used for packaging other verbspaces.
@@ -184,22 +180,22 @@ class VerbRunner(object):
         context = '%s.help()' % self.__class__.__name__
         all = utility.kwargs_get(kwargs, 'all', default = False)
         if all:
-            sys.stdout.write('\n===== Full Help =====\n')
-            self.usage()
             for verb_name in self.verbspace.verb_names:
-                if not self.verbspace.verbs[verb_name].cli_spec.baseverb:
+                verb_spec = self.verbspace.verbs[verb_name].cli_spec
+                if not verb_spec.baseverb and not verb_spec.hideverb:
                     sys.stdout.write('\n===== Verb: %s =====\n' % verb_name)
-                    self._help_verb(verb_name)
+                    self._print_verb_help(verb_name)
             for verb_name in self.verbspace.verb_names:
-                if self.verbspace.verbs[verb_name].cli_spec.baseverb:
+                verb_spec = self.verbspace.verbs[verb_name].cli_spec
+                if verb_spec.baseverb and not verb_spec.hideverb:
                     sys.stdout.write('\n===== Common Verb: %s =====\n' % verb_name)
-                    self._help_verb(verb_name)
+                    self._print_verb_help(verb_name)
         else:
             if args:
                 for name in args:
                     for verb_name in self.verbspace.verb_names:
                         if verb_name == name.lower():
-                            self._help_verb(verb_name)
+                            self._print_verb_help(verb_name)
                             break
                     else:
                         utility.error('Verb "%s" was not found.' % name)
@@ -238,8 +234,9 @@ class VerbRunner(object):
         """
         Display usage screen.
         """
+        parser = VoltCLIParser(self.verbspace)
         sys.stdout.write('\n')
-        self.cli_processor.print_help()
+        parser.print_help()
         sys.stdout.write('\n')
 
     def set_default_func(self, default_func):
@@ -285,17 +282,18 @@ class VerbRunner(object):
             args2 = [verb_name] + list(args[1:])
             self._run_command(self.internal_verbspaces[verbspace_name], *args2, **kwargs)
 
-    def call_sysproc(self, name, types, args):
-        proc = voltdbclient.VoltProcedure(self.client, name, types)
+    def call_sysproc(self, sysproc_name, types, args):
+        proc = voltdbclient.VoltProcedure(self.client, sysproc_name, types)
         response = proc.call(params = args)
         if response.status != 1:
             utility.abort('@Pause system procedure call failed.', (response,))
         utility.verbose_info(response)
 
-    def _help_verb(self, name):
+    def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
-        verb = self.verbspace.verbs[name]
-        parser = self.cli_processor.create_verb_parser(verb)
+        verb = self.verbspace.verbs[verb_name]
+        parser = VoltCLIParser(self.verbspace)
+        parser.initialize_verb(verb_name)
         sys.stdout.write('\n')
         parser.print_help()
         if verb.cli_spec.description2:
@@ -323,16 +321,9 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s', package = True, *s
 
     def _run_command(self, verbspace, *args, **kwargs):
         # Internal method to run a command.
-        processor = cli.VoltCLICommandProcessor(verbspace.verbs,
-                                                base_cli_spec.options,
-                                                base_cli_spec.usage,
-                                                '\n'.join((verbspace.description,
-                                                           base_cli_spec.description)),
-                                                '%%prog version %s' % verbspace.version)
-        command = processor.parse(args)
-        command.outer_opts = self.outer_opts
-        runner = VerbRunner(command, verbspace, self.internal_verbspaces, self.config,
-                            processor, **kwargs)
+        parser = VoltCLIParser(verbspace)
+        command = parser.parse(*args)
+        runner = VerbRunner(command, verbspace, self.internal_verbspaces, self.config, **kwargs)
         runner.execute()
 
 #===============================================================================
@@ -424,28 +415,36 @@ class VoltConfig(utility.PersistentConfig):
         return value
 
 #===============================================================================
+class VoltCLIParser(cli.CLIParser):
+#===============================================================================
+    def __init__(self, verbspace):
+        """
+        VoltCLIParser constructor.
+        """
+        cli.CLIParser.__init__(self, verbspace.verbs,
+                                     base_cli_spec.options,
+                                     base_cli_spec.usage,
+                                     '\n'.join((verbspace.description,
+                                                base_cli_spec.description)),
+                                     '%%prog version %s' % verbspace.version)
+
+#===============================================================================
 def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
 #===============================================================================
     """
     Run a command after parsing the command line arguments provided.
     """
     # Parse the command line.
-    processor = cli.VoltCLICommandProcessor(verbspace.verbs,
-                                            base_cli_spec.options,
-                                            base_cli_spec.usage,
-                                            '\n'.join((verbspace.description,
-                                                       base_cli_spec.description)),
-                                            '%%prog version %s' % verbspace.version)
-    command = processor.parse(args)
+    parser = VoltCLIParser(verbspace)
+    command = parser.parse(*args)
 
     # Initialize utility function options according to parsed options.
-    utility.set_verbose(command.outer_opts.verbose)
-    utility.set_debug(  command.outer_opts.debug)
-    utility.set_dryrun( command.outer_opts.dryrun)
+    utility.set_verbose(command.opts.verbose)
+    utility.set_debug(  command.opts.debug)
 
     # Run the command. Pass along kwargs. This allows verbs calling other verbs
     # to add keyword arguments like "classpath".
-    runner = VerbRunner(command, verbspace, internal_verbspaces, config, processor, **kwargs)
+    runner = VerbRunner(command, verbspace, internal_verbspaces, config, **kwargs)
     runner.execute()
 
 #===============================================================================
@@ -460,11 +459,9 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
     try:
         # Pre-scan for verbose, debug, and dry-run options so that early code
         # can display verbose and debug messages, and obey dry-run.
-        preproc = cli.VoltCLICommandPreprocessor(base_cli_spec.options)
-        preproc.preprocess(args)
-        utility.set_verbose(preproc.get_option('-v', '--verbose') == True)
-        utility.set_debug(  preproc.get_option('-d', '--debug'  ) == True)
-        utility.set_dryrun( preproc.get_option('-n', '--dry-run') == True)
+        opts = cli.preprocess_options(base_cli_spec.options, args)
+        utility.set_verbose(opts.verbose)
+        utility.set_debug(opts.debug)
 
         # Load the configuration and state
         permanent_path = os.path.join(os.getcwd(), 'volt.cfg')
