@@ -222,7 +222,6 @@ class CLIParser(ExtendedHelpOptionParser):
             description = description,
             usage       = usage,
             version     = version)
-        self.add_base_options()
 
     def add_base_options(self):
         """
@@ -280,6 +279,9 @@ class CLIParser(ExtendedHelpOptionParser):
         """
         Initialize command line options for a specific verb.
         """
+        # Add the base options that are applicable to all verbs.
+        self.add_base_options()
+
         # See if we know about the verb.
         if verb_name.startswith('-'):
             self._abort('The first argument must be a verb, not an option.')
