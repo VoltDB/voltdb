@@ -192,7 +192,12 @@ public class StatementQuery extends StatementDMQL {
         // to represent UNION, etc.
         int exprType = queryExpr.getUnionType();
         if (exprType == QueryExpression.NOUNION) {
-            return voltGetXMLSpecification(queryExpr, session);
+            // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
+            if (! (queryExpr instanceof QuerySpecification)) {
+                throw new HSQLParseException(queryExpr.operatorName() + " is not supported.");
+            }
+            QuerySpecification select = (QuerySpecification) queryExpr;
+            return voltGetXMLSpecification(select, session);
         } else if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
                    exprType == QueryExpression.EXCEPT || exprType == QueryExpression.EXCEPT_ALL ||
                    exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
@@ -218,28 +223,20 @@ public class StatementQuery extends StatementDMQL {
      * @return VoltXMLElement transformed UNION expression.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltTransformUnionXMLExpression(VoltXMLElement unionExpr, VoltXMLElement childExpr)
+    VoltXMLElement voltTransformUnionXMLExpression(VoltXMLElement parentExpr, VoltXMLElement childExpr)
     throws HSQLParseException
     {
         if ("union".equalsIgnoreCase(childExpr.name) &&
-            unionExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
-                unionExpr.children.addAll(childExpr.children);
+            parentExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
+                parentExpr.children.addAll(childExpr.children);
         } else {
-            unionExpr.children.add(childExpr);
+            parentExpr.children.add(childExpr);
         }
-        return unionExpr;
+        return parentExpr;
     }
     
-    VoltXMLElement voltGetXMLSpecification(QueryExpression queryExpr, Session session)
-    throws HSQLParseException
-    {
-        // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
-        if (! (queryExpr instanceof QuerySpecification)) {
-            throw new HSQLParseException(queryExpr.operatorName() + " and similar tuple set operators are not supported.");
-        }
-        
-        QuerySpecification select = (QuerySpecification) queryExpr;
-
+    VoltXMLElement voltGetXMLSpecification(QuerySpecification select, Session session)
+    throws HSQLParseException {
         try {
             getResult(session);
         }

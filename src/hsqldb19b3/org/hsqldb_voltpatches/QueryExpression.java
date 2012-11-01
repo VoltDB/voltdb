@@ -592,7 +592,7 @@ public class QueryExpression {
 
         return unionCorrespondingColumns.size();
     }
-    
+
     public void collectAllExpressions(HsqlList set, OrderedIntHashSet typeSet,
                                       OrderedIntHashSet stopAtTypeSet) {
 
@@ -805,7 +805,7 @@ public class QueryExpression {
         leftQueryExpression.getBaseTableNames(set);
         rightQueryExpression.getBaseTableNames(set);
     }
-    
+
     /*************** VOLTDB *********************/
 
     /**
@@ -815,7 +815,7 @@ public class QueryExpression {
     public int getUnionType() {
         return unionType;
     }
-    
+
     /**
      * VoltDB added method to get the left expression.
      * @return QueryExpression Left expression.

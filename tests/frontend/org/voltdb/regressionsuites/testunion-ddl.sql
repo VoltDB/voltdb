@@ -19,4 +19,11 @@ CREATE TABLE C (
  PRIMARY KEY (PKEY)
 );
 
+-- replicated in test
+CREATE TABLE D (
+ PKEY          INTEGER,
+ I             INTEGER,
+ PRIMARY KEY (PKEY)
+);
+
 

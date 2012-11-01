@@ -171,7 +171,6 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT ALL SELECT I FROM B EXCEPT ALL SELECT I FROM C;")
                                  .getResults()[0];
         int r = result.getRowCount();
-        System.out.println(result.toString());
         assertEquals(3, result.getRowCount());
     }
 
@@ -226,12 +225,12 @@ public class TestUnionSuite extends RegressionSuite {
     }
 
     /**
-     * Three table - (A.I union B.I) except C.I
+     * (A.I union B.I) except C.I
      * @throws NoConnectionsException
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testMultipleSetOperations() throws NoConnectionsException, IOException, ProcCallException {
+    public void testMultipleSetOperations1() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         client.callProcedure("InsertA", 0, 0); // in A,B union. Eliminated by C.PKEY=3
         client.callProcedure("InsertA", 1, 1); // in A,B union. Eliminated by C.PKEY=1
@@ -246,7 +245,30 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A UNION SELECT I FROM B EXCEPT SELECT I FROM C;")
                 .getResults()[0];
         assertEquals(1, result.getRowCount());
-    }
+   }
+
+    /**
+     * (A.I union B.I) except (C.I union D.I)
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMultipleSetOperations2() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        client.callProcedure("InsertA", 1, 1); // in A,B and C,D unions. Eliminated by EXCEPT
+        client.callProcedure("InsertA", 3, 4); // in A,B union. Not in C,D. In final result set
+        client.callProcedure("InsertB", 1, 0); // in A,B and C,D unions. Eliminated by EXCEPT
+        client.callProcedure("InsertB", 3, 2); // in A,B and C,D unions. Eliminated by EXCEPT
+        client.callProcedure("InsertC", 1, 1); // in A,B and C,D unions. Eliminated by EXCEPT
+        client.callProcedure("InsertC", 3, 0); // in A,B and C,D unions. Eliminated by EXCEPT
+        client.callProcedure("InsertC", 4, 3); // in A,B and C,D unions. Eliminated by EXCEPT
+        client.callProcedure("InsertD", 0, 2); // in A,B and C,D unions. Eliminated by EXCEPT
+        VoltTable result = client.callProcedure("@AdHoc", "(SELECT I FROM A UNION SELECT I FROM B) EXCEPT (SELECT I FROM C UNION SELECT I FROM D);")
+                .getResults()[0];
+        assertEquals(1, result.getRowCount());
+        result.advanceToRow(0);
+        assertEquals(4, result.getLong(0));
+   }
 
 
     static public junit.framework.Test suite() {
@@ -260,6 +282,7 @@ public class TestUnionSuite extends RegressionSuite {
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");
+        project.addStmtProcedure("InsertD", "INSERT INTO D VALUES(?, ?);");
 
         // local
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
