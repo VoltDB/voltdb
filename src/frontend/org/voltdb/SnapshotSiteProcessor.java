@@ -232,13 +232,18 @@ public class SnapshotSiteProcessor {
         m_idlePredicate = idlePredicate;
     }
 
-    public void shutdown() {
+    public void shutdown() throws InterruptedException {
         for (BBContainer c : m_snapshotBufferOrigins ) {
             c.discard();
         }
         m_snapshotBufferOrigins.clear();
         m_availableSnapshotBuffers.clear();
         m_snapshotCreateSetupPermit = null;
+        if (m_snapshotTargetTerminators != null) {
+            for (Thread t : m_snapshotTargetTerminators) {
+                t.join();
+            }
+        }
     }
 
     void initializeBufferPool() {

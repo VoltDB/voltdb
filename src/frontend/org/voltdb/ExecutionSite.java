@@ -57,7 +57,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -470,7 +469,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             }
         }
 
-        m_snapshotter.shutdown();
+        try {
+            m_snapshotter.shutdown();
+        } catch (InterruptedException e) {
+            hostLog.warn("Interrupted during shutdown", e);
+        }
     }
 
     /**
@@ -615,6 +618,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     };
 
+    @Override
     public void tick() {
         /*
          * poke the PartitionDRGateway regularly even if we are not idle. In the
@@ -872,7 +876,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 serializedCatalog = voltdb.getCatalogContext().catalog.serialize();
             }
             hsql = null;
-            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog, txnId, configuredNumberOfPartitions);
+            ee =
+                    initializeEE(
+                            voltdb.getBackendTargetType(),
+                            serializedCatalog,
+                            txnId,
+                            m_context.m_timestamp,
+                            configuredNumberOfPartitions);
         }
 
         m_systemProcedureContext = new SystemProcedureContext();
@@ -941,7 +951,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     private ExecutionEngine
-    initializeEE(BackendTarget target, String serializedCatalog, final long txnId, int configuredNumberOfPartitions)
+    initializeEE(
+            BackendTarget target,
+            String serializedCatalog,
+            final long txnId,
+            final long timestamp,
+            int configuredNumberOfPartitions)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
 
@@ -958,7 +973,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                         configuredNumberOfPartitions);
-                eeTemp.loadCatalog( txnId, serializedCatalog);
+                eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, txnId);
             }
@@ -976,7 +991,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             target,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
                             m_tracker.m_numberOfPartitions);
-                eeTemp.loadCatalog( 0, serializedCatalog);
+                eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
             }
@@ -1001,7 +1016,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         ee.quiesce(lastCommittedTxnId);
-        ee.updateCatalog( context.m_transactionId, catalogDiffCommands);
+        ee.updateCatalog( context.m_timestamp, catalogDiffCommands);
 
         return true;
     }

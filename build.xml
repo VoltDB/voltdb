@@ -1178,6 +1178,7 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
                 <!-- Excluded pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
                 <exclude name="**/TestCommandLogReinitiator.class"/>
@@ -1247,7 +1248,6 @@ TEST CASES
     <condition property="enableiv2" value="${enableiv2}" else="false">
         <isset property="enableiv2"/>
     </condition>
-
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1261,6 +1261,7 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
             </fileset>
         </tests>
     </run_junit>

@@ -363,7 +363,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         JSONObject topology = config.getTopology(hostIds);
         long crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath,
                                                           true);
-        context = new CatalogContext(0, catalog, bytes, crc, 0, 0);
+        context = new CatalogContext(0, 0, catalog, bytes, crc, 0, 0);
         siteTrackers = new HashMap<Integer, SiteTracker>();
 
         // create MailboxNodeContexts for all hosts (we only need getAllHosts(), I think)
