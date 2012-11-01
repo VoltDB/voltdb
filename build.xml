@@ -1183,11 +1183,12 @@ TEST CASES
                 <exclude name="**/TestCommandLogReinitiator.class"/>
                 <exclude name="**/TestCommandLog.class"/>
                 <exclude name="**/TestLogReader.class"/>
+                <exclude name="**/TestTaskLog.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestVoltLicense.class" />
-                <exclude name="**/TestPauselessRejoinEndToEnd" />
-                <exclude name="**/TestPauselessRejoinFuzz" />
+                <exclude name="**/TestPauselessRejoinEndToEnd.class" />
+                <exclude name="**/TestPauselessRejoinFuzz.class" />
                 <exclude name="**/TestSecondaryRejoin.class" />
                 <exclude name="**/TestSnapshotSaveTruncation.class" />
                 <!-- Exclude community tests -->
