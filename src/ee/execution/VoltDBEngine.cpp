@@ -509,6 +509,14 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
 }
 
 bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPayload) {
+    assert(m_executorContext != NULL);
+    ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
+    if (executorContext == NULL) {
+        VOLT_DEBUG("Rebinding EC (%ld) to new thread", (long)m_executorContext);
+        // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
+        m_executorContext->bindToThread();
+    }
+
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
     m_catalog->execute(catalogPayload);
@@ -625,7 +633,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                                                                  catalogTable->signature());
 
             // use the delegate to init the table and create indexes n' stuff
-            if (tcd->init(m_executorContext, *m_database, *catalogTable) != 0) {
+            if (tcd->init(*m_database, *catalogTable) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            catTableIter->second->name().c_str());
                 return false;
@@ -719,10 +727,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                     // add the index to the stats source
                     index->getIndexStats()->configure(index->getName() + " stats",
                                                       table->name(),
-                                                      m_executorContext->m_hostId,
-                                                      m_executorContext->m_hostname,
-                                                      m_executorContext->m_siteId,
-                                                      m_executorContext->m_partitionId,
                                                       indexIter->second->relativeIndex());
                 }
             }
@@ -1270,11 +1274,19 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     }
 }
 
+
+void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
+{
+    m_currentUndoQuantum = undoQuantum;
+    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
+}
+
+
 /*
  * Exists to transition pre-existing unit test cases.
  */
 ExecutorContext * VoltDBEngine::getExecutorContext() {
-    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum());
+    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
     return m_executorContext;
 }
 

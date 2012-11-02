@@ -479,11 +479,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (getPlanNodeType() == type)
             collected.add(this);
 
-        for (AbstractPlanNode n : m_children)
-            n.findAllNodesOfType_recurse(type, collected, visited);
+        for (AbstractPlanNode child : m_children)
+            child.findAllNodesOfType_recurse(type, collected, visited);
 
-        // NOTE: ignores inline nodes.
-
+        for (AbstractPlanNode inlined : m_inlineNodes.values())
+            inlined.findAllNodesOfType_recurse(type, collected, visited);
     }
 
     /**

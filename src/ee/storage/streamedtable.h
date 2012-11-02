@@ -44,8 +44,7 @@ class StreamedTable : public Table {
     friend class StreamedTableStats;
 
   public:
-    StreamedTable(ExecutorContext *ctx, bool exportEnabled);
-    StreamedTable(int tableAllocationTargetSize);
+    StreamedTable(bool exportEnabled);
     static StreamedTable* createForTest(size_t, ExecutorContext*);
 
     virtual ~StreamedTable();

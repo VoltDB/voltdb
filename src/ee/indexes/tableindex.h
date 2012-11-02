@@ -60,6 +60,8 @@
 
 namespace voltdb {
 
+class AbstractExpression;
+
 /**
  * Parameter for constructing TableIndex. TupleSchema, then key schema
  */
@@ -67,33 +69,88 @@ struct TableIndexScheme {
     TableIndexScheme() {
         tupleSchema = NULL;
     }
-    TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                         std::vector<ValueType> columnTypes, bool unique,
-                         bool intsOnly, TupleSchema *tupleSchema) {
-        this->name = name; this->type = type; this->columnIndices = columnIndices;
-        this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->countable = true;
+
+    TableIndexScheme(std::string a_name, TableIndexType a_type,
+                     const std::vector<int32_t>& a_columnIndices,
+                     const std::vector<AbstractExpression*>& a_indexedExpressions,
+                     bool a_unique, bool a_countable,
+                     const std::string& a_expressionsAsText,
+                     const TupleSchema *a_tupleSchema) :
+      name(a_name),
+      type(a_type),
+      columnIndices(a_columnIndices),
+      indexedExpressions(a_indexedExpressions),
+      unique(a_unique),
+      countable(a_countable),
+      expressionsAsText(a_expressionsAsText),
+      tupleSchema(a_tupleSchema)
+    {}
+
+    // TODO: Remove this temporary backward-compatible test-only constructor -- this should go away soon, forcing
+    // column index construction in the ee tests to provide rather than default the empty expressionsAsText string.
+    // TODO: Better yet: move the call to construct the indexId:
+    // Since the expressionsAsText is only used to additionally qualify the index id string, a process that is
+    // initiated (rather awkwardly) from the TypeIndex constructor, it would be less trouble for the VoltDBEngine
+    // (which already knows how) to always construct the entire indexId from the catalog index and pass THAT to
+    // the TableIndexScheme constructor above (fully qualified by expressionsAsText) in place of expressionsAsText.
+    // The small downside is the slightly larger string buffer being subject to the copying and recopying of
+    // TableIndexScheme members on their way to their final embedding in the TableIndex.
+    // This change would eliminate the mostly redundant method for TableIndexScheme-to-indexId conversion.
+    // TableIndexScheme construction in most if not all ee tests could provide a dummy (empty or nonce) value
+    // for indexId. Index Ids seem only to be of interest in catalog-driven processing.
+    TableIndexScheme(std::string a_name, TableIndexType a_type,
+                     const std::vector<int32_t>& a_columnIndices,
+                     const std::vector<AbstractExpression*>& a_indexedExpressions,
+                     bool a_unique, bool a_countable,
+                     const TupleSchema *a_tupleSchema) :
+      name(a_name),
+      type(a_type),
+      columnIndices(a_columnIndices),
+      indexedExpressions(a_indexedExpressions),
+      unique(a_unique),
+      countable(a_countable),
+      expressionsAsText(""),
+      tupleSchema(a_tupleSchema)
+    {
     }
-/* This constructor does not set countable field according what you value you pass in.
- * FIX it when VoltDB CompactingMap can pack memory together for TreeNode without allocating
- * memory for the 4 bytes countable field.
- * */
-    TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                     std::vector<ValueType> columnTypes, bool unique,  bool countable,
-                     bool intsOnly, TupleSchema *tupleSchema) {
-        this->name = name; this->type = type; this->columnIndices = columnIndices;
-        this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->countable = countable;
+
+    TableIndexScheme(const TableIndexScheme& other) :
+      name(other.name),
+      type(other.type),
+      columnIndices(other.columnIndices),
+      indexedExpressions(other.indexedExpressions),
+      unique(other.unique),
+      countable(other.countable),
+      expressionsAsText(other.expressionsAsText),
+      tupleSchema(other.tupleSchema)
+    {}
+
+    TableIndexScheme& operator=(const TableIndexScheme& other)
+    {
+        name = other.name;
+        type = other.type;
+        columnIndices = other.columnIndices;
+        indexedExpressions = other.indexedExpressions;
+        unique = other.unique;
+        countable = other.countable;
+        expressionsAsText = other.expressionsAsText;
+        tupleSchema = other.tupleSchema;
+        return *this;
+    }
+
+    static const std::vector<TableIndexScheme> noOptionalIndices()
+    {
+        return std::vector<TableIndexScheme>();
     }
 
     std::string name;
     TableIndexType type;
     std::vector<int32_t> columnIndices;
-    std::vector<ValueType> columnTypes;
+    std::vector<AbstractExpression*> indexedExpressions;
     bool unique;
     bool countable;
-    bool intsOnly;
-    TupleSchema *tupleSchema;
+    std::string expressionsAsText;
+    const TupleSchema *tupleSchema;
 };
 
 /**
@@ -337,6 +394,18 @@ public:
     {
         return m_scheme.columnIndices;
     }
+
+    // Provide an empty expressions vector to indicate a simple columns-only index.
+    static const std::vector<AbstractExpression*>& simplyIndexColumns() {
+        static std::vector<AbstractExpression*> emptyExpressionVector;
+        return emptyExpressionVector;
+    }
+
+    const std::vector<AbstractExpression*>& getIndexedExpressions() const
+    {
+        return m_scheme.indexedExpressions;
+    }
+
 
     const std::string& getName() const
     {

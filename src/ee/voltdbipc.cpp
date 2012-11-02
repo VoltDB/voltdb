@@ -358,7 +358,11 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
         if (m_engine->loadCatalog(ntohll(msg->timestamp), std::string(msg->data)) == true) {
             return kErrorCode_Success;
         }
-    } catch (SerializableEEException &e) {}
+    //TODO: FatalException and SerializableException should be universally caught and handled in "execute",
+    // rather than in hard-to-maintain "execute method" boilerplate code like this.
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    } catch (SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
 
     return kErrorCode_Error;
 }

@@ -173,7 +173,7 @@ class CompactingHashUniqueIndex : public TableIndex
 
     const KeyType setKeyFromTuple(const TableTuple *tuple)
     {
-        KeyType result(tuple, m_scheme.columnIndices, m_keySchema);
+        KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
         return result;
     }
 
