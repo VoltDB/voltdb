@@ -46,6 +46,7 @@ try:
     # Tweak the Python library path to call voltcli.runner.main().
     sys.path.insert(0, lib_dir)
     from voltcli import runner
+    os.chdir(os.path.join(base_dir, 'examples', 'voter'))
 # Be selective about exceptions to avoid masking load-time library exceptions.
 except (IOError, OSError, ImportError), e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))

@@ -47,12 +47,11 @@ base_cli_spec = cli.CLISpec(
 Specific actions are provided by verbs.  Run "%prog help VERB" to display full
 usage for a verb, including its options and arguments.
 ''',
-    usage = '%prog VERB [ARGUMENTS ...]',
+    usage = '%prog VERB [ ARGUMENTS ... ]',
     options = (
         cli.BooleanOption(None, '--debug', 'debug',
                           'display debug messages'),
-        cli.BooleanOption(None, '--pause', 'pause',
-                          'pause before significant actions'),
+        cli.BooleanOption(None, '--pause', 'pause', None),
         cli.BooleanOption('-v', '--verbose', 'verbose',
                           'display verbose messages, including external command lines'),
     )
@@ -68,22 +67,25 @@ class JavaRunner(object):
     Execute or compile Java programs.
     """
 
-    def __init__(self, verb_classpath):
+    def __init__(self, verb, config, **kwargs):
+        self.verb      = verb
+        self.config    = config
+        self.kwargs    = kwargs
         self.classpath = None
-        self.verb_classpath = verb_classpath
 
     def initialize(self):
         if self.classpath is None:
             # Build the Java classpath using environment variable, config file,
             # verb attribute, and kwargs.
             self.classpath = ':'.join(environment.classpath)
-            classpath_ext = config.get('volt.classpath')
+            classpath_ext = self.config.get('volt.classpath')
             if classpath_ext:
                 self.classpath = ':'.join((self.classpath, classpath_ext))
-            if self.verb_classpath:
-                self.classpath = ':'.join((self.verb_classpath, self.classpath))
-            if 'classpath' in kwargs:
-                self.classpath = ':'.join((kwargs['classpath'], self.classpath))
+            verb_classpath = getattr(self.verb, 'classpath', None)
+            if verb_classpath:
+                self.classpath = ':'.join((verb_classpath, self.classpath))
+            if 'classpath' in self.kwargs:
+                self.classpath = ':'.join((self.kwargs['classpath'], self.classpath))
 
     def execute(self, java_class, java_opts_override, *args, **kwargs):
         """
@@ -137,15 +139,14 @@ class VerbRunner(object):
         self.args   = command.args
         self.parser = command.parser
         # The verbspace supports running nested commands.
-        self.verbspace     = verbspace
-        self.config        = config
-        self.default_func  = None
-        self.project_path  = os.path.join(os.getcwd(), 'project.xml')
+        self.verbspace    = verbspace
+        self.config       = config
+        self.default_func = None
+        self.project_path = os.path.join(os.getcwd(), 'project.xml')
         # The internal verbspaces are just used for packaging other verbspaces.
         self.internal_verbspaces = internal_verbspaces
         # Create a Java runner.
-        verb_classpath = getattr(self.verb, 'classpath', None)
-        self.java = JavaRunner(verb_classpath)
+        self.java = JavaRunner(self.verb, self.config, **kwargs)
 
     def shell(self, *args):
         """
@@ -272,7 +273,7 @@ the package file to an explicit python version, e.g.
         """
         self.default_func = default_func
 
-    def go(self, *args):
+    def go(self):
         """
         Invoke the default function provided by a Verb object.
         """
@@ -280,7 +281,7 @@ the package file to an explicit python version, e.g.
             utility.abort('Verb "%s" (class %s) does not provide a default go() function.'
                                 % (self.verb.name, self.verb.__class__.__name__))
         else:
-            self.default_func(self, *args)
+            self.default_func(self)
 
     def execute(self):
         """

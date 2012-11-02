@@ -43,28 +43,30 @@ def show_config(runner, *args):
             if n == 0:
                 sys.stdout.write('%s *not found*\n' % filter)
 
-targets = dict(
+types = dict(
     config = show_config,
 )
+type_names = types.keys()
+type_names.sort()
+valid_types = '|'.join(type_names)
 
 @VOLT.Command(description = 'Display various types of information.',
-              usage = 'TARGET [ARGUMENT ...]',
+              arguments = (
+                    VOLT.StringArgument('type', 'information type: %s' % valid_types),
+                    VOLT.StringArgument('item', 'optional item(s) (see type-specific help)',
+                                        min_count = 0, max_count = None)),
               description2 = '''
-Targets:
+Information Types:
 
     Display all or specific configuration key/value pairs.
 
         show config [KEY ...]
 ''')
 def show(runner):
-    if not runner.args:
-        utility.error('No target specified for "show".')
-        runner.help()
+    tag = runner.args[0].lower()
+    tgtargs = runner.args[1:]
+    if tag in types:
+        types[tag](runner, *tgtargs)
     else:
-        target = runner.args[0].lower()
-        tgtargs = runner.args[1:]
-        if target in targets:
-            targets[target](runner, *tgtargs)
-        else:
-            utility.error('Invalid target "%s" specified.' % target)
-            runner.help()
+        utility.error('Invalid tag "%s" specified (%s).' % (tag, valid_types))
+        runner.help()

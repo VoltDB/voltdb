@@ -27,6 +27,7 @@
 
 __author__ = 'scooper'
 
+import sys
 from voltdbclient import *
 from voltcli import cli
 from voltcli import environment
@@ -85,12 +86,6 @@ class BaseVerb(object):
     def __str__(self):
         return '%s: %s\n%s' % (self.__class__.__name__, self.name, self.cli_spec)
 
-    def get_options(self, required_only = False):
-        return (o for o in self.iter_options(required_only = required_only))
-
-    def get_arguments(self):
-        return (o for o in self.iter_arguments())
-
     def get_option_count(self):
         if not self.cli_spec.options:
             return 0
@@ -103,20 +98,39 @@ class BaseVerb(object):
 
     def iter_options(self, required_only = False):
         if self.cli_spec.options:
-            if self.dirty_opts:
-                self.cli_spec.options.sort()
-                self.dirty_opts = False
+            self._check_options()
             for o in self.cli_spec.options:
                 if not required_only or (o.required and getattr(opts, o.kwargs['dest']) is None):
                     yield o
 
     def iter_arguments(self):
         if self.cli_spec.arguments:
-            if self.dirty_args:
-                self.cli_spec.arguments.sort()
-                self.dirty_args = False
+            self._check_arguments()
             for o in self.cli_spec.arguments:
                 yield o
+
+    def _check_options(self):
+        if self.dirty_opts:
+            self.cli_spec.options.sort()
+            self.dirty_opts = False
+
+    def _check_arguments(self):
+        if self.dirty_args:
+            nargs = len(self.cli_spec.arguments)
+            if nargs > 1:
+                for i in range(nargs-1):
+                    a = self.cli_spec.arguments[i]
+                    if a.min_count < 0 or a.max_count < 0:
+                        utility.abort('%s argument (%s) has a negative min or max count declared.'
+                                            % (self.name, self.cli_spec.arguments[0].name))
+                    if a.min_count == 0 and a.max_count == 0:
+                        utility.abort('%s argument (%s) has zero min and max counts declared.'
+                                            % (self.name, self.cli_spec.arguments[0].name))
+                    if a.min_count != 1 or a.max_count != 1:
+                        utility.abort('%s argument (%s) is not the last argument, '
+                                      'but has min/max counts declared.'
+                                            % (self.name, self.cli_spec.arguments[0].name))
+            self.dirty_args = False
 
 #===============================================================================
 class CommandVerb(BaseVerb):
@@ -132,7 +146,7 @@ class CommandVerb(BaseVerb):
         runner.set_default_func(self.go)
         self.function(runner)
 
-    def go(self, runner, *args):
+    def go(self, runner):
         utility.abort('The default go() method is not implemented by %s.'
                             % self.__class__.__name__)
 
@@ -147,13 +161,12 @@ class JavaVerb(CommandVerb):
         CommandVerb.__init__(self, name, function, **kwargs)
         self.java_class = java_class
         self.add_options(
-           cli.IntegerOption('-D', '--debugport', 'debugport',
-                             'enable remote debugging on the specified port'),
+           cli.IntegerOption(None, '--debugport', 'debugport',
+                             'enable remote Java debugging on the specified port'),
            cli.BooleanOption(None, '--dry-run', 'dryrun', None))
 
-    def go(self, runner, *args):
-        final_args = list(args) + list(runner.args)
-        self.run_java(runner, *final_args)
+    def go(self, runner):
+        self.run_java(runner, *runner.args)
 
     def run_java(self, runner, *args):
         opts_override = self.get_attr('java_opts_override', default = [])
@@ -193,7 +206,7 @@ class ServerVerb(JavaVerb):
                 '-XX:HeapDumpPath=/tmp',
                 '-XX:-ReduceInitialCardMarks')
 
-    def go(self, runner, *args):
+    def go(self, runner):
         final_args = [self.server_subcommand]
         catalog = runner.opts.catalog
         if not catalog:
@@ -201,8 +214,6 @@ class ServerVerb(JavaVerb):
         if catalog is None:
             utility.abort('A catalog path is required.')
         final_args.extend(['catalog', catalog])
-        if args:
-            final_args.extend(args)
         if runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])
         if runner.opts.host:
@@ -212,7 +223,8 @@ class ServerVerb(JavaVerb):
                 final_args.extend(['port', host.port])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
-        java_args = list(args) + list(runner.args)
+        if runner.args:
+            final_args.extend(runner.args)
         self.run_java(runner, *final_args)
 
 #===============================================================================
@@ -261,15 +273,15 @@ class HelpVerb(CommandVerb):
     """
     def __init__(self, name, function, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
-        self.set_defaults(description = 'Display general or verb-specific help.',
-                          usage       = '[VERB ...]',
-                          baseverb    = True)
+        self.set_defaults(description = 'Display general or verb-specific help.', baseverb = True)
         self.add_options(
             cli.BooleanOption('-a', '--all', 'all',
                               'display all available help, including verb usage'))
+        self.add_arguments(
+            cli.StringArgument('verb', 'verb name', min_count = 0, max_count = None))
 
-    def go(self, runner, *args):
-        runner.help(all = runner.opts.all, *runner.args)
+    def go(self, runner):
+        runner.help(all = runner.opts.all, *runner.opts.verb)
 
 #===============================================================================
 class PackageVerb(CommandVerb):
@@ -280,7 +292,6 @@ class PackageVerb(CommandVerb):
     def __init__(self, name, function, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
         self.set_defaults(description  = 'Create a runnable Python program package.',
-                          usage        = '[NAME ...]',
                           baseverb     = True,
                           hideverb     = True,
                           description2 = '''\
@@ -293,9 +304,11 @@ packaged.''')
                               default = False),
             cli.StringOption('-o', '--output_dir', 'output_dir',
                              'specify the output directory (defaults to the working directory)'))
+        self.add_arguments(
+            cli.StringArgument('name', 'base command name', min_count = 0, max_count = None))
 
-    def go(self, runner, *args):
-        runner.package(runner.opts.output_dir, runner.opts.force, *args)
+    def go(self, runner):
+        runner.package(runner.opts.output_dir, runner.opts.force, *runner.opts.name)
 
 #===============================================================================
 class VerbDecorators(object):

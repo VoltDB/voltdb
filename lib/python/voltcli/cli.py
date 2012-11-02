@@ -132,9 +132,14 @@ class IntegerOption(BaseOption):
 #===============================================================================
 class BaseArgument(object):
 #===============================================================================
-    def __init__(self, name, help):
-        self.name = name
-        self.help = help
+    def __init__(self, name, help, **kwargs):
+        self.name      = name
+        self.help      = help
+        self.min_count = kwargs.get('min_count', 1)
+        self.max_count = kwargs.get('max_count', 1)
+        # A max_count value of None is interpreted as infinity.
+        if self.max_count is None:
+            self.max_count = sys.maxint
     def get(self):
         utility.abort('BaseArgument subclass must implement a get() method: %s'
                             % self.__class__.__name__)
@@ -142,16 +147,16 @@ class BaseArgument(object):
 #===============================================================================
 class StringArgument(BaseArgument):
 #===============================================================================
-    def __init__(self, name, help):
-        BaseArgument.__init__(self, name, help)
+    def __init__(self, name, help, **kwargs):
+        BaseArgument.__init__(self, name, help, **kwargs)
     def get(self, value):
         return str(value)
 
 #===============================================================================
 class IntegerArgument(BaseArgument):
 #===============================================================================
-    def __init__(self, name, help):
-        BaseArgument.__init__(self, name, help)
+    def __init__(self, name, help, **kwargs):
+        BaseArgument.__init__(self, name, help, **kwargs)
     def get(self, value):
         try:
             return int(value)
@@ -259,25 +264,44 @@ class CLIParser(ExtendedHelpOptionParser):
 
     def process_verb_arguments(self, verb, verb_args, verb_opts):
         """
-        Validate the verb arguments. Check that required arguments are present.
-        Set option values for required arguments and remove them from the
-        argument list.
+        Validate the verb arguments. Check that required arguments are present
+        and populate verb_opts attributes with scalar values or lists (for
+        trailing arguments with max_count > 1).
         """
         # Add fixed arguments passed in through the decorator to the verb object.
         args = copy.copy(verb_args) + verb.command_arguments
         # Set attributes for required arguments.
         missing = []
         iarg = 0
-        for o in verb.iter_arguments():
-            if iarg < len(args):
-                setattr(verb_opts, o.name, args[iarg])
+        nargs = verb.get_argument_count()
+        for a in verb.iter_arguments():
+            # It's missing if we've exhausted all the arguments before
+            # exhausting all the argument specs, unless it's the last argument
+            # spec and it's optional.
+            if iarg > len(args) or (iarg == len(args) and a.min_count > 0):
+                missing.append((a.name, a.help))
             else:
-                missing.append((o.name, o.help))
-            iarg += 1
+                # The last argument can have repeated arguments. If more than
+                # one are allowed the values are put into a list.
+                if iarg == nargs - 1 and a.max_count > 1:
+                    value = list(args[iarg:])
+                    if len(value) < a.min_count:
+                        utility.abort('A minimum of %d %s arguments are required.'
+                                            % (a.min_count, a.name.upper()))
+                    if len(value) > a.max_count:
+                        utility.abort('A maximum of %d %s arguments are allowed.'
+                                            % (a.max_count, a.name.upper()))
+                    iarg += len(value)
+                else:
+                    # All other arguments are treated as scalars.
+                    value = args[iarg]
+                    iarg += 1
+                setattr(verb_opts, a.name, value)
+        # Abort if extra arguments were provided.
+        if iarg < len(args):
+            utility.abort('Extra arguments were provided:', args[iarg:])
         # Abort if arguments are missing.
         check_missing_items('argument', missing)
-        # Return the argument list with the required arguments removed.
-        return args[iarg:]
 
     def initialize_verb(self, verb_name):
         """
@@ -328,8 +352,10 @@ class CLIParser(ExtendedHelpOptionParser):
             verb_opts, verb_args = self.parse_args(verb_cmdargs)
             # Check for required options.
             self.check_verb_options(self.verb, verb_opts)
-            # Post-process expected arguments.
-            verb_args = self.process_verb_arguments(self.verb, verb_args, verb_opts)
+            # Post-process arguments.
+            self.process_verb_arguments(self.verb, verb_args, verb_opts)
+            # The arguments should all be attributes in verb_opts now.
+            verb_args = None
 
         return ParsedCommand(self, verb_opts, verb_args, self.verb)
 
@@ -354,11 +380,11 @@ class CLIParser(ExtendedHelpOptionParser):
         return ''.join(scraper.usage)
 
     def on_format_epilog(self):
-        if not self.verb:# or self.verb.get_argument_count() == 0:
+        if not self.verb:
             return self._format_verb_list()
-        rows = [(a.name.upper(), a.help) for a in self.verb.iter_arguments()]
         if self.verb.get_argument_count() == 0:
             return ''
+        rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
         return '\nArguments:\n%s\n' % utility.format_table(rows, indent = 2)
 
     def _abort(self, *msgs):
@@ -467,17 +493,34 @@ def check_missing_items(type_name, missing_items):
                       (fmt % (o.upper(), h) for (o, h) in missing_items))
 
 #===============================================================================
+def get_argument_usage(a):
+#===============================================================================
+    if a.max_count > 1:
+        ellipsis = ' ...'
+    else:
+        ellipsis = ''
+    if a.min_count == 0:
+        fmt = '[ %s%s ]'
+    else:
+        fmt = '%s%s'
+    return fmt % (a.name.upper(), ellipsis)
+
+#===============================================================================
 def get_verb_usage(verb):
 #===============================================================================
     """
     Provide the full usage string, including argument names, for a verb.
     """
-    usage = verb.name
     if verb.cli_spec.usage:
-        usage += ' %s' % verb.cli_spec.usage
-    for o in verb.iter_arguments():
-        usage += ' %s' % o.name.upper()
-    return usage
+        usage2 = ' %s' % verb.cli_spec.usage
+    else:
+        usage2 = ''
+    args = [get_argument_usage(a) for a in verb.iter_arguments()]
+    if args:
+        sargs = ' %s' % (' '.join(args))
+    else:
+        sargs = ''
+    return ''.join([verb.name, usage2, sargs])
 
 #===============================================================================
 def preprocess_options(base_options, cmdargs):
