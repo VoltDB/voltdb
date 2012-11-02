@@ -394,9 +394,18 @@ public abstract class SubPlanAssembler {
                 // GT scans pose a problem in that any compound key in the index that was an exact
                 // equality match on the filtered key component(s) and had a non-null value for any
                 // remaining component(s) would be mistaken for a match.
-                //TODO: Various workarounds for this issue are possible. See ENG-3913.
-                // For now, disqualify use of this index.
-                return null;
+                // The current work-around for this is to add (back) the GT condition to the set of
+                // "other" filter expressions that get evaluated for each tuple found in the index scan.
+                // This will eliminate the initial entries that are equal on the prefix key.
+                // This is not as efficient as getting the index scan to start in the "correct" place,
+                // but it puts off having to change the EE code.
+                // TODO: ENG-3913 describes more ambitious alternative solutions that include:
+                //  - padding with MAX values rather than null/MIN values for GT scans.
+                //  - adding the GT condition as a special "initialExpr" post-condition
+                //    that disables itself as soon as it evaluates to true for any row
+                //    -- it would be expected to always evaluate to true after that.
+                AbstractExpression comparator = startingBoundExpr.getFilter();
+                retval.otherExprs.add(comparator);
             }
         }
 

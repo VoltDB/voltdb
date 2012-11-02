@@ -58,6 +58,34 @@ public class TestIndexesSuite extends RegressionSuite {
     // - multi-column
     // - multi-map
 
+    //
+    // Multimap multi column, indexing only on prefix key
+    // @throws IOException
+    // @throws ProcCallException
+    //
+    public void testOrderedMultiMultiPrefixOnly()
+    throws IOException, ProcCallException
+    {
+        String[] tables = {"P3", "R3"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+            String query = String.format("select * from %s T where T.NUM > 100", table);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            String queryEq = String.format("select * from %s T where T.NUM = 200", table);
+            VoltTable[] resultsEq = client.callProcedure("@AdHoc", queryEq).getResults();
+            assertEquals(2, resultsEq[0].getRowCount());
+        }
+    }
+
     public void testParameterizedLimitOnIndexScan()
     throws IOException, ProcCallException {
         String[] tables = {"P1", "R1", "P2", "R2"};
