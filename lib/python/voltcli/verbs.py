@@ -149,8 +149,7 @@ class JavaVerb(CommandVerb):
         self.add_options(
            cli.IntegerOption('-D', '--debugport', 'debugport',
                              'enable remote debugging on the specified port'),
-           cli.BooleanOption('-n', '--dry-run', 'dryrun',
-                             'display actions without executing them'))
+           cli.BooleanOption(None, '--dry-run', 'dryrun', None))
 
     def go(self, runner, *args):
         final_args = list(args) + list(runner.args)

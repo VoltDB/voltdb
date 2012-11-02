@@ -49,7 +49,7 @@ usage for a verb, including its options and arguments.
 ''',
     usage = '%prog VERB [ARGUMENTS ...]',
     options = (
-        cli.BooleanOption('-d', '--debug', 'debug',
+        cli.BooleanOption(None, '--debug', 'debug',
                           'display debug messages'),
         cli.BooleanOption(None, '--pause', 'pause',
                           'pause before significant actions'),

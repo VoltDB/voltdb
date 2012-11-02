@@ -54,7 +54,11 @@ class BaseOption(object):
             self.required = False
         self.kwargs = kwargs
         self.kwargs['dest'] = dest
-        self.kwargs['help'] = help_msg
+        # A help message of None makes it a hidden option.
+        if help_msg is not None:
+            self.kwargs['help'] = help_msg
+        else:
+            self.kwargs['help'] = optparse.SUPPRESS_HELP
         if 'default' in self.kwargs:
             if utility.is_string(kwargs['default']):
                 self.kwargs['help'] += ' (default="%s")' % self.kwargs['default']
