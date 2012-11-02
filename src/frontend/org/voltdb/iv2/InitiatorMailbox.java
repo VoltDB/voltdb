@@ -246,7 +246,7 @@ public class InitiatorMailbox implements Mailbox
     {
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
-            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
+            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
             m_scheduler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
