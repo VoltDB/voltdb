@@ -310,7 +310,8 @@ the package file to an explicit python version, e.g.
             args2 = [verb_name] + list(args[1:])
             self._run_command(self.internal_verbspaces[verbspace_name], *args2, **kwargs)
 
-    def call_sysproc(self, sysproc_name, types, args):
+    def call_proc(self, sysproc_name, types, args):
+        utility.verbose_info('Call procedure: %s%s' % (sysproc_name, tuple(args)))
         proc = voltdbclient.VoltProcedure(self.client, sysproc_name, types)
         response = proc.call(params = args)
         if response.status != 1:

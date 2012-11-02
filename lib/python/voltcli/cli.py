@@ -355,7 +355,7 @@ class CLIParser(ExtendedHelpOptionParser):
             # Post-process arguments.
             self.process_verb_arguments(self.verb, verb_args, verb_opts)
             # The arguments should all be attributes in verb_opts now.
-            verb_args = None
+            verb_args = []
 
         return ParsedCommand(self, verb_opts, verb_args, self.verb)
 

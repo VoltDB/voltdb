@@ -35,7 +35,7 @@ from voltcli import utility
         VOLT.StringArgument('nonce',
                             'the unique snapshot identifier (nonce)')))
 def restore(runner):
-    runner.call_sysproc('@SnapshotRestore', [VOLT.FastSerializer.VOLTTYPE_STRING,
-                                             VOLT.FastSerializer.VOLTTYPE_STRING],
-                                            [runner.opts.directory, runner.opts.nonce])
+    runner.call_proc('@SnapshotRestore', [VOLT.FastSerializer.VOLTTYPE_STRING,
+                                          VOLT.FastSerializer.VOLTTYPE_STRING],
+                                         [runner.opts.directory, runner.opts.nonce])
     utility.info('The snapshot was restored.')

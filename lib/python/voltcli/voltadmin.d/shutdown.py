@@ -29,5 +29,5 @@ from voltcli import utility
 
 @VOLT.Admin_Client(description = 'Shut down the running VoltDB cluster.')
 def shutdown(runner):
-    runner.call_sysproc('@Shutdown', [], [])
+    runner.call_proc('@Shutdown', [], [])
     utility.info('The cluster was successfully stopped.')

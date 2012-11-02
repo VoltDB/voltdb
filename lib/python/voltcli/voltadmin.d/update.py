@@ -37,7 +37,7 @@ from voltcli import utility
 def update(runner):
     catalog    = VOLT.utility.File(runner.opts.catalog).read_hex()
     deployment = VOLT.utility.File(runner.opts.deployment).read()
-    runner.call_sysproc('@UpdateApplicationCatalog', [VOLT.FastSerializer.VOLTTYPE_STRING,
-                                                      VOLT.FastSerializer.VOLTTYPE_STRING],
-                                                     [catalog, deployment])
+    runner.call_proc('@UpdateApplicationCatalog', [VOLT.FastSerializer.VOLTTYPE_STRING,
+                                                   VOLT.FastSerializer.VOLTTYPE_STRING],
+                                                  [catalog, deployment])
     utility.info('The catalog update succeeded.')

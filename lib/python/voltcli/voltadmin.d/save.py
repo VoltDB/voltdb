@@ -33,7 +33,7 @@ from voltcli import utility
     options = (
         VOLT.BooleanOption(None, '--blocking', 'blocking',
                            'blocking mode stops database activity during the snapshot',
-                           default = False),
+                           default = True),
         VOLT.StringOption('-f', '--format', 'format',
                           'snapshot format: "native" or "csv"',
                           default = 'native')),
@@ -51,5 +51,5 @@ def save(runner):
     json_opts = '{uripath:"%s",nonce:"%s",block:%s,format:"%s"}' % (
                     uri, runner.opts.nonce, blocking, runner.opts.format)
     utility.debug('@SnapshotSave "%s"' % json_opts)
-    runner.call_sysproc('@SnapshotSave', [VOLT.FastSerializer.VOLTTYPE_STRING], [json_opts])
+    runner.call_proc('@SnapshotSave', [VOLT.FastSerializer.VOLTTYPE_STRING], [json_opts])
     utility.info('The snapshot was saved.')

@@ -29,5 +29,5 @@ from voltcli import utility
 
 @VOLT.Admin_Client(description = 'Resume a paused VoltDB cluster that is in admin mode.')
 def resume(runner):
-    runner.call_sysproc('@Resume', [], [])
+    runner.call_proc('@Resume', [], [])
     utility.info('The cluster has resumed.')
