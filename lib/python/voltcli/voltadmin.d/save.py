@@ -48,8 +48,11 @@ def save(runner):
         blocking = 'true'
     else:
         blocking = 'false'
-    json_opts = '{uripath:"%s",nonce:"%s",block:%s,format:"%s"}' % (
-                    uri, runner.opts.nonce, blocking, runner.opts.format)
+    json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s"}'
+                    % (uri, runner.opts.nonce, blocking, runner.opts.format)]
     utility.debug('@SnapshotSave "%s"' % json_opts)
-    runner.call_proc('@SnapshotSave', [VOLT.FastSerializer.VOLTTYPE_STRING], [json_opts])
-    utility.info('The snapshot was saved.')
+    col_types = [VOLT.FastSerializer.VOLTTYPE_STRING]
+    response = runner.call_proc('@SnapshotSave', col_types, json_opts)
+    rows = response.tables[0].tuples
+    headings = [c.name for c in response.tables[0].columns]
+    print utility.format_table(rows, caption = 'Snapshot Results', headings = headings)

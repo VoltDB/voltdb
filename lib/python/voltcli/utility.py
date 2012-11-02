@@ -306,9 +306,14 @@ def format_table(data_rows, caption = None, headings = None, indent = 0):
     # Add a row for headings, if supplied.
     rows = []
     if headings:
-        rows[0] = heading_row = []
-        for heading in headings:
-            heading_row.append('- %s -' % heading)
+        rows.append(headings)
+        widths = []
+        for row in rows + data_rows:
+            if len(widths) < len(row):
+                widths += [0] * (len(row) - len(widths))
+            for i in range(len(row)):
+                widths[i] = max(widths[i], len(str(row[i])))
+        rows.append(['-' * widths[i] for i in range(len(widths))])
     rows.extend(data_rows)
     # Measure the column widths.
     widths = []

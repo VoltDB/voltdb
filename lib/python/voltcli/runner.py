@@ -317,6 +317,7 @@ the package file to an explicit python version, e.g.
         if response.status != 1:
             utility.abort('@Pause system procedure call failed.', (response,))
         utility.verbose_info(response)
+        return response
 
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
