@@ -261,7 +261,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertB", 3, 2); // in A,B and C,D unions. Eliminated by EXCEPT
         client.callProcedure("InsertC", 1, 1); // in A,B and C,D unions. Eliminated by EXCEPT
         client.callProcedure("InsertC", 3, 0); // in A,B and C,D unions. Eliminated by EXCEPT
-        client.callProcedure("InsertC", 4, 3); // in A,B and C,D unions. Eliminated by EXCEPT
+        client.callProcedure("InsertC", 4, 3); // only in C,D union. Eliminated by EXCEPT
         client.callProcedure("InsertD", 0, 2); // in A,B and C,D unions. Eliminated by EXCEPT
         VoltTable result = client.callProcedure("@AdHoc", "(SELECT I FROM A UNION SELECT I FROM B) EXCEPT (SELECT I FROM C UNION SELECT I FROM D);")
                 .getResults()[0];

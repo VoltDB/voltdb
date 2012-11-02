@@ -25,6 +25,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.SendPlanNode;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -111,11 +112,11 @@ public class QueryPlanner {
         }
 
         // Init PlanProcessor
-        PlanProcessor planProcessor = new PlanProcessor(m_cluster, m_db, m_estimates, stmtName,
+        PlanSelector planSelector = new PlanSelector(m_cluster, m_db, m_estimates, stmtName,
                 procName, sql, costModel, paramHints, m_quietPlanner, m_fullDebug);
-        planProcessor.outputCompiledStatement(xmlSQL);
+        planSelector.outputCompiledStatement(xmlSQL);
         // Init Assembler
-        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, planProcessor);
+        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, planSelector);
 
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
@@ -132,12 +133,10 @@ public class QueryPlanner {
             return null;
         }
 
-        planProcessor.outputParsedStatement(parsedStmt);
+        planSelector.outputParsedStatement(parsedStmt);
 
         // find the plan with minimal cost
-        // Hint to the assembler that plan needs send node to be added
-        boolean isTopPlan = true;
-        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, isTopPlan);
+         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 
         // make sure we got a winner
         if (bestPlan == null) {
@@ -147,6 +146,17 @@ public class QueryPlanner {
             }
             return null;
         }
+        if (bestPlan.readOnly) {
+            SendPlanNode sendNode = new SendPlanNode();
+
+            // connect the nodes to build the graph
+            sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
+            sendNode.generateOutputSchema(m_db);
+
+            bestPlan.rootPlanGraph = sendNode;
+            }
+
+        planSelector.finalizeOutput(bestPlan, planSelector.m_bestFilename, planSelector.m_stats);
 
         // reset all the plan node ids for a given plan
         // this makes the ids deterministic

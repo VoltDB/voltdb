@@ -92,7 +92,7 @@ public class PlanAssembler {
     /** parsed statement for an union */
     ParsedUnionStmt m_parsedUnion = null;
 
-    PlanProcessor m_processor;
+    PlanSelector m_planSelector;
 
     /** Describes the specified and inferred partition context. */
     private final PartitioningForStatement m_partitioning;
@@ -126,11 +126,11 @@ public class PlanAssembler {
      * @param partitioning
      *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning, PlanProcessor processor) {
+    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning, PlanSelector processor) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
         m_partitioning = partitioning;
-        m_processor = processor;
+        m_planSelector = processor;
     }
 
     String getSQLText() {
@@ -300,11 +300,9 @@ public class PlanAssembler {
      * Generate the best cost plan for the current SQL statement context.
      *
      * @param parsedStmt Current SQL statement to generate plan for
-     * @param isTopPlan hint to the assembler whether it needs to add a send node
-     *        (true) or not (false) to the plan
      * @return The best cost plan or null.
      */
-    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt, boolean isTopPlan) {
+    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
 
         // set up the plan assembler for this statement
         setupForNewPlans(parsedStmt);
@@ -316,7 +314,7 @@ public class PlanAssembler {
         while (true) {
 
             try {
-                rawplan = getNextPlan(isTopPlan);
+                rawplan = getNextPlan();
             }
             // on exception, set the error message and bail...
             catch (PlanningErrorException e) {
@@ -328,25 +326,20 @@ public class PlanAssembler {
             if (rawplan == null)
                 break;
             // Update the best cost plan so far
-            m_processor.processPlan(rawplan);
+            m_planSelector.considerCandidatePlan(rawplan);
         }
 
-        if (isTopPlan && m_processor.m_bestPlan != null) {
-            m_processor.finalizeOutput(m_processor.m_bestFilename, m_processor.m_stats);
-        }
-        return m_processor.m_bestPlan;
+        return m_planSelector.m_bestPlan;
     }
 
     /**
      * Generate a unique and correct plan for the current SQL statement context.
      * This method gets called repeatedly until it returns null, meaning there
      * are no more plans.
-     * @param isTopPlan true if the plan's root is the root node for the entire statement
-     *
      * @return A not-previously returned query plan or null if no more
      *         computable plans.
      */
-    CompiledPlan getNextPlan(boolean isTopPlan) {
+    CompiledPlan getNextPlan() {
         // reset the plan column guids and pool
         //PlanColumn.resetAll();
 
@@ -354,13 +347,13 @@ public class PlanAssembler {
         AbstractParsedStmt nextStmt = null;
         if (m_parsedUnion != null) {
             nextStmt = m_parsedUnion;
-            retval = getNextUnionPlan(isTopPlan);
+            retval = getNextUnionPlan();
             if (retval != null) {
                 retval.readOnly = true;
             }
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
-            retval.rootPlanGraph = getNextSelectPlan(isTopPlan);
+            retval.rootPlanGraph = getNextSelectPlan();
             retval.readOnly = true;
             if (retval.rootPlanGraph != null)
             {
@@ -414,11 +407,9 @@ public class PlanAssembler {
      * This is a UNION specific method. Generate a unique and correct plan
      * for the current SQL UNION statement by building the best plans for each individual statements
      * within the UNION.
-     * @param isTopPlan true if the plan's root is the root node for the entire statement
-     *
      * @return A union plan or null.
      */
-    private CompiledPlan getNextUnionPlan(boolean isTopPlan) {
+    private CompiledPlan getNextUnionPlan() {
         AbstractPlanNode subUnionRoot = subAssembler.nextPlan();
         if (subUnionRoot == null) {
             return null;
@@ -437,11 +428,11 @@ public class PlanAssembler {
         int planId = 0;
         for (AbstractParsedStmt parsedChildStmt : m_parsedUnion.m_children) {
             PartitioningForStatement partitioning = (PartitioningForStatement)m_partitioning.clone();
-            PlanProcessor processor = (PlanProcessor) m_processor.clone();
+            PlanSelector processor = (PlanSelector) m_planSelector.clone();
             processor.m_planId = planId;
             PlanAssembler assembler = new PlanAssembler(
                     m_catalogCluster, m_catalogDb, partitioning, processor);
-            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt, isPlanFinal);
+            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
             // make sure we got a winner
             if (bestChildPlan == null) {
                 if (m_recentErrorMsg == null) {
@@ -457,7 +448,7 @@ public class PlanAssembler {
             planId = processor.m_planId;
         }
         // need to reset plan id for the entire UNION
-        m_processor.m_planId = planId;
+        m_planSelector.m_planId = planId;
 
         // Add and link children plans
         for (CompiledPlan selectPlan : childrenPlans) {
@@ -465,20 +456,10 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = new CompiledPlan();
-        if (isTopPlan) {
-            // If this is the top plan add send node on top of it
-            SendPlanNode sendNode = new SendPlanNode();
+        retval.rootPlanGraph = subUnionRoot;
 
-            // connect the nodes to build the graph
-            sendNode.addAndLinkChild(subUnionRoot);
-            sendNode.generateOutputSchema(m_catalogDb);
-
-            retval.rootPlanGraph = sendNode;
-        } else {
-            retval.rootPlanGraph = subUnionRoot;
-        }
         retval.readOnly = true;
-        retval.sql = m_processor.m_sql;
+        retval.sql = m_planSelector.m_sql;
         retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
 
         // compute the cost - total of all children
@@ -525,7 +506,7 @@ public class PlanAssembler {
         }
     }
 
-    private AbstractPlanNode getNextSelectPlan(boolean isTopPlan) {
+    private AbstractPlanNode getNextSelectPlan() {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
@@ -558,17 +539,7 @@ public class PlanAssembler {
             root = handleLimitOperator(root);
         }
 
-        if (isTopPlan) {
-            SendPlanNode sendNode = new SendPlanNode();
-
-            // connect the nodes to build the graph
-            sendNode.addAndLinkChild(root);
-            sendNode.generateOutputSchema(m_catalogDb);
-
-            return sendNode;
-        } else {
-            return root;
-        }
+        return root;
     }
 
     private AbstractPlanNode getNextDeletePlan() {
