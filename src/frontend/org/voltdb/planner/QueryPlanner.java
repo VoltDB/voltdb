@@ -25,7 +25,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.SendPlanNode;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -136,7 +135,9 @@ public class QueryPlanner {
         planSelector.outputParsedStatement(parsedStmt);
 
         // find the plan with minimal cost
-         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
+        // Hint to the assembler that plan needs send node to be added
+        boolean isTopPlan = true;
+        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, isTopPlan);
 
         // make sure we got a winner
         if (bestPlan == null) {
@@ -146,17 +147,6 @@ public class QueryPlanner {
             }
             return null;
         }
-        if (bestPlan.readOnly) {
-            SendPlanNode sendNode = new SendPlanNode();
-
-            // connect the nodes to build the graph
-            sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
-            sendNode.generateOutputSchema(m_db);
-
-            bestPlan.rootPlanGraph = sendNode;
-            }
-
-        planSelector.finalizeOutput(bestPlan, planSelector.m_bestFilename, planSelector.m_stats);
 
         // reset all the plan node ids for a given plan
         // this makes the ids deterministic
