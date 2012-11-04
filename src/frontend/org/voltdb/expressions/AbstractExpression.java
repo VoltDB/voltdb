@@ -241,13 +241,26 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (obj instanceof AbstractExpression == false) return false;
         AbstractExpression expr = (AbstractExpression) obj;
 
-        // check that the presence, or lack thereof, of children is the same
-        if ((expr.m_left == null) != (m_left == null))
+        if (m_type != expr.m_type) {
             return false;
-        if ((expr.m_right == null) != (m_right == null))
+        }
+        if ( ! hasEqualAttributes(expr)) {
             return false;
+        }
+        // The derived classes have verified that any added attributes are identical.
 
-        // check that the children identify themselves as the same
+        // Check that the presence, or lack, of children is the same
+        if ((m_left == null) != (expr.m_left == null)) {
+            return false;
+        }
+        if ((m_right == null) != (expr.m_right == null)) {
+            return false;
+        }
+        if ((m_args == null) != (expr.m_args == null)) {
+            return false;
+        }
+
+        // Check that the children identify themselves as equal
         if (expr.m_left != null)
             if (expr.m_left.equals(m_left) == false)
                 return false;
@@ -260,11 +273,100 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 return false;
         }
 
-        if (m_type != expr.m_type)
-            return false;
-
-        // this abstract base class gets here if the children verify local members
         return true;
+    }
+
+    // Derived classes that define attributes should compare them in their refinements of this method.
+    // This implementation is provided as a convenience for Operators et. al. that have no attributes that could differ.
+    protected boolean hasEqualAttributes(AbstractExpression expr) {
+        return true;
+    }
+
+    // A check for "structural similarity" to an indexed expression that generally uses equality between
+    // the expression trees but also matches a ParameterValueExpression having an "original value" constant
+    // in the LHS to an equal ConstantValueExpression within the RHS -- that's actually taken care of
+    // in the ParameterValueExpression override of this function.
+    // @return - null if there is no match, otherwise a list of "bound parameters" used by the match,
+    //           possibly an empty list if the found match was based on expression equality and
+    //           didn't involve parameters.
+    public List<AbstractExpression> bindingToIndexedExpression(AbstractExpression expr) {
+        // Defer the result construction for as long as possible on the assumption that this
+        // function mostly gets applied to eliminate negative cases.
+        if (m_type != expr.m_type) {
+            // The only allowed difference in expression types is between a parameter
+            // and its original constant value.  That's handled in the independent override.
+            return null;
+        }
+
+        // From here, this is much like the straight equality check, except that this function and "equals" must
+        // each call themselves in the recursions.
+
+        // Delegating to this factored-out component of the "equals" implementation eases simultaneous
+        // refinement of both methods.
+        if ( ! hasEqualAttributes(expr)) {
+            return null;
+        }
+        // The derived classes have verified that any added attributes are identical.
+
+        // Check that the presence, or lack, of children is the same
+        if ((expr.m_left == null) != (m_left == null)) {
+            return null;
+        }
+        if ((expr.m_right == null) != (m_right == null)) {
+            return null;
+        }
+        if ((expr.m_args == null) != (m_args == null)) {
+            return null;
+        }
+
+        // Check that the children identify themselves as matching
+        List<AbstractExpression> leftBindings = null;
+        if (m_left != null) {
+            leftBindings = m_left.bindingToIndexedExpression(expr.m_left);
+            if (leftBindings == null) {
+                return null;
+            }
+        }
+        List<AbstractExpression> rightBindings = null;
+        if (m_right != null) {
+            rightBindings = m_right.bindingToIndexedExpression(expr.m_right);
+            if (rightBindings == null) {
+                return null;
+            }
+        }
+        List<AbstractExpression> argBindings = null;
+        if (m_args != null) {
+            if (m_args.size() != expr.m_args.size()) {
+                return null;
+            }
+            argBindings = new ArrayList<AbstractExpression>();
+            int ii = 0;
+            // iterate the args lists in parallel, binding pairwise
+            for (AbstractExpression rhs : expr.m_args) {
+                AbstractExpression lhs = m_args.get(ii++);
+                List<AbstractExpression> moreBindings = lhs.bindingToIndexedExpression(rhs);
+                if (moreBindings == null) { // fail on any non-match
+                    return null;
+                }
+                argBindings.addAll(moreBindings);
+            }
+        }
+
+        // It's a match, so gather up the details.
+        // It's rare (if even possible) for the same bound parameter to get listed twice,
+        // so don't worry about duplicate entries, here.
+        // That should not cause any issue for the caller.
+        List<AbstractExpression> result = new ArrayList<AbstractExpression>();
+        if (leftBindings != null) { // null here can only mean no left child
+            result.addAll(leftBindings);
+        }
+        if (rightBindings != null) { // null here can only mean no right child
+            result.addAll(rightBindings);
+        }
+        if (argBindings != null) { // null here can only mean no args
+            result.addAll(argBindings);
+        }
+        return result;
     }
 
     @Override
@@ -394,6 +496,32 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         expr.loadFromJSONObject(obj, db);
 
         return expr;
+    }
+
+    public static List<AbstractExpression> fromJSONArrayString(String jsontext, Database db) throws JSONException {
+        JSONArray jarray = new JSONArray(jsontext);
+        return loadFromJSONArray(null, jarray, db);
+    }
+
+    public static List<AbstractExpression> loadFromJSONArray(List<AbstractExpression> starter, JSONObject parent, String key, Database db) throws JSONException {
+        if( parent.isNull( key ) ) {
+            return starter;
+        }
+        JSONArray jarray = parent.getJSONArray( key );
+        return loadFromJSONArray(starter, jarray, db);
+    }
+
+    public static List<AbstractExpression> loadFromJSONArray(List<AbstractExpression> starter, JSONArray jarray, Database db) throws JSONException {
+        List<AbstractExpression> result = starter;
+        if (result == null) {
+            result = new ArrayList<AbstractExpression>();
+        }
+        int size = jarray.length();
+        for( int i = 0 ; i < size; i++ ) {
+            JSONObject tempjobj = jarray.getJSONObject( i );
+            result.add(fromJSONObject(tempjobj, db));
+        }
+        return result;
     }
 
     public ArrayList<AbstractExpression> findBaseTVEs() {

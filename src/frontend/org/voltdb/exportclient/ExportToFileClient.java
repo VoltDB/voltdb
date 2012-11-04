@@ -32,21 +32,29 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltFile;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+
+import com.google.common.base.Throwables;
 
 /**
  * Uses the Export feature of VoltDB to write exported tables to files.
@@ -59,6 +67,8 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
  *
  */
 public class ExportToFileClient extends ExportClientBase2 {
+    public static final int INTERNAL_FIELD_COUNT = 6;
+
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
     // These get put in from of the batch folders
@@ -68,7 +78,7 @@ public class ExportToFileClient extends ExportClientBase2 {
     // ODBC Datetime Format
     // if you need microseconds, you'll have to change this code or
     //  export a bigint representing microseconds since an epoch
-    protected static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
+    public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
     // use thread-local to avoid SimpleDateFormat thread-safety issues
     protected ThreadLocal<SimpleDateFormat> m_ODBCDateformat;
     protected char m_delimiter;
@@ -86,9 +96,6 @@ public class ExportToFileClient extends ExportClientBase2 {
     protected String m_dateFormatOriginalString;
     protected int m_firstfield;
 
-    // timer used to roll batches
-    protected final Timer m_timer = new Timer();
-
     // record the original command line args for servers
     protected final List<String> m_commandLineServerArgs = new ArrayList<String>();
 
@@ -99,8 +106,10 @@ public class ExportToFileClient extends ExportClientBase2 {
     protected boolean m_batched;
     protected boolean m_withSchema;
 
-    protected final Object m_batchLock = new Object();
+    protected final ReentrantReadWriteLock m_batchLock = new ReentrantReadWriteLock();
 
+    // timer used to roll batches
+    protected ScheduledExecutorService m_ses;
     /**
     *
     */
@@ -112,7 +121,6 @@ public class ExportToFileClient extends ExportClientBase2 {
         boolean m_hasClosed = false;
         protected final Date start;
         protected Date end = null;
-        protected HashSet<ExportToFileDecoder> m_decoders = new HashSet<ExportToFileDecoder>();
         protected final Set<String> m_batchSchemasWritten = new HashSet<String>();
 
         class FileHandle implements Comparable<FileHandle> {
@@ -184,7 +192,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             start = batchStart;
 
             if (m_batched) {
-                m_dirContainingFiles = new File(getPathOfBatchDir(ACTIVE_PREFIX));
+                m_dirContainingFiles = new VoltFile(getPathOfBatchDir(ACTIVE_PREFIX));
                 m_logger.trace(String.format("Creating dir for batch at %s", m_dirContainingFiles.getPath()));
                 m_dirContainingFiles.mkdirs();
                 if (m_dirContainingFiles.exists() == false) {
@@ -200,20 +208,6 @@ public class ExportToFileClient extends ExportClientBase2 {
         String getPathOfBatchDir(String prefix) {
             assert(m_batched);
             return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.get().format(start);
-        }
-
-        /**
-         * Release a hold on the batch. When all holds are done
-         * and the roll time has passed, the batch can move out
-         * of the active state.
-         */
-        void decref(ExportToFileDecoder decoder) {
-            synchronized (m_batchLock) {
-                m_decoders.remove(decoder);
-                if ((end != null) && (m_decoders.size() == 0)) {
-                    closeAllWriters();
-                }
-            }
         }
 
         /**
@@ -239,7 +233,6 @@ public class ExportToFileClient extends ExportClientBase2 {
                     writer.flush();
                     writer.close();
                 } catch (IOException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
             }
@@ -263,13 +256,13 @@ public class ExportToFileClient extends ExportClientBase2 {
             String oldPath = getPathOfBatchDir(ACTIVE_PREFIX);
             String newPath = getPathOfBatchDir("");
 
-            File oldDir = new File(oldPath);
+            File oldDir = new VoltFile(oldPath);
             assert(oldDir.exists());
             assert(oldDir.isDirectory());
             assert(oldDir.canWrite());
 
             if (oldDir.listFiles().length > 0) {
-                File newDir = new File(newPath);
+                File newDir = new VoltFile(newPath);
                 oldDir.renameTo(newDir);
                 notifyRollIsComplete(new File[] { newDir });
             }
@@ -279,7 +272,7 @@ public class ExportToFileClient extends ExportClientBase2 {
         }
 
         void closeFiles() {
-            File[] notifySet = new File[m_writers.size()];
+            File[] notifySet = new VoltFile[m_writers.size()];
 
             int i = 0;
             // Sort the open files by TXN ID so that we can close and rename
@@ -313,12 +306,12 @@ public class ExportToFileClient extends ExportClientBase2 {
                 String oldPath = handle.getPath(ACTIVE_PREFIX);
                 String newPath = handle.getPath("");
 
-                File oldFile = new File(oldPath);
+                File oldFile = new VoltFile(oldPath);
                 assert(oldFile.exists());
                 assert(oldFile.isFile());
                 assert(oldFile.canWrite());
 
-                File newFile = new File(newPath);
+                File newFile = new VoltFile(newPath);
                 assert(!newFile.exists());
                 oldFile.renameTo(newFile);
 
@@ -336,7 +329,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                 return writer;
 
             String path = handle.getPath(ACTIVE_PREFIX);
-            File newFile = new File(path);
+            File newFile = new VoltFile(path);
             if (newFile.exists()) {
                 m_logger.error("Error: Output file for next period already exists at path: " + newFile.getPath());
                 m_logger.error("Consider using a more specific timestamp in your filename or cleaning up your export data directory.");
@@ -346,15 +339,15 @@ public class ExportToFileClient extends ExportClientBase2 {
             try {
                 OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
                 if (m_fullDelimiters != null) {
-                    writer = new CSVWriter(new BufferedWriter(osw, 1048576),
+                    writer = new CSVWriter(new BufferedWriter(osw, 4096 * 4),
                             m_fullDelimiters[0], m_fullDelimiters[1], m_fullDelimiters[2], String.valueOf(m_fullDelimiters[3]));
                 }
                 else if (m_delimiter == ',')
                     // CSV
-                    writer = new CSVWriter(new BufferedWriter(osw, 1048576), m_delimiter);
+                    writer = new CSVWriter(new BufferedWriter(osw, 4096 * 4), m_delimiter);
                 else {
                     // TSV
-                    writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 1048576));
+                    writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 4096 * 4));
                 }
             }
             catch (Exception e) {
@@ -373,35 +366,38 @@ public class ExportToFileClient extends ExportClientBase2 {
             FileHandle handle = new FileHandle(tableName, generation);
             String path = handle.getPathForSchema();
 
-            // only write the schema once per batch
-            if (m_batched) {
-                if (m_batchSchemasWritten.contains(path)) {
-                    return;
-                }
-            }
-            else {
-                if (m_globalSchemasWritten.contains(path)) {
-                    return;
-                }
-            }
-
-            File newFile = new File(path);
-            try {
-                OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
-                BufferedWriter writer = new BufferedWriter(osw, 1048576);
-                writer.write(schema);
-                writer.flush();
-                writer.close();
+            Set<String> targetSet = m_batched ? m_batchSchemasWritten : m_globalSchemasWritten;
+            synchronized (targetSet) {
+                // only write the schema once per batch
                 if (m_batched) {
-                    m_batchSchemasWritten.add(path);
+                    if (m_batchSchemasWritten.contains(path)) {
+                        return;
+                    }
                 }
                 else {
-                    m_globalSchemasWritten.add(path);
+                    if (m_globalSchemasWritten.contains(path)) {
+                        return;
+                    }
                 }
-            } catch (Exception e) {
-                m_logger.error(e.getMessage());
-                m_logger.error("Error: Failed to create output file: " + path);
-                throw new RuntimeException();
+
+                File newFile = new VoltFile(path);
+                try {
+                    OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
+                    BufferedWriter writer = new BufferedWriter(osw);
+                    writer.write(schema);
+                    writer.flush();
+                    writer.close();
+                    if (m_batched) {
+                        m_batchSchemasWritten.add(path);
+                    }
+                    else {
+                        m_globalSchemasWritten.add(path);
+                    }
+                } catch (Exception e) {
+                    m_logger.error(e.getMessage());
+                    m_logger.error("Error: Failed to create output file: " + path);
+                    throw new RuntimeException();
+                }
             }
         }
 
@@ -412,12 +408,11 @@ public class ExportToFileClient extends ExportClientBase2 {
          */
         @Override
         protected void finalize() throws Throwable {
-            synchronized (m_batchLock) {
-                closeAllWriters();
-            }
+            closeAllWriters();
             super.finalize();
         }
     }
+
 
     // This class outputs exported rows converted to CSV or TSV values
     // for the table named in the constructor's AdvertisedDataSource
@@ -426,17 +421,30 @@ public class ExportToFileClient extends ExportClientBase2 {
         private final String m_tableName;
         protected String m_schemaString = "ERROR SERIALIZING SCHEMA";
         private final HashSet<AdvertisedDataSource> m_sources = new HashSet<AdvertisedDataSource>();
+        private FutureTask<CSVWriter> m_firstBlockTask;
+        private CSVWriter m_writer;
 
-        // transient per-block state
-        protected PeriodicExportContext m_context = null;
-        protected CSVWriter m_writer = null;
+        private void resetWriter() {
+            m_firstBlockTask = new FutureTask<CSVWriter>(new Callable<CSVWriter>() {
+                @Override
+                public CSVWriter call() throws Exception {
+                    CSVWriter writer = m_current.getWriter(m_tableName, m_generation);
+                    m_current.writeSchema(m_tableName, m_generation, m_schemaString);
+                    return writer;
+                }
+            });;
+        }
 
-        public ExportToFileDecoder(AdvertisedDataSource source, String tableName, long generation) {
+        public ExportToFileDecoder(
+                AdvertisedDataSource source,
+                String tableName,
+                long generation) {
             super(source);
             m_generation = generation;
             m_tableName = tableName;
 
             setSchemaForSource(source);
+            resetWriter();
         }
 
         /**
@@ -516,23 +524,13 @@ public class ExportToFileClient extends ExportClientBase2 {
          */
         @Override
         public void onBlockStart() {
-            // get the current batch
-            m_context = getCurrentContextAndAddref(this);
-            if (m_context == null) {
-                m_logger.error("NULL context object found.");
-                throw new RuntimeException("NULL context object found.");
+            m_batchLock.readLock().lock();
+            m_firstBlockTask.run();
+            try {
+                m_writer = m_firstBlockTask.get();
+            } catch (Throwable e) {
+                Throwables.propagate(e);
             }
-
-            // prevent us from trying to get a writer in the middle of a roll
-            synchronized (m_batchLock) {
-                m_writer = m_context.getWriter(m_tableName, m_generation);
-            }
-            if (m_writer == null) {
-                m_logger.error("NULL writer object from context.");
-                throw new RuntimeException("NULL writer object from context.");
-            }
-
-            m_context.writeSchema(m_tableName, m_generation, m_schemaString);
         }
 
         /**
@@ -541,64 +539,27 @@ public class ExportToFileClient extends ExportClientBase2 {
         @Override
         public void onBlockCompletion() {
             try {
-                if (m_writer != null)
-                    m_writer.flush();
+                m_writer.flush();
+            } catch (Throwable t) {
+                Throwables.propagate(t);
+            } finally {
+                m_batchLock.readLock().unlock();
             }
-            catch (Exception e) {
-                m_logger.error(e.getMessage());
-                throw new RuntimeException();
-            }
-            finally {
-                if (m_context != null) {
-                    m_context.decref(this);
-                }
-                m_context = null;
-            }
-        }
-
-        @Override
-        protected void finalize() throws Throwable {
-            try {
-                if (m_writer != null) {
-                    m_writer.flush();
-                    m_writer.close();
-                    m_writer = null;
-                }
-            }
-            catch (Exception e) {
-                m_logger.error(e.getMessage());
-                throw new RuntimeException();
-            }
-            finally {
-                if (m_context != null)
-                    m_context.decref(this);
-            }
-            super.finalize();
         }
 
         @Override
         public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
+            m_batchLock.writeLock().lock();
             try {
-                if (m_writer != null) {
-                    m_writer.flush();
-                    m_writer.close();
-                    m_writer = null;
+                HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
+                if (decoders != null) {
+                    decoders.remove(m_tableName);
+                    if (decoders.isEmpty()) {
+                        m_tableDecoders.remove(m_generation);
+                    }
                 }
-            }
-            catch (Exception e) {
-                m_logger.error(e.getMessage());
-                throw new RuntimeException();
-            }
-            finally {
-                if (m_context != null)
-                    m_context.decref(this);
-            }
-            HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(m_generation);
-            if (decoders != null) {
-                decoders.remove(m_tableName);
-                if (decoders.isEmpty()) {
-                    m_tableDecoders.remove(m_generation);
-                }
+            } finally {
+                m_batchLock.writeLock().unlock();
             }
         }
     }
@@ -647,30 +608,40 @@ public class ExportToFileClient extends ExportClientBase2 {
                 withSchema);
     }
 
-    PeriodicExportContext getCurrentContextAndAddref(ExportToFileDecoder decoder) {
-        synchronized(m_batchLock) {
-            m_current.m_decoders.add(decoder);
-            return m_current;
+    @Override
+    public ExportToFileDecoder constructExportDecoder(AdvertisedDataSource source) {
+        m_batchLock.writeLock().lock();
+        try {
+            // For every source that provides part of a table, use the same
+            // export decoder.
+            String table_name = source.tableName;
+            HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(source.m_generation);
+            if (decoders == null) {
+                decoders = new HashMap<String, ExportToFileDecoder>();
+                m_tableDecoders.put(source.m_generation, decoders);
+            }
+            ExportToFileDecoder decoder = decoders.get(table_name);
+            if (decoder == null) {
+                decoder = new ExportToFileDecoder(source, table_name, source.m_generation);
+                decoders.put(table_name, decoder);
+            }
+            decoder.m_sources.add(source);
+            return decoders.get(table_name);
+        } finally {
+            m_batchLock.writeLock().unlock();
         }
     }
 
     @Override
-    public ExportToFileDecoder constructExportDecoder(AdvertisedDataSource source) {
-        // For every source that provides part of a table, use the same
-        // export decoder.
-        String table_name = source.tableName;
-        HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(source.m_generation);
-        if (decoders == null) {
-            decoders = new HashMap<String, ExportToFileDecoder>();
-            m_tableDecoders.put(source.m_generation, decoders);
+    public void shutdown() {
+        m_ses.shutdown();
+        try {
+            m_ses.awaitTermination(365, TimeUnit.DAYS);
+        } catch( InterruptedException iex) {
+            Throwables.propagate(iex);
         }
-        ExportToFileDecoder decoder = decoders.get(table_name);
-        if (decoder == null) {
-            decoder = new ExportToFileDecoder(source, table_name, source.m_generation);
-            decoders.put(table_name, decoder);
-        }
-        decoder.m_sources.add(source);
-        return decoders.get(table_name);
+        m_batchLock.writeLock().lock();
+        m_current.closeAllWriters();
     }
 
     /**
@@ -678,14 +649,26 @@ public class ExportToFileClient extends ExportClientBase2 {
      * be active until all writers have finished writing their current blocks
      * to it.
      */
-    void roll(Date rollTime) {
-        synchronized(m_batchLock) {
-            m_logger.trace("Rolling batch.");
+    void roll(final Date rollTime) {
+        m_batchLock.writeLock().lock();
+        final PeriodicExportContext previous = m_current;
+        try {
             m_current.end = rollTime;
-            if (m_current.m_decoders.size() == 0)
-                m_current.closeAllWriters();
+
             m_current = new PeriodicExportContext(rollTime);
+
+            m_logger.trace("Rolling batch.");
+
+            for( Map<String, ExportToFileDecoder> genDecoders: m_tableDecoders.values()) {
+                for( ExportToFileDecoder decoder: genDecoders.values()) {
+                    decoder.resetWriter();
+                }
+            }
+
+        } finally {
+            m_batchLock.writeLock().unlock();
         }
+        previous.closeAllWriters();
     }
 
     protected void logConfigurationInfo() {
@@ -776,7 +759,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                 printHelpAndQuit(-1);
             }
             else if (arg.equals("--skipinternals")) {
-                firstfield = 6;
+                firstfield = INTERNAL_FIELD_COUNT;
             }
             else if (arg.equals("--connect")) {
                 if (args.length < ii + 1) {
@@ -824,7 +807,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                     printHelpAndQuit(-1);
                 }
                 boolean invalidDir = false;
-                outdir = new File(args[ii + 1]);
+                outdir = new VoltFile(args[ii + 1]);
                 if (!outdir.exists()) {
                     if (!outdir.mkdir()) {
                         System.err.println("Error: " + outdir.getPath() + " cannot be created");
@@ -948,7 +931,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             printHelpAndQuit(-1);
         }
         if (outdir == null) {
-            outdir = new File(".");
+            outdir = new VoltFile(".");
         }
         if (delimiter == '\0') {
             System.err.println("ExportToFile: must provide an output type");
@@ -996,13 +979,11 @@ public class ExportToFileClient extends ExportClientBase2 {
     }
 
     @Override
-    public void configure(byte[] config) throws Exception {
-        JSONObject conf = new JSONObject(new String( config, "UTF-8"));
-
-        String nonce = conf.getString("nonce");
+    public void configure( Properties conf) throws Exception {
+        String nonce = conf.getProperty("nonce");
 
         char delimiter = '\0';
-        String type = conf.optString("type", null).trim();
+        String type = conf.getProperty("type", "").trim();
         if (type != null) {
             if (type.equalsIgnoreCase("csv")) {
                 delimiter = ',';
@@ -1016,12 +997,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             throw new IllegalArgumentException("ExportToFile: must provide an output type");
         }
 
-        if (delimiter == '\0') {
-            System.err.println("ExportToFile: must provide an output type");
-            printHelpAndQuit(-1);
-        }
-
-        File outdir = new File(conf.optString("outdir", "."));
+        File outdir = new VoltFile(conf.getProperty("outdir", "."));
         if (!outdir.exists()) {
             if (!outdir.mkdir()) {
                 throw new IllegalArgumentException("Error: " + outdir.getPath() + " cannot be created");
@@ -1037,23 +1013,23 @@ public class ExportToFileClient extends ExportClientBase2 {
             throw new IllegalArgumentException("Error: " + outdir.getPath() + " does not have write permission set");
         }
 
-        int firstfield = conf.optBoolean("skipinternals") ? 6 : 0;
+        int firstfield = Boolean.parseBoolean(conf.getProperty("skipinternals","false")) ? INTERNAL_FIELD_COUNT : 0;
 
-        int period = conf.optInt("period", 60);
+        int period = Integer.parseInt(conf.getProperty("period", "60"));
         if (period < 1) {
             throw new IllegalArgumentException("Error: Specified value for --period must be >= 1.");
         }
 
-        String dateformatString = conf.optString("dateformat", "yyyyMMddHHmmss").trim();
-        boolean batched = conf.optBoolean("batched", false);
-        boolean withSchema = conf.optBoolean("with-schema", false);
+        String dateformatString = conf.getProperty("dateformat", "yyyyMMddHHmmss").trim();
+        boolean batched = Boolean.parseBoolean(conf.getProperty("batched", "false"));
+        boolean withSchema = Boolean.parseBoolean(conf.getProperty("with-schema", "false"));
 
-        String fullDelimiters = conf.optString("delimeters", null);
+        String fullDelimiters = conf.getProperty("delimeters");
         if (fullDelimiters != null) {
             fullDelimiters = fullDelimiters.trim();
-            String charsAsStr = StringEscapeUtils.unescapeHtml4(fullDelimiters.trim());
+            String charsAsStr = StringEscapeUtils.unescapeJava(fullDelimiters.trim());
             if (charsAsStr.length() != 4) {
-                throw new IllegalArgumentException("The delimiter set must contain exactly 4 characters (after any html escaping).");
+                throw new IllegalArgumentException("The delimiter set must contain exactly 4 characters (after any string escaping).");
             }
         }
 
@@ -1109,7 +1085,6 @@ public class ExportToFileClient extends ExportClientBase2 {
             m_fullDelimiters = new char[4];
             for (int i = 0; i < 4; i++) {
                 m_fullDelimiters[i] = fullDelimiters.charAt(i);
-                //System.out.printf("FULL DELIMETER %d: %c\n", i, m_fullDelimiters[i]);
             }
         }
         else {
@@ -1120,13 +1095,19 @@ public class ExportToFileClient extends ExportClientBase2 {
         assert(m_current == null);
         m_current = new PeriodicExportContext(new Date());
 
+
         // schedule rotations every m_period minutes
-        TimerTask rotateTask = new TimerTask() {
+        Runnable rotator = new Runnable() {
             @Override
             public void run() {
-                roll(new Date());
+                try {
+                    roll(new Date());
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
             }
         };
-        m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
+        m_ses = CoreUtils.getScheduledThreadPoolExecutor("Export file rotate timer for nonce " + nonce, 1, 131072);
+        m_ses.scheduleWithFixedDelay(rotator, m_period, m_period, TimeUnit.MINUTES);
     }
 }

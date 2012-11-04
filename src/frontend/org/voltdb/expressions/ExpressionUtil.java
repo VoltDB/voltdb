@@ -90,30 +90,6 @@ public abstract class ExpressionUtil {
         return new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, left, right);
     }
 
-    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, String tableName) {
-        assert(expr != null);
-        AbstractExpression retval = expr.getLeft();
-
-        AbstractExpression left = expr.getLeft();
-        if (left instanceof TupleValueExpression) {
-            TupleValueExpression lv = (TupleValueExpression) left;
-            if (lv.getTableName().equals(tableName))
-                retval = null;
-        }
-
-        if (retval == null) {
-            retval = expr.getRight();
-            AbstractExpression right = expr.getRight();
-            if (right instanceof TupleValueExpression) {
-                TupleValueExpression rv = (TupleValueExpression) right;
-                if (rv.getTableName().equals(tableName))
-                    retval = null;
-            }
-        }
-
-        return retval;
-    }
-
     /**
      * Recursively walk an expression and return a list of all the tuple
      * value expressions it contains.

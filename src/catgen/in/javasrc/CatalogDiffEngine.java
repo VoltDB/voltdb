@@ -88,6 +88,24 @@ public class CatalogDiffEngine {
             return false;
         }
 
+        // expression indexes only help if they are on exactly the same expressions in the same order.
+        // OK -- that's obviously overspecifying the requirement, since expression order has nothing
+        // to do with it, and uniqueness of just a subset of the new index expressions would do, but
+        // that's hard to check for, so we punt on optimized dynamic update except for the critical
+        // case of grand-fathering in a surviving pre-existing index.
+        if (existingIndex.getExpressionsjson().length() > 0) {
+            if (existingIndex.getExpressionsjson().equals(newIndex.getExpressionsjson())) {
+                return true;
+            } else {
+                return false;
+            }
+        } else if (newIndex.getExpressionsjson().length() > 0) {
+            // A column index does not generally provide coverage for an expression index,
+            // though there are some special cases not being recognized, here,
+            // like expression indexes that list a mix of non-column expressions and unique columns.
+            return false;
+        }
+
         // iterate over all of the existing columns
         for (ColumnRef existingColRef : existingIndex.getColumns()) {
             boolean foundMatch = false;
@@ -134,7 +152,7 @@ public class CatalogDiffEngine {
      * @return true if the CatalogType can be dynamically added or removed
      * from a running system.
      */
-    boolean checkAddDropWhitelist(CatalogType suspect, ChangeType changeType) {
+    private boolean checkAddDropWhitelist(CatalogType suspect, ChangeType changeType) {
         // should generate this from spec.txt
         CatalogType orig = suspect;
 

@@ -28,8 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -49,14 +47,11 @@ import org.voltdb.VoltZK.MailboxType;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 
 public class MailboxTracker {
     private final ZooKeeper m_zk;
     private final MailboxUpdateHandler m_handler;
-    private final ListeningExecutorService m_es =
-            MoreExecutors.listeningDecorator(
-                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Mailbox tracker", 1024 * 128)));
+    private final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("Mailbox tracker");
 
     private byte m_lastChecksum[] = null;
 

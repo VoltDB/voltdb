@@ -17,6 +17,10 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
+import org.voltdb.rejoin.TaskLog;
+
 import org.voltdb.SiteProcedureConnection;
 
 public abstract class SiteTasker {
@@ -30,6 +34,7 @@ public abstract class SiteTasker {
     /**
      * Run the task on an inconsistent/rejoining EE.
      */
-    abstract public void runForRejoin(SiteProcedureConnection siteConnection);
+    abstract public void runForRejoin(SiteProcedureConnection siteConnection,
+            TaskLog rejoinTaskLog) throws IOException;
 
 }

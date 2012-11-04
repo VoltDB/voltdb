@@ -74,7 +74,7 @@ class ParameterizationInfo {
             return null;
         }
 
-        Map<Long, Integer> idToParamIndexMap = new HashMap<Long, Integer>();
+        Map<String, Integer> idToParamIndexMap = new HashMap<String, Integer>();
         List<String> paramValues = new ArrayList<String>();
 
         parameterizeRecursively(parameterizedXmlSQL, paramsNode,
@@ -89,37 +89,53 @@ class ParameterizationInfo {
 
     static void parameterizeRecursively(VoltXMLElement node,
                                         VoltXMLElement paramsNode,
-                                        Map<Long, Integer> idToParamIndexMap,
+                                        Map<String, Integer> idToParamIndexMap,
                                         List<String> paramValues) {
         if (node.name.equals("value")) {
             String idStr = node.attributes.get("id");
             assert(idStr != null);
-            long id = Long.parseLong(idStr);
 
-            String typeStr = node.attributes.get("type");
-            VoltType type = VoltType.typeFromString(typeStr);
-
-            Integer paramIndex = idToParamIndexMap.get(id);
+            // A value id is currently a "string-formatted long", but there's no need to commit
+            // to that format in this early processing -- here, the id just needs to be a unique
+            // string for each parsed value. It allows hsql to replicate a parameter reference
+            // within its parse trees without causing code like this to lose track of its identity.
+            Integer paramIndex = idToParamIndexMap.get(idStr);
             if (paramIndex == null) {
+                // Use the next param index for each new value with an unfamiliar id,
+                // starting at 0.
                 paramIndex = paramValues.size();
+                // Later references to this value's id will re-use this same param index.
+                idToParamIndexMap.put(idStr, paramIndex);
 
                 VoltXMLElement paramIndexNode = new VoltXMLElement("parameter");
                 paramIndexNode.attributes.put("index", String.valueOf(paramIndex));
+                String typeStr = node.attributes.get("type");
                 paramIndexNode.attributes.put("type", typeStr);
                 paramIndexNode.attributes.put("id", idStr);
                 paramsNode.children.add(paramIndexNode);
 
-                idToParamIndexMap.put(id, paramIndex);
-
-                String value = node.attributes.get("value");
-                if (type == VoltType.NULL) {
-                    value = null;
+                String value = null;
+                if (VoltType.typeFromString(typeStr) != VoltType.NULL) {
+                    value = node.attributes.get("value");
                 }
-
                 paramValues.add(value);
             }
 
+            // Assume that all values, whether or not their ids have been seen before, can
+            // be considered planner-generated parameters (proxies for user-provided constants).
+            // This is one simplification that leverages the fact that statements that came with
+            // user-provided parameters were barred from being (further) parameterized.
             node.attributes.put("isparam", "true");
+            node.attributes.put("isplannergenerated", "true");
+
+            // Remove the "value" attribute -- this is the critical step to folding
+            // different raw VoltXML trees into the same parameterized VoltXML tree.
+            // The value differences are extracted into paramValues for future reference by:
+            //     the execution engine which needs to substitute actual values for all parameters
+            //         to run the query
+            //     the index scan planner which may need to "bind" the parameters to their original
+            //     values to apply indexes on expressions like "(colA + 2 * colB)" when used in a query
+            //     like "... WHERE t2.colA + 2 * t2.colB > 3*t1.colC".
             node.attributes.remove("value");
         }
 

@@ -51,6 +51,7 @@ public class VoltZK {
     public static final String restoreMarker = "/db/did_restore";
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
+    public static final String exportGenerations = "/db/export_generations";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";

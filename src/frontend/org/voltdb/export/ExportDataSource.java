@@ -17,6 +17,8 @@
 
 package org.voltdb.export;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -26,11 +28,15 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -42,7 +48,9 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -60,6 +68,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final String m_database;
     private final String m_tableName;
     private final String m_signature;
+    private final byte [] m_signatureBytes;
     private final long m_HSId;
     private final long m_generation;
     private final int m_partitionId;
@@ -69,8 +78,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
+    private Runnable m_onMastership;
     private final ListeningExecutorService m_es;
     private SettableFuture<BBContainer> m_pollFuture;
+    private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
+            new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
 
     private final int m_nullArrayLength;
 
@@ -89,8 +101,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             String db, String tableName,
             int partitionId, long HSId, String signature, long generation,
             CatalogMap<Column> catalogMap,
-            String overflowPath) throws IOException
+            String overflowPath
+            ) throws IOException
             {
+        checkNotNull( onDrain, "onDrain runnable is null");
+
         m_generation = generation;
         m_onDrain = onDrain;
         m_database = db;
@@ -107,6 +122,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * catalog updates that add or drop tables.
          */
         m_signature = signature;
+        m_signatureBytes = m_signature.getBytes(VoltDB.UTF8ENCODING);
         m_partitionId = partitionId;
         m_HSId = HSId;
 
@@ -153,12 +169,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
     }
 
-    public ExportDataSource(Runnable onDrain, File adFile) throws IOException {
+    public ExportDataSource(Runnable onDrain,
+            File adFile
+            ) throws IOException {
+
         /*
          * Certainly no more data coming if this is coming off of disk
          */
         m_endOfStream = true;
         m_onDrain = onDrain;
+
         String overflowPath = adFile.getParent();
         FileInputStream fis = new FileInputStream(adFile);
         byte data[] = new byte[(int)adFile.length()];
@@ -173,6 +193,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_generation = fds.readLong();
         m_partitionId = fds.readInt();
         m_signature = fds.readString();
+        m_signatureBytes = m_signature.getBytes(VoltDB.UTF8ENCODING);
         m_tableName = fds.readString();
         fds.readLong(); // timestamp of JVM startup can be ignored
         int numColumns = fds.readInt();
@@ -189,6 +210,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " sig " + m_signature, 1);
+    }
+
+    public void updateAckMailboxes( final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
+        m_ackMailboxRefs.set( ackMailboxes);
     }
 
     private void resetPollMarker() throws IOException {
@@ -341,7 +366,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     } catch (Exception e) {
                         exportLog.error("Error processing export action", e);
                     } catch (Error e) {
-                        VoltDB.crashLocalVoltDB("Error processing export action", false, e);
+                        VoltDB.crashLocalVoltDB("Error processing export action", true, e);
                     }
                 }
         });
@@ -466,12 +491,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             assert(bufferPtr == 0);
             assert(buffer == null);
             assert(!sync);
+
             m_endOfStream = endOfStream;
 
             if (m_committedBuffers.sizeInBytes() == 0) {
                 exportLog.info("Pushed EOS buffer with 0 bytes remaining");
                 try {
+                    if (m_pollFuture != null) {
+                        m_pollFuture.set(null);
+                        m_pollFuture = null;
+                    }
                     m_onDrain.run();
+
                 } finally {
                     m_onDrain = null;
                 }
@@ -533,7 +564,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (Exception e) {
                     exportLog.error("Error pushing export buffer", e);
                 } catch (Error e) {
-                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", false, e);
+                    VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, e);
                 }
             }
         });
@@ -565,13 +596,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
                     if (m_committedBuffers.isEmpty() && m_endOfStream) {
                         try {
-                            m_onDrain.run();
+                            if (m_pollFuture != null) {
+                                m_pollFuture.set(null);
+                                m_pollFuture = null;
+                            }
+                            if (m_onDrain != null) {
+                                m_onDrain.run();
+                            }
                         } finally {
                             m_onDrain = null;
                         }
                     }
                 } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                    VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, e);
                 }
             }
         });
@@ -680,8 +717,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private class AckingContainer extends BBContainer {
-        private final long m_uso;
+    class AckingContainer extends BBContainer {
+        final long m_uso;
         public AckingContainer(ByteBuffer buf, long uso) {
             super(buf, 0L);
             m_uso = uso;
@@ -689,22 +726,53 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         @Override
         public void discard() {
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        ack(m_uso);
-                    } catch (Exception e) {
-                        exportLog.error("Error acking export buffer", e);
-                    } catch (Error e) {
-                        VoltDB.crashLocalVoltDB("Error acking export buffer", false, e);
-                    }
+            try {
+                ack(m_uso);
+            } finally {
+                forwardAckToOtherReplicas();
+            }
+        }
+
+        private void forwardAckToOtherReplicas() {
+            Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+            Mailbox mbx = p.getFirst();
+
+            if (mbx != null) {
+                // partition:int(4) + length:int(4) +
+                // signaturesBytes.length + ackUSO:long(8)
+                final int msgLen = 4 + 4 + m_signatureBytes.length + 8;
+
+                ByteBuffer buf = ByteBuffer.allocate(msgLen);
+                buf.putInt(m_partitionId);
+                buf.putInt(m_signatureBytes.length);
+                buf.put(m_signatureBytes);
+                buf.putLong(m_uso);
+
+                BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
+
+                for( Long siteId: p.getSecond()) {
+                    mbx.send(siteId, bpm);
                 }
-            });
+            }
         }
     }
 
-    private void ack(long uso) {
+    public void ack(final long uso) {
+        m_es.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    ackImpl(uso);
+                } catch (Exception e) {
+                    exportLog.error("Error acking export buffer", e);
+                } catch (Error e) {
+                    VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
+                }
+            }
+        });
+    }
+
+    private void ackImpl(long uso) {
         //Assemble a list of blocks to delete so that they can be deleted
         //outside of the m_committedBuffers critical section
         ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
@@ -724,5 +792,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 sb.deleteContent();
             }
         }
+    }
+
+    /**
+     * Trigger an execution of the mastership runnable by the associated
+     * executor service
+     */
+    public void acceptMastership() {
+        Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
+
+        m_es.execute(m_onMastership);
+    }
+
+    /**
+     * set the runnable task that is to be executed on mastership designation
+     * @param toBeRunOnMastership a {@link @Runnable} task
+     */
+    public void setOnMastership(Runnable toBeRunOnMastership) {
+        Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
+
+        m_onMastership = toBeRunOnMastership;
     }
 }
