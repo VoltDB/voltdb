@@ -791,7 +791,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                                 value = Encoder.hexDecode((String) value);
                             }
                             if (value instanceof byte[]) {
-                                if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
+                                if (((byte[]) value).length > maxColSize)
                                     throw new VoltOverflowException(
                                             "Value in VoltTable.addRow(...) larger than allowed max " +
                                                     VoltType.humanReadableSize(maxColSize));
