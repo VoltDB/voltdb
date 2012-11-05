@@ -145,7 +145,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="licensecheck, compile, voltdbipc, ee"
+    depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
@@ -163,7 +163,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_noclustering"
-    depends="licensecheck, compile, voltdbipc, ee"
+    depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
@@ -993,6 +993,18 @@ NATIVE EE STUFF
     </copy>
 </target>
 
+<target name='recompile_ee_nodepends'
+    description="Build C++ JNI library and copy it to production folder.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="build.py ${build}" />
+    </exec>
+    <copy todir='voltdb'>
+        <fileset dir="${build.dir}/nativelibs">
+            <include name="libvoltdb-${dist.version}.*"/>
+        </fileset>
+    </copy>
+</target>
+
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
@@ -1178,68 +1190,71 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <!-- pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
+                <exclude name="**/TestCommandLogReinitiator.class"/>
+                <exclude name="**/TestCommandLog.class"/>
+                <exclude name="**/TestLogReader.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestVoltLicense.class" />
-                <!-- <exclude name="**/TestPrimary.class" /> -->
                 <exclude name="**/TestPauselessRejoinEndToEnd" />
                 <exclude name="**/TestPauselessRejoinFuzz" />
                 <exclude name="**/TestSecondaryRejoin.class" />
+                <exclude name="**/TestSnapshotSaveTruncation.class" />
                 <!-- <exclude name="**/TestInvocationBufferServer.class" /> -->
                 <!-- <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" /> -->
-                <exclude name="**/TestSnapshotSaveTruncation.class" />
+                <!-- <exclude name="**/TestPrimary.class" /> -->
                 <!-- community tests -->
-<!--                <exclude name="**/TestHSQLBackend.class" /> -->
-<!--                <exclude name="**/TestAdHocQueries.class" /> -->
-<!--                <exclude name="**/TestJSONInterface.class" /> -->
-<!--                <exclude name="**/TestRejoinEndToEnd.class" /> -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-<!--                <exclude name="**/TestRejoinWithCatalogUpdates.class" /> -->
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
-<!--                <exclude name="**/TestReplicatedInvocation.class" /> -->
-<!--                <exclude name="**/TestRestoreAgent.class" -->
-<!--                <exclude name="**/TestSimpleCJK.class" /> -->
-<!--                <exclude name="**/TestClientTimeouts.class" /> -->
-<!--                <exclude name="**/TestExportToFileClient.class" /> -->
                 <exclude name="**/TestNonDetermisticSeppuku.class" />
-<!--                <exclude name="**/TestJDBCDriver.class" />-->
-<!--                <exclude name="**/TestAdminMode.class" />-->
-<!--                <exclude name="**/TestCatalogUpdateSuite.class" /> -->
-<!--                <exclude name="**/TestCRUDSuite.class" /> -->
-<!--                <exclude name="**/TestFailureDetectSuite.class" /> -->
-                <!-- ExecutionSite not relevant to Iv2. -->
                 <exclude name="**/TestExecutionSite.class" />
-<!--                <exclude name="**/TestExecutionSiteDeath.class" /> -->
-<!--                <exclude name="**/TestFailuresSuite.class" /> -->
-<!--                <exclude name="**/TestFixedSQLSuite.class" /> -->
-<!--                <exclude name="**/TestFunctionsSuite.class" /> -->
-<!--                <exclude name="**/TestGiantDeleteSuite.class" /> -->
-<!--                <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
-<!--                <exclude name="**/TestIndexesSuite.class" /> -->
-<!--                <exclude name="**/TestLimitOffsetSuite.class" /> -->
-<!--                <exclude name="**/TestLoadingSuite.class" /> -->
                 <exclude name="**/TestMaliciousClientSuite.class" />
-<!--                <exclude name="**/TestMaterializedViewSuite.class" /> -->
-<!--                <exclude name="**/TestMultiPartitionSuite.class" /> -->
-<!--                <exclude name="**/TestOrderBySuite.class" /> -->
-<!--                <exclude name="**/TestPartitionDetection.class" /> -->
-<!--                <exclude name="**/TestPlansGroupBySuite.class" /> -->
-<!--                <exclude name="**/TestReplicationSuite.class" /> -->
-<!--                <exclude name="**/TestRollbackSuite.class" /> -->
-<!--                <exclude name="**/TestSQLFeaturesSuite.class" /> -->
-<!--                <exclude name="**/TestSQLTypesSuite.class" /> -->
-<!--                <exclude name="**/TestSecuritySuite.class" /> -->
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
-<!--                <exclude name="**/TestSqlAggregateSuite.class" /> -->
-<!--                <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
-<!--                <exclude name="**/TestSqlUpdateSuite.class" /> -->
-<!--                <exclude name="**/TestSystemCatalogSuite.class" /> -->
-<!--                <exclude name="**/TestSystemInformationSuite.class" /> -->
-<!--                <exclude name="**/TestSystemProcedureSuite.class" /> -->
-<!--                <exclude name="**/TestTPCCSuite.class" /> -->
-<!--                <exclude name="**/TestBlobType.class" /> -->
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
+                <!-- <exclude name="**/TestHSQLBackend.class" /> -->
+                <!-- <exclude name="**/TestAdHocQueries.class" /> -->
+                <!-- <exclude name="**/TestJSONInterface.class" /> -->
+                <!-- <exclude name="**/TestRejoinEndToEnd.class" /> -->
+                <!-- <exclude name="**/TestRejoinWithCatalogUpdates.class" /> -->
+                <!-- <exclude name="**/TestReplicatedInvocation.class" /> -->
+                <!-- <exclude name="**/TestRestoreAgent.class" -->
+                <!-- <exclude name="**/TestSimpleCJK.class" /> -->
+                <!-- <exclude name="**/TestClientTimeouts.class" /> -->
+                <!-- <exclude name="**/TestExportToFileClient.class" /> -->
+                <!-- <exclude name="**/TestJDBCDriver.class" />-->
+                <!-- <exclude name="**/TestAdminMode.class" />-->
+                <!-- <exclude name="**/TestCatalogUpdateSuite.class" /> -->
+                <!-- <exclude name="**/TestCRUDSuite.class" /> -->
+                <!-- <exclude name="**/TestFailureDetectSuite.class" /> -->
+                <!-- <exclude name="**/TestExecutionSiteDeath.class" /> -->
+                <!-- <exclude name="**/TestFailuresSuite.class" /> -->
+                <!-- <exclude name="**/TestFixedSQLSuite.class" /> -->
+                <!-- <exclude name="**/TestFunctionsSuite.class" /> -->
+                <!-- <exclude name="**/TestGiantDeleteSuite.class" /> -->
+                <!-- <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
+                <!-- <exclude name="**/TestIndexesSuite.class" /> -->
+                <!-- <exclude name="**/TestLimitOffsetSuite.class" /> -->
+                <!-- <exclude name="**/TestLoadingSuite.class" /> -->
+                <!-- <exclude name="**/TestMaterializedViewSuite.class" /> -->
+                <!-- <exclude name="**/TestMultiPartitionSuite.class" /> -->
+                <!-- <exclude name="**/TestOrderBySuite.class" /> -->
+                <!-- <exclude name="**/TestPartitionDetection.class" /> -->
+                <!-- <exclude name="**/TestPlansGroupBySuite.class" /> -->
+                <!-- <exclude name="**/TestReplicationSuite.class" /> -->
+                <!-- <exclude name="**/TestRollbackSuite.class" /> -->
+                <!-- <exclude name="**/TestSQLFeaturesSuite.class" /> -->
+                <!-- <exclude name="**/TestSQLTypesSuite.class" /> -->
+                <!-- <exclude name="**/TestSecuritySuite.class" /> -->
+                <!-- <exclude name="**/TestSqlAggregateSuite.class" /> -->
+                <!-- <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
+                <!-- <exclude name="**/TestSqlUpdateSuite.class" /> -->
+                <!-- <exclude name="**/TestSystemCatalogSuite.class" /> -->
+                <!-- <exclude name="**/TestSystemInformationSuite.class" /> -->
+                <!-- <exclude name="**/TestSystemProcedureSuite.class" /> -->
+                <!-- <exclude name="**/TestTPCCSuite.class" /> -->
+                <!-- <exclude name="**/TestBlobType.class" /> -->
             </fileset>
         </tests>
     </run_junit>
@@ -1319,6 +1334,7 @@ TEST CASES
                 <exclude name="**/TestPartitionDetection.class"  />
                 <exclude name="**/TestSystemProcedureSuite.class"  />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
             </fileset>
         </tests>
     </run_junit>
@@ -1338,6 +1354,7 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
             </fileset>
         </tests>
     </run_junit>

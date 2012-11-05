@@ -25,19 +25,19 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
-
-import org.voltdb.MemoryStats;
-import org.voltdb.NodeDRGateway;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.MemoryStats;
+import org.voltdb.NodeDRGateway;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.export.ExportManager;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -84,7 +84,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
+                          VoltDB.START_ACTION startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
@@ -98,7 +98,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable(),
+                startAction,
                 agent, memStats, cl);
 
         m_tickProducer.start();
@@ -158,6 +158,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
             }
             super.acceptPromotion();
+            // Tag along and become the export master too
+            ExportManager.instance().acceptMastership(m_partitionId);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }

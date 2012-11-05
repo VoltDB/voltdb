@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +27,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.client.ClientResponse;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -107,9 +110,16 @@ public class MpProcedureTask extends ProcedureTask
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
         throw new RuntimeException("MP procedure task asked to run on rejoining site.");
+    }
+
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException("MP procedure task asked to run from tasklog on rejoining site.");
     }
 
     @Override

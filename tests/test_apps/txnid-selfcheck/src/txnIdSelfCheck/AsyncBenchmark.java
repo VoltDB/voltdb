@@ -62,6 +62,8 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
 
@@ -422,15 +424,31 @@ public class AsyncBenchmark {
         // connect to one or more servers, loop until success
         connect();
 
-        // initialize using synchronous call
-        Client initClient = clients.get(0);
-        initClient.callProcedure("Initialize");
-        ClientResponse rowResp = initClient.callProcedure("getLastRow");
-        VoltTable[] rowResults = rowResp.getResults();
-        assert(rowResp.getStatus() == ClientResponse.SUCCESS);
-        ClientResponse replicatedRowResp = initClient.callProcedure("getLastReplicatedRow");
-        VoltTable[] replicatedResults = replicatedRowResp.getResults();
-        assert(replicatedRowResp.getStatus() == ClientResponse.SUCCESS);
+        VoltTable[] rowResults = null;
+        VoltTable[] replicatedResults = null;
+        boolean succeeded = false;
+        // If server fails during initialization, try again
+        while (!succeeded) {
+            try {
+                // initialize using synchronous call
+                Client initClient = clients.get(0);
+                initClient.callProcedure("Initialize");
+                ClientResponse rowResp = initClient.callProcedure("getLastRow");
+                rowResults = rowResp.getResults();
+                assert (rowResp.getStatus() == ClientResponse.SUCCESS);
+                System.err.println("start");
+                Thread.sleep(3000);
+                System.err.println("end");
+                ClientResponse replicatedRowResp = initClient.callProcedure("getLastReplicatedRow");
+                replicatedResults = replicatedRowResp.getResults();
+                assert (replicatedRowResp.getStatus() == ClientResponse.SUCCESS);
+                succeeded = true;
+            } catch (ProcCallException e) {
+                System.err.println(e.getMessage());
+            } catch (NoConnectionsException e) {
+                System.err.println("Failed to initialize, will retry: " + e.getMessage());
+            }
+        }
 
         // total of 127 cids
         final int cidCount = 127;

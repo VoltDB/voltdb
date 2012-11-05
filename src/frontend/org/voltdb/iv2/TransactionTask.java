@@ -38,6 +38,9 @@ public abstract class TransactionTask extends SiteTasker
     @Override
     abstract public void run(SiteProcedureConnection siteConnection);
 
+    // run from the live rejoin task log.
+    abstract public void runFromTaskLog(SiteProcedureConnection siteConnection);
+
     public TransactionState getTransactionState()
     {
         return m_txn;

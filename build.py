@@ -165,6 +165,7 @@ CTX.INPUT['catalog'] = """
  columnref.cpp
  connector.cpp
  connectortableinfo.cpp
+ connectorproperty.cpp
  constraint.cpp
  constraintref.cpp
  database.cpp

@@ -65,7 +65,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
+                          VoltDB.START_ACTION startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
@@ -73,8 +73,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         throws KeeperException, InterruptedException, ExecutionException
     {
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions,
-                createForRejoin && isRejoinable(), null, null, cl);
+                csp, numberOfPartitions, startAction, null, null, cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),

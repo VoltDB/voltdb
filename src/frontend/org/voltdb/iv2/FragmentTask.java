@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +26,8 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
@@ -41,6 +45,19 @@ public class FragmentTask extends TransactionTask
     final FragmentTaskMessage m_task;
     final Map<Integer, List<VoltTable>> m_inputDeps;
 
+    // This constructor is used during live rejoin log replay.
+    FragmentTask(Mailbox mailbox,
+            FragmentTaskMessage message,
+            ParticipantTransactionState txnState)
+    {
+        this(mailbox,
+            txnState,
+            null,
+            message,
+            null);
+    }
+
+    // This constructor is used during normal operation.
     FragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
                  TransactionTaskQueue queue,
@@ -56,7 +73,9 @@ public class FragmentTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.debug("STARTING: " + this);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this);
+        }
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
@@ -69,7 +88,9 @@ public class FragmentTask extends TransactionTask
         // completion?
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
-        hostLog.debug("COMPLETE: " + this);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE: " + this);
+        }
     }
 
     @Override
@@ -82,13 +103,33 @@ public class FragmentTask extends TransactionTask
      * Produce a rejoining response.
      */
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
+        taskLog.logTask(m_task);
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_task, m_initiator.getHSId());
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
         m_initiator.deliver(response);
+    }
+
+    /**
+     * Run for replay after a live rejoin snapshot transfer.
+     */
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        // Set the begin undo token if we haven't already
+        // In the future we could record a token per batch
+        // and do partial rollback
+        if (!m_txn.isReadOnly()) {
+            if (m_txn.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+            }
+        }
+        // ignore response.
+        processFragmentTask(siteConnection);
     }
 
 

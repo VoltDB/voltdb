@@ -74,7 +74,7 @@ TableStats::generateEmptyTableStatsTable()
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
                                                             name,
                                                             schema,
-                                                            &columnNames[0],
+                                                            columnNames,
                                                             NULL));
 }
 
@@ -100,12 +100,8 @@ TableStats::TableStats(Table* table)
  */
 void TableStats::configure(
         string name,
-        CatalogId hostId,
-        string hostname,
-        int64_t siteId,
-        CatalogId partitionId,
         CatalogId databaseId) {
-    StatsSource::configure(name, hostId, hostname, siteId, partitionId, databaseId);
+    StatsSource::configure(name, databaseId);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
 }
