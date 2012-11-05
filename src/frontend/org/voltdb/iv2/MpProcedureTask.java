@@ -134,18 +134,9 @@ public class MpProcedureTask extends ProcedureTask
 
     private void restartTransaction()
     {
-        CompleteTransactionMessage complete = new CompleteTransactionMessage(
-                m_initiator.getHSId(), // who is the "initiator" now??
-                m_initiator.getHSId(),
-                m_txn.txnId,
-                m_txn.isReadOnly(),
-                true,   // restart always means rollback
-                false,  // really don't want to have ack the ack.
-                true,   // signal the SPIs that this is a restart
-                m_msg.isForReplay());
-
-        complete.setOriginalTxnId(m_msg.getOriginalTxnId());
-        m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
+        // We don't need to send restart messages here; the next SiteTasker
+        // which will run on the MPI's Site thread will be the repair task,
+        // which will send the necessary CompleteTransactionMessage to restart.
         ((MpTransactionState)m_txn).restart();
         // Update the masters list with the list provided when restart was triggered
         updateMasters(m_restartMasters);
