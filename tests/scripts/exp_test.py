@@ -72,6 +72,7 @@ logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
 elem2Test = {'helloworld':'./run.sh', 'voltcache':'./run.sh', 'voltkv':'./run.sh', 'voter':'./run.sh'}
 defaultHost = "localhost"
 defaultPort = 21212
+sectionBreak="====================================================="
 
 # To parse the output of './examples/voter/run.sh client' and get a specific portion
 # of the output. A sample value would be like the one below:
@@ -148,7 +149,8 @@ def installVoltDB(pkg, release):
     srce = root + thispkg
     dest = logDir + thispkg
     cmd = "wget " + srce + " -O " + dest + " 2>/dev/null"
-    print "To execute this cmd: %s" % cmd
+    print sectionBreak
+    print "Getting " + srce
 
     ret = call(cmd, shell=True)
     if ret != 0 or not os.path.exists(dest):
@@ -256,21 +258,21 @@ def stopService(ps, serviceHandle):
 # To execute 'run.sh client' and save the output in logC
 def execThisService(service, logS, logC):
     cmd = service + " > " + logS + " 2>&1"
-    print "Server - Exec CMD: '%s'" % cmd
+    print "   Server - Exec CMD: '%s'" % cmd
     service_ps = subprocess.Popen(cmd, shell=True)
     time.sleep(2)
     client = getClient()
     cmd = service + " client > " + logC + " 2>&1"
-    print "Client - Exec CMD: '%s'" % cmd
+    print "   Client - Exec CMD: '%s'" % cmd
     ret = call(cmd, shell=True)
-    print "Returning results from service execution: '%s'" % ret
+    print "   Returning results from service execution: '%s'" % ret
     client.onecmd("shutdown")
     service_ps.communicate()
 
 # Further assertion is required
 # We want to make sure that logFileC contains several key strings
 # which is defined in 'staticKeyStr'
-def assertVotekv_Votecache(mod, logC):
+def assertVoltkv_Voltcache(mod, logC):
     staticKeyStr = {
 "Command Line Configuration":1,
 "Setup & Initialization":1,
@@ -379,18 +381,18 @@ def startTest(testSuiteList):
             os.chdir(path)
             currDir = os.getcwd()
             service = elem2Test[suiteName]
-            print "===--->>> Start to test this suite: %s\nCurrent Directory: '%s'" % (suiteName, currDir)
+            print ">>> Test: %s\n   Current Directory: '%s'" % (suiteName, currDir)
             logFileS = logDir + suiteName + "_server"
             logFileC = logDir + suiteName + "_client"
-            print "Log File for VoltDB Server: '%s'" % logFileS
-            print "Log File for VoltDB Client: '%s'" % logFileC
+            print "   Log File for VoltDB Server: '%s'" % logFileS
+            print "   Log File for VoltDB Client: '%s'" % logFileC
             execThisService(service, logFileS, logFileC)
             if(suiteName == "helloworld"):
                 (result, msg) = assertHelloWorld(suiteName, logFileC)
             elif(suiteName == "voter"):
                 (result, msg) = assertVoter(suiteName, logFileC)
             elif(suiteName == "voltkv" or suiteName == "voltcache"):
-                (result, msg, keyStrSet) = assertVotekv_Votecache(suiteName, logFileC)
+                (result, msg, keyStrSet) = assertVoltkv_Voltcache(suiteName, logFileC)
         else:
             # Should never fall into this block
             msg = "Unknown Suite Name: '%s'. To be implemented. Exit with an error..." % suiteName
@@ -416,7 +418,7 @@ def startTest(testSuiteList):
 #                        failed for package either 'voltkv' or 'voltcache', the final report
 #                        will display a list missing strings that are expected in log files
 #                        for client.
-def create_rpt(info, status, msg, keyStrings, elapsed):
+def create_rpt(info, status, msg, keyStrings, elapsed, rptf):
     testtime = "%.2f" % elapsed
     testsuites = Element('testsuites', {'time':testtime})
     for (mod, suiteNameDict) in status.iteritems():
@@ -459,12 +461,11 @@ def create_rpt(info, status, msg, keyStrings, elapsed):
                 error = SubElement(testcase, 'error',
                         {'Error':info["err"]})
 
-    rptf = "/tmp/exp_rpt.xml"
     fo = open(rptf, "wb")
     fo.write(prettify(testsuites))
     fo.close()
     if not os.path.exists(rptf):
-        rptf = None
+        reportfile = None
     return rptf
 
 if __name__ == "__main__":
@@ -477,6 +478,8 @@ if __name__ == "__main__":
                       help="VoltDB package type: comm, pro, voltkv or voltcache. Default is comm. If not set, then this framework will take all packages.")
     parser.add_option("-s", "--suite", dest="suite",
                       help="Test suite name, if not set, then this framework will take all suites. If an incorrect suite name is passed in, then the test suite name is set to 'all' as a default value.")
+    parser.add_option("-x","--reportxml", dest="reportfile", default="exp_test.xml",
+                      help="Report file location")
 
     parser.set_defaults(pkg="all")
     parser.set_defaults(suite="all")
@@ -500,7 +503,7 @@ if __name__ == "__main__":
 
     list = None
     if(options.pkg in pkgDict):
-        print "############################################"
+        print sectionBreak
         print "Testing Version in this RUN: %s" % releaseNum
         print "--------------------------------------"
         if(options.pkg == "all"):
@@ -516,7 +519,6 @@ if __name__ == "__main__":
             print "Testing this package only in this RUN:"
             print "--------------------------------------"
             print "%s - %s" % (pkgDict[options.pkg], pkgFullName)
-        print "############################################"
     else:
         print "Unknown package name passed in from cmdline: %s" % options.pkg
         exit(1)
@@ -539,7 +541,6 @@ if __name__ == "__main__":
         msgD[p] = msg
         keysD[p] = keys
 
-    sepLineD = "================================================="
     status = True
     # tfD is a 2-D dictionary.
     # First level keys: module name, e.g. comm, pro, voltkv, voltcache
@@ -551,9 +552,9 @@ if __name__ == "__main__":
                 status = False
                 print >> sys.stderr, "The test suite '%s' in '%s' package is FAILED \
                     \n'%s'\n%s" \
-                    % (suitename, module, msgD[module][suitename], sepLineD)
+                    % (suitename, module, msgD[module][suitename], sectionBreak)
     elapsed = (time.time() - start)
-    reportXML = create_rpt(ret, tfD, msgD, keysD, elapsed)
+    reportXML = create_rpt(ret, tfD, msgD, keysD, elapsed, options.reportfile)
     print "Refer to the final report '%s' for details." % reportXML
     print "Total time consumed in this run: '%.2f'" % elapsed
     if(status == False):
