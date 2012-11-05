@@ -221,6 +221,8 @@ public class MpTransactionState extends TransactionState
         // if we're restarting this transaction, and we only have local work, add some dummy
         // remote work so that we can avoid injecting a borrow task into the local buddy site
         // before the CompleteTransactionMessage with the restart flag reaches it.
+        // Right now, any read on a replicated table which has no distributed work will
+        // generate these null fragments in the restarted transaction.
         boolean usedNullFragment = false;
         if (m_isRestart && m_remoteWork == null) {
             usedNullFragment = true;
