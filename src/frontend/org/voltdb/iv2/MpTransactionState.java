@@ -63,15 +63,17 @@ public class MpTransactionState extends TransactionState
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
     boolean m_haveDistributedInitTask = false;
+    boolean m_isRestart = false;
 
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
-                       List<Long> useHSIds, long buddyHSId)
+                       List<Long> useHSIds, long buddyHSId, boolean isRestart)
     {
         super(mailbox, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
         m_useHSIds.addAll(useHSIds);
         m_buddyHSId = buddyHSId;
+        m_isRestart = isRestart;
     }
 
     public void updateMasters(List<Long> masters)
@@ -90,6 +92,7 @@ public class MpTransactionState extends TransactionState
         // Also need to make sure that we get the original invocation in the first fragment
         // since some masters may not have seen it.
         m_haveDistributedInitTask = false;
+        m_isRestart = true;
     }
 
     @Override
@@ -215,6 +218,18 @@ public class MpTransactionState extends TransactionState
     @Override
     public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
     {
+        // if we're restarting this transaction, and we only have local work, add some dummy
+        // remote work so that we can avoid injecting a borrow task into the local buddy site
+        // before the CompleteTransactionMessage with the restart flag reaches it.
+        if (m_isRestart && m_remoteWork == null) {
+            //m_remoteWork = new FragmentTaskMessage(m_localWork.getInitiatorHSId(),
+            //        m_localWork.getCoordinatorHSId(),
+            //        m_localWork.getTxnId(),
+            //        m_localWork.getTimestamp(),
+            //        m_localWork.isReadOnly(),
+            //        false,
+            //        false);
+        }
         // Do distributed fragments, if any
         if (m_remoteWork != null) {
             // Create some record of expected dependencies for tracking

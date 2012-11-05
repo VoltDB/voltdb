@@ -46,11 +46,11 @@ public class MpProcedureTask extends ProcedureTask
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators,
-                  long buddyHSId)
+                  long buddyHSId, boolean isRestart)
     {
         super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators,
-                                     buddyHSId),
+                                     buddyHSId, isRestart),
               queue);
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);
