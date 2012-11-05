@@ -25,12 +25,15 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.utils.LogKeys;
+
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
 public class FragmentTask extends TransactionTask
 {
@@ -100,6 +103,13 @@ public class FragmentTask extends TransactionTask
 
         if (m_inputDeps != null) {
             siteConnection.stashWorkUnitDependencies(m_inputDeps);
+        }
+
+        if (m_task.isEmptyForRestart()) {
+            int outputDepId = m_task.getOutputDepId(0);
+            currentFragResponse.addDependency(outputDepId,
+                    new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+            return currentFragResponse;
         }
 
         for (int frag = 0; frag < m_task.getFragmentCount(); frag++)

@@ -221,14 +221,26 @@ public class MpTransactionState extends TransactionState
         // if we're restarting this transaction, and we only have local work, add some dummy
         // remote work so that we can avoid injecting a borrow task into the local buddy site
         // before the CompleteTransactionMessage with the restart flag reaches it.
+        boolean usedNullFragment = false;
         if (m_isRestart && m_remoteWork == null) {
-            //m_remoteWork = new FragmentTaskMessage(m_localWork.getInitiatorHSId(),
-            //        m_localWork.getCoordinatorHSId(),
-            //        m_localWork.getTxnId(),
-            //        m_localWork.getTimestamp(),
-            //        m_localWork.isReadOnly(),
-            //        false,
-            //        false);
+            usedNullFragment = true;
+            m_remoteWork = new FragmentTaskMessage(m_localWork.getInitiatorHSId(),
+                    m_localWork.getCoordinatorHSId(),
+                    m_localWork.getTxnId(),
+                    m_localWork.getTimestamp(),
+                    m_localWork.isReadOnly(),
+                    false,
+                    false);
+            m_remoteWork.setEmptyForRestart(getNextDependencyId());
+            // Distribute fragments to remote destinations.
+            long[] non_local_hsids = new long[m_useHSIds.size()];
+            for (int i = 0; i < m_useHSIds.size(); i++) {
+                non_local_hsids[i] = m_useHSIds.get(i);
+            }
+            // send to all non-local sites
+            if (non_local_hsids.length > 0) {
+                m_mbox.send(non_local_hsids, m_remoteWork);
+            }
         }
         // Do distributed fragments, if any
         if (m_remoteWork != null) {
@@ -256,7 +268,11 @@ public class MpTransactionState extends TransactionState
 
         BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
         m_localWork.m_sourceHSId = m_mbox.getHSId();
-        borrowmsg.addInputDepMap(m_remoteDepTables);
+        // if we created a bogus fragment to distribute to serialize restart and borrow tasks,
+        // don't include the empty dependencies we got back in the borrow fragment.
+        if (!usedNullFragment) {
+            borrowmsg.addInputDepMap(m_remoteDepTables);
+        }
         m_mbox.send(m_buddyHSId, borrowmsg);
 
         FragmentResponseMessage msg = null;

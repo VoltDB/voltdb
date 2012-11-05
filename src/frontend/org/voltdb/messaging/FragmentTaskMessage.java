@@ -96,8 +96,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     boolean m_isFinal = false;
     byte m_taskType = 0;
-    // Unused, should get removed from this message
-    boolean m_shouldUndo = false;
+    // We use this flag to generate a null FragmentTaskMessage that returns a
+    // response for a dependency but doesn't try to execute anything on the EE.
+    // This is a hack to serialize CompleteTransactionMessages and
+    // BorrowTaskMessages when the first fragment of the restarting transaction
+    // is a short-circuited replicated table read.
+    // If this flag is set, the message should contain a single fragment with the
+    // desired output dep ID, but no real work to do.
+    boolean m_emptyForRestart = false;
     int m_inputDepCount = 0;
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
@@ -144,6 +150,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_inputDepCount = ftask.m_inputDepCount;
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
+        m_emptyForRestart = ftask.m_emptyForRestart;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -283,6 +290,18 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public int getFragmentCount() {
         return m_items.size();
+    }
+
+    // We're going to use this fragment task to generate a null distributed
+    // fragment to serialize Completion and Borrow messages.  Create an empty
+    // fragment with the provided outputDepId
+    public void setEmptyForRestart(int outputDepId) {
+        m_emptyForRestart = true;
+        addFragment(Long.MIN_VALUE, outputDepId, ByteBuffer.allocate(0));
+    }
+
+    public boolean isEmptyForRestart() {
+        return m_emptyForRestart;
     }
 
     /*
@@ -484,7 +503,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.putShort(nUnplanned);
         buf.put(m_isFinal ? (byte) 1 : (byte) 0);
         buf.put(m_taskType);
-        buf.put(m_shouldUndo ? (byte) 1 : (byte) 0);
+        buf.put(m_emptyForRestart ? (byte) 1 : (byte) 0);
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
 
@@ -564,7 +583,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(unplannedCount >= 0 && unplannedCount <= fragCount);
         m_isFinal = buf.get() != 0;
         m_taskType = buf.get();
-        m_shouldUndo = buf.get() != 0;
+        m_emptyForRestart = buf.get() != 0;
         boolean haveOutputDependencies = buf.get() != 0;
         boolean haveInputDependencies = buf.get() != 0;
 
@@ -696,8 +715,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             sb.append("\n  UNKNOWN FRAGMENT TASK TYPE");
         }
 
-        if (m_shouldUndo)
-            sb.append("\n  THIS IS AN UNDO REQUEST");
+        if (m_emptyForRestart)
+            sb.append("\n  THIS IS A NULL FRAGMENT TASK USED FOR RESTART");
 
         return sb.toString();
     }
