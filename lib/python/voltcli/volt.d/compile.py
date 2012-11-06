@@ -43,5 +43,5 @@ def compile(runner):
                             None,
                             runner.project_path,
                             runner.opts.catalog,
-                            *runner.args,
-                            classpath = runner.opts.classpath)
+                            classpath = runner.opts.classpath,
+                            *runner.args)

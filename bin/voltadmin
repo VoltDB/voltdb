@@ -50,4 +50,4 @@ try:
 except (IOError, OSError, ImportError), e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
     sys.exit(1)
-runner.main(cmd_name, cmd_dir, version, description, *sys.argv[1:], standalone = standalone)
+runner.main(cmd_name, cmd_dir, version, description, standalone = standalone, *sys.argv[1:])

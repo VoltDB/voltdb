@@ -29,7 +29,7 @@ from voltcli import utility
 
 def show_snapshots(runner):
     response = runner.call_proc('@SnapshotStatus', [], [])
-    utility.format_volt_table(response.tables[0], caption = 'Snapshot Status')
+    print response.table(0).format_table(caption = 'Snapshot Status')
 
 @VOLT.Multi_Command(
     wrapper = VOLT.AdminWrapper(),
