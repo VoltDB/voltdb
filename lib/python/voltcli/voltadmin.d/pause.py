@@ -27,7 +27,14 @@
 
 from voltcli import utility
 
-@VOLT.Admin_Client(description = 'Pause the VoltDB cluster and switch it to admin mode.')
+@VOLT.Command(
+    wrapper = VOLT.AdminWrapper(),
+    description = 'Pause the VoltDB cluster and switch it to admin mode.'
+)
 def pause(runner):
-    runner.call_proc('@Pause', [], [])
-    utility.info('The cluster is paused.')
+    # Check the STATUS column. runner.call_proc() detects and aborts on errors.
+    status = runner.call_proc('@Pause', [], []).table(0).tuple(0).column_integer(0)
+    if status == 0:
+        utility.info('The cluster is paused.')
+    else:
+        utility.error('The cluster has failed to pause with status: %d' % status)

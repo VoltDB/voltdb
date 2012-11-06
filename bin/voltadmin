@@ -40,7 +40,7 @@ try:
     # Adjust these variables as needed for other base commands, locations, etc..
     base_dir    = os.path.dirname(cmd_dir)
     lib_dir     = os.path.join(base_dir, 'lib', 'python')
-    version     = open(os.path.join(base_dir, 'version.txt')).read().strip(),
+    version     = open(os.path.join(base_dir, 'version.txt')).read().strip()
     description = 'This is the command line interface to VoltDB administrative functions.'
     standalone  = True
     # Tweak the Python library path to call voltcli.runner.main().

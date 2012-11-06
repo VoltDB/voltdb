@@ -40,7 +40,7 @@ try:
     # Adjust these variables as needed for other base commands, locations, etc..
     base_dir    = os.path.dirname(cmd_dir)
     lib_dir     = os.path.join(base_dir, 'lib', 'python')
-    version     = open(os.path.join(base_dir, 'version.txt')).read().strip(),
+    version     = open(os.path.join(base_dir, 'version.txt')).read().strip()
     description = 'Preview release command line interface to the Voter example in examples/voter.'
     standalone  = False
     # Tweak the Python library path to call voltcli.runner.main().

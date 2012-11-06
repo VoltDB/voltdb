@@ -147,6 +147,8 @@ class VerbRunner(object):
         self.internal_verbspaces = internal_verbspaces
         # Create a Java runner.
         self.java = JavaRunner(self.verb, self.config, **kwargs)
+        # Populated for Volt client verbs.
+        self.client = None
 
     def shell(self, *args):
         """
@@ -310,14 +312,14 @@ the package file to an explicit python version, e.g.
             args2 = [verb_name] + list(args[1:])
             self._run_command(self.internal_verbspaces[verbspace_name], *args2, **kwargs)
 
-    def call_proc(self, sysproc_name, types, args):
+    def call_proc(self, sysproc_name, types, args, check_status = True):
         utility.verbose_info('Call procedure: %s%s' % (sysproc_name, tuple(args)))
         proc = voltdbclient.VoltProcedure(self.client, sysproc_name, types)
         response = proc.call(params = args)
-        if response.status != 1:
-            utility.abort('@Pause system procedure call failed.', (response,))
+        if check_status and response.status != 1:
+            utility.abort('"%s" procedure call failed.' % sysproc_name, (response,))
         utility.verbose_info(response)
-        return response
+        return utility.VoltResponseWrapper(response)
 
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
@@ -348,6 +350,11 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
             zipper.add_file_from_string(main_script, '__main__.py')
             # Recursively package lib/python as lib in the zip file.
             zipper.add_directory(environment.volt_python, '')
+            # Add <verbspace-name>.d subdirectory if found under the command directory.
+            command_d = os.path.join(environment.command_dir, '%s.d' % name)
+            if os.path.isdir(command_d):
+                dst = os.path.join('voltcli', os.path.basename(command_d))
+                zipper.add_directory(command_d, dst)
         finally:
             zipper.close(make_executable = True)
 
@@ -382,6 +389,11 @@ class VOLT(object):
         self.VoltTable       = voltdbclient.VoltTable
         self.VoltColumn      = voltdbclient.VoltColumn
         self.FastSerializer  = voltdbclient.FastSerializer
+        # For declaring multi-command verbs like "show".
+        self.Modifier = Modifier
+        # Wrappers
+        self.ClientWrapper = ClientWrapper
+        self.AdminWrapper  = AdminWrapper
         # As a convenience expose the utility module so that commands don't
         # need to import it.
         self.utility = utility
@@ -394,7 +406,8 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
     file's directory, the calling script location (if provided), and the
     working directory.
     """
-    utility.debug('Loading verbspace for "%s" from "%s"...' % (command_name, command_dir))
+    utility.debug('Loading verbspace for "%s" version "%s" from "%s"...'
+                        % (command_name, version, command_dir))
     scan_base_dirs = [os.path.dirname(__file__)]
     verbs_subdir = '%s.d' % command_name
     if command_dir is not None and command_dir not in scan_base_dirs:

@@ -28,31 +28,31 @@
 import os
 from voltcli import utility
 
-@VOLT.Admin_Client(
+@VOLT.Command(
+    wrapper = VOLT.AdminWrapper(),
     description = 'Save a VoltDB database snapshot.',
     options = (
-        VOLT.BooleanOption(None, '--blocking', 'blocking',
-                           'blocking mode stops database activity during the snapshot',
+        VOLT.BooleanOption('-n', '--non-blocking', 'nonblocking',
+                           'do not wait for snapshot to complete',
                            default = True),
         VOLT.StringOption('-f', '--format', 'format',
                           'snapshot format: "native" or "csv"',
-                          default = 'native')),
+                          default = 'native')
+    ),
     arguments = (
-        VOLT.StringArgument('directory',
-                            'the local snapshot directory path'),
-        VOLT.StringArgument('nonce',
-                            'the unique snapshot identifier (nonce)')))
+        VOLT.StringArgument('directory', 'the local snapshot directory path'),
+        VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
+    )
+)
 def save(runner):
     uri = 'file://%s' % os.path.realpath(runner.opts.directory)
-    if runner.opts.blocking:
-        blocking = 'true'
-    else:
+    if runner.opts.nonblocking:
         blocking = 'false'
+    else:
+        blocking = 'true'
     json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s"}'
                     % (uri, runner.opts.nonce, blocking, runner.opts.format)]
     utility.debug('@SnapshotSave "%s"' % json_opts)
-    col_types = [VOLT.FastSerializer.VOLTTYPE_STRING]
-    response = runner.call_proc('@SnapshotSave', col_types, json_opts)
-    rows = response.tables[0].tuples
-    headings = [c.name for c in response.tables[0].columns]
-    print utility.format_table(rows, caption = 'Snapshot Results', headings = headings)
+    columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
+    response = runner.call_proc('@SnapshotSave', columns, json_opts)
+    print response.table(0).format_table(caption = 'Snapshot Save Results')

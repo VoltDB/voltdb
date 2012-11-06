@@ -27,14 +27,14 @@
 
 from voltcli import utility
 
-@VOLT.Command(
+def show_snapshots(runner):
+    response = runner.call_proc('@SnapshotStatus', [], [])
+    utility.format_volt_table(response.tables[0], caption = 'Snapshot Status')
+
+@VOLT.Multi_Command(
     wrapper = VOLT.AdminWrapper(),
-    description = 'Resume a paused VoltDB cluster that is in admin mode.'
+    description = 'Display information about a live database.',
+    modifiers = VOLT.Modifier('snapshots', show_snapshots, 'Display current snapshot status.')
 )
-def resume(runner):
-    # Check the STATUS column. runner.call_proc() detects and aborts on errors.
-    status = runner.call_proc('@Resume', [], []).table(0).tuple(0).column_integer(0)
-    if status == 0:
-        utility.info('The cluster has resumed.')
-    else:
-        utility.error('The cluster has failed to resume with status: %d' % status)
+def show(runner):
+    runner.go()

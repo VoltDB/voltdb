@@ -404,9 +404,9 @@ class CLIParser(ExtendedHelpOptionParser):
                     rows2.append((get_verb_usage(verb), verb.cli_spec.description))
                 else:
                     rows1.append((get_verb_usage(verb), verb.cli_spec.description))
-        table1 = utility.format_table(rows1, caption = 'Verb Descriptions')
-        table2 = utility.format_table(rows2, caption = 'Common Verbs')
-        return '\n%s\n\n%s' % (table1, table2)
+        table1 = utility.format_table(rows1, caption = 'Verb Descriptions', separator = '  ')
+        table2 = utility.format_table(rows2, caption = 'Common Verbs', separator = '  ')
+        return '%s\n%s' % (table1, table2)
 
     def _get_full_usage(self):
         full_usage        = '%s\n' % usage

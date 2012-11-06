@@ -27,15 +27,17 @@
 
 from voltcli import utility
 
-@VOLT.Admin_Client(
+@VOLT.Command(
+    wrapper = VOLT.AdminWrapper(),
     description = 'Restore a VoltDB database snapshot.',
     arguments = (
-        VOLT.StringArgument('directory',
-                            'the local snapshot directory path'),
-        VOLT.StringArgument('nonce',
-                            'the unique snapshot identifier (nonce)')))
+        VOLT.StringArgument('directory', 'the local snapshot directory path'),
+        VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
+    )
+)
 def restore(runner):
-    runner.call_proc('@SnapshotRestore', [VOLT.FastSerializer.VOLTTYPE_STRING,
-                                          VOLT.FastSerializer.VOLTTYPE_STRING],
-                                         [runner.opts.directory, runner.opts.nonce])
+    columns = [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING]
+    params  = [runner.opts.directory, runner.opts.nonce]
+    response = runner.call_proc('@SnapshotRestore', columns, params)
     utility.info('The snapshot was restored.')
+    print response.table(0).format_table(caption = 'Snapshot Restore Results')
