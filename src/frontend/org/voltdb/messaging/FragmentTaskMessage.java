@@ -28,8 +28,8 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.LogKeys;
 
 /**
  * Message from a stored procedure coordinator to an execution site
@@ -99,6 +99,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // Unused, should get removed from this message
     boolean m_shouldUndo = false;
     int m_inputDepCount = 0;
+    Iv2InitiateTaskMessage m_initiateTask;
+    ByteBuffer m_initiateTaskBuffer;
 
     /** Empty constructor for de-serialization */
     FragmentTaskMessage() {
@@ -116,10 +118,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public FragmentTaskMessage(long initiatorHSId,
                                long coordinatorHSId,
                                long txnId,
+                               long timestamp,
                                boolean isReadOnly,
-                               boolean isFinal) {
-        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
-
+                               boolean isFinal,
+                               boolean isForReplay) {
+        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
         m_isFinal = isFinal;
         m_subject = Subject.DEFAULT.getId();
         assert(selfCheck());
@@ -134,12 +137,16 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     {
         super(initiatorHSId, coordinatorHSId, ftask);
 
-        m_spHandle = ftask.m_spHandle;
+        setSpHandle(ftask.getSpHandle());
         m_taskType = ftask.m_taskType;
         m_isFinal = ftask.m_isFinal;
         m_subject = ftask.m_subject;
         m_inputDepCount = ftask.m_inputDepCount;
         m_items = ftask.m_items;
+        m_initiateTask = ftask.m_initiateTask;
+        if (ftask.m_initiateTaskBuffer != null) {
+            m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
+        }
         assert(selfCheck());
     }
 
@@ -192,13 +199,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public static FragmentTaskMessage createWithOneFragment(long initiatorHSId,
                                                             long coordinatorHSId,
                                                             long txnId,
+                                                            long timestamp,
                                                             boolean isReadOnly,
                                                             long fragmentId,
                                                             int outputDepId,
                                                             ByteBuffer parameterSet,
-                                                            boolean isFinal) {
+                                                            boolean isFinal,
+                                                            boolean isForReplay) {
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
-                                                          txnId, isReadOnly, isFinal);
+                                                          txnId, timestamp, isReadOnly, isFinal, isForReplay);
         ret.addFragment(fragmentId, outputDepId, parameterSet);
         return ret;
     }
@@ -274,6 +283,25 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public int getFragmentCount() {
         return m_items.size();
+    }
+
+    /*
+     * The first fragment contains the initiate task for a multi-part txn for command logging
+     */
+    public void setInitiateTask(Iv2InitiateTaskMessage initiateTask) {
+        m_initiateTask = initiateTask;
+        m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        try {
+            initiateTask.flattenToBuffer(m_initiateTaskBuffer);
+            m_initiateTaskBuffer.flip();
+        } catch (IOException e) {
+            //Executive decision, don't throw a checked exception. Let it burn.
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Iv2InitiateTaskMessage getInitiateTask() {
+        return m_initiateTask;
     }
 
     public long getFragmentId(int index) {
@@ -370,6 +398,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // Fragment ID block
         msgsize += 8 * m_items.size();
+
+        //nested initiate task message length prefix
+        msgsize += 4;
+        if (m_initiateTaskBuffer != null) {
+            msgsize += m_initiateTaskBuffer.remaining();
+        }
 
         // Make a pass through the fragment data items to account for the
         // optional output and input dependency blocks, plus the unplanned block.
@@ -486,6 +520,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        if (m_initiateTaskBuffer != null) {
+            ByteBuffer dup = m_initiateTaskBuffer.duplicate();
+            buf.putInt(dup.remaining());
+            buf.put(dup);
+        } else {
+            buf.putInt(0);
+        }
+
         // Unplanned item block
         for (short index = 0; index < m_items.size(); index++) {
             // Each unplanned item gets an index (2) and a size (4) and buffer for
@@ -567,6 +609,37 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        int initiateTaskMessageLength = buf.getInt();
+        if (initiateTaskMessageLength > 0) {
+            int startPosition = buf.position();
+            Iv2InitiateTaskMessage message = new Iv2InitiateTaskMessage();
+            // EHGAWD: init task was serialized with flatten which added
+            // the message type byte. deserialization expects the message
+            // factory to have stripped that byte. but ... that's not the
+            // way we do it here. So read the message type byte...
+            byte messageType = buf.get();
+            assert(messageType == VoltDbMessageFactory.IV2_INITIATE_TASK_ID);
+            message.initFromBuffer(buf);
+            m_initiateTask = message;
+            if (m_initiateTask != null && m_initiateTaskBuffer == null) {
+                m_initiateTaskBuffer = ByteBuffer.allocate(m_initiateTask.getSerializedSize());
+                try {
+                    m_initiateTask.flattenToBuffer(m_initiateTaskBuffer);
+                    m_initiateTaskBuffer.flip();
+                } catch (IOException e) {
+                    //Executive decision, don't throw a checked exception. Let it burn.
+                    throw new RuntimeException(e);
+                }
+            }
+
+            /*
+             * There is an assertion that all bytes of the message are consumed.
+             * Initiate task lazily deserializes the parameter buffer and doesn't consume
+             * all the bytes so do it here so the assertion doesn't trip
+             */
+            buf.position(startPosition + initiateTaskMessageLength);
+        }
+
         // Unplanned block
         for (int iUnplanned = 0; iUnplanned < unplannedCount; iUnplanned++) {
             short index = buf.getShort();
@@ -578,6 +651,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.get(item.m_fragmentPlan);
             }
         }
+
     }
 
     @Override
@@ -588,7 +662,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
-        sb.append(", SP HANDLE: ").append(m_spHandle);
+        sb.append(" FOR REPLAY ").append(isForReplay());
+        sb.append(", SP HANDLE: ").append(getSpHandle());
         sb.append("\n");
         if (m_isReadOnly)
             sb.append("  READ, COORD ");

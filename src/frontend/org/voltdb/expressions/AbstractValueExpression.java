@@ -17,6 +17,9 @@
 
 package org.voltdb.expressions;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -26,12 +29,46 @@ import org.voltdb.types.ExpressionType;
  */
 public abstract class AbstractValueExpression extends AbstractExpression {
 
+    // This works on the assumption that it is only used to return final "leaf node" bindingLists that
+    // are never updated "in place", but just get their contents dumped into a summary List that was created
+    // inline and NOT initialized here.
+    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<AbstractExpression>();
+
     public AbstractValueExpression() {
         // This is needed for serialization
     }
 
     public AbstractValueExpression(ExpressionType type) {
         super(type);
+    }
+
+    // Disable all the structural equality checking overhead of AbstractExpression.
+    // Force AbstractValueExpression derived classes to fend for themselves.
+    @Override
+    public abstract boolean equals(Object obj);
+
+    // Except for ParameterValueExpression, which takes care of itself, binding to value expressions
+    // amounts to an equality test. If the values expressions are identical, the binding is trivially
+    // possible, indicated by returning an empty list of binding requirements.
+    // Otherwise, there is no binding possible, indicated by a null return.
+    @Override
+    public List<AbstractExpression> bindingToIndexedExpression(AbstractExpression expr) {
+        if (equals(expr)) {
+            return s_reusableImmutableEmptyBinding;
+        }
+        return null;
+    }
+
+    @Override
+    public void normalizeOperandTypes_recurse()
+    {
+        // Nothing to do... no operands.
+    }
+
+    @Override
+    public void finalizeValueTypes()
+    {
+        // Nothing to do... This is all about pulling types UP from child expressions.
     }
 
 }

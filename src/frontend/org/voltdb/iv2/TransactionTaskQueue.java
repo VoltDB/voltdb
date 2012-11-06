@@ -20,11 +20,10 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.exceptions.SerializableException;
-
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -32,9 +31,21 @@ public class TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final private Deque<TransactionTask> m_backlog =
-        new ArrayDeque<TransactionTask>();
     final private SiteTaskerQueue m_taskQueue;
+
+    /*
+     * Multi-part transactions create a backlog of tasks behind them. A queue is
+     * created for each multi-part task to maintain the backlog until the next
+     * multi-part task.
+     *
+     * DR uses m_drMPSentinelBacklog to queue additional sentinels than the one
+     * currently in progress because DR uses GENERIC_MP_SENTINEL value for all
+     * sentinels. When a DR multipart completes, another sentinel will be polled
+     * from m_drMPSentinelBacklog and put in this map. It is impossible to have
+     * an empty m_backlog while m_drMPSentinelBacklog has more
+     * sentinels queued.
+     */
+    Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -52,14 +63,14 @@ public class TransactionTaskQueue
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         boolean retval = false;
-        // Single partitions never queue if empty
-        // Multipartitions always queue
-        // Fragments queue if they're not part of the queue head TXN ID
-        // offer to SiteTaskerQueue if:
-        // the queue was empty
-        // the queue wasn't empty but the txn IDs matched
         if (!m_backlog.isEmpty()) {
-            if (task.getMpTxnId() != m_backlog.getFirst().getMpTxnId())
+            /*
+             * This branch happens during regular execution when a multi-part is in progress.
+             * The first task for the multi-part is the head of the queue, and all the single parts
+             * are being queued behind it. The txnid check catches tasks that are part of the multi-part
+             * and immediately queues them for execution.
+             */
+            if (task.getTxnId() != m_backlog.getFirst().getTxnId())
             {
                 m_backlog.addLast(task);
                 retval = true;
@@ -69,6 +80,12 @@ public class TransactionTaskQueue
             }
         }
         else {
+            /*
+             * Base case nothing queued nothing in progress
+             * If the task is a multipart then put an entry in the backlog which
+             * will act as a barrier for single parts, queuing them for execution after the
+             * multipart
+             */
             if (!task.getTransactionState().isSinglePartition()) {
                 m_backlog.addLast(task);
                 retval = true;
@@ -82,14 +99,19 @@ public class TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task)
+    synchronized void repair(SiteTasker task, List<Long> masters)
     {
         m_taskQueue.offer(task);
-        if (!m_backlog.isEmpty()) {
+        Iterator<TransactionTask> iter = m_backlog.iterator();
+        if (iter.hasNext()) {
+            TransactionTask next = iter.next();
             // get head
-            MpTransactionState txn = (MpTransactionState)m_backlog.getFirst().getTransactionState();
+            // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
+            // that the TransactionTasks we pull out of it have to be MP transactions, so this
+            // cast is safe
+            MpTransactionState txn = (MpTransactionState)next.getTransactionState();
             // inject poison pill
-            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, false, false);
+            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
             FragmentResponseMessage poison =
                 new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
             // Provide a serializable exception so that the procedure runner sees
@@ -99,6 +121,13 @@ public class TransactionTaskQueue
                     "Transaction rolled back by fault recovery or shutdown.");
             poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, forcedTermination);
             txn.offerReceivedFragmentResponse(poison);
+            // Now, iterate through the rest of the data structure and update the partition masters
+            // for all MpProcedureTasks not at the head of the TransactionTaskQueue
+            while (iter.hasNext())
+            {
+                next = iter.next();
+                ((MpProcedureTask)next).updateMasters(masters);
+            }
         }
     }
 
@@ -112,45 +141,52 @@ public class TransactionTaskQueue
 
     /**
      * Try to offer as many runnable Tasks to the SiteTaskerQueue as possible.
-     * Currently just blocks on the next uncompleted multipartition transaction
-     * @return
+     * @return the number of TransactionTasks queued to the SiteTaskerQueue
      */
     synchronized int flush()
     {
         int offered = 0;
-        // check to see if head is done
-        // then offer until the next MP or FragTask
-        if (!m_backlog.isEmpty()) {
-            if (m_backlog.getFirst().getTransactionState().isDone()) {
-                // remove the completed MP txn
-                m_backlog.removeFirst();
-                while (!m_backlog.isEmpty()) {
-                    TransactionTask next = m_backlog.getFirst();
-                    taskQueueOffer(next);
-                    ++offered;
-                    if (next.getTransactionState().isSinglePartition()) {
-                        m_backlog.removeFirst();
-                    }
-                    else {
-                        // Walk the queue and find any other task with the same
-                        // txn ID as the MP transaction we just offered and also
-                        // offer them.
-                        Iterator<TransactionTask> iter = m_backlog.iterator();
-                        // need to skip the head because that's the fragment we're looking
-                        // to match; don't want to add it twice and pull it out of the backlog
-                        iter.next();
-                        while (iter.hasNext()) {
-                            TransactionTask task = iter.next();
-                            if (task.getMpTxnId() == next.getMpTxnId())
-                            {
-                                iter.remove();
-                                taskQueueOffer(task);
-                                ++offered;
-                            }
-                        }
-                        break;
+        // If the first entry of the backlog is a completed transaction, clear it so it no longer
+        // blocks the backlog then iterate the backlog for more work.
+        //
+        // Note the kooky corner case where a multi-part transaction can actually have multiple outstanding
+        // tasks. At first glance you would think that because the relationship is request response there
+        // can be only one outstanding task for a given multi-part transaction.
+        //
+        // That isn't true.
+        //
+        // A rollback can cause there to be a fragment task as well as a rollback
+        // task. The rollback is generated asynchronously by another partition.
+        // If we don't flush all the associated tasks now then flush won't be called again because it is waiting
+        // for the complete transaction task that is languishing in the queue to do the flush post multi-part.
+        // It can't be called eagerly because that would destructively flush single parts as well.
+        if (m_backlog.isEmpty() || !m_backlog.getFirst().getTransactionState().isDone()) {
+            return offered;
+        }
+        m_backlog.removeFirst();
+        Iterator<TransactionTask> iter = m_backlog.iterator();
+        while (iter.hasNext()) {
+            TransactionTask task = iter.next();
+            long lastQueuedTxnId = task.getTxnId();
+            taskQueueOffer(task);
+            ++offered;
+            if (task.getTransactionState().isSinglePartition()) {
+                // single part can be immediately removed and offered
+                iter.remove();
+                continue;
+            }
+            else {
+                // leave the mp fragment at the head of the backlog but
+                // iterate and take care of the kooky case explained above.
+                while (iter.hasNext()) {
+                    task = iter.next();
+                    if (task.getTxnId() == lastQueuedTxnId) {
+                        iter.remove();
+                        taskQueueOffer(task);
+                        ++offered;
                     }
                 }
+                break;
             }
         }
         return offered;

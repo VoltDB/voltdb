@@ -111,31 +111,33 @@ public abstract class StatementCompiler {
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(0);
 
+
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
+        String sql = catalogStmt.getSqltext();
+        String stmtName = catalogStmt.getTypeName();
+        String procName = catalogStmt.getParent().getTypeName();
         TrivialCostModel costModel = new TrivialCostModel();
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, false);
+                sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
+                partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
+                costModel, null, joinOrder);
 
         CompiledPlan plan = null;
         try {
-            plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
-                    catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(), DEFAULT_MAX_JOIN_TABLES, null);
+            planner.parse();
+            plan = planner.plan();
+            assert(plan != null);
         } catch (PlanningErrorException e) {
             // These are normal expectable errors -- don't normally need a stack-trace.
-            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
-        }
-        if (plan == null) {
-            String msg = "Failed to plan for statement type("
-                + catalogStmt.getTypeName() + ") "
-                + catalogStmt.getSqltext();
-            String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null) {
-                msg += " Error: \"" + plannerMsg + "\"";
+            String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") " + catalogStmt.getSqltext();
+            if (e.getMessage() != null) {
+                msg += " Error: \"" + e.getMessage() + "\"";
             }
             throw compiler.new VoltCompilerException(msg);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         }
 
         // Check order determinism before accessing the detail which it caches.

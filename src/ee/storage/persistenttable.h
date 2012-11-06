@@ -73,7 +73,6 @@ class TupleSerializer;
 class SerializeInput;
 class Topend;
 class ReferenceSerializeOutput;
-class ExecutorContext;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class PersistentTableUndoDeleteAction;
@@ -161,15 +160,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * targetTuple is swapped when making calls on the indexes. This
      * is just an inconsistency in the argument ordering.
      */
-    bool updateTuple(TableTuple &sourceTuple, TableTuple &targetTuple,
-                     bool updatesIndexes);
+    bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                        TableTuple &sourceTupleWithNewValues,
+                                        std::vector<TableIndex*> &indexesToUpdate);
 
     /*
      * Identical to regular updateTuple except no memory management
      * for unlined columns is performed because that will be handled
      * by the UndoAction.
      */
-    void updateTupleForUndo(TableTuple &sourceTuple, TableTuple &targetTuple,
+    void updateTupleForUndo(TableTuple &targetTupleToUpdate,
+                            TableTuple &sourceTupleWithNewValues,
                             bool revertIndexes);
 
     /*
@@ -184,16 +185,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * Does a primary key lookup or table scan if necessary.
      */
     voltdb::TableTuple lookupTuple(TableTuple tuple);
-
-    // ------------------------------------------------------------------
-    // INDEXES
-    // ------------------------------------------------------------------
-    virtual int indexCount() const { return m_indexCount; }
-    virtual int uniqueIndexCount() const { return m_uniqueIndexCount; }
-    virtual std::vector<TableIndex*> allIndexes() const;
-    virtual TableIndex *index(std::string name);
-    virtual TableIndex *primaryKeyIndex() { return m_pkeyIndex; }
-    virtual const TableIndex *primaryKeyIndex() const { return m_pkeyIndex; }
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -260,7 +251,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         m_nonInlinedMemorySize -= bytes;
     }
 
-protected:
+  private:
 
     size_t allocatedBlockCount() const {
         return m_data.size();
@@ -290,19 +281,18 @@ protected:
     // ------------------------------------------------------------------
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
-    void updateFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
-    void updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
-
     bool tryInsertOnAllIndexes(TableTuple *tuple);
-    bool tryUpdateOnAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
+    bool checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
+                                    const TableTuple &sourceTupleWithNewValues,
+                                    std::vector<TableIndex*> &indexesToUpdate);
 
     bool checkNulls(TableTuple &tuple) const;
 
-    PersistentTable(ExecutorContext *ctx, bool exportEnabled);
+    PersistentTable(int partitionColumn);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
-    void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple);
+    void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
     /**
      * Normally this will return the tuple storage to the free list.
@@ -321,23 +311,11 @@ protected:
 
     TBPtr allocateNextBlock();
 
-    // pointer to current transaction id and other "global" state.
-    // abstract this out of VoltDBEngine to avoid creating dependendencies
-    // between the engine and the storage layers - which complicate test.
-    ExecutorContext *m_executorContext;
-
     // CONSTRAINTS
-    TableIndex** m_uniqueIndexes;
-    int m_uniqueIndexCount;
-    bool* m_allowNulls;
-
-    // INDEXES
-    TableIndex** m_indexes;
-    int m_indexCount;
-    TableIndex *m_pkeyIndex;
+    std::vector<bool> m_allowNulls;
 
     // partition key
-    int m_partitionColumn;
+    const int m_partitionColumn;
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;

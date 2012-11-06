@@ -32,8 +32,8 @@ import junit.framework.TestCase;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.EstTime;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.EstTime;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
@@ -136,6 +136,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       String connectionHostname,
                                       boolean adminConnection,
                                       long txnId,
+                                      long timestamp,
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
@@ -175,41 +176,30 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
-            // TODO Auto-generated method stub
-
-        }
+        public void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {}
 
         @Override
         public Map<Long, long[]> getOutstandingTxnStats()
         {
-            // TODO Auto-generated method stub
             return null;
         }
 
         @Override
-        public void setSendHeartbeats(boolean val) {
-            // TODO Auto-generated method stub
-
-        }
+        public void setSendHeartbeats(boolean val) {}
 
         @Override
-        public void sendHeartbeat(long txnId) {
-            // TODO Auto-generated method stub
-
-        }
+        public void sendHeartbeat(long txnId) {}
 
         @Override
         public boolean isOnBackPressure() {
-            // TODO Auto-generated method stub
             return false;
         }
 
         @Override
-        public void removeConnectionStats(long connectionId) {
-            // TODO Auto-generated method stub
+        public void removeConnectionStats(long connectionId) {}
 
-        }
+        @Override
+        public void sendSentinel(long txnId, int partitionId) {}
     }
 
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,
@@ -433,12 +423,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
         {
             dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("sweet")));
         }
-        catch (RuntimeException e)
+        catch (AssertionError e)
         {
-            if (e.getMessage().contains("Mismatched"))
-            {
-                caught = true;
-            }
+            caught = true;
         }
         assertTrue(caught);
         m_testStream.reset();
@@ -452,12 +439,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
         {
             dim.deliver(createInitiateResponse(2, 1, true, true, false, createResultSet("sweet")));
         }
-        catch (RuntimeException e)
+        catch (AssertionError e)
         {
-            if (e.getMessage().contains("Mismatched"))
-            {
-                caught = true;
-            }
+            caught = true;
         }
         assertTrue(caught);
     }

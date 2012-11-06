@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.Stack;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -92,6 +91,7 @@ public class PlanAssembler {
     /** parsed statement for an union */
     ParsedUnionStmt m_parsedUnion = null;
 
+    /** plan selector */
     PlanSelector m_planSelector;
 
     /** Describes the specified and inferred partition context. */
@@ -126,11 +126,11 @@ public class PlanAssembler {
      * @param partitioning
      *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning, PlanSelector processor) {
+    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning, PlanSelector planSelector) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
         m_partitioning = partitioning;
-        m_planSelector = processor;
+        m_planSelector = planSelector;
     }
 
     String getSQLText() {
@@ -192,7 +192,13 @@ public class PlanAssembler {
         return false;
     }
 
-    public void verifyTablePartition (AbstractParsedStmt parsedStmt) {
+    /**
+     * Clear any old state and get ready to plan a new plan. The next call to
+     * getNextPlan() will return the first candidate plan for these parameters.
+     *
+     */
+    void setupForNewPlans(AbstractParsedStmt parsedStmt) {
+        m_insertPlanWasGenerated = false;
         int countOfPartitionedTables = 0;
         Map<String, String> partitionColumnByTable = new HashMap<String, String>();
         // Do we have a need for a distributed scan at all?
@@ -229,16 +235,7 @@ public class PlanAssembler {
                 throw new PlanningErrorException(msg);
             }
         }
-    }
 
-    /**
-     * Clear any old state and get ready to plan a new plan. The next call to
-     * getNextPlan() will return the first candidate plan for these parameters.
-     *
-     */
-    void setupForNewPlans(AbstractParsedStmt parsedStmt)
-    {
-        verifyTablePartition (parsedStmt);
         if (parsedStmt instanceof ParsedUnionStmt) {
             m_parsedUnion = (ParsedUnionStmt) parsedStmt;
             subAssembler = new UnionSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
@@ -332,7 +329,10 @@ public class PlanAssembler {
         }
 
         if (isTopPlan && m_planSelector.m_bestPlan != null) {
-            m_planSelector.finalizeOutput(m_planSelector.m_bestFilename, m_planSelector.m_stats);
+            // reset all the plan node ids for a given plan
+            // this makes the ids deterministic
+            m_planSelector.m_bestPlan.resetPlanNodeIds();
+            m_planSelector.finalizeOutput();
         }
         return m_planSelector.m_bestPlan;
     }
@@ -540,11 +540,7 @@ public class PlanAssembler {
         root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
 
-        if ((subSelectRoot.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-            ((IndexScanPlanNode) subSelectRoot).getSortDirection() == SortDirectionType.INVALID) &&
-            m_parsedSelect.orderColumns.size() > 0) {
-            root = addOrderBy(root);
-        }
+        root = handleOrderBy(root);
 
         if ((root.getPlanNodeType() != PlanNodeType.AGGREGATE) &&
             (root.getPlanNodeType() != PlanNodeType.HASHAGGREGATE) &&
@@ -917,11 +913,32 @@ public class PlanAssembler {
     }
 
     /**
-     * Configure the sort columns for a new OrderByPlanNode
-     * @return new OrderByPlanNode
+     * Create an order by node as required by the statement and make it a parent of root.
+     * @param root
+     * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    OrderByPlanNode createOrderBy() {
+    AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
         assert (m_parsedSelect != null);
+
+        // Only sort when the statement has an ORDER BY.
+        if ( ! m_parsedSelect.hasOrderByColumns()) {
+            return root;
+        }
+
+        // Ignore ORDER BY in cases where there can be at most one row.
+        if (m_parsedSelect.guaranteesUniqueRow()) {
+            return root;
+        }
+
+        // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
+        // Note that even tree index scans that produce values in their own "key order" only report
+        // their sort direction != SortDirectionType.INVALID
+        // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
+        if (root.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+            if (((IndexScanPlanNode) root).getSortDirection() != SortDirectionType.INVALID) {
+                return root;
+            }
+        }
 
         OrderByPlanNode orderByNode = new OrderByPlanNode();
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderColumns) {
@@ -929,18 +946,34 @@ public class PlanAssembler {
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
         }
-        return orderByNode;
-    }
-
-    /**
-     * Create an order by node and add make it a parent of root.
-     * @param root
-     * @return new orderByNode (the new root)
-     */
-    AbstractPlanNode addOrderBy(AbstractPlanNode root) {
-        OrderByPlanNode orderByNode = createOrderBy();
         orderByNode.addAndLinkChild(root);
         orderByNode.generateOutputSchema(m_catalogDb);
+
+        // The method for determining that the ordering is on a unique value or unique combination of values is a little weak, here.
+        // In theory, for a single-table query, there just needs to exist a uniqueness constraint (primary key or other unique index)
+        // on some of the ORDER BY values regardless of whether the associated index is used in the selected plan.
+        // For now, we only recognize such an index if it is currently used in the plan.
+        // Strictly speaking, if it was used at the top of the plan, this function would have already returned without adding an orderByNode.
+        // The interesting case here, addressing issue ENG-3335, is when the index scan is in the distributed part of the plan.
+        // Then, the orderByNode is required to re-order the results at the coordinator.
+
+        // Start by eliminating joins since, in general, a join (one-to-many) may produce multiple joined rows for each unique input row.
+        // TODO: In theory, it is possible to analyze the join criteria and/or projected columns
+        // to determine whether the particular join preserves the uniqueness of its index-scanned input.
+        if (m_parsedSelect.tableList.size() == 1) {
+            List<AbstractPlanNode> indexScans = root.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+            if (indexScans.size() == 1) {
+                IndexScanPlanNode ixnode = (IndexScanPlanNode) (indexScans.get(0));
+                // The index must be associated with the expected ordering.
+                if (ixnode.getSortDirection() != SortDirectionType.INVALID) {
+                    Index index = ixnode.getCatalogIndex();
+                    // Index must guarantee uniqueness
+                    if (index.getUnique()) {
+                        orderByNode.setOrderingByUniqueColumns();
+                    }
+                }
+            }
+        }
         return orderByNode;
     }
 
@@ -950,12 +983,6 @@ public class PlanAssembler {
      * @return new plan's root node
      */
     AbstractPlanNode handleLimitOperator(AbstractPlanNode root) {
-        // The nodes that need to be applied at the coordinator
-        Stack<AbstractPlanNode> coordGraph = new Stack<AbstractPlanNode>();
-
-        // The nodes that need to be applied at the distributed plan.
-        Stack<AbstractPlanNode> distGraph = new Stack<AbstractPlanNode>();
-
         int limitParamIndex = m_parsedSelect.getLimitParameterIndex();
         int offsetParamIndex = m_parsedSelect.getOffsetParameterIndex();
 
@@ -973,18 +1000,22 @@ public class PlanAssembler {
          * TODO: allow push down limit with distinct (select distinct C from T limit 5)
          * or distinct in aggregates.
          */
+        AbstractPlanNode sendNode = null;
         // Whether or not we can push the limit node down
-        boolean canPushDown = true;
-
-        if (m_parsedSelect.distinct || checkPushDownViability(root) == null) {
-            canPushDown = false;
-        }
-        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
-            AbstractExpression rootExpr = col.expression;
-            if (rootExpr instanceof AggregateExpression) {
-                if (((AggregateExpression)rootExpr).m_distinct) {
-                    canPushDown = false;
-                    break;
+        boolean canPushDown = ! m_parsedSelect.distinct;
+        if (canPushDown) {
+            sendNode = checkPushDownViability(root);
+            if (sendNode == null) {
+                canPushDown = false;
+            } else {
+                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
+                    AbstractExpression rootExpr = col.expression;
+                    if (rootExpr instanceof AggregateExpression) {
+                        if (((AggregateExpression)rootExpr).m_distinct) {
+                            canPushDown = false;
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -995,17 +1026,12 @@ public class PlanAssembler {
          * there is no need to do the push down work, the limit plan node will
          * be run in the partition.
          */
-        if ((canPushDown == false) || (root.hasAnyNodeOfType(PlanNodeType.RECEIVE) == false)) {
-            // not for partitioned table or cannot push down
-            distGraph.push(topLimit);
-        } else {
+        if (canPushDown) {
             /*
              * For partitioned table, the pushed-down limit plan node has a limit based
              * on the combined limit and offset, which may require an expression if either of these was not a hard-coded constant.
              * The top level limit plan node remains the same, with the original limit and offset values.
              */
-            coordGraph.push(topLimit);
-
             LimitPlanNode distLimit = new LimitPlanNode();
             // Offset on a pushed-down limit node makes no sense, just defaults to 0
             // -- the original offset must be factored into the pushed-down limit as a pad on the limit.
@@ -1026,10 +1052,25 @@ public class PlanAssembler {
             }
             // else let the parameterized forms of offset/limit default to unused/invalid.
 
-            distGraph.push(distLimit);
+            // Disconnect the distributed parts of the plan below the SEND node
+            AbstractPlanNode distributedPlan = sendNode.getChild(0);
+            distributedPlan.clearParents();
+            sendNode.clearChildren();
+
+            // If the distributed limit must be performed on ordered input,
+            // ensure the order of the data on each partition.
+            distributedPlan = handleOrderBy(distributedPlan);
+
+            // Apply the distributed limit.
+            distLimit.addAndLinkChild(distributedPlan);
+
+            // Add the distributed work back to the plan
+            sendNode.addAndLinkChild(distLimit);
         }
 
-        return pushDownLimit(root, distGraph, coordGraph);
+        topLimit.addAndLinkChild(root);
+        topLimit.generateOutputSchema(m_catalogDb);
+        return topLimit;
     }
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
@@ -1341,79 +1382,6 @@ public class PlanAssembler {
         return root;
     }
 
-
-    /**
-     * Push the distributed node down if the plan is distributed, then add the
-     * coord. nodes at the top of the root plan. If the coord node is not given,
-     * nothing is pushed down - the distributed node is added on top of the
-     * send/receive pair directly.
-     *
-     * Note: this works in part because the push-down node is also an acceptable
-     * top level node if the plan is not distributed. This wouldn't be true
-     * if we started pushing down something like (sum, count) to calculate
-     * a distributed average.
-     *
-     * @param root
-     *            The root node
-     * @param distributedNode
-     *            The node to push down
-     * @param coordNodes
-     *            New coordinator node(s) to put on top of the plan.
-     *            If this is null, no push-down will be performed.
-     * @return The new root node.
-     */
-    AbstractPlanNode pushDownLimit(AbstractPlanNode root,
-                                  Stack<AbstractPlanNode> distNodes,
-                                  Stack<AbstractPlanNode> coordNodes) {
-
-        AbstractPlanNode receiveNode = checkPushDownViability(root);
-
-        // If there is work to distribute and a receive node was found,
-        // disconnect the coordinator and distributed parts of the plan
-        // below the SEND node
-        AbstractPlanNode distributedPlan = root;
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            distributedPlan = receiveNode.getChild(0).getChild(0);
-            distributedPlan.clearParents();
-            receiveNode.getChild(0).clearChildren();
-        }
-
-        // If there is work to distribute, determine if the distributed
-        // limit must be performed on ordered input. If so, produce that
-        // order if an explicit sort is necessary
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            if ((distributedPlan.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                ((IndexScanPlanNode) distributedPlan).getSortDirection() == SortDirectionType.INVALID) &&
-                m_parsedSelect.orderColumns.size() > 0) {
-                distNodes.push(createOrderBy());
-            }
-        }
-
-        // Add the distributed work to the plan
-        while (!distNodes.isEmpty()) {
-            AbstractPlanNode distributedNode = distNodes.pop();
-            distributedNode.addAndLinkChild(distributedPlan);
-            distributedPlan = distributedNode;
-        }
-
-        // Reconnect the plans and add the coordinator's work
-        if (!coordNodes.isEmpty() && receiveNode != null) {
-            receiveNode.getChild(0).addAndLinkChild(distributedPlan);
-
-            while (!coordNodes.isEmpty()) {
-                AbstractPlanNode coordNode = coordNodes.pop();
-                coordNode.addAndLinkChild(root);
-                root = coordNode;
-            }
-        }
-        else {
-            root = distributedPlan;
-        }
-
-        root.generateOutputSchema(m_catalogDb);
-        return root;
-    }
-
     /**
      * Check if we can push the limit node down.
      *
@@ -1424,27 +1392,20 @@ public class PlanAssembler {
     protected AbstractPlanNode checkPushDownViability(AbstractPlanNode root) {
         AbstractPlanNode receiveNode = root;
 
-        // Find a receive node, if one exists. There is guaranteed to be at
-        // most a single receive. Abort the search if between root and receive
-        // a node that can't be pushed down past is found.
+        // Return a mid-plan send node, if one exists and can host a distributed limit node.
+        // There is guaranteed to be at most a single receive/send pair.
+        // Abort the search if a node that a "limit" can't be pushed past is found before its receive node.
         //
         // Can only push past:
-        //   * coordinatingAggregator: a distributed aggregator has
-        //     has already been pushed down. Distributed LIMIT of that
-        //     aggregation is correct.
+        //   * coordinatingAggregator: a distributed aggregator a copy of which  has already been pushed down.
+        //     Distributing a LIMIT to just above that aggregator is correct. (I've got some doubts that this is correct??? --paul)
         //
-        //   * order by: if the plan requires a sort, getNextSelectPlan()
-        //     will have already added an ORDER BY. LIMIT will be added
-        //     above that sort. However, if LIMIT can be successfully
-        //     pushed down, it may be necessary to create and push down
-        //     a distributed sort as well. That work is done here.
+        //   * order by: if the plan requires a sort, getNextSelectPlan()  will have already added an ORDER BY.
+        //     A distributed LIMIT will be added above a copy of that ORDER BY node.
         //
-        //   * projection: we only LIMIT on constant value expressions.
-        //     whether the LIMIT happens pre-or-post projection is
-        //     is irrelevant.
+        //   * projection: these have no effect on the application of limits.
         //
-        // Set receiveNode to null if the plan is not distributed or if
-        // the distributed plan does not allow push-down of a limit.
+        // Return null if the plan is single-partition or if its "coordinator" part contains a push-blocking node type.
 
         while (!(receiveNode instanceof ReceivePlanNode)) {
 
@@ -1452,28 +1413,37 @@ public class PlanAssembler {
             if (!(receiveNode instanceof AggregatePlanNode) &&
                 !(receiveNode instanceof OrderByPlanNode) &&
                 !(receiveNode instanceof ProjectionPlanNode)) {
-                receiveNode = null;
-                break;
+                return null;
             }
 
             // Limitation: can only push past coordinating aggregation nodes
             if (receiveNode instanceof AggregatePlanNode &&
                 !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
-                receiveNode = null;
-                break;
+                return null;
+            }
+
+            if (receiveNode instanceof OrderByPlanNode) {
+                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderByColumns()) {
+                    AbstractExpression rootExpr = col.expression;
+                    // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
+                    if (rootExpr instanceof TupleValueExpression) {
+                        if  (((TupleValueExpression) rootExpr).hasAggregate()) {
+                            return null;
+                        }
+                    }
+                }
             }
 
             // Traverse...
             if (receiveNode.getChildCount() == 0) {
-                receiveNode = null;
-                break;
+                return null;
             }
 
             // nothing that allows pushing past has multiple inputs
             assert(receiveNode.getChildCount() == 1);
             receiveNode = receiveNode.getChild(0);
         }
-        return receiveNode;
+        return receiveNode.getChild(0);
     }
 
     /**
@@ -1486,10 +1456,12 @@ public class PlanAssembler {
         if (m_parsedSelect.distinct) {
             // We currently can't handle DISTINCT of multiple columns.
             // Throw a planner error if this is attempted.
-            if (m_parsedSelect.displayColumns.size() > 1)
-            {
-                throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
-            }
+            //if (m_parsedSelect.displayColumns.size() > 1)
+            //{
+            //    throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
+            //}
+            AbstractExpression distinctExpr = null;
+            AbstractExpression nextExpr = null;
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
                 // Distinct can in theory handle any expression now, but it's
                 // untested so we'll balk on anything other than a TVE here
@@ -1497,17 +1469,26 @@ public class PlanAssembler {
                 if (col.expression instanceof TupleValueExpression)
                 {
                     // Add distinct node(s) to the plan
-                    root = addDistinctNodes(root, col.expression);
-                    // aggregate handlers are expected to produce the required projection.
-                    // the other aggregates do this inherently but distinct may need a
-                    // projection node.
-                    root = addProjection(root);
+                    if (distinctExpr == null) {
+                        distinctExpr = col.expression;
+                        nextExpr = distinctExpr;
+                    } else {
+                        nextExpr.setRight(col.expression);
+                        nextExpr = nextExpr.getRight();
+                    }
                  }
                 else
                 {
                     throw new PlanningErrorException("DISTINCT of an expression currently unsupported");
                 }
             }
+            // Add distinct node(s) to the plan
+            root = addDistinctNodes(root, distinctExpr);
+            // aggregate handlers are expected to produce the required projection.
+            // the other aggregates do this inherently but distinct may need a
+            // projection node.
+            root = addProjection(root);
+
         }
 
         return root;

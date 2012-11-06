@@ -18,6 +18,8 @@
 #ifndef STREAMEDTABLE_H
 #define STREAMEDTABLE_H
 
+#include <vector>
+
 #include "common/ids.h"
 #include "table.h"
 #include "storage/StreamedTableStats.h"
@@ -42,8 +44,7 @@ class StreamedTable : public Table {
     friend class StreamedTableStats;
 
   public:
-    StreamedTable(ExecutorContext *ctx, bool exportEnabled);
-    StreamedTable(int tableAllocationTargetSize);
+    StreamedTable(bool exportEnabled);
     static StreamedTable* createForTest(size_t, ExecutorContext*);
 
     virtual ~StreamedTable();
@@ -55,7 +56,9 @@ class StreamedTable : public Table {
 
     virtual void deleteAllTuples(bool freeAllocatedStrings);
     virtual bool insertTuple(TableTuple &source);
-    virtual bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes);
+    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                TableTuple &sourceTupleWithNewValues,
+                                                std::vector<TableIndex*> &indexesToUpdate);
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings);
     virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);

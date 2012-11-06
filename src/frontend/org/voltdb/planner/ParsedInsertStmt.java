@@ -36,16 +36,21 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     public HashMap<Column, AbstractExpression> columns = new HashMap<Column, AbstractExpression>();
 
-    ParsedInsertStmt() {
-        columns = new HashMap<Column, AbstractExpression>();
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedInsertStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
     }
 
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode) {
         assert(tableList.size() <= 1);
 
         String tableName = stmtNode.attributes.get("table");
-        Table table = db.getTables().getIgnoreCase(tableName);
+        Table table = getTableFromDB(tableName);
 
         // if the table isn't in the list add it
         // if it's there, good
@@ -59,14 +64,14 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
             if (node.name.equalsIgnoreCase("columns")) {
                 for (VoltXMLElement colNode : node.children) {
                     if (colNode.name.equalsIgnoreCase("column")) {
-                         parseInsertColumn(colNode, db, table);
+                         parseInsertColumn(colNode, table);
                     }
                 }
             }
         }
     }
 
-    void parseInsertColumn(VoltXMLElement columnNode, Database db, Table table) {
+    void parseInsertColumn(VoltXMLElement columnNode, Table table) {
         String tableName = columnNode.attributes.get("table");
         String columnName = columnNode.attributes.get("name");
 
@@ -75,10 +80,9 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         AbstractExpression expr = null;
         for (VoltXMLElement node : columnNode.children) {
-            expr = parseExpressionTree(node, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(expr,
-                    VoltType.get((byte)column.getType()));
-            ExpressionUtil.assignOutputValueTypesRecursively(expr);
+            expr = parseExpressionTree(node);
+            expr.refineValueType(VoltType.get((byte)column.getType()));
+            ExpressionUtil.finalizeValueTypes(expr);
         }
 
         columns.put(column, expr);

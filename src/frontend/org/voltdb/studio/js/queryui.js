@@ -6,15 +6,15 @@ var QueryUI = (function(queryTab){
         {
 			var SingleLineComments = /^\s*(\/\/|--).*$/gm;
 			var Extract = new RegExp(/'[^']*'/gm);
-			var AutoSplit = /\s(select|insert|update|delete|exec|execute)\s/gim;
+			var AutoSplit = /\s(select|insert|update|delete|exec|execute|explain|explainproc)\s/gim;
 			var AutoSplitParameters = /[\s,]+/gm;
 			this.parse = function(src)
 			{
-                var command = ["exec", "execute"];
+                var command = ["exec", "execute", "explain", "explainproc"];
                 var keyword = ["select", "insert", "update", "delete"];
                 for(var i = 0;i<command.length;i++)
                 {
-                    for(var j = 0;j<command.length;j++)
+                    for(var j = 0;j<keyword.length;j++)
                     {
                         var r = new RegExp("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", "gmi");
                         src = src.replace(r, " $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
@@ -44,6 +44,7 @@ var QueryUI = (function(queryTab){
 								sql = sql.replace('$(SQL_PARSER_STRING_FRAGMENT#' + j + ')', frag[j]);
 						sql = sql.replace(/\$\(SQL_PARSER_ESCAPE_SINGLE_QUOTE\)/g,"''");
                         sql = sql.replace("#SQL_PARSER_STRING_KEYWORD#","");
+                        sql = sql.replace(/\"/g, '\\"');
 						statements.push(sql);
 					}
 				}
@@ -149,6 +150,16 @@ this.execute = function()
 			connectionQueue.BeginExecute(procedure, params, callback.Callback);
 		}
 		else
+		if (/^explain /i.test(statements[i]))
+		{
+			connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
+		}
+		else
+		if (/^explainproc /i.test(statements[i]))
+		{
+			connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
+		}
+		else
 		{
 			connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
 		}
@@ -198,10 +209,20 @@ function isUpdateResult(table)
 {
 	return ((table.schema[0].name.length == 0 || table.schema[0].name == "modified_tuples") && table.data.length == 1 && table.schema.length == 1 && table.schema[0].type == 6);
 }
-
+function applyFormat(val)
+{
+    // Formatting for explain proc.  Only format on objects that have a replace function
+    if (null != val && val.replace != null) 
+    {
+        val = val.replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+        val = val.replace(/ /g, '&nbsp;');
+        val = val.replace(/\n/g, '<br>');
+    }
+    return val;
+}
 function printGrid(target, id, table)
 {
-    var src = '<table id="resultset-' + id + '" class="sortable tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
+	var src = '<table id="resultset-' + id + '" class="sortable tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
     if (isUpdateResult(table))
 		src += '<th>modified_tuples</th>';
     else
@@ -214,7 +235,11 @@ function printGrid(target, id, table)
 	{
 		src += '<tr>';
 		for(var k = 0; k < table.data[j].length; k++)
-            src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + table.data[j][k] + '</td>';
+		{
+		    var val = table.data[j][k];
+		    val = applyFormat(val);
+			src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + val + '</td>';
+		}
 		src += '</tr>';
 	}
 	src += '</tbody></table>';

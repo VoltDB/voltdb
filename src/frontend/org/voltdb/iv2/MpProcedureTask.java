@@ -17,17 +17,20 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 
+import org.voltdb.rejoin.TaskLog;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.ProcedureRunner;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -37,20 +40,31 @@ import org.voltdb.utils.LogKeys;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-    final long[] m_initiatorHSIds;
+    final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     final Iv2InitiateTaskMessage m_msg;
 
-    MpProcedureTask(Mailbox mailbox, ProcedureRunner runner,
-                  long txnId, TransactionTaskQueue queue,
+    MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators,
                   long buddyHSId)
     {
-        super(mailbox, runner,
-              new MpTransactionState(mailbox, txnId, msg, pInitiators,
+        super(mailbox, procName,
+              new MpTransactionState(mailbox, msg, pInitiators,
                                      buddyHSId),
               queue);
         m_msg = msg;
-        m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
+        m_initiatorHSIds.addAll(pInitiators);
+    }
+
+    /**
+     * Update the list of partition masters in the event of a failure/promotion.
+     * Currently only thread-"safe" by virtue of only calling this on
+     * MpProcedureTasks which are not at the head of the MPI's TransactionTaskQueue.
+     */
+    public void updateMasters(List<Long> masters)
+    {
+        m_initiatorHSIds.clear();
+        m_initiatorHSIds.addAll(masters);
+        ((MpTransactionState)getTransactionState()).updateMasters(masters);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -63,7 +77,7 @@ public class MpProcedureTask extends ProcedureTask
         m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         // Exception path out of here for rollback is going to need to
         // call m_txn.setDone() somehow
-        final InitiateResponseMessage response = processInitiateTask(txn.m_task);
+        final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         if (!response.shouldCommit()) {
             txn.setNeedsRollback();
         }
@@ -76,9 +90,16 @@ public class MpProcedureTask extends ProcedureTask
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
         throw new RuntimeException("MP procedure task asked to run on rejoining site.");
+    }
+
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException("MP procedure task asked to run from tasklog on rejoining site.");
     }
 
     @Override
@@ -90,17 +111,15 @@ public class MpProcedureTask extends ProcedureTask
                 m_txn.txnId,
                 m_txn.isReadOnly(),
                 m_txn.needsRollback(),
-                false);  // really don't want to have ack the ack.
+                false,  // really don't want to have ack the ack.
+                false,
+                m_msg.isForReplay());
+
         complete.setTruncationHandle(m_msg.getTruncationHandle());
-        m_initiator.send(m_initiatorHSIds, complete);
+        complete.setOriginalTxnId(m_msg.getOriginalTxnId());
+        m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txn.setDone();
         m_queue.flush();
-    }
-
-    @Override
-    public long getMpTxnId()
-    {
-        return m_txn.txnId;
     }
 
     @Override
@@ -108,8 +127,8 @@ public class MpProcedureTask extends ProcedureTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("MpProcedureTask:");
-        sb.append("  MP TXN ID: ").append(getMpTxnId());
-        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+        sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }

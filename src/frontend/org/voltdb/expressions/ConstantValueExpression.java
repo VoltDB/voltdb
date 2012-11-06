@@ -86,24 +86,19 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof ConstantValueExpression == false) return false;
+        if (obj instanceof ConstantValueExpression == false) {
+            return false;
+        }
         ConstantValueExpression expr = (ConstantValueExpression) obj;
 
-        if (expr.m_isNull && m_isNull)
-        {
+        if (m_isNull != expr.m_isNull) {
+            return false;
+        }
+
+        if (m_isNull) { // implying that both sides are null
             return true;
         }
-
-        if (expr.m_isNull != m_isNull)
-        {
-            return false;
-        }
-
-        if (expr.m_value.equals(m_value) == false)
-            return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
+        return m_value.equals(expr.m_value);
     }
 
     @Override
@@ -212,5 +207,58 @@ public class ConstantValueExpression extends AbstractValueExpression {
         return null;
     }
 
+    @Override
+    public void refineValueType(VoltType columnType) {
+        if (m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL)) {
+            m_valueType = columnType;
+            m_valueSize = columnType.getLengthInBytesForFixedTypes();
+            return;
+        }
+        if (columnType.isInteger()) {
+            Long.parseLong(getValue());
+            m_valueType = columnType;
+            m_valueSize = columnType.getLengthInBytesForFixedTypes();
+        }
+        else {
+            throw new NumberFormatException("NUMERIC constant value type must match a FLOAT, DECIMAL, or integral column, not " + columnType.toSQLString());
+        }
+    }
+
+    @Override
+    public void refineOperandType(VoltType columnType) {
+        if (m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL)) {
+            m_valueType = columnType;
+            m_valueSize = columnType.getLengthInBytesForFixedTypes();
+            return;
+        }
+        if (columnType.isInteger()) {
+            try {
+                Long.parseLong(getValue());
+            } catch (NumberFormatException e) {
+                //TODO: Or DECIMAL? Either is OK for integer comparison, but math gets different results?
+                columnType = VoltType.FLOAT;
+            }
+            m_valueType = columnType;
+            m_valueSize = columnType.getLengthInBytesForFixedTypes();
+        }
+        else {
+            throw new NumberFormatException("NUMERIC constant value type must match a FLOAT, DECIMAL, or integral column, not " + columnType.toSQLString());
+        }
+    }
+
+    @Override
+    public void finalizeValueTypes() {
+        if (m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        m_valueType = VoltType.FLOAT;
+        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+    }
 
 }

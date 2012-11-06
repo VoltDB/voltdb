@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -26,11 +27,12 @@ import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 
 /**
@@ -40,13 +42,16 @@ import org.voltcore.zk.ZKUtil;
 public class VoltZK {
     public static final String root = "/db";
 
+    public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String topology = "/db/topology";
-    public static final String replicationrole = "/db/replicationrole";
+    public static final String replicationconfig = "/db/replicationconfig";
     public static final String deploymentBytes = "/db/deploymentBytes";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";
+    public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
+    public static final String exportGenerations = "/db/export_generations";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
@@ -70,6 +75,7 @@ public class VoltZK {
     public static final String nodes_currently_snapshotting = "/db/nodes_currently_snapshotting";
     public static final String restore = "/db/restore";
     public static final String restore_barrier = "/db/restore_barrier";
+    public static final String restore_barrier2 = "/db/restore_barrier2";
     public static final String restore_snapshot_id = "/db/restore/snapshot_id";
     public static final String request_truncation_snapshot = "/db/request_truncation_snapshot";
     public static final String snapshot_truncation_master = "/db/snapshot_truncation_master";
@@ -81,9 +87,12 @@ public class VoltZK {
 
     // leader election
     public static final String iv2masters = "/db/iv2masters";
+    public static final String iv2appointees = "/db/iv2appointees";
     public static final String iv2mpi = "/db/iv2mpi";
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
+    public static final String leaders_globalservice = "/db/leaders/globalservice";
+    public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -92,9 +101,12 @@ public class VoltZK {
             cluster_metadata,
             operationMode,
             iv2masters,
+            iv2appointees,
             iv2mpi,
             leaders,
-            leaders_initiators
+            leaders_initiators,
+            leaders_globalservice,
+            lastKnownLiveNodes
     };
 
     /**
@@ -177,5 +189,19 @@ public class VoltZK {
                clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
             } catch (KeeperException.NoNodeException e){}
         }
+    }
+
+    /**
+     * Convert a list of ZK nodes named HSID_SUFFIX (such as that used by LeaderElector)
+     * into a list of HSIDs.
+     */
+    public static List<Long> childrenToReplicaHSIds(Collection<String> children)
+    {
+        List<Long> replicas = new ArrayList<Long>(children.size());
+        for (String child : children) {
+            long HSId = Long.parseLong(CoreZK.getPrefixFromChildName(child));
+            replicas.add(HSId);
+        }
+        return replicas;
     }
 }

@@ -30,6 +30,7 @@ import java.util.logging.Logger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
 import org.voltdb.ParameterSet;
+import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -91,6 +92,7 @@ import org.voltdb.messaging.FastSerializer;
  */
 
 public class ExecutionEngineIPC extends ExecutionEngine {
+
     /** Commands are serialized over the connection */
     private enum Commands {
         Initialize(0),
@@ -271,7 +273,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             throw new EOFException();
                         }
                     }
-
+                    messageBuffer.flip();
                     final int reasonLength = messageBuffer.getInt();
                     final byte reasonBytes[] = new byte[reasonLength];
                     messageBuffer.get(reasonBytes);
@@ -291,6 +293,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     for (int ii = 0; ii < numTraces; ii++) {
                         final int traceLength = messageBuffer.getInt();
                         final byte traceBytes[] = new byte[traceLength];
+                        messageBuffer.get(traceBytes);
                         traces[ii] = new String(traceBytes, "UTF-8");
                     }
 
@@ -331,8 +334,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             uso,
                             0,
                             length == 0 ? null : exportBuffer,
-                            sync,
-                            isEndOfGeneration);
+                                    sync,
+                                    isEndOfGeneration);
                     continue;
                 }
                 if (status == kErrorCode_getQueuedExportBytes) {
@@ -492,7 +495,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final int totalPartitions) {
-        super();
+        super(siteId, partitionId);
+
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
         m_siteId = siteId;
@@ -575,7 +579,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the catalog as a UTF-8 byte string via connection */
     @Override
-    public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException {
+    public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -585,7 +589,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
             m_data.putInt(Commands.LoadCatalog.m_id);
-            m_data.putLong(txnId);
+            m_data.putLong(timestamp);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -606,7 +610,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
+    public void updateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -616,7 +620,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
             m_data.putInt(Commands.UpdateCatalog.m_id);
-            m_data.putLong(txnId);
+            m_data.putLong(timestamp);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -674,7 +678,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     private void sendPlanFragmentsInvocation(final Commands cmd,
             final int numFragmentIds,
             final long[] planFragmentIds,
-            long[] inputDepIds,
+            long[] inputDepIdsIn,
             final ParameterSet[] parameterSets,
             final long txnId,
             final long lastCommittedTxnId,
@@ -691,6 +695,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         // if inputDepIds is null, make a bunch of dummies
+        long[] inputDepIds = inputDepIdsIn;
         if (inputDepIds == null) {
             inputDepIds = new long[numFragmentIds];
             for (int i = 0; i < inputDepIds.length; i++) {
@@ -739,19 +744,34 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         int result = ExecutionEngine.ERRORCODE_ERROR;
         long planFragId = 0;
-        boolean cacheHit = false;
         long cacheSize = 0;
+        PlannerStatsCollector.CacheUse cacheUse = PlannerStatsCollector.CacheUse.FAIL;
+
+        // Start collecting statistics
+        startStatsCollection();
+
         try {
-            result = m_connection.readStatusByte();
-            planFragId = m_connection.readLong();
-            cacheHit = m_connection.readLong() != 0;
-            cacheSize = m_connection.readLong();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
+            try {
+                result = m_connection.readStatusByte();
+                planFragId = m_connection.readLong();
+                cacheSize = m_connection.readLong();
+                if (m_connection.readLong() != 0) {
+                    cacheUse = PlannerStatsCollector.CacheUse.HIT1;
+                }
+                else {
+                    cacheUse = PlannerStatsCollector.CacheUse.MISS;
+                }
+            } catch (final IOException e) {
+                System.out.println("Exception: " + e.getMessage());
+                throw new RuntimeException(e);
+            }
+            if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
+                throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
+            }
         }
-        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-            throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
+        finally {
+            // Stop collecting statistics.
+            endStatsCollection(cacheSize, cacheUse);
         }
         return planFragId;
     }
@@ -808,7 +828,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public void loadTable(final int tableId, final VoltTable table, final long txnId,
             final long lastCommittedTxnId)
-        throws EEException
+    throws EEException
     {
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);

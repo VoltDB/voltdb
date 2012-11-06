@@ -17,6 +17,10 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
+import org.voltdb.rejoin.TaskLog;
+
 import org.voltdb.SiteProcedureConnection;
 
 public abstract class SiteTasker {
@@ -30,25 +34,7 @@ public abstract class SiteTasker {
     /**
      * Run the task on an inconsistent/rejoining EE.
      */
-    abstract public void runForRejoin(SiteProcedureConnection siteConnection);
+    abstract public void runForRejoin(SiteProcedureConnection siteConnection,
+            TaskLog rejoinTaskLog) throws IOException;
 
-    /**
-     * Priority returns the relative task priority. 0 is the highest
-     * priority.
-     */
-    abstract public int priority();
-
-    // the scheduler guarntees equal priority tasks run in
-    // insertion order. m_seq disambiguates equal priority tasks.
-    private long m_seq;
-
-    void setSeq(long seq)
-    {
-        m_seq = seq;
-    }
-
-    long seq()
-    {
-        return m_seq;
-    }
 }

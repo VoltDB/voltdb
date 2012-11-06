@@ -103,6 +103,18 @@ class AbstractExecutor {
      */
     virtual bool needsOutputTableClear() { return true; };
 
+    /**
+     * Set up a multi-column temp output table for those executors that require one.
+     * Called from p_init.
+     */
+    void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
+
+    /**
+     * Set up a single-column temp output table for DML executors that require one to return their counts.
+     * Called from p_init.
+     */
+    void setDMLCountOutputTable(TempTableLimits* limits);
+
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
     TempTable* m_tmpOutputTable;
@@ -121,6 +133,11 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     {
         VOLT_TRACE("Clearing output table...");
         m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+    }
+
+    // substitute params for output schema
+    for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {
+        m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
     }
 
     // run the executor

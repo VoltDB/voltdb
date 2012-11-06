@@ -27,8 +27,8 @@ import java.lang.management.MemoryUsage;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 
-import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.processtools.ShellTools;
 
 /**
@@ -136,7 +136,7 @@ public class SystemStatsCollector {
         public static PSData getPSData(int pid) {
             // run "ps" to get stats for this pid
             String command = String.format("ps -p %d -o rss,pmem,pcpu,time,etime", pid);
-            String results = ShellTools.cmd(command);
+            String results = ShellTools.local_cmd(command);
 
             // parse ps into value array
             String[] lines = results.split("\n");

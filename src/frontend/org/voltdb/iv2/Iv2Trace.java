@@ -20,19 +20,15 @@ package org.voltdb.iv2;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.client.ClientResponse;
-
 import org.voltdb.ClientInterfaceHandleManager;
-
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class Iv2Trace
 {
@@ -77,7 +73,7 @@ public class Iv2Trace
             return "UNUSED";
         }
         else {
-            return Long.toString(txnId);
+            return TxnEgo.txnIdToString(txnId);
         }
     }
 
@@ -163,6 +159,17 @@ public class Iv2Trace
         }
     }
 
+    public static void logIv2MultipartSentinel(MultiPartitionParticipantMessage message, long localHSId,
+            long txnId)
+    {
+        if (iv2log.isTraceEnabled()) {
+            String logmsg = new String("rxSntlMsg %s from %s txnId %s");
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                        CoreUtils.hsIdToString(message.m_sourceHSId),
+                        txnIdToString(txnId)));
+        }
+    }
+
     public static void logFragmentTaskMessage(FragmentTaskMessage ftask, long localHSId, long spHandle,
             boolean borrow)
     {
@@ -175,11 +182,12 @@ public class Iv2Trace
                 iv2log.error("FragmentTaskMessage SP HANDLE conflict.  Message: " + ftask.getSpHandle() +
                         ", locally held: " + spHandle);
             }
-            String logmsg = new String("%s %s from %s txnId %s spHandle %s");
+            String logmsg = new String("%s %s from %s txnId %s spHandle %s trunc %s");
             iv2log.trace(String.format(logmsg, label, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(ftask.m_sourceHSId),
                         txnIdToString(ftask.getTxnId()),
-                        txnIdToString(spHandle)));
+                        txnIdToString(spHandle),
+                        txnIdToString(ftask.getTruncationHandle())));
         }
     }
 
@@ -187,7 +195,8 @@ public class Iv2Trace
     {
         if (iv2queuelog.isTraceEnabled()) {
             String logmsg = new String ("txnQOffer txnId %s spHandle %s type %s");
-            iv2queuelog.trace(String.format(logmsg, task.getMpTxnId(), task.getLocalTxnId(),
+            iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
+                        txnIdToString(task.getSpHandle()),
                     task.m_txn.isSinglePartition() ? "SP" : "MP"));
         }
     }
@@ -196,7 +205,8 @@ public class Iv2Trace
     {
         if (iv2queuelog.isTraceEnabled()) {
             String logmsg = new String ("tskQOffer txnId %s spHandle %s type %s");
-            iv2queuelog.trace(String.format(logmsg, task.getMpTxnId(), task.getLocalTxnId(),
+            iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
+                            txnIdToString(task.getSpHandle()),
                     task.m_txn.isSinglePartition() ? "SP" : "MP"));
         }
     }

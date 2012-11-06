@@ -19,15 +19,19 @@
 #define TABLECATALOGDELEGATE_HPP
 
 #include "common/CatalogDelegate.hpp"
+#include "indexes/tableindex.h"
+#include "catalog/table.h"
+#include "catalog/index.h"
 
 namespace catalog {
-class Table;
 class Database;
 }
 
 namespace voltdb {
 class Table;
 class ExecutorContext;
+class TupleSchema;
+class TableIndexScheme;
 
 /*
  * Implementation of CatalogDelgate for Table
@@ -44,9 +48,22 @@ class TableCatalogDelegate : public CatalogDelegate {
 
 
     // table specific
-    int init(ExecutorContext *executorContext,
-             catalog::Database &catalogDatabase,
+    int init(catalog::Database &catalogDatabase,
              catalog::Table &catalogTable);
+
+    static TupleSchema *createTupleSchema(catalog::Table &catalogTable);
+
+    static bool getIndexScheme(catalog::Table &catalogTable,
+                               catalog::Index &catalogIndex,
+                               const TupleSchema *schema,
+                               TableIndexScheme *scheme);
+
+    /**
+     * Return a string that identifies this index by table name and schema,
+     * rather than by given/assigned name.
+     */
+    static std::string getIndexIdString(const catalog::Index &catalogIndex);
+    static std::string getIndexIdString(const TableIndexScheme &indexScheme);
 
     // ADXXX: should be const
     Table *getTable() {

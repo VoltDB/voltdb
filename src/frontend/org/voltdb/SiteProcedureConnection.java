@@ -17,10 +17,9 @@
 
 package org.voltdb;
 
-import java.util.concurrent.Future;
-
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
@@ -116,7 +115,7 @@ public interface SiteProcedureConnection {
     /**
      * IV2 commit / rollback interface to the EE
      */
-    public void truncateUndoLog(boolean rollback, long token, long txnId);
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle);
 
     /**
      * IV2: send dependencies to the EE
@@ -131,11 +130,18 @@ public interface SiteProcedureConnection {
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params);
 
-    public void setRejoinComplete();
+    /**
+     * IV2: get the procedure runner for the named procedure
+     */
+    public ProcedureRunner getProcedureRunner(String procedureName);
+
+    public void setRejoinComplete(org.voltdb.iv2.RejoinProducer.ReplayCompletionAction action);
 
     public long[] getUSOForExportTable(String signature);
 
     public void toggleProfiler(int toggle);
+
+    public void tick();
 
     public void quiesce();
 
@@ -150,4 +156,5 @@ public interface SiteProcedureConnection {
 
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
 }

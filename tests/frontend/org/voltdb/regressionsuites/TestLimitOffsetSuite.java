@@ -105,10 +105,14 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         client.callProcedure("InsertA", 0, 1);
         client.callProcedure("InsertA", 1, 1);
         client.callProcedure("InsertA", 2, 2);
-        VoltTable result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;")
-                                 .getResults()[0];
+        VoltTable result = null;
+
+        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 1 OFFSET 1;").getResults()[0];
         assertEquals(1, result.getRowCount());
-    }
+
+        result = client.callProcedure("@AdHoc", "SELECT DISTINCT I FROM A LIMIT 0 OFFSET 1;").getResults()[0];
+        assertEquals(0, result.getRowCount());
+}
 
     public void testJoinAndLimitOffset() throws IOException, ProcCallException, InterruptedException {
         Client client = this.getClient();
@@ -116,6 +120,38 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM A, B WHERE A.PKEY < B.PKEY LIMIT 1 OFFSET 1;")
                                  .getResults()[0];
         assertEquals(1, result.getRowCount());
+    }
+
+    public void testENG3487() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        client.callProcedure("A.insert", 1, 1);
+        client.callProcedure("A.insert", 2, 1);
+        client.callProcedure("A.insert", 3, 1);
+        client.callProcedure("A.insert", 4, 4);
+        client.callProcedure("A.insert", 5, 4);
+        client.callProcedure("A.insert", 6, 9);
+
+
+        VoltTable result = client.callProcedure("@AdHoc", "select I, count(*) as tag from A group by I order by tag, I limit 1")
+                .getResults()[0];
+
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        //System.err.println("Result:\n" + result);
+        assertEquals(9, result.getLong(0));
+        assertEquals(1, result.getLong(1));
+
+    }
+
+    public void testENG1808() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        client.callProcedure("A.insert", 1, 1);
+
+        VoltTable result = client.callProcedure("@AdHoc", "select I from A limit 0").getResults()[0];
+
+        assertEquals(0, result.getRowCount());
     }
 
     static public junit.framework.Test suite() {
@@ -126,6 +162,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
         project.addSchema(TestLimitOffsetSuite.class.getResource("testlimitoffset-ddl.sql"));
         project.addPartitionInfo("A", "PKEY");
+
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("LimitAPKEY", "SELECT * FROM A ORDER BY PKEY LIMIT ? OFFSET ?;");
@@ -143,6 +180,10 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
+        // HSQL for baseline
+        config = new LocalCluster("testlimitoffset-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
         return builder;
     }
 }

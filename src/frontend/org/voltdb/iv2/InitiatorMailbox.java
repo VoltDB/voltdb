@@ -17,33 +17,22 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.atomic.AtomicLong;
-
-import java.util.concurrent.ExecutionException;
-
 import java.util.List;
-
-import org.json_voltpatches.JSONObject;
+import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
-
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheReader;
-
+import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
-
-import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -62,12 +51,9 @@ public class InitiatorMailbox implements Mailbox
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
     private final RejoinProducer m_rejoinProducer;
-    private final MapCacheReader m_masterMapCache;
+    private final LeaderCacheReader m_masterLeaderCache;
     private long m_hsId;
     private RepairAlgo m_algo;
-
-    // hacky temp txnid
-    AtomicLong m_txnId = new AtomicLong(0);
 
     synchronized public void setRepairAlgo(RepairAlgo algo)
     {
@@ -77,8 +63,21 @@ public class InitiatorMailbox implements Mailbox
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
         m_repairLog.setLeaderState(true);
-        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
         m_scheduler.setLeaderState(true);
+        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
+    }
+
+    public synchronized void setMaxLastSeenMultipartTxnId(long txnId) {
+        m_repairLog.m_lastMpHandle = txnId;
+    }
+
+
+    synchronized public void setMaxLastSeenTxnId(long txnId) {
+        m_scheduler.setMaxSeenTxnId(txnId);
+    }
+
+    synchronized public void enableWritingIv2FaultLog() {
+        m_scheduler.enableWritingIv2FaultLog();
     }
 
     public InitiatorMailbox(int partitionId,
@@ -92,9 +91,9 @@ public class InitiatorMailbox implements Mailbox
         m_repairLog = repairLog;
         m_rejoinProducer = rejoinProducer;
 
-        m_masterMapCache = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
+        m_masterLeaderCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
         try {
-            m_masterMapCache.start(false);
+            m_masterLeaderCache.start(false);
         } catch (InterruptedException ignored) {
             // not blocking. shouldn't interrupt.
         } catch (ExecutionException crashme) {
@@ -105,7 +104,7 @@ public class InitiatorMailbox implements Mailbox
 
     synchronized public void shutdown() throws InterruptedException
     {
-        m_masterMapCache.shutdown();
+        m_masterLeaderCache.shutdown();
         if (m_algo != null) {
             m_algo.cancel();
         }
@@ -126,15 +125,8 @@ public class InitiatorMailbox implements Mailbox
 
     public long getMasterHsId(int partitionId)
     {
-        try {
-            JSONObject master = m_masterMapCache.get(Integer.toString(partitionId));
-            long masterHsId = Long.valueOf(master.getLong("hsid"));
-            return masterHsId;
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to deserialize map cache reader object.", false, e);
-        }
-        // unreachable.
-        return Long.MIN_VALUE;
+        long masterHSId = m_masterLeaderCache.get(partitionId);
+        return masterHSId;
     }
 
     @Override
@@ -259,6 +251,9 @@ public class InitiatorMailbox implements Mailbox
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
             send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
+        }
+        else {
+            throw new RuntimeException("Invalid repair message type: " + repairWork);
         }
     }
 

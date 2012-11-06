@@ -524,33 +524,27 @@ public class ExpressionOp extends Expression {
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
+        boolean unsupported = false;
         switch (opType) {
         case OpTypes.LIMIT:             element = "limit"; break;
-        case OpTypes.ADD:               element = "add"; break;
-        case OpTypes.SUBTRACT:          element = "subtract"; break;
-        case OpTypes.MULTIPLY:          element = "multiply"; break;
-        case OpTypes.DIVIDE:            element = "divide"; break;
-        case OpTypes.EQUAL:             element = "equal"; break;
-        case OpTypes.NOT_EQUAL:         element = "notequal"; break;
-        case OpTypes.GREATER:           element = "greaterthan"; break;
-        case OpTypes.GREATER_EQUAL:     element = "greaterthanorequalto"; break;
-        case OpTypes.SMALLER:           element = "lessthan"; break;
-        case OpTypes.SMALLER_EQUAL:     element = "lessthanorequalto"; break;
-        case OpTypes.AND:               element = "and"; break;
-        case OpTypes.OR:                element = "or"; break;
-        case OpTypes.IN:                element = "in"; break;
-        case OpTypes.COUNT:             element = "count"; break;
-        case OpTypes.SUM:               element = "sum"; break;
-        case OpTypes.MIN:               element = "min"; break;
-        case OpTypes.MAX:               element = "max"; break;
-        case OpTypes.AVG:               element = "avg"; break;
-        case OpTypes.SQL_FUNCTION:      element = "function"; break;
-        case OpTypes.IS_NULL:           element = "is_null"; break;
-        case OpTypes.NOT:               element = "not"; break;
+        //TODO: Enable these as they are supported in VoltDB.
+        // They appear to be a complete set as supported by the other methods in this module.
+        case OpTypes.ALTERNATIVE :   unsupported = true; element = "alternative"; break;
+        case OpTypes.CASEWHEN :      unsupported = true; element = "case"; break;
+        case OpTypes.CAST :          unsupported = true; element = "cast (possibly implied)"; break;
+        case OpTypes.ORDER_BY :      unsupported = true; element = "order by"; break;
+        case OpTypes.SIMPLE_COLUMN : unsupported = true; element = "simple column"; break;
+        case OpTypes.TABLE :         unsupported = true; element = "tablen"; break;
+        case OpTypes.VALUE :         unsupported = true; element = "value"; break;
+        case OpTypes.ZONE_MODIFIER : unsupported = true; element = "zone modifier"; break;
         default:
             throw new HSQLParseException("Unsupported Expression Operation: " +
                                          String.valueOf(opType));
         }
+        if (unsupported) {
+            throw new HSQLParseException(element + " operation is not supported");
+        }
+
 
         VoltXMLElement exp = new VoltXMLElement("operation");
         // We want to keep track of which expressions are the same in the XML output

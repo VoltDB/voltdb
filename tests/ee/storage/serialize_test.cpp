@@ -73,10 +73,11 @@ ValueType col_types[NUM_OF_COLUMNS] = { VALUE_TYPE_TINYINT, VALUE_TYPE_BIGINT, V
 
 class TableSerializeTest : public Test {
     public:
-        TableSerializeTest() {
+        TableSerializeTest() :
+          columnNames(NUM_OF_COLUMNS)
+        {
             this->database_id = 1000;
 
-            columnNames = new std::string[NUM_OF_COLUMNS];
             std::vector<voltdb::ValueType> columnTypes;
             std::vector<int32_t> columnSizes;
             std::vector<bool> columnAllowNull(NUM_OF_COLUMNS, false);
@@ -90,8 +91,7 @@ class TableSerializeTest : public Test {
                 columnTypes.push_back(col_types[ctr]);
             }
             voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
-            table_ = TableFactory::getTempTable(this->database_id, "temp_table",
-                                                schema, columnNames, NULL);
+            table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
 
             for (int64_t i = 1; i <= TUPLES; ++i) {
                 TableTuple &tuple = table_->tempTuple();
@@ -112,13 +112,12 @@ class TableSerializeTest : public Test {
         ~TableSerializeTest() {
             table_->deleteAllTuples(true);
             delete table_;
-            delete []columnNames;
         }
     protected:
         CatalogId database_id;
         CatalogId table_id;
         Table* table_;
-        std::string *columnNames;
+        std::vector<std::string> columnNames;
 };
 
 
@@ -139,9 +138,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
     ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
-    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo",
-                                                     schema, columnNames,
-                                                     &limits);
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
     deserialized->loadTuplesFrom(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
@@ -162,7 +159,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
 }
 
 TEST_F(TableSerializeTest, NullStrings) {
-    std::string *columnNames = new std::string[1];
+    std::vector<std::string> columnNames(1);
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_VARCHAR);
     std::vector<int32_t> columnSizes(1, 20);
     std::vector<bool> columnAllowNull(1, false);
@@ -170,8 +167,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     columnNames[0] = "";
     table_->deleteAllTuples(true);
     delete table_;
-    table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema,
-                                        columnNames, NULL);
+    table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
 
     TableTuple& tuple = table_->tempTuple();
     tuple.setNValue(0, ValueFactory::getNullStringValue());
@@ -185,8 +181,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
     TempTableLimits limits;
     schema = TupleSchema::createTupleSchema(table_->schema());
-    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema,
-                                                     columnNames, &limits);
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
     deserialized->loadTuplesFrom(serialize_in, NULL);
 
     EXPECT_EQ(1, deserialized->activeTupleCount());
@@ -213,8 +208,6 @@ TEST_F(TableSerializeTest, NullStrings) {
     }
     EXPECT_EQ(1, count);
     delete deserialized;
-    // clean up
-    delete[] columnNames;
 }
 
 int main() {

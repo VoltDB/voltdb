@@ -42,8 +42,17 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     public UnionType m_unionType = UnionType.NOUNION;
 
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedUnionStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
+    }
+
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode) {
         String type = stmtNode.attributes.get("uniontype");
         // Set operation type
         m_unionType = UnionType.valueOf(type);
@@ -52,7 +61,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         int i = 0;
         for (VoltXMLElement selectSQL : stmtNode.children) {
             AbstractParsedStmt nextSelectStmt = m_children.get(i++);
-            nextSelectStmt.parse(selectSQL, db);
+            nextSelectStmt.parse(selectSQL);
         }
     }
 
@@ -61,14 +70,14 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param root
      * @param db
      */
-    void parseTablesAndParams(VoltXMLElement stmtNode, Database db) {
+    void parseTablesAndParams(VoltXMLElement stmtNode) {
 
         assert(stmtNode.children.size() > 1);
         tableList.clear();
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-                AbstractParsedStmt childStmt = new ParsedSelectStmt();
-                childStmt.parseTablesAndParams(childSQL, db);
+                AbstractParsedStmt childStmt = new ParsedSelectStmt(this.m_paramValues, this.m_db);
+                childStmt.parseTablesAndParams(childSQL);
                 m_children.add(childStmt);
 
                 // So far T UNION T (as well as T JOIN T) are not handled properly
@@ -101,10 +110,10 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 // Add statement's tables to the consolidated list
                 tableList.addAll(childStmt.tableList);
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-                ParsedUnionStmt childStmt = new ParsedUnionStmt();
+                ParsedUnionStmt childStmt = new ParsedUnionStmt(this.m_paramValues, this.m_db);
                 // Pass already accumulated unique tables to the child union
                 childStmt.m_uniqueTables = m_uniqueTables;
-                childStmt.parseTablesAndParams(childSQL, db);
+                childStmt.parseTablesAndParams(childSQL);
                 m_children.add(childStmt);
                 // Add statement's tables to the consolidated list
                 tableList.addAll(childStmt.tableList);
@@ -122,10 +131,10 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param db
      * @param joinOrder
      */
-    void postParse(String sql, Database db, String joinOrder) {
+    void postParse(String sql, String joinOrder) {
 
         for (AbstractParsedStmt selectStmt : m_children) {
-            selectStmt.postParse(sql, db, joinOrder);
+            selectStmt.postParse(sql, joinOrder);
         }
         // these just shouldn't happen right?
         assert(this.multiTableSelectionList.size() == 0);

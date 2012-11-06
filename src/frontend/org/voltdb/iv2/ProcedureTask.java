@@ -27,11 +27,9 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -39,25 +37,27 @@ import org.voltdb.utils.LogKeys;
 
 abstract public class ProcedureTask extends TransactionTask
 {
-    final ProcedureRunner m_runner;
     final Mailbox m_initiator;
+    final String m_procName;
 
-    ProcedureTask(Mailbox initiator, ProcedureRunner runner, TransactionState txn,
+    ProcedureTask(Mailbox initiator, String procName, TransactionState txn,
                   TransactionTaskQueue queue)
     {
         super(txn, queue);
         m_initiator = initiator;
-        m_runner = runner;
+        m_procName = procName;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
+    @Override
     abstract public void run(SiteProcedureConnection siteConnection);
 
     /** procedure tasks must complete their txnstates */
     abstract void completeInitiateTask(SiteProcedureConnection siteConnection);
 
     /** Mostly copy-paste of old ExecutionSite.processInitiateTask() */
-    protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage task)
+    protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage task,
+            SiteProcedureConnection siteConnection)
     {
         final InitiateResponseMessage response = new InitiateResponseMessage(task);
 
@@ -82,21 +82,9 @@ abstract public class ProcedureTask extends TransactionTask
             if (callerParams != null) {
                 ClientResponseImpl cr = null;
 
-                // find the txn id visible to the proc
-                long txnId;
-                if (getMpTxnId() != Iv2InitiateTaskMessage.UNUSED_MP_TXNID) {
-                    txnId = getMpTxnId();
-                }
-                else {
-                    txnId = m_txn.txnId;
-                }
-                StoredProcedureInvocation invocation = m_txn.getInvocation();
-                if ((invocation != null) && (invocation.getType() == ProcedureInvocationType.REPLICATED)) {
-                    txnId = invocation.getOriginalTxnId();
-                }
-
-                m_runner.setupTransaction(m_txn);
-                cr = m_runner.call(txnId, task.getParameters());
+                ProcedureRunner runner = siteConnection.getProcedureRunner(m_procName);
+                runner.setupTransaction(m_txn);
+                cr = runner.call(task.getParameters());
 
                 response.setResults(cr);
                 // record the results of write transactions to the transaction state

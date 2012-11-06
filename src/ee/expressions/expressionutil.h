@@ -67,6 +67,9 @@ public:
     static AbstractExpression* comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
     static AbstractExpression* conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
 
+    static void loadIndexedExprsFromJson(std::vector<voltdb::AbstractExpression*>& indexed_exprs,
+                                         const std::string& jsonarraystring);
+
     /** If the passed vector contains only TupleValueExpression, it
      * returns ColumnIds of them, otherwise NULL.*/
     static boost::shared_array<int>
@@ -77,8 +80,8 @@ public:
     static boost::shared_array<int>
     convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
 
-    // Implemented in functionexpression.cpp because function expression handling is growing into a system unto itself.
-    static AbstractExpression * functionFactory(ExpressionType et, const std::vector<AbstractExpression*>* arguments);
+    // Implemented in functionexpression.cpp because function expression handling is a system unto itself.
+    static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);
 
 };
 

@@ -16,12 +16,14 @@
  */
 package org.voltdb;
 
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +36,9 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
+
+import com.google.common.primitives.Longs;
 
 public class SnapshotCompletionMonitor {
     @SuppressWarnings("unused")
@@ -44,12 +49,7 @@ public class SnapshotCompletionMonitor {
     private final ExecutorService m_es = new ThreadPoolExecutor(1, 1,
             0L, TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<Runnable>(),
-            new ThreadFactory() {
-                @Override
-                public Thread newThread(Runnable r) {
-                    return new Thread(r, "SnapshotCompletionMonitor");
-                }
-            },
+            CoreUtils.getThreadFactory("SnapshotCompletionMonitor"),
             new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
 
     private final Watcher m_newSnapshotWatcher = new Watcher() {
@@ -68,6 +68,20 @@ public class SnapshotCompletionMonitor {
             }
         }
     };
+
+    /*
+     * For every snapshot, the local sites will log their partition specific txnids here
+     * and when the snapshot completes the completion monitor will grab the list of partition specific
+     * txnids to pass to those who are interestewd
+     */
+    private final HashMap<Long, List<Long>> m_snapshotTxnIdsToPartitionTxnIds = new HashMap<Long, List<Long>>();
+
+    public void registerPartitionTxnIdsForSnapshot(long snapshotTxnId, List<Long> partitionTxnIds) {
+        synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
+            assert(!m_snapshotTxnIdsToPartitionTxnIds.containsKey(snapshotTxnId));
+            m_snapshotTxnIdsToPartitionTxnIds.put(snapshotTxnId, partitionTxnIds);
+        }
+    }
 
     private TreeSet<String> m_lastKnownSnapshots = new TreeSet<String>();
 
@@ -147,10 +161,19 @@ public class SnapshotCompletionMonitor {
         boolean truncation = jsonObj.getBoolean("isTruncation");
 
         if (hosts.length() == totalNodesFinished) {
+            long partitionTxnIds[] = null;
+            synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
+                List<Long> partitionTxnIdsList = m_snapshotTxnIdsToPartitionTxnIds.get(txnId);
+                if (partitionTxnIdsList != null) {
+                    partitionTxnIds = Longs.toArray(partitionTxnIdsList);
+                } else {
+                    partitionTxnIds = new long[0];
+                }
+            }
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
-                interest.snapshotCompleted(nonce, txnId, truncation);
+                interest.snapshotCompleted(nonce, txnId, Arrays.copyOf(partitionTxnIds, partitionTxnIds.length), truncation);
             }
         }
     }

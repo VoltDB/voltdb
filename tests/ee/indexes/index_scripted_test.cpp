@@ -60,8 +60,6 @@ const char *kInsertSuccess = "is";
 const char *kInsertFailure = "if";
 const char *kLookupSuccess = "ls";
 const char *kLookupFailure = "lf";
-const char *kUpdateSuccess = "us";
-const char *kUpdateFailure = "uf";
 const char *kDeleteSuccess = "ds";
 const char *kDeleteFailure = "df";
 
@@ -141,22 +139,6 @@ bool commandLF(voltdb::TableTuple &key)
     return !(currentIndex->moveToKey(&key));
 }
 
-bool commandUS(voltdb::TableTuple &oldkey, voltdb::TableTuple &newkey)
-{
-    //cout << "running us" << endl;
-    //cout << " candidate key old : " << oldkey.tupleLength() << " - " << oldkey.debug("") << endl;
-    //cout << " candidate key new : " << newkey.tupleLength() << " - " << newkey.debug("") << endl;
-    return currentIndex->replaceEntry(&oldkey, &newkey);
-}
-
-bool commandUF(voltdb::TableTuple &oldkey, voltdb::TableTuple &newkey)
-{
-    //cout << "running uf" << endl;
-    //cout << " candidate key old : " << oldkey.tupleLength() << " - " << oldkey.debug("") << endl;
-    //cout << " candidate key new : " << newkey.tupleLength() << " - " << newkey.debug("") << endl;
-    return !currentIndex->replaceEntry(&oldkey, &newkey);
-}
-
 bool commandDS(voltdb::TableTuple &key)
 {
     //cout << "running ds" << endl;
@@ -221,35 +203,51 @@ void setNewCurrent(const char *testName,
         voltdb::TableIndex *index;
 
         if (strcmp(indexName, kMultiIntsHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, false, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiIntsTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, false, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            false, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, false, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            false, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, false, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            false, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, true, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, true, true, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            true, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericHash) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX, columnIndices, columnTypes, true, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            true, false, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericTree) == 0) {
-            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX, columnIndices, columnTypes, true, false, schema);
+            voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
+                                            columnIndices, TableIndex::simplyIndexColumns(),
+                                            true, true, schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else {
@@ -286,10 +284,6 @@ void runTest()
                 result = commandLS(*command.key);
             else if (command.op == kLookupFailure)
                 result = commandLF(*command.key);
-            else if (command.op == kUpdateSuccess)
-                result = commandUS(*command.key, *command.key2);
-            else if (command.op == kUpdateFailure)
-                result = commandUF(*command.key, *command.key2);
             else if (command.op == kDeleteSuccess)
                 result = commandDS(*command.key);
             else if (command.op == kDeleteFailure)
@@ -510,8 +504,6 @@ int main(int argc, char **argv)
             else if (strcmp(command, kInsertFailure) == 0) cmd.op = kInsertFailure;
             else if (strcmp(command, kLookupSuccess) == 0) cmd.op = kLookupSuccess;
             else if (strcmp(command, kLookupFailure) == 0) cmd.op = kLookupFailure;
-            else if (strcmp(command, kUpdateSuccess) == 0) cmd.op = kUpdateSuccess;
-            else if (strcmp(command, kUpdateFailure) == 0) cmd.op = kUpdateFailure;
             else if (strcmp(command, kDeleteSuccess) == 0) cmd.op = kDeleteSuccess;
             else if (strcmp(command, kDeleteFailure) == 0) cmd.op = kDeleteFailure;
             else {

@@ -30,6 +30,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
+import org.voltdb.PlannerStatsCollector;
+import org.voltdb.PlannerStatsCollector.CacheUse;
+import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.VoltDB;
@@ -53,6 +56,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_SUCCESS = 0;
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
+
+    /** Partition ID */
+    protected final int m_partitionId;
+
+    /** Statistics collector (provided later) */
+    private PlannerStatsCollector m_plannerStats = null;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -83,8 +92,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine() {
+    public ExecutionEngine(long siteId, int partitionId) {
+        m_partitionId = partitionId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        // In mock test environments there may be no stats agent.
+        final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
+        if (statsAgent != null) {
+            m_plannerStats = new PlannerStatsCollector(siteId);
+            statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
+        }
+    }
+
+    /** Alternate constructor without planner statistics tracking. */
+    public ExecutionEngine() {
+        m_partitionId = 0;  // not used
+        m_plannerStats = null;
     }
 
     /*
@@ -183,6 +205,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotFound.name(),
                                new Object[] { dependencyId }, null);
                 VoltDB.crashLocalVoltDB("No additional info.", false, null);
+                // Prevent warnings.
+                return;
             }
             for (final Object dependency : dependencies) {
                 if (dependency == null) {
@@ -190,6 +214,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                    new Object[] { dependencyId },
                             null);
                     VoltDB.crashLocalVoltDB("No additional info.", false, null);
+                    // Prevent warnings.
+                    return;
                 }
                 if (log.isTraceEnabled()) {
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
@@ -271,10 +297,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void release() throws EEException, InterruptedException;
 
     /** Pass the catalog to the engine */
-    abstract public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException;
+    abstract public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
+    abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
     /** Load a fragment, given a plan, into the EE with a specific fragment id */
     abstract public long loadPlanFragment(byte[] plan) throws EEException;
@@ -398,7 +424,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * NOTE: Call initialize() separately for initialization.
      * This does strictly nothing so that this method never throws an exception.
      * @return the created VoltDBEngine pointer casted to jlong.
-    */
+     */
     protected native long nativeCreate(boolean isSunJVM);
     /**
      * Releases all resources held in the execution engine.
@@ -452,7 +478,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * human-readable text strings separated by line feeds.
      * @return error code
      */
-    protected native int nativeLoadCatalog(long pointer, long txnId, byte serialized_catalog[]);
+    protected native int nativeLoadCatalog(long pointer, long timestamp, byte serialized_catalog[]);
 
     /**
      * Update the EE's catalog.
@@ -462,7 +488,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, long txnId, byte diff_commands[]);
+    protected native int nativeUpdateCatalog(long pointer, long timestamp, byte diff_commands[]);
 
     /**
      * This method is called to initially load table data.
@@ -645,4 +671,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Returns the RSS size in bytes or -1 on error (or wrong platform).
      */
     public native static long nativeGetRSS();
+
+    /**
+     * Start collecting statistics (starts timer).
+     */
+    protected void startStatsCollection() {
+        if (m_plannerStats != null) {
+            m_plannerStats.startStatsCollection();
+        }
+    }
+
+    /**
+     * Finalize collected statistics (stops timer and supplies cache statistics).
+     *
+     * @param cacheSize  size of cache
+     * @param cacheUse   where the plan came from
+     */
+    protected void endStatsCollection(long cacheSize, CacheUse cacheUse) {
+        if (m_plannerStats != null) {
+            m_plannerStats.endStatsCollection(cacheSize, 0, cacheUse, m_partitionId);
+        }
+    }
 }

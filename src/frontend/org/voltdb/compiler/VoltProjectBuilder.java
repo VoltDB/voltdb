@@ -34,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -57,6 +58,8 @@ import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ExportOnServerType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
@@ -65,15 +68,21 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
+import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SecurityType;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.utils.NotImplementedException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Text;
+
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -261,6 +270,10 @@ public class VoltProjectBuilder {
     private Integer m_maxTempTableMemory = 100;
 
     private List<String> m_diagnostics;
+
+    private Properties m_elConfig;
+    private boolean m_elOnServer;
+    private String m_elExportTo;
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
             Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
@@ -465,6 +478,31 @@ public class VoltProjectBuilder {
         m_elloader = loader;
         m_elenabled = enabled;
         m_elAuthGroups = groups;
+        m_elOnServer = false;
+    }
+
+    public void addOnServerExport(boolean enabled, List<String> groups, String exportTo, Properties config) {
+        m_elloader = GuestProcessor.class.getName();
+        m_elenabled = enabled;
+        m_elAuthGroups = groups;
+        m_elOnServer = true;
+
+        if (config == null) {
+            config = new Properties();
+            config.putAll(ImmutableMap.<String, String>of(
+                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag"
+                    ));
+        }
+        m_elConfig = config;
+
+        if (exportTo == null || exportTo.trim().isEmpty()) {
+            exportTo = "file";
+        }
+        m_elExportTo = exportTo;
+    }
+
+    public void addOnServerExport( boolean enabled, List<String> groups) {
+        addOnServerExport(enabled, groups, null, null);
     }
 
     public void setTableAsExportOnly(String name) {
@@ -605,11 +643,6 @@ public class VoltProjectBuilder {
         final Element project = doc.createElement("project");
         doc.appendChild(project);
 
-        // <security>
-        final Element security = doc.createElement("security");
-        security.setAttribute("enabled", Boolean.valueOf(m_securityEnabled).toString());
-        project.appendChild(security);
-
         // <database>
         final Element database = doc.createElement("database");
         database.setAttribute("name", "database");
@@ -659,10 +692,7 @@ public class VoltProjectBuilder {
         }
         if (deployment != null) {
             try {
-                m_pathToDeployment = writeDeploymentFile(
-                        deployment.hostCount, deployment.sitesPerHost,
-                        deployment.replication, deploymentVoltRoot,
-                        deployment.useCustomAdmin, deployment.adminPort, deployment.adminOnStartup);
+                m_pathToDeployment = writeDeploymentFile(deploymentVoltRoot, deployment);
             } catch (Exception e) {
                 System.out.println("Failed to create deployment file in testcase.");
                 e.printStackTrace();
@@ -894,16 +924,15 @@ public class VoltProjectBuilder {
     /**
      * Writes deployment.xml file to a temporary file. It is constructed from the passed parameters and the m_users
      * field.
-     * @param hostCount Number of hosts.
-     * @param sitesPerHost Sites per host.
-     * @param kFactor Replication factor.
-     * @return Returns the path the temporary file was written to.
+     *
+     * @param voltRoot
+     * @param dinfo an instance {@link DeploymentInfo}
+     * @return deployment path
      * @throws IOException
      * @throws JAXBException
      */
     private String writeDeploymentFile(
-            int hostCount, int sitesPerHost, int kFactor, String voltRoot,
-            boolean useCustomAdmin, int adminPort, boolean adminOnStartup) throws IOException, JAXBException
+            String voltRoot, DeploymentInfo dinfo) throws IOException, JAXBException
             {
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
@@ -915,9 +944,9 @@ public class VoltProjectBuilder {
         // <cluster>
         ClusterType cluster = factory.createClusterType();
         deployment.setCluster(cluster);
-        cluster.setHostcount(hostCount);
-        cluster.setSitesperhost(sitesPerHost);
-        cluster.setKfactor(kFactor);
+        cluster.setHostcount(dinfo.hostCount);
+        cluster.setSitesperhost(dinfo.sitesPerHost);
+        cluster.setKfactor(dinfo.replication);
 
         // <paths>
         PathsType paths = factory.createPathsType();
@@ -951,6 +980,10 @@ public class VoltProjectBuilder {
             snapshot.setPrefix(m_snapshotPrefix);
             snapshot.setRetain(m_snapshotRetain);
         }
+
+        SecurityType security = factory.createSecurityType();
+        deployment.setSecurity(security);
+        security.setEnabled(m_securityEnabled);
 
         if (m_commandLogSync != null || m_commandLogEnabled != null ||
                 m_commandLogFsyncInterval != null || m_commandLogMaxTxnsBeforeFsync != null ||
@@ -990,11 +1023,11 @@ public class VoltProjectBuilder {
         // can't be disabled, but only write out the non-default config if
         // requested by a test. otherwise, take the implied defaults (or
         // whatever local cluster overrides on the command line).
-        if (useCustomAdmin) {
+        if (dinfo.useCustomAdmin) {
             AdminModeType admin = factory.createAdminModeType();
             deployment.setAdminMode(admin);
-            admin.setPort(adminPort);
-            admin.setAdminstartup(adminOnStartup);
+            admin.setPort(dinfo.adminPort);
+            admin.setAdminstartup(dinfo.adminOnStartup);
         }
 
         // <systemsettings>
@@ -1046,9 +1079,30 @@ public class VoltProjectBuilder {
         // <export>
         ExportType export = factory.createExportType();
         deployment.setExport(export);
-        export.setEnabled(m_elenabled);
-        if (m_elloader != null) {
-            export.setClazz(m_elloader);
+
+        // this is for old generation export test suite backward compatibility
+        export.setEnabled(m_elenabled && m_elloader != null && !m_elloader.trim().isEmpty());
+
+        if (m_elOnServer) {
+            ExportOnServerType onServer = factory.createExportOnServerType();
+            ServerExportEnum exportTo = ServerExportEnum.fromValue(m_elExportTo.toLowerCase());
+            onServer.setExportto(exportTo);
+            export.setOnserver(onServer);
+            if( m_elConfig != null && m_elConfig.size() > 0) {
+                ExportConfigurationType exportConfig = factory.createExportConfigurationType();
+                List<PropertyType> configProperties = exportConfig.getProperty();
+
+                for( Object nameObj: m_elConfig.keySet()) {
+                    String name = String.class.cast(nameObj);
+
+                    PropertyType prop = factory.createPropertyType();
+                    prop.setName(name);
+                    prop.setValue(m_elConfig.getProperty(name));
+
+                    configProperties.add(prop);
+                }
+                onServer.setConfiguration(exportConfig);
+            }
         }
 
         // Have some yummy boilerplate!

@@ -19,20 +19,17 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-
-import java.util.concurrent.Future;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeSet;
+import java.util.concurrent.Future;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
@@ -44,7 +41,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
-    private long m_maxSeenTxnId = 0; // UPDATE ME TO REAL VALUE WHEN EXTRACTING BASE CLASS
+    private long m_maxSeenTxnId;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -106,12 +103,13 @@ public class SpPromoteAlgo implements RepairAlgo
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public SpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami)
+            String whoami, int partitionId)
     {
         m_mailbox = mailbox;
         m_survivors = survivors;
 
         m_whoami = whoami;
+        m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
     }
 
     @Override
@@ -122,7 +120,7 @@ public class SpPromoteAlgo implements RepairAlgo
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.done(Long.MIN_VALUE);
+            m_promotionResult.done(m_maxSeenTxnId);
         }
         return m_promotionResult;
     }
@@ -166,7 +164,13 @@ public class SpPromoteAlgo implements RepairAlgo
                         + " repair log entries from "
                         + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
-            m_repairLogUnion.add(response);
+            // Long.MAX_VALUE has rejoin semantics
+            if (response.getHandle() != Long.MAX_VALUE) {
+                m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
+            }
+            if (response.getPayload() != null) {
+                m_repairLogUnion.add(response);
+            }
             if (rrs.update(response)) {
                 tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
                         + " responses for " + rrs.m_expectedResponses +
@@ -189,7 +193,7 @@ public class SpPromoteAlgo implements RepairAlgo
         return true;
     }
 
-    /** Send missed-messages to survivors. Exciting! */
+    /** Send missed-messages to survivors. */
     public void repairSurvivors()
     {
         // cancel() and repair() must be synchronized by the caller (the deliver lock,
@@ -214,7 +218,7 @@ public class SpPromoteAlgo implements RepairAlgo
                 }
             }
             if (!needsRepair.isEmpty()) {
-                m_mailbox.repairReplicasWith(needsRepair, li);
+                m_mailbox.repairReplicasWith(needsRepair, li.getPayload());
             }
         }
         tmLog.info(m_whoami + "finished queuing " + queued + " replica repair messages.");

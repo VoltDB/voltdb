@@ -25,9 +25,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+
+import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -35,12 +37,9 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpTransactionState extends TransactionState
 {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     /**
      *  This is thrown by the TransactionState instance when something
      *  goes wrong mid-fragment, and execution needs to back all the way
@@ -59,19 +58,26 @@ public class MpTransactionState extends TransactionState
     Map<Integer, Set<Long>> m_remoteDeps;
     Map<Integer, List<VoltTable>> m_remoteDepTables =
         new HashMap<Integer, List<VoltTable>>();
-    List<Long> m_useHSIds;
+    final List<Long> m_useHSIds = new ArrayList<Long>();
     long m_buddyHSId;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
+    boolean m_haveDistributedInitTask = false;
 
-    MpTransactionState(Mailbox mailbox, long txnId,
+    MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
                        List<Long> useHSIds, long buddyHSId)
     {
-        super(txnId, mailbox, notice);
+        super(mailbox, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
-        m_useHSIds = useHSIds;
+        m_useHSIds.addAll(useHSIds);
         m_buddyHSId = buddyHSId;
+    }
+
+    public void updateMasters(List<Long> masters)
+    {
+        m_useHSIds.clear();
+        m_useHSIds.addAll(masters);
     }
 
     @Override
@@ -108,7 +114,7 @@ public class MpTransactionState extends TransactionState
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        return null;
+        return m_task.getStoredProcedureInvocation();
     }
 
     @Override
@@ -148,6 +154,18 @@ public class MpTransactionState extends TransactionState
         // there are no fragments to be done in this message
         // At some point maybe ProcedureRunner.slowPath() can get smarter
         if (task.getFragmentCount() > 0) {
+            // Distribute the initiate task for command log replay.
+            // Command log must log the initiate task;
+            // Only send the fragment once.
+            if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
+                m_haveDistributedInitTask = true;
+                task.setInitiateTask((Iv2InitiateTaskMessage)getNotice());
+            }
+
+            if (m_task.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {
+                task.setOriginalTxnId(m_task.getStoredProcedureInvocation().getOriginalTxnId());
+            }
+
             m_remoteWork = task;
             m_remoteWork.setTruncationHandle(m_task.getTruncationHandle());
             // Distribute fragments to remote destinations.
@@ -156,8 +174,6 @@ public class MpTransactionState extends TransactionState
                 non_local_hsids[i] = m_useHSIds.get(i);
             }
             // send to all non-local sites
-            // IZZY: This needs to go through mailbox.deliver()
-            // so that fragments could get replicated for k>0
             if (non_local_hsids.length > 0) {
                 m_mbox.send(non_local_hsids, m_remoteWork);
             }

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="2" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export enabled="true">
+        <onserver exportto="file">
+            <configuration>
+                <property name="type">tsv</property>
+                <property name="with-schema">true</property>
+                <property name="batched">true</property>
+                <property name="nonce">zohan</property>
+                <property name="period">10</property>
+            </configuration>
+        </onserver>
+    </export>
+</deployment>

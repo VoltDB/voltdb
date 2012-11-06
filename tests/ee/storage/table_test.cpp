@@ -106,7 +106,7 @@ protected:
         vector<boost::shared_ptr<const TableColumn> > columns;
         char buffer[32];
 
-        string *columnNames = new string[NUM_OF_COLUMNS];
+        vector<string> columnNames(NUM_OF_COLUMNS);
         vector<ValueType> columnTypes;
         vector<int32_t> columnLengths;
         vector<bool> columnAllowNull;
@@ -119,18 +119,14 @@ protected:
         }
         TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
         if (xact) {
-            persistent_table = TableFactory::getPersistentTable(database_id, NULL, "test_table", schema, columnNames, -1, false, false);
+            persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
             table = persistent_table;
         } else {
             limits.setMemoryLimit(1024 * 1024);
-            temp_table = TableFactory::getTempTable(database_id, "test_table",
-                                                    schema, columnNames, &limits);
+            temp_table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, &limits);
             table = temp_table;
         }
         assert(tableutil::addRandomTuples(this->table, NUM_OF_TUPLES));
-
-        // clean up
-        delete[] columnNames;
     }
 
     Table* table;
@@ -234,7 +230,9 @@ TEST_F(TableTest, TupleUpdate) {
                 }
             }
         }
-        if (update) EXPECT_EQ(true, temp_table->updateTuple(temp_tuple, tuple, true));
+        if (update) {
+            EXPECT_EQ(true, temp_table->updateTuple(tuple, temp_tuple));
+        }
     }
 
     //
@@ -386,7 +384,7 @@ TEST_F(TableTest, TupleDelete) {
         if (update) {
             //printf("BEFORE?: %s\n", tuple->debug(this->table.get()).c_str());
             //persistent_table->setUndoLog(undos[xact_ctr]);
-            EXPECT_EQ(true, persistent_table->updateTuple(temp_tuple, tuple, true));
+            EXPECT_EQ(true, persistent_table->updateTuple(tuple, temp_tuple, true));
             //printf("UNDO: %s\n", undos[xact_ctr]->debug().c_str());
         }
         //printf("AFTER: %s\n", temp_tuple->debug(this->table.get()).c_str());

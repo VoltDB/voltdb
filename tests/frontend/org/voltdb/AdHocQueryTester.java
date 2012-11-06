@@ -23,6 +23,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 
 import junit.framework.TestCase;
@@ -33,6 +34,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 public abstract class AdHocQueryTester extends TestCase {
 
@@ -73,8 +75,8 @@ public abstract class AdHocQueryTester extends TestCase {
                 "create view V_PARTED1 (PARTVAL, num_rows, sum_bigint) as " +
                 "select PARTVAL, count(*), sum(NONPART) from PARTED1 group by PARTVAL;" +
 
-                "create view V_SCATTERED1 (NONPART, num_rows, sum_bigint) as " +
-                "select NONPART, count(*), sum(PARTVAL) from PARTED1 group by NONPART;" +
+                "create view V_SCATTERED1 (NONPART, PARTVAL, num_rows, sum_bigint) as " +
+                "select NONPART, PARTVAL, count(*), sum(PARTVAL) from PARTED1 group by NONPART, PARTVAL;" +
 
                 "create view V_REPPED1 (REPPEDVAL, num_rows, sum_bigint) as " +
                 "select REPPEDVAL, count(*), sum(NONPART) from REPPED1 group by REPPEDVAL;" +
@@ -97,6 +99,8 @@ public abstract class AdHocQueryTester extends TestCase {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
 
+        //Clean up before each test
+        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         setUpSchema(builder, pathToCatalog, pathToDeployment);

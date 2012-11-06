@@ -84,6 +84,12 @@
 <property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
+<property name='debian.package.dir'          value='obj/debian' />
+
+<!-- os.mac is set when build is running on Mac OSX -->
+<condition property="os.mac">
+    <os family="mac"/>
+</condition>
 
 <!-- emma build instrumentation location -->
 <property name='build.instr.dir'             location='${build.dir}/instr' />
@@ -139,7 +145,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="licensecheck, compile, voltdbipc, ee"
+    depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
@@ -157,7 +163,7 @@ PRIMARY ENTRY POINTS
     </exec>
 </target>
 <target name="check_noclustering"
-    depends="licensecheck, compile, voltdbipc, ee"
+    depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
@@ -325,7 +331,6 @@ DISTRIBUTION
             <include name="examples/**"/>
             <include name="lib/**"/>
             <include name="tools/demo/**"/>
-            <include name="tools/sqlcmd/**"/>
             <include name="voltdb/**"/>
             <exclude name=".gitignore"/>
         </fileset>
@@ -353,20 +358,8 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- save the symbols from the shared library -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
-    </exec>
-
-    <!-- strip the voltbin shared library (~40x size reduction) -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/strip --strip-debug --strip-unneeded libvoltdb*'"/>
-    </exec>
-
-    <!-- embed the path to the symbol file into the ELF binary -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
-    </exec>
+    <!-- OS-specific preparation of libvoltdb* -->
+    <antcall target="dist_libvoltdb" />
 
     <!-- copy studio.web -->
     <mkdir dir="${dist.dir}/tools/studio.web" />
@@ -397,7 +390,6 @@ DISTRIBUTION
             <include name="doc/tutorials/**/run.sh"/>
             <include name="examples/**/run.sh"/>
             <include name="tools/generate"/>
-            <include name="tools/sqlcmd/sqlcmd"/>
         </fileset>
     </chmod>
 
@@ -441,7 +433,7 @@ DISTRIBUTION
         <fileset dir="${dist.dir}/" defaultexcludes="yes">
             <include name="**/*"/>
             <exclude name=".gitignore"/>
-            <exclude name="bin/"/>
+            <include name="bin/sqlcmd"/>
             <exclude name="voltdb/libvoltdb*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
             <exclude name="voltdb/libjzmq*"/>
@@ -458,7 +450,7 @@ DISTRIBUTION
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
             <include name="tools/generate"/>
-            <include name="tools/sqlcmd/sqlcmd"/>
+            <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
 
@@ -479,6 +471,39 @@ DISTRIBUTION
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist-client-java"/>
+    </exec>
+</target>
+
+<!-- Prepare libvoltdb* for distribution. -->
+<target name="dist_libvoltdb" depends="dist_libvoltdb_linux, dist_libvoltdb_mac" />
+
+<!-- Linux prepare libvoltdb* for distribution. -->
+<target name="dist_libvoltdb_linux" unless="os.mac">
+
+    <!-- save the symbols from the shared library -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
+    </exec>
+
+    <!-- strip the voltbin shared library (~40x size reduction) -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/strip --strip-debug --strip-unneeded libvoltdb*'"/>
+    </exec>
+
+    <!-- embed the path to the symbol file into the ELF binary -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
+    </exec>
+
+</target>
+
+<!-- Mac prepare libvoltdb* for distribution. -->
+<target name="dist_libvoltdb_mac" if="os.mac">
+    <!-- objcopy is unavailable by default on Mac -->
+
+    <!-- Just use strip -S since strip-unneeded option is unavailable. -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/strip -S libvoltdb*'"/>
     </exec>
 </target>
 
@@ -559,7 +584,7 @@ CLEANING
 
 <target name='clean'
 	description="Remove all compiled and generated files."
-	depends="cleantmp, clean_project_gen, clean_deployment_gen">
+	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -616,6 +641,7 @@ JAR BUILDING
             <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/apache/**" />
+            <include name="jsr166y/**"/>
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
@@ -967,6 +993,18 @@ NATIVE EE STUFF
     </copy>
 </target>
 
+<target name='recompile_ee_nodepends'
+    description="Build C++ JNI library and copy it to production folder.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <arg line="build.py ${build}" />
+    </exec>
+    <copy todir='voltdb'>
+        <fileset dir="${build.dir}/nativelibs">
+            <include name="libvoltdb-${dist.version}.*"/>
+        </fileset>
+    </copy>
+</target>
+
 <target name='ee_profile' depends="catalog, jnicompile"
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
@@ -1152,64 +1190,71 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <!-- pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
+                <exclude name="**/TestCommandLogReinitiator.class"/>
+                <exclude name="**/TestCommandLog.class"/>
+                <exclude name="**/TestLogReader.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestVoltLicense.class" />
-                <exclude name="**/TestPrimary.class" />
+                <exclude name="**/TestPauselessRejoinEndToEnd" />
+                <exclude name="**/TestPauselessRejoinFuzz" />
                 <exclude name="**/TestSecondaryRejoin.class" />
-                <exclude name="**/TestInvocationBufferServer.class" />
-                <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" />
                 <exclude name="**/TestSnapshotSaveTruncation.class" />
+                <!-- <exclude name="**/TestInvocationBufferServer.class" /> -->
+                <!-- <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" /> -->
+                <!-- <exclude name="**/TestPrimary.class" /> -->
                 <!-- community tests -->
-<!--                <exclude name="**/TestHSQLBackend.class" /> -->
-<!--                <exclude name="**/TestAdHocQueries.class" /> -->
-                <exclude name="**/TestJSONInterface.class" />
-<!--                <exclude name="**/TestRejoinEndToEnd.class" /> -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestRejoinWithCatalogUpdates.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
-                <exclude name="**/TestReplicatedInvocation.class" />
-<!--                <exclude name="**/TestRestoreAgent.class" -->
-<!--                <exclude name="**/TestSimpleCJK.class" /> -->
-<!--                <exclude name="**/TestClientTimeouts.class" /> -->
-                <exclude name="**/TestExportToFileClient.class" />
                 <exclude name="**/TestNonDetermisticSeppuku.class" />
-<!--                <exclude name="**/TestJDBCDriver.class" />-->
-                <exclude name="**/TestAdminMode.class" />
-                <exclude name="**/TestCatalogUpdateSuite.class" />
-<!--                <exclude name="**/TestCRUDSuite.class" /> -->
-<!--                <exclude name="**/TestExecutionSiteDeath.class" /> -->
-<!--                <exclude name="**/TestFailureDetectSuite.class" /> -->
-<!--                <exclude name="**/TestFailuresSuite.class" /> -->
-<!--                <exclude name="**/TestFixedSQLSuite.class" /> -->
-<!--                <exclude name="**/TestFunctionsSuite.class" /> -->
-<!--                <exclude name="**/TestGiantDeleteSuite.class" /> -->
-<!--                <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
-<!--                <exclude name="**/TestIndexesSuite.class" /> -->
-<!--                <exclude name="**/TestLimitOffsetSuite.class" /> -->
-<!--                <exclude name="**/TestLoadingSuite.class" /> -->
+                <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" />
-<!--                <exclude name="**/TestMaterializedViewSuite.class" /> -->
-<!--                <exclude name="**/TestMultiPartitionSuite.class" /> -->
-<!--                <exclude name="**/TestOrderBySuite.class" /> -->
-                <exclude name="**/TestPartitionDetection.class" />
-<!--                <exclude name="**/TestPlansGroupBySuite.class" /> -->
-                <exclude name="**/TestReplicationSuite.class" />
-<!--                <exclude name="**/TestRollbackSuite.class" /> -->
-                <exclude name="**/TestSQLFeaturesSuite.class" />
-<!--                <exclude name="**/TestSQLTypesSuite.class" /> -->
-<!--                <exclude name="**/TestSecuritySuite.class" /> -->
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
-<!--                <exclude name="**/TestSqlAggregateSuite.class" /> -->
-<!--                <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
-<!--                <exclude name="**/TestSqlUpdateSuite.class" /> -->
-<!--                <exclude name="**/TestSystemCatalogSuite.class" /> -->
-<!--                <exclude name="**/TestSystemInformationSuite.class" /> -->
-                <exclude name="**/TestSystemProcedureSuite.class" />
-<!--                <exclude name="**/TestTPCCSuite.class" /> -->
-<!--                <exclude name="**/TestBlobType.class" /> -->
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
+                <!-- <exclude name="**/TestHSQLBackend.class" /> -->
+                <!-- <exclude name="**/TestAdHocQueries.class" /> -->
+                <!-- <exclude name="**/TestJSONInterface.class" /> -->
+                <!-- <exclude name="**/TestRejoinEndToEnd.class" /> -->
+                <!-- <exclude name="**/TestRejoinWithCatalogUpdates.class" /> -->
+                <!-- <exclude name="**/TestReplicatedInvocation.class" /> -->
+                <!-- <exclude name="**/TestRestoreAgent.class" -->
+                <!-- <exclude name="**/TestSimpleCJK.class" /> -->
+                <!-- <exclude name="**/TestClientTimeouts.class" /> -->
+                <!-- <exclude name="**/TestExportToFileClient.class" /> -->
+                <!-- <exclude name="**/TestJDBCDriver.class" />-->
+                <!-- <exclude name="**/TestAdminMode.class" />-->
+                <!-- <exclude name="**/TestCatalogUpdateSuite.class" /> -->
+                <!-- <exclude name="**/TestCRUDSuite.class" /> -->
+                <!-- <exclude name="**/TestFailureDetectSuite.class" /> -->
+                <!-- <exclude name="**/TestExecutionSiteDeath.class" /> -->
+                <!-- <exclude name="**/TestFailuresSuite.class" /> -->
+                <!-- <exclude name="**/TestFixedSQLSuite.class" /> -->
+                <!-- <exclude name="**/TestFunctionsSuite.class" /> -->
+                <!-- <exclude name="**/TestGiantDeleteSuite.class" /> -->
+                <!-- <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
+                <!-- <exclude name="**/TestIndexesSuite.class" /> -->
+                <!-- <exclude name="**/TestLimitOffsetSuite.class" /> -->
+                <!-- <exclude name="**/TestLoadingSuite.class" /> -->
+                <!-- <exclude name="**/TestMaterializedViewSuite.class" /> -->
+                <!-- <exclude name="**/TestMultiPartitionSuite.class" /> -->
+                <!-- <exclude name="**/TestOrderBySuite.class" /> -->
+                <!-- <exclude name="**/TestPartitionDetection.class" /> -->
+                <!-- <exclude name="**/TestPlansGroupBySuite.class" /> -->
+                <!-- <exclude name="**/TestReplicationSuite.class" /> -->
+                <!-- <exclude name="**/TestRollbackSuite.class" /> -->
+                <!-- <exclude name="**/TestSQLFeaturesSuite.class" /> -->
+                <!-- <exclude name="**/TestSQLTypesSuite.class" /> -->
+                <!-- <exclude name="**/TestSecuritySuite.class" /> -->
+                <!-- <exclude name="**/TestSqlAggregateSuite.class" /> -->
+                <!-- <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
+                <!-- <exclude name="**/TestSqlUpdateSuite.class" /> -->
+                <!-- <exclude name="**/TestSystemCatalogSuite.class" /> -->
+                <!-- <exclude name="**/TestSystemInformationSuite.class" /> -->
+                <!-- <exclude name="**/TestSystemProcedureSuite.class" /> -->
+                <!-- <exclude name="**/TestTPCCSuite.class" /> -->
+                <!-- <exclude name="**/TestBlobType.class" /> -->
             </fileset>
         </tests>
     </run_junit>
@@ -1289,6 +1334,7 @@ TEST CASES
                 <exclude name="**/TestPartitionDetection.class"  />
                 <exclude name="**/TestSystemProcedureSuite.class"  />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
             </fileset>
         </tests>
     </run_junit>
@@ -1308,7 +1354,7 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestRejoinEndToEnd.class" />
+                <exclude name="**/TestExportBase.class"/>
             </fileset>
         </tests>
     </run_junit>
@@ -1418,8 +1464,10 @@ TEST CASES
   </antcall>
   <antcall target="sqlcoverage">
     <param name="build.dir.suffix" value="-coverage" />
+    <param name="sqlcoverage.failonerror" value="false" />
   </antcall>
   <!-- Get test coverage -->
+  <echo>Processing coverage</echo>
   <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
     <arg line="--directory ${build.dir}-coverage/objects"/>
     <arg line="--capture"/>
@@ -1597,6 +1645,7 @@ TEST CASES
 <target name='sqlcoverage' depends="ee,compile"
     description="Run the SQL coverage tests.">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
+    <property name="sqlcoverage.failonerror" value="true" />
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
     <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
@@ -1633,11 +1682,29 @@ TEST CASES
     <condition property="hosts" value="${sql_coverage_hosts}" else="1">
         <isset property="sql_coverage_hosts"/>
     </condition>
-    <condition property="sitesperhost" value="${sql_coverage_sites}" else="1">
+    <condition property="sitesperhost" value="${sql_coverage_sites}" else="3">
         <isset property="sql_coverage_sites"/>
     </condition>
     <condition property="replicas" value="${sql_coverage_replicas}" else="0">
         <isset property="sql_coverage_replicas"/>
+    </condition>
+    <condition property="hostname" value="-l ${sql_coverage_hostname}" else="">
+        <isset property="sql_coverage_hostname"/>
+    </condition>
+    <condition property="hostport" value="-p ${sql_coverage_hostport}" else="">
+        <isset property="sql_coverage_hostport"/>
+    </condition>
+    <condition property="hostcount" value="-n ${sql_coverage_hosts}" else="-n 1">
+        <isset property="sql_coverage_hosts"/>
+    </condition>
+    <condition property="kfactor" value="-k ${sql_coverage_replicas}" else="-k 0">
+        <isset property="sql_coverage_replicas"/>
+    </condition>
+    <condition property="sitescount" value="-t ${sql_coverage_sites}" else="-t 3">
+        <isset property="sql_coverage_sites"/>
+    </condition>
+    <condition property="flushddl" value="-f ${sql_coverage_flushddl}" else="-f flush-DDL.sql">
+        <isset property="sql_coverage_flushddl"/>
     </condition>
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
@@ -1657,7 +1724,7 @@ TEST CASES
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/scripts' executable='python2.6' failonerror='true'>
+    <exec dir='tests/scripts' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
         <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
@@ -1668,6 +1735,12 @@ TEST CASES
         <arg file="${meta_config}" />
         <arg file="${sqlcov.dir}" />
         <arg line='"${simpleserver.command}"' />
+        <arg line="${hostname}" />
+        <arg line="${hostport}" />
+        <arg line="${hostcount}" />
+        <arg line="${kfactor}" />
+        <arg line="${sitescount}" />
+        <arg line="${flushddl}" />
     </exec>
 </target>
 
@@ -1699,6 +1772,20 @@ TEST CASES
   </findbugs>
 </target>
 
+
+<target name="plannertester" description="Run plannertester">
+    <property name="plannertester.dir" value="tests/scripts/plannertester"/>
+    <fileset id="plannertester.configs" dir="${plannertester.dir}/config" includes="**"/>
+    <echo message="Running from ${plannertester.dir}"/>
+
+    <java classname="org.voltdb.planner.plannerTester"
+          classpathref="project.classpath"
+          dir="${plannertester.dir}"
+          failonerror="true"
+          fork="true">
+        <arg line="-C=config/voter,config/voltkv,config/voltcache -d -s -e -cs -r=reports -sp=plan-voter,plan-voltkv,plan-voltcache"/>
+    </java>
+</target>
 
 <!--
 ***************************************
@@ -1889,6 +1976,41 @@ DEPLOYMENT FILE SCHEMA CODE GENERATION
         description="Remove all source files generated by JAXB for deployment file schema.">
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${deployment.parsergen.dir}'" />
+    </exec>
+</target>
+
+<!--
+***********************
+DEBIAN PACKAGE CREATION
+***********************
+-->
+
+<target name="debian_package"
+	    depends="buildinfo"
+        description="Create Debian/Ubuntu package. Uses sudo, so it may prompt for a password.">
+    <exec executable="sudo" failonerror="true">
+        <arg value="python" />
+        <arg value="${base.dir}/tools/voltdb-install.py" />
+        <arg value="-D" />
+        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz" />
+    </exec>
+</target>
+
+<!-- This debian package cleaning target is safe. It doesn't run as root. -->
+<target name="clean_debian_package"
+	    depends=""
+        description="Remove all Debian/Ubuntu package build artifacts.">
+    <exec dir='.' executable='/bin/sh' failonerror='false'>
+        <arg line="-c 'rm -rfv ${debian.package.dir}'" />
+    </exec>
+</target>
+
+<!-- Use this if permissions are messed up by interrupted package building as root. -->
+<target name="force_clean_debian_package"
+	    depends=""
+        description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
+    <exec dir="." executable="sudo" failonerror="false">
+        <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
     </exec>
 </target>
 

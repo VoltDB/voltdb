@@ -44,7 +44,9 @@
  */
 
 #include <cassert>
-#include "boost/scoped_ptr.hpp"
+#include <boost/scoped_ptr.hpp>
+#include <boost/foreach.hpp>
+
 #include "updateexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -81,22 +83,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_targetTable);
     assert(m_node->getTargetTable());
 
-    TupleSchema* schema = m_node->generateTupleSchema(false);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      "temp",
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
-
-    // record if a full index update is needed, or if these checks can be skipped
-    m_updatesIndexes = m_node->doesUpdateIndexes();
+    setDMLCountOutputTable(limits);
 
     AbstractPlanNode *child = m_node->getChildren()[0];
     ProjectionPlanNode *proj_node = NULL;
@@ -115,7 +102,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     }
 
     vector<string> output_column_names = proj_node->getOutputColumnNames();
-    vector<string> targettable_column_names = m_targetTable->getColumnNames();
+    const vector<string> &targettable_column_names = m_targetTable->getColumnNames();
 
     /*
      * The first output column is the tuple address expression and it isn't part of our output so we skip
@@ -140,6 +127,26 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     if (m_partitionColumn != -1) {
         if (m_targetTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
             m_partitionColumnIsString = true;
+        }
+    }
+
+    // determine which indices are updated by this executor
+    // iterate through all target table indices and see if they contain
+    //  tables mutated by this executor
+    BOOST_FOREACH(TableIndex *index, m_targetTable->allIndexes()) {
+        bool indexKeyUpdated = false;
+        BOOST_FOREACH(int colIndex, index->getColumnIndices()) {
+            std::pair<int, int> updateColInfo; // needs to be here because of macro failure
+            BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
+                if (updateColInfo.second == colIndex) {
+                    indexKeyUpdated = true;
+                    break;
+                }
+            }
+            if (indexKeyUpdated) break;
+        }
+        if (indexKeyUpdated) {
+            m_indexesToUpdate.push_back(index);
         }
     }
 
@@ -195,8 +202,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             }
         }
 
-        if (!m_targetTable->updateTuple(tempTuple, m_targetTuple,
-                                        m_updatesIndexes)) {
+        if (!m_targetTable->updateTupleWithSpecificIndexes(m_targetTuple, tempTuple,
+                                                           m_indexesToUpdate)) {
             VOLT_INFO("Failed to update tuple from table '%s'",
                       m_targetTable->name().c_str());
             return false;

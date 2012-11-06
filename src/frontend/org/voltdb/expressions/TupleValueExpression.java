@@ -20,7 +20,10 @@ package org.voltdb.expressions;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -39,6 +42,18 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected String m_tableName = null;
     protected String m_columnName = null;
     protected String m_columnAlias = null;
+
+    private boolean m_hasAggregate = false;
+
+    /// Only set for the special case of an aggregate function result used in an "ORDER BY" clause.
+    /// This TupleValueExpression represents the corresponding "column" in the aggregate's generated output TEMP table.
+    public boolean hasAggregate() {
+        return m_hasAggregate;
+    }
+
+    public void setHasAggregate(boolean m_hasAggregate) {
+        this.m_hasAggregate = m_hasAggregate;
+    }
 
     public TupleValueExpression() {
         super(ExpressionType.VALUE_TUPLE);
@@ -125,23 +140,28 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof TupleValueExpression == false) return false;
+        if (obj instanceof TupleValueExpression == false) {
+            return false;
+        }
         TupleValueExpression expr = (TupleValueExpression) obj;
 
-        if ((expr.m_tableName == null) != (m_tableName == null))
+        if ((m_tableName == null) != (expr.m_tableName == null)) {
             return false;
-        if ((expr.m_columnName == null) != (m_columnName == null))
+        }
+        if ((m_columnName == null) != (expr.m_columnName == null)) {
             return false;
-
-        if (expr.m_tableName != null)
-            if (expr.m_tableName.equals(m_tableName) == false)
+        }
+        if (m_tableName != null) { // Implying both sides non-null
+            if (m_tableName.equals(expr.m_tableName) == false) {
                 return false;
-        if (expr.m_columnName != null)
-            if (expr.m_columnName.equals(m_columnName) == false)
+            }
+        }
+        if (m_columnName != null) { // Implying both sides non-null
+            if (m_columnName.equals(expr.m_columnName) == false) {
                 return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
+            }
+        }
+        return true;
     }
 
     @Override
@@ -174,4 +194,63 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_columnName = obj.getString(Members.COLUMN_NAME.name());
         m_columnAlias = obj.getString(Members.COLUMN_ALIAS.name());
     }
+
+    @Override
+    public void resolveForDB(Database db) {
+        if (m_tableName == null && m_columnName == null) {
+            // This is a dummy TVE standing in for a simplecolumn
+            // -- the assumption has to be that it is not being used in a general expression,
+            // so the schema-dependent type implications don't matter
+            // and its "target" value is getting properly validated, so we can shortcut checking here.
+            return;
+        }
+        Table table = db.getTables().getIgnoreCase(m_tableName);
+        resolveForTable(table);
+    }
+
+
+    @Override
+    public void resolveForTable(Table table) {
+        assert(table != null);
+        // It MAY be that for the case in which this function is called (expression indexes), the column's
+        // table name is not specified (and not missed?).
+        // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
+        // -- not bothering for now.
+        Column column = table.getColumns().getIgnoreCase(m_columnName);
+        assert(column != null);
+        m_tableName = table.getTypeName();
+        m_columnIndex = column.getIndex();
+        setValueType(VoltType.get((byte)column.getType()));
+        setValueSize(column.getSize());
+    }
+
+    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
+    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
+    // depend on tables.
+    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, Table table) {
+        assert(expr != null);
+        AbstractExpression retval = expr.getLeft();
+        if (isOperandDependentOnTable(retval, table)) {
+            retval = expr.getRight();
+            assert( ! isOperandDependentOnTable(retval, table));
+        }
+        return retval;
+    }
+
+    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
+    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
+    // depend on tables.
+    public static boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
+        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
+            //TODO: This clumsy testing of table names regardless of table aliases is
+            // EXACTLY why we can't have nice things like self-joins.
+            if (table.getTypeName().equals(tve.getTableName()))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
 }

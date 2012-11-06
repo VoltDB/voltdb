@@ -18,6 +18,7 @@
 package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,11 @@ public class Statistics extends VoltSystemProcedure {
     static final int DEP_procedureAggregator = (int)
         SysProcFragmentId.PF_procedureAggregator;
 
+    static final int DEP_plannerData = (int)
+        SysProcFragmentId.PF_plannerData | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    static final int DEP_plannerAggregator = (int)
+        SysProcFragmentId.PF_plannerAggregator;
+
     static final int DEP_initiatorData = (int)
         SysProcFragmentId.PF_initiatorData | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_initiatorAggregator = (int)
@@ -104,6 +110,8 @@ public class Statistics extends VoltSystemProcedure {
         registerPlanFragment(SysProcFragmentId.PF_nodeMemoryAggregator);
         registerPlanFragment(SysProcFragmentId.PF_procedureData);
         registerPlanFragment(SysProcFragmentId.PF_procedureAggregator);
+        registerPlanFragment(SysProcFragmentId.PF_plannerData);
+        registerPlanFragment(SysProcFragmentId.PF_plannerAggregator);
         registerPlanFragment(SysProcFragmentId.PF_initiatorData);
         registerPlanFragment(SysProcFragmentId.PF_initiatorAggregator);
         registerPlanFragment(SysProcFragmentId.PF_partitionCount);
@@ -196,6 +204,24 @@ public class Statistics extends VoltSystemProcedure {
         else if (fragmentId == SysProcFragmentId.PF_procedureAggregator) {
             VoltTable result = unionTables(dependencies.get(DEP_procedureData));
             return new DependencyPair(DEP_procedureAggregator, result);
+        }
+        //  PLANNER statistics
+        else if (fragmentId == SysProcFragmentId.PF_plannerData) {
+            assert(params.toArray().length == 2);
+            final boolean interval =
+                ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
+            final Long now = (Long)params.toArray()[1];
+            VoltTable result = VoltDB.instance().
+                    getStatsAgent().getSiteAndHostStats(
+                            SysProcSelector.PLANNER,
+                            interval,
+                            now,
+                            context.getSiteId());
+            return new DependencyPair(DEP_plannerData, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_plannerAggregator) {
+            VoltTable result = unionTables(dependencies.get(DEP_plannerData));
+            return new DependencyPair(DEP_plannerAggregator, result);
         }
         //  STARVATION statistics
         else if (fragmentId == SysProcFragmentId.PF_starvationData) {
@@ -411,7 +437,30 @@ public class Statistics extends VoltSystemProcedure {
             results = getIndexData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.PROCEDURE.name())) {
-            results = getProcedureData(interval, now);
+            /*
+             * For IV2, MP procedure stats are stored at the MPI, which is the
+             * site that's running this procedure now. Get the MP procedure
+             * stats and stick them to the end of the SP stats gathered from
+             * other sites.
+             */
+            VoltTable[] spResults = getProcedureData(interval, now);
+            if (VoltDB.instance().isIV2Enabled()) {
+                List<VoltTable> allResults = new ArrayList<VoltTable>();
+                allResults.addAll(Arrays.asList(spResults));
+                List<Long> catalogIds = new ArrayList<Long>();
+                catalogIds.add(ctx.getSiteId());
+                allResults.add(VoltDB.instance().getStatsAgent().getStats(
+                                                 SysProcSelector.PROCEDURE,
+                                                 catalogIds,
+                                                 interval != 0,
+                                                 now));
+                results = new VoltTable[] {unionTables(allResults)};
+            } else {
+                results = spResults;
+            }
+        }
+        else if (selector.toUpperCase().equals(SysProcSelector.PLANNER.name())) {
+            results = getPlannerData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.INITIATOR.name())) {
             results = getInitiatorData(interval, now);
@@ -575,6 +624,33 @@ public class Statistics extends VoltSystemProcedure {
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
         results = executeSysProcPlanFragments(pfs, DEP_procedureAggregator);
+        return results;
+    }
+
+    private VoltTable[] getPlannerData(long interval, final long now) {
+        VoltTable[] results;
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+        // create a work fragment to gather planner data from each of the sites.
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_plannerData;
+        pfs[1].outputDepId = DEP_plannerData;
+        pfs[1].inputDepIds = new int[]{};
+        pfs[1].multipartition = true;
+        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters.setParameters((byte)interval, now);
+
+        // create a work fragment to aggregate the results.
+        // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_plannerAggregator;
+        pfs[0].outputDepId = DEP_plannerAggregator;
+        pfs[0].inputDepIds = new int[]{DEP_plannerData};
+        pfs[0].multipartition = false;
+        pfs[0].parameters = new ParameterSet();
+
+        // distribute and execute these fragments providing pfs and id of the
+        // aggregator's output dependency table.
+        results = executeSysProcPlanFragments(pfs, DEP_plannerAggregator);
         return results;
     }
 

@@ -17,14 +17,17 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -39,10 +42,10 @@ public class EveryPartitionTask extends TransactionTask
     final Iv2InitiateTaskMessage m_msg;
     final Mailbox m_mailbox;
 
-    EveryPartitionTask(Mailbox mailbox, long txnId, TransactionTaskQueue queue,
+    EveryPartitionTask(Mailbox mailbox, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators)
     {
-        super(new SpTransactionState(txnId, msg), queue);
+        super(new SpTransactionState(msg), queue);
         m_msg = msg;
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
         m_mailbox = mailbox;
@@ -60,15 +63,16 @@ public class EveryPartitionTask extends TransactionTask
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
         throw new RuntimeException("MPI asked to execute everysite proc. while rejoining.");
     }
 
     @Override
-    public long getMpTxnId()
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        return m_txn.txnId;
+        throw new RuntimeException("MPI asked to execute everysite proc from task log while rejoining.");
     }
 
     @Override
@@ -76,8 +80,8 @@ public class EveryPartitionTask extends TransactionTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("EveryPartitionTask:");
-        sb.append("  MP TXN ID: ").append(getMpTxnId());
-        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  TXN ID: ").append(getTxnId());
+        sb.append("  SP HANDLE ID: ").append(getSpHandle());
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_mailbox.getHSId()));
         return sb.toString();
     }

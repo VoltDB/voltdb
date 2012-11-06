@@ -64,8 +64,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public boolean grouped = false;
     public boolean distinct = false;
 
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedSelectStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
+    }
+
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode) {
         String node;
 
         if ((node = stmtNode.attributes.get("limit")) != null)
@@ -87,23 +96,25 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns"))
-                parseDisplayColumns(child, db);
+                parseDisplayColumns(child);
             else if (child.name.equalsIgnoreCase("querycondition"))
-                parseQueryCondition(child, db);
+                parseConditions(child);
             else if (child.name.equalsIgnoreCase("ordercolumns"))
-                parseOrderColumns(child, db);
+                parseOrderColumns(child);
             else if (child.name.equalsIgnoreCase("groupcolumns")) {
-                parseGroupByColumns(child, db);
+                parseGroupByColumns(child);
             }
         }
     }
 
-    void parseDisplayColumns(VoltXMLElement columnsNode, Database db) {
+    void parseDisplayColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
             ParsedColInfo col = new ParsedColInfo();
-            col.expression = parseExpressionTree(child, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(col.expression);
-            ExpressionUtil.assignOutputValueTypesRecursively(col.expression);
+            col.expression = parseExpressionTree(child);
+            if (col.expression instanceof ConstantValueExpression) {
+                assert(col.expression.getValueType() != VoltType.NUMERIC);
+            }
+            ExpressionUtil.finalizeValueTypes(col.expression);
             assert(col.expression != null);
             col.alias = child.attributes.get("alias");
 
@@ -128,26 +139,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    void parseQueryCondition(VoltXMLElement conditionNode, Database db) {
-        if (conditionNode.children.size() == 0)
-            return;
-
-        VoltXMLElement exprNode = conditionNode.children.get(0);
-        where = parseExpressionTree(exprNode, db);
-        ExpressionUtil.assignLiteralConstantTypesRecursively(where);
-        ExpressionUtil.assignOutputValueTypesRecursively(where);
-    }
-
-    void parseGroupByColumns(VoltXMLElement columnsNode, Database db) {
+    void parseGroupByColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
-            parseGroupByColumn(child, db);
+            parseGroupByColumn(child);
         }
     }
 
-    void parseGroupByColumn(VoltXMLElement groupByNode, Database db) {
+    void parseGroupByColumn(VoltXMLElement groupByNode) {
 
         ParsedColInfo col = new ParsedColInfo();
-        col.expression = parseExpressionTree(groupByNode, db);
+        col.expression = parseExpressionTree(groupByNode);
         assert(col.expression != null);
 
         if (groupByNode.name.equals("columnref"))
@@ -163,21 +164,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         assert(col.alias.equalsIgnoreCase(col.columnName));
-        assert(db.getTables().getIgnoreCase(col.tableName) != null);
-        assert(db.getTables().getIgnoreCase(col.tableName).getColumns().getIgnoreCase(col.columnName) != null);
+        assert(getTableFromDB(col.tableName) != null);
+        assert(getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName) != null);
         org.voltdb.catalog.Column catalogColumn =
-            db.getTables().getIgnoreCase(col.tableName).getColumns().getIgnoreCase(col.columnName);
+                getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName);
         col.index = catalogColumn.getIndex();
         groupByColumns.add(col);
     }
 
-    void parseOrderColumns(VoltXMLElement columnsNode, Database db) {
+    void parseOrderColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
-            parseOrderColumn(child, db);
+            parseOrderColumn(child);
         }
     }
 
-    void parseOrderColumn(VoltXMLElement orderByNode, Database db) {
+    void parseOrderColumn(VoltXMLElement orderByNode) {
         // make sure everything is kosher
         assert(orderByNode.name.equalsIgnoreCase("operation"));
         String operationType = orderByNode.attributes.get("type");
@@ -196,7 +197,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ParsedColInfo order_col = new ParsedColInfo();
         order_col.orderBy = true;
         order_col.ascending = !descending;
-        AbstractExpression order_exp = parseExpressionTree(child, db);
+        AbstractExpression order_exp = parseExpressionTree(child);
 
         // Cases:
         // inner child could be columnref, in which case it's just a normal
@@ -280,14 +281,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 tve.setTableName("VOLT_TEMP_TABLE");
                 tve.setValueSize(orig_col.expression.getValueSize());
                 tve.setValueType(orig_col.expression.getValueType());
+                if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    tve.setHasAggregate(true);
+                }
             }
         }
         else if (child.name.equals("function") == false)
         {
             throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
         }
-        ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
-        ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
+        if (order_exp instanceof ConstantValueExpression) {
+            assert(order_exp.getValueType() != VoltType.NUMERIC);
+        }
+        ExpressionUtil.finalizeValueTypes(order_exp);
         order_col.expression = order_exp;
         orderColumns.add(order_col);
     }
@@ -351,18 +357,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public int getLimitParameterIndex() {
-        return paramIndexById(limitParameterId);
+        return paramIndexById(m_paramsById, limitParameterId);
     }
 
     public int getOffsetParameterIndex() {
-        return paramIndexById(offsetParameterId);
+        return paramIndexById(m_paramsById, offsetParameterId);
     }
 
     private AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
         if (id != -1) {
             ParameterValueExpression parameter = new ParameterValueExpression();
-            assert(paramsById.containsKey(id));
-            int index = paramsById.get(id);
+            assert(m_paramsById.containsKey(id));
+            int index = m_paramsById.get(id);
             parameter.setParameterIndex(index);
             parameter.setValueType(paramList[index]);
             parameter.setValueSize(paramList[index].getLengthInBytesForFixedTypes());
@@ -528,7 +534,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return result;
     }
 
-    private boolean guaranteesUniqueRow() {
+    boolean guaranteesUniqueRow() {
         if (((grouped == false) || groupByColumns.isEmpty() ) && displaysAgg()) {
             return true;
         }

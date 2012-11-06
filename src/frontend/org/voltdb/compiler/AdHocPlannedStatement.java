@@ -17,11 +17,15 @@
 
 package org.voltdb.compiler;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
+import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltType;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.CorePlan;
 
 /**
  * Holds the plan and original SQL source for a single statement.
@@ -29,26 +33,21 @@ import org.voltdb.planner.CompiledPlan;
  * Will typically be contained by AdHocPlannedStmtBatch. Both this class and the batch extend
  * AsyncCompilerResult to allow working at either the batch or the individual statement level.
  */
-public class AdHocPlannedStatement implements Cloneable {
-    public byte[] sql;
-    public byte[] aggregatorFragment = null;
-    public byte[] collectorFragment = null;
-    public boolean isReplicatedTableDML;
-    public boolean isNonDeterministic;
-    public boolean readOnly;
-    public int catalogVersion;
-    public VoltType[] params;
-    public Object partitionParam; // not serialized
+public class AdHocPlannedStatement {
+    public final CorePlan core;
+    public final byte[] sql;
+    public final ParameterSet extractedParamValues;
+    private final int[] boundParamIndexes;
+    public final String[] extractedParamStrings;
+    private String[] boundParamStrings;
+    public final Object partitionParam; // not serialized
 
-    AdHocPlannedStatement(CompiledPlan plan) {
+    AdHocPlannedStatement(CompiledPlan plan, int catalogVersion, String[] extractedLiterals) {
         sql = plan.sql.getBytes(VoltDB.UTF8ENCODING);
-        aggregatorFragment = CompiledPlan.bytesForPlan(plan.rootPlanGraph);
-        collectorFragment = CompiledPlan.bytesForPlan(plan.subPlanGraph);
-        isReplicatedTableDML = plan.replicatedTableDML;
-        isNonDeterministic = (!plan.isContentDeterministic()) || (!plan.isOrderDeterministic());
-        catalogVersion = -1;
-        params = plan.parameters;
-        readOnly = plan.readOnly;
+        core = new CorePlan(plan, catalogVersion);
+        extractedParamValues = plan.extractedParamValues;
+        boundParamIndexes = plan.boundParamIndexes();
+        extractedParamStrings = extractedLiterals;
         partitionParam = plan.getPartitioningKey();
 
         validate();
@@ -57,154 +56,162 @@ public class AdHocPlannedStatement implements Cloneable {
     /***
      * Constructor
      *
-     * @param sql                       SQL statement source
-     * @param aggregatorFragment        planned aggregator fragment
-     * @param collectorFragment         planned collector fragment
-     * @param isReplicatedTableDML      replication flag
-     * @param isNonDeterministic        non-deterministic SQL flag
-     * @param isReadOnly                does it write
-     * @param params                    parameter type array
-     * @param catalogVersion            catalog version
+     * @param sql                       bytes of sql string (utf-8)
+     * @param core                      core immutable plan
+     * @param extractedParamValues      params extracted from constant values
+     * @param partitionParam            value used for partitioning
      */
     public AdHocPlannedStatement(byte[] sql,
-                                 byte[] aggregatorFragment,
-                                 byte[] collectorFragment,
-                                 boolean isReplicatedTableDML,
-                                 boolean isNonDeterministic,
-                                 boolean isReadOnly,
-                                 VoltType[] params,
-                                 int catalogVersion) {
-        this.sql = sql;
-        this.aggregatorFragment = aggregatorFragment;
-        this.collectorFragment = collectorFragment;
-        this.isReplicatedTableDML = isReplicatedTableDML;
-        this.isNonDeterministic = isNonDeterministic;
-        this.readOnly = isReadOnly;
-        this.params = params;
-        this.catalogVersion = catalogVersion;
+                                 CorePlan core,
+                                 ParameterSet extractedParamValues,
+                                 String[] extractedParamStrings,
+                                 String[] constants,
+                                 Object partitionParam) {
 
-        // as this constructor is used for deserializaton on the proc-running side,
-        // no partitioning param object is needed
+        this.sql = sql;
+        this.core = core;
+        this.extractedParamValues = extractedParamValues;
+        this.boundParamIndexes = null;
+        this.extractedParamStrings = extractedParamStrings;
+        this.boundParamStrings = constants;
+        this.partitionParam = partitionParam;
+
+        // When this constructor is used for deserializaton on the proc-running side,
+        // the bound param and extracted param string constants and the partitioning param object are not required.
 
         validate();
     }
 
     private void validate() {
-        assert(aggregatorFragment != null);
-        assert((isNonDeterministic == false) || (readOnly == true)); // nondet => readonly
-        assert((isReplicatedTableDML == false) || (readOnly == false)); // dml => !readonly
-        assert((isReplicatedTableDML == false) || (collectorFragment != null)); // repdml => 2partplan
+        assert(core != null);
+        assert(core.aggregatorFragment != null);
+
+        // nondet => readonly
+        assert((core.isNonDeterministic == false) || (core.readOnly == true));
+
+        // dml => !readonly
+        assert((core.isReplicatedTableDML == false) || (core.readOnly == false));
+
+        // repdml => 2partplan
+        assert((core.isReplicatedTableDML == false) || (core.collectorFragment != null));
+
+        // zero param types => null extracted params
+        // nonzero param types => param types and extracted params have same size
+        assert(core.parameterTypes != null);
+        assert(extractedParamValues != null);
+        // any extracted params => extracted param size == param type array size
+        assert((extractedParamValues.size() == 0) ||
+                (extractedParamValues.size() == core.parameterTypes.length));
     }
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("COMPILED PLAN {\n");
-        sb.append("  SQL: ").append((sql != null) ? new String(sql, VoltDB.UTF8ENCODING) : "null").append("\n");
-        sb.append("  ONE: ").append(aggregatorFragment == null ? "null" : new String(aggregatorFragment, VoltDB.UTF8ENCODING)).append("\n");
-        sb.append("  ALL: ").append(collectorFragment == null ? "null" : new String(collectorFragment, VoltDB.UTF8ENCODING)).append("\n");
-        sb.append("  RTD: ").append(isReplicatedTableDML ? "true" : "false").append("\n");
-        sb.append("}");
-        return sb.toString();
-    }
-
-    @Override
-    public Object clone() {
-        try {
-            return super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
-        }
+        return core.toString();
     }
 
     public int getSerializedSize() {
-        int size = 2 + sql.length;
-        size += 4 + aggregatorFragment.length;
-        if (collectorFragment != null) {
-            size += 4 + collectorFragment.length;
-        }
-        else {
-            size += 4;
-        }
-        size += 3; // booleans
-        size += 4; // catalog version
+        // plan
+        int size = core.getSerializedSize();
 
-        size += 2; // params count
-        if (params != null) {
-            size += params.length;
-        }
+        // sql bytes
+        size += 2;
+        size += sql.length;
+
+        // params
+        size += extractedParamValues.getSerializedSize();
 
         return size;
     }
 
-    void flattenToBuffer(ByteBuffer buf) {
+    void flattenToBuffer(ByteBuffer buf) throws IOException {
         validate(); // assertions for extra safety
 
+        // plan
+        core.flattenToBuffer(buf);
+
+        // sql bytes
         buf.putShort((short) sql.length);
         buf.put(sql);
 
-        buf.putInt(aggregatorFragment.length);
-        buf.put(aggregatorFragment);
+        // params
+        extractedParamValues.flattenToBuffer(buf);
+    }
 
-        if (collectorFragment == null) {
-            buf.putInt(-1);
+    public static AdHocPlannedStatement fromBuffer(ByteBuffer buf) throws IOException {
+        // plan
+        CorePlan core = CorePlan.fromBuffer(buf);
+
+        // sql bytes
+        short sqlLength = buf.getShort();
+        byte[] sql = new byte[sqlLength];
+        buf.get(sql);
+
+        // params
+        ParameterSet parameterSet = new ParameterSet();
+        FastDeserializer fds = new FastDeserializer(buf);
+        parameterSet.readExternal(fds);
+
+        return new AdHocPlannedStatement(sql, core, parameterSet, null, null, null);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     * Mostly for debugging and testing.
+     * Not zippy for the fast path.
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof AdHocPlannedStatement)) {
+            return false;
         }
-        else {
-            buf.putInt(collectorFragment.length);
-            buf.put(collectorFragment);
-        }
+        AdHocPlannedStatement other = (AdHocPlannedStatement) obj;
 
-        buf.put((byte) (isReplicatedTableDML ? 1 : 0));
-        buf.put((byte) (isNonDeterministic ? 1 : 0));
-        buf.put((byte) (readOnly ? 1 : 0));
-
-        buf.putInt(catalogVersion);
-
-        if (params != null) {
-            buf.putShort((short) params.length);
-            for (VoltType type : params) {
-                buf.put(type.getValue());
+        if (partitionParam != null) {
+            if (!partitionParam.equals(other.partitionParam)) {
+                return false;
             }
         }
         else {
-            buf.putShort((short) 0);
+            if (other.partitionParam != null) {
+                return false;
+            }
         }
+        if (!Arrays.equals(sql, other.sql)) {
+            return false;
+        }
+        if (!core.equals(other.core)) {
+            return false;
+        }
+        if (!extractedParamValues.equals(other.extractedParamValues)) {
+            return false;
+        }
+
+        return true;
     }
 
-    public static AdHocPlannedStatement fromBuffer(ByteBuffer buf) {
-        byte[] sql = new byte[buf.getShort()];
-        buf.get(sql);
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        assert false : "hashCode not designed";
+        return 42; // any arbitrary constant will do
+    }
 
-        byte[] aggregatorFragment = new byte[buf.getInt()];
-        buf.get(aggregatorFragment);
-
-        byte[] collectorFragment = null;
-        int cflen = buf.getInt();
-        if (cflen >= 0) {
-            collectorFragment = new byte[cflen];
-            buf.get(collectorFragment);
+    public String[] parameterBindings() {
+        if (boundParamStrings != null) {
+            return boundParamStrings;
         }
-
-        boolean isReplicatedTableDML = buf.get() == 1;
-        boolean isNonDeterministic = buf.get() == 1;
-        boolean isReadOnly = buf.get() == 1;
-
-        int catalogVersion = buf.getInt();
-
-        short paramCount = buf.getShort();
-        VoltType[] params = new VoltType[paramCount];
-        for (int i = 0; i < paramCount; ++i) {
-            params[i] = VoltType.get(buf.get());
+        if (extractedParamStrings == null) {
+            return null;
         }
-
-        return new AdHocPlannedStatement(
-                sql,
-                aggregatorFragment,
-                collectorFragment,
-                isReplicatedTableDML,
-                isNonDeterministic,
-                isReadOnly,
-                params,
-                catalogVersion);
+        if (boundParamIndexes == null || boundParamIndexes.length == 0) {
+            return null;
+        }
+        boundParamStrings = new String[extractedParamValues.size()];
+        for (int paramIndex : boundParamIndexes) {
+            boundParamStrings[paramIndex] = extractedParamStrings[paramIndex];
+        }
+        return boundParamStrings;
     }
 }

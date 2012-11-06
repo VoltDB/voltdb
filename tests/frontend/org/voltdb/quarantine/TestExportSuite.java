@@ -44,25 +44,17 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
-import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportTestClient;
+import org.voltdb.export.TestExportBase;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportToFileClient;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
-import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.regressionsuites.VoltServerConfig;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotVerifier;
 import org.voltdb.utils.VoltFile;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Insert;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
-import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
 
 /**
  *  End to end Export tests using the RawProcessor and the ExportSinkServer.
@@ -72,49 +64,9 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
  *  DB, really needs an Export round trip test.
  */
 
-public class TestExportSuite extends RegressionSuite {
+public class TestExportSuite extends TestExportBase {
 
     private ExportTestClient m_tester;
-
-    /** Shove a table name and pkey in front of row data */
-    private Object[] convertValsToParams(String tableName, final int i,
-            final Object[] rowdata)
-    {
-        final Object[] params = new Object[rowdata.length + 2];
-        params[0] = tableName;
-        params[1] = i;
-        for (int ii=0; ii < rowdata.length; ++ii)
-            params[ii+2] = rowdata[ii];
-        return params;
-    }
-
-    /** Push pkey into expected row data */
-    private Object[] convertValsToRow(final int i, final char op,
-            final Object[] rowdata) {
-        final Object[] row = new Object[rowdata.length + 2];
-        row[0] = (byte)(op == 'I' ? 1 : 0);
-        row[1] = i;
-        for (int ii=0; ii < rowdata.length; ++ii)
-            row[ii+2] = rowdata[ii];
-        return row;
-    }
-
-    /** Push pkey into expected row data */
-    @SuppressWarnings("unused")
-    private Object[] convertValsToLoaderRow(final int i, final Object[] rowdata) {
-        final Object[] row = new Object[rowdata.length + 1];
-        row[0] = i;
-        for (int ii=0; ii < rowdata.length; ++ii)
-            row[ii+1] = rowdata[ii];
-        return row;
-    }
-
-    private void quiesce(final Client client)
-    throws Exception
-    {
-        client.drain();
-        client.callProcedure("@Quiesce");
-    }
 
     private void quiesceAndVerify(final Client client, ExportTestClient tester)
     throws Exception
@@ -303,7 +255,7 @@ public class TestExportSuite extends RegressionSuite {
         }
         assertTrue(threwException);
 
-        File tempDir = new File("/tmp/" + System.getProperty("user.name"));
+        File tempDir = new VoltFile("/tmp/" + System.getProperty("user.name"));
         File outfile = null;
         for (File f : tempDir.listFiles()) {
             if (f.getName().contains("testnonce") && f.getName().endsWith(".csv")) {
@@ -465,7 +417,7 @@ public class TestExportSuite extends RegressionSuite {
       }
       assertTrue(threwException);
 
-      File tempDir = new File("/tmp/" + System.getProperty("user.name"));
+      File tempDir = new VoltFile("/tmp/" + System.getProperty("user.name"));
       File outfile = null;
       for (File f : tempDir.listFiles()) {
           if (f.getName().contains("testnonce") && f.getName().endsWith(".csv")) {
@@ -997,36 +949,6 @@ public class TestExportSuite extends RegressionSuite {
         quiesceAndVerify(client, m_tester);
     }
 
-    static final GroupInfo GROUPS[] = new GroupInfo[] {
-        new GroupInfo("export", false, false, false),
-        new GroupInfo("proc", true, true, true),
-        new GroupInfo("admin", true, true, true)
-    };
-
-    static final UserInfo[] USERS = new UserInfo[] {
-        new UserInfo("export", "export", new String[]{"export"}),
-        new UserInfo("default", "password", new String[]{"proc"}),
-        new UserInfo("admin", "admin", new String[]{"proc", "admin"})
-    };
-
-    /*
-     * Test suite boilerplate
-     */
-    static final ProcedureInfo[] PROCEDURES = {
-        new ProcedureInfo( new String[]{"proc"}, Insert.class),
-        new ProcedureInfo( new String[]{"proc"}, InsertBase.class),
-        new ProcedureInfo( new String[]{"proc"}, RollbackInsert.class),
-        new ProcedureInfo( new String[]{"proc"}, Update_Export.class)
-    };
-
-    static final ProcedureInfo[] PROCEDURES2 = {
-        new ProcedureInfo( new String[]{"proc"}, Update_Export.class)
-    };
-
-    static final ProcedureInfo[] PROCEDURES3 = {
-        new ProcedureInfo( new String[]{"proc"}, InsertAddedTable.class)
-    };
-
     public TestExportSuite(final String name) {
         super(name);
     }
@@ -1042,8 +964,9 @@ public class TestExportSuite extends RegressionSuite {
         project.setSecurityEnabled(true);
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl.sql"));
+
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true  /*enabled*/,
                 java.util.Arrays.asList(new String[]{"export"}));
@@ -1087,7 +1010,7 @@ public class TestExportSuite extends RegressionSuite {
         project = new VoltProjectBuilder();
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true,  //enabled
                 java.util.Arrays.asList(new String[]{"export"}));
@@ -1115,9 +1038,9 @@ public class TestExportSuite extends RegressionSuite {
         project = new VoltProjectBuilder();
         project.addGroups(GROUPS);
         project.addUsers(USERS);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-addedtable-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-addedtable-export-ddl.sql"));
         project.addExport("org.voltdb.export.processors.RawProcessor",
                 true  /*enabled*/,
                 java.util.Arrays.asList(new String[]{"export"}));

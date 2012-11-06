@@ -35,23 +35,23 @@ public abstract class TransactionTask extends SiteTasker
         m_queue = queue;
     }
 
+    @Override
     abstract public void run(SiteProcedureConnection siteConnection);
 
-    @Override
-    final public int priority()
-    {
-        return 0;
-    }
+    // run from the live rejoin task log.
+    abstract public void runFromTaskLog(SiteProcedureConnection siteConnection);
 
     public TransactionState getTransactionState()
     {
         return m_txn;
     }
 
-    public long getLocalTxnId()
+    public long getSpHandle()
     {
-        return m_txn.txnId;
+        return m_txn.spHandle;
     }
 
-    abstract public long getMpTxnId();
+    public long getTxnId() {
+        return m_txn.txnId;
+    }
 }

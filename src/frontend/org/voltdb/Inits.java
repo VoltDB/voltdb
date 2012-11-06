@@ -38,16 +38,19 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -268,11 +271,15 @@ public class Inits {
                     } finally {
                         fin.close();
                     }
+                    //Export needs a cluster global timestamp for the initial catalog version
+                    long catalogTimestamp = System.currentTimeMillis();
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
+                    buffer = null;
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
-                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 4);
+                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 12);
                     versionAndBytes.putInt(0);
+                    versionAndBytes.putLong(catalogTimestamp);
                     versionAndBytes.put(catalogBytes);
                     // publish the catalog bytes to ZK
                     m_rvdb.getHostMessenger().getZK().create(VoltZK.catalogbytes,
@@ -302,11 +309,13 @@ public class Inits {
         public void run() {
             byte[] catalogBytes = null;
             int version = 0;
+            long catalogTimestamp = 0;
             do {
                 try {
                     ByteBuffer versionAndBytes =
                         ByteBuffer.wrap(m_rvdb.getHostMessenger().getZK().getData(VoltZK.catalogbytes, false, null));
                     version = versionAndBytes.getInt();
+                    catalogTimestamp = versionAndBytes.getLong();
                     catalogBytes = new byte[versionAndBytes.remaining()];
                     versionAndBytes.get(catalogBytes);
                     versionAndBytes = null;
@@ -343,7 +352,13 @@ public class Inits {
             }
 
             try {
-                long catalogTxnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                long catalogTxnId;
+                if (m_rvdb.isIV2Enabled()) {
+                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+                } else {
+                    catalogTxnId =
+                            org.voltdb.TransactionIdManager.makeIdFromComponents(catalogTimestamp, 0, 0);
+                }
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 zk.create(
                         VoltZK.initial_catalog_txnid,
@@ -355,6 +370,7 @@ public class Inits {
                 m_rvdb.m_serializedCatalog = catalog.serialize();
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogTxnId,
+                        catalogTimestamp,
                         catalog, catalogBytes, m_rvdb.m_depCRC, version, -1);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", false, e);
@@ -534,32 +550,44 @@ public class Inits {
         @Override
         public void run() {
             try {
+                JSONStringer js = new JSONStringer();
+                js.object();
+                js.key("role").value(m_config.m_replicationRole.ordinal());
+                js.key("active").value(m_rvdb.getReplicationActive());
+                js.endObject();
+
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 // rejoining nodes figure out the replication role from other nodes
                 if (!m_isRejoin)
                 {
                     try {
                         zk.create(
-                                VoltZK.replicationrole,
-                                m_config.m_replicationRole.toString().getBytes("UTF-8"),
+                                VoltZK.replicationconfig,
+                                js.toString().getBytes("UTF-8"),
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
-                    String discoveredReplicationRole =
-                        new String(zk.getData(VoltZK.replicationrole, false, null), "UTF-8");
-                    if (!discoveredReplicationRole.equals(m_config.m_replicationRole.toString())) {
-                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredReplicationRole +
+                    String discoveredReplicationConfig =
+                        new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
+                    JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
+                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
+                    if (!discoveredRole.equals(m_config.m_replicationRole)) {
+                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredRole +
                                 " doesn't match locally specified replication role " + m_config.m_replicationRole,
                                 true, null);
                     }
 
                     // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(ReplicationRole.valueOf(discoveredReplicationRole));
+                    m_rvdb.setReplicationRole(discoveredRole);
                 } else {
-                    String discoveredReplicationRole =
-                        new String(zk.getData(VoltZK.replicationrole, false, null), "UTF-8");
+                    String discoveredReplicationConfig =
+                            new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
+                    JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
+                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
+                    boolean replicationActive = discoveredjsObj.getBoolean("active");
                     // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(ReplicationRole.valueOf(discoveredReplicationRole));
+                    m_rvdb.setReplicationRole(discoveredRole);
+                    m_rvdb.setReplicationActive(replicationActive);
                 }
             } catch (Exception e) {
                 VoltDB.crashGlobalVoltDB("Error discovering replication role", false, e);
@@ -576,7 +604,7 @@ public class Inits {
         public void run() {
             // Let the Export system read its configuration from the catalog.
             try {
-                ExportManager.initialize(m_rvdb.m_myHostId, m_rvdb.m_catalogContext, m_isRejoin);
+                ExportManager.initialize(m_rvdb.m_myHostId, m_rvdb.m_catalogContext, m_isRejoin, m_rvdb.m_messenger);
             } catch (ExportManager.SetupException e) {
                 hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ExportInitFailure.name(), e);
                 System.exit(-1);

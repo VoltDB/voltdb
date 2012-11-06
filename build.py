@@ -165,6 +165,7 @@ CTX.INPUT['catalog'] = """
  columnref.cpp
  connector.cpp
  connectortableinfo.cpp
+ connectorproperty.cpp
  constraint.cpp
  constraintref.cpp
  database.cpp
@@ -224,6 +225,8 @@ CTX.INPUT['executors'] = """
  distinctexecutor.cpp
  executorutil.cpp
  indexscanexecutor.cpp
+ indexcountexecutor.cpp
+ tablecountexecutor.cpp
  insertexecutor.cpp
  limitexecutor.cpp
  materializeexecutor.cpp
@@ -254,6 +257,8 @@ CTX.INPUT['plannodes'] = """
  deletenode.cpp
  distinctnode.cpp
  indexscannode.cpp
+ indexcountnode.cpp
+ tablecountnode.cpp
  insertnode.cpp
  limitnode.cpp
  materializenode.cpp
@@ -317,6 +322,10 @@ CTX.INPUT['logging'] = """
 CTX.THIRD_PARTY_INPUT['json_spirit'] = """
  json_spirit_reader.cpp
  json_spirit_value.cpp
+"""
+
+CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
+ jsoncpp.cpp
 """
 
 ###############################################################################
@@ -393,6 +402,7 @@ if whichtests in ("${eetestsuite}", "storage"):
 if whichtests in ("${eetestsuite}", "structures"):
     CTX.TESTS['structures'] = """
      CompactingMapTest
+     CompactingMapIndexCountTest
      CompactingHashTest
      CompactingPoolTest
     """

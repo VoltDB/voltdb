@@ -58,31 +58,40 @@ public abstract class TheHashinator {
     }
 
     /**
-     * Given an Object value, pick a partition to store the data. Currently only String objects can be hashed.
+     * Given an byte[] bytes, pick a partition to store the data.
      *
      * @param value The value to hash.
      * @param partitionCount The number of partitions to choose from.
      * @return A value between 0 and partitionCount-1, hopefully pretty evenly
      * distributed.
      */
-    static int hashinateString(Object value) {
+    static int hashinateBytes(byte[] bytes) {
         int partitionCount = TheHashinator.catalogPartitionCount;
-
-        if (value instanceof String) {
-            String string = (String) value;
-            try {
-                byte bytes[] = string.getBytes("UTF-8");
-                int hashCode = 0;
-                int offset = 0;
-                for (int ii = 0; ii < bytes.length; ii++) {
-                   hashCode = 31 * hashCode + bytes[offset++];
-                }
-                return java.lang.Math.abs(hashCode % partitionCount);
-            } catch (UnsupportedEncodingException e) {
-                hostLogger.l7dlog( Level.FATAL, LogKeys.host_TheHashinator_ExceptionHashingString.name(), new Object[] { string }, e);
-                VoltDB.crashLocalVoltDB("No additional info.", false, e);
-            }
+        int hashCode = 0;
+        int offset = 0;
+        for (int ii = 0; ii < bytes.length; ii++) {
+            hashCode = 31 * hashCode + bytes[offset++];
         }
+        return java.lang.Math.abs(hashCode % partitionCount);
+    }
+
+    /**
+     * Given an String value, pick a partition to store the data.
+     *
+     * @param value The value to hash.
+     * @param partitionCount The number of partitions to choose from.
+     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
+     * distributed.
+     */
+    static int hashinateString(String value) {
+        try {
+            byte bytes[] = value.getBytes("UTF-8");
+            return hashinateBytes(bytes);
+        } catch (UnsupportedEncodingException e) {
+            hostLogger.l7dlog( Level.FATAL, LogKeys.host_TheHashinator_ExceptionHashingString.name(), new Object[] { value }, e);
+            VoltDB.crashLocalVoltDB("No additional info.", false, e);
+        }
+
         hostLogger.l7dlog(Level.FATAL, LogKeys.host_TheHashinator_AttemptedToHashinateNonLongOrString.name(), new Object[] { value
                 .getClass().getName() }, null);
         VoltDB.crashLocalVoltDB("No additional info.", false, null);
@@ -103,8 +112,8 @@ public abstract class TheHashinator {
         else if (obj instanceof Long) {
             long value = ((Long) obj).longValue();
             index = hashinateLong(value);
-        } else if (obj instanceof String) {
-            index = hashinateString(obj);
+        } else if (obj instanceof String ) {
+            index = hashinateString((String) obj);
         } else if (obj instanceof Integer) {
             long value = ((Integer)obj).intValue();
             index = hashinateLong(value);
@@ -114,6 +123,8 @@ public abstract class TheHashinator {
         } else if (obj instanceof Byte) {
             long value = ((Byte)obj).byteValue();
             index = hashinateLong(value);
+        } else if (obj instanceof byte[]) {
+            index = hashinateBytes((byte[]) obj );
         }
         return index;
     }

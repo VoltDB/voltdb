@@ -184,10 +184,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Catalog Functions
         // -------------------------------------------------
-        bool loadCatalog(const int64_t txnId, const std::string &catalogPayload);
-        bool updateCatalog(const int64_t txnId, const std::string &catalogPayload);
-        bool processCatalogAdditions(bool addAll, int64_t txnId);
-        bool processCatalogDeletes(int64_t txnId);
+        bool loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
+        bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
+        bool processCatalogAdditions(bool addAll, int64_t timestamp);
+        bool processCatalogDeletes(int64_t timestamp);
         bool rebuildPlanFragmentCollections();
         bool rebuildTableCollections();
 
@@ -318,7 +318,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                     return;
                 }
             }
-            m_currentUndoQuantum = m_undoLog.generateUndoQuantum(nextUndoToken);
+            setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
         inline void releaseUndoToken(int64_t undoToken) {
@@ -388,11 +388,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         size_t tableHashCode(int32_t tableId);
 
-    protected:
-        /*
-         * Get the list of persistent table Ids by inspecting the catalog.
-         */
-        std::vector<int32_t> getPersistentTableIds();
+    private:
+
+        void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);
+
         std::string getClusterNameFromTable(voltdb::Table *table);
         std::string getDatabaseNameFromTable(voltdb::Table *table);
 

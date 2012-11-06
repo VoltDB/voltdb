@@ -21,14 +21,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.iv2.Site;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.iv2.Site;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -59,21 +60,23 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
+    protected final boolean m_isForReplay;
 
     // is this transaction run during a rejoin
     protected RejoinState m_rejoinState = RejoinState.NORMAL;
 
     /** Iv2 constructor */
-    protected TransactionState(long txnId, Mailbox mbox,
+    protected TransactionState(Mailbox mbox,
                                TransactionInfoBaseMessage notice)
     {
-        super(txnId, notice.getInitiatorHSId());
+        super(notice.getTxnId(), notice.getSpHandle(), notice.getTimestamp(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = null;
         m_notice = notice;
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = Site.kInvalidUndoToken;
+        m_isForReplay = notice.isForReplay();
     }
 
     /**
@@ -87,13 +90,16 @@ public abstract class TransactionState extends OrderableTransaction  {
                                ExecutionSite site,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getInitiatorHSId());
+        super(notice.getTxnId(), notice.getSpHandle(),
+                TransactionIdManager.getTimestampFromTransactionId(notice.getTxnId()),
+                notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = site;
         m_notice = notice;
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
+        m_isForReplay = notice.isForReplay();
     }
 
     final public TransactionInfoBaseMessage getNotice() {
@@ -124,6 +130,10 @@ public abstract class TransactionState extends OrderableTransaction  {
     public boolean isReadOnly()
     {
         return m_isReadOnly;
+    }
+
+    public boolean isForReplay() {
+        return m_isForReplay;
     }
 
     /**

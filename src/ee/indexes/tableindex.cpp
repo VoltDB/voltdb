@@ -45,53 +45,65 @@
 
 #include <iostream>
 #include "indexes/tableindex.h"
+#include "expressions/abstractexpression.h"
+#include "storage/TableCatalogDelegate.hpp"
 
 using namespace voltdb;
 
-TableIndex::TableIndex(const TableIndexScheme &scheme) :
-    m_scheme(scheme), name_(scheme.name), m_stats(this)
-{
-    column_indices_vector_ = scheme.columnIndices;
-    column_types_vector_ = scheme.columnTypes;
-    colCount_ = (int)column_indices_vector_.size();
-    is_unique_index_ = scheme.unique;
-    m_tupleSchema = scheme.tupleSchema;
-    assert(column_types_vector_.size() == column_indices_vector_.size());
-    column_indices_ = new int[colCount_];
-    column_types_ = new ValueType[colCount_];
-    for (int i = 0; i < colCount_; ++i)
-    {
-        column_indices_[i] = column_indices_vector_[i];
-        column_types_[i] = column_types_vector_[i];
-    }
-    m_keySchema = scheme.keySchema;
+TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
+    m_scheme(scheme),
+    m_keySchema(keySchema),
+    m_id(TableCatalogDelegate::getIndexIdString(scheme)),
+
     // initialize all the counters to zero
-    m_lookups = m_inserts = m_deletes = m_updates = 0;
-}
+    m_lookups(0),
+    m_inserts(0),
+    m_deletes(0),
+    m_updates(0),
+
+    m_stats(this)
+{}
+
 TableIndex::~TableIndex()
 {
-    delete[] column_indices_;
-    delete[] column_types_;
-    voltdb::TupleSchema::freeTupleSchema(m_keySchema);
+    TupleSchema::freeTupleSchema(const_cast<TupleSchema*>(m_keySchema));
+    const std::vector<AbstractExpression*> &indexed_expressions = getIndexedExpressions();
+    for (int ii = 0; ii < indexed_expressions.size(); ++ii) {
+        delete indexed_expressions[ii];
+    }
 }
 
 std::string TableIndex::debug() const
 {
     std::ostringstream buffer;
-    buffer << this->getTypeName() << "(" << this->getName() << ")";
+    buffer << getTypeName() << "(" << getName() << ")";
     buffer << (isUniqueIndex() ? " UNIQUE " : " NON-UNIQUE ");
     //
     // Columns
     //
-    buffer << " -> Columns[";
+    const std::vector<int> &column_indices_vector = getColumnIndices();
+    const std::vector<AbstractExpression*> &indexed_expressions = getIndexedExpressions();
+
     std::string add = "";
-    for (int ctr = 0; ctr < this->colCount_; ctr++) {
-        buffer << add << ctr << "th entry=" << this->column_indices_[ctr]
-               << "th (" << voltdb::valueToString(column_types_[ctr])
+    if (indexed_expressions.size() > 0) {
+        buffer << " -> " << indexed_expressions.size() << " expressions[";
+        for (int ctr = 0; ctr < indexed_expressions.size(); ctr++) {
+            buffer << add << ctr << "th entry=" << indexed_expressions[ctr]->debug()
+                   << " type=(" << voltdb::valueToString(m_keySchema->columnType(ctr)) << ")";
+            add = ", ";
+        }
+        buffer << "] -> Base Columns[";
+    } else {
+        buffer << " -> Columns[";
+    }
+    add = "";
+    for (int ctr = 0; ctr < column_indices_vector.size(); ctr++) {
+        buffer << add << ctr << "th entry=" << column_indices_vector[ctr]
+               << "th (" << voltdb::valueToString(m_keySchema->columnType(ctr))
                << ") column in parent table";
         add = ", ";
     }
-    buffer << "] --- size: " << this->getSize();
+    buffer << "] --- size: " << getSize();
 
     std::string ret(buffer.str());
     return (ret);
@@ -103,7 +115,7 @@ IndexStats* TableIndex::getIndexStats() {
 
 void TableIndex::printReport()
 {
-    std::cout << name_ << ",";
+    std::cout << m_scheme.name << ",";
     std::cout << getTypeName() << ",";
     std::cout << m_lookups << ",";
     std::cout << m_inserts << ",";

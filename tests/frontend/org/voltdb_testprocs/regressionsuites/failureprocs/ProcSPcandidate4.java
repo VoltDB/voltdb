@@ -34,7 +34,7 @@ public class ProcSPcandidate4 extends VoltProcedure {
 
     // Constant expression filtered WHERE clause enables SP processing, assuming the user can unravel the expression's value.
     public static final SQLStmt query = new SQLStmt(
-            "select count(*) from blah, indexed_blah where indexed_blah.sval = blah.sval and blah.ival = abs(1)+1");
+            "select count(*) from blah, indexed_replicated_blah where indexed_replicated_blah.sval = blah.sval and blah.ival = abs(1)+1");
 
     public long run() {
         voltQueueSQL(query);

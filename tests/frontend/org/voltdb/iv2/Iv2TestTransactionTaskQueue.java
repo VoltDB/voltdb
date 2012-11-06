@@ -23,21 +23,29 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 
 import junit.framework.TestCase;
 
 import org.junit.Test;
+import org.voltdb.StarvationTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-import static org.mockito.Mockito.*;
-
 public class Iv2TestTransactionTaskQueue extends TestCase
 {
+
+    private static SiteTaskerQueue getSiteTaskerQueue() {
+        SiteTaskerQueue queue = new SiteTaskerQueue();
+        queue.setStarvationTracker(new StarvationTracker(0));
+        return queue;
+    }
 
     // Cases to test:
     // several single part txns
@@ -49,21 +57,28 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         // the default SP value (usually set by ClientInterface).
         Iv2InitiateTaskMessage init = mock(Iv2InitiateTaskMessage.class);
         when(init.getTxnId()).thenReturn(Iv2InitiateTaskMessage.UNUSED_MP_TXNID);
+        when(init.getSpHandle()).thenReturn(localTxnId);
 
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
 
         SpProcedureTask task =
-            new SpProcedureTask(mbox, null, localTxnId, queue, init);
+            new SpProcedureTask(mbox, "TestProc", queue, init, null);
         return task;
     }
 
+    private FragmentTask createFrag(long localTxnId, long mpTxnId,
+            TransactionTaskQueue queue) {
+        return createFrag(localTxnId, mpTxnId, queue, false);
+    }
     // Create the first fragment of a MP txn
     private FragmentTask createFrag(long localTxnId, long mpTxnId,
-                                    TransactionTaskQueue queue)
+                                    TransactionTaskQueue queue,
+                                    boolean forReplay)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
+        when(msg.isForReplay()).thenReturn(forReplay);
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
         ParticipantTransactionState pft =
@@ -93,14 +108,16 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         CompleteTransactionTask task =
-            new CompleteTransactionTask(txn, queue, msg);
+            new CompleteTransactionTask(txn, queue, msg, null);
         return task;
     }
 
     private void addTask(TransactionTask task, TransactionTaskQueue dut,
                          Deque<TransactionTask> teststorage)
     {
-        teststorage.addLast(task);
+        if (teststorage != null) {
+            teststorage.addLast(task);
+        }
         dut.offer(task);
         dut.flush();
     }
@@ -110,7 +127,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
     {
         long localTxnId = 0;
         long mpTxnId = 0;
-        SiteTaskerQueue task_queue = new SiteTaskerQueue();
+        SiteTaskerQueue task_queue = getSiteTaskerQueue();
         TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
         Deque<TransactionTask> expected_order =
             new ArrayDeque<TransactionTask>();
@@ -148,7 +165,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
 
         // Add a completion for the next blocker, too.  Simulates rollback causing
         // an additional task for this TXN ID to appear before it's blocking the queue
-        next = createComplete(next.getTransactionState(), next.getMpTxnId(), dut);
+        next = createComplete(next.getTransactionState(), next.getTxnId(), dut);
         addTask(next, dut, blocked);
         assertEquals(blocked.size() + 1, dut.size());
         System.out.println("blocked: " + blocked);
@@ -173,10 +190,10 @@ public class Iv2TestTransactionTaskQueue extends TestCase
 
         while (!expected_order.isEmpty())
         {
-            TransactionTask next_poll = (TransactionTask)task_queue.poll();
+            TransactionTask next_poll = (TransactionTask)task_queue.take();
             TransactionTask expected = expected_order.removeFirst();
-            assertEquals(expected.getLocalTxnId(), next_poll.getLocalTxnId());
-            assertEquals(expected.getMpTxnId(), next_poll.getMpTxnId());
+            assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
+            assertEquals(expected.getTxnId(), next_poll.getTxnId());
         }
     }
 }

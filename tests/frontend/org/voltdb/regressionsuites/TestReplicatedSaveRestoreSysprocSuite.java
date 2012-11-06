@@ -23,6 +23,10 @@
 
 package org.voltdb.regressionsuites;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
@@ -35,7 +39,24 @@ import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectB
  * with no partitioned tables. Run as many of the tests as is practical without taking forever.
  */
 public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSysprocSuite {
-
+    private Set<String> skippedTests = new HashSet<String>(Arrays.asList(
+            "testSaveRestoreJumboRows",
+            "testSaveAndRestorePartitionedTable",
+            "testCorruptedFiles",
+            "testCorruptedFilesRandom",
+            "testRepartition",
+            "testChangeDDL",
+            "testGoodChangeAttributeTypes",
+            "testBadChangeAttributeTypes",
+            "testRestore12Snapshot",
+            "testQueueUserSnapshot",
+            "testQueueFailedUserSnapshot",
+            "testTSVConversion",
+            "testCSVConversion",
+            "testBadSnapshotParams",
+            "testIdleOnlineSnapshot",
+            "testRestoreMissingPartitionFile",
+            "testPropagateIV2TransactionIds"));
     public TestReplicatedSaveRestoreSysprocSuite(String name) {
         super(name);
     }
@@ -43,12 +64,14 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
     @Override
     public void setUp() throws Exception
     {
+        if (skippedTests.contains(m_methodName)) return;
         super.setUp();
     }
 
     @Override
     public void tearDown() throws Exception
     {
+        if (skippedTests.contains(m_methodName)) return;
         super.tearDown();
     }
 
@@ -99,6 +122,9 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
 
     @Override
     public void testRestoreMissingPartitionFile() {}
+
+    @Override
+    public void testPropagateIV2TransactionIds() {}
 
     /**
      * Build a list of the tests to be run. Use the regression suite

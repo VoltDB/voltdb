@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -35,8 +34,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltcore.zk.LeaderElector;
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheReader;
 
 import org.voltdb.compiler.ClusterConfig;
 
@@ -59,19 +56,19 @@ import com.google.common.collect.UnmodifiableIterator;
 public class Cartographer extends StatsSource
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private final MapCacheReader m_iv2Masters;
-    private final MapCacheReader m_iv2Mpi;
+    private final LeaderCacheReader m_iv2Masters;
+    private final LeaderCacheReader m_iv2Mpi;
     private final ZooKeeper m_zk;
     private final int m_numberOfPartitions;
 
     /**
-     * A dummy iterator that wraps an UnmodifiableIterator<String> and provides the
+     * A dummy iterator that wraps an UnmodifiableIterator<Integer> and provides the
      * Iterator<Object>
      */
     private class DummyIterator implements Iterator<Object> {
-        private final UnmodifiableIterator<String> i;
+        private final UnmodifiableIterator<Integer> i;
 
-        private DummyIterator(UnmodifiableIterator<String> i) {
+        private DummyIterator(UnmodifiableIterator<Integer> i) {
             this.i = i;
         }
 
@@ -96,8 +93,8 @@ public class Cartographer extends StatsSource
         super(false);
         m_numberOfPartitions = numberOfPartitions;
         m_zk = zk;
-        m_iv2Masters = new MapCache(m_zk, VoltZK.iv2masters);
-        m_iv2Mpi = new MapCache(m_zk, VoltZK.iv2mpi);
+        m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters);
+        m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi);
         try {
             m_iv2Masters.start(true);
             m_iv2Mpi.start(true);
@@ -109,7 +106,7 @@ public class Cartographer extends StatsSource
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns)
     {
-        columns.add(new ColumnInfo("Partition", VoltType.STRING));
+        columns.add(new ColumnInfo("Partition", VoltType.INTEGER));
         columns.add(new ColumnInfo("Sites", VoltType.STRING));
         columns.add(new ColumnInfo("Leader", VoltType.STRING));
 
@@ -123,35 +120,18 @@ public class Cartographer extends StatsSource
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        JSONObject thing = m_iv2Masters.pointInTimeCache().get((String)rowKey);
-        long leader = Long.MIN_VALUE;
-        try {
-            leader = Long.valueOf(thing.getLong("hsid"));
-        } catch (JSONException e) {
-            throw new RuntimeException(e);
-        }
-        List<Long> sites = getReplicasForIv2Master((String)rowKey);
+        long leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
+        List<Long> sites = getReplicasForPartition((Integer)rowKey);
 
         rowValues[columnNameToIndex.get("Partition")] = rowKey;
         rowValues[columnNameToIndex.get("Sites")] = CoreUtils.hsIdCollectionToString(sites);
         rowValues[columnNameToIndex.get("Leader")] = CoreUtils.hsIdToString(leader);
     }
 
-    private static int getPartitionIdFromIv2MasterPath(String zkPath)
-    {
-        return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
-    }
-
     // This used to be the method to get this on SiteTracker
     public long getHSIdForMultiPartitionInitiator()
     {
-        try {
-            return m_iv2Mpi.get(Integer.toString(-1)).getLong("hsid");
-        }
-        catch (JSONException je) {
-            // IZZY: Probably need a more coherent failure strategy here later
-            throw new RuntimeException(je);
-        }
+        return m_iv2Mpi.get(MpInitiator.MP_INIT_PID);
     }
 
     public long getBuddySiteForMPI(long hsid)
@@ -161,29 +141,12 @@ public class Cartographer extends StatsSource
         // constructor, then go looking for a matching host ID.
         List<MailboxNodeContent> sitesList = getMailboxNodeContentList();
         for (MailboxNodeContent site : sitesList) {
-            if (site.partitionId != -1 && host == CoreUtils.getHostIdFromHSId(site.HSId)) {
+            if (site.partitionId != MpInitiator.MP_INIT_PID && host == CoreUtils.getHostIdFromHSId(site.HSId)) {
                 return site.HSId;
             }
         }
         throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
                                    CoreUtils.hsIdToString(hsid));
-    }
-
-    /**
-     * Take a ZK path of a child in the VoltZK.iv2masters and return
-     * all of the HSIDs of the sites replicating that partition
-     */
-    public List<Long> getReplicasForIv2Master(String zkPath) {
-        List<Long> retval = null;
-        if (!zkPath.startsWith(VoltZK.iv2masters)) {
-            hostLog.error("Invalid ZK path given to getReplicasForIv2Master: " + zkPath +
-                    ".  It must be a child of " + VoltZK.iv2masters);
-        }
-        else {
-            int partId = getPartitionIdFromIv2MasterPath(zkPath);
-            retval = getReplicasForPartition(partId);
-        }
-        return retval;
     }
 
     /**
@@ -253,9 +216,7 @@ public class Cartographer extends StatsSource
     private List<MailboxNodeContent> getMailboxNodeContentList()
     {
         List<MailboxNodeContent> sitesList = new ArrayList<MailboxNodeContent>();
-        Set<String> partitionStrings = m_iv2Masters.pointInTimeCache().keySet();
-        for (String partString : partitionStrings) {
-            int partId = getPartitionIdFromIv2MasterPath(partString);
+        for (Integer partId : m_iv2Masters.pointInTimeCache().keySet()) {
             List<Long> hsidsForPart = getReplicasForPartition(partId);
             for (long hsid : hsidsForPart) {
                 MailboxNodeContent mnc = new MailboxNodeContent(hsid, partId);

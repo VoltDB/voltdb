@@ -46,7 +46,9 @@
 #include <sstream>
 #include <cassert>
 #include <cstdio>
-#include "boost/scoped_array.hpp"
+#include <boost/foreach.hpp>
+#include <boost/scoped_array.hpp>
+
 #include "table.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -65,7 +67,7 @@ namespace voltdb {
 Table::Table(int tableAllocationTargetSize) :
     m_tempTuple(),
     m_schema(NULL),
-    m_columnNames(NULL),
+    m_columnNames(),
     m_columnHeaderData(NULL),
     m_columnHeaderSize(-1),
     m_tupleCount(0),
@@ -78,6 +80,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_name(""),
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
+    m_pkeyIndex(NULL),
     m_refcount(0)
 {
 }
@@ -86,14 +89,18 @@ Table::~Table() {
     // not all tables are reference counted but this should be invariant
     assert(m_refcount == 0);
 
+    // clean up indexes
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        delete index;
+    }
+    m_pkeyIndex = NULL;
+
     // clear the schema
     if (m_ownsTupleSchema) {
         TupleSchema::freeTupleSchema(m_schema);
     }
 
     m_schema = NULL;
-    delete[] m_columnNames;
-    m_columnNames = NULL;
     m_tempTuple.m_data = NULL;
 
     // clear any cached column serializations
@@ -102,7 +109,7 @@ Table::~Table() {
     m_columnHeaderData = NULL;
 }
 
-void Table::initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema) {
+void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema) {
 
     // copy the tuple schema
     if (m_ownsTupleSchema) {
@@ -137,8 +144,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 #endif
 
     // initialize column names
-    delete[] m_columnNames;
-    m_columnNames = new std::string[m_columnCount];
+    m_columnNames.resize(m_columnCount);
     for (int i = 0; i < m_columnCount; ++i)
         m_columnNames[i] = columnNames[i];
 
@@ -155,6 +161,15 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
     m_tmpTarget2 = TableTuple(m_schema);
 
     onSetColumns(); // for more initialization
+}
+
+// ------------------------------------------------------------------
+// OPERATIONS
+// ------------------------------------------------------------------
+
+bool Table::updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues) {
+    std::vector<TableIndex*> indexes = allIndexes();
+    return updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexes);
 }
 
 // ------------------------------------------------------------------
@@ -372,7 +387,7 @@ bool Table::equals(voltdb::Table *other) {
     if ((!m_schema->equals(otherSchema))) return false;
 
     voltdb::TableIterator firstTI = iterator();
-    voltdb::TableIterator secondTI = iterator();
+    voltdb::TableIterator secondTI = other->iterator();
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
     while(firstTI.next(firstTuple)) {
@@ -384,14 +399,6 @@ bool Table::equals(voltdb::Table *other) {
 
 voltdb::TableStats* Table::getTableStats() {
     return NULL;
-}
-
-std::vector<std::string> Table::getColumnNames() {
-    std::vector<std::string> columnNames;
-    for (int ii = 0; ii < m_columnCount; ii++) {
-        columnNames.push_back(m_columnNames[ii]);
-    }
-    return columnNames;
 }
 
 void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
@@ -474,5 +481,108 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
 
     loadTuplesFromNoHeader(serialize_io, stringPool);
 }
+
+bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {
+    BOOST_FOREACH(TableIndex *i2, indexes) {
+        if (i2 == index) {
+            return true;
+        }
+    }
+    return false;
+}
+
+TableIndex *Table::index(std::string name) {
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        if (index->getName().compare(name) == 0) {
+            return index;
+        }
+    }
+    std::stringstream errorString;
+    errorString << "Could not find Index with name " << name << " among {";
+    const char* sep = "";
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        errorString << sep << index->getName();
+        sep = ", ";
+    }
+    errorString << "}";
+    throwFatalException("%s", errorString.str().c_str());
+}
+
+void Table::addIndex(TableIndex *index) {
+    // silently ignore indexes if they've gotten this far
+    if (isExport()) {
+        return;
+    }
+
+    assert(!isExistingTableIndex(m_indexes, index));
+
+    // can't yet add a unique index to a non-emtpy table
+    // the problem is that there's no way to roll back this change if it fails
+    if (index->isUniqueIndex() && activeTupleCount() > 0) {
+        throwFatalException("Adding unique indexes to non-empty tables is unsupported.");
+    }
+
+    // fill the index with tuples... potentially the slow bit
+    TableTuple tuple(m_schema);
+    TableIterator iter = iterator();
+    while (iter.next(tuple)) {
+        index->addEntry(&tuple);
+    }
+
+    // add the index to the table
+    if (index->isUniqueIndex()) {
+        m_uniqueIndexes.push_back(index);
+    }
+    m_indexes.push_back(index);
+}
+
+void Table::removeIndex(TableIndex *index) {
+    // silently ignore indexes if they've gotten this far
+    if (isExport()) {
+        return;
+    }
+
+    assert(isExistingTableIndex(m_indexes, index));
+
+    std::vector<TableIndex*>::iterator iter;
+    for (iter = m_indexes.begin(); iter != m_indexes.end(); iter++) {
+        if ((*iter) == index) {
+            m_indexes.erase(iter);
+            break;
+        }
+    }
+    for (iter = m_uniqueIndexes.begin(); iter != m_uniqueIndexes.end(); iter++) {
+        if ((*iter) == index) {
+            m_uniqueIndexes.erase(iter);
+            break;
+        }
+    }
+    if (m_pkeyIndex == index) {
+        m_pkeyIndex = NULL;
+    }
+
+    // this should free any memory used by the index
+    delete index;
+}
+
+void Table::setPrimaryKeyIndex(TableIndex *index) {
+    // for now, no calling on non-empty tables
+    assert(activeTupleCount() == 0);
+    assert(isExistingTableIndex(m_indexes, index));
+
+    m_pkeyIndex = index;
+}
+
+void Table::configureIndexStats(CatalogId databaseId)
+{
+    // initialize stats for all the indexes for the table
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        index->getIndexStats()->configure(index->getName() + " stats",
+                                          name(),
+                                          databaseId);
+    }
+
+}
+
 
 }

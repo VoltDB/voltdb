@@ -44,6 +44,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.ProcedureCompiler;
@@ -87,10 +88,9 @@ public class ProcedureRunner {
 
     // per txn state (are reset after call)
     //
-    protected long m_txnId = -1; // determinism id, not ordering id
     protected TransactionState m_txnState; // used for sysprocs only
     // Status code that can be set by stored procedure upon invocation that will be returned with the response.
-    protected byte m_statusCode = Byte.MIN_VALUE;
+    protected byte m_statusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
     protected String m_statusString = null;
     // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
     // a given call don't re-seed and generate the same number over and over
@@ -161,8 +161,12 @@ public class ProcedureRunner {
      * @return The transaction id for determinism, not for ordering.
      */
     long getTransactionId() {
-        assert(m_txnId > 0);
-        return m_txnId;
+        StoredProcedureInvocation invocation = m_txnState.getInvocation();
+        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+            return invocation.getOriginalTxnId();
+        } else {
+            return m_txnState.txnId;
+        }
     }
 
     Random getSeededRandomNumberGenerator() {
@@ -173,18 +177,14 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
-    public ClientResponseImpl call(long txnId, Object... paramListIn) {
+    public ClientResponseImpl call(Object... paramListIn) {
         // verify per-txn state has been reset
-        assert(m_txnId == -1);
-        assert(m_statusCode == Byte.MIN_VALUE);
+        assert(m_statusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
-
-        m_txnId = txnId;
-        assert(m_txnId >= 0);
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
@@ -206,7 +206,7 @@ public class ProcedureRunner {
             }
 
             if (paramList.length != m_paramTypes.length) {
-                m_statsCollector.endProcedure( false, true);
+                m_statsCollector.endProcedure(false, true, null, null);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 status = ClientResponse.GRACEFUL_FAILURE;
@@ -223,7 +223,7 @@ public class ProcedureRunner {
                             m_paramTypeComponentType[i],
                             paramList[i]);
                 } catch (Exception e) {
-                    m_statsCollector.endProcedure( false, true);
+                    m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.getMessage();
                     status = ClientResponse.GRACEFUL_FAILURE;
@@ -258,7 +258,7 @@ public class ProcedureRunner {
                         error = true;
                     }
                     if (ex instanceof Error) {
-                        m_statsCollector.endProcedure( false, true);
+                        m_statsCollector.endProcedure(false, true, null, null);
                         throw (Error)ex;
                     }
 
@@ -291,7 +291,10 @@ public class ProcedureRunner {
                 }
             }
 
-            m_statsCollector.endProcedure( abort, error);
+            // Record statistics for procedure call.
+            StoredProcedureInvocation invoc = (m_txnState != null ? m_txnState.getInvocation() : null);
+            ParameterSet paramSet = (invoc != null ? invoc.getParams() : null);
+            m_statsCollector.endProcedure(abort, error, results, paramSet);
 
             // don't leave empty handed
             if (results == null)
@@ -312,9 +315,8 @@ public class ProcedureRunner {
             m_batch.clear();
 
             // reset other per-txn state
-            m_txnId = -1;
             m_txnState = null;
-            m_statusCode = Byte.MIN_VALUE;
+            m_statusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
             m_statusString = null;
             m_cachedRNG = null;
             m_cachedSingleStmt.params = null;
@@ -350,8 +352,12 @@ public class ProcedureRunner {
     }
 
     public Date getTransactionTime() {
-        long ts = TransactionIdManager.getTimestampFromTransactionId(getTransactionId());
-        return new Date(ts);
+        StoredProcedureInvocation invocation = m_txnState.getInvocation();
+        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+            return new Date(invocation.getOriginalTimestamp());
+        } else {
+            return new Date(m_txnState.timestamp);
+        }
     }
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
@@ -390,15 +396,35 @@ public class ProcedureRunner {
             AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
                     plannedStatement.sql,
-                    plannedStatement.aggregatorFragment,
-                    plannedStatement.collectorFragment,
-                    plannedStatement.isReplicatedTableDML,
-                    plannedStatement.params);
-            queuedSQL.params = getCleanParams( queuedSQL.stmt, args);
+                    plannedStatement.core.aggregatorFragment,
+                    plannedStatement.core.collectorFragment,
+                    plannedStatement.core.isReplicatedTableDML,
+                    plannedStatement.core.parameterTypes);
+            if (plannedStatement.extractedParamValues.size() == 0) {
+                // case handles if there were parameters OR
+                // if there were no constants to pull out
+                queuedSQL.params = getCleanParams(queuedSQL.stmt, args);
+            }
+            else {
+                if (args.length > 0) {
+                    throw new ExpectedProcedureException(
+                            "Number of arguments provided was " + args.length  +
+                            " where 0 were expected for statement " + sql);
+                }
+                Object[] extractedParams = plannedStatement.extractedParamValues.toArray();
+                if (extractedParams.length != queuedSQL.stmt.numStatementParamJavaTypes) {
+                    String msg = String.format("Wrong number of extracted param for parameterized statement: %s", sql);
+                    throw new VoltAbortException(msg);
+                }
+                queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
+            }
             m_batch.add(queuedSQL);
         } catch (Exception e) {
             if (e instanceof ExecutionException) {
                 throw new VoltAbortException(e.getCause());
+            }
+            if (e instanceof VoltAbortException) {
+                throw (VoltAbortException) e;
             }
             throw new VoltAbortException(e);
         }
@@ -474,8 +500,8 @@ public class ProcedureRunner {
                 }
                 else {
                     assert(qs.stmt.plan != null);
-                    //TODO: For now ad hoc SQL parameters aren't supported.
-                    assert(qs.params.toArray().length == 0);
+                    //TODO: For now extracted ad hoc SQL parameters are discarded
+                    qs.params = new ParameterSet();
                     sparams = new ArrayList<StmtParameter>();
                 }
                 results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(
@@ -491,7 +517,7 @@ public class ProcedureRunner {
 
         // check expectations
         int i = 0; for (QueuedSQL qs : batch) {
-            Expectation.check(m_procedureName, qs.stmt.getText(),
+            Expectation.check(m_procedureName, qs.stmt.sqlText,
                     i, qs.expectation, results[i]);
             i++;
         }
@@ -935,15 +961,20 @@ public class ProcedureRunner {
            m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                  siteId,
                                                  m_txnState.txnId,
+                                                 m_txnState.timestamp,
                                                  m_txnState.isReadOnly(),
-                                                 false);
+                                                 false,
+                                                 txnState.isForReplay());
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        siteId,
                                                        m_txnState.txnId,
+                                                       m_txnState.timestamp,
                                                        m_txnState.isReadOnly(),
-                                                       finalTask);
+                                                       finalTask,
+                                                       txnState.isForReplay());
+
        }
 
        /*

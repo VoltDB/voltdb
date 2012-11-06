@@ -30,9 +30,9 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -45,6 +45,7 @@ import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -85,13 +86,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
-    private final ScheduledThreadPoolExecutor m_es = new ScheduledThreadPoolExecutor( 1, new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(null, r, "SnapshotDaemon", 131072);
-            }
-        },
-        new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
+    private final ScheduledThreadPoolExecutor m_es =
+            new ScheduledThreadPoolExecutor(1, CoreUtils.getThreadFactory("SnapshotDaemon"),
+                                            new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
 
     private ZooKeeper m_zk;
     private DaemonInitiator m_initiator;
@@ -202,7 +199,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
     }
 
-    public void init(DaemonInitiator initiator, ZooKeeper zk, Runnable threadLocalInit) {
+    public void init(DaemonInitiator initiator, ZooKeeper zk, Runnable threadLocalInit, GlobalServiceElector gse) {
         m_initiator = initiator;
         m_zk = zk;
 
@@ -217,13 +214,38 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_es.execute(threadLocalInit);
         }
 
-        // Really shouldn't leak this from a constructor, and twice to boot
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                leaderElection();
-            }
-        });
+        /*
+         *  Really shouldn't leak this from a constructor, and twice to boot
+         *  If IV2 is enabled leader election for the snapshot daemon is always tied to
+         *  leader election for the MP coordinator so that they can't be partitioned
+         *  from each other.
+         */
+        if (gse == null) {
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    leaderElection();
+                }
+            });
+        } else {
+            gse.registerService(new Promotable() {
+                @Override
+                public void acceptPromotion() throws InterruptedException,
+                        ExecutionException, KeeperException {
+                    m_es.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                electedTruncationLeader();
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB("Exception in snapshot daemon electing master via ZK", true, e);
+                            }
+                        }
+                    });
+                }
+
+            });
+        }
     }
 
     /*
@@ -354,6 +376,27 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_initiator.initiateSnapshotDaemonWork("@SnapshotDelete", handle, params);
     }
 
+    /*
+     * If this cluster has per partition transactions ids carried over from
+     * previous instances, retrieve them from ZK and pass them to snapshot save so that it can
+     * include them in the snapshot
+     */
+    private JSONArray retrievePerPartitionTransactionIds() {
+        JSONArray retval = new JSONArray();
+        try {
+            ByteBuffer values = ByteBuffer.wrap(m_zk.getData(VoltZK.perPartitionTxnIds, false, null));
+            int numKeys = values.getInt();
+            for (int ii = 0; ii < numKeys; ii++) {
+                retval.put(values.getLong());
+            }
+        } catch (KeeperException.NoNodeException e) {/*doesn't have to exist*/}
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to retrieve per partition transaction ids for snapshot", false, e);
+        }
+        return retval;
+    }
+
+
     /**
      * Leader election for snapshots.
      * Leader will watch for truncation and user snapshot requests
@@ -383,19 +426,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 if (stat == null) {
                     try {
                         m_zk.create(VoltZK.snapshot_truncation_master, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                        loggingLog.info("This node was selected as the leader for snapshot truncation");
-                        m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    scanTruncationSnapshots();
-                                } catch (Exception e) {
-                                    loggingLog.error("Error during scan and group of truncation snapshots");
-                                }
-                            }
-                        }, 0, 1, TimeUnit.HOURS);
-                        truncationRequestExistenceCheck();
-                        userSnapshotRequestExistenceCheck();
+                        electedTruncationLeader();
                         return;
                     } catch (NodeExistsException e) {
                     }
@@ -407,6 +438,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Exception in snapshot daemon electing master via ZK", true, e);
         }
+    }
+
+    /*
+     * Invoked when this snapshot daemon has been elected as leader
+     */
+    private void electedTruncationLeader() throws Exception {
+        loggingLog.info("This node was selected as the leader for snapshot truncation");
+        m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    scanTruncationSnapshots();
+                } catch (Exception e) {
+                    loggingLog.error("Error during scan and group of truncation snapshots");
+                }
+            }
+        }, 0, 1, TimeUnit.HOURS);
+        truncationRequestExistenceCheck();
+        userSnapshotRequestExistenceCheck();
     }
 
     /*
@@ -462,6 +512,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             jsObj.put("path", snapshotPath );
             jsObj.put("nonce", nonce);
+            jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -640,6 +691,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              * field now that it is consumed
              */
             jsObj.remove("requestId");
+            jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
             final long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -799,31 +851,35 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                         false);
                             } else if (haveFailure) {
                                 hostLog.info("Queued user snapshot was attempted, but there was a failure.");
-                                ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                m_zk.create(
-                                        VoltZK.user_snapshot_response + requestId,
-                                        rimpl.flattenToBuffer(buf).array(),
-                                        Ids.OPEN_ACL_UNSAFE,
-                                        CreateMode.PERSISTENT);
+                                if (requestId != null) {
+                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                    m_zk.create(
+                                            VoltZK.user_snapshot_response + requestId,
+                                            rimpl.flattenToBuffer(buf).array(),
+                                            Ids.OPEN_ACL_UNSAFE,
+                                            CreateMode.PERSISTENT);
+                                }
                                 //Reset the watch, in case this is recoverable
                                 userSnapshotRequestExistenceCheck();
                                 //Log the details of the failure, after resetting the watch in case of some odd NPE
                                 result.resetRowPosition();
                                 hostLog.info(result);
                             } else {
-                                hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
-                                        VoltZK.user_snapshot_response + requestId);
-                                /*
-                                 * Snapshot was started no problem, reset the watch for new requests
-                                 */
-                                ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                m_zk.create(
-                                        VoltZK.user_snapshot_response + requestId,
-                                        rimpl.flattenToBuffer(buf).array(),
-                                        Ids.OPEN_ACL_UNSAFE,
-                                        CreateMode.PERSISTENT);
+                                if (requestId != null) {
+                                    hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
+                                            VoltZK.user_snapshot_response + requestId);
+                                    /*
+                                     * Snapshot was started no problem, reset the watch for new requests
+                                     */
+                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                    m_zk.create(
+                                            VoltZK.user_snapshot_response + requestId,
+                                            rimpl.flattenToBuffer(buf).array(),
+                                            Ids.OPEN_ACL_UNSAFE,
+                                            CreateMode.PERSISTENT);
+                                }
                                 userSnapshotRequestExistenceCheck();
                                 return;
                             }
@@ -1060,6 +1116,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             jsObj.put("path", m_path);
             jsObj.put("nonce", nonce);
+            jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
             m_snapshots.offer(new Snapshot(m_path, nonce, now));
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -1652,7 +1709,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
          * If the caller wants to be notified of final results for the snapshot
          * request, set up a watcher only if the snapshot is queued.
          */
-        if (notifyChanges && SnapshotUtil.isSnapshotQueued(response.getResults())) {
+        if (notifyChanges && (response.getStatus() == ClientResponse.SUCCESS) &&
+            SnapshotUtil.isSnapshotQueued(response.getResults())) {
             Watcher watcher = new Watcher() {
                 @Override
                 public void process(final WatchedEvent event) {
@@ -1690,7 +1748,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     @Override
-    public CountDownLatch snapshotCompleted(final String nonce, final long txnId, final boolean truncation) {
+    public CountDownLatch snapshotCompleted(
+            final String nonce, final long txnId, final long partitionTxnIds[], final boolean truncation) {
         if (!truncation) {
             return new CountDownLatch(0);
         }

@@ -49,6 +49,7 @@
       <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
       <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
                   type="systemSettingsType" />
+      <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
     </xs:all>
   </xs:complexType>
 
@@ -100,12 +101,17 @@
     </xs:all>
   </xs:complexType>
 
+  <!-- <security> -->
+  <xs:complexType name="securityType">
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+  </xs:complexType>
+
   <!-- <admin-mode> (always enabled.) -->
   <xs:complexType name="adminModeType">
     <xs:attribute name="port" type="xs:int" default="21211"/>
     <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
-  
+
   <!-- <replication> -->
   <xs:complexType name="replicationType">
     <xs:attribute name="port" type="xs:int" default="5555"/>
@@ -158,7 +164,7 @@
       <xs:maxInclusive value="10"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- restriction on command log size in megabytes -->
   <xs:simpleType name="logSizeType">
     <xs:restriction base="xs:int">
@@ -166,7 +172,7 @@
       <xs:maxInclusive value="102400"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- restriction on command log fsync frequency -->
   <xs:simpleType name="logFrequencyTimeType">
     <xs:restriction base="xs:int">
@@ -214,9 +220,46 @@
 
   <!-- <export> -->
   <xs:complexType name="exportType">
-    <xs:attribute name="class" type="xs:string" default="org.voltdb.export.processors.RawProcessor"/>
+    <xs:sequence>
+      <xs:element name="onserver" type="ExportOnServerType" minOccurs="0" maxOccurs="1"/>
+    </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
+
+  <xs:complexType name="ExportOnServerType">
+    <xs:sequence>
+      <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="1"/>
+    </xs:sequence>
+    <xs:attribute name="exportto" type="ServerExportEnum" default="file"/>
+  </xs:complexType>
+
+  <xs:complexType name="ExportConfigurationType">
+    <xs:sequence>
+      <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="PropertyType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="name" type="PropertyNameString" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:simpleType name="PropertyNameString">
+    <xs:restriction base="xs:normalizedString">
+      <xs:maxLength value="256"/>
+      <xs:minLength value="1"/>
+      <xs:pattern value="\p{L}[\p{L}\d_-]*(\.[\p{L}\d_-]+)*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ServerExportEnum">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="file"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <!-- <users> -->
   <xs:complexType name="usersType">
@@ -225,6 +268,7 @@
         <xs:complexType>
           <xs:attribute name="name" type="xs:string" use="required"/>
           <xs:attribute name="groups" type="xs:string"/>
+          <xs:attribute name="roles" type="xs:string"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
         </xs:complexType>
       </xs:element>

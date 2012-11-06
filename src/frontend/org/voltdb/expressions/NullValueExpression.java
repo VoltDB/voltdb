@@ -33,6 +33,11 @@ public class NullValueExpression extends AbstractValueExpression {
     }
 
     @Override
+    public boolean equals(Object obj) {
+        return (obj instanceof NullValueExpression);
+    }
+
+    @Override
     public Object clone() throws CloneNotSupportedException {
         NullValueExpression clone = (NullValueExpression)super.clone();
         return clone;

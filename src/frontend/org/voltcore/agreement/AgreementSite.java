@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -216,7 +215,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         new RecoveryMessage(
                                 m_hsId,
                                 safeTxnId,
-                                Arrays.asList(new byte[4]), -1);
+                                -1);
                     m_mailbox.send( sourceHSId, recoveryMessage);
                 }
             }
@@ -566,7 +565,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         }
 
         if (!m_pendingFailedSites.add(faultMessage.failedSite)) {
-            VoltDB.crashLocalVoltDB("A site id shouldn't be distributed as a fault twice", true, null);
+            VoltDB.crashLocalVoltDB("A site id shouldn't be distributed as a fault twice", false, null);
         }
 
         discoverGlobalFaultData_send();
@@ -686,7 +685,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             }
 
             if (m == null) {
-                //Don't need to do anything here?
+                // Send a heartbeat to keep the dead host timeout active.  Needed because IV2 doesn't
+                // generate its own heartbeats to keep this running.
+                sendHeartbeats();
                 continue;
             }
             if (!m_hsIds.contains(m.m_sourceHSId)) continue;
@@ -836,7 +837,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         processMessage(lom);
                     } catch (Exception e) {
                         org.voltdb.VoltDB.crashLocalVoltDB(
-                                "Unexpected exception processing AgreementSite message", false, e);
+                                "Unexpected exception processing AgreementSite message", true, e);
                     }
                 } finally {
                     sem.release();

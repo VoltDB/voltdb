@@ -17,7 +17,9 @@
 
 package org.voltdb.types;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
@@ -71,7 +73,14 @@ public enum IndexType {
      * parsing support, it checks for certain strings in index names to
      * determine what kind of index it is. This is a giant hack, but
      * works until the team can put more resources into DDL parsing.
+     * TODO: This should probably be an enum attribute.
      */
+    public static String getSQLSuffix(int type)
+    {
+        IndexType it = get(type);
+        return it.getSQLSuffix();
+    }
+
     public String getSQLSuffix() {
         switch (this) {
         case BALANCED_TREE:
@@ -81,5 +90,28 @@ public enum IndexType {
             return "";
         }
         return null;
+    }
+
+    /**
+     * Distinguish whether the IndexType with the given value supports ordered indexing.
+     * TODO: This should probably be an enum attribute.
+     */
+    public static boolean isScannable(int type)
+    {
+        IndexType it = get(type);
+        assert(it != INVALID);
+        return it.isScannable();
+    }
+
+    private boolean isScannable() {
+        switch (this) {
+        case BALANCED_TREE:
+        case BTREE:
+            return true;
+        case HASH_TABLE:
+        case INVALID:
+            return false;
+        }
+        return false;
     }
 }

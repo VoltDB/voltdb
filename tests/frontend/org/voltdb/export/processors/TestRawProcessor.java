@@ -30,6 +30,10 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import junit.framework.TestCase;
 
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.MockVoltDB;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
@@ -39,11 +43,10 @@ import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.utils.VoltFile;
-import org.voltcore.utils.DeferredSerialization;
+
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 
 public class TestRawProcessor extends TestCase {
 
@@ -94,6 +97,13 @@ public class TestRawProcessor extends TestCase {
         public static int m_site = 1;
         public static int m_part = 2;
 
+        public static final Runnable m_noopRunnable = new Runnable() {
+            @Override
+            public void run() {
+                // NOOP
+            }
+        };
+
         static {
 
             m_mockVoltDB.addSite(CoreUtils.getHSIdFromHostAndSite( m_host, m_site), m_part);
@@ -106,13 +116,13 @@ public class TestRawProcessor extends TestCase {
         public MockExportDataSource(String db, String tableName,
                                  int partitionId, int siteId, String tableSignature) throws Exception
         {
-            super(null, db, tableName, partitionId, siteId, tableSignature, 0,
+            super(m_noopRunnable, db, tableName, partitionId, siteId, tableSignature, 0,
                   m_mockVoltDB.getCatalogContext().database.getTables().get("TableName").getColumns(),
                   "/tmp/" + System.getProperty("user.name"));
         }
 
         @Override
-        public void exportAction(RawProcessor.ExportInternalMessage m) {
+        public ListenableFuture<?> exportAction(RawProcessor.ExportInternalMessage m) {
             // Simulate what ExecutionEngineJNI and ExecutionSite do.
             if (m.m_m.isPoll()) {
                 ExportProtoMessage r =
@@ -123,6 +133,7 @@ public class TestRawProcessor extends TestCase {
                 r.pollResponse(2000, data);
                 eequeue.add(r);
             }
+            return Futures.immediateFuture(null);
         }
     }
 

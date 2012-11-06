@@ -70,68 +70,19 @@ class ExecutorContext;
 class TableFactory {
 public:
     /**
-    * Creates an empty persistent table with given name and columns.
+    * Creates an empty persistent table with given name, columns, PK index, other indexes, partition column, etc.
     * Every PersistentTable must be instantiated via this method.
     * Also, columns can't be added/changed/removed after a PersistentTable
     * instance is made. TableColumn is immutable.
-    * In the same way, Indexes, Primary Keys, Constraints are immutable
-    * to make the classes easy to maintain.
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
         const std::string &name,
         TupleSchema* schema,
-        const std::string* columnNames,
-        int partitionColumn,
-        bool exportEnabled,
-        bool exportOnly);
-
-    /**
-    * Creates an empty persistent table with given ID, name, columns and PK index.
-    */
-    static Table* getPersistentTable(
-        voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
-        const std::string &name,
-        TupleSchema* schema,
-        const std::string* columnNames,
-        const TableIndexScheme &pkey_index,
-        int partitionColumn,
-        bool exportEnabled,
-        bool exportOnly);
-
-
-    /**
-    * Creates an empty persistent table with given name, columns and indexes.
-    */
-    static Table* getPersistentTable(
-        voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
-        const std::string &name,
-        TupleSchema* schema,
-        const std::string* columnNames,
-        const std::vector<TableIndexScheme> &indexes,
-        int partitionColumn,
-        bool exportEnabled,
-        bool exportOnly);
-
-
-    /**
-    * Creates an empty persistent table with given name, columns, PK index and indexes.
-    */
-    static Table* getPersistentTable(
-        voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
-        const std::string &name,
-        TupleSchema* schema,
-        const std::string* columnNames,
-        const TableIndexScheme &pkeyIndex,
-        const std::vector<TableIndexScheme> &indexes,
-        int partitionColumn,
-        bool exportEnabled,
-        bool exportOnly);
-
+        const std::vector<std::string> &columnNames,
+        int partitionColumn = -1, // defaults provided for ease of testing.
+        bool exportEnabled = false,
+        bool exportOnly = false);
 
     /**
     * Creates an empty temp table with given name and columns.
@@ -143,7 +94,7 @@ public:
         voltdb::CatalogId databaseId,
         const std::string &name,
         TupleSchema* schema,
-        const std::string* columnNames,
+        const std::vector<std::string> &columnNames,
         TempTableLimits* limits);
 
     /**
@@ -156,19 +107,16 @@ public:
         TempTableLimits* limits);
 
 private:
-    static void initConstraints(PersistentTable* table);
-
     static void initCommon(
         voltdb::CatalogId databaseId,
         Table *table,
         const std::string &name,
         TupleSchema *schema,
-        const std::string *columnNames,
+        const std::vector<std::string> &columnNames,
         const bool ownsTupleSchema);
 
     static void configureStats(
         voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
         std::string name,
         Table *table);
 };

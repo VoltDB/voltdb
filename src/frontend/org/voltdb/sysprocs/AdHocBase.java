@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +74,13 @@ public abstract class AdHocBase extends VoltSystemProcedure {
         assert(serializedBatchData != null);
 
         ByteBuffer buf = ByteBuffer.wrap(serializedBatchData);
-        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
+        AdHocPlannedStatement[] statements = null;
+        try {
+            statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
+        }
+        catch (IOException e) {
+            throw new VoltAbortException(e);
+        }
 
         if (statements.length == 0) {
             return new VoltTable[]{};
@@ -82,7 +89,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
         int currentCatalogVersion = ctx.getCatalogVersion();
 
         for (AdHocPlannedStatement statement : statements) {
-            if (currentCatalogVersion != statement.catalogVersion) {
+            if (currentCatalogVersion != statement.core.catalogVersion) {
                 String msg = String.format("AdHoc transaction %d wasn't planned " +
                         "against the current catalog version. Statement: %s",
                         ctx.getCurrentTxnId(),
@@ -92,11 +99,12 @@ public abstract class AdHocBase extends VoltSystemProcedure {
 
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,
-                    statement.aggregatorFragment,
-                    statement.collectorFragment,
-                    statement.isReplicatedTableDML,
-                    statement.params);
-            voltQueueSQL(stmt);
+                    statement.core.aggregatorFragment,
+                    statement.core.collectorFragment,
+                    statement.core.isReplicatedTableDML,
+                    statement.core.parameterTypes);
+
+            voltQueueSQL(stmt, statement.extractedParamValues.toArray());
         }
 
         return voltExecuteSQL(true);

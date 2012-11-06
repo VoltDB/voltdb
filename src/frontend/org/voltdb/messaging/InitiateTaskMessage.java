@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
@@ -39,9 +40,48 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
     long m_lastSafeTxnID; // this is the largest txn acked by all partitions running the java for it
     AtomicBoolean m_isDurable;
 
+    /*
+     * For multi-part txn ONLY.
+     *
+     * The initiator will send the list of non-coordinator sites it has sent
+     * participant notices to to the coordinator so that the coordinator will
+     * send fragment works to all sites.
+     *
+     * Only the coordinator will have this, coordinator replicas and other sites
+     * won't have this.
+     */
+    long[] m_nonCoordinatorSites = null;
+
     /** Empty constructor for de-serialization */
     InitiateTaskMessage() {
         super();
+    }
+
+    /**
+     * Used for multi-part txn initiation only.
+     *
+     * @param nonCoordinatorSites
+     *            Non-coordinator sites, including coordinator replicas and
+     *            other sites.
+     */
+    public InitiateTaskMessage(long initiatorHSId,
+                               long coordinatorHSId,
+                               long txnId,
+                               boolean isReadOnly,
+                               boolean isSinglePartition,
+                               StoredProcedureInvocation invocation,
+                               long lastSafeTxnID,
+                               long[] nonCoordinatorSites) {
+        super(initiatorHSId,
+                coordinatorHSId,
+                txnId,
+                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                isReadOnly,
+                false);
+        m_isSinglePartition = isSinglePartition;
+        m_invocation = invocation;
+        m_lastSafeTxnID = lastSafeTxnID;
+        m_nonCoordinatorSites = nonCoordinatorSites;
     }
 
     public InitiateTaskMessage(long initiatorHSId,
@@ -51,10 +91,16 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
                         boolean isSinglePartition,
                         StoredProcedureInvocation invocation,
                         long lastSafeTxnID) {
-        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
+        super(initiatorHSId,
+                coordinatorHSId,
+                txnId,
+                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                isReadOnly,
+                false);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_lastSafeTxnID = lastSafeTxnID;
+        m_nonCoordinatorSites = null;
     }
 
     @Override
@@ -103,12 +149,21 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_isDurable;
     }
 
+    public long[] getNonCoordinatorSites() {
+        return m_nonCoordinatorSites;
+    }
+
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
         msgsize += 8 // m_lastSafeTxnId
-            + 1; // is single partition flag?
+            + 1 // is single partition flag?
+            + 1; // is m_nonCoordinatorSites null?
+
+        if (m_nonCoordinatorSites != null) {
+            msgsize += 4 + (m_nonCoordinatorSites.length * 8); // m_nonCoordinatorSites
+        }
 
         msgsize += m_invocation.getSerializedSize();
 
@@ -122,6 +177,15 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         super.flattenToBuffer(buf);
         buf.putLong(m_lastSafeTxnID);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
+
+        buf.put(m_nonCoordinatorSites == null ? 1 : (byte) 0);
+        if (m_nonCoordinatorSites != null) {
+            buf.putInt(m_nonCoordinatorSites.length);
+            for (long hsId : m_nonCoordinatorSites) {
+                buf.putLong(hsId);
+            }
+        }
+
         m_invocation.flattenToBuffer(buf);
 
         assert(buf.capacity() == buf.position());
@@ -134,6 +198,14 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
         m_lastSafeTxnID = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
+
+        if (buf.get() == 0) {
+            m_nonCoordinatorSites = new long[buf.getInt()];
+            for (int i = 0; i < m_nonCoordinatorSites.length; i++) {
+                m_nonCoordinatorSites[i] = buf.getLong();
+            }
+        }
+
         m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
     }

@@ -95,8 +95,10 @@ public class PlanSelector implements Cloneable{
         m_sql = sql;
         m_costModel = costModel;
         m_paramHints = paramHints;
-        m_quietPlanner = quietPlanner;
-        m_fullDebug = fullDebug;
+        //m_quietPlanner = quietPlanner;
+        //m_fullDebug = fullDebug;
+        m_quietPlanner = false;
+        m_fullDebug = true;
     }
 
     /**
@@ -125,6 +127,14 @@ public class PlanSelector implements Cloneable{
         if (!m_quietPlanner && m_fullDebug) {
             // output the xml from hsql to disk for debugging
             BuildDirectoryUtils.writeFile("statement-hsql-xml", m_procName + "_" + m_stmtName + ".xml", xmlSQL.toString());
+        }
+    }
+
+
+    public void outputParameterizedCompiledStatement(VoltXMLElement parameterizedXmlSQL) {
+        if (!m_quietPlanner && m_fullDebug) {
+            // output the xml from hsql to disk for debugging
+            BuildDirectoryUtils.writeFile("statement-hsql-xml", m_procName + "_" + m_stmtName + "-parameterized.xml", parameterizedXmlSQL.toString());
         }
     }
 
@@ -174,11 +184,11 @@ public class PlanSelector implements Cloneable{
      * @param bestFilename
      * @param stats
      */
-    public void finalizeOutput(String bestFilename, PlanStatistics stats) {
+    public void finalizeOutput() {
         if (m_quietPlanner) {
             return;
         }
-        //outputPlan(bestPlan, bestPlan.rootPlanGraph, bestFilename);
+        outputPlan(m_bestPlan, m_bestPlan.rootPlanGraph, m_bestFilename);
 
         // find out where debugging is going
         String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
@@ -189,24 +199,24 @@ public class PlanSelector implements Cloneable{
         // if outputting full stuff
         if (m_fullDebug) {
             // rename the winner json plan
-            winnerFilename = prefix + bestFilename + "-json.txt";
-            winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + "-json.txt";
+            winnerFilename = prefix + m_bestFilename + "-json.txt";
+            winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + "-json.txt";
             renameFile(winnerFilename, winnerFilenameRenamed);
 
             // rename the winner dot plan
-            winnerFilename = prefix + bestFilename + ".dot";
-            winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + ".dot";
+            winnerFilename = prefix + m_bestFilename + ".dot";
+            winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + ".dot";
             renameFile(winnerFilename, winnerFilenameRenamed);
         }
 
         // rename the winner explain plan
-        winnerFilename = prefix + bestFilename + ".txt";
-        winnerFilenameRenamed = prefix + "WINNER-" + bestFilename + ".txt";
+        winnerFilename = prefix + m_bestFilename + ".txt";
+        winnerFilenameRenamed = prefix + "WINNER-" + m_bestFilename + ".txt";
         renameFile(winnerFilename, winnerFilenameRenamed);
 
         if (m_fullDebug) {
             // output the plan statistics to disk for debugging
-            BuildDirectoryUtils.writeFile("statement-stats", m_procName + "_" + m_stmtName + ".txt", stats.toString());
+            BuildDirectoryUtils.writeFile("statement-stats", m_procName + "_" + m_stmtName + ".txt", m_stats.toString());
         }
     }
 

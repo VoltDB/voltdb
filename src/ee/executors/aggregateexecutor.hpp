@@ -64,7 +64,6 @@
 #include "plannodes/aggregatenode.h"
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
-#include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 
 #include "boost/unordered_map.hpp"
@@ -632,7 +631,8 @@ public:
         {
             VOLT_TRACE("no record. outputting a NULL row..");
             Agg** aggregates =
-                static_cast<Agg**>(m_memoryPool->allocate(sizeof(void*)));
+                static_cast<Agg**>(m_memoryPool->allocate(sizeof(void*) *
+                                                           m_colTypes->size()));
             for (int i = 0; i < m_colTypes->size(); i++)
             {
                 // It is necessary to look up the mapping between the
@@ -852,8 +852,6 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
     assert(limits);
 
     assert(node->getInputTables().size() == 1);
-    int columnCount = (int)node->getOutputSchema().size();
-    assert(columnCount >= 1);
 
     assert(node->getChildren()[0] != NULL);
     for (int i = 0; i < node->getAggregateInputExpressions().size(); i++)
@@ -894,18 +892,7 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
         }
     }
 
-    TupleSchema* schema = node->generateTupleSchema(true);
-    std::string* columnNames = new std::string[columnCount];
-    for (int ctr = 0; ctr < columnCount; ctr++)
-    {
-        columnNames[ctr] = node->getOutputSchema()[ctr]->getColumnName();
-    }
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                    "temp",
-                                                    schema,
-                                                    columnNames,
-                                                    limits));
-    delete[] columnNames;
+    setTempOutputTable(limits);
 
     std::vector<ValueType> groupByColumnTypes;
     std::vector<int32_t> groupByColumnSizes;
@@ -946,8 +933,10 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
     std::vector<ValueType> col_types(node->getAggregateInputExpressions().size());
     for (int i = 0; i < col_types.size(); i++)
     {
-        col_types[i] =
-            node->getAggregateInputExpressions()[i]->getValueType();
+        // substitue params here too
+        AbstractExpression *expr = node->getAggregateInputExpressions()[i];
+        expr->substitute(params);
+        col_types[i] = expr->getValueType();
     }
 
     TableIterator it = input_table->iterator();
@@ -956,6 +945,11 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
         node->getDistinctAggregates();
     std::vector<AbstractExpression*> groupByExpressions =
         node->getGroupByExpressions();
+    // substitute params
+    for (int i = 0; i < groupByExpressions.size(); i++) {
+        groupByExpressions[i]->substitute(params);
+    }
+
     TableTuple prev(input_table->schema());
 
     Aggregator<aggregateType> aggregator(&m_memoryPool, m_groupByKeySchema,

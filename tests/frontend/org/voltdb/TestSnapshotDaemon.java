@@ -136,7 +136,7 @@ public class TestSnapshotDaemon {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         m_initiator = new Initiator();
         m_daemon = new SnapshotDaemon();
-        m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK(), null);
+        m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK(), null, null);
         return m_daemon;
     }
 
@@ -612,7 +612,7 @@ public class TestSnapshotDaemon {
         JSONObject jsObj = new JSONObject((String)m_initiator.params[0]);
         assertTrue(jsObj.getString("path").equals("/tmp"));
         assertTrue(jsObj.getString("nonce").startsWith("woobie_"));
-        assertTrue(jsObj.length() == 2);
+        assertTrue(jsObj.length() == 3);
 
         handle = m_initiator.clientData;
         m_initiator.clear();

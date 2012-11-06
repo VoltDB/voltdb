@@ -16,17 +16,9 @@
  */
 package org.voltdb;
 
-import java.util.List;
-import java.io.EOFException;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
 import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -47,6 +39,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.rejoin.RejoinDataAckMessage;
+import org.voltdb.rejoin.RejoinDataMessage;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 
@@ -89,6 +83,13 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
     private final long m_HSId;
 
     /**
+     * Mailbox used to transfer the snapshot data
+     */
+    private final Mailbox m_mb;
+
+    private volatile long m_recoverySourceHSId;
+
+    /**
      * What to do when data recovery is completed
      */
     private final Runnable m_onCompletion;
@@ -117,8 +118,6 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
 
     private long m_timeSpentHandlingData = 0;
 
-    private SocketChannel m_sc;
-
     private final LinkedBlockingQueue<BBContainer> m_incoming = new LinkedBlockingQueue<BBContainer>();
 
     private IODaemon m_iodaemon;
@@ -127,11 +126,8 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
 
     private class IODaemon {
 
-        private final SocketChannel m_sc;
-        private volatile boolean closed = false;
         private volatile Exception m_lastException = null;
-        private final Thread m_inThread = new Thread("Recovery in thread for site " +
-                CoreUtils.hsIdToString(m_HSId)) {
+        private final Thread m_inThread = new Thread("Recovery in thread") {
             @Override
             public void run() {
                 try {
@@ -139,35 +135,30 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                             ByteBuffer.allocateDirect(
                                     CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
                     while (true) {
-                        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-                        while (lengthBuffer.hasRemaining()) {
-                            int read = m_sc.read(lengthBuffer);
-                            if (read == -1) {
-                                throw new EOFException();
-                            }
-                        }
-                        lengthBuffer.flip();
-
                         BBContainer container = m_buffers.take();
+                        ByteBuffer messageBuffer = container.b;
+                        messageBuffer.clear();
+                        compressionBuffer.clear();
                         boolean success = false;
+
                         try {
-                            ByteBuffer messageBuffer = container.b;
-                            messageBuffer.clear();
-                            compressionBuffer.clear();
-                            compressionBuffer.limit(lengthBuffer.getInt());
-                            while(compressionBuffer.hasRemaining()) {
-                                int read = m_sc.read(compressionBuffer);
-                                if (read == -1) {
-                                    throw new EOFException();
-                                }
+                            VoltMessage msg = m_mb.recvBlocking();
+                            if (msg == null) {
+                                return;
                             }
+                            assert(msg instanceof RejoinDataMessage);
+                            RejoinDataMessage dataMsg = (RejoinDataMessage) msg;
+                            m_recoverySourceHSId = dataMsg.m_sourceHSId;
+                            byte[] data = dataMsg.getData();
+
+                            compressionBuffer.limit(data.length);
+                            compressionBuffer.put(data);
                             compressionBuffer.flip();
                             int uncompressedSize =
                                     CompressionService.decompressBuffer(
                                             compressionBuffer,
                                             messageBuffer);
                             messageBuffer.limit(uncompressedSize);
-                            recoveryLog.trace("Received message");
                             m_incoming.offer(container);
                             RecoveryMessage rm = new RecoveryMessage();
                             rm.m_sourceHSId = m_HSId;
@@ -193,9 +184,6 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                         }
                         Thread.sleep(300);
                     } catch (InterruptedException e2) {}
-                    if (closed) {
-                        return;
-                    }
                     recoveryLog.error(
                             "Error reading a message from a recovery stream.", e);
                 } catch (InterruptedException e) {
@@ -204,18 +192,12 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             }
         };
 
-        public IODaemon(SocketChannel sc) throws IOException {
-            m_sc = sc;
+        public IODaemon() throws IOException {
             m_inThread.start();
         }
 
         public void close() {
-            closed = true;
             m_inThread.interrupt();
-            try {
-                m_sc.close();
-            } catch (IOException e) {
-            }
         }
     }
 
@@ -259,11 +241,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         message.getLong(HSIdOffset);
         final int blockIndex = message.getInt(blockIndexOffset);
         final int tableId = message.getInt(tableIdOffset);
-        ByteBuffer ackMessage = ByteBuffer.allocate(16);
-        ackMessage.putInt(12);
-        ackMessage.putLong(m_HSId);
-        ackMessage.putInt(blockIndex);
-        ackMessage.flip();
+        RejoinDataAckMessage ackMessage = new RejoinDataAckMessage(blockIndex);
         if (type == RecoveryMessageType.ScanTuples) {
             if (m_toggleProfiling.tryAcquire()) {
                 m_engine.toggleProfiler(1);
@@ -298,17 +276,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 /*
                  * Send ack for the last thing, but if the other side is gone, no worries
                  */
-                while(ackMessage.hasRemaining()) {
-                    int written = 0;
-                    try {
-                        written = m_sc.write(ackMessage);
-                    } catch (IOException e) {
-                        break;
-                    }
-                    if (written == -1) {
-                        break;
-                    }
-                }
+                m_mb.send(m_recoverySourceHSId, ackMessage);
                 return;
             }
 //                    "," + bytesUsed + ")");
@@ -319,17 +287,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         } else {
             VoltDB.crashLocalVoltDB("Received an unexpect message of type " + type, false, null);
         }
-        while(ackMessage.hasRemaining()) {
-            int written = 0;
-            try {
-                written = m_sc.write(ackMessage);
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to write ack message", true, e);
-            }
-            if (written == -1) {
-                VoltDB.crashLocalVoltDB("Unable to write ack message", false, null);
-            }
-        }
+        m_mb.send(m_recoverySourceHSId, ackMessage);
         recoveryLog.trace("Writing ack for block " + blockIndex + " from " + CoreUtils.hsIdToString(m_HSId));
     }
 
@@ -442,12 +400,14 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             HashMap<Pair<String, Integer>, Long> tableToSourceSite,
             ExecutionEngine engine,
             Mailbox mailbox,
+            Mailbox dataMailbox,
             final long HSId,
             final int partitionId,
             Runnable onCompletion,
             MessageHandler messageHandler) {
         super();
         m_mailbox = mailbox;
+        m_mb = dataMailbox;
         m_engine = engine;
         m_HSId = HSId;
         m_partitionId = partitionId;
@@ -475,90 +435,16 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
      * for a response to the initiate message
      */
     public void sendInitiateMessage(long txnId) throws IOException {
-        ServerSocketChannel ssc = ServerSocketChannel.open();
-        ssc.configureBlocking(false);
-        InetSocketAddress sockAddr = null;
-        boolean allInterfaces = false;
-        String internalInterface = VoltDB.instance().getConfig().m_internalInterface;
-        if ( internalInterface != null && !internalInterface.isEmpty()) {
-            recoveryLog.debug("An internal interface was specified (" + internalInterface + ")" +
-                    " binding to an ephemeral port to receive recovery connection");
-            sockAddr = new InetSocketAddress( internalInterface, 0);
-        } else {
-            recoveryLog.debug("No internal interface was specified. " +
-                    "Binding to all interfaces with an ephemeral port to receive recovery connection");
-            allInterfaces = true;
-            sockAddr = new InetSocketAddress(0);
-        }
-        ssc.socket().bind(sockAddr);
-        final int port = ssc.socket().getLocalPort();
-
-        List<byte[]> addresses = new ArrayList<byte[]>();
-        List<InetAddress> inetAddresses = new ArrayList<InetAddress>();
-        List<byte[]> loopbackInterfaces = new ArrayList<byte[]>();
-        List<InetAddress> loopbackAddresses = new ArrayList<InetAddress>();
-
-        /*
-         * If no internal interface was specified, bind on everything and then ship
-         * over every possible public address. Yikes!
-         */
-        if (allInterfaces) {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                NetworkInterface intf = interfaces.nextElement();
-                if (!intf.isUp()) {
-                    continue;
-                }
-                Enumeration<InetAddress> addressesEnum = intf.getInetAddresses();
-                while (addressesEnum.hasMoreElements()) {
-                    InetAddress address = addressesEnum.nextElement();
-                    if (intf.isLoopback()) {
-                        loopbackAddresses.add(address);
-                        loopbackInterfaces.add(address.getAddress());
-                    } else {
-                        inetAddresses.add(address);
-                        addresses.add(address.getAddress());
-                    }
-                }
-            }
-        } else {
-            addresses.add(ssc.socket().getInetAddress().getAddress());
-        }
-        inetAddresses.addAll(loopbackAddresses);
-        addresses.addAll(loopbackInterfaces);
-
-        recoveryLog.debug("Advertising interfaces " + inetAddresses);
-
-        RecoveryMessage recoveryMessage = new RecoveryMessage(m_HSId, txnId, addresses, port);
+        RecoveryMessage recoveryMessage = new RecoveryMessage(m_HSId, txnId, m_mb.getHSId());
         recoveryLog.trace(
                 "Sending recovery initiate request before txnid " + txnId +
                 " from site " + CoreUtils.hsIdToString(m_HSId) + " to " + CoreUtils.hsIdToString(m_sourceHSId));
         m_mailbox.send( m_sourceHSId, recoveryMessage);
 
-        final long startTime = System.currentTimeMillis();
-        while (System.currentTimeMillis() - startTime < 5000) {
-            try {
-                m_sc = ssc.accept();
-                if (m_sc != null) {
-                    break;
-                }
+        // TODO: check mailbox for request response, might get rejected
+        checkMailbox(false, txnId);
 
-                // check mailbox for request response, might get rejected
-                checkMailbox(false, txnId);
-            } catch (IOException e) {
-                recoveryLog.error("Exception while attempting to accept recovery connection", e);
-                ssc.close();
-            }
-            Thread.yield();
-        }
-        if (m_sc == null) {
-            VoltDB.crashLocalVoltDB("Timed out waiting for connection from source partition", false, null);
-        }
-        ssc.close();
-        m_sc.configureBlocking(true);
-        m_sc.socket().setTcpNoDelay(true);
-
-        m_iodaemon = new IODaemon(m_sc);
+        m_iodaemon = new IODaemon();
 
         processNextInitiateResponse(txnId);
 
@@ -683,6 +569,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 tableToSourceSite,
                 engine,
                 mailbox,
+                VoltDB.instance().getHostMessenger().createMailbox(),
                 HSId,
                 partitionId,
                 onCompletion,

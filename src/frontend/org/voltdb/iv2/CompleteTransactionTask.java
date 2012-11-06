@@ -17,20 +17,31 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
+import org.voltdb.PartitionDRGateway;
+
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class CompleteTransactionTask extends TransactionTask
 {
     final private CompleteTransactionMessage m_msg;
+    final private PartitionDRGateway m_drGateway;
 
     public CompleteTransactionTask(TransactionState txn,
                                    TransactionTaskQueue queue,
-                                   CompleteTransactionMessage msg)
+                                   CompleteTransactionMessage msg,
+                                   PartitionDRGateway drGateway)
     {
         super(txn, queue);
         m_msg = msg;
+        m_drGateway = drGateway;
     }
 
     @Override
@@ -42,25 +53,45 @@ public class CompleteTransactionTask extends TransactionTask
             // legacy interaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
-            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId);
+            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
         }
         m_txn.setDone();
         m_queue.flush();
         hostLog.debug("COMPLETE: " + this);
+
+        // Log invocation to DR
+        if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
+            FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
+            Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
+            assert(initiateTask != null);
+            StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
+            invocation.setOriginalTxnId(m_txn.txnId);
+            invocation.setOriginalTimestamp(m_txn.timestamp);
+            m_drGateway.onSuccessfulProcedureCall(m_txn.spHandle, m_txn.timestamp, true,
+                                                  invocation, m_txn.getResults());
+        }
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
-        // future: offer to siteConnection.IBS for replay.
+        taskLog.logTask(m_msg);
         m_txn.setDone();
         m_queue.flush();
     }
 
     @Override
-    public long getMpTxnId()
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        return m_msg.getTxnId();
+        if (!m_txn.isReadOnly()) {
+            // the truncation point token SHOULD be part of m_txn. However, the
+            // legacy interaces don't work this way and IV2 hasn't changed this
+            // ownership yet. But truncateUndoLog is written assuming the right
+            // eventual encapsulation.
+            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
+        }
+        m_txn.setDone();
     }
 
     @Override
@@ -68,8 +99,8 @@ public class CompleteTransactionTask extends TransactionTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("CompleteTransactionTask:");
-        sb.append("  MP TXN ID: ").append(getMpTxnId());
-        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+        sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  UNDO TOKEN: ").append(m_txn.getBeginUndoToken());
         sb.append("  MSG: ").append(m_msg.toString());
         return sb.toString();

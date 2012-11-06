@@ -270,9 +270,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // If there is a multi-partition statement on one or more partitioned Tables
         // and the pre-join Send/Receive nodes were suppressed,
         // they need to come into play "post-join".
-        if (deferSendReceivePair &&
-                (m_partitioning.getCountOfPartitionedTables() > 0) &&
-                m_partitioning.effectivePartitioningValue() == null) {
+        if (deferSendReceivePair && m_partitioning.requiresTwoFragments()) {
             retv = addSendReceivePair(retv);
         }
         return retv;
@@ -310,7 +308,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
              * If the access plan for the table in the join order was for a
              * distributed table scan there will be a send/receive pair at the top.
              */
-            if (deferSendReceivePair || (m_partitioning.effectivePartitioningValue() != null) || joinOrder[at].getIsreplicated()) {
+            if (deferSendReceivePair || !m_partitioning.requiresTwoFragments() || joinOrder[at].getIsreplicated()) {
                 continue;
             }
             resultPlan = addSendReceivePair(resultPlan);

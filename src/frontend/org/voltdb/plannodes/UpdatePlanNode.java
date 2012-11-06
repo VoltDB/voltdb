@@ -18,7 +18,9 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 
 public class UpdatePlanNode extends AbstractOperationPlanNode {
@@ -50,6 +52,13 @@ public class UpdatePlanNode extends AbstractOperationPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.UPDATES_INDEXES.name()).value(m_updatesIndexes);
+    }
+
+    // TODO:Members not loaded
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        super.loadFromJSONObject(jobj, db);
+        m_updatesIndexes = jobj.getBoolean( Members.UPDATES_INDEXES .name() );
     }
 
     @Override
