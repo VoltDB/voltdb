@@ -311,6 +311,10 @@ public class ExportManager
             newProcessor.setExportGeneration(m_generations.firstEntry().getValue());
             newProcessor.setProcessorConfig(m_processorConfig);
             newProcessor.readyForData();
+            if (m_generations.firstEntry().getValue().isDiskBased() &&
+                    !m_loaderClass.equals(RawProcessor.class.getName())) {
+                m_generations.firstEntry().getValue().kickOffLeaderElection();
+            }
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
