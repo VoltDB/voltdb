@@ -125,7 +125,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
 
     public void testCountStar04() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS = ?", 1, false);
-        checkIndexCounter(pn, false);
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar05() {

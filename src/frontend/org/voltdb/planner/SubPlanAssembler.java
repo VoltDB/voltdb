@@ -629,10 +629,11 @@ public abstract class SubPlanAssembler {
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
-        // build the list of search-keys for the index in question
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
+        // Build the list of search-keys for the index in question
+        // They are the rhs expressions of the normalized indexExpr comparisons.
         for (AbstractExpression expr : path.indexExprs) {
-            AbstractExpression expr2 = TupleValueExpression.getOtherTableExpression(expr, table);
+            AbstractExpression expr2 = expr.getRight();
             assert(expr2 != null);
             scanNode.addSearchKeyExpression(expr2);
         }
@@ -642,23 +643,12 @@ public abstract class SubPlanAssembler {
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
         scanNode.setSortDirection(path.sortDirection);
+        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
+        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+
         scanNode.setTargetTableName(table.getTypeName());
         scanNode.setTargetTableAlias(table.getTypeName());
         scanNode.setTargetIndexName(index.getTypeName());
-        if (path.sortDirection != SortDirectionType.DESC) {
-            List<AbstractExpression> predicate = new ArrayList<AbstractExpression>();
-            predicate.addAll(path.indexExprs);
-            predicate.addAll(path.otherExprs);
-            scanNode.setPredicate(ExpressionUtil.combine(predicate));
-            scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
-        }
-        else {
-            List<AbstractExpression> predicate = new ArrayList<AbstractExpression>();
-            predicate.addAll(path.indexExprs);
-            predicate.addAll(path.endExprs);
-            predicate.addAll(path.otherExprs);
-            scanNode.setPredicate(ExpressionUtil.combine(predicate));
-        }
         return scanNode;
     }
 }
