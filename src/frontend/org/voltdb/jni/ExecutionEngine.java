@@ -297,10 +297,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void release() throws EEException, InterruptedException;
 
     /** Pass the catalog to the engine */
-    abstract public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException;
+    abstract public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
+    abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
     /** Load a fragment, given a plan, into the EE with a specific fragment id */
     abstract public long loadPlanFragment(byte[] plan) throws EEException;
@@ -424,7 +424,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * NOTE: Call initialize() separately for initialization.
      * This does strictly nothing so that this method never throws an exception.
      * @return the created VoltDBEngine pointer casted to jlong.
-    */
+     */
     protected native long nativeCreate(boolean isSunJVM);
     /**
      * Releases all resources held in the execution engine.
@@ -478,7 +478,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * human-readable text strings separated by line feeds.
      * @return error code
      */
-    protected native int nativeLoadCatalog(long pointer, long txnId, byte serialized_catalog[]);
+    protected native int nativeLoadCatalog(long pointer, long timestamp, byte serialized_catalog[]);
 
     /**
      * Update the EE's catalog.
@@ -488,7 +488,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, long txnId, byte diff_commands[]);
+    protected native int nativeUpdateCatalog(long pointer, long timestamp, byte diff_commands[]);
 
     /**
      * This method is called to initially load table data.

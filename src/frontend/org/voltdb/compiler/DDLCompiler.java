@@ -1017,7 +1017,7 @@ public class DDLCompiler {
                 if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
                     throw m_compiler.new VoltCompilerException("Table name " + name + " column " + c.getName() +
                             " has a maximum size of " + c.getSize() + " bytes" +
-                            " but the maximum supported size is " + VoltType.MAX_VALUE_LENGTH_STR);
+                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
                 }
                 maxRowSize += 4 + c.getSize();
             } else {

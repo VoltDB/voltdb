@@ -211,7 +211,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         //
         // 3 seconds translates to 3 billion nanos, which overflows internal
         // values (ENG-1039)
-        results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
+        //It's possible that the nanosecond count goes backwards... so run this a couple
+        //of times to make sure the min value gets set
+        for (int ii = 0; ii < 3; ii++) {
+            results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
+        }
         results = client.callProcedure("@Statistics", "procedure", 0).getResults();
         // one aggregate table returned
         assertEquals(1, results.length);
