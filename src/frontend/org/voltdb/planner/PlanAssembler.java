@@ -58,6 +58,7 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
@@ -449,10 +450,12 @@ public class PlanAssembler {
 
         assert(subSelectRoot instanceof AbstractScanPlanNode);
 
-        // if the scan below matches all nodes, we can throw away the scan
-        // nodes and use a truncate delete node
+        // If the scan matches all rows, we can throw away the scan
+        // nodes and use a truncate delete node.
+        // Assume all index scans have filters in this context, so only consider seq scans.
         if (m_partitioning.wasSpecifiedAsSingle() &&
-                (((AbstractScanPlanNode) subSelectRoot).getPredicate() == null)) {
+                (subSelectRoot instanceof SeqScanPlanNode) &&
+                (((SeqScanPlanNode) subSelectRoot).getPredicate() == null)) {
             deleteNode.setTruncate(true);
             return deleteNode;
         }
@@ -946,6 +949,8 @@ public class PlanAssembler {
          */
         if (containsAggregateExpression || m_parsedSelect.grouped) {
             AggregatePlanNode topAggNode;
+            //TODO: add "m_parsedSelect.grouped &&" to the preconditions for HashAggregate.
+            // Otherwise, a runtime hash is built for nothing -- just to hold a single entry.
             if (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID) {
                 aggNode = new HashAggregatePlanNode();
