@@ -293,8 +293,9 @@ public class QueryPlanner {
 
         m_planSelector.outputParsedStatement(parsedStmt);
 
-        // Init Assembler
-        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, m_planSelector);
+        // Init Assembler. Each plan assembler requires a new instance of the PlanSelector
+        // to keep track of the best plan
+        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
         // Hint to the assembler that plan needs send node to be added
         boolean isTopPlan = true;

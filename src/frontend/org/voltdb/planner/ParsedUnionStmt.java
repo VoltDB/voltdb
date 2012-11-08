@@ -56,10 +56,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         String type = stmtNode.attributes.get("uniontype");
         // Set operation type
         m_unionType = UnionType.valueOf(type);
-
-        assert(stmtNode.children.size() == m_children.size());
+        // Extra one is for 'parameters' element
+        assert(stmtNode.children.size() == m_children.size() + 1);
         int i = 0;
         for (VoltXMLElement selectSQL : stmtNode.children) {
+            if (selectSQL.name.equalsIgnoreCase("parameters")) {
+                continue;
+            }
             AbstractParsedStmt nextSelectStmt = m_children.get(i++);
             nextSelectStmt.parse(selectSQL);
         }
@@ -119,6 +122,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 tableList.addAll(childStmt.tableList);
                 // Child's unique tables now contains the consolidated list
                 m_uniqueTables = childStmt.m_uniqueTables;
+            } else if (childSQL.name.equalsIgnoreCase("parameters")) {
+                //@TODO Ignore 'parameters' node
             } else {
                 throw new PlanningErrorException("Unexpected Element in UNION statement: " + childSQL.name);
             }
