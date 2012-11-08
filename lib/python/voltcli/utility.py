@@ -142,7 +142,8 @@ def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
                     if hasattr(msg, '__iter__'):
                         display_messages(msg, f = f, tag = tag, level = level + 1)
                     else:
-                        f.write('%s%s%s\n' % (stag, sindent, str(msg)))
+                        for msg2 in str(msg).split('\n'):
+                            f.write('%s%s%s\n' % (stag, sindent, msg2))
 
 #===============================================================================
 def info(*msgs):
@@ -288,12 +289,12 @@ def normalize_list(items, width, filler = None):
     return tuple(output)
 
 #===============================================================================
-def format_table(data_rows, caption = None, headings = None, indent = 0):
+def format_table(tuples, caption = None, headings = None, indent = 0, separator = ' '):
 #===============================================================================
     """
-    Format a tabular display including an optional caption, optional column
-    headings, and rows of data cells. Aligns the headings and data cells.
-    Headings and data rows must be iterable. Each data row must provide
+    Format a table, i.e. tuple list, including an optional caption, optional
+    column headings, and rows of data cells. Aligns the headings and data
+    cells.  Headings and data rows must be iterable. Each data row must provide
     iterable cells.  For now it only handles stringized data and right
     alignment. Returns the table-formatted string.
     """
@@ -301,14 +302,19 @@ def format_table(data_rows, caption = None, headings = None, indent = 0):
     sindent = ' ' * indent
     # Display the caption, if supplied.
     if caption:
-        output.append('%s-- %s --\n' % (sindent, caption))
+        output.append('\n%s-- %s --\n' % (sindent, caption))
     # Add a row for headings, if supplied.
     rows = []
     if headings:
-        rows[0] = heading_row = []
-        for heading in headings:
-            heading_row.append('- %s -' % heading)
-    rows.extend(data_rows)
+        rows.append(headings)
+        widths = []
+        for row in rows + tuples:
+            if len(widths) < len(row):
+                widths += [0] * (len(row) - len(widths))
+            for i in range(len(row)):
+                widths[i] = max(widths[i], len(str(row[i])))
+        rows.append(['-' * widths[i] for i in range(len(widths))])
+    rows.extend(tuples)
     # Measure the column widths.
     widths = []
     for row in rows:
@@ -321,10 +327,60 @@ def format_table(data_rows, caption = None, headings = None, indent = 0):
                 widths[icolumn] = max(widths[icolumn], width)
             icolumn += 1
     # Generate the format string and then format the headings and rows.
-    fmt = '%s%s' % (sindent, '  '.join(['%%-%ds' % width for width in widths]))
+    fmt = '%s%s' % (sindent, separator.join(['%%-%ds' % width for width in widths]))
     for row in rows:
         output.append(fmt % normalize_list(row, len(widths), ''))
     return '\n'.join(output)
+
+#===============================================================================
+def format_tables(tuples_list, caption_list = None, heading_list = None, indent = 0):
+#===============================================================================
+    """
+    Format multiple tables, i.e. a list of tuple lists. See format_table() for
+    more information.
+    """
+    output = []
+    for i in range(len(tuples_list)):
+        if caption_list is None or i >= len(caption_list):
+            caption = None
+        else:
+            caption = caption_list[i]
+        if heading_list is None or i >= len(heading_list):
+            heading = None
+        else:
+            heading = heading_list[i]
+        s = format_table(tuples_list[i], caption = caption, heading = heading, indent = indent)
+        output.append(s)
+    return '\n\n'.join(output)
+
+#===============================================================================
+def format_volt_table(table, caption = None, headings = True):
+#===============================================================================
+    """
+    Format a VoltTable for display.
+    """
+    rows = table.tuples
+    if headings:
+        heading_row = [c.name for c in table.columns]
+    else:
+        heading_row = None
+    return format_table(rows, caption = caption, headings = heading_row)
+
+#===============================================================================
+def format_volt_tables(table_list, caption_list = None, headings = True):
+#===============================================================================
+    """
+    Format a list of VoltTable's for display.
+    """
+    output = []
+    if table_list:
+        for i in range(len(table_list)):
+            if caption_list is None or i >= len(caption_list):
+                caption = None
+            else:
+                caption = caption_list[i]
+            output.append(format_volt_table(table_list[i], caption = caption, headings = headings))
+    return '\n\n'.join(output)
 
 #===============================================================================
 def run_cmd(cmd, *args):
@@ -487,10 +543,10 @@ class Zipper(object):
         for re_exclude in self.re_excludes:
             path_in_full = os.path.realpath(path_in)
             if re_exclude.search(path_in):
-                self._debug('skip "%s"' % path_in_full)
+                self._verbose_info('skip "%s"' % path_in_full)
                 break
         else:
-            self._debug('add "%s" as "%s"' % (path_in_full, path_out))
+            self._verbose_info('add "%s" as "%s"' % (path_in_full, path_out))
             try:
                 if self.output_zip:
                     self.output_zip.write(path_in, path_out)
@@ -499,7 +555,7 @@ class Zipper(object):
                 self._abort('Failed to write file "%s" to output zip file "%s".', path_out, e)
 
     def add_file_from_string(self, s, path_out):
-        self._debug('write string to "%s"' % path_out)
+        self._verbose_info('write string to "%s"' % path_out)
         if self.output_zip:
             try:
                 self.output_zip.writestr(path_out, s)
@@ -510,6 +566,7 @@ class Zipper(object):
     def add_directory(self, path_in, dst, excludes = []):
         if not os.path.isdir(path_in):
             self._abort('Zip source directory "%s" does not exist.' % path_in)
+        self._verbose_info('add directory "%s" to "%s"' % (path_in, dst))
         savedir = os.getcwd()
         # Get nice relative paths by temporarily switching directories.
         os.chdir(path_in)
@@ -522,8 +579,8 @@ class Zipper(object):
         finally:
             os.chdir(savedir)
 
-    def _debug(self, msg):
-        debug('%s: %s' % (self.output_path, msg))
+    def _verbose_info(self, msg):
+        verbose_info('%s: %s' % (self.output_path, msg))
 
     def _abort(self, *msgs):
         abort('Fatal error writing zip file "%s".' % self.output_path, msgs)
@@ -623,6 +680,11 @@ def kwargs_get(kwargs, name, remove = True, default = None):
     defaults = {name: default}
     args = kwargs_extract(kwargs, defaults, remove = remove, check_extras = False)
     return getattr(args, name)
+
+#===============================================================================
+def kwargs_get_list(kwargs, name, remove = True, default = None):
+#===============================================================================
+    return flatten_to_list(kwargs_get(kwargs, name, remove = remove, default = default))
 
 #===============================================================================
 def kwargs_set_defaults(kwargs, **defaults):
@@ -883,3 +945,74 @@ class PersistentConfig(object):
         for key in keys:
             results.append((key, d[key]))
         return results
+
+#===============================================================================
+class VoltTupleWrapper(object):
+#===============================================================================
+    """
+    Wraps a Volt tuple to add error handling, type safety, etc..
+    """
+    def __init__(self, tuple):
+        self.tuple = tuple
+    def column_count(self, index):
+        return len(self.tuple)
+    def column(self, index):
+        if index < 0 or index >= len(self.tuple):
+            abort('Bad column index %d (%d columns available).' % (index, len(self.tuple)))
+        return self.tuple[index]
+    def column_string(self, index):
+        return str(self.column(index))
+    def column_integer(self, index):
+        try:
+            return int(self.column(index))
+        except ValueError:
+            abort('Column %d value (%s) is not an integer.' % (index, str(self.column(index))))
+    def __str__(self):
+        return format_table([self.tuple])
+
+#===============================================================================
+class VoltTableWrapper(object):
+#===============================================================================
+    """
+    Wraps a voltdbclient.VoltTable to add error handling, type safety, etc..
+    """
+    def __init__(self, table):
+        self.table = table
+    def tuple_count(self, index):
+        return len(self.table.tuples)
+    def tuple(self, index):
+        if index < 0 or index >= len(self.table.tuples):
+            abort('Bad tuple index %d (%d tuples available).' % (index, len(self.table.tuples)))
+        return VoltTupleWrapper(self.table.tuples[index])
+    def tuples(self):
+        return self.table.tuples
+    def format_table(self, caption = None):
+        return format_volt_table(self.table, caption = caption)
+    def __str__(self):
+        return self.format_table()
+
+#===============================================================================
+class VoltResponseWrapper(object):
+#===============================================================================
+    """
+    Wraps a voltdbclient.VoltResponse to add error handling, type safety, etc..
+    """
+    def __init__(self, response):
+        self.response = response
+    def status(self):
+        return self.response.status
+    def table_count(self):
+        if not self.response.tables:
+            return 0
+        return len(self.response.tables)
+    def table(self, index):
+        if index < 0 or index >= self.table_count():
+            abort('Bad table index %d (%d tables available).' % (index, self.table_count()))
+        return VoltTableWrapper(self.response.tables[index])
+    def format_tables(self, caption_list = None):
+        return format_volt_tables(self.response.tables, caption_list = caption_list)
+    def __str__(self):
+        output = [str(self.response)]
+        if self.table_count() > 0:
+            output.append(self.format_tables())
+        return '\n\n'.join(output)

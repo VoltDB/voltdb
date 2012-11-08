@@ -25,23 +25,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
+from voltcli import utility
 
-@VOLT.Command(
-    description = 'Run the VoltDB compiler to build the catalog.',
-    options = (
-        VOLT.BooleanOption('-C', '--conditional', 'conditional',
-                           'build only when the catalog file is missing')),
-    arguments = (
-        VOLT.StringArgument('classpath',
-                            'additional colon-separated Java CLASSPATH directories'),
-        VOLT.StringArgument('catalog',
-                            'the application catalog jar file path')))
-def compile(runner):
-    if not runner.opts.conditional or not os.path.exists(runner.opts.catalog):
-        runner.java.execute('org.voltdb.compiler.VoltCompiler',
-                            None,
-                            runner.project_path,
-                            runner.opts.catalog,
-                            classpath = runner.opts.classpath,
-                            *runner.args)
+def show_snapshots(runner):
+    response = runner.call_proc('@SnapshotStatus', [], [])
+    print response.table(0).format_table(caption = 'Snapshot Status')
+
+@VOLT.Multi_Command(
+    wrapper = VOLT.AdminWrapper(),
+    description = 'Display information about a live database.',
+    modifiers = VOLT.Modifier('snapshots', show_snapshots, 'Display current snapshot status.')
+)
+def show(runner):
+    runner.go()

@@ -54,7 +54,11 @@ class BaseOption(object):
             self.required = False
         self.kwargs = kwargs
         self.kwargs['dest'] = dest
-        self.kwargs['help'] = help_msg
+        # A help message of None makes it a hidden option.
+        if help_msg is not None:
+            self.kwargs['help'] = help_msg
+        else:
+            self.kwargs['help'] = optparse.SUPPRESS_HELP
         if 'default' in self.kwargs:
             if utility.is_string(kwargs['default']):
                 self.kwargs['help'] += ' (default="%s")' % self.kwargs['default']
@@ -65,6 +69,14 @@ class BaseOption(object):
 
     def get_option_names(self):
         return [a for a in (self.short_opt, self.long_opt) if a is not None]
+
+    def get_dest(self):
+        if 'dest' not in self.kwargs:
+            utility.abort('%s must specify a "dest" property.' % self.__class__.__name__)
+        return self.kwargs['dest']
+
+    def get_default(self):
+        return self.kwargs.get('default', None)
 
     def __str__(self):
         return '%s(%s/%s %s)' % (self.__class__.__name__,
@@ -85,6 +97,9 @@ class BaseOption(object):
         if other.long_opt:
             return -1
         return 0
+
+    def has_value(self):
+        return (not 'action' in self.kwargs or self.kwargs['action'] == 'store')
 
 #===============================================================================
 class BooleanOption(BaseOption):
@@ -117,9 +132,14 @@ class IntegerOption(BaseOption):
 #===============================================================================
 class BaseArgument(object):
 #===============================================================================
-    def __init__(self, name, help):
-        self.name = name
-        self.help = help
+    def __init__(self, name, help, **kwargs):
+        self.name      = name
+        self.help      = help
+        self.min_count = kwargs.get('min_count', 1)
+        self.max_count = kwargs.get('max_count', 1)
+        # A max_count value of None is interpreted as infinity.
+        if self.max_count is None:
+            self.max_count = sys.maxint
     def get(self):
         utility.abort('BaseArgument subclass must implement a get() method: %s'
                             % self.__class__.__name__)
@@ -127,16 +147,16 @@ class BaseArgument(object):
 #===============================================================================
 class StringArgument(BaseArgument):
 #===============================================================================
-    def __init__(self, name, help):
-        BaseArgument.__init__(self, name, help)
+    def __init__(self, name, help, **kwargs):
+        BaseArgument.__init__(self, name, help, **kwargs)
     def get(self, value):
         return str(value)
 
 #===============================================================================
 class IntegerArgument(BaseArgument):
 #===============================================================================
-    def __init__(self, name, help):
-        BaseArgument.__init__(self, name, help)
+    def __init__(self, name, help, **kwargs):
+        BaseArgument.__init__(self, name, help, **kwargs)
     def get(self, value):
         try:
             return int(value)
@@ -149,88 +169,14 @@ class ParsedCommand(object):
     """
     Holds the result of parsing a CLI command.
     """
-    def __init__(self, outer_parser, outer_opts, parser, opts, args, verb):
-        self.outer_parser = outer_parser
-        self.outer_opts   = outer_opts
-        self.opts         = opts
-        self.args         = args
-        self.parser       = parser
-        self.verb         = verb
+    def __init__(self, parser, opts, args, verb):
+        self.opts   = opts
+        self.args   = args
+        self.parser = parser
+        self.verb   = verb
 
     def __str__(self):
-        return 'ParsedCommand: %s | %s %s %s' % (self.outer_opts, self.verb.name,
-                                                 self.opts, self.args)
-
-#===============================================================================
-class VoltCLICommandPreprocessor(object):
-#===============================================================================
-    """
-    This class knows how to iterate the outer options and find the verb.
-    It can do simplistic parsing of the outer options to allow early option
-    checking before the full command line is parsed. This allows the parsing
-    process itself to display debug messages.
-    """
-    def __init__(self, options):
-        """
-        Command line preprocessor constructor. Initializes metadata.
-        """
-        self.options = options
-        # Determine which options require arguments.
-        self.arg_opts = set()
-        for option in options:
-            if (not 'action' in option.kwargs or option.kwargs['action'] == 'store'):
-                for opt in option.args:
-                    arg_opts.add(opt)
-        # Clear the parsed data.
-        self.clear()
-
-    def clear(self):
-        """
-        Clear the parsed data.
-        """
-        self.cmdargs       = []
-        self.iverb         = 0
-        self.option_values = []
-        self.outer_opts    = []
-        self.verb_cmdargs  = []
-        self.verb          = None
-
-    def preprocess(self, cmdargs):
-        """
-        Preprocess the command line. Populate verb and option data.
-        """
-        self.clear()
-        self.cmdargs = cmdargs
-        iopt = 0
-        while iopt < len(self.cmdargs):
-            if not self.cmdargs[iopt].startswith('-'):
-                # Found the verb - we're done.
-                break
-            if self.cmdargs[iopt] in self.arg_opts:
-                # Option with argument
-                self.option_values.append((self.cmdargs[iopt], self.cmdargs[iopt+1]))
-                iopt += 2
-            else:
-                # Boolean option
-                self.option_values.append((self.cmdargs[iopt], True))
-                iopt += 1
-        self.iverb = iopt
-        self.outer_opts = list(self.cmdargs[:self.iverb])
-        if iopt < len(cmdargs):
-            self.verb = self.cmdargs[self.iverb]
-            self.verb_cmdargs = list(self.cmdargs[self.iverb+1:])
-
-    def get_option(self, *names):
-        """
-        Get an option value or None if not set. Allow multiple option names.
-        When multiple values exist the last one wins.
-        """
-        ret_value = None
-        for name, value in self.option_values:
-            if name in names:
-                if value is not None:
-                    ret_value = value
-        return ret_value
+        return 'ParsedCommand: %s %s %s' % (self.verb.name, self.opts, self.args)
 
 #===============================================================================
 class ExtendedHelpOptionParser(optparse.OptionParser):
@@ -265,72 +211,43 @@ class ExtendedHelpOptionParser(optparse.OptionParser):
                             % self.__class__.__name__)
 
 #===============================================================================
-class VerbOptionParser(ExtendedHelpOptionParser):
+class CLIParser(ExtendedHelpOptionParser):
 #===============================================================================
     """
-    Option parser to extend the help displayed for verbs to include arguments.
-    """
-    def __init__(self, verb):
-        self.verb = verb
-        ExtendedHelpOptionParser.__init__(self, description = verb.cli_spec.description,
-                                                usage       = get_verb_usage(verb))
-
-    def on_format_epilog(self):
-        if self.verb.get_argument_count() == 0:
-            return ''
-        rows = [(a.name.upper(), a.help) for a in self.verb.iter_arguments()]
-        return '\nArguments:\n%s\n' % utility.format_table(rows, indent = 2)
-
-#===============================================================================
-class VoltCLICommandProcessor(ExtendedHelpOptionParser):
-#===============================================================================
-    """
-    Bi-level argument/option parsing and validation class. Handles both global
-    and verb-specific arguments and options.
+    Command/sub-command (verb) argument and option parsing and validation.
     """
 
-    def __init__(self, verbs, options, usage, description, version):
+    def __init__(self, verbs, base_options, usage, description, version):
         """
         Command line processor constructor.
         """
-        self.verbs      = verbs
-        self.verb_names = verbs.keys()
-        self.options    = options
-        self.preproc    = VoltCLICommandPreprocessor(self.options)
-        full_usage      = '%s\n' % usage
+        self.verb         = None
+        self.verbs        = verbs
+        self.verb_names   = verbs.keys()
+        self.base_options = base_options
         self.verb_names.sort()
-        if verbs:
-            for verb_name in self.verb_names:
-                verb = self.verbs[verb_name]
-                if not verb.cli_spec.baseverb:
-                    full_usage += '\n       %s' % get_verb_usage(verb)
-            full_usage += '\n'
-            for verb_name in self.verb_names:
-                verb = self.verbs[verb_name]
-                if verb.cli_spec.baseverb:
-                    full_usage += '\n       %s' % get_verb_usage(verb)
+        self.base_options.sort()
         optparse.OptionParser.__init__(self,
             description = description,
-            usage       = full_usage,
+            usage       = usage,
             version     = version)
-        self.options.sort()
-        for option in self.options:
+
+    def add_base_options(self):
+        """
+        Add the base options.
+        """
+        for option in self.base_options:
             self.add_option(*option.get_option_names(), **option.kwargs)
 
-    def create_verb_parser(self, verb):
+    def add_verb_options(self, verb):
         """
-        Create CLI option parser for verb command line.
+        Add options for verb command line.
         """
-        # Parse the command-specific options.
-        parser = VerbOptionParser(verb)
-        if self.preproc.verb:
-            for option in verb.iter_options():
-                try:
-                    parser.add_option(*option.get_option_names(), **option.kwargs)
-                except Exception, e:
-                    utility.abort('Exception initializing options for verb "%s".'
-                                        % verb.name, e)
-        return parser
+        for option in verb.iter_options():
+            try:
+                self.add_option(*option.get_option_names(), **option.kwargs)
+            except Exception, e:
+                utility.abort('Exception initializing options for verb "%s".' % verb.name, e)
 
     def check_verb_options(self, verb, opts):
         """
@@ -347,73 +264,128 @@ class VoltCLICommandProcessor(ExtendedHelpOptionParser):
 
     def process_verb_arguments(self, verb, verb_args, verb_opts):
         """
-        Validate the verb arguments. Check that required arguments are present.
-        Set option values for required arguments and remove them from the
-        argument list.
+        Validate the verb arguments. Check that required arguments are present
+        and populate verb_opts attributes with scalar values or lists (for
+        trailing arguments with max_count > 1).
         """
         # Add fixed arguments passed in through the decorator to the verb object.
         args = copy.copy(verb_args) + verb.command_arguments
         # Set attributes for required arguments.
         missing = []
         iarg = 0
-        for o in verb.iter_arguments():
-            if iarg < len(args):
-                setattr(verb_opts, o.name, args[iarg])
+        nargs = verb.get_argument_count()
+        for a in verb.iter_arguments():
+            # It's missing if we've exhausted all the arguments before
+            # exhausting all the argument specs, unless it's the last argument
+            # spec and it's optional.
+            if iarg > len(args) or (iarg == len(args) and a.min_count > 0):
+                missing.append((a.name, a.help))
             else:
-                missing.append((o.name, o.help))
-            iarg += 1
+                # The last argument can have repeated arguments. If more than
+                # one are allowed the values are put into a list.
+                if iarg == nargs - 1 and a.max_count > 1:
+                    value = list(args[iarg:])
+                    if len(value) < a.min_count:
+                        utility.abort('A minimum of %d %s arguments are required.'
+                                            % (a.min_count, a.name.upper()))
+                    if len(value) > a.max_count:
+                        utility.abort('A maximum of %d %s arguments are allowed.'
+                                            % (a.max_count, a.name.upper()))
+                    iarg += len(value)
+                else:
+                    # All other arguments are treated as scalars.
+                    value = args[iarg]
+                    iarg += 1
+                setattr(verb_opts, a.name, value)
+        # Abort if extra arguments were provided.
+        if iarg < len(args):
+            utility.abort('Extra arguments were provided:', args[iarg:])
         # Abort if arguments are missing.
         check_missing_items('argument', missing)
-        # Return the argument list with the required arguments removed.
-        return args[iarg:]
 
-    def parse(self, cmdargs):
+    def initialize_verb(self, verb_name):
+        """
+        Initialize command line options for a specific verb.
+        """
+        # Add the base options that are applicable to all verbs.
+        self.add_base_options()
+
+        # See if we know about the verb.
+        if verb_name.startswith('-'):
+            self._abort('The first argument must be a verb, not an option.')
+        if verb_name not in self.verbs:
+            self._abort('Unknown verb: %s' % verb_name)
+        self.verb = self.verbs[verb_name]
+
+        # Change the messaging from generic to verb-specific.
+        self.set_usage(get_verb_usage(self.verb))
+        self.set_description(self.verb.cli_spec.get_attr('description', 'No description provided'))
+
+        # Parse the command-specific options.
+        self.add_verb_options(self.verb)
+
+    def parse(self, *cmdargs):
         """
         Parse command line.
         """
-        # Separate the global options preceding the command from
-        # command-specific options that follow it.
-        # Allow no verb for help and version requests.
-        self.preproc.preprocess(cmdargs)
-        allow_no_verb = (self.preproc.get_option('-h', '--help', '--version') is not None)
-        if self.preproc.verb is None and not allow_no_verb:
+        # Need something.
+        if not cmdargs:
             self._abort('No verb was specified.')
+        pre_opts = preprocess_options(self.base_options, cmdargs)
 
-        # See if we know about the verb.
-        if self.preproc.verb is None:
-            verb = None
-        else:
-            if self.preproc.verb not in self.verbs:
-                self._abort('Unknown command: %s' % self.preproc.verb)
-            verb = self.verbs[self.preproc.verb]
+        # Support verb-less options like -h, --help and --version.
+        if cmdargs[0].startswith('-') and (pre_opts.help or pre_opts.version):
+            opts, args = self.parse_args(list(cmdargs))
+            return ParsedCommand(self, opts, args, None)
 
-        # Parse the global options. args should be empty
-        outer_opts, outer_args = optparse.OptionParser.parse_args(self, self.preproc.outer_opts)
-        assert len(outer_args) == 0
+        # Initialize options and arguments.
+        self.initialize_verb(cmdargs[0])
+        verb_cmdargs = list(cmdargs[1:])
 
-        # Parse the command-specific options.
-        verb_parser = self.create_verb_parser(verb)
-        if self.preproc.verb:
-            if verb.cli_spec.passthrough:
-                # Provide all options and arguments without processing the options.
-                # E.g. Java programs want to handle all the options without interference.
-                verb_args = self.preproc.verb_cmdargs
-                verb_opts = None
-            else:
-                # Parse the verb command line.
-                verb_opts, verb_args = verb_parser.parse_args(self.preproc.verb_cmdargs)
-                # Check for required options.
-                self.check_verb_options(verb, verb_opts)
-                # Post-process expected arguments.
-                verb_args = self.process_verb_arguments(verb, verb_args, verb_opts)
-        else:
+        if self.verb.cli_spec.passthrough:
+            # Provide all options and arguments without processing the options.
+            # E.g. Java programs want to handle all the options without interference.
+            verb_args = verb_cmdargs
             verb_opts = None
-            args = []
+        else:
+            # Parse the verb command line.
+            verb_opts, verb_args = self.parse_args(verb_cmdargs)
+            # Check for required options.
+            self.check_verb_options(self.verb, verb_opts)
+            # Post-process arguments.
+            self.process_verb_arguments(self.verb, verb_args, verb_opts)
+            # The arguments should all be attributes in verb_opts now.
+            verb_args = []
 
-        return ParsedCommand(self, outer_opts, verb_parser, verb_opts, verb_args, verb)
+        return ParsedCommand(self, verb_opts, verb_args, self.verb)
+
+    def get_usage_string(self):
+        """
+        Get usage string.
+        """
+        # Swap stdout with UsageScraper pseudo-file object so that output is captured.
+        # Necessary because optparse only sends help to stdout.
+        class UsageScraper(object):
+            def __init__(self):
+                self.usage = []
+            def write(self, s):
+                self.usage.append(s)
+        scraper = UsageScraper()
+        stdout_save = sys.stdout
+        try:
+            sys.stdout = scraper
+            self.print_help()
+        finally:
+            sys.stdout = stdout_save
+        return ''.join(scraper.usage)
 
     def on_format_epilog(self):
-        return self._format_verb_list()
+        if not self.verb:
+            return self._format_verb_list()
+        if self.verb.get_argument_count() == 0:
+            return ''
+        rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
+        return '\nArguments:\n%s\n' % utility.format_table(rows, indent = 2)
 
     def _abort(self, *msgs):
         utility.error(*msgs)
@@ -427,13 +399,28 @@ class VoltCLICommandProcessor(ExtendedHelpOptionParser):
         rows2 = []
         for verb_name in self.verb_names:
             verb = self.verbs[verb_name]
-            if verb.cli_spec.baseverb:
-                rows2.append((verb.name, verb.cli_spec.description))
-            else:
-                rows1.append((verb.name, verb.cli_spec.description))
-        table1 = utility.format_table(rows1, caption = 'Verb Descriptions')
-        table2 = utility.format_table(rows2, caption = 'Common Verbs')
-        return '\n%s\n\n%s' % (table1, table2)
+            if not verb.cli_spec.hideverb:
+                if verb.cli_spec.baseverb:
+                    rows2.append((get_verb_usage(verb), verb.cli_spec.description))
+                else:
+                    rows1.append((get_verb_usage(verb), verb.cli_spec.description))
+        table1 = utility.format_table(rows1, caption = 'Verb Descriptions', separator = '  ')
+        table2 = utility.format_table(rows2, caption = 'Common Verbs', separator = '  ')
+        return '%s\n%s' % (table1, table2)
+
+    def _get_full_usage(self):
+        full_usage        = '%s\n' % usage
+        self.verb_names.sort()
+        if verbs:
+            for verb_name in self.verb_names:
+                verb = self.verbs[verb_name]
+                if not verb.cli_spec.baseverb and not verb.cli_spec.hideverb:
+                    full_usage += '\n       %s' % get_verb_usage(verb)
+            full_usage += '\n'
+            for verb_name in self.verb_names:
+                verb = self.verbs[verb_name]
+                if verb.cli_spec.baseverb and not verb.cli_spec.hideverb:
+                    full_usage += '\n       %s' % get_verb_usage(verb)
 
 #===============================================================================
 class CLISpec(object):
@@ -477,6 +464,18 @@ class CLISpec(object):
     def set_defaults(self, **kwargs):
         utility.kwargs_set_defaults(self._kwargs, **kwargs)
 
+    def find_option(self, dest_name):
+        for o in self._kwargs['options']:
+            if o.get_dest() == dest_name:
+                return o
+        return None
+
+    def find_argument(self, dest_name):
+        for a in self._kwargs['arguments']:
+            if a.name == dest_name:
+                return a
+        return None
+
 #===============================================================================
 def check_missing_items(type_name, missing_items):
 #===============================================================================
@@ -494,14 +493,70 @@ def check_missing_items(type_name, missing_items):
                       (fmt % (o.upper(), h) for (o, h) in missing_items))
 
 #===============================================================================
+def get_argument_usage(a):
+#===============================================================================
+    if a.max_count > 1:
+        ellipsis = ' ...'
+    else:
+        ellipsis = ''
+    if a.min_count == 0:
+        fmt = '[ %s%s ]'
+    else:
+        fmt = '%s%s'
+    return fmt % (a.name.upper(), ellipsis)
+
+#===============================================================================
 def get_verb_usage(verb):
 #===============================================================================
     """
     Provide the full usage string, including argument names, for a verb.
     """
-    usage = '%%prog %s' % verb.name
     if verb.cli_spec.usage:
-        usage += ' %s' % verb.cli_spec.usage
-    for o in verb.iter_arguments():
-        usage += ' %s' % o.name.upper()
-    return usage
+        usage2 = ' %s' % verb.cli_spec.usage
+    else:
+        usage2 = ''
+    args = [get_argument_usage(a) for a in verb.iter_arguments()]
+    if args:
+        sargs = ' %s' % (' '.join(args))
+    else:
+        sargs = ''
+    return ''.join([verb.name, usage2, sargs])
+
+#===============================================================================
+def preprocess_options(base_options, cmdargs):
+#===============================================================================
+    """
+    Simplistically parses command line options to allow early option checking.
+    Allows the parsing process to display debug messages.  Returns an object
+    with attributes set for option values.
+    """
+    class OptionValues(object):
+        pass
+    option_values = OptionValues()
+    # Create a base option dictionary indexed by short and long options.
+    # Add the built-in optparse help and version options so that they can be
+    # detected as stand-alone options.
+    options = {}
+    builtins = [BooleanOption('-h', '--help', 'help', ''),
+                BooleanOption(None, '--version', 'version', '')]
+    for opt in list(base_options) + builtins:
+        setattr(option_values, opt.get_dest(), opt.get_default())
+        if opt.short_opt:
+            options[opt.short_opt] = opt
+        if opt.long_opt:
+            options[opt.long_opt] = opt
+    # Walk through the options and arguments and set option values as attributes.
+    iopt = 0
+    while iopt < len(cmdargs):
+        if cmdargs[iopt].startswith('-'):
+            if cmdargs[iopt] in options:
+                opt = options[cmdargs[iopt]]
+                if opt.has_value():
+                    # Option with argument
+                    setattr(option_values, opt.get_dest(), cmdargs[iopt+1])
+                    iopt += 1
+                else:
+                    # Boolean option
+                    setattr(option_values, opt.get_dest(), True)
+        iopt += 1
+    return option_values

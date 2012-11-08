@@ -28,17 +28,17 @@
 from voltcli import utility
 
 @VOLT.Command(description = 'Configure project settings.',
-              usage       = 'KEY=VALUE ...')
+              arguments = (
+                  VOLT.StringArgument('keyvalue', 'KEY=VALUE assignment',
+                                      min_count = 1, max_count = None),))
 def config(runner):
-    if not runner.args:
-        utility.abort('At least one argument is required.')
     bad = []
-    for arg in runner.args:
+    for arg in runner.opts.keyvalue:
         if arg.find('=') == -1:
             bad.append(arg)
     if bad:
         utility.abort('Bad arguments (must be KEY=VALUE format):', bad)
-    for arg in runner.args:
+    for arg in runner.opts.keyvalue:
         key, value = [s.strip() for s in arg.split('=', 1)]
         # Default to 'volt.' if simple name is given.
         if key.find('.') == -1:

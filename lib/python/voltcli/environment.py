@@ -40,6 +40,7 @@ from voltcli import utility
 re_voltdb_jar = re.compile('^voltdb(client)?-2[.0-9]+[.]jar$')
 
 # Filled in during startup.
+standalone   = None
 version      = None
 command_dir  = None
 command_name = None
@@ -71,16 +72,21 @@ if 'JAVA_OPTS' in os.environ:
 if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
     java_opts.append('-Xmx1024m')
 
-def initialize(command_name_arg, command_dir_arg, version_arg):
+def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """
     Set the VOLTDB_LIB and VOLTDB_VOLTDB environment variables based on the
     script location and the working directory.
     """
-
     global command_name, command_dir, version
     command_name = command_name_arg
     command_dir = command_dir_arg
     version = version_arg
+
+    # Stand-alone scripts don't need a develoopment environment.
+    global standalone
+    standalone = standalone_arg
+    if standalone:
+        return
 
     # Add the working directory, the command directory, and VOLTCORE as
     # starting points for the scan.
@@ -145,7 +151,7 @@ def initialize(command_name_arg, command_dir_arg, version_arg):
     # LOG4J configuration
     if 'LOG4J_CONFIG_PATH' not in os.environ:
         for chk_dir in ('$VOLTDB_LIB/../src/frontend', '$VOLTDB_VOLTDB'):
-            path = os.path.join(os.path.realpath(os.path.expandvars(*chk_dir)), 'log4j.xml')
+            path = os.path.join(os.path.realpath(os.path.expandvars(chk_dir)), 'log4j.xml')
             if os.path.exists(path):
                 os.environ['LOG4J_CONFIG_PATH'] = path
                 utility.debug('LOG4J_CONFIG_PATH=>%s' % os.environ['LOG4J_CONFIG_PATH'])

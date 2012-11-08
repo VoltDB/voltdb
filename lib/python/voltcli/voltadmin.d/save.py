@@ -28,29 +28,31 @@
 import os
 from voltcli import utility
 
-@VOLT.Admin_Client(
+@VOLT.Command(
+    wrapper = VOLT.AdminWrapper(),
     description = 'Save a VoltDB database snapshot.',
     options = (
-        VOLT.BooleanOption(None, '--blocking', 'blocking',
-                           'blocking mode stops database activity during the snapshot',
-                           default = False),
+        VOLT.BooleanOption('-n', '--non-blocking', 'nonblocking',
+                           'do not wait for snapshot to complete',
+                           default = True),
         VOLT.StringOption('-f', '--format', 'format',
                           'snapshot format: "native" or "csv"',
-                          default = 'native')),
+                          default = 'native')
+    ),
     arguments = (
-        VOLT.StringArgument('directory',
-                            'the local snapshot directory path'),
-        VOLT.StringArgument('nonce',
-                            'the unique snapshot identifier (nonce)')))
+        VOLT.StringArgument('directory', 'the local snapshot directory path'),
+        VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
+    )
+)
 def save(runner):
     uri = 'file://%s' % os.path.realpath(runner.opts.directory)
-    if runner.opts.blocking:
-        blocking = 'true'
-    else:
+    if runner.opts.nonblocking:
         blocking = 'false'
-    json_opts = '{uripath:"%s",nonce:"%s",block:%s,format:"%s"}' % (
-                    uri, runner.opts.nonce, blocking, runner.opts.format)
+    else:
+        blocking = 'true'
+    json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s"}'
+                    % (uri, runner.opts.nonce, blocking, runner.opts.format)]
     utility.debug('@SnapshotSave "%s"' % json_opts)
-    proc = VOLT.VoltProcedure(runner.client, '@SnapshotSave', [VOLT.FastSerializer.VOLTTYPE_STRING])
-    response = proc.call(params = [json_opts])
-    print response
+    columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
+    response = runner.call_proc('@SnapshotSave', columns, json_opts)
+    print response.table(0).format_table(caption = 'Snapshot Save Results')

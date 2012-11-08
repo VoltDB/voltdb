@@ -25,8 +25,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Admin_Client(description = 'Resume a paused VoltDB cluster that is in admin mode.')
+from voltcli import utility
+
+@VOLT.Command(
+    wrapper = VOLT.AdminWrapper(),
+    description = 'Resume a paused VoltDB cluster that is in admin mode.'
+)
 def resume(runner):
-    proc = VOLT.VoltProcedure(runner.client, '@Resume')
-    response = proc.call()
-    print response
+    # Check the STATUS column. runner.call_proc() detects and aborts on errors.
+    status = runner.call_proc('@Resume', [], []).table(0).tuple(0).column_integer(0)
+    if status == 0:
+        utility.info('The cluster has resumed.')
+    else:
+        utility.error('The cluster has failed to resume with status: %d' % status)

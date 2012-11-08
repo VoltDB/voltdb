@@ -27,6 +27,7 @@
 
 __author__ = 'scooper'
 
+import sys
 from voltdbclient import *
 from voltcli import cli
 from voltcli import environment
@@ -40,8 +41,6 @@ class BaseVerb(object):
     """
     def __init__(self, name, **kwargs):
         self.name = name
-        # The baseverb flag is used for common verbs like package and help so
-        # that they can be kept separate from application-specific verbs.
         self.classpath = utility.kwargs_get(kwargs, 'classpath', default = None)
         self.cli_spec = cli.CLISpec(**kwargs)
         self.dirty_opts = False
@@ -54,8 +53,16 @@ class BaseVerb(object):
                             % (self.__class__.__name__, self.name))
 
     def add_options(self, *args):
-        self.cli_spec.add_to_list('options', *args)
-        self.dirty_opts = True
+        """
+        Add options if not already present as an option or argument.
+        """
+        for o in args:
+            dest_name = o.get_dest()
+            if self.cli_spec.find_option(dest_name):
+                utility.debug('Not adding "%s" option more than once.' % dest_name)
+            else:
+                self.cli_spec.add_to_list('options', o)
+                self.dirty_opts = True
 
     def add_arguments(self, *args):
         self.cli_spec.add_to_list('arguments', *args)
@@ -79,12 +86,6 @@ class BaseVerb(object):
     def __str__(self):
         return '%s: %s\n%s' % (self.__class__.__name__, self.name, self.cli_spec)
 
-    def get_options(self, required_only = False):
-        return (o for o in self.iter_options(required_only = required_only))
-
-    def get_arguments(self):
-        return (o for o in self.iter_arguments())
-
     def get_option_count(self):
         if not self.cli_spec.options:
             return 0
@@ -97,20 +98,39 @@ class BaseVerb(object):
 
     def iter_options(self, required_only = False):
         if self.cli_spec.options:
-            if self.dirty_opts:
-                self.cli_spec.options.sort()
-                self.dirty_opts = False
+            self._check_options()
             for o in self.cli_spec.options:
                 if not required_only or (o.required and getattr(opts, o.kwargs['dest']) is None):
                     yield o
 
     def iter_arguments(self):
         if self.cli_spec.arguments:
-            if self.dirty_args:
-                self.cli_spec.arguments.sort()
-                self.dirty_args = False
+            self._check_arguments()
             for o in self.cli_spec.arguments:
                 yield o
+
+    def _check_options(self):
+        if self.dirty_opts:
+            self.cli_spec.options.sort()
+            self.dirty_opts = False
+
+    def _check_arguments(self):
+        if self.dirty_args:
+            nargs = len(self.cli_spec.arguments)
+            if nargs > 1:
+                for i in range(nargs-1):
+                    a = self.cli_spec.arguments[i]
+                    if a.min_count < 0 or a.max_count < 0:
+                        utility.abort('%s argument (%s) has a negative min or max count declared.'
+                                            % (self.name, self.cli_spec.arguments[0].name))
+                    if a.min_count == 0 and a.max_count == 0:
+                        utility.abort('%s argument (%s) has zero min and max counts declared.'
+                                            % (self.name, self.cli_spec.arguments[0].name))
+                    if a.min_count != 1 or a.max_count != 1:
+                        utility.abort('%s argument (%s) is not the last argument, '
+                                      'but has min/max counts declared.'
+                                            % (self.name, self.cli_spec.arguments[0].name))
+            self.dirty_args = False
 
 #===============================================================================
 class CommandVerb(BaseVerb):
@@ -121,12 +141,26 @@ class CommandVerb(BaseVerb):
     def __init__(self, name, function, **kwargs):
         BaseVerb.__init__(self, name, **kwargs)
         self.function = function
+        self.wrapper = utility.kwargs_get(kwargs, 'wrapper', default = None)
+        # Allow the wrapper to adjust options.
+        if self.wrapper:
+            self.wrapper.initialize(self)
 
     def execute(self, runner):
-        runner.set_default_func(self.go)
-        self.function(runner)
+        # Start the wrapper, e.g. to create client a connection.
+        if self.wrapper:
+            self.wrapper.start(self, runner)
+        try:
+            # Set up the go() method for use as the default implementation.
+            runner.set_default_func(self.go)
+            # Execute the verb function.
+            self.function(runner)
+        finally:
+            # Stop the wrapper.
+            if self.wrapper:
+                self.wrapper.stop(self, runner)
 
-    def go(self, runner, *args):
+    def go(self, runner):
         utility.abort('The default go() method is not implemented by %s.'
                             % self.__class__.__name__)
 
@@ -141,12 +175,12 @@ class JavaVerb(CommandVerb):
         CommandVerb.__init__(self, name, function, **kwargs)
         self.java_class = java_class
         self.add_options(
-           cli.IntegerOption('-D', '--debugport', 'debugport',
-                             'enable remote debugging on the specified port'))
+           cli.IntegerOption(None, '--debugport', 'debugport',
+                             'enable remote Java debugging on the specified port'),
+           cli.BooleanOption(None, '--dry-run', 'dryrun', None))
 
-    def go(self, runner, *args):
-        final_args = list(args) + list(runner.args)
-        self.run_java(runner, *final_args)
+    def go(self, runner):
+        self.run_java(runner, *runner.args)
 
     def run_java(self, runner, *args):
         opts_override = self.get_attr('java_opts_override', default = [])
@@ -186,7 +220,7 @@ class ServerVerb(JavaVerb):
                 '-XX:HeapDumpPath=/tmp',
                 '-XX:-ReduceInitialCardMarks')
 
-    def go(self, runner, *args):
+    def go(self, runner):
         final_args = [self.server_subcommand]
         catalog = runner.opts.catalog
         if not catalog:
@@ -194,8 +228,6 @@ class ServerVerb(JavaVerb):
         if catalog is None:
             utility.abort('A catalog path is required.')
         final_args.extend(['catalog', catalog])
-        if args:
-            final_args.extend(args)
         if runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])
         if runner.opts.host:
@@ -205,46 +237,9 @@ class ServerVerb(JavaVerb):
                 final_args.extend(['port', host.port])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
-        java_args = list(args) + list(runner.args)
+        if runner.args:
+            final_args.extend(runner.args)
         self.run_java(runner, *final_args)
-
-#===============================================================================
-class ClientVerb(CommandVerb):
-#===============================================================================
-    """
-    Verb that wraps a function which uses the client API to call stored
-    procedures, etc..
-    """
-    def __init__(self, name, function, default_port, **kwargs):
-        CommandVerb.__init__(self, name, function, **kwargs)
-        self.default_port = default_port
-        self.add_options(
-            cli.StringOption('-H', '--host', 'host',
-                             'the target host as HOST[:PORT]',
-                             default = 'localhost'),
-            cli.StringOption('-p', '--password', 'password',
-                             "the user's connection password",
-                             default = ''),
-            cli.StringOption('-u', '--user', 'username',
-                             'the connection user name',
-                             default = ''))
-
-    def execute(self, runner):
-        host = utility.parse_hosts(runner.opts.host, min_hosts = 1, max_hosts = 1,
-                                   default_port = self.default_port)[0]
-        # Connect the client.
-        try:
-            runner.client = FastSerializer(host.host, host.port,
-                                           username = runner.opts.username,
-                                           password = runner.opts.password)
-        except Exception, e:
-            utility.abort('Client connection failed.', e)
-        try:
-            # Execute the verb.
-            CommandVerb.execute(self, runner)
-        finally:
-            # Disconnect the client.
-            runner.client.close()
 
 #===============================================================================
 class HelpVerb(CommandVerb):
@@ -254,15 +249,15 @@ class HelpVerb(CommandVerb):
     """
     def __init__(self, name, function, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
-        self.set_defaults(description = 'Display command help.',
-                          usage       = '[COMMAND ...]',
-                          baseverb    = True)
+        self.set_defaults(description = 'Display general or verb-specific help.', baseverb = True)
         self.add_options(
             cli.BooleanOption('-a', '--all', 'all',
                               'display all available help, including verb usage'))
+        self.add_arguments(
+            cli.StringArgument('verb', 'verb name', min_count = 0, max_count = None))
 
-    def go(self, runner, *args):
-        runner.help(all = runner.opts.all, *runner.args)
+    def go(self, runner):
+        runner.help(all = runner.opts.all, *runner.opts.verb)
 
 #===============================================================================
 class PackageVerb(CommandVerb):
@@ -273,8 +268,8 @@ class PackageVerb(CommandVerb):
     def __init__(self, name, function, **kwargs):
         CommandVerb.__init__(self, name, function, **kwargs)
         self.set_defaults(description  = 'Create a runnable Python program package.',
-                          usage        = '[NAME ...]',
                           baseverb     = True,
+                          hideverb     = True,
                           description2 = '''\
 The optional NAME argument(s) allow package generation for base commands other
 than the current one. If no NAME is provided the current base command is
@@ -285,9 +280,69 @@ packaged.''')
                               default = False),
             cli.StringOption('-o', '--output_dir', 'output_dir',
                              'specify the output directory (defaults to the working directory)'))
+        self.add_arguments(
+            cli.StringArgument('name', 'base command name', min_count = 0, max_count = None))
 
-    def go(self, runner, *args):
-        runner.package(runner.opts.output_dir, runner.opts.force, *args)
+    def go(self, runner):
+        runner.package(runner.opts.output_dir, runner.opts.force, *runner.opts.name)
+
+#===============================================================================
+class Modifier(object):
+#===============================================================================
+    """
+    Class for declaring multi-command modifiers.
+    """
+    def __init__(self, name, function, description, arg_name = ''):
+        self.name = name
+        self.description = description
+        self.function = function
+        self.arg_name = arg_name.upper()
+
+#===============================================================================
+class MultiVerb(CommandVerb):
+#===============================================================================
+    """
+    Verb to create multi-commands with modifiers and optional arguments.
+    """
+    def __init__(self, name, function, **kwargs):
+        CommandVerb.__init__(self, name, function, **kwargs)
+        self.modifiers = utility.kwargs_get_list(kwargs, 'modifiers', default = [])
+        if not self.modifiers:
+            utility.abort('Multi-command "%s" must provide a "modifiers" list.' % self.name)
+        valid_modifiers = '|'.join([mod.name for mod in self.modifiers])
+        has_args = 0
+        rows = []
+        for mod in self.modifiers:
+            if mod.arg_name:
+                usage = '%s %s [ %s ... ]' % (self.name, mod.name, mod.arg_name)
+                has_args += 1
+            else:
+                usage = '%s %s' % (self.name, mod.name)
+            rows.append((usage, mod.description))
+        caption = '"%s" Command Variations' % self.name
+        description2 = utility.format_table(rows, caption = caption, separator = '  ')
+        self.set_defaults(description2 = description2.strip())
+        args = [
+            cli.StringArgument('modifier',
+                               'command modifier (valid modifiers: %s)' % valid_modifiers)]
+        if has_args > 0:
+            if has_args == len(self.modifiers):
+                arg_desc = 'optional arguments(s)'
+            else:
+                arg_desc = 'optional arguments(s) (where applicable)'
+            args.append(cli.StringArgument('arg', arg_desc, min_count = 0, max_count = None))
+        self.add_arguments(*args)
+
+    def go(self, runner):
+        mod_name = runner.opts.modifier.lower()
+        for mod in self.modifiers:
+            if mod.name == mod_name:
+                mod.function(runner)
+                break
+        else:
+            valid_modifiers = '|'.join([mod.name for mod in self.modifiers])
+            utility.error('Invalid "%s" modifier "%s".' % (self.name, mod_name))
+            runner.help(self.name)
 
 #===============================================================================
 class VerbDecorators(object):
@@ -348,20 +403,6 @@ class VerbDecorators(object):
         """
         return self._get_decorator(ServerVerb, server_subcommand, *args, **kwargs)
 
-    def Client(self, *args, **kwargs):
-        """
-        @VOLT.Client decorator for declaring commands that run as VoltDB
-        clients.
-        """
-        return self._get_decorator(ClientVerb, 21212, *args, **kwargs)
-
-    def Admin_Client(self, *args, **kwargs):
-        """
-        @VOLT.Admin_Client decorator for declaring commands that run as
-        administrative VoltDB clients.
-        """
-        return self._get_decorator(ClientVerb, 21211, *args, **kwargs)
-
     def Help(self, *args, **kwargs):
         """
         @VOLT.Help decorator for declaring help commands.
@@ -370,9 +411,15 @@ class VerbDecorators(object):
 
     def Package(self, *args, **kwargs):
         """
-        @VOLT.Package decorator for declarin commands for CLI packaging.
+        @VOLT.Package decorator for declaring commands for CLI packaging.
         """
         return self._get_decorator(PackageVerb, *args, **kwargs)
+
+    def Multi_Command(self, *args, **kwargs):
+        """
+        @VOLT.Multi decorator for declaring "<verb> <tag>" commands.
+        """
+        return self._get_decorator(MultiVerb, *args, **kwargs)
 
 #===============================================================================
 class VerbSpace(object):
@@ -389,3 +436,60 @@ class VerbSpace(object):
         self.verb_names  = self.verbs.keys()
         self.verb_names.sort()
 
+#===============================================================================
+class BaseClientWrapper(object):
+#===============================================================================
+    """
+    Wrapper class to automatically create a client connection.  Use by
+    assigning an instance to the "wrapper" keyword inside a decorator
+    invocation.
+    """
+    def __init__(self, default_port):
+        self.default_port = default_port
+
+    def initialize(self, verb):
+        verb.add_options(
+            cli.StringOption('-H', '--host', 'host',
+                             'the target host as HOST[:PORT]',
+                             default = 'localhost'),
+            cli.StringOption('-p', '--password', 'password',
+                             "the user's connection password",
+                             default = ''),
+            cli.StringOption('-u', '--user', 'username',
+                             'the connection user name',
+                             default = ''))
+
+    def start(self, verb, runner):
+        host = utility.parse_hosts(runner.opts.host, min_hosts = 1, max_hosts = 1,
+                                   default_port = self.default_port)[0]
+        try:
+            runner.client = FastSerializer(host.host, host.port,
+                                           username = runner.opts.username,
+                                           password = runner.opts.password)
+        except Exception, e:
+            utility.abort('Client connection failed.', e)
+
+    def stop(self, verb, runner):
+        runner.client.close()
+
+#===============================================================================
+class ClientWrapper(BaseClientWrapper):
+#===============================================================================
+    """
+    Wrapper class to automatically create an non-admin client connection.  Use
+    by assigning an instance to the "wrapper" keyword inside a decorator
+    invocation.
+    """
+    def __init__(self, **kwargs):
+        BaseClientWrapper.__init__(self, 21212, **kwargs)
+
+#===============================================================================
+class AdminWrapper(BaseClientWrapper):
+#===============================================================================
+    """
+    Wrapper class to automatically create an admin client connection.  Use by
+    assigning an instance to the "wrapper" keyword inside a decorator
+    invocation.
+    """
+    def __init__(self, **kwargs):
+        BaseClientWrapper.__init__(self, 21211, **kwargs)

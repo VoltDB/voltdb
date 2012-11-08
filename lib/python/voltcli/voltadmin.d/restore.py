@@ -25,16 +25,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Admin_Client(
+from voltcli import utility
+
+@VOLT.Command(
+    wrapper = VOLT.AdminWrapper(),
     description = 'Restore a VoltDB database snapshot.',
     arguments = (
-        VOLT.StringArgument('directory',
-                            'the local snapshot directory path'),
-        VOLT.StringArgument('nonce',
-                            'the unique snapshot identifier (nonce)')))
+        VOLT.StringArgument('directory', 'the local snapshot directory path'),
+        VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
+    )
+)
 def restore(runner):
-    proc = VOLT.VoltProcedure(runner.client, '@SnapshotRestore', [
-                                    VOLT.FastSerializer.VOLTTYPE_STRING,
-                                    VOLT.FastSerializer.VOLTTYPE_STRING])
-    response = proc.call(params = (runner.opts.directory, runner.opts.nonce))
-    print response
+    columns = [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING]
+    params  = [runner.opts.directory, runner.opts.nonce]
+    response = runner.call_proc('@SnapshotRestore', columns, params)
+    utility.info('The snapshot was restored.')
+    print response.table(0).format_table(caption = 'Snapshot Restore Results')

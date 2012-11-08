@@ -25,20 +25,21 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Client(
+from voltcli import utility
+
+@VOLT.Command(
+    wrapper = VOLT.AdminWrapper(),
     description = 'Update the schema of a running database.',
-    options = (
-        VOLT.StringOption('-d', '--deployment', 'deployment',
-                          'the deployment configuration file path',
-                          default = 'deployment.xml')),
     arguments = (
-        VOLT.StringArgument('catalog',
-                            'the new application catalog jar file path')))
+        VOLT.StringArgument('catalog', 'the new application catalog jar file path'),
+        VOLT.StringArgument('deployment', 'the deployment configuration file path')
+    )
+)
 def update(runner):
-    proc = VOLT.VoltProcedure(runner.client, '@UpdateApplicationCatalog', [
-                                    VOLT.FastSerializer.VOLTTYPE_STRING,
-                                    VOLT.FastSerializer.VOLTTYPE_STRING])
+    columns    = [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING]
     catalog    = VOLT.utility.File(runner.opts.catalog).read_hex()
     deployment = VOLT.utility.File(runner.opts.deployment).read()
-    response = proc.call(params = (catalog, deployment))
-    print response
+    params     = [catalog, deployment]
+    # call_proc() aborts with an error if the update failed.
+    runner.call_proc('@UpdateApplicationCatalog', columns, params)
+    utility.info('The catalog update succeeded.')
