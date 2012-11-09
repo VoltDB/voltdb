@@ -130,7 +130,11 @@ public enum VoltType {
     /**
      * String representation of <code>MAX_VALUE_LENGTH</code>.
      */
-    public static final String MAX_VALUE_LENGTH_STR = String.valueOf(MAX_VALUE_LENGTH / 1024) + "k";
+    public static String humanReadableSize(int size)
+    {
+        if (size > 9999) return String.valueOf(size / 1024) + "K";
+        return String.valueOf(size) + "B";
+    }
 
     private final byte m_val;
     private final int m_lengthInBytes;
@@ -206,7 +210,7 @@ public enum VoltType {
     }
 
     private boolean matchesString(String str) {
-        return str.endsWith(name());
+        return str.toLowerCase().endsWith(name().toLowerCase());
     }
 
     /**
@@ -233,8 +237,8 @@ public enum VoltType {
                 return type;
             }
         }
-        if (str.equals("DOUBLE")) return FLOAT;
-        if (str.equals("CHARACTER") || str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
+        if (str.equalsIgnoreCase("DOUBLE")) return FLOAT;
+        if (str.equalsIgnoreCase("CHARACTER") || str.equalsIgnoreCase("CHAR") || str.equalsIgnoreCase("VARCHAR")) return STRING;
 
         throw new RuntimeException("Can't find type: " + str);
     }
