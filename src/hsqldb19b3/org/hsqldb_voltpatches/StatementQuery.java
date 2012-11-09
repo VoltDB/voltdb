@@ -204,11 +204,6 @@ public class StatementQuery extends StatementDMQL {
                    exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
             VoltXMLElement unionExpr = new VoltXMLElement("union");
             unionExpr.attributes.put("uniontype", queryExpr.operatorName());
-            
-            // parameters @TODO
-            VoltXMLElement params = new VoltXMLElement("parameters");
-            unionExpr.children.add(params);
-            assert(params != null);
 
             VoltXMLElement leftExpr = voltGetXMLExpression(
                     queryExpr.getLeftQueryExpression(), session);
@@ -233,32 +228,11 @@ public class StatementQuery extends StatementDMQL {
     VoltXMLElement voltTransformUnionXMLExpression(VoltXMLElement parentExpr, VoltXMLElement childExpr)
     throws HSQLParseException
     {
-        VoltXMLElement parentParams = null;
-        for (VoltXMLElement nextChild : parentExpr.children) {
-            if (nextChild.name.equals("parameters")) {
-                parentParams = nextChild;
-                break;
-            }
-        }
-        assert (parentParams != null);
-        
         if ("union".equalsIgnoreCase(childExpr.name) &&
             parentExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
-            for (VoltXMLElement grandChild : childExpr.children) {
-                if (grandChild.name.equals("parameters")) {
-                    parentParams.children.addAll(grandChild.children);
-                } else {
-                    parentExpr.children.add(grandChild);
-                }
-            }
+            parentExpr.children.addAll(childExpr.children);
         } else {
             parentExpr.children.add(childExpr);
-            // Move child parameters to the parent
-            for (VoltXMLElement grandChild : childExpr.children) {
-                if (grandChild.name.equals("parameters")) {
-                    parentParams.children.addAll(grandChild.children);
-                }
-            }
         }
         return parentExpr;
     }

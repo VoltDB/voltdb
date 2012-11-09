@@ -54,9 +54,10 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION SELECT I FROM B UNION SELECT I FROM C;")
                                  .getResults()[0];
         assertEquals(4, result.getRowCount());
-//        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;")
-//                .getResults()[0];
-//        assertEquals(3, result.getRowCount());
+        // test with parameters
+        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;")
+                .getResults()[0];
+        assertEquals(3, result.getRowCount());
     }
 
     /**
@@ -248,6 +249,10 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A UNION SELECT I FROM B EXCEPT SELECT I FROM C;")
                 .getResults()[0];
         assertEquals(1, result.getRowCount());
+        // test with parameters
+        result = client.callProcedure("@AdHoc", "SELECT I FROM A where I = 0 UNION SELECT I FROM B EXCEPT SELECT I FROM C WHERE I = 3;")
+                .getResults()[0];
+        assertEquals(3, result.getRowCount());
    }
 
     /**
