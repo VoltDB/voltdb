@@ -97,7 +97,7 @@ public:
         int num_of_columns = 100;
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
-        string *columnNames = new string[num_of_columns];
+        vector<string> columnNames(num_of_columns);
 
         vector<ValueType> columnTypes(num_of_columns, VALUE_TYPE_BIGINT);
         vector<int32_t> columnLengths(num_of_columns, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
@@ -119,68 +119,66 @@ public:
         // make up 40 column index (320 byte key). this is intentionally arranged to
         // not be all consecutive columns and not strictly ordered from left to right
         vector<int> pkey_column_indices;
-        vector<ValueType> pkey_column_types;
-        pkey_column_indices.push_back(0);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(1);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(2);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(3);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(4);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(5);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(6);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(7);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(8);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(9);    pkey_column_types.push_back(VALUE_TYPE_BIGINT); // 10
+        pkey_column_indices.push_back(0);
+        pkey_column_indices.push_back(1);
+        pkey_column_indices.push_back(2);
+        pkey_column_indices.push_back(3);
+        pkey_column_indices.push_back(4);
+        pkey_column_indices.push_back(5);
+        pkey_column_indices.push_back(6);
+        pkey_column_indices.push_back(7);
+        pkey_column_indices.push_back(8);
+        pkey_column_indices.push_back(9); // 10
 
-        pkey_column_indices.push_back(10);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(11);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(12);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(13);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(14);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(15);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(16);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(17);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(18);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(19);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
+        pkey_column_indices.push_back(10);
+        pkey_column_indices.push_back(11);
+        pkey_column_indices.push_back(12);
+        pkey_column_indices.push_back(13);
+        pkey_column_indices.push_back(14);
+        pkey_column_indices.push_back(15);
+        pkey_column_indices.push_back(16);
+        pkey_column_indices.push_back(17);
+        pkey_column_indices.push_back(18);
+        pkey_column_indices.push_back(19);
 
-        pkey_column_indices.push_back(20);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(21);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(22);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(23);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(24);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(25);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(26);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(27);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(28);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(29);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
+        pkey_column_indices.push_back(20);
+        pkey_column_indices.push_back(21);
+        pkey_column_indices.push_back(22);
+        pkey_column_indices.push_back(23);
+        pkey_column_indices.push_back(24);
+        pkey_column_indices.push_back(25);
+        pkey_column_indices.push_back(26);
+        pkey_column_indices.push_back(27);
+        pkey_column_indices.push_back(28);
+        pkey_column_indices.push_back(29);
 
-        pkey_column_indices.push_back(30);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(31);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(32);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(33);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(34);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(35);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(36);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(37);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(38);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_indices.push_back(39);    pkey_column_types.push_back(VALUE_TYPE_BIGINT);
+        pkey_column_indices.push_back(30);
+        pkey_column_indices.push_back(31);
+        pkey_column_indices.push_back(32);
+        pkey_column_indices.push_back(33);
+        pkey_column_indices.push_back(34);
+        pkey_column_indices.push_back(35);
+        pkey_column_indices.push_back(36);
+        pkey_column_indices.push_back(37);
+        pkey_column_indices.push_back(38);
+        pkey_column_indices.push_back(39);
 
 
         TableIndexScheme pkeyScheme(name,
                                     BALANCED_TREE_INDEX,
-                                    pkey_column_indices,
-                                    pkey_column_types,
+                                    pkey_column_indices, TableIndex::simplyIndexColumns(),
                                     true, true, schema);
+        vector<TableIndexScheme> indexes;
+        indexes.push_back(pkeyScheme);
 
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
-        table =
-          dynamic_cast<PersistentTable*>
-          (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
-                                            "test_wide_table", schema,
-                                            columnNames, -1, false, false));
-        delete[] columnNames;
+        table = dynamic_cast<PersistentTable*>(
+            TableFactory::getPersistentTable(database_id, "test_wide_table",
+                                             schema, columnNames,
+                                             -1, false, false));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -267,14 +265,16 @@ public:
     void init(std::string name, TableIndexType type, std::vector<int32_t> &ix_columnIndices,
               std::vector<ValueType> &ix_columnTypes, bool unique)
     {
-        bool intsOnly = true;
+        bool countable = true;
         TupleSchema *initiallyNullTupleSchema = NULL;
-        TableIndexScheme index(name, type, ix_columnIndices, ix_columnTypes, unique, intsOnly, initiallyNullTupleSchema);
+        TableIndexScheme index(name, type,
+                               ix_columnIndices, TableIndex::simplyIndexColumns(),
+                               unique, countable, initiallyNullTupleSchema);
 
         CatalogId database_id = 1000;
         vector<boost::shared_ptr<const TableColumn> > columns;
 
-        string *columnNames = new string[NUM_OF_COLUMNS];
+        vector<string> columnNames(NUM_OF_COLUMNS);
 
         char buffer[32];
         vector<ValueType> columnTypes(NUM_OF_COLUMNS, VALUE_TYPE_BIGINT);
@@ -298,12 +298,9 @@ public:
         vector<ValueType> pkey_column_types;
         pkey_column_indices.push_back(0);
         pkey_column_indices.push_back(1);
-        pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        pkey_column_types.push_back(VALUE_TYPE_BIGINT);
-        TableIndexScheme pkeyScheme("idx_pkey",
-                                    BALANCED_TREE_INDEX,
-                                    pkey_column_indices,
-                                    pkey_column_types,
+
+        TableIndexScheme pkeyScheme("idx_pkey", BALANCED_TREE_INDEX,
+                                    pkey_column_indices, TableIndex::simplyIndexColumns(),
                                     true, true, schema);
 
         vector<TableIndexScheme> indexes;
@@ -312,12 +309,7 @@ public:
         m_exceptionBuffer = new char[4096];
         m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
-        table =
-            dynamic_cast<PersistentTable*>
-          (TableFactory::getPersistentTable(database_id, m_engine->getExecutorContext(),
-                                            "test_table", schema,
-                                            columnNames, -1, false, false));
-        delete[] columnNames;
+        table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
@@ -325,7 +317,7 @@ public:
         table->setPrimaryKeyIndex(pkeyIndex);
 
         // add other indexes
-        BOOST_FOREACH(TableIndexScheme scheme, indexes) {
+        BOOST_FOREACH(TableIndexScheme &scheme, indexes) {
             TableIndex *index = TableIndexFactory::getInstance(scheme);
             assert(index);
             table->addIndex(index);

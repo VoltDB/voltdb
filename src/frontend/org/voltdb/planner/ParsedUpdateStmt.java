@@ -39,23 +39,32 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     LinkedHashMap<Column, AbstractExpression> columns =
         new LinkedHashMap<Column, AbstractExpression>();
 
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedUpdateStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
+    }
+
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode) {
         String tableName = stmtNode.attributes.get("table");
         assert(tableName != null);
         tableName = tableName.trim();
-        table = db.getTables().getIgnoreCase(tableName);
+        table = getTableFromDB(tableName);
         tableList.add(table);
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns"))
-                parseColumns(child, db);
+                parseColumns(child);
             else if (child.name.equalsIgnoreCase("condition"))
-                parseConditions(child, db);
+                parseConditions(child);
         }
     }
 
-    void parseColumns(VoltXMLElement columnsNode, Database db) {
+    void parseColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
             assert(child.name.equals("column"));
 
@@ -70,7 +79,7 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
             AbstractExpression expr = null;
             assert(child.children.size() == 1);
             VoltXMLElement subChild = child.children.get(0);
-            expr = parseExpressionTree(subChild, db);
+            expr = parseExpressionTree(subChild);
             assert(expr != null);
             expr.refineValueType(VoltType.get((byte)col.getType()));
             ExpressionUtil.finalizeValueTypes(expr);

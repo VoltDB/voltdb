@@ -16,30 +16,37 @@
  */
 package org.voltcore.zk;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
-import java.io.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.zip.*;
+import java.util.zip.CRC32;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.Pair;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 public class ZKUtil {
 
@@ -222,6 +229,43 @@ public class ZKUtil {
         return zk;
     }
 
+    public static final void mkdirs(ZooKeeper zk, String dirDN) {
+        ZKUtil.StringCallback callback = asyncMkdirs(zk, dirDN );
+        try {
+            callback.get();
+        } catch (Throwable t) {
+            Throwables.propagate(t);
+        }
+    }
+
+    public static ZKUtil.StringCallback asyncMkdirs( ZooKeeper zk, String dirDN) {
+        Preconditions.checkArgument(
+                dirDN != null &&
+                ! dirDN.trim().isEmpty() &&
+                ! "/".equals(dirDN) &&
+                dirDN.startsWith("/")
+                );
+
+        StringBuilder dsb = new StringBuilder(128);
+        ZKUtil.StringCallback lastCallback = null;
+        try {
+            for (String dirPortion: dirDN.substring(1).split("/")) {
+                lastCallback = new ZKUtil.StringCallback();
+                dsb.append('/').append(dirPortion);
+                zk.create(
+                        dsb.toString(),
+                        null,
+                        Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT,
+                        lastCallback,
+                        null);
+            }
+        }
+        catch (Throwable t) {
+            Throwables.propagate(t);
+        }
+        return lastCallback;
+    }
     /**
      * Sorts the sequential nodes based on their sequence numbers.
      * @param nodes
@@ -430,6 +474,11 @@ public class ZKUtil {
             done.countDown();
         }
 
+        @SuppressWarnings("unchecked")
+        public List<String> getChildren()  throws InterruptedException, KeeperException  {
+            done.await();
+            return (List<String>)getResult()[3];
+        }
     }
 
 }

@@ -101,6 +101,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         catalogBytes,
                         expectedCatalogVersion,
                         getTransactionId(),
+                        getTransactionTime().getTime(),
                         deploymentCRC);
         ctx.updateCatalog(commands, p.getFirst(), p.getSecond());
 

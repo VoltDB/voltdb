@@ -52,6 +52,22 @@
         <level value="INFO"/>
     </logger -->
 
+    <logger name="REJOIN">
+        <level value="DEBUG"/>
+    </logger>
+
+    <!-- logger name="IV2TRACE">
+        <level value="TRACE"/>
+    </logger -->
+
+    <!-- logger name="IV2QUEUETRACE">
+        <level value="TRACE"/>
+    </logger -->
+
+    <logger name="TM">
+        <level value="INFO"/>
+    </logger>
+
     <root>
         <priority value="info" />
         <appender-ref ref="file" />

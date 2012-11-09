@@ -36,11 +36,16 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltcore.logging.VoltLogger;
 
 import jsr166y.LinkedTransferQueue;
 
@@ -50,6 +55,16 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
 public class CoreUtils {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    /**
+     * Create an unbounded single threaded executor
+     */
+    public static ListeningExecutorService getSingleThreadExecutor(String name) {
+        ExecutorService ste = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(name));
+        return MoreExecutors.listeningDecorator(ste);
+    }
+
     /**
      * Create a bounded single threaded executor that rejects requests if more than capacity
      * requests are outstanding.
@@ -99,11 +114,49 @@ public class CoreUtils {
         return getThreadFactory(name, 131072);
     }
 
-    public static ThreadFactory getThreadFactory(final String name, final int stackSize) {
+    public static ThreadFactory getThreadFactory(String groupName, String name) {
+        return getThreadFactory(groupName, name, 131072);
+    }
+
+    public static ThreadFactory getThreadFactory(String name, int stackSize) {
+        return getThreadFactory(null, name, stackSize);
+    }
+
+    /**
+     * Creates a thread factory that creates threads within a thread group if
+     * the group name is given. The threads created will catch any unhandled
+     * exceptions and log them to the HOST logger.
+     *
+     * @param groupName
+     * @param name
+     * @param stackSize
+     * @return
+     */
+    public static ThreadFactory getThreadFactory(final String groupName, final String name, final int stackSize) {
+        ThreadGroup group = null;
+        if (groupName != null) {
+            group = new ThreadGroup(Thread.currentThread().getThreadGroup(), groupName);
+        }
+        final ThreadGroup finalGroup = group;
+
         return new ThreadFactory() {
+            private final AtomicLong m_createdThreadCount = new AtomicLong(0);
+            private final ThreadGroup m_group = finalGroup;
             @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(null, r, name, stackSize);
+            public Thread newThread(final Runnable r) {
+                final String threadName = name + " - " + m_createdThreadCount.getAndIncrement();
+                Runnable runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            r.run();
+                        } catch (Throwable t) {
+                            hostLog.error("Exception thrown in thread " + threadName, t);
+                        }
+                    }
+                };
+
+                Thread t = new Thread(m_group, runnable, threadName, stackSize);
                 t.setDaemon(true);
                 return t;
             }

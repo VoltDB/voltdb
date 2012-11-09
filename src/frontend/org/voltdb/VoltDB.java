@@ -81,6 +81,12 @@ public class VoltDB {
         CREATE, RECOVER, START, REJOIN, LIVE_REJOIN
     }
 
+    public static boolean createForRejoin(VoltDB.START_ACTION startAction)
+    {
+        return startAction == VoltDB.START_ACTION.REJOIN ||
+               startAction == VoltDB.START_ACTION.LIVE_REJOIN;
+    }
+
     public static Charset UTF8ENCODING = Charset.forName("UTF-8");
 
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
@@ -542,15 +548,6 @@ public class VoltDB {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
 
-        List<String> throwerStacktrace = null;
-        if (thrown != null) {
-            throwerStacktrace = new ArrayList<String>();
-            throwerStacktrace.add("Stack trace of thrown exception: " + thrown.toString());
-            for (StackTraceElement ste : thrown.getStackTrace()) {
-                throwerStacktrace.add(ste.toString());
-            }
-        }
-
         // Even if the logger is null, don't stop.  We want to log the stack trace and
         // any other pertinent information to a .dmp file for crash diagnosis
         List<String> currentStacktrace = new ArrayList<String>();
@@ -582,9 +579,7 @@ public class VoltDB {
             if (thrown != null) {
                 writer.println();
                 writer.println("****** Exception Thread ****** ");
-                for (String throwerStackElem : throwerStacktrace) {
-                    writer.println(throwerStackElem);
-                }
+                thrown.printStackTrace(writer);
             }
 
             writer.println();
@@ -625,9 +620,7 @@ public class VoltDB {
             log.fatal(errMsg);
             if (thrown != null) {
                 if (stackTrace) {
-                    for (String throwerStackElem : throwerStacktrace) {
-                        log.fatal(throwerStackElem);
-                    }
+                    log.fatal("Fatal exception", thrown);
                 } else {
                     log.fatal(thrown.toString());
                 }
@@ -642,9 +635,7 @@ public class VoltDB {
             System.err.println(errMsg);
             if (thrown != null) {
                 if (stackTrace) {
-                    for (String throwerStackElem : throwerStacktrace) {
-                        System.err.println(throwerStackElem);
-                    }
+                    thrown.printStackTrace();
                 } else {
                     System.err.println(thrown.toString());
                 }

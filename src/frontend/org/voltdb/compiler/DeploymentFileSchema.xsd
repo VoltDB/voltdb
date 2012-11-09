@@ -220,9 +220,46 @@
 
   <!-- <export> -->
   <xs:complexType name="exportType">
-    <xs:attribute name="class" type="xs:string" default="org.voltdb.export.processors.RawProcessor"/>
+    <xs:sequence>
+      <xs:element name="onserver" type="ExportOnServerType" minOccurs="0" maxOccurs="1"/>
+    </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
+
+  <xs:complexType name="ExportOnServerType">
+    <xs:sequence>
+      <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="1"/>
+    </xs:sequence>
+    <xs:attribute name="exportto" type="ServerExportEnum" default="file"/>
+  </xs:complexType>
+
+  <xs:complexType name="ExportConfigurationType">
+    <xs:sequence>
+      <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="PropertyType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="name" type="PropertyNameString" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:simpleType name="PropertyNameString">
+    <xs:restriction base="xs:normalizedString">
+      <xs:maxLength value="256"/>
+      <xs:minLength value="1"/>
+      <xs:pattern value="\p{L}[\p{L}\d_-]*(\.[\p{L}\d_-]+)*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ServerExportEnum">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="file"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <!-- <users> -->
   <xs:complexType name="usersType">

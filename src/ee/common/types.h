@@ -148,6 +148,19 @@ enum SortDirectionType {
 };
 
 // ------------------------------------------------------------------
+// Union Type
+// ------------------------------------------------------------------
+enum UnionType {
+    UNION_TYPE_NOUNION          = 0,
+    UNION_TYPE_UNION            = 1,
+    UNION_TYPE_UNION_ALL        = 2,
+    UNION_TYPE_INTERSECT        = 3,
+    UNION_TYPE_INTERSECT_ALL    = 4,
+    UNION_TYPE_EXCEPT_ALL       = 5,
+    UNION_TYPE_EXCEPT           = 6
+};
+
+// ------------------------------------------------------------------
 // PlanNode Type
 // ------------------------------------------------------------------
 enum PlanNodeType {
@@ -290,7 +303,6 @@ enum ExpressionType {
 enum TableIndexType {
     BALANCED_TREE_INDEX     = 1,
     HASH_TABLE_INDEX        = 2,
-    ARRAY_INDEX             = 3,
 };
 
 // ------------------------------------------------------------------
@@ -357,6 +369,7 @@ enum RecoveryMsgType {
 // -----------------------------------------------------------------
 std::string getTypeName(ValueType type);
 bool isNumeric(ValueType type);
+bool isIntegralType(ValueType type);
 
 // for testing, obtain a random instance of the specified type
 NValue getRandomValue(ValueType type);

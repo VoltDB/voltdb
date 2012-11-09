@@ -358,7 +358,8 @@ tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
 
     return new TupleValueExpression(valueIdxValue.get_int(),
                                     tableName.get_str(),
-                                    columnName.get_str());
+                                    columnName.get_str(),
+                                    lc, rc);
 }
 
 AbstractExpression *
@@ -525,5 +526,18 @@ ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractEx
     }
     return ret;
 }
+
+void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring)
+{
+    json_spirit::Value jValue;
+    json_spirit::read( jsonarraystring, jValue );
+    json_spirit::Array expressionsArray = jValue.get_array();
+    for (int ii = 0; ii < expressionsArray.size(); ii++) {
+        json_spirit::Object expressionObject = expressionsArray[ii].get_obj();
+        AbstractExpression *expr = AbstractExpression::buildExpressionTree(expressionObject);
+        indexed_exprs.push_back(expr);
+    }
+}
+
 
 }

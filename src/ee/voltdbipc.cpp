@@ -183,7 +183,7 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int64_t txnId;
+    int64_t timestamp;
     char data[0];
 }__attribute__((packed)) catalog_load;
 
@@ -355,10 +355,14 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
 
     catalog_load *msg = reinterpret_cast<catalog_load*>(cmd);
     try {
-        if (m_engine->loadCatalog(ntohll(msg->txnId), std::string(msg->data)) == true) {
+        if (m_engine->loadCatalog(ntohll(msg->timestamp), std::string(msg->data)) == true) {
             return kErrorCode_Success;
         }
-    } catch (SerializableEEException &e) {}
+    //TODO: FatalException and SerializableException should be universally caught and handled in "execute",
+    // rather than in hard-to-maintain "execute method" boilerplate code like this.
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    } catch (SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
 
     return kErrorCode_Error;
 }
@@ -371,12 +375,12 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
 
     struct updatecatalog {
         struct ipc_command cmd;
-        int64_t txnId;
+        int64_t timestamp;
         char data[];
     };
     struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(ntohll(uc->txnId), std::string(uc->data)) == true) {
+        if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
     } catch (FatalException e) {

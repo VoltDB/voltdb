@@ -23,20 +23,42 @@
 
 package org.voltdb.export;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.voltdb.export.ExportMatchers.ackPayloadIs;
+
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
 
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
+import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.export.processors.RawProcessor.ExportStateBlock;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
 
 public class TestExportDataSource extends TestCase {
 
@@ -80,7 +102,7 @@ public class TestExportDataSource extends TestCase {
         for (String table_name : tables)
         {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource( null, "database",
+            ExportDataSource s = new ExportDataSource( Mockito.mock(Runnable.class), "database",
                                                 table.getTypeName(),
                                                 m_part,
                                                 m_site,
@@ -109,7 +131,7 @@ public class TestExportDataSource extends TestCase {
     public void testPoll() throws Exception{
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource( null,
+        ExportDataSource s = new ExportDataSource( Mockito.mock(Runnable.class),
                                             "database",
                                             table.getTypeName(),
                                             m_part,
@@ -207,6 +229,194 @@ public class TestExportDataSource extends TestCase {
         assertEquals( 0, m.m_data.getInt());
     }
 
+    public void testPollV2() throws Exception{
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource( Mockito.mock(Runnable.class),
+                                            "database",
+                                            table.getTypeName(),
+                                            m_part,
+                                            m_site,
+                                            table.getSignature(),
+                                            0,
+                                            table.getColumns(),
+                                            "/tmp");
+        final CountDownLatch cdl = new CountDownLatch(1);
+        Runnable cdlWaiter = new Runnable() {
+
+            @Override
+            public void run() {
+                cdl.countDown();
+            }
+        };
+        s.setOnMastership(cdlWaiter);
+        s.acceptMastership();
+        cdl.await();
+
+        ByteBuffer foo = ByteBuffer.allocate(20);
+        s.pushExportBuffer(23, 0, foo.duplicate(), false, false);
+        assertEquals(s.sizeInBytes(), 20 );
+
+        //Push it twice more to check stats calc
+        s.pushExportBuffer(43, 0, foo.duplicate(), false, false);
+        assertEquals(s.sizeInBytes(), 40 );
+        s.pushExportBuffer(63, 0, foo.duplicate(), false, false);
+
+        //Only two are kept in memory, flattening the third takes 12 bytes extra so 72 instead of 60
+        assertEquals(s.sizeInBytes(), 72);
+
+        //Sync which flattens them all
+        s.pushExportBuffer(63, 0, null, true, false);
+
+        //flattened size with 60 + (12 * 3)
+        assertEquals( 96, s.sizeInBytes());
+
+        AckingContainer cont = (AckingContainer)s.poll().get();
+        //No change in size because the buffers are flattened to disk, until the whole
+        //file is polled/acked it won't shrink
+        assertEquals( 96, s.sizeInBytes());
+        assertEquals( 43, cont.m_uso);
+
+        foo = ByteBuffer.allocate(20);
+        foo.order(ByteOrder.LITTLE_ENDIAN);
+        assertEquals( foo, cont.b);
+
+        cont.discard();
+        cont = (AckingContainer)s.poll().get();
+
+        //No change in size because the buffers are flattened to disk, until the whole
+        //file is polled/acked it won't shrink
+        assertEquals( 96, s.sizeInBytes());
+
+        assertEquals( 63, cont.m_uso);
+        assertEquals( foo, cont.b);
+
+        cont.discard();
+        cont = (AckingContainer)s.poll().get();
+
+        //The two buffers pushed into a file at the head are now gone
+        //One file with a single buffer remains.
+        assertEquals( 32, s.sizeInBytes());
+        assertEquals( 83, cont.m_uso);
+        assertEquals( foo, cont.b);
+
+        cont.discard();
+        ListenableFuture<BBContainer> fut = s.poll();
+        try {
+            cont = (AckingContainer)fut.get(100,TimeUnit.MILLISECONDS);
+            fail("did not get expected timeout");
+        }
+        catch( TimeoutException ignoreIt) {}
+
+        s.pushExportBuffer(83, 0, null, false, true);
+        assertNull(fut.get());
+    }
+
+    public void testReplicatedPoll() throws Exception{
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource( Mockito.mock(Runnable.class),
+                                            "database",
+                                            table.getTypeName(),
+                                            m_part,
+                                            m_site,
+                                            table.getSignature(),
+                                            0,
+                                            table.getColumns(),
+                                            "/tmp");
+        final CountDownLatch cdl = new CountDownLatch(1);
+        Runnable cdlWaiter = new Runnable() {
+            @Override
+            public void run() {
+                cdl.countDown();
+            }
+        };
+        Mailbox mockedMbox = Mockito.mock(Mailbox.class);
+        final AtomicReference<CountDownLatch> refSendCdl = new AtomicReference<CountDownLatch>(new CountDownLatch(1));
+        doAnswer(new Answer<Void>() {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                refSendCdl.get().countDown();
+                return null;
+            }
+        }).when(mockedMbox).send(eq(42L), any(BinaryPayloadMessage.class));
+
+        s.updateAckMailboxes(Pair.<Mailbox,ImmutableList<Long>>of(mockedMbox, ImmutableList.<Long>of(42L)));
+
+        s.setOnMastership(cdlWaiter);
+        s.acceptMastership();
+        cdl.await();
+
+        ByteBuffer foo = ByteBuffer.allocate(20);
+        // we are not purposely starting at 0, because on rejoin
+        // we may start at non zero offsets
+        s.pushExportBuffer(23, 0, foo.duplicate(), false, false);
+        assertEquals(s.sizeInBytes(), 20 );
+
+        //Push it twice more to check stats calc
+        s.pushExportBuffer(43, 0, foo.duplicate(), false, false);
+        assertEquals(s.sizeInBytes(), 40 );
+        s.pushExportBuffer(63, 0, foo.duplicate(), false, false);
+
+        //Only two are kept in memory, flattening the third takes 12 bytes extra so 72 instead of 60
+        //accounting for lengths overhead (we are only keeping two buffers in memory thus the
+        //third one flushes to disk, and incurs the size overhead
+        assertEquals(s.sizeInBytes(), 72);
+
+        //Sync which flattens them all
+        s.pushExportBuffer(63, 0, null, true, false);
+
+        //flattened size with 60 + (12 * 3)
+        assertEquals( 96, s.sizeInBytes());
+
+        AckingContainer cont = (AckingContainer)s.poll().get();
+        //No change in size because the buffers are flattened to disk, until the whole
+        //file is polled/acked it won't shrink
+        assertEquals( 96, s.sizeInBytes());
+        assertEquals( 43, cont.m_uso);
+
+        foo = ByteBuffer.allocate(20);
+        foo.order(ByteOrder.LITTLE_ENDIAN);
+        assertEquals( foo, cont.b);
+
+        cont.discard();
+
+        assertTrue("timeout while wating for ack to be sent",refSendCdl.get().await(5,TimeUnit.SECONDS));
+
+        verify(mockedMbox, times(1)).send(
+                eq(42L),
+                argThat(ackPayloadIs(m_part, table.getSignature(), 43))
+                );
+
+        // removed 2 buffers
+        s.ack(63);
+
+        int i = 1000;
+        while( i > 0 && s.sizeInBytes() > 32) {
+            --i; Thread.sleep(2);
+        }
+        // 20 + 12 overhead = 32
+        assertEquals( 32, s.sizeInBytes());
+
+        cont = (AckingContainer)s.poll().get();
+        assertEquals(s.sizeInBytes(), 32);
+        assertEquals(83, cont.m_uso);
+
+        s.pushExportBuffer(83, 0, null, false, true);
+
+        refSendCdl.set(new CountDownLatch(1));
+        cont.discard();
+
+        assertTrue("timeout while wating for ack to be sent",refSendCdl.get().await(5,TimeUnit.SECONDS));
+
+        verify(mockedMbox, times(1)).send(
+                eq(42L),
+                argThat(ackPayloadIs(m_part, table.getSignature(), 83))
+                );
+
+        assertNull(s.poll().get());
+    }
+
     /**
      * Test basic release.  create two buffers, release the first one, and
      * ensure that our next poll returns the second one.
@@ -216,7 +426,7 @@ public class TestExportDataSource extends TestCase {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(
-                                            null,
+                                            Mockito.mock(Runnable.class),
                                             "database",
                                             table.getTypeName(),
                                             m_part,
@@ -224,7 +434,8 @@ public class TestExportDataSource extends TestCase {
                                             table.getSignature(),
                                             0,
                                             table.getColumns(),
-                                            "/tmp");
+                                            "/tmp"
+                                            );
 
         // we get nothing with no data
         ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
@@ -272,7 +483,7 @@ public class TestExportDataSource extends TestCase {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(
-                                            null,
+                                            Mockito.mock(Runnable.class),
                                             "database",
                                             table.getTypeName(),
                                             m_part,
@@ -280,7 +491,8 @@ public class TestExportDataSource extends TestCase {
                                             table.getSignature(),
                                             0,
                                             table.getColumns(),
-                                            "/tmp");
+                                            "/tmp"
+                                            );
 
         // we get nothing with no data
         ExportProtoMessage m = new ExportProtoMessage( 0, m_part, table.getSignature());
@@ -356,7 +568,7 @@ public class TestExportDataSource extends TestCase {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
         ExportDataSource s = new ExportDataSource(
-                                            null,
+                                            Mockito.mock(Runnable.class),
                                             "database",
                                             table.getTypeName(),
                                             m_part,
