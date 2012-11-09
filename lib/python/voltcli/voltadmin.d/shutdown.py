@@ -28,7 +28,7 @@
 from voltcli import utility
 
 @VOLT.Command(
-    wrapper = VOLT.AdminWrapper(),
+    bundles = VOLT.AdminBundle(),
     description = 'Shut down the running VoltDB cluster.'
 )
 def shutdown(runner):

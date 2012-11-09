@@ -28,7 +28,7 @@
 from voltcli import utility
 
 @VOLT.Command(
-    wrapper = VOLT.AdminWrapper(),
+    bundles = VOLT.AdminBundle(),
     description = 'Restore a VoltDB database snapshot.',
     arguments = (
         VOLT.StringArgument('directory', 'the local snapshot directory path'),

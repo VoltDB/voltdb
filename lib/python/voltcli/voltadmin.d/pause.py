@@ -28,7 +28,7 @@
 from voltcli import utility
 
 @VOLT.Command(
-    wrapper = VOLT.AdminWrapper(),
+    bundles = VOLT.AdminBundle(),
     description = 'Pause the VoltDB cluster and switch it to admin mode.'
 )
 def pause(runner):

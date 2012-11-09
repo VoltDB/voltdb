@@ -682,7 +682,7 @@ def kwargs_get(kwargs, name, remove = True, default = None):
     return getattr(args, name)
 
 #===============================================================================
-def kwargs_get_list(kwargs, name, remove = True, default = None):
+def kwargs_get_list(kwargs, name, remove = True, default = []):
 #===============================================================================
     return flatten_to_list(kwargs_get(kwargs, name, remove = remove, default = default))
 

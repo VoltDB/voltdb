@@ -28,7 +28,7 @@
 from voltcli import utility
 
 @VOLT.Command(
-    wrapper = VOLT.AdminWrapper(),
+    bundles = VOLT.AdminBundle(),
     description = 'Resume a paused VoltDB cluster that is in admin mode.'
 )
 def resume(runner):

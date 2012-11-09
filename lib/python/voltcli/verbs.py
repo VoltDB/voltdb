@@ -96,18 +96,17 @@ class BaseVerb(object):
             return 0
         return len(self.cli_spec.arguments)
 
-    def iter_options(self, required_only = False):
+    def iter_options(self):
         if self.cli_spec.options:
             self._check_options()
             for o in self.cli_spec.options:
-                if not required_only or (o.required and getattr(opts, o.kwargs['dest']) is None):
-                    yield o
+                yield o
 
     def iter_arguments(self):
         if self.cli_spec.arguments:
             self._check_arguments()
-            for o in self.cli_spec.arguments:
-                yield o
+            for a in self.cli_spec.arguments:
+                yield a
 
     def _check_options(self):
         if self.dirty_opts:
@@ -141,24 +140,24 @@ class CommandVerb(BaseVerb):
     def __init__(self, name, function, **kwargs):
         BaseVerb.__init__(self, name, **kwargs)
         self.function = function
-        self.wrapper = utility.kwargs_get(kwargs, 'wrapper', default = None)
-        # Allow the wrapper to adjust options.
-        if self.wrapper:
-            self.wrapper.initialize(self)
+        self.bundles = utility.kwargs_get_list(kwargs, 'bundles')
+        # Allow the bundles to adjust options.
+        for bundle in self.bundles:
+            bundle.initialize(self)
 
     def execute(self, runner):
-        # Start the wrapper, e.g. to create client a connection.
-        if self.wrapper:
-            self.wrapper.start(self, runner)
+        # Start the bundles, e.g. to create client a connection.
+        for bundle in self.bundles:
+            bundle.start(self, runner)
         try:
             # Set up the go() method for use as the default implementation.
             runner.set_default_func(self.go)
             # Execute the verb function.
             self.function(runner)
         finally:
-            # Stop the wrapper.
-            if self.wrapper:
-                self.wrapper.stop(self, runner)
+            # Stop the bundles in reverse order.
+            for i in range(len(self.bundles)-1, -1, -1):
+                self.bundles[i].stop(self, runner)
 
     def go(self, runner):
         utility.abort('The default go() method is not implemented by %s.'
@@ -205,11 +204,8 @@ class ServerVerb(JavaVerb):
             cli.StringOption('-d', '--deployment', 'deployment',
                              'the deployment configuration file path',
                              default = 'deployment.xml'),
-            cli.StringOption('-H', '--host', 'host',
-                             'the coordinating host as HOST[:PORT]',
-                             default = 'localhost'),
-            cli.StringOption('-l', '--license', 'license',
-                             'the license file path'))
+            cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'),
+            cli.StringOption('-l', '--license', 'license', 'the license file path'))
         self.add_arguments(
             cli.StringArgument('catalog',
                                'the application catalog jar file path'))
@@ -231,10 +227,9 @@ class ServerVerb(JavaVerb):
         if runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])
         if runner.opts.host:
-            host = utility.parse_hosts(runner.opts.host, min_hosts = 1, max_hosts = 1)[0]
-            final_args.extend(['host', host.host])
-            if host.port is not None:
-                final_args.extend(['port', host.port])
+            final_args.extend(['host', runner.opts.host.host])
+            if runner.opts.host.port is not None:
+                final_args.extend(['port', runner.opts.host.port])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
         if runner.args:
@@ -437,35 +432,53 @@ class VerbSpace(object):
         self.verb_names.sort()
 
 #===============================================================================
-class BaseClientWrapper(object):
+class ConnectionBundle(object):
 #===============================================================================
     """
-    Wrapper class to automatically create a client connection.  Use by
-    assigning an instance to the "wrapper" keyword inside a decorator
-    invocation.
+    Bundle class to add host(s), port(s), user, and password connection
+    options. Use by assigning an instance to the "bundles" keyword inside a
+    decorator invocation.
     """
-    def __init__(self, default_port):
+    def __init__(self, default_port = None, min_count = 1, max_count = 1):
         self.default_port = default_port
+        self.min_count    = min_count
+        self.max_count    = max_count
 
     def initialize(self, verb):
         verb.add_options(
-            cli.StringOption('-H', '--host', 'host',
-                             'the target host as HOST[:PORT]',
-                             default = 'localhost'),
-            cli.StringOption('-p', '--password', 'password',
-                             "the user's connection password",
-                             default = ''),
-            cli.StringOption('-u', '--user', 'username',
-                             'the connection user name',
-                             default = ''))
+            cli.HostOption('-H', '--host', 'host', 'connection',
+                           default      = 'localhost',
+                           min_count    = self.min_count,
+                           max_count    = self.max_count,
+                           default_port = self.default_port),
+            cli.StringOption('-p', '--password', 'password', "the connection password"),
+            cli.StringOption('-u', '--user', 'username', 'the connection user name'))
 
     def start(self, verb, runner):
-        host = utility.parse_hosts(runner.opts.host, min_hosts = 1, max_hosts = 1,
-                                   default_port = self.default_port)[0]
+        pass
+
+    def stop(self, verb, runner):
+        pass
+
+#===============================================================================
+class BaseClientBundle(ConnectionBundle):
+#===============================================================================
+    """
+    Bundle class to automatically create a client connection.  Use by
+    assigning an instance to the "bundles" keyword inside a decorator
+    invocation.
+    """
+    def __init__(self, default_port):
+        ConnectionBundle.__init__(self, default_port = default_port, min_count = 1, max_count = 1)
+
+    def start(self, verb, runner):
         try:
-            runner.client = FastSerializer(host.host, host.port,
-                                           username = runner.opts.username,
-                                           password = runner.opts.password)
+            kwargs = {}
+            if runner.opts.username:
+                kwargs['username'] = runner.opts.username
+                if runner.opts.password:
+                    kwargs['password'] = runner.opts.password
+            runner.client = FastSerializer(runner.opts.host.host, runner.opts.host.port, **kwargs)
         except Exception, e:
             utility.abort('Client connection failed.', e)
 
@@ -473,23 +486,23 @@ class BaseClientWrapper(object):
         runner.client.close()
 
 #===============================================================================
-class ClientWrapper(BaseClientWrapper):
+class ClientBundle(BaseClientBundle):
 #===============================================================================
     """
-    Wrapper class to automatically create an non-admin client connection.  Use
-    by assigning an instance to the "wrapper" keyword inside a decorator
+    Bundle class to automatically create an non-admin client connection.  Use
+    by assigning an instance to the "bundles" keyword inside a decorator
     invocation.
     """
     def __init__(self, **kwargs):
-        BaseClientWrapper.__init__(self, 21212, **kwargs)
+        BaseClientBundle.__init__(self, 21212, **kwargs)
 
 #===============================================================================
-class AdminWrapper(BaseClientWrapper):
+class AdminBundle(BaseClientBundle):
 #===============================================================================
     """
-    Wrapper class to automatically create an admin client connection.  Use by
-    assigning an instance to the "wrapper" keyword inside a decorator
+    Bundle class to automatically create an admin client connection.  Use by
+    assigning an instance to the "bundles" keyword inside a decorator
     invocation.
     """
     def __init__(self, **kwargs):
-        BaseClientWrapper.__init__(self, 21211, **kwargs)
+        BaseClientBundle.__init__(self, 21211, **kwargs)

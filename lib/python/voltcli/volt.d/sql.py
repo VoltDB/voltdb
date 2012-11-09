@@ -25,9 +25,42 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Command(description = '''
-Run the interactive SQL interpreter. Optional arguments are executed as
-non-interactive queries.
-''')
+@VOLT.Command(
+    bundles = VOLT.ConnectionBundle(),
+    description  = 'Run the interactive SQL interpreter.',
+    description2 = 'Optional arguments are executed as non-interactive queries.',
+    options = [
+        VOLT.EnumOption(None, '--format', 'format',
+                        'output format', 'fixed', 'csv', 'tab',
+                        default = 'fixed'),
+        VOLT.BooleanOption(None, '--clean', 'clean',
+                           'clean output with no headings or counts',
+                           default = False),
+        VOLT.BooleanOption(None, '--exception-stacks', 'exception_stacks',
+                           'display exception stack traces',
+                           default = False),
+    ],
+    arguments = [
+        VOLT.StringArgument('query', min_count = 0, max_count = None,
+                            help = 'One or more queries to execute non-interactively.')
+    ],
+)
 def sql(runner):
-    runner.java.execute('org.voltdb.utils.SQLCommand', None, *runner.args)
+    args = []
+    if runner.opts.host:
+        if runner.opts.host.host:
+            args.append('--servers=%s' % runner.opts.host.host)
+        if runner.opts.host.port:
+            args.append('--port=%d'    % runner.opts.host.port)
+    if runner.opts.username:
+        args.append('--user=%s'     % runner.opts.username)
+        args.append('--password=%s' % runner.opts.password)
+    for query in runner.opts.query:
+        args.append('--query=%s' % query)
+    if runner.opts.format:
+        args.append('--output-format=%s' % runner.opts.format.lower())
+    if runner.opts.clean:
+        args.append('--output-skip-metadata')
+    if runner.opts.exception_stacks:
+        args.append('--debug')
+    runner.java.execute('org.voltdb.utils.SQLCommand', None, *args)

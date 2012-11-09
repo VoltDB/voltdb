@@ -29,15 +29,15 @@ import os
 from voltcli import utility
 
 @VOLT.Command(
-    wrapper = VOLT.AdminWrapper(),
+    bundles = VOLT.AdminBundle(),
     description = 'Save a VoltDB database snapshot.',
     options = (
         VOLT.BooleanOption('-n', '--non-blocking', 'nonblocking',
                            'do not wait for snapshot to complete',
                            default = True),
-        VOLT.StringOption('-f', '--format', 'format',
-                          'snapshot format: "native" or "csv"',
-                          default = 'native')
+        VOLT.EnumOption('-f', '--format', 'format',
+                        'snapshot format', 'native', 'csv',
+                        default = 'native')
     ),
     arguments = (
         VOLT.StringArgument('directory', 'the local snapshot directory path'),

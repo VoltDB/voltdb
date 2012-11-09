@@ -48,11 +48,7 @@ class BaseOption(object):
     def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
         self.short_opt = short_opt
         self.long_opt  = long_opt
-        if 'required' in kwargs:
-            self.required = kwargs.pop('required')
-        else:
-            self.required = False
-        self.kwargs = kwargs
+        self.kwargs    = kwargs
         self.kwargs['dest'] = dest
         # A help message of None makes it a hidden option.
         if help_msg is not None:
@@ -64,8 +60,6 @@ class BaseOption(object):
                 self.kwargs['help'] += ' (default="%s")' % self.kwargs['default']
             else:
                 self.kwargs['help'] += ' (default=%s)' % self.kwargs['default']
-        if self.required:
-            self.kwargs['help'] += ' (required)'
 
     def get_option_names(self):
         return [a for a in (self.short_opt, self.long_opt) if a is not None]
@@ -77,6 +71,10 @@ class BaseOption(object):
 
     def get_default(self):
         return self.kwargs.get('default', None)
+
+    def postprocess_value(self, value):
+        # Hook for massaging the option instance value. Default to NOP.
+        return value
 
     def __str__(self):
         return '%s(%s/%s %s)' % (self.__class__.__name__,
@@ -118,7 +116,7 @@ class StringOption(BaseOption):
     CLI string value option.
     """
     def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
-        BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, type = 'string', **kwargs)
+        BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
 
 #===============================================================================
 class IntegerOption(BaseOption):
@@ -127,7 +125,82 @@ class IntegerOption(BaseOption):
     Integer CLI option.
     """
     def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
-        BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, type = 'int', **kwargs)
+        BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
+
+#===============================================================================
+class StringListOption(StringOption):
+#===============================================================================
+    """
+    CLI comma-separated string list option.
+    """
+    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
+        StringOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
+    def postprocess_value(self, value):
+        return [v.strip() for v in value.split(',')]
+
+#===============================================================================
+class IntegerListOption(StringOption):
+#===============================================================================
+    """
+    CLI comma-separated integer list option.
+    """
+    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
+        StringOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
+    def postprocess_value(self, value):
+        bad = []
+        converted = []
+        for v in value.split(','):
+            try:
+                converted.append(int(v.strip()))
+            except ValueError:
+                bad.append(v.strip())
+        if bad:
+            utility.abort('Bad "%s" integer list value(s):' % self.get_dest().upper(), bad)
+        return converted
+
+#===============================================================================
+class EnumOption(StringOption):
+#===============================================================================
+    """
+    Enumeration option for selecting from a list of possible symbols.
+    """
+    def __init__(self, short_opt, long_opt, dest, help_pfx, *values, **kwargs):
+        if not values or len(values) <= 1:
+            utility.abort('EnumOption "%s" must specify multiple valid values.' % dest)
+        self.values = values
+        help_msg = '%s [%s]' % (help_pfx, '|'.join(self.values))
+        StringOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
+    def postprocess_value(self, value):
+        if value not in self.values:
+            utility.abort('EnumOption "%s" value "%s" is not one of the following:'
+                              % (self.get_dest(), value), self.values)
+        return value
+
+#===============================================================================
+class HostOption(StringOption):
+#===============================================================================
+    """
+    CLI comma-separated string list option.
+    """
+    def __init__(self, short_opt, long_opt, dest, name, **kwargs):
+        self.min_count    = utility.kwargs_get(kwargs, 'min_count', default = 1)
+        self.max_count    = utility.kwargs_get(kwargs, 'max_count', default = 1)
+        self.default_port = utility.kwargs_get(kwargs, 'default_port', default = 21212)
+        if self.max_count == 1:
+            help_msg = 'the %s HOST[:PORT]' % name
+        else:
+            help_msg = 'the comma-separated %s HOST[:PORT] list' % name
+        if self.default_port:
+            help_msg += ' (default port=%d)' % self.default_port
+        StringOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
+    def postprocess_value(self, value):
+        hosts = utility.parse_hosts(value,
+                                    min_hosts = self.min_count,
+                                    max_hosts = self.max_count,
+                                    default_port = self.default_port)
+        if self.max_count == 1:
+            return hosts[0]
+        return hosts
 
 #===============================================================================
 class BaseArgument(object):
@@ -140,8 +213,8 @@ class BaseArgument(object):
         # A max_count value of None is interpreted as infinity.
         if self.max_count is None:
             self.max_count = sys.maxint
-    def get(self):
-        utility.abort('BaseArgument subclass must implement a get() method: %s'
+    def get(self, value):
+        utility.abort('BaseArgument subclass must implement a get(value) method: %s'
                             % self.__class__.__name__)
 
 #===============================================================================
@@ -249,18 +322,16 @@ class CLIParser(ExtendedHelpOptionParser):
             except Exception, e:
                 utility.abort('Exception initializing options for verb "%s".' % verb.name, e)
 
-    def check_verb_options(self, verb, opts):
+    def process_verb_options(self, verb, opts):
         """
-        Validate the verb options, e.g. check that required options are present.
+        Validate the verb options and post-process the values.
         """
         max_width = 0
         missing = []
-        for o in verb.iter_options(required_only = True):
-            missing_opt = ', '.join(o.get_option_names())
-            max_width = max(len(missing_opt), max_width)
-            missing.append((missing_opt, o.kwargs['help']))
-        # Abort if required options are missing.
-        check_missing_items('option', missing)
+        # Post-process the option values, e.g. convert strings to lists as needed.
+        for o in verb.iter_options():
+            dest = o.get_dest()
+            setattr(opts, dest, o.postprocess_value(getattr(opts, dest)))
 
     def process_verb_arguments(self, verb, verb_args, verb_opts):
         """
@@ -350,8 +421,8 @@ class CLIParser(ExtendedHelpOptionParser):
         else:
             # Parse the verb command line.
             verb_opts, verb_args = self.parse_args(verb_cmdargs)
-            # Check for required options.
-            self.check_verb_options(self.verb, verb_opts)
+            # Post-process options.
+            self.process_verb_options(self.verb, verb_opts)
             # Post-process arguments.
             self.process_verb_arguments(self.verb, verb_args, verb_opts)
             # The arguments should all be attributes in verb_opts now.

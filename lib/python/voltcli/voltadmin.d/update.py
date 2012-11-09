@@ -28,7 +28,7 @@
 from voltcli import utility
 
 @VOLT.Command(
-    wrapper = VOLT.AdminWrapper(),
+    bundles = VOLT.AdminBundle(),
     description = 'Update the schema of a running database.',
     arguments = (
         VOLT.StringArgument('catalog', 'the new application catalog jar file path'),

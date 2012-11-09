@@ -53,7 +53,7 @@ usage for a verb, including its options and arguments.
                           'display debug messages'),
         cli.BooleanOption(None, '--pause', 'pause', None),
         cli.BooleanOption('-v', '--verbose', 'verbose',
-                          'display verbose messages, including external command lines'),
+                          'display verbose messages and external commands'),
     )
 )
 
@@ -382,6 +382,7 @@ class VOLT(object):
         self.IntegerOption   = cli.IntegerOption
         self.StringArgument  = cli.StringArgument
         self.IntegerArgument = cli.IntegerArgument
+        self.EnumOption      = cli.EnumOption
         # Expose voltdbclient symbols for Volt client commands.
         self.VoltProcedure   = voltdbclient.VoltProcedure
         self.VoltResponse    = voltdbclient.VoltResponse
@@ -391,9 +392,10 @@ class VOLT(object):
         self.FastSerializer  = voltdbclient.FastSerializer
         # For declaring multi-command verbs like "show".
         self.Modifier = Modifier
-        # Wrappers
-        self.ClientWrapper = ClientWrapper
-        self.AdminWrapper  = AdminWrapper
+        # Bundles
+        self.ConnectionBundle = ConnectionBundle
+        self.ClientBundle     = ClientBundle
+        self.AdminBundle      = AdminBundle
         # As a convenience expose the utility module so that commands don't
         # need to import it.
         self.utility = utility

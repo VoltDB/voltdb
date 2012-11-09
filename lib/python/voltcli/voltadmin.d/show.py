@@ -32,7 +32,7 @@ def show_snapshots(runner):
     print response.table(0).format_table(caption = 'Snapshot Status')
 
 @VOLT.Multi_Command(
-    wrapper = VOLT.AdminWrapper(),
+    bundles = VOLT.AdminBundle(),
     description = 'Display information about a live database.',
     modifiers = VOLT.Modifier('snapshots', show_snapshots, 'Display current snapshot status.')
 )
