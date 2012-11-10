@@ -38,6 +38,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportToFileClient.ExportToFileDecoder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.VoltFile;
 
 public class TestExportToFileClient extends TestCase {
 
@@ -65,20 +66,12 @@ public class TestExportToFileClient extends TestCase {
     }
 
     public void testNoAutoDiscovery() throws Exception {
-        // clean up any files that exist
-        File tmpdir = new File("/tmp");
-        assertTrue(tmpdir.exists());
-        assertTrue(tmpdir.isDirectory());
-        FileFilter filter = new FileFilter() {
+        final FileFilter filter = new FileFilter() {
             @Override
             public boolean accept(File pathname) {
                 return pathname.getPath().contains("nadclient") && pathname.getPath().contains(".csv");
             }
         };
-        File[] filesToDelete = tmpdir.listFiles(filter);
-        for (File f : filesToDelete) {
-            f.delete();
-        }
 
         String simpleSchema =
             "create table blah (" +
@@ -99,6 +92,10 @@ public class TestExportToFileClient extends TestCase {
         assertTrue(success);
         cluster.startUp(true);
 
+        File tmpdir = new VoltFile("/tmp");
+        assertTrue(tmpdir.exists());
+        assertTrue(tmpdir.isDirectory());
+
         final String listener = cluster.getListenerAddresses().get(0);
         final Client client = ClientFactory.createClient();
         client.createConnection(listener);
@@ -109,7 +106,7 @@ public class TestExportToFileClient extends TestCase {
                 new ExportToFileClient(
                     ',',
                     "nadclient1",
-                    new File("/tmp/"),
+                    new VoltFile("/tmp/"),
                     1,
                     "yyyyMMddHHmmss",
                     null,
@@ -123,7 +120,7 @@ public class TestExportToFileClient extends TestCase {
                 new ExportToFileClient(
                     ',',
                     "nadclient2",
-                    new File("/tmp/"),
+                    new VoltFile("/tmp/"),
                     1,
                     "yyyyMMddHHmmss",
                     null,
@@ -145,14 +142,14 @@ public class TestExportToFileClient extends TestCase {
             @Override
             public void run() {
                 try {
-                    exportClient1.run(5000);
+                    exportClient1.run(10000);
                 } catch (ExportClientException e) {
                     e.printStackTrace();
                 }
             }
         };
         other.start();
-        exportClient2.run(5000);
+        exportClient2.run(10000);
         other.join();
 
         cluster.shutDown();

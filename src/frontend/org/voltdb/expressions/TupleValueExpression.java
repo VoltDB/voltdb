@@ -140,23 +140,28 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof TupleValueExpression == false) return false;
+        if (obj instanceof TupleValueExpression == false) {
+            return false;
+        }
         TupleValueExpression expr = (TupleValueExpression) obj;
 
-        if ((expr.m_tableName == null) != (m_tableName == null))
+        if ((m_tableName == null) != (expr.m_tableName == null)) {
             return false;
-        if ((expr.m_columnName == null) != (m_columnName == null))
+        }
+        if ((m_columnName == null) != (expr.m_columnName == null)) {
             return false;
-
-        if (expr.m_tableName != null)
-            if (expr.m_tableName.equals(m_tableName) == false)
+        }
+        if (m_tableName != null) { // Implying both sides non-null
+            if (m_tableName.equals(expr.m_tableName) == false) {
                 return false;
-        if (expr.m_columnName != null)
-            if (expr.m_columnName.equals(m_columnName) == false)
+            }
+        }
+        if (m_columnName != null) { // Implying both sides non-null
+            if (m_columnName.equals(expr.m_columnName) == false) {
                 return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
+            }
+        }
+        return true;
     }
 
     @Override
@@ -213,9 +218,39 @@ public class TupleValueExpression extends AbstractValueExpression {
         // -- not bothering for now.
         Column column = table.getColumns().getIgnoreCase(m_columnName);
         assert(column != null);
+        m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());
     }
+
+    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
+    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
+    // depend on tables.
+    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, Table table) {
+        assert(expr != null);
+        AbstractExpression retval = expr.getLeft();
+        if (isOperandDependentOnTable(retval, table)) {
+            retval = expr.getRight();
+            assert( ! isOperandDependentOnTable(retval, table));
+        }
+        return retval;
+    }
+
+    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
+    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
+    // depend on tables.
+    public static boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
+        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
+            //TODO: This clumsy testing of table names regardless of table aliases is
+            // EXACTLY why we can't have nice things like self-joins.
+            if (table.getTypeName().equals(tve.getTableName()))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
 }

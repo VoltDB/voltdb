@@ -20,11 +20,13 @@ CREATE TABLE replicated
   txnid  bigint NOT NULL
 , ts     bigint NOT NULL
 , rid    bigint NOT NULL
+, cnt    bigint NOT NULL
 , CONSTRAINT PK_id PRIMARY KEY
   (
     txnid
   )
 , UNIQUE ( rid )
+, UNIQUE ( cnt )
 );
 
 -- procedures

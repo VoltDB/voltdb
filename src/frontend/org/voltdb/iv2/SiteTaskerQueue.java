@@ -32,7 +32,8 @@ public class SiteTaskerQueue
         return m_tasks.offer(task);
     }
 
-    public SiteTasker poll() throws InterruptedException
+    // Block on the site tasker queue.
+    public SiteTasker take() throws InterruptedException
     {
         SiteTasker task = m_tasks.poll();
         if (task == null) {
@@ -45,6 +46,12 @@ public class SiteTaskerQueue
         } finally {
             m_starvationTracker.endStarvation();
         }
+    }
+
+    // Non-blocking poll on the site tasker queue.
+    public SiteTasker poll()
+    {
+        return m_tasks.poll();
     }
 
     public boolean isEmpty() {

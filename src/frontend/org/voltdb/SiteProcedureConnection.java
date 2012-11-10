@@ -135,7 +135,7 @@ public interface SiteProcedureConnection {
      */
     public ProcedureRunner getProcedureRunner(String procedureName);
 
-    public void setRejoinComplete();
+    public void setRejoinComplete(org.voltdb.iv2.RejoinProducer.ReplayCompletionAction action);
 
     public long[] getUSOForExportTable(String signature);
 

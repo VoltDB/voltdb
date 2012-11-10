@@ -324,7 +324,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     }
                     //Forward the sequence number to the EE
                     context.getSiteProcedureConnection().exportAction(
-                            false,
+                            true,
                             0,
                             sequenceNumber,
                             myPartitionId,
@@ -1447,7 +1447,7 @@ public class SnapshotRestore extends VoltSystemProcedure
          * has to be threaded this way because invoking the async mailbox plan fragment
          * enters the EE to service stats stuff which relies on thread locals.
          */
-        ExecutorService es =  Executors.newSingleThreadExecutor();
+        ExecutorService es =  Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Snapshot Restore"));
         Future<VoltTable[]> ft = es.submit(new Callable<VoltTable[]>() {
             @Override
             public VoltTable[] call() throws Exception {

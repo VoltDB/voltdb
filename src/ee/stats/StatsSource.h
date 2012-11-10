@@ -74,10 +74,6 @@ public:
      */
     void configure(
             std::string name,
-            voltdb::CatalogId hostId,
-            std::string hostname,
-            int64_t siteId,
-            voltdb::CatalogId partitionId,
             voltdb::CatalogId databaseId);
 
     /*

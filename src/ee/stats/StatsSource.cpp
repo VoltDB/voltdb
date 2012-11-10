@@ -15,12 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "stats/StatsSource.h"
+
+#include "common/executorcontext.hpp"
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "stats/StatsSource.h"
 #include <vector>
 #include <string>
 #include <cassert>
@@ -61,15 +63,13 @@ StatsSource::StatsSource()  : m_statsTable(NULL) {
  */
 void StatsSource::configure(
         string name,
-        CatalogId hostId,
-        string hostname,
-        int64_t siteId,
-        CatalogId partitionId,
         CatalogId databaseId) {
-    m_siteId = siteId;
-    m_partitionId = partitionId;
-    m_hostId = hostId;
-    m_hostname = ValueFactory::getStringValue(hostname);
+    ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
+    m_siteId = executorContext->m_siteId;
+    m_partitionId = executorContext->m_partitionId;
+    m_hostId = executorContext->m_hostId;
+    m_hostname = ValueFactory::getStringValue(executorContext->m_hostname);
+
     vector<string> columnNames = generateStatsColumnNames();
 
     vector<ValueType> columnTypes;
@@ -82,8 +82,7 @@ void StatsSource::configure(
         m_columnName2Index[columnNames[ii]] = ii;
     }
 
-    m_statsTable.reset(TableFactory::getTempTable(databaseId, name, schema,
-                                                  &columnNames[0], NULL));
+    m_statsTable.reset(TableFactory::getTempTable(databaseId, name, schema, columnNames, NULL));
     m_statsTuple = m_statsTable->tempTuple();
 }
 

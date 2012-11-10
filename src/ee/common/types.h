@@ -290,7 +290,6 @@ enum ExpressionType {
 enum TableIndexType {
     BALANCED_TREE_INDEX     = 1,
     HASH_TABLE_INDEX        = 2,
-    ARRAY_INDEX             = 3,
 };
 
 // ------------------------------------------------------------------
@@ -357,6 +356,7 @@ enum RecoveryMsgType {
 // -----------------------------------------------------------------
 std::string getTypeName(ValueType type);
 bool isNumeric(ValueType type);
+bool isIntegralType(ValueType type);
 
 // for testing, obtain a random instance of the specified type
 NValue getRandomValue(ValueType type);

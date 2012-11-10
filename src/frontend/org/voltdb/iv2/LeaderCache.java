@@ -27,7 +27,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -43,7 +42,6 @@ import org.voltcore.zk.ZKUtil.ByteArrayCallback;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Tracker monitors and provides snapshots of a single ZK node's
@@ -141,9 +139,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     private final String m_rootNode;
 
     // All watch processing is run serially in this thread.
-    private final ListeningExecutorService m_es =
-            MoreExecutors.listeningDecorator(
-                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("LeaderCache", 1024 * 128)));
+    private final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("LeaderCache");
 
     // previous children snapshot for internal use.
     private Set<String> m_lastChildren = new HashSet<String>();

@@ -57,13 +57,11 @@
 #include "common/Pool.hpp"
 
 namespace voltdb {
-
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
-            ExecutorContext *ctx,
             const std::string &name,
             TupleSchema* schema,
-            const std::string* columnNames,
+            const std::vector<std::string> &columnNames,
             int partitionColumn,
             bool exportEnabled,
             bool exportOnly)
@@ -71,18 +69,16 @@ Table* TableFactory::getPersistentTable(
     Table *table = NULL;
 
     if (exportOnly) {
-        table = new StreamedTable(ctx, exportEnabled);
-        TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
+        table = new StreamedTable(exportEnabled);
     }
     else {
-        table = new PersistentTable(ctx, exportEnabled);
-        PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
-        TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
-        pTable->m_partitionColumn = partitionColumn;
+        table = new PersistentTable(partitionColumn);
     }
 
+    initCommon(databaseId, table, name, schema, columnNames, true);
+
     // initialize stats for the table
-    configureStats(databaseId, ctx, name, table);
+    configureStats(databaseId, name, table);
 
     return dynamic_cast<Table*>(table);
 }
@@ -91,11 +87,11 @@ TempTable* TableFactory::getTempTable(
             const voltdb::CatalogId databaseId,
             const std::string &name,
             TupleSchema* schema,
-            const std::string* columnNames,
+            const std::vector<std::string> &columnNames,
             TempTableLimits* limits)
 {
     TempTable* table = new TempTable();
-    TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
+    initCommon(databaseId, table, name, schema, columnNames, true);
     table->m_limits = limits;
     return table;
 }
@@ -110,8 +106,7 @@ TempTable* TableFactory::getCopiedTempTable(
             TempTableLimits* limits)
 {
     TempTable* table = new TempTable();
-    TableFactory::initCommon(databaseId, table, name, template_table->m_schema,
-                             template_table->m_columnNames, false);
+    initCommon(databaseId, table, name, template_table->m_schema, template_table->m_columnNames, false);
     table->m_limits = limits;
     return table;
 }
@@ -121,12 +116,12 @@ void TableFactory::initCommon(
             Table *table,
             const std::string &name,
             TupleSchema *schema,
-            const std::string *columnNames,
+            const std::vector<std::string> &columnNames,
             const bool ownsTupleSchema) {
 
     assert(table != NULL);
     assert(schema != NULL);
-    assert(columnNames != NULL);
+    assert(columnNames.size() != 0);
 
     table->m_databaseId = databaseId;
     table->m_name = name;
@@ -135,16 +130,10 @@ void TableFactory::initCommon(
 }
 
 void TableFactory::configureStats(voltdb::CatalogId databaseId,
-                                  ExecutorContext *ctx,
                                   std::string name,
                                   Table *table) {
-
     // initialize stats for the table
     table->getTableStats()->configure(name + " stats",
-                                      ctx->m_hostId,
-                                      ctx->m_hostname,
-                                      ctx->m_siteId,
-                                      ctx->m_partitionId,
                                       databaseId);
 }
 

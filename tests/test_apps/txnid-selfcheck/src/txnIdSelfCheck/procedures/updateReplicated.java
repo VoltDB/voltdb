@@ -38,7 +38,10 @@ public class updateReplicated extends VoltProcedure
     public final SQLStmt deleteStmt = new SQLStmt("DELETE FROM replicated;");
 
     // Insert into the replicated table
-    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?, ?, ?);");
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?, ?, ?, ?);");
+
+    // Update the counter
+    public final SQLStmt updateStmt = new SQLStmt("UPDATE replicated SET cnt = cnt + 1 WHERE txnid = ?;");
 
     // Get top 10 from the replicated table
     public final SQLStmt selectStmt = new SQLStmt("SELECT * FROM replicated ORDER BY txnid LIMIT 10;");
@@ -67,7 +70,10 @@ public class updateReplicated extends VoltProcedure
                                          " >= current rid " + rid);
         }
 
-        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, ts, rid);
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, ts, rid, previousResult.getLong("cnt"));
+        voltExecuteSQL();
+
+        voltQueueSQL(updateStmt, EXPECT_SCALAR_MATCH(1), txnId);
         voltQueueSQL(selectStmt);
         VoltTable[] results = voltExecuteSQL(true);
 

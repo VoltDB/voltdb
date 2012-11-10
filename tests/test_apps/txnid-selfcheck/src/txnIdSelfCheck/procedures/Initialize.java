@@ -33,7 +33,7 @@ public class Initialize extends VoltProcedure
     public final SQLStmt checkStmt = new SQLStmt("SELECT * FROM replicated ORDER BY rid;");
 
     // Insert into the replicated table
-    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?, ?, ?);");
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?, ?, ?, ?);");
 
     public long run() {
         voltQueueSQL(checkStmt, EXPECT_ZERO_OR_ONE_ROW);
@@ -48,7 +48,7 @@ public class Initialize extends VoltProcedure
         // initialize the data using the txnId
         long txnId = getTransactionId();
         long ts = getTransactionTime().getTime();
-        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, ts, -1);
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, ts, -1, 0);
         voltExecuteSQL(true);
 
         // return the rid

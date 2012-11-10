@@ -17,17 +17,20 @@
 
 package org.voltdb.compiler;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
+import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
-import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
 import org.voltdb.planner.PartitioningForStatement;
@@ -139,41 +142,55 @@ public class PlannerTool {
                     partitioning, m_hsql, new DatabaseEstimates(), true,
                     AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null);
             CompiledPlan plan = null;
+            String[] extractedLiterals = null;
             String parsedToken = null;
             try {
                 planner.parse();
                 parsedToken = planner.parameterize();
-                if (parsedToken != null) {
-
+                if (cacheable) {
                     // if cacheable, check the cache for a matching pre-parameterized plan
                     // if plan found, build the full plan using the parameter data in the
                     // QueryPlanner.
-                    if (cacheable) {
-                        CorePlan core = m_cache.getWithParsedToken(parsedToken);
-                        if (core != null) {
+                    assert(parsedToken != null);
+                    extractedLiterals = planner.extractedParamLiteralValues();
+                    List<BoundPlan> boundVariants = m_cache.getWithParsedToken(parsedToken);
+                    if (boundVariants != null) {
+                        assert( ! boundVariants.isEmpty());
+                        BoundPlan matched = null;
+                        for (BoundPlan boundPlan : boundVariants) {
+                            if (boundPlan.allowsParams(extractedLiterals)) {
+                                matched = boundPlan;
+                                break;
+                            }
+                        }
+                        if (matched != null) {
+                            CorePlan core = matched.core;
                             ParameterSet params = new ParameterSet();
                             planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                                    core.parameterTypes, params);
+                                    boundVariants.get(0).core.parameterTypes, params);
+                            Object[] paramArray = params.toArray();
                             Object partitionKey = null;
                             if (core.partitioningParamIndex >= 0) {
-                                partitionKey = params.toArray()[core.partitioningParamIndex];
+                                partitionKey = paramArray[core.partitioningParamIndex];
                             }
                             AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(VoltDB.UTF8ENCODING),
                                                                                    core,
                                                                                    params,
+                                                                                   extractedLiterals,
+                                                                                   matched.constants,
                                                                                    partitionKey);
                             m_cache.put(sql, parsedToken, ahps);
                             cacheUse = CacheUse.HIT2;
                             return ahps;
                         }
                     }
-
-                    // if not cacheable or no cach hit, do the expensive full planning
-                    plan = planner.plan();
-                    assert(plan != null);
                 }
+
+                // if not cacheable or no cach hit, do the expensive full planning
+                plan = planner.plan();
+                assert(plan != null);
             } catch (Exception e) {
-                throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
+                throw new RuntimeException("Error compiling query: " + e.toString(), e);
             }
 
             if (plan == null) {
@@ -199,7 +216,7 @@ public class PlannerTool {
             // OUTPUT THE RESULT
             //////////////////////
 
-            AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, m_catalogVersion);
+            AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, m_catalogVersion, extractedLiterals);
 
             if (cacheable && planner.compiledAsParameterizedPlan()) {
                 assert(parsedToken != null);

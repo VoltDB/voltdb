@@ -83,19 +83,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_targetTable);
     assert(m_node->getTargetTable());
 
-    TupleSchema* schema = m_node->generateTupleSchema(false);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      "temp",
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
+    setDMLCountOutputTable(limits);
 
     AbstractPlanNode *child = m_node->getChildren()[0];
     ProjectionPlanNode *proj_node = NULL;
@@ -114,7 +102,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     }
 
     vector<string> output_column_names = proj_node->getOutputColumnNames();
-    vector<string> targettable_column_names = m_targetTable->getColumnNames();
+    const vector<string> &targettable_column_names = m_targetTable->getColumnNames();
 
     /*
      * The first output column is the tuple address expression and it isn't part of our output so we skip

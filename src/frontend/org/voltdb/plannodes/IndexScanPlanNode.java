@@ -85,6 +85,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
+    private ArrayList<AbstractExpression> m_bindings = null;
+
     public IndexScanPlanNode() {
         super();
     }
@@ -416,5 +418,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         retval += " using \"" + m_targetIndexName + "\"";
         retval += " " + usageInfo;
         return retval;
+    }
+
+    public void setBindings(ArrayList<AbstractExpression> bindings) {
+        m_bindings  = bindings;
+    }
+
+    public ArrayList<AbstractExpression> getBindings() {
+        return m_bindings;
     }
 }

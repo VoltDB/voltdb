@@ -36,37 +36,56 @@ public abstract class VoltTypeUtil {
     protected static final Long DATE_START = VoltTypeUtil.DATE_STOP - 153792000;
 
     public static Object getRandomValue(VoltType type) {
+        return getRandomValue(type, 32, 0, rand);
+    }
+
+    public static Object getRandomValue(VoltType type, int maxSize) {
+        return getRandomValue(type, maxSize, 0, rand);
+    }
+
+    public static Object getRandomValue(VoltType type, int maxSize, double nullFraction, Random r) {
+        assert(type != null);
+        assert(maxSize > 0);
+        assert(nullFraction >= 0.0);
+        assert(nullFraction <= 1.0);
+        assert(r != null);
+
+        // return null for some fraction of requests
+        if (r.nextDouble() < nullFraction) {
+            return null;
+        }
+
         Object ret = null;
         switch (type) {
             // --------------------------------
             // INTEGERS
             // --------------------------------
             case TINYINT:
-                ret = Byte.valueOf((byte) Math.abs(VoltTypeUtil.rand.nextInt() % 128));
+                ret = Byte.valueOf((byte) Math.abs(r.nextInt() % 128));
                 break;
             case SMALLINT:
-                ret = Short.valueOf((short) Math.abs(VoltTypeUtil.rand.nextInt() % 32768));
+                ret = Short.valueOf((short) Math.abs(r.nextInt() % 32768));
                 break;
             case INTEGER:
-                ret = Integer.valueOf(Math.abs(VoltTypeUtil.rand.nextInt() % 100000));
+                ret = Integer.valueOf(Math.abs(r.nextInt() % 100000));
                 break;
             case BIGINT:
-                ret = Long.valueOf(Math.abs(VoltTypeUtil.rand.nextInt() % 100000));
+                ret = Long.valueOf(Math.abs(r.nextInt() % 100000));
                 break;
             // --------------------------------
             // FLOATS
             // --------------------------------
             case FLOAT:
-                ret = Double.valueOf(Math.abs(VoltTypeUtil.rand.nextDouble()));
+                ret = Double.valueOf(Math.abs(r.nextDouble()));
                 break;
             // --------------------------------
             // STRINGS
             // --------------------------------
-            case STRING:
-                int size = VoltTypeUtil.rand.nextInt(31) + 1;
+            case STRING: {
+                int size = r.nextInt(maxSize) + 1;
                 String ret_str = "";
                 for (int ctr = 0; ctr < size; ctr++) {
-                    char data = (char)(Math.abs(VoltTypeUtil.rand.nextInt()) % 128);
+                    char data = (char)(Math.abs(r.nextInt()) % 128);
                     //
                     // Skip quotation marks
                     //
@@ -78,11 +97,22 @@ public abstract class VoltTypeUtil {
                  }
                 ret = ret_str;
                 break;
+            }
+            // --------------------------------
+            // VARBINARY
+            // --------------------------------
+            case VARBINARY: {
+                int size = r.nextInt(maxSize) + 1;
+                byte[] bytestr = new byte[size];
+                r.nextBytes(bytestr);
+                ret = bytestr;
+                break;
+            }
             // --------------------------------
             // TIMESTAMP
             // --------------------------------
             case TIMESTAMP: {
-                long timestamp = VoltTypeUtil.rand.nextInt((int)(VoltTypeUtil.DATE_STOP - VoltTypeUtil.DATE_START)) + VoltTypeUtil.DATE_START;
+                long timestamp = r.nextInt((int)(VoltTypeUtil.DATE_STOP - VoltTypeUtil.DATE_START)) + VoltTypeUtil.DATE_START;
                 ret = new TimestampType(Long.valueOf(timestamp * 1000));
                 break;
             }

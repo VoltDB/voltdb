@@ -24,7 +24,6 @@ import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +36,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 
 import com.google.common.primitives.Longs;
 
@@ -49,12 +49,7 @@ public class SnapshotCompletionMonitor {
     private final ExecutorService m_es = new ThreadPoolExecutor(1, 1,
             0L, TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<Runnable>(),
-            new ThreadFactory() {
-                @Override
-                public Thread newThread(Runnable r) {
-                    return new Thread(r, "SnapshotCompletionMonitor");
-                }
-            },
+            CoreUtils.getThreadFactory("SnapshotCompletionMonitor"),
             new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
 
     private final Watcher m_newSnapshotWatcher = new Watcher() {

@@ -592,4 +592,14 @@ public class MiscUtils {
         }
         return result;
     }
+
+    public static void deleteRecursively( File file) {
+        if (file == null || !file.exists() || !file.canRead() || !file.canWrite()) return;
+        if (file.isDirectory() && file.canExecute()) {
+            for (File f: file.listFiles()) {
+                deleteRecursively(f);
+            }
+        }
+        file.delete();
+    }
 }

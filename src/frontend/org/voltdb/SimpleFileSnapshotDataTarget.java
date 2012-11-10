@@ -21,17 +21,15 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotTableTask;
 
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 
 public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private final File m_tempFile;
@@ -58,18 +56,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         RandomAccessFile ras = new RandomAccessFile(m_tempFile, "rw");
         m_fc = ras.getChannel();
 
-        m_es = MoreExecutors.listeningDecorator(
-                Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-
-                return new Thread(
-                        Thread.currentThread().getThreadGroup(),
-                        r,
-                        "Snapshot write thread for " + m_file,
-                        131072);
-            }
-        }));
+        m_es = CoreUtils.getSingleThreadExecutor("Snapshot write thread for " + m_file);
     }
 
     private final ListeningExecutorService m_es;
