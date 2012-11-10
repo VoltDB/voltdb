@@ -71,7 +71,7 @@ public class TestSequentialRejoinCoordinator {
         m_overflow = getTempDir();
         HostMessenger messenger = mock(HostMessenger.class);
         doReturn(1000l).when(messenger).generateMailboxId(null);
-        m_coordinator = spy(new SequentialRejoinCoordinator(messenger, sites, m_overflow.getAbsolutePath()));
+        m_coordinator = spy(new SequentialRejoinCoordinator(messenger, sites, m_overflow.getAbsolutePath(),true));
     }
 
     @After

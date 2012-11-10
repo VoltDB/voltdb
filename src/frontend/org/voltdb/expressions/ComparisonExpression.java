@@ -56,7 +56,7 @@ public class ComparisonExpression extends AbstractExpression {
         return true;
     }
 
-    private static Map<ExpressionType,ExpressionType> reverses = new HashMap<ExpressionType, ExpressionType>();
+    public static final Map<ExpressionType,ExpressionType> reverses = new HashMap<ExpressionType, ExpressionType>();
     static {
         reverses.put(ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL);
         reverses.put(ExpressionType.COMPARE_NOTEQUAL, ExpressionType.COMPARE_NOTEQUAL);

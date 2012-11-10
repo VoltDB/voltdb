@@ -60,7 +60,6 @@
 #include "storage/temptable.h"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
 using namespace std;
 using namespace voltdb;
@@ -186,22 +185,13 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(node->getInputTables().size() == 1);
 
     int schema_size = static_cast<int>(node->getOutputSchema().size());
-    string* columnNames = new string[schema_size];
+    // Create output table based on output schema from the plan
+    setTempOutputTable(limits);
+
     for (int i = 0; i < schema_size; i++)
     {
-        columnNames[i] = node->getOutputSchema()[i]->getColumnName();
-        m_outputExpressions.
-            push_back(node->getOutputSchema()[i]->getExpression());
+        m_outputExpressions.push_back(node->getOutputSchema()[i]->getExpression());
     }
-
-    TupleSchema* schema = node->generateTupleSchema(true);
-
-    // create the output table
-    node->setOutputTable(
-        TableFactory::getTempTable(node->getInputTables()[0]->databaseId(),
-                                   "temp", schema, columnNames,
-                                   limits));
-    delete[] columnNames;
 
     //
     // Make sure that we actually have search keys
@@ -472,24 +462,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 else {
                     return false;
                 }
-            }
-
-            if (m_sortDirection != SORT_DIRECTION_TYPE_INVALID) {
-                bool order_by_asc = true;
-
-                if (m_sortDirection == SORT_DIRECTION_TYPE_ASC) {
-                    // nothing now
-                }
-                else {
-                    order_by_asc = false;
-                }
-
-                if (num_of_searchkeys == 0) {
-                    index->moveToEnd(order_by_asc);
-                }
-            }
-            else if (m_sortDirection == SORT_DIRECTION_TYPE_INVALID && num_of_searchkeys == 0) {
-                index->moveToEnd(true);
+            } else {
+                bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+                index->moveToEnd(toStartActually);
             }
 
             while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&

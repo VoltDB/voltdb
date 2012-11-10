@@ -86,24 +86,19 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof ConstantValueExpression == false) return false;
+        if (obj instanceof ConstantValueExpression == false) {
+            return false;
+        }
         ConstantValueExpression expr = (ConstantValueExpression) obj;
 
-        if (expr.m_isNull && m_isNull)
-        {
+        if (m_isNull != expr.m_isNull) {
+            return false;
+        }
+
+        if (m_isNull) { // implying that both sides are null
             return true;
         }
-
-        if (expr.m_isNull != m_isNull)
-        {
-            return false;
-        }
-
-        if (expr.m_value.equals(m_value) == false)
-            return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
+        return m_value.equals(expr.m_value);
     }
 
     @Override

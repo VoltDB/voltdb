@@ -86,12 +86,12 @@ public class BabySitter
         m_shutdown.set(true);
     }
 
-    private BabySitter(ZooKeeper zk, String dir, Callback cb)
+    private BabySitter(ZooKeeper zk, String dir, Callback cb, ExecutorService es)
     {
         m_zk = zk;
         m_dir = dir;
         m_cb = cb;
-        m_es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Babysitter-" + dir));
+        m_es = es;
     }
 
     /**
@@ -100,7 +100,20 @@ public class BabySitter
     public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb)
         throws InterruptedException, ExecutionException
     {
-        BabySitter bs = new BabySitter(zk, dir, cb);
+        ExecutorService es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Babysitter-" + dir));
+        return blockingFactory(zk, dir, cb, es);
+    }
+
+    /**
+     * Create a new BabySitter and block on reading the initial children list.
+     * Use the provided ExecutorService to queue events to, rather than
+     * creating a private ExecutorService.
+     */
+    public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb,
+            ExecutorService es)
+        throws InterruptedException, ExecutionException
+    {
+        BabySitter bs = new BabySitter(zk, dir, cb, es);
         Future<List<String>> task = bs.m_es.submit(bs.m_eventHandler);
         List<String> initialChildren = task.get();
         return new Pair<BabySitter, List<String>>(bs, initialChildren);

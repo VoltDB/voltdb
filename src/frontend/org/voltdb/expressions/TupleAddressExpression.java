@@ -35,5 +35,16 @@ public class TupleAddressExpression extends AbstractValueExpression {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
+    public boolean equals(Object obj) {
+        // This is slightly over-permissive
+        // -- it assumes that the (implied) target tables are the same whenever equality is
+        // being checked within the context of identical expressions.
+        // If that ever matters, add some kind of table identifier attribute to this class.
+        return (obj instanceof TupleAddressExpression);
+    }
+
+    @Override
+    protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
+        // No attributes -- nothing to load.
+    }
 }

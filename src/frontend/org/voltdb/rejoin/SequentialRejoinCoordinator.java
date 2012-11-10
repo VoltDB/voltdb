@@ -42,11 +42,15 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
     private final Queue<Long> m_pendingSites;
     // contains all sites that haven't finished replaying transactions
     private final Queue<Long> m_rejoiningSites = new LinkedList<Long>();
+    // true if performing live rejoin
+    private final boolean m_liveRejoin;
 
     public SequentialRejoinCoordinator(HostMessenger messenger,
                                        List<Long> sites,
-                                       String voltroot) {
+                                       String voltroot,
+                                       boolean liveRejoin) {
         super(messenger);
+        m_liveRejoin = liveRejoin;
         m_pendingSites = new LinkedList<Long>(sites);
         if (m_pendingSites.isEmpty()) {
             VoltDB.crashLocalVoltDB("No execution sites to rejoin", false, null);
@@ -69,7 +73,8 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
      */
     private void initiateRejoinOnSite(long HSId) {
         RejoinMessage msg = new RejoinMessage(getHSId(),
-                                              RejoinMessage.Type.INITIATION);
+                m_liveRejoin ? RejoinMessage.Type.INITIATION :
+                               RejoinMessage.Type.INITIATION_COMMUNITY);
         send(HSId, msg);
     }
 

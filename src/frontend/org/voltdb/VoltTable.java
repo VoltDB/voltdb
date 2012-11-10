@@ -138,6 +138,11 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     int m_rowCount = -1;
     int m_colCount = -1;
 
+    // kept around if provided for schema enforcement - only really used for test code
+    ColumnInfo[] m_originalColumnInfos = null;
+    // used for test code that generates schema from tables
+    String m_name = null;
+
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
     static final String JSON_TYPE_KEY = "type";
@@ -159,7 +164,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * <p>Note: VoltDB current supports ASCII encoded column names only. Column values are
      * still UTF-8 encoded.</p>
      */
-    public static final class ColumnInfo {
+    public static class ColumnInfo {
 
         /**
          * Construct an immutable <tt>ColumnInfo</tt> instance.
@@ -186,6 +191,16 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         // immutable actual data
         final String name;
         final VoltType type;
+
+        // data below not exposed publicly / not serialized
+        int size = VoltType.MAX_VALUE_LENGTH;
+        boolean nullable = true;
+        boolean unique = false;
+        int pkeyIndex = -1; // -1 when not part of pkey
+        String defaultValue = NO_DEFAULT_VALUE;
+
+        // pick a random string as sigil for no default
+        static final String NO_DEFAULT_VALUE = "!@#$%^&*(!@#$%^&*(";
     }
 
     /**
@@ -262,6 +277,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         // allocate a 1K table backing for starters
         int allocationSize = 1024;
         m_buffer = ByteBuffer.allocate(allocationSize);
+
+        // save these around for tests that use them for schema checking during addRow
+        m_originalColumnInfos = columns;
 
         // while not successful at initializing,
         //  use a bigger and bigger backing
@@ -458,6 +476,68 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         return retval;
     }
 
+    // package-private methods to get constraint for test code
+    final boolean getColumnNullable(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].nullable;
+        }
+        return true;
+    }
+
+    // package-private methods to get constraint for test code
+    final int getColumnMaxSize(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].size;
+        }
+        return VoltType.MAX_VALUE_LENGTH;
+    }
+
+    // package-private methods to get constraint for test code
+    final int getColumnPkeyIndex(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].pkeyIndex;
+        }
+        return -1;
+    }
+
+    // package-private methods to get constraint for test code
+    final int[] getPkeyColumnIndexes() {
+        if (m_originalColumnInfos != null) {
+            int pkeyCount = 0;
+            for (ColumnInfo colInfo : m_originalColumnInfos) {
+                if (colInfo.pkeyIndex != -1) {
+                    pkeyCount++;
+                }
+            }
+            int[] retval = new int[pkeyCount];
+            for (int i = 0; i < m_originalColumnInfos.length; i++) {
+                if (m_originalColumnInfos[i].pkeyIndex != -1) {
+                    retval[m_originalColumnInfos[i].pkeyIndex] = i;
+                }
+            }
+            return retval;
+        }
+        return new int[0];
+    }
+
+    // package-private methods to get constraint for test code
+    final boolean getColumnUniqueness(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].unique;
+        }
+        return false;
+    }
+
+    // package-private methods to get constraint for test code
+    final String getColumnDefaultValue(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].defaultValue;
+        }
+        return null;
+    }
+
+
+
     @Override
     public final int getColumnIndex(String name) {
         assert(verifyTableInvariants());
@@ -551,10 +631,26 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 Object value = values[col];
                 VoltType columnType = VoltType.get(m_buffer.get(typePos + col));
 
+                // schema checking code that is used for some tests
+                boolean allowNulls = true;
+                int maxColSize = VoltType.MAX_VALUE_LENGTH;
+                if (m_originalColumnInfos != null) {
+                    allowNulls = m_originalColumnInfos[col].nullable;
+                    maxColSize = m_originalColumnInfos[col].size;
+                }
+
                 try
                 {
                     if (VoltType.isNullVoltType(value))
                     {
+                        // schema checking code that is used for some tests
+                        // alllowNulls should always be true in production
+                        if (allowNulls == false) {
+                            throw new IllegalArgumentException(
+                                    String.format("Column %s at index %d doesn't allow NULL values.",
+                                    getColumnName(col), col));
+                        }
+
                         switch (columnType) {
                         case TINYINT:
                             m_buffer.put(VoltType.NULL_TINYINT);
@@ -669,18 +765,20 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                         case STRING: {
                             // Accept byte[] and String
                             if (value instanceof byte[]) {
-                                if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
+                                if (((byte[]) value).length > maxColSize)
                                     throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                                            "Value in VoltTable.addRow(...) larger than allowed max " +
+                                                    VoltType.humanReadableSize(maxColSize));
 
                                 // bytes MUST be a UTF-8 encoded string.
                                 assert(testForUTF8Encoding((byte[]) value));
                                 writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                             }
                             else {
-                                if (((String) value).length() > VoltType.MAX_VALUE_LENGTH)
+                                if (((String) value).length() > maxColSize)
                                     throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                                            "Value in VoltTable.addRow(...) larger than allowed max " +
+                                                    VoltType.humanReadableSize(maxColSize));
 
                                 writeStringToBuffer((String) value, ROWDATA_ENCODING, m_buffer);
                             }
@@ -693,9 +791,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                                 value = Encoder.hexDecode((String) value);
                             }
                             if (value instanceof byte[]) {
-                                if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
+                                if (((byte[]) value).length > maxColSize)
                                     throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                                            "Value in VoltTable.addRow(...) larger than allowed max " +
+                                                    VoltType.humanReadableSize(maxColSize));
                                 writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                             }
                             break;

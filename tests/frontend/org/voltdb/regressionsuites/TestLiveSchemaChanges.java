@@ -227,6 +227,43 @@ public class TestLiveSchemaChanges extends RegressionSuite {
     }
 
     /**
+     * Variant of testRenameIndex to test structural identity checks for expression indexes.
+     * @throws Exception
+     */
+    public void testRenameExpressionIndex() throws Exception
+    {
+        Client client = getClient();
+        loadSomeData(client, "P1", 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        long tupleCount = TestCatalogUpdateSuite.indexEntryCountFromStats(client, "P1", "EXPRESS");
+        assertTrue(tupleCount > 0);
+
+        // rename the one user-created index in the table
+        String newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-renamedexpressionindex.jar");
+        VoltTable[] results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        long newTupleCount = TestCatalogUpdateSuite.indexEntryCountFromStats(client, "P1", "EXPRESS_RENAMED");
+        assertTrue(tupleCount > 0);
+        assertEquals(newTupleCount, tupleCount);
+
+        loadSomeData(client, "P1", 10, 2000);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // rename the index back for fun
+        newCatalogURL = Configuration.getPathToCatalogForTest("liveschema-base.jar");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(m_globalDeploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        loadSomeData(client, "P1", 2010, 100);
+        client.drain();
+        assertTrue(callbackSuccess);
+    }
+
+    /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
      */
@@ -258,6 +295,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
+        project.addLiteralSchema("CREATE UNIQUE INDEX EXPRESS ON P1 (ABS(SMALL));");
         // build the jarfile
         boolean basecompile = config.compile(project);
         assertTrue(basecompile);
@@ -276,6 +314,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("P2", true, false, false, false));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));
+        project.addLiteralSchema("CREATE UNIQUE INDEX EXPRESS ON P1 (ABS(SMALL));");
         boolean compile = config.compile(project);
         assertTrue(compile);
 
@@ -284,6 +323,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         project.addLiteralSchema(makeTable("P1", true, false, false, false));
         project.addLiteralSchema(makeTable("R1", true, true, false, false));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
+        project.addLiteralSchema("CREATE UNIQUE INDEX EXPRESS ON P1 (ABS(SMALL));");
         compile = config.compile(project);
         assertTrue(compile);
 
@@ -292,6 +332,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, false));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
+        project.addLiteralSchema("CREATE UNIQUE INDEX EXPRESS ON P1 (ABS(SMALL));");
         compile = config.compile(project);
         assertTrue(compile);
 
@@ -300,6 +341,16 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));
         project.addLiteralSchema("CREATE UNIQUE INDEX RLTYX ON P1 (BIG);");
+        project.addLiteralSchema("CREATE UNIQUE INDEX EXPRESS ON P1 (ABS(SMALL));");
+        compile = config.compile(project);
+        assertTrue(compile);
+
+        config = new LocalCluster("liveschema-renamedexpressionindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new VoltProjectBuilder();
+        project.addLiteralSchema(makeTable("P1", true, false, false, true));
+        project.addLiteralSchema(makeTable("R1", true, true, false, true));
+        project.addLiteralSchema("CREATE UNIQUE INDEX RLTY ON P1 (BIG);");
+        project.addLiteralSchema("CREATE UNIQUE INDEX EXPRESS_RENAMED ON P1 (ABS(SMALL));");
         compile = config.compile(project);
         assertTrue(compile);
 

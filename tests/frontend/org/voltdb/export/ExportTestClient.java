@@ -30,15 +30,14 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportConnection;
 import org.voltdb.exportclient.ExportDecoderBase;
-import org.voltcore.logging.VoltLogger;
 
 public class ExportTestClient extends ExportClientBase
 {
@@ -151,7 +150,7 @@ public class ExportTestClient extends ExportClientBase
     public boolean verifyExportOffsets()
     {
         boolean retval = true;
-
+        //      table         partition offset
         HashMap<String, HashMap<Integer, Long>> table_offsets = new HashMap<String, HashMap<Integer,Long>>();
 
         // Generate polls for every connection/table/partition

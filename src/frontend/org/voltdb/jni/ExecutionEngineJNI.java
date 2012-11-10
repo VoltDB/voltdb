@@ -181,12 +181,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      *  catalog.
      */
     @Override
-    public void loadCatalog(long txnId, final String serializedCatalog) throws EEException {
+    public void loadCatalog(long timestamp, final String serializedCatalog) throws EEException {
         //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeLoadCatalog(pointer, txnId, getStringBytes(serializedCatalog));
+            errorCode = nativeLoadCatalog(pointer, timestamp, getStringBytes(serializedCatalog));
         }
         checkErrorCode(errorCode);
         //LOG.info("Loaded Catalog.");
@@ -197,12 +197,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * engine's catalog.
      */
     @Override
-    public void updateCatalog(long txnId, final String catalogDiffs) throws EEException {
+    public void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
         //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeUpdateCatalog(pointer, txnId, getStringBytes(catalogDiffs));
+            errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
         }
         checkErrorCode(errorCode);
     }

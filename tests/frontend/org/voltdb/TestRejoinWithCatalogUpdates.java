@@ -155,6 +155,7 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
                 BackendTarget.NATIVE_EE_JNI);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
+        cluster.setHasLocalServer(false);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));

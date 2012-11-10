@@ -17,6 +17,9 @@
 
 package org.voltdb.expressions;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -34,6 +37,11 @@ public class ParameterValueExpression extends AbstractValueExpression {
     }
 
     protected int m_paramIndex = -1;
+    // Only parameters injected by the plan cache "parameterizer" have an associated constant
+    // representing the original statement's constant value that the parameter replaces.
+    // The constant value does not need to participate in parameter value identity (equality/hashing)
+    // or serialization (export to EE).
+    private ConstantValueExpression m_originalValue = null;
 
     public ParameterValueExpression() {
         super(ExpressionType.VALUE_PARAMETER);
@@ -43,6 +51,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
     public Object clone() throws CloneNotSupportedException {
         ParameterValueExpression clone = (ParameterValueExpression)super.clone();
         clone.m_paramIndex = m_paramIndex;
+        clone.m_originalValue = m_originalValue;
         return clone;
     }
 
@@ -62,21 +71,18 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof ParameterValueExpression == false) return false;
+        if (obj instanceof ParameterValueExpression == false) {
+            return false;
+        }
         ParameterValueExpression expr = (ParameterValueExpression) obj;
 
-        if (expr.m_paramIndex != m_paramIndex)
-            return false;
-
-        // if all seems well, defer to the superclass, which checks kids
-        return super.equals(obj);
+        return m_paramIndex == expr.m_paramIndex;
     }
 
     @Override
     public int hashCode() {
         // based on implementation of equals
-        int result = m_paramIndex;
-        return result += super.hashCode();
+        return m_paramIndex;
     }
 
     @Override
@@ -122,6 +128,29 @@ public class ParameterValueExpression extends AbstractValueExpression {
         }
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+    }
+
+    public void setOriginalValue(ConstantValueExpression cve) {
+        m_originalValue = cve;
+    }
+
+    public ConstantValueExpression getOriginalValue() {
+        return m_originalValue;
+    }
+
+    // Return this parameter in a list of bound parameters if the expr argument is in fact
+    // its original value constant "binding". This ensures that the index plan that depends
+    // on the parameter binding to a critical constant value does not get misapplied to a later
+    // query in which that constant differs.
+    @Override
+    public List<AbstractExpression> bindingToIndexedExpression(AbstractExpression expr) {
+        if (m_originalValue == null || ! m_originalValue.equals(expr)) {
+            return null;
+        }
+        // This parameter's value was matched, so return this as one bound parameter.
+        List<AbstractExpression> result = new ArrayList<AbstractExpression>();
+        result.add(this);
+        return result;
     }
 
 }
