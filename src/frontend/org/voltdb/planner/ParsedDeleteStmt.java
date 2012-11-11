@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -28,6 +29,15 @@ import org.voltdb.expressions.ExpressionUtil;
  */
 public class ParsedDeleteStmt extends AbstractParsedStmt {
     Table table = null;
+
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedDeleteStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
+    }
 
     @Override
     void parse(VoltXMLElement stmtNode) {
