@@ -331,11 +331,9 @@ public class PlanAssembler {
     /**
      * Output the best cost plan.
      *
-     * @param bestPlan best cost plan
-     * @return The best cost plan or null.
      */
-    public void finalizeBestCostPlan(CompiledPlan bestPlan) {
-        m_planSelector.finalizeOutput(bestPlan);
+    public void finalizeBestCostPlan() {
+        m_planSelector.finalizeOutput();
     }
 
     /**

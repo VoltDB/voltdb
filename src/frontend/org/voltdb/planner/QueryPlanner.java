@@ -311,7 +311,7 @@ public class QueryPlanner {
             bestPlan.rootPlanGraph = sendNode;
         }
         // Output the best plan debug info
-        assembler.finalizeBestCostPlan(bestPlan);
+        assembler.finalizeBestCostPlan();
 
         // reset all the plan node ids for a given plan
         // this makes the ids deterministic

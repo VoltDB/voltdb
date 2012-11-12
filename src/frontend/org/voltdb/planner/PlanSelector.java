@@ -95,10 +95,8 @@ public class PlanSelector implements Cloneable{
         m_sql = sql;
         m_costModel = costModel;
         m_paramHints = paramHints;
-        //m_quietPlanner = quietPlanner;
-        //m_fullDebug = fullDebug;
-        m_quietPlanner = false;
-        m_fullDebug = true;
+        m_quietPlanner = quietPlanner;
+        m_fullDebug = fullDebug;
     }
 
     /**
@@ -178,19 +176,13 @@ public class PlanSelector implements Cloneable{
 
             outputPlan(plan, planGraph, filename);
         }
-    }
-
-   /**
-    */
-   public void finalizeOutput() {
-       this.finalizeOutput();
    }
 
-   public void finalizeOutput(CompiledPlan bestPlan) {
+   public void finalizeOutput() {
         if (m_quietPlanner) {
             return;
         }
-        outputPlan(bestPlan, bestPlan.rootPlanGraph, m_bestFilename);
+        outputPlan(m_bestPlan, m_bestPlan.rootPlanGraph, m_bestFilename);
 
         // find out where debugging is going
         String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
