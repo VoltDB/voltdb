@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -198,7 +199,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
     }
 
-    public void init(DaemonInitiator initiator, ZooKeeper zk, Runnable threadLocalInit) {
+    public void init(DaemonInitiator initiator, ZooKeeper zk, Runnable threadLocalInit, GlobalServiceElector gse) {
         m_initiator = initiator;
         m_zk = zk;
 
@@ -213,13 +214,38 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_es.execute(threadLocalInit);
         }
 
-        // Really shouldn't leak this from a constructor, and twice to boot
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                leaderElection();
-            }
-        });
+        /*
+         *  Really shouldn't leak this from a constructor, and twice to boot
+         *  If IV2 is enabled leader election for the snapshot daemon is always tied to
+         *  leader election for the MP coordinator so that they can't be partitioned
+         *  from each other.
+         */
+        if (gse == null) {
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    leaderElection();
+                }
+            });
+        } else {
+            gse.registerService(new Promotable() {
+                @Override
+                public void acceptPromotion() throws InterruptedException,
+                        ExecutionException, KeeperException {
+                    m_es.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                electedTruncationLeader();
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB("Exception in snapshot daemon electing master via ZK", true, e);
+                            }
+                        }
+                    });
+                }
+
+            });
+        }
     }
 
     /*
@@ -400,19 +426,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 if (stat == null) {
                     try {
                         m_zk.create(VoltZK.snapshot_truncation_master, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                        loggingLog.info("This node was selected as the leader for snapshot truncation");
-                        m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    scanTruncationSnapshots();
-                                } catch (Exception e) {
-                                    loggingLog.error("Error during scan and group of truncation snapshots");
-                                }
-                            }
-                        }, 0, 1, TimeUnit.HOURS);
-                        truncationRequestExistenceCheck();
-                        userSnapshotRequestExistenceCheck();
+                        electedTruncationLeader();
                         return;
                     } catch (NodeExistsException e) {
                     }
@@ -424,6 +438,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Exception in snapshot daemon electing master via ZK", true, e);
         }
+    }
+
+    /*
+     * Invoked when this snapshot daemon has been elected as leader
+     */
+    private void electedTruncationLeader() throws Exception {
+        loggingLog.info("This node was selected as the leader for snapshot truncation");
+        m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    scanTruncationSnapshots();
+                } catch (Exception e) {
+                    loggingLog.error("Error during scan and group of truncation snapshots");
+                }
+            }
+        }, 0, 1, TimeUnit.HOURS);
+        truncationRequestExistenceCheck();
+        userSnapshotRequestExistenceCheck(false);
     }
 
     /*
@@ -677,7 +710,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                         //Reset the watch
-                        userSnapshotRequestExistenceCheck();
+                        userSnapshotRequestExistenceCheck(true);
                         return;
                     }
 
@@ -698,7 +731,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                         //Reset the watch
-                        userSnapshotRequestExistenceCheck();
+                        userSnapshotRequestExistenceCheck(true);
                         return;
                     }
                 }
@@ -775,7 +808,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                                 hostLog.error(clientResponse.getStatusString());
                                 //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
 
@@ -787,7 +820,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 /*
                                  * Don't think this should happen, reset the watch to allow later requests
                                  */
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
 
@@ -828,7 +861,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                             CreateMode.PERSISTENT);
                                 }
                                 //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 //Log the details of the failure, after resetting the watch in case of some odd NPE
                                 result.resetRowPosition();
                                 hostLog.info(result);
@@ -847,7 +880,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                             Ids.OPEN_ACL_UNSAFE,
                                             CreateMode.PERSISTENT);
                                 }
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
                         }
@@ -913,8 +946,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * Set the watch in ZK on the node that represents a user
      * request for a snapshot
      */
-    void userSnapshotRequestExistenceCheck() throws Exception {
-        m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
+    void userSnapshotRequestExistenceCheck(boolean deleteExistingRequest) throws Exception {
+        if (deleteExistingRequest) {
+            m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
+        }
         if (m_zk.exists(VoltZK.user_snapshot_request, m_userSnapshotRequestExistenceWatcher) != null) {
             processUserSnapshotRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,

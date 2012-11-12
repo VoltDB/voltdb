@@ -49,6 +49,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
@@ -1043,7 +1044,15 @@ public class SnapshotUtil {
                             break;
                         }
                     } catch (ForwardClientException e) {
-                        break;
+                        //This happens when something goes wrong in the snapshot daemon
+                        //I think it will always be that there was an existing snapshot request
+                        //It should eventually terminate and then we can submit one.
+                        try {
+                            Thread.sleep(5000);
+                        } catch (InterruptedException e1) {}
+                        new VoltLogger("HOST").warn("Partition detection was unable to submit a snapshot request" +
+                                                     "because one already existed. Retrying.");
+                        continue;
                     } catch (InterruptedException ignore) {}
                 }
 

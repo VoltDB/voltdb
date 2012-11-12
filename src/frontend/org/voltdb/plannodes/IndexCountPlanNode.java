@@ -79,6 +79,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
+    private ArrayList<AbstractExpression> m_bindings;
+
     public IndexCountPlanNode() {
         super();
     }
@@ -99,6 +101,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_lookupType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
         m_predicate = null;
+        m_bindings = isp.getBindings();
 
         m_outputSchema = apn.getOutputSchema().clone();
         this.setEndKeyExpression(isp.getEndExpression());
@@ -363,5 +366,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         retval += " using \"" + m_targetIndexName + "\"";
         retval += " " + usageInfo;
         return retval;
+    }
+
+    public ArrayList<AbstractExpression> getBindings() {
+        return m_bindings;
     }
 }

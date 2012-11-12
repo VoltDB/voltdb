@@ -52,7 +52,6 @@
 #include "expressions/expressionutil.h"
 #include "plannodes/materializenode.h"
 #include "storage/table.h"
-#include "storage/tablefactory.h"
 #include "storage/temptable.h"
 
 namespace voltdb {
@@ -70,18 +69,8 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     m_columnCount = static_cast<int>(node->getOutputSchema().size());
     assert(m_columnCount >= 0);
 
-    TupleSchema* schema = node->generateTupleSchema(true);
-    std::string* column_names = new std::string[m_columnCount];
-    for (int ctr = 0; ctr < m_columnCount; ctr++)
-    {
-        column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
-    }
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                    "temp",
-                                                    schema,
-                                                    column_names,
-                                                    limits));
-    delete[] column_names;
+    // Create output table based on output schema from the plan
+    setTempOutputTable(limits);
 
     // initialize local variables
     all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());

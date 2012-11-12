@@ -37,12 +37,17 @@ public class AdHocPlannedStatement {
     public final CorePlan core;
     public final byte[] sql;
     public final ParameterSet extractedParamValues;
+    private final int[] boundParamIndexes;
+    public final String[] extractedParamStrings;
+    private String[] boundParamStrings;
     public final Object partitionParam; // not serialized
 
-    AdHocPlannedStatement(CompiledPlan plan, int catalogVersion) {
+    AdHocPlannedStatement(CompiledPlan plan, int catalogVersion, String[] extractedLiterals) {
         sql = plan.sql.getBytes(VoltDB.UTF8ENCODING);
         core = new CorePlan(plan, catalogVersion);
         extractedParamValues = plan.extractedParamValues;
+        boundParamIndexes = plan.boundParamIndexes();
+        extractedParamStrings = extractedLiterals;
         partitionParam = plan.getPartitioningKey();
 
         validate();
@@ -59,15 +64,20 @@ public class AdHocPlannedStatement {
     public AdHocPlannedStatement(byte[] sql,
                                  CorePlan core,
                                  ParameterSet extractedParamValues,
+                                 String[] extractedParamStrings,
+                                 String[] constants,
                                  Object partitionParam) {
 
         this.sql = sql;
         this.core = core;
         this.extractedParamValues = extractedParamValues;
+        this.boundParamIndexes = null;
+        this.extractedParamStrings = extractedParamStrings;
+        this.boundParamStrings = constants;
         this.partitionParam = partitionParam;
 
-        // as this constructor is used for deserializaton on the proc-running side,
-        // no partitioning param object is needed
+        // When this constructor is used for deserializaton on the proc-running side,
+        // the bound param and extracted param string constants and the partitioning param object are not required.
 
         validate();
     }
@@ -141,7 +151,7 @@ public class AdHocPlannedStatement {
         FastDeserializer fds = new FastDeserializer(buf);
         parameterSet.readExternal(fds);
 
-        return new AdHocPlannedStatement(sql, core, parameterSet, null);
+        return new AdHocPlannedStatement(sql, core, parameterSet, null, null, null);
     }
 
     /* (non-Javadoc)
@@ -186,5 +196,22 @@ public class AdHocPlannedStatement {
     public int hashCode() {
         assert false : "hashCode not designed";
         return 42; // any arbitrary constant will do
+    }
+
+    public String[] parameterBindings() {
+        if (boundParamStrings != null) {
+            return boundParamStrings;
+        }
+        if (extractedParamStrings == null) {
+            return null;
+        }
+        if (boundParamIndexes == null || boundParamIndexes.length == 0) {
+            return null;
+        }
+        boundParamStrings = new String[extractedParamValues.size()];
+        for (int paramIndex : boundParamIndexes) {
+            boundParamStrings[paramIndex] = extractedParamStrings[paramIndex];
+        }
+        return boundParamStrings;
     }
 }

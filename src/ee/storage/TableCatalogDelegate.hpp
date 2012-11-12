@@ -48,8 +48,7 @@ class TableCatalogDelegate : public CatalogDelegate {
 
 
     // table specific
-    int init(ExecutorContext *executorContext,
-             catalog::Database &catalogDatabase,
+    int init(catalog::Database &catalogDatabase,
              catalog::Table &catalogTable);
 
     static TupleSchema *createTupleSchema(catalog::Table &catalogTable);

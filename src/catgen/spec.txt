@@ -57,12 +57,18 @@ begin ConnectorTableInfo      "Per-export connector table configuration"
   bool appendOnly             "DEPRICATED: True if this table is an append-only table for export."
 end
 
+begin ConnectorProperty              "Connector configuration property"
+  string name                        "Configuration property name"
+  string value                       "Configuration property value"
+end
+
 begin Connector                      "Export connector"
   string loaderclass                 "The class name of the connector"
   bool enabled                       "Is the connector enabled"
   UserRef* authUsers                 "Users authorized to invoke this procedure"
   GroupRef* authGroups               "Groups authorized to invoke this procedure"
   ConnectorTableInfo* tableInfo      "Per table configuration"
+  ConnectorProperty* config          "Connector configuration properties"
 end
 
 begin Group

@@ -17,8 +17,10 @@
 
 package org.voltdb.export;
 
-import org.voltcore.network.InputHandler;
+import java.util.Properties;
+
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.InputHandler;
 
 /**
  * Interface ExportManager imposes on processors.
@@ -72,4 +74,9 @@ public interface ExportDataProcessor  {
 
     void bootClient();
 
+    /**
+     * Pass processor specific processor configuration properties
+     * @param config an instance of {@linkplain Properties}
+     */
+    public void setProcessorConfig( Properties config);
 }

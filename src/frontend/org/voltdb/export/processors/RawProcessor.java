@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -447,6 +448,12 @@ public class RawProcessor implements ExportDataProcessor {
         }
         ExportDataSource source = partmap.get(signature);
         return source;
+    }
+
+
+
+    @Override
+    public void setProcessorConfig(Properties config) {
     }
 
     @Override

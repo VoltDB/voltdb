@@ -66,22 +66,10 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(abstractNode);
     assert(node);
 
-    //
-    // Construct the output table
-    //
-    TupleSchema* schema = node->generateTupleSchema(true);
+    // Create output table based on output schema from the plan
+    setTempOutputTable(limits);
+
     m_columnCount = static_cast<int>(node->getOutputSchema().size());
-    std::string* column_names = new std::string[m_columnCount];
-    for (int ctr = 0; ctr < m_columnCount; ctr++)
-    {
-        column_names[ctr] = node->getOutputSchema()[ctr]->getColumnName();
-    }
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                    "temp",
-                                                    schema,
-                                                    column_names,
-                                                    limits));
-    delete[] column_names;
 
     // initialize local variables
     all_tuple_array_ptr = ExpressionUtil::convertIfAllTupleValues(node->getOutputColumnExpressions());

@@ -72,17 +72,12 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
-
-import org.voltdb.compiler.AdHocCompilerCache;
-
-import org.voltdb.VoltDB;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -160,7 +155,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.8.3.1";
+    private static final String m_defaultVersionString = "2.8.4";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -585,7 +580,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive);
                 } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), false, null);
+                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
             }
 
@@ -862,7 +857,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             assert(m_clientInterfaces.size() > 0);
             ClientInterface ci = m_clientInterfaces.get(0);
-            ci.initializeSnapshotDaemon(m_messenger.getZK());
+            ci.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
@@ -1210,14 +1205,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // create groups as needed for users
             if (m_deployment.getUsers() != null) {
                 for (UsersType.User user : m_deployment.getUsers().getUser()) {
-                    String groupsCSV = user.getGroups();
-                    if (groupsCSV == null || groupsCSV.isEmpty()) {
+                    Set<String> roles = CatalogUtil.mergeUserRoles(user);
+                    if (roles.isEmpty()) {
                         continue;
                     }
-                    String[] groups = groupsCSV.split(",");
-                    for (String group : groups) {
-                        if (db.getGroups().get(group) == null) {
-                            db.getGroups().add(group);
+                    for (String role : roles) {
+                        if (db.getGroups().get(role) == null) {
+                            db.getGroups().add(role);
                         }
                     }
                 }
@@ -1228,7 +1222,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             assert(depCRC != -1);
 
             m_catalogContext = new CatalogContext(
-                    isIV2Enabled() ? TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId() : 0,
+                    isIV2Enabled() ? TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId() : 0,//txnid
+                            0,//timestamp
                             catalog, null, depCRC, 0, -1);
 
             int numberOfNodes = m_deployment.getCluster().getHostcount();
@@ -1653,9 +1648,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     ci.shutdown();
                 }
 
-                // shut down Export and its connectors.
-                ExportManager.instance().shutdown();
-
                 if (!isIV2Enabled()) {
                     // tell all m_sites to stop their runloops
                     if (m_localSites != null) {
@@ -1696,6 +1688,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         }
                     }
                 }
+
+                // shut down Export and its connectors.
+                ExportManager.instance().shutdown();
+
                 // After sites are terminated, shutdown the InvocationBufferServer.
                 // The IBS is shared by all sites; don't kill it while any site is active.
                 if (m_nodeDRGateway != null) {
@@ -1797,6 +1793,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             byte[] newCatalogBytes,
             int expectedCatalogVersion,
             long currentTxnId,
+            long currentTxnTimestamp,
             long deploymentCRC)
     {
         synchronized(m_catalogUpdateLock) {
@@ -1821,7 +1818,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             // 0. A new catalog! Update the global context and the context tracker
             m_catalogContext =
-                m_catalogContext.update(currentTxnId, newCatalogBytes, diffCommands, true, deploymentCRC);
+                m_catalogContext.update(
+                        currentTxnId,
+                        currentTxnTimestamp,
+                        newCatalogBytes,
+                        diffCommands,
+                        true,
+                        deploymentCRC);
             final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
             m_txnIdToContextTracker.put(currentTxnId,
                     new ContextTracker(
@@ -2090,6 +2093,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
          */
         for (Initiator initiator : m_iv2Initiators) {
             initiator.enableWritingIv2FaultLog();
+        }
+
+        /*
+         * IV2: From this point on, not all node failures should crash global VoltDB.
+         */
+        if (m_leaderAppointer != null) {
+            m_leaderAppointer.onReplayCompletion();
         }
 
         /*
