@@ -67,7 +67,7 @@ class ParameterizationInfo {
 
         ParameterizationInfo info = null;
         if(idToParamIndexMap.size() > 0) {
-            new ParameterizationInfo(
+            info = new ParameterizationInfo(
                 xmlSQL, parameterizedXmlSQL,
                 paramValues.toArray(new String[paramValues.size()]));
         }

@@ -180,15 +180,17 @@ public class PlanSelector implements Cloneable{
         }
     }
 
-    /**
-     * @param bestFilename
-     * @param stats
-     */
-    public void finalizeOutput() {
+   /**
+    */
+   public void finalizeOutput() {
+       this.finalizeOutput();
+   }
+
+   public void finalizeOutput(CompiledPlan bestPlan) {
         if (m_quietPlanner) {
             return;
         }
-        outputPlan(m_bestPlan, m_bestPlan.rootPlanGraph, m_bestFilename);
+        outputPlan(bestPlan, bestPlan.rootPlanGraph, m_bestFilename);
 
         // find out where debugging is going
         String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +

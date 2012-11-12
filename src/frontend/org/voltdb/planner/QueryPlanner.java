@@ -17,14 +17,9 @@
 
 package org.voltdb.planner;
 
-import java.io.File;
-import java.util.List;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
@@ -33,10 +28,8 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.plannodes.SendPlanNode;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -297,9 +290,7 @@ public class QueryPlanner {
         // to keep track of the best plan
         PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
-        // Hint to the assembler that plan needs send node to be added
-        boolean isTopPlan = true;
-        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, isTopPlan);
+        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 
         // make sure we got a winner
         if (bestPlan == null) {
@@ -309,6 +300,22 @@ public class QueryPlanner {
             }
             return null;
         }
+
+        if (bestPlan.readOnly == true) {
+            SendPlanNode sendNode = new SendPlanNode();
+            // connect the nodes to build the graph
+            sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
+            // this plan is final, generate schema and resolve all the column index references
+            sendNode.generateOutputSchema(m_db);
+            sendNode.resolveColumnIndexes();
+            bestPlan.rootPlanGraph = sendNode;
+        }
+        // Output the best plan debug info
+        assembler.finalizeBestCostPlan(bestPlan);
+
+        // reset all the plan node ids for a given plan
+        // this makes the ids deterministic
+        bestPlan.resetPlanNodeIds();
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
         Fragmentizer.fragmentize(bestPlan, m_db);
