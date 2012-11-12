@@ -51,6 +51,7 @@
 #include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
+#include "indexes/tableindex.h"
 
 // Inline PlanNodes
 #include "plannodes/indexscannode.h"
@@ -59,7 +60,6 @@
 
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
@@ -77,19 +77,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node->getTargetTable());
 
     // Create output table based on output schema from the plan
-    TupleSchema* schema = m_node->generateTupleSchema(true);
-    int column_count = static_cast<int>(m_node->getOutputSchema().size());
-    std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
-    m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-                                                      m_node->getTargetTable()->name(),
-                                                      schema,
-                                                      column_names,
-                                                      limits));
-    delete[] column_names;
+    setTempOutputTable(limits, m_node->getTargetTable()->name());
 
     //
     // INLINE PROJECTION
@@ -212,15 +200,10 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_sortDirection = m_node->getSortDirection();
 
     // Need to move GTE to find (x,_) when doing a partial covering search.
-    // the planner sometimes lies in this case: index_lookup_type_eq is incorrect.
-    // Index_lookup_type_gte is necessary. Make the change here.
-    if (m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
-        m_searchKey.getSchema()->columnCount() > m_numOfSearchkeys)
-    {
-        VOLT_TRACE("Setting lookup type to GTE for partial covering key.");
-        m_lookupType = INDEX_LOOKUP_TYPE_GTE;
-    }
-
+    // the planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
+    // Index_lookup_type_gte is necessary.
+    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
+           m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
     return true;
 }
 
@@ -389,23 +372,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         else {
             return false;
         }
-    }
-
-    //printf ("<INDEX SCAN> localSortDirection: %d\n", localSortDirection);
-    if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
-        if (activeNumOfSearchKeys == 0) {
-            bool order_by_asc = true;
-            if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
-                // nothing now
-            }
-            else {
-                order_by_asc = false;
-            }
-            m_index->moveToEnd(order_by_asc);
-        }
-    }
-    else if (localSortDirection == SORT_DIRECTION_TYPE_INVALID && activeNumOfSearchKeys == 0) {
-        m_index->moveToEnd(true);
+    } else {
+        bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+        m_index->moveToEnd(toStartActually);
     }
 
     int tuple_ctr = 0;

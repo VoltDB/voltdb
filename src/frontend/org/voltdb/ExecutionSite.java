@@ -1866,6 +1866,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     private void discoverGlobalFaultData(ExecutionSiteNodeFailureMessage message)
     {
+        if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
+            VoltDB.crashGlobalVoltDB("Detected node failure during command log replay. Cluster will shut down.",
+                                     false, null);
+        }
+
         //Keep it simple and don't try to recover on the recovering node.
         if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Aborting rejoin due to a remote node failure. Retry again.", false, null);

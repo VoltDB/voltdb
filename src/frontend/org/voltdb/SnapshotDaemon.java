@@ -456,7 +456,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         }, 0, 1, TimeUnit.HOURS);
         truncationRequestExistenceCheck();
-        userSnapshotRequestExistenceCheck();
+        userSnapshotRequestExistenceCheck(false);
     }
 
     /*
@@ -710,7 +710,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                         //Reset the watch
-                        userSnapshotRequestExistenceCheck();
+                        userSnapshotRequestExistenceCheck(true);
                         return;
                     }
 
@@ -731,7 +731,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                         //Reset the watch
-                        userSnapshotRequestExistenceCheck();
+                        userSnapshotRequestExistenceCheck(true);
                         return;
                     }
                 }
@@ -808,7 +808,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                                 hostLog.error(clientResponse.getStatusString());
                                 //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
 
@@ -820,7 +820,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 /*
                                  * Don't think this should happen, reset the watch to allow later requests
                                  */
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
 
@@ -861,7 +861,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                             CreateMode.PERSISTENT);
                                 }
                                 //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 //Log the details of the failure, after resetting the watch in case of some odd NPE
                                 result.resetRowPosition();
                                 hostLog.info(result);
@@ -880,7 +880,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                             Ids.OPEN_ACL_UNSAFE,
                                             CreateMode.PERSISTENT);
                                 }
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
                         }
@@ -946,8 +946,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * Set the watch in ZK on the node that represents a user
      * request for a snapshot
      */
-    void userSnapshotRequestExistenceCheck() throws Exception {
-        m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
+    void userSnapshotRequestExistenceCheck(boolean deleteExistingRequest) throws Exception {
+        if (deleteExistingRequest) {
+            m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
+        }
         if (m_zk.exists(VoltZK.user_snapshot_request, m_userSnapshotRequestExistenceWatcher) != null) {
             processUserSnapshotRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,

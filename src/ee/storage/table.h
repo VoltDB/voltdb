@@ -200,7 +200,10 @@ class Table {
     // COLUMNS
     // ------------------------------------------------------------------
     int columnIndex(const std::string &name) const;
-    std::vector<std::string> getColumnNames();
+    const std::vector<std::string>& getColumnNames() const {
+        return m_columnNames;
+    }
+
 
     inline const TupleSchema* schema() const {
         return m_schema;
@@ -212,10 +215,6 @@ class Table {
 
     inline int columnCount() const {
         return m_columnCount;
-    }
-
-    const std::string *columnNames() {
-        return m_columnNames;
     }
 
     // ------------------------------------------------------------------
@@ -244,11 +243,7 @@ class Table {
         return m_pkeyIndex;
     }
 
-    void configureIndexStats(CatalogId hostId,
-                             std::string hostname,
-                             int64_t siteId,
-                             CatalogId partitionId,
-                             CatalogId databaseId);
+    void configureIndexStats(CatalogId databaseId);
 
     // mutating indexes
     virtual void addIndex(TableIndex *index);
@@ -380,7 +375,7 @@ protected:
         return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
     }
 
-    void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
+    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema);
 
     // per table-type initialization
     virtual void onSetColumns() {
@@ -405,7 +400,7 @@ protected:
     TupleSchema* m_schema;
 
     // schema as array of string names
-    std::string* m_columnNames;
+    std::vector<std::string> m_columnNames;
     char *m_columnHeaderData;
     int32_t m_columnHeaderSize;
 

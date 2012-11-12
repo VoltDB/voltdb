@@ -386,8 +386,7 @@ public abstract class CatalogUtil {
             // Primary Keys / Unique Constraints
             if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
                 Index catalog_idx = catalog_const.getIndex();
-                IndexType idx_type = IndexType.get(catalog_idx.getType());
-                String idx_suffix = idx_type.getSQLSuffix();
+                String idx_suffix = IndexType.getSQLSuffix(catalog_idx.getType());
 
                 ret += add + spacer +
                        (!idx_suffix.isEmpty() ? "CONSTRAINT " + catalog_const.getTypeName() + " " : "") +

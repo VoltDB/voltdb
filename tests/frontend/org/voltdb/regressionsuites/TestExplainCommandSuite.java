@@ -66,7 +66,15 @@ public class TestExplainCommandSuite extends RegressionSuite {
             String plan = (String) vt.get(0, VoltType.STRING );
             assertTrue( plan.contains("INDEX COUNT") );
         }
-    }
+
+        //test expression index usage
+        vt = client.callProcedure("@Explain", "SELECT * FROM t3 where I3 + I4 < 100" ).getResults()[0];
+        while( vt.advanceRow() ) {
+            System.out.println(vt);
+            String plan = (String) vt.get(0, VoltType.STRING );
+            assertTrue( plan.contains("INDEX SCAN") );
+        }
+}
 
     public void testExplainProc() throws IOException, ProcCallException {
         Client client = getClient();

@@ -218,9 +218,39 @@ public class TupleValueExpression extends AbstractValueExpression {
         // -- not bothering for now.
         Column column = table.getColumns().getIgnoreCase(m_columnName);
         assert(column != null);
+        m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
         setValueType(VoltType.get((byte)column.getType()));
         setValueSize(column.getSize());
     }
+
+    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
+    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
+    // depend on tables.
+    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, Table table) {
+        assert(expr != null);
+        AbstractExpression retval = expr.getLeft();
+        if (isOperandDependentOnTable(retval, table)) {
+            retval = expr.getRight();
+            assert( ! isOperandDependentOnTable(retval, table));
+        }
+        return retval;
+    }
+
+    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
+    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
+    // depend on tables.
+    public static boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
+        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
+            //TODO: This clumsy testing of table names regardless of table aliases is
+            // EXACTLY why we can't have nice things like self-joins.
+            if (table.getTypeName().equals(tve.getTableName()))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
 }

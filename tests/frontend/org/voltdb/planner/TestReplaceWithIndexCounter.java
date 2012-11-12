@@ -109,9 +109,10 @@ public class TestReplaceWithIndexCounter extends TestCase {
         assertTrue(p instanceof SeqScanPlanNode);
     }
 
-    // This is generated as IndexScan other than SeqScan as "SELECT count(*) from T1"
-    // "Order by" here cheat planner at this point
-    // Maybe we should fix it later
+    // This is generated as an IndexScan which can't be converted into an index count,
+    // rather than as the same table count as "SELECT count(*) from T1".
+    // The meaningless "order by" here fools the planner.
+    // We should fix this later by generally ignoring the "order by" clause on non-grouped aggregate queries.
     public void testCountStar01() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 ORDER BY POINTS ASC", 0, false);
         checkIndexCounter(pn, false);
@@ -119,11 +120,6 @@ public class TestReplaceWithIndexCounter extends TestCase {
 
     public void testCountStar02() {
         List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, false);
-        checkIndexCounter(pn, false);
-    }
-
-    public void testCountStar03() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC", 0, false);
         checkIndexCounter(pn, false);
     }
 
@@ -159,7 +155,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
 
     // Down below are cases that we can replace
     public void testCountStar11() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS", 0, false);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4", 0, false);
         checkIndexCounter(pn, true);
     }
 
@@ -236,6 +232,12 @@ public class TestReplaceWithIndexCounter extends TestCase {
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexCountPlanNode);
+    }
+
+    public void testCountStar23() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC", 0, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof IndexCountPlanNode);
     }
 

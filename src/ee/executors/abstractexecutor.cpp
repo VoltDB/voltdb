@@ -48,6 +48,8 @@
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
+#include "storage/tablefactory.h"
+
 #include <vector>
 
 using namespace std;
@@ -143,5 +145,45 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     }
     return true;
 }
+
+/**
+ * Set up a multi-column temp output table for those executors that require one.
+ * Called from p_init.
+ */
+void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
+    assert(limits);
+    TupleSchema* schema = m_abstractNode->generateTupleSchema(true);
+    int column_count = (int)m_abstractNode->getOutputSchema().size();
+    std::vector<std::string> column_names(column_count);
+    assert(column_count >= 1);
+    for (int ctr = 0; ctr < column_count; ctr++)
+    {
+        column_names[ctr] = m_abstractNode->getOutputSchema()[ctr]->getColumnName();
+    }
+    m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                              tempTableName,
+                                                              schema,
+                                                              column_names,
+                                                              limits));
+}
+
+/**
+ * Set up a single-column temp output table for DML executors that require one to return their counts.
+ * Called from p_init.
+ */
+void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
+    TupleSchema* schema = m_abstractNode->generateTupleSchema(false);
+    // The column count (1) and column name for the DML counter column is hard-coded in the planner
+    // and passed via the output schema -- kind of pointless since they could just as easily be hard-coded here,
+    // possibly saving the trouble of serializing an outputSchema at all for DML nodes.
+    assert(m_abstractNode->getOutputSchema().size() == 1);
+    std::vector<std::string> columnNames(1, m_abstractNode->getOutputSchema()[0]->getColumnName());
+    m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                              "temp",
+                                                              schema,
+                                                              columnNames,
+                                                              limits));
+}
+
 
 AbstractExecutor::~AbstractExecutor() {}

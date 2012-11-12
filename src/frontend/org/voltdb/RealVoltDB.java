@@ -2098,6 +2098,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         /*
+         * IV2: From this point on, not all node failures should crash global VoltDB.
+         */
+        if (m_leaderAppointer != null) {
+            m_leaderAppointer.onReplayCompletion();
+        }
+
+        /*
          * LEGACY: Enable the initiator to send normal heartbeats and accept client
          * connections
          */
