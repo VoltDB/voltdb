@@ -63,7 +63,7 @@ class ParameterizationInfo {
         Map<String, Integer> idToParamIndexMap = new HashMap<String, Integer>();
         List<String> paramValues = new ArrayList<String>();
 
-        ParameterizationInfo.parameterizeRecursively(parameterizedXmlSQL, idToParamIndexMap, paramValues);
+        parameterizeRecursively(parameterizedXmlSQL, idToParamIndexMap, paramValues);
 
         ParameterizationInfo info = null;
         if(idToParamIndexMap.size() > 0) {
@@ -81,7 +81,7 @@ class ParameterizationInfo {
         if (parameterizedXmlSQL.name.equals("union")) {
             // UNION has its parameters on the individual selects level
             for (VoltXMLElement xmlChildSQL : parameterizedXmlSQL.children) {
-                ParameterizationInfo.parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
+                parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
             }
         } else {
             // find the parameters xml node

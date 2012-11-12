@@ -55,7 +55,6 @@
 #include "storage/tablefactory.h"
 
 #include <set>
-#include <vector>
 #include <cassert>
 
 using namespace voltdb;
@@ -82,23 +81,6 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
                                               limits));
     }
     return (true);
-}
-
-namespace detail {
-    struct ltTuples {
-        bool operator () (const std::vector<NValue>& v1, const std::vector<NValue>& v2) const {
-            assert(v1.size() == v2.size());
-            std::vector<NValue>::const_iterator it1 = v1.begin();
-            std::vector<NValue>::const_iterator it2 = v2.begin();
-            for (; it1 != v1.end(); ++it1, ++it2) {
-                int comp = it1->compare(*it2);
-                if (comp != 0) {
-                    return comp < 0;
-                }
-            }
-            return false;
-        }
-    };
 }
 
 bool DistinctExecutor::p_execute(const NValueArray &params) {
