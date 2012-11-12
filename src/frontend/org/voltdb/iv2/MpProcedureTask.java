@@ -110,6 +110,7 @@ public class MpProcedureTask extends ProcedureTask
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(errorResp);
             hostLog.debug("SYSPROCFAIL: " + this);
+            return;
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         if (response.getClientResponseData().getStatus() != ClientResponse.TXN_RESTART) {

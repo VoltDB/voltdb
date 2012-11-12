@@ -145,7 +145,6 @@ public class MpTransactionState extends TransactionState
         m_localWork = null;
         m_remoteWork = null;
         m_remoteDeps = null;
-        m_newDeps.clear();
         m_remoteDepTables.clear();
     }
 
@@ -234,6 +233,10 @@ public class MpTransactionState extends TransactionState
                     false,
                     false);
             m_remoteWork.setEmptyForRestart(getNextDependencyId());
+            if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
+                m_haveDistributedInitTask = true;
+                m_remoteWork.setInitiateTask((Iv2InitiateTaskMessage)getNotice());
+            }
             // Distribute fragments to remote destinations.
             long[] non_local_hsids = new long[m_useHSIds.size()];
             for (int i = 0; i < m_useHSIds.size(); i++) {
