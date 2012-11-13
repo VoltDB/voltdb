@@ -56,8 +56,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey>
     {
-        private long m_txnId;
-        private long m_spHandle;
+        private final long m_txnId;
+        private final long m_spHandle;
         transient final int m_hash;
 
         DuplicateCounterKey(long txnId, long spHandle)
@@ -68,6 +68,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 ((int)(m_spHandle ^ (m_spHandle >>> 32)));
         }
 
+        @Override
         public boolean equals(Object o)
         {
             if (this == o) {
@@ -83,6 +84,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         // Only care about comparing TXN ID part for sorting in updateReplicas
+        @Override
         public int compareTo(DuplicateCounterKey o)
         {
             if (m_txnId < o.m_txnId) {
@@ -102,11 +104,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
 
+        @Override
         public int hashCode()
         {
             return m_hash;
         }
 
+        @Override
         public String toString()
         {
             return "<" + m_txnId + ", " + m_spHandle + ">";
@@ -149,12 +153,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         };
     }
 
+    @Override
     public void setLeaderState(boolean isLeader)
     {
         super.setLeaderState(isLeader);
         m_snapMonitor.addInterest(this);
     }
 
+    @Override
     public void setMaxSeenTxnId(long maxSeenTxnId)
     {
         super.setMaxSeenTxnId(maxSeenTxnId);
@@ -686,6 +692,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_cl = cl;
     }
 
+    @Override
     public void enableWritingIv2FaultLog()
     {
         m_replayComplete = true;
@@ -724,7 +731,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     @Override
     public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
-            long[] partitionTxnIds, boolean truncationSnapshot)
+            long[] partitionTxnIds, boolean truncationSnapshot, String requestId)
     {
         if (truncationSnapshot) {
             writeIv2ViableReplayEntry();

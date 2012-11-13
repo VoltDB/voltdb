@@ -487,10 +487,19 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final WatchedEvent event) {
         loggingLog.info("Snapshot truncation leader received snapshot truncation request");
         String snapshotPathTemp;
+        // Get the snapshot path.
         try {
             snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
         } catch (Exception e) {
             loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
+            return;
+        }
+        // Get the request ID if provided.
+        String requestId;
+        try {
+            requestId = new String(m_zk.getData(event.getPath(), true, null), "UTF-8");
+        } catch (Exception e) {
+            loggingLog.error("Unable to retrieve truncation snapshot request ID from ZK, log can't be truncated");
             return;
         }
         m_truncationSnapshotPath = snapshotPathTemp;
@@ -513,6 +522,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("path", snapshotPath );
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            jsObj.put("requestId", requestId != null ? requestId : "");
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -1749,7 +1759,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(
-            final String nonce, final long txnId, final long partitionTxnIds[], final boolean truncation) {
+            final String nonce, final long txnId, final long partitionTxnIds[],
+            final boolean truncation, String requestId) {
         if (!truncation) {
             return new CountDownLatch(0);
         }

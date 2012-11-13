@@ -23,5 +23,6 @@ public interface SnapshotCompletionInterest {
             String nonce,
             long multipartTxnId,
             long partitionTxnIds[],
-            boolean truncationSnapshot);
+            boolean truncationSnapshot,
+            String requestId);
 }
