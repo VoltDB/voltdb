@@ -71,6 +71,12 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
                 return new ConstraintFailureException(b);
             }
         },
+        TransactionRestartException() {
+            @Override
+            protected SerializableException deserializeException(ByteBuffer b) {
+                return new TransactionRestartException(b);
+            }
+        },
         GenericSerializableException() {
             @Override
             protected SerializableException deserializeException(ByteBuffer b) {
