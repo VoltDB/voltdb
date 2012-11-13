@@ -31,7 +31,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 
 @ProcInfo(singlePartition = false)
-public class Promote extends VoltSystemProcedure {
+public class PromoteReplicaStatus extends VoltSystemProcedure {
 
     @Override
     public void init() {}
@@ -41,7 +41,7 @@ public class Promote extends VoltSystemProcedure {
                                               long fragmentId,
                                               ParameterSet params,
                                               SystemProcedureExecutionContext context) {
-        throw new RuntimeException("Promote was given an " +
+        throw new RuntimeException("@PromoteReplicaStatus was given an " +
                                    "invalid fragment id: " + String.valueOf(fragmentId));
     }
 

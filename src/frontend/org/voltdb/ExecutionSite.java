@@ -222,7 +222,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public CountDownLatch snapshotCompleted(String nonce,
                                                 long txnId,
                                                 long partitionTxnIds[],
-                                                boolean truncationSnapshot) {
+                                                boolean truncationSnapshot,
+                                                String requestId) {
             if (m_rejoinSnapshotTxnId != -1) {
                 if (m_rejoinSnapshotTxnId == txnId) {
                     m_rejoinLog.debug("Rejoin snapshot for site " + getSiteId() +
