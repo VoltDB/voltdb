@@ -47,16 +47,23 @@ import java.io.OutputStreamWriter;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
-import org.voltdb.client.exampleutils.ClientConnection;
-import org.voltdb.client.exampleutils.ClientConnectionPool;
-import org.voltdb.client.exampleutils.IRateLimiter;
-import org.voltdb.client.exampleutils.LatencyLimiter;
-import org.voltdb.client.exampleutils.RateLimiter;
 
 public class AsyncExportClient
 {
@@ -130,7 +137,7 @@ public class AsyncExportClient
                 }
                 catch (IOException e)
                 {
-                    // TODO Auto-generated catch block
+                    // TODO write down new rowid that is not randomly generated
                     e.printStackTrace();
                 }
             }
@@ -141,14 +148,64 @@ public class AsyncExportClient
         }
     }
 
+    // Connection configuration
+    private final static class ConnectionConfig {
+
+        final long displayInterval;
+        final long duration;
+        final String servers;
+        final int port;
+        final int poolSize;
+        final int rateLimit;
+        final boolean autoTune;
+        final int latencyTarget;
+        final String [] parsedServers;
+        final String procedure;
+
+        ConnectionConfig( AppHelper apph) {
+            displayInterval = apph.longValue("displayinterval");
+            duration        = apph.longValue("duration");
+            servers         = apph.stringValue("servers");
+            port            = apph.intValue("port");
+            poolSize        = apph.intValue("poolsize");
+            rateLimit       = apph.intValue("ratelimit");
+            autoTune        = apph.booleanValue("autotune");
+            latencyTarget   = apph.intValue("latencytarget");
+            procedure       = apph.stringValue("procedure");
+            parsedServers   = servers.split(",");
+        }
+    }
+
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
 
-    // Reference to the database connection we will use
-    private static ClientConnection Con;
-
     private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
+
+    // Connection reference
+    private static final AtomicReference<Client> clientRef = new AtomicReference<Client>();
+
+    // Shutdown flag
+    private static final AtomicBoolean shutdown = new AtomicBoolean(false);
+
+    // Connection Configuration
+    private static ConnectionConfig config;
+
+    // Test startup time
+    private static long benchmarkStartTS;
+
+    private static final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable arg0) {
+            Thread thread = new Thread(arg0, "Retry Connection");
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
+
+    // Statistics manager objects from the client
+    private static ClientStatsContext periodicStatsContext;
+    private static ClientStatsContext fullStatsContext;
 
     // Application entry point
     public static void main(String[] args)
@@ -175,26 +232,19 @@ public class AsyncExportClient
                 .setArguments(args)
             ;
 
+            config = new ConnectionConfig(apph);
+
             // Retrieve parameters
-            final long displayInterval = apph.longValue("displayinterval");
-            final long duration        = apph.longValue("duration");
-            final String servers       = apph.stringValue("servers");
-            final int port             = apph.intValue("port");
-            final int poolSize         = apph.intValue("poolsize");
-            final String procedure     = apph.stringValue("procedure");
-            final long rateLimit       = apph.longValue("ratelimit");
-            final boolean autoTune     = apph.booleanValue("autotune");
-            final double latencyTarget = apph.doubleValue("latencytarget");
             final boolean catalogSwap  = apph.booleanValue("catalogswap");
             final String csv           = apph.stringValue("statsfile");
 
             TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
 
             // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("poolsize", (duration > 0))
-                .validate("ratelimit", (rateLimit > 0))
-                .validate("latencytarget", (latencyTarget > 0))
+            apph.validate("duration", (config.duration > 0))
+                .validate("poolsize", (config.poolSize > 0))
+                .validate("ratelimit", (config.rateLimit > 0))
+                .validate("latencytarget", (config.latencyTarget > 0))
             ;
 
             // Display actual parameters, for reference
@@ -203,7 +253,9 @@ public class AsyncExportClient
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Get a client connection - we retry for a while in case the server hasn't started yet
-            Con = ClientConnectionPool.getWithRetry(servers, port);
+            createClient();
+            connect();
+
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -214,44 +266,40 @@ public class AsyncExportClient
                 @Override
                 public void run()
                 {
-                    System.out.print(Con.getStatistics(procedure));
+                    printStatistics(periodicStatsContext,true);
                 }
             }
-            , displayInterval*1000l
-            , displayInterval*1000l
+            , config.displayInterval*1000l
+            , config.displayInterval*1000l
             );
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
-            IRateLimiter limiter = null;
-            if (autoTune)
-                limiter = new LatencyLimiter(Con, procedure, latencyTarget, rateLimit);
-            else
-                limiter = new RateLimiter(rateLimit);
+            benchmarkStartTS = System.currentTimeMillis();
 
             // Run the benchmark loop for the requested duration
-            final long endTime = System.currentTimeMillis() + (1000l * duration);
+            final long endTime = benchmarkStartTS + (1000l * config.duration);
             Random rand = new Random();
             int swap_count = 0;
             boolean first_cat = false;
             while (endTime > System.currentTimeMillis())
             {
                 // Post the request, asynchronously
-                Con.executeAsync(new AsyncCallback(writer),
-                                 procedure,
-                                 (long)rand.nextInt(poolSize),
-                                 0);
+                clientRef.get().callProcedure(
+                        new AsyncCallback(writer),
+                        config.procedure,
+                        (long)rand.nextInt(config.poolSize),
+                        0);
+
                 swap_count++;
                 if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
                 {
                     System.out.println("Changing catalogs...");
-                    Con.updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
+                    clientRef.get().updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
                     first_cat = !first_cat;
                 }
-                // Use the limiter to throttle client activity
-                limiter.throttle();
             }
+            shutdown.compareAndSet(false, true);
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -259,7 +307,8 @@ public class AsyncExportClient
             timer.cancel();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
-            Con.drain();
+            clientRef.get().drain();
+
             Thread.sleep(10000);
 
             // Now print application results:
@@ -284,12 +333,15 @@ public class AsyncExportClient
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics(procedure).toString(false));
+            printStatistics(fullStatsContext,false);
 
             // Dump statistics to a CSV file
-            Con.saveStatistics(csv);
+            clientRef.get().writeSummaryCSV(
+                    fullStatsContext.getStatsByProc().get(config.procedure),
+                    csv
+                    );
 
-            Con.close();
+            clientRef.get().close();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -299,5 +351,132 @@ public class AsyncExportClient
             System.out.println("Exception: " + x);
             x.printStackTrace();
         }
+    }
+
+    /**
+     * Connect to a set of servers in parallel. Each will retry until
+     * connection. This call will block until all have connected.
+     *
+     * @param servers A comma separated list of servers using the hostname:port
+     * syntax (where :port is optional).
+     * @throws InterruptedException if anything bad happens with the threads.
+     */
+    static void connect() throws InterruptedException {
+        System.out.println("Connecting to VoltDB...");
+
+        String[] serverArray = config.parsedServers;
+        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+
+        // use a new thread to connect to each server
+        for (final String server : serverArray) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    connectToOneServerWithRetry(server, config.port);
+                    connections.countDown();
+                }
+            }).start();
+        }
+        // block until all have connected
+        connections.await();
+    }
+
+    /**
+     * Connect to a single server with retry. Limited exponential backoff.
+     * No timeout. This will run until the process is killed if it's not
+     * able to connect.
+     *
+     * @param client The client to use for this server
+     * @param server hostname:port or just hostname (hostname can be ip).
+     */
+    static void connectToOneServerWithRetry(String server, int port) {
+        Client client = clientRef.get();
+        int sleep = 1000;
+        while (true) {
+            try {
+                client.createConnection(server, port);
+                break;
+            }
+            catch (Exception e) {
+                System.err.printf("Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
+                try { Thread.sleep(sleep); } catch (Exception interruted) {}
+                if (sleep < 8000) sleep += sleep;
+            }
+        }
+        System.out.printf("Connected to VoltDB node at: %s.\n", server);
+    }
+
+    static Client createClient() {
+        StatusListener statusListener = new StatusListener();
+        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        if (config.autoTune) {
+            clientConfig.enableAutoTune();
+            clientConfig.setAutoTuneTargetInternalLatency(config.latencyTarget);
+        }
+        else {
+            clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
+        }
+        Client client = ClientFactory.createClient(clientConfig);
+        clientRef.set(client);
+
+        periodicStatsContext = client.createStatsContext();
+        fullStatsContext = client.createStatsContext();
+
+        return client;
+    }
+
+    /**
+     * Remove the client from the list if connection is broken.
+     */
+    static class StatusListener extends ClientStatusListenerExt {
+
+        @Override
+        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            if (shutdown.get()) {
+                return;
+            }
+
+            // if the benchmark is still active
+            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
+                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+            }
+
+            // setup for retry
+            final String server = hostname;
+            final int finalPort = port;
+            es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    connectToOneServerWithRetry(server, finalPort);
+                }
+            });
+        }
+    }
+
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    static private synchronized void printStatistics(ClientStatsContext context, boolean resetBaseline) {
+        if (resetBaseline) {
+            context = context.fetchAndResetBaseline();
+        } else {
+            context = context.fetch();
+        }
+
+        ClientStats stats = context
+                .getStatsByProc()
+                .get(config.procedure);
+
+        if (stats == null) return;
+
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
+                stats.kPercentileLatency(0.95));
     }
 }
