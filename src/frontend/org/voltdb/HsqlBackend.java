@@ -135,7 +135,7 @@ public class HsqlBackend {
         dml = dml.trim();
         String indicator = dml.substring(0, 1).toLowerCase();
         if (indicator.equals("s") || // "s" is for "select ..."
-      		indicator.equals("(")) { // "(" is for "(select ... UNION ...)" et. al.
+            indicator.equals("(")) { // "(" is for "(select ... UNION ...)" et. al.
             try {
                 Statement stmt = dbconn.createStatement();
                 sqlLog.l7dlog( Level.DEBUG, LogKeys.sql_Backend_ExecutingDML.name(), new Object[] { dml }, null);
