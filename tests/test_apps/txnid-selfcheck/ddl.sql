@@ -35,6 +35,6 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.doTxn;
 PARTITION PROCEDURE doTxn ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.updateReplicated;
 CREATE PROCEDURE txnIdSelfCheck.procedures.getLastRow AS
-       SELECT cid, MAX(rid) AS last_rid FROM partitioned GROUP BY cid;
+       SELECT cid, MAX(-1 * rid) AS last_rid FROM partitioned GROUP BY cid;
 CREATE PROCEDURE txnIdSelfCheck.procedures.getLastReplicatedRow AS
        SELECT rid FROM replicated;
