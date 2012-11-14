@@ -1182,6 +1182,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             ClientResponseImpl clientResponse = response.getClientResponseData();
                                             ClientInterfaceHandleManager.Iv2InFlight clientData =
                                                     cihm.findHandle(response.getClientInterfaceHandle());
+                                            if (clientData == null) {
+                                                return new ByteBuffer[] {};
+                                            }
                                             final long now = System.currentTimeMillis();
                                             final int delta = (int)(now - clientData.m_creationTime);
 

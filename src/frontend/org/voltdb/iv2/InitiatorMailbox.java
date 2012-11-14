@@ -242,11 +242,11 @@ public class InitiatorMailbox implements Mailbox
      * work needs to do duplicate counting; MPI can simply broadcast the
      * repair to the needs repair units -- where the SP will do the rest.
      */
-    void repairReplicasWith(List<Long> needsRepair, VoltMessage repairWork)
+    synchronized void repairReplicasWith(List<Long> needsRepair, VoltMessage repairWork)
     {
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
-            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
+            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
             m_scheduler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {

@@ -222,7 +222,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         System.out.println("Test procedures table: " + results[0].toString());
 
         VoltTable stats = results[0];
-        stats.advanceRow();
+        String procname = "blerg";
+        while (!procname.equals("org.voltdb_testprocs.regressionsuites.malicious.GoSleep")) {
+            stats.advanceRow();
+            procname = (String)stats.get("PROCEDURE", VoltType.STRING);
+        }
 
         // Retrieve all statistics
         long min_time = (Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT);
