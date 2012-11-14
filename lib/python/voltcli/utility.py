@@ -131,13 +131,11 @@ def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
                 f.write('%s%s%s Exception: %s\n' % (stag, sindent, msg.__class__.__name__, str(msg)))
             else:
                 # Handle multi-line strings
-                try:
-                    # Raises TypeError if not string
-                    var = msg + ' '
+                if is_string(msg):
                     # If it is a string slice and dice it by linefeeds.
                     for msg2 in msg.split('\n'):
                         f.write('%s%s%s\n' % (stag, sindent, msg2))
-                except TypeError:
+                else:
                     # Recursively display an iterable with indentation added.
                     if hasattr(msg, '__iter__'):
                         display_messages(msg, f = f, tag = tag, level = level + 1)
@@ -279,11 +277,7 @@ def normalize_list(items, width, filler = None):
     """
     assert items is not None
     assert width >= 0
-    output = []
-    for item in items:
-        if len(output) == width:
-            break
-        output.append(item)
+    output = items[:width]
     if len(output) < width:
         output += filler * (width - len(output))
     return tuple(output)
@@ -303,17 +297,11 @@ def format_table(tuples, caption = None, headings = None, indent = 0, separator 
     # Display the caption, if supplied.
     if caption:
         output.append('\n%s-- %s --\n' % (sindent, caption))
-    # Add a row for headings, if supplied.
     rows = []
+    # Add a row for headings, if supplied. Underlining is added after widths are known.
     if headings:
         rows.append(headings)
-        widths = []
-        for row in rows + tuples:
-            if len(widths) < len(row):
-                widths += [0] * (len(row) - len(widths))
-            for i in range(len(row)):
-                widths[i] = max(widths[i], len(str(row[i])))
-        rows.append(['-' * widths[i] for i in range(len(widths))])
+    # Add the data rows.
     rows.extend(tuples)
     # Measure the column widths.
     widths = []
@@ -326,6 +314,9 @@ def format_table(tuples, caption = None, headings = None, indent = 0, separator 
             else:
                 widths[icolumn] = max(widths[icolumn], width)
             icolumn += 1
+    # If we have headings inject a row with underlining based on the calculated widths.
+    if headings:
+        rows.insert(1, ['-' * widths[i] for i in range(len(widths))])
     # Generate the format string and then format the headings and rows.
     fmt = '%s%s' % (sindent, separator.join(['%%-%ds' % width for width in widths]))
     for row in rows:
@@ -447,21 +438,20 @@ def is_sequence(item):
         return False
 
 #===============================================================================
-def _flatten(*items):
+def _flatten(item):
 #===============================================================================
     """
     Internal function to recursively iterate a potentially nested sequence.
     None items are filtered out.
     """
-    for item in items:
+    if item is not None:
         if is_sequence(item):
             for subitem in item:
                 for subsubitem in _flatten(subitem):
-                    if subitem is not None:
+                    if subsubitem is not None:
                         yield subsubitem
         else:
-            if item is not None:
-                yield item
+            yield item
 
 #===============================================================================
 def flatten(*items):
@@ -469,7 +459,7 @@ def flatten(*items):
     """
     Flatten and yield individual items from a potentially nested list or tuple.
     """
-    for item in _flatten(*items):
+    for item in _flatten(items):
         yield item
 
 #===============================================================================
@@ -537,7 +527,10 @@ class Zipper(object):
             self.output_file.close()
             if make_executable:
                 mode = os.stat(self.output_path).st_mode
-                os.chmod(self.output_path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                try:
+                    os.chmod(self.output_path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                except (IOError, OSError), e:
+                    self._abort('Failed to add executable permission.', e)
 
     def add_file(self, path_in, path_out):
         for re_exclude in self.re_excludes:
@@ -552,7 +545,7 @@ class Zipper(object):
                     self.output_zip.write(path_in, path_out)
                     self.manifest.append(path_out)
             except (IOError, OSError), e:
-                self._abort('Failed to write file "%s" to output zip file "%s".', path_out, e)
+                self._abort('Failed to write file "%s".' % path_out, e)
 
     def add_file_from_string(self, s, path_out):
         self._verbose_info('write string to "%s"' % path_out)
@@ -573,7 +566,7 @@ class Zipper(object):
         try:
             for basedir, subdirs, filenames in os.walk('.'):
                 for filename in filenames:
-                    file_path_in = os.path.join(basedir, filename)[2:]
+                    file_path_in = os.path.join(basedir[2:], filename)
                     file_path_out = os.path.join(dst, basedir[2:], filename)
                     self.add_file(file_path_in, file_path_out)
         finally:
@@ -648,6 +641,19 @@ def choose(prompt, *choices):
             return response[0]
 
 #===============================================================================
+def dict_to_sorted_pairs(d):
+#===============================================================================
+    """
+    Convert a dictionary to a list of key/value pairs sorted by key.
+    """
+    keys = d.keys()
+    keys.sort()
+    results = []
+    for key in keys:
+        results.append((key, d[key]))
+    return results
+
+#===============================================================================
 def kwargs_extract(kwargs, defaults, remove = True, check_extras = False):
 #===============================================================================
     """
@@ -710,22 +716,22 @@ def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = 
         host = split_host[0]
         if len(split_host) > 2:
             abort('Bad HOST:PORT format "%s" - too many colons.' % host_port)
-        if len(split_host) == 1:
-            # Add the default port if specified.
-            if default_port:
-                port = default_port
+        try:
+            if len(split_host) == 1:
+                # Add the default port if specified.
+                if default_port:
+                    port = int(default_port)
+                else:
+                    port = None
             else:
-                port = None
-        else:
-            try:
                 port = int(split_host[1])
-            except ValueError, e:
-                abort('Bad port value "%s".' % split_host[1], e)
+        except ValueError, e:
+            abort('Bad port value "%s".' % split_host[1], e)
         hosts.append(Host(host, port))
     if min_hosts is not None and len(hosts) < min_hosts:
         abort('Too few hosts in host string "%s". The minimum is %d.'
                     % (host_string, min_hosts))
-    if max_hosts is not None and len(hosts) < max_hosts:
+    if max_hosts is not None and len(hosts) > max_hosts:
         abort('Too many hosts in host string "%s". The maximum is %d.'
                     % (host_string, max_hosts))
     return hosts
@@ -758,7 +764,7 @@ class File(object):
             try:
                 return f.read()
             except (IOError, OSError), e:
-                abort('Read error.', e)
+                self._abort('Read error.', e)
         finally:
             # Close locally-opened file.
             if self.f is None:
@@ -773,7 +779,7 @@ class File(object):
         try:
             self.f.write(s)
         except (IOError, OSError), e:
-            abort('Write error.', e)
+            self._abort('Write error.', e)
     def close(self):
         if self.f:
             self.f.close()
@@ -787,39 +793,6 @@ class File(object):
         if e:
             msgs.append(str(e))
         abort(*msgs)
-
-#===============================================================================
-class XMLConfigManager(object):
-#===============================================================================
-    """
-    Loads/saves XML format configuration to and from a dictionary.
-    """
-
-    def load(self, path):
-        parser = ConfigParser.SafeConfigParser()
-        parser.read(path)
-        d = dict()
-        for section in parser.sections():
-            for name, value in parser.items(section):
-                d['%s.%s' % (section, name)] = value
-        return d
-
-    def save(self, path, d):
-        parser = ConfigParser.SafeConfigParser()
-        keys = d.keys()
-        keys.sort()
-        cur_section = None
-        for key in keys:
-            section, name = key.split('.', 1)
-            if cur_section is None or section != cur_section:
-                parser.add_section(section)
-                cur_section = section
-            parser.set(cur_section, name, d[name])
-            f = FileWriter(path)
-            try:
-                parser.write(f)
-            finally:
-                f.close()
 
 #===============================================================================
 class INIConfigManager(object):
@@ -913,7 +886,7 @@ class PersistentConfig(object):
         self.local[key] = value
         self.save_local()
 
-    def query(self, filter = filter):
+    def query(self, filter = None):
         """
         Query for keys and values as a merged dictionary.
         The optional filter is matched against the start of each key.
@@ -925,12 +898,12 @@ class PersistentConfig(object):
                     results[key] = self.local[key]
             for key in self.permanent:
                 if key not in results and key.startswith(filter):
-                    self.results[key] = self.permanent[key]
+                    results[key] = self.permanent[key]
         else:
             results = self.local
             for key in self.permanent:
                 if key not in results:
-                    self.results[key] = self.permanent[key]
+                    results[key] = self.permanent[key]
         return results
 
     def query_pairs(self, filter = None):
@@ -938,13 +911,7 @@ class PersistentConfig(object):
         Query for keys and values as a sorted list of (key, value) pairs.
         The optional filter is matched against the start of each key.
         """
-        d = self.query(filter = filter)
-        keys = d.keys()
-        keys.sort()
-        results = []
-        for key in keys:
-            results.append((key, d[key]))
-        return results
+        return dict_to_sorted_pairs(self.query(filter = filter))
 
 #===============================================================================
 class VoltTupleWrapper(object):

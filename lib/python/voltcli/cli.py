@@ -180,7 +180,7 @@ class EnumOption(StringOption):
 class HostOption(StringOption):
 #===============================================================================
     """
-    CLI comma-separated string list option.
+    Comma-separated HOST[:PORT] list option.
     """
     def __init__(self, short_opt, long_opt, dest, name, **kwargs):
         self.min_count    = utility.kwargs_get(kwargs, 'min_count', default = 1)
@@ -345,29 +345,29 @@ class CLIParser(ExtendedHelpOptionParser):
         missing = []
         iarg = 0
         nargs = verb.get_argument_count()
-        for a in verb.iter_arguments():
+        for arg in verb.iter_arguments():
             # It's missing if we've exhausted all the arguments before
             # exhausting all the argument specs, unless it's the last argument
             # spec and it's optional.
-            if iarg > len(args) or (iarg == len(args) and a.min_count > 0):
-                missing.append((a.name, a.help))
+            if iarg > len(args) or (iarg == len(args) and arg.min_count > 0):
+                missing.append((arg.name, arg.help))
             else:
                 # The last argument can have repeated arguments. If more than
                 # one are allowed the values are put into a list.
-                if iarg == nargs - 1 and a.max_count > 1:
+                if iarg == nargs - 1 and arg.max_count > 1:
                     value = list(args[iarg:])
-                    if len(value) < a.min_count:
+                    if len(value) < arg.min_count:
                         utility.abort('A minimum of %d %s arguments are required.'
-                                            % (a.min_count, a.name.upper()))
-                    if len(value) > a.max_count:
+                                            % (arg.min_count, arg.name.upper()))
+                    if len(value) > arg.max_count:
                         utility.abort('A maximum of %d %s arguments are allowed.'
-                                            % (a.max_count, a.name.upper()))
+                                            % (arg.max_count, arg.name.upper()))
                     iarg += len(value)
                 else:
                     # All other arguments are treated as scalars.
                     value = args[iarg]
                     iarg += 1
-                setattr(verb_opts, a.name, value)
+                setattr(verb_opts, arg.name, value)
         # Abort if extra arguments were provided.
         if iarg < len(args):
             utility.abort('Extra arguments were provided:', args[iarg:])
@@ -420,11 +420,11 @@ class CLIParser(ExtendedHelpOptionParser):
             verb_opts = None
         else:
             # Parse the verb command line.
-            verb_opts, verb_args = self.parse_args(verb_cmdargs)
+            verb_opts, verb_parsed_args = self.parse_args(verb_cmdargs)
             # Post-process options.
             self.process_verb_options(self.verb, verb_opts)
             # Post-process arguments.
-            self.process_verb_arguments(self.verb, verb_args, verb_opts)
+            self.process_verb_arguments(self.verb, verb_parsed_args, verb_opts)
             # The arguments should all be attributes in verb_opts now.
             verb_args = []
 
@@ -478,20 +478,6 @@ class CLIParser(ExtendedHelpOptionParser):
         table1 = utility.format_table(rows1, caption = 'Verb Descriptions', separator = '  ')
         table2 = utility.format_table(rows2, caption = 'Common Verbs', separator = '  ')
         return '%s\n%s' % (table1, table2)
-
-    def _get_full_usage(self):
-        full_usage        = '%s\n' % usage
-        self.verb_names.sort()
-        if verbs:
-            for verb_name in self.verb_names:
-                verb = self.verbs[verb_name]
-                if not verb.cli_spec.baseverb and not verb.cli_spec.hideverb:
-                    full_usage += '\n       %s' % get_verb_usage(verb)
-            full_usage += '\n'
-            for verb_name in self.verb_names:
-                verb = self.verbs[verb_name]
-                if verb.cli_spec.baseverb and not verb.cli_spec.hideverb:
-                    full_usage += '\n       %s' % get_verb_usage(verb)
 
 #===============================================================================
 class CLISpec(object):

@@ -310,7 +310,7 @@ the package file to an explicit python version, e.g.
                               'Available verbs in "%s":' % verbspace_name,
                               verbspace.verb_names)
             args2 = [verb_name] + list(args[1:])
-            self._run_command(self.internal_verbspaces[verbspace_name], *args2, **kwargs)
+            self._run_command(verbspace, *args2, **kwargs)
 
     def call_proc(self, sysproc_name, types, args, check_status = True):
         utility.verbose_info('Call procedure: %s%s' % (sysproc_name, tuple(args)))
@@ -334,7 +334,7 @@ the package file to an explicit python version, e.g.
 
     def _create_package(self, output_dir, name, version, description, force):
         # Internal method to create a runnable Python package.
-        output_path = os.path.join(output_dir, '%s' % name)
+        output_path = os.path.join(output_dir, name)
         utility.info('Creating compressed executable Python program: %s' % output_path)
         zipper = utility.Zipper(excludes = ['[.]pyc$'])
         zipper.open(output_path, force = force, preamble = '#!/usr/bin/env python\n')

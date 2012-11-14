@@ -1116,13 +1116,16 @@ public class SQLCommand
                     password = arg.split("=")[1];
                 else if (arg.startsWith("--query="))
                 {
-                    if (queries == null)
-                    {
-                        queries = parseQuery(arg.split("=")[1]);
-                    }
-                    else
-                    {
-                        queries.addAll(parseQuery(arg.split("=")[1]));
+                    List<String> argQueries = parseQuery(arg.substring(8));
+                    if (!argQueries.isEmpty()) {
+                        if (queries == null)
+                        {
+                            queries = argQueries;
+                        }
+                        else
+                        {
+                            queries.addAll(argQueries);
+                        }
                     }
                 }
                 else if (arg.startsWith("--output-format="))

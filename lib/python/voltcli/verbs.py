@@ -113,22 +113,30 @@ class BaseVerb(object):
             self.cli_spec.options.sort()
             self.dirty_opts = False
 
+
     def _check_arguments(self):
         if self.dirty_args:
+            # Use a local function to sanity check an argument's min/max counts,
+            # with an additional check applied to arguments other than the last
+            # one since they cannot repeat or be missing.
+            def check_argument(cli_spec_arg, is_last):
+                if cli_spec_arg.min_count < 0 or cli_spec_arg.max_count < 0:
+                    utility.abort('%s argument (%s) has a negative min or max count declared.'
+                                        % (self.name, self.cli_spec_arg.name))
+                if cli_spec_arg.min_count == 0 and cli_spec_arg.max_count == 0:
+                    utility.abort('%s argument (%s) has zero min and max counts declared.'
+                                        % (self.name, self.cli_spec_arg.name))
+                if not is_last and (cli_spec_arg.min_count != 1 or cli_spec_arg.max_count != 1):
+                    utility.abort('%s argument (%s) is not the last argument, '
+                                  'but has min/max counts declared.'
+                                        % (self.name, self.cli_spec_arg.name))
             nargs = len(self.cli_spec.arguments)
             if nargs > 1:
+                # Check all arguments except the last.
                 for i in range(nargs-1):
-                    a = self.cli_spec.arguments[i]
-                    if a.min_count < 0 or a.max_count < 0:
-                        utility.abort('%s argument (%s) has a negative min or max count declared.'
-                                            % (self.name, self.cli_spec.arguments[0].name))
-                    if a.min_count == 0 and a.max_count == 0:
-                        utility.abort('%s argument (%s) has zero min and max counts declared.'
-                                            % (self.name, self.cli_spec.arguments[0].name))
-                    if a.min_count != 1 or a.max_count != 1:
-                        utility.abort('%s argument (%s) is not the last argument, '
-                                      'but has min/max counts declared.'
-                                            % (self.name, self.cli_spec.arguments[0].name))
+                    check_argument(self.cli_spec.arguments[i], False)
+                # Check the last argument.
+                check_argument(self.cli_spec.arguments[-1], True)
             self.dirty_args = False
 
 #===============================================================================
@@ -336,7 +344,9 @@ class MultiVerb(CommandVerb):
                 break
         else:
             valid_modifiers = '|'.join([mod.name for mod in self.modifiers])
-            utility.error('Invalid "%s" modifier "%s".' % (self.name, mod_name))
+            utility.error('Invalid "%s" modifier "%s". Valid modifiers are listed below:'
+                                % (self.name, mod_name),
+                          [mod.name for mod in self.modifiers])
             runner.help(self.name)
 
 #===============================================================================

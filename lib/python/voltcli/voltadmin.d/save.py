@@ -34,7 +34,7 @@ from voltcli import utility
     options = (
         VOLT.BooleanOption('-n', '--non-blocking', 'nonblocking',
                            'do not wait for snapshot to complete',
-                           default = True),
+                           default = False),
         VOLT.EnumOption('-f', '--format', 'format',
                         'snapshot format', 'native', 'csv',
                         default = 'native')
