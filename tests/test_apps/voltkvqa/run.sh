@@ -87,7 +87,7 @@ function async-benchmark() {
         --duration=60 \
         --servers=localhost \
         --poolsize=100000 \
-        --preload=false \
+        --preload=true \
         --getputratio=0.9 \
         --keysize=32 \
         --minvaluesize=1024 \
@@ -95,7 +95,7 @@ function async-benchmark() {
         --entropy=127 \
         --usecompression=false \
         --ratelimit=100000 \
-        --autotune=false \
+        --autotune=true \
         --multisingleratio=0.1 \
         --recover=false \
         --latencytarget=10
