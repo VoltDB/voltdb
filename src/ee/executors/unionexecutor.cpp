@@ -71,6 +71,8 @@ struct SetOperator {
         m_input_tables(input_tables), m_output_table(output_table), m_is_all(is_all)
         {}
 
+    virtual ~SetOperator() {}
+
     bool processTuples() {
         return processTuplesDo();
     }
