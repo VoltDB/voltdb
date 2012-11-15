@@ -52,7 +52,10 @@ public class StreamSnapshotDataTarget extends StreamSnapshotBase
 implements SnapshotDataTarget {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
-    final static long WRITE_TIMEOUT_MS = 30 * 1000;
+    private static boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtest");
+
+    // shortened when in test mode
+    final static long WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
     final static long WATCHDOG_PERIOS_S = 5;
 
     // schemas for all the tables on this partition
@@ -189,7 +192,7 @@ implements SnapshotDataTarget {
                     m_mb.send(m_destHSId, msg);
                     m_bytesSent.addAndGet(compressedSize);
 
-                    rejoinLog.info("Sending direct buffer");
+                    rejoinLog.trace("Sending direct buffer");
                 } else {
                     byte compressedBytes[] =
                             CompressionService.compressBytes(
@@ -200,7 +203,7 @@ implements SnapshotDataTarget {
                     m_mb.send(m_destHSId, msg);
                     m_bytesSent.addAndGet(compressedBytes.length);
 
-                    rejoinLog.info("Sending heap buffer");
+                    rejoinLog.trace("Sending heap buffer");
                 }
             } catch (IOException e) {
                 rejoinLog.error("Error writing rejoin snapshot block", e);
@@ -244,6 +247,7 @@ implements SnapshotDataTarget {
                             "A snapshot write task failed after a timeout (currently %d seconds outstanding).",
                             (now - work.m_ts) / 1000));
                     m_writeFailed.set(true);
+                    break;
                 }
             }
             if (m_writeFailed.get()) {
@@ -264,7 +268,7 @@ implements SnapshotDataTarget {
             return;
         }
 
-        rejoinLog.info("Clearing outstanding work.");
+        rejoinLog.trace("Clearing outstanding work.");
 
         for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
             e.getValue().discard();
@@ -286,11 +290,16 @@ implements SnapshotDataTarget {
 
             try {
                 while (!m_closed.get()) {
-                    rejoinLog.info("Blocking on receiving mailbox");
-                    VoltMessage msg = m_mb.recvBlocking();
+                    rejoinLog.trace("Blocking on receiving mailbox");
+                    VoltMessage msg = m_mb.recvBlocking(5000);
+                    if (msg == null) continue;
                     assert(msg instanceof RejoinDataAckMessage);
                     RejoinDataAckMessage ackMsg = (RejoinDataAckMessage) msg;
                     final int blockIndex = ackMsg.getBlockIndex();
+
+                    // a particular test ignores acks to trigger the watchdog
+                    if (m_rejoinDeathTestMode)
+                        continue;
 
                     receiveAck(blockIndex);
                 }
@@ -302,6 +311,9 @@ implements SnapshotDataTarget {
                 m_lastAckReceiverException = e;
                 rejoinLog.error("Error reading a message from a recovery stream", e);
             }
+            finally {
+                rejoinLog.trace("Ack receiver thread exiting");
+            }
         }
     }
 
@@ -310,7 +322,7 @@ implements SnapshotDataTarget {
      * @param blockIndex The index of the block that is being acked.
      */
     public synchronized void receiveAck(int blockIndex) {
-        rejoinLog.info("Recieved block ack for index " + String.valueOf(blockIndex));
+        rejoinLog.trace("Recieved block ack for index " + String.valueOf(blockIndex));
 
         m_outstandingWorkCount.decrementAndGet();
         SendWork work = m_outstandingWork.remove(blockIndex);
@@ -329,7 +341,7 @@ implements SnapshotDataTarget {
                                      SnapshotTableTask context) {
         assert(context != null);
 
-        rejoinLog.info("Starting write");
+        rejoinLog.trace("Starting write");
 
         try {
             BBContainer chunk = null;
@@ -417,7 +429,7 @@ implements SnapshotDataTarget {
          * target
          */
         if (!m_closed.get()) {
-            rejoinLog.debug("Closing stream snapshot target");
+            rejoinLog.trace("Closing stream snapshot target");
 
             // block until all acks have arrived
             while (!m_writeFailed.get() && (m_outstandingWorkCount.get() > 0)) {
@@ -429,7 +441,15 @@ implements SnapshotDataTarget {
 
             // Send EOF
             ByteBuffer buf = ByteBuffer.allocate(1);
-            buf.put((byte) StreamSnapshotMessageType.END.ordinal());
+            if (m_writeFailed.get()) {
+                // signify failure, at least on this end
+                buf.put((byte) StreamSnapshotMessageType.FAILURE.ordinal());
+            }
+            else {
+                // success - join the cluster
+                buf.put((byte) StreamSnapshotMessageType.END.ordinal());
+            }
+
             buf.flip();
             byte compressedBytes[] =
                     CompressionService.compressBytes(
@@ -450,7 +470,7 @@ implements SnapshotDataTarget {
                 assert(m_outstandingWork.size() == 0);
             }
 
-            rejoinLog.debug("Closed stream snapshot target");
+            rejoinLog.trace("Closed stream snapshot target");
         }
 
         Runnable closeHandle = m_onCloseHandler.get();

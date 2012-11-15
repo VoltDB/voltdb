@@ -170,13 +170,21 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
             ByteBuffer block = container.b;
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
             StreamSnapshotMessageType type = StreamSnapshotMessageType.values()[typeByte];
+            if (type == StreamSnapshotMessageType.FAILURE) {
+                VoltDB.crashLocalVoltDB("Rejoin source sent failure message.", false, null);
+
+                // for test code only
+                m_EOF = true;
+                return null;
+            }
             if (type == StreamSnapshotMessageType.END) {
                 rejoinLog.trace("Got END message");
 
                 // End of stream, no need to ack this buffer
                 m_EOF = true;
                 return null;
-            } else if (type == StreamSnapshotMessageType.SCHEMA) {
+            }
+            else if (type == StreamSnapshotMessageType.SCHEMA) {
                 rejoinLog.trace("Got SCHEMA message");
 
                 block.position(block.position() + 1);
