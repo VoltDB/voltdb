@@ -1779,7 +1779,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       new long[0],//this param not used pre-iv2
                                       null,
                                       m_systemProcedureContext,
-                                      CoreUtils.getHostnameOrAddress());
+                                      CoreUtils.getHostnameOrAddress(),
+                                      "");  // truncReqId not used here
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
                 snapshotMsg.crash) {
                 String msg = "Partition detection snapshot completed. Shutting down. " +

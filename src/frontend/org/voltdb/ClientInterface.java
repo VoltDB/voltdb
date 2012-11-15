@@ -1767,7 +1767,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         {
             m_sysProc = sysProc;
             m_task = task.getShallowCopy();
-            m_task.setParams("@PromoteReplicaStatus");
+            m_task.setProcName("@PromoteReplicaStatus");
             m_commandLog = commandLog;
             m_ccxn = ccxn;
             m_isAdmin = isAdmin;
@@ -1905,7 +1905,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             else if (task.procName.equals("@Promote")) {
                 // Map @Promote to @PromoteReplicaState for validation.
-                sysProc = SystemProcedureCatalog.listing.get("@PromoteReplicaState");
+                sysProc = SystemProcedureCatalog.listing.get("@PromoteReplicaStatus");
                 assert(sysProc != null);
             }
         }
