@@ -26,6 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+import urllib
 from voltcli import utility
 
 @VOLT.Command(
@@ -45,14 +46,15 @@ from voltcli import utility
     )
 )
 def save(runner):
-    uri = 'file://%s' % os.path.realpath(runner.opts.directory)
+    uri   = 'file://%s' % urllib.quote(os.path.realpath(runner.opts.directory))
+    nonce = runner.opts.nonce.replace('"', '\\"')
     if runner.opts.nonblocking:
         blocking = 'false'
     else:
         blocking = 'true'
     json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s"}'
-                    % (uri, runner.opts.nonce, blocking, runner.opts.format)]
-    utility.debug('@SnapshotSave "%s"' % json_opts)
+                    % (uri, nonce, blocking, runner.opts.format)]
+    utility.verbose_info('@SnapshotSave "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
     response = runner.call_proc('@SnapshotSave', columns, json_opts)
     print response.table(0).format_table(caption = 'Snapshot Save Results')
