@@ -98,7 +98,7 @@ public class LeaderAppointer implements Promotable
         new AtomicReference<AppointerState>(AppointerState.INIT);
     private CountDownLatch m_startupLatch = null;
     private final boolean m_partitionDetectionEnabled;
-    private boolean m_partitionSnapshotRequested = false;
+    private boolean m_partitionDetected = false;
     private boolean m_usingCommandLog = false;
     private final AtomicBoolean m_replayComplete = new AtomicBoolean(false);
 
@@ -221,7 +221,7 @@ public class LeaderAppointer implements Promotable
                                              false, null);
                 }
                 // Check to see if there's been a possible network partition and we're not already handling it
-                if (m_partitionDetectionEnabled && !m_partitionSnapshotRequested) {
+                if (m_partitionDetectionEnabled && !m_partitionDetected) {
                     doPartitionDetectionActivities();
                 }
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.
@@ -497,6 +497,8 @@ public class LeaderAppointer implements Promotable
 
     private void doPartitionDetectionActivities()
     {
+        // We should never re-enter here once we've decided we're partitioned and doomed
+        assert(!m_partitionDetected);
         // After everything is resolved, write the new surviving set to ZK
         List<Integer> currentNodes = null;
         try {
@@ -510,24 +512,26 @@ public class LeaderAppointer implements Promotable
         boolean partitionDetectionTriggered = makePPDDecision(previousHosts, currentHosts);
 
         if (partitionDetectionTriggered) {
+            m_partitionDetected = true;
             if (m_usingCommandLog) {
                 // Just shut down immediately
                 VoltDB.crashGlobalVoltDB("Use of command logging detected, no additional database snapshot will " +
                         "be generated.  Please use the 'recover' action to restore the database if necessary.",
                         false, null);
             }
-            else if (!m_partitionSnapshotRequested) {
+            else {
                 SnapshotUtil.requestSnapshot(0L,
                         m_partSnapshotSchedule.getPath(),
                         m_partSnapshotSchedule.getPrefix() + System.currentTimeMillis(),
                         true, SnapshotFormat.NATIVE, null, m_snapshotHandler,
                         true);
-                m_partitionSnapshotRequested = true;
             }
         }
-
         // If the cluster host set has changed, then write the new set to ZK
-        if (!currentHosts.equals(previousHosts)) {
+        // NOTE: we don't want to update the known live nodes if we've decided that our subcluster is
+        // dying, otherwise a poorly timed subsequent failure might reverse this decision.  Any future promoted
+        // LeaderAppointer should make their partition detection decision based on the pre-partition cluster state.
+        else if (!currentHosts.equals(previousHosts)) {
             writeKnownLiveNodes(currentNodes);
         }
     }
