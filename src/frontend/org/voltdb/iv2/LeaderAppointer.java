@@ -99,6 +99,7 @@ public class LeaderAppointer implements Promotable
     private CountDownLatch m_startupLatch = null;
     private final boolean m_partitionDetectionEnabled;
     private boolean m_partitionSnapshotRequested = false;
+    private boolean m_usingCommandLog = false;
     private final AtomicBoolean m_replayComplete = new AtomicBoolean(false);
 
     // Provide a single single-threaded executor service to all the BabySitters for each partition.
@@ -219,11 +220,13 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashGlobalVoltDB("Detected node failure during command log replay. Cluster will shut down.",
                                              false, null);
                 }
-                else if (missingHSIds.contains(m_currentLeader)) {
-                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
-                }
-                if (m_partitionDetectionEnabled) {
+                // Check to see if there's been a possible network partition and we're not already handling it
+                if (m_partitionDetectionEnabled && !m_partitionSnapshotRequested) {
                     doPartitionDetectionActivities();
+                }
+                // If we survived the above gauntlet of fail, appoint a new leader for this partition.
+                if (missingHSIds.contains(m_currentLeader)) {
+                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
                 }
             }
             m_replicas.clear();
@@ -254,6 +257,7 @@ public class LeaderAppointer implements Promotable
     public LeaderAppointer(HostMessenger hm, int numberOfPartitions,
             int kfactor, boolean partitionDetectionEnabled,
             SnapshotSchedule partitionSnapshotSchedule,
+            boolean usingCommandLog,
             JSONObject topology, MpInitiator mpi)
     {
         m_hostMessenger = hm;
@@ -268,6 +272,7 @@ public class LeaderAppointer implements Promotable
         m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
         m_partitionDetectionEnabled = partitionDetectionEnabled;
         m_partSnapshotSchedule = partitionSnapshotSchedule;
+        m_usingCommandLog = usingCommandLog;
     }
 
     @Override
@@ -504,13 +509,21 @@ public class LeaderAppointer implements Promotable
 
         boolean partitionDetectionTriggered = makePPDDecision(previousHosts, currentHosts);
 
-        if (partitionDetectionTriggered && !m_partitionSnapshotRequested) {
-            SnapshotUtil.requestSnapshot(0L,
-                    m_partSnapshotSchedule.getPath(),
-                    m_partSnapshotSchedule.getPrefix() + System.currentTimeMillis(),
-                    true, SnapshotFormat.NATIVE, null, m_snapshotHandler,
-                    true);
-            m_partitionSnapshotRequested = true;
+        if (partitionDetectionTriggered) {
+            if (m_usingCommandLog) {
+                // Just shut down immediately
+                VoltDB.crashGlobalVoltDB("Use of command logging detected, no additional database snapshot will " +
+                        "be generated.  Please use the 'recover' action to restore the database if necessary.",
+                        false, null);
+            }
+            else if (!m_partitionSnapshotRequested) {
+                SnapshotUtil.requestSnapshot(0L,
+                        m_partSnapshotSchedule.getPath(),
+                        m_partSnapshotSchedule.getPrefix() + System.currentTimeMillis(),
+                        true, SnapshotFormat.NATIVE, null, m_snapshotHandler,
+                        true);
+                m_partitionSnapshotRequested = true;
+            }
         }
 
         // If the cluster host set has changed, then write the new set to ZK
