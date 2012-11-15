@@ -188,7 +188,7 @@ class VerbRunner(object):
         """
         # The only valid keyword argument is 'all' for now.
         context = '%s.help()' % self.__class__.__name__
-        all = utility.kwargs_get(kwargs, 'all', default = False)
+        all = utility.kwargs_get_boolean(kwargs, 'all', default = False)
         if all:
             for verb_name in self.verbspace.verb_names:
                 verb_spec = self.verbspace.verbs[verb_name].cli_spec
@@ -501,9 +501,9 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
     Called by running script to execute command with command line arguments.
     """
     # The "package" keyword flags when running from a package zip __main__.py.
-    package = utility.kwargs_get(kwargs, 'package', default = False)
+    package = utility.kwargs_get_boolean(kwargs, 'package', default = False)
     # The "standalone" keyword allows environment.py to skip the library search.
-    standalone = utility.kwargs_get(kwargs, 'standalone', default = False)
+    standalone = utility.kwargs_get_boolean(kwargs, 'standalone', default = False)
     try:
         # Pre-scan for verbose, debug, and dry-run options so that early code
         # can display verbose and debug messages, and obey dry-run.

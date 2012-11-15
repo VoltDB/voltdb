@@ -41,7 +41,7 @@ class BaseVerb(object):
     """
     def __init__(self, name, **kwargs):
         self.name = name
-        self.classpath = utility.kwargs_get(kwargs, 'classpath', default = None)
+        self.classpath = utility.kwargs_get_string(kwargs, 'classpath', default = None)
         self.cli_spec = cli.CLISpec(**kwargs)
         self.dirty_opts = False
         self.dirty_args = False
@@ -343,7 +343,6 @@ class MultiVerb(CommandVerb):
                 mod.function(runner)
                 break
         else:
-            valid_modifiers = '|'.join([mod.name for mod in self.modifiers])
             utility.error('Invalid "%s" modifier "%s". Valid modifiers are listed below:'
                                 % (self.name, mod_name),
                           [mod.name for mod in self.modifiers])

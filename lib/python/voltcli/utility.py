@@ -688,6 +688,33 @@ def kwargs_get(kwargs, name, remove = True, default = None):
     return getattr(args, name)
 
 #===============================================================================
+def kwargs_get_string(kwargs, name, remove = True, default = None):
+#===============================================================================
+    value = kwargs_get(kwargs, name, remove = remove, default = default)
+    if value is not None:
+        value = str(value)
+    return value
+
+#===============================================================================
+def kwargs_get_integer(kwargs, name, remove = True, default = None):
+#===============================================================================
+    value = kwargs_get(kwargs, name, remove = remove, default = default)
+    if value is not None:
+        try:
+            value = int(value)
+        except (ValueError, TypeError):
+            abort('Keyword argument "%s" must be an integer: %s' % (name, str(value)))
+    return value
+
+#===============================================================================
+def kwargs_get_boolean(kwargs, name, remove = True, default = None):
+#===============================================================================
+    value = kwargs_get(kwargs, name, remove = remove, default = default)
+    if value is None or value == True or value == False:
+        return value
+    abort('Keyword argument "%s" must be a boolean value: %s' % (name, str(value)))
+
+#===============================================================================
 def kwargs_get_list(kwargs, name, remove = True, default = []):
 #===============================================================================
     return flatten_to_list(kwargs_get(kwargs, name, remove = remove, default = default))
@@ -716,17 +743,17 @@ def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = 
         host = split_host[0]
         if len(split_host) > 2:
             abort('Bad HOST:PORT format "%s" - too many colons.' % host_port)
-        try:
-            if len(split_host) == 1:
-                # Add the default port if specified.
-                if default_port:
-                    port = int(default_port)
-                else:
-                    port = None
+        if len(split_host) == 1:
+            # Add the default port if specified. Validated by caller to be an integer.
+            if default_port:
+                port = default_port
             else:
+                port = None
+        else:
+            try:
                 port = int(split_host[1])
-        except ValueError, e:
-            abort('Bad port value "%s".' % split_host[1], e)
+            except ValueError, e:
+                abort('Bad port value "%s" for host: %s' % (split_host[1], host_port))
         hosts.append(Host(host, port))
     if min_hosts is not None and len(hosts) < min_hosts:
         abort('Too few hosts in host string "%s". The minimum is %d.'

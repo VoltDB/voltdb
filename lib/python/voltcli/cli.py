@@ -183,9 +183,9 @@ class HostOption(StringOption):
     Comma-separated HOST[:PORT] list option.
     """
     def __init__(self, short_opt, long_opt, dest, name, **kwargs):
-        self.min_count    = utility.kwargs_get(kwargs, 'min_count', default = 1)
-        self.max_count    = utility.kwargs_get(kwargs, 'max_count', default = 1)
-        self.default_port = utility.kwargs_get(kwargs, 'default_port', default = 21212)
+        self.min_count    = utility.kwargs_get_integer(kwargs, 'min_count', default = 1)
+        self.max_count    = utility.kwargs_get_integer(kwargs, 'max_count', default = 1)
+        self.default_port = utility.kwargs_get_integer(kwargs, 'default_port', default = 21212)
         if self.max_count == 1:
             help_msg = 'the %s HOST[:PORT]' % name
         else:
