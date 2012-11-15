@@ -89,12 +89,14 @@ public class SnapshotSaveAPI
      * @param data
      * @param context
      * @param hostname
+     * @param truncReqId
      * @return VoltTable describing the results of the snapshot attempt
      */
     public VoltTable startSnapshotting(
             String file_path, String file_nonce, SnapshotFormat format, byte block,
             long multiPartTxnId, long partitionTxnId, long legacyPerPartitionTxnIds[],
-            String data, SystemProcedureExecutionContext context, String hostname)
+            String data, SystemProcedureExecutionContext context, String hostname,
+            String truncReqId)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
@@ -168,6 +170,7 @@ public class SnapshotSaveAPI
                         data,
                         context,
                         hostname,
+                        truncReqId,
                         result);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
@@ -234,7 +237,7 @@ public class SnapshotSaveAPI
 
 
     private void logSnapshotStartToZK(long txnId,
-            SystemProcedureExecutionContext context, String nonce) {
+            SystemProcedureExecutionContext context, String nonce, String truncReqId) {
         /*
          * Going to send out the requests async to make snapshot init move faster
          */
@@ -288,7 +291,7 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation)) {
+        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation, truncReqId)) {
             // the node already exists, add local host ID to the list
             increaseParticipateHostCount(txnId, context.getHostId());
         }
@@ -362,12 +365,14 @@ public class SnapshotSaveAPI
      * @param txnId
      * @param hostId The local host ID
      * @param isTruncation Whether or not this is a truncation snapshot
+     * @param truncReqId Optional unique ID fed back to the monitor for identification
      * @return true if the node is created successfully, false if the node already exists.
      */
     public static boolean createSnapshotCompletionNode(String nonce,
-                                                       long txnId,
-                                                       int hostId,
-                                                       boolean isTruncation) {
+                                                          long txnId,
+                                                          int hostId,
+                                                          boolean isTruncation,
+                                                          String truncReqId) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
@@ -381,6 +386,7 @@ public class SnapshotSaveAPI
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("finishedHosts").value(0);
             stringer.key("nonce").value(nonce);
+            stringer.key("truncReqId").value(truncReqId);
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());
             nodeBytes = jsonObj.toString(4).getBytes("UTF-8");
@@ -409,7 +415,7 @@ public class SnapshotSaveAPI
             String file_path, String file_nonce, SnapshotFormat format,
             long txnId, List<Long> partitionTransactionIds,
             String data, SystemProcedureExecutionContext context,
-            String hostname, final VoltTable result) {
+            String hostname, String truncReqId, final VoltTable result) {
         {
             SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
@@ -720,7 +726,7 @@ public class SnapshotSaveAPI
                          */
                         VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
                                 txnId, partitionTransactionIds);
-                        logSnapshotStartToZK( txnId, context, file_nonce);
+                        logSnapshotStartToZK( txnId, context, file_nonce, truncReqId);
                     }
                 }
             } catch (Exception ex) {

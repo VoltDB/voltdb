@@ -494,10 +494,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
             return;
         }
-        // Get the request ID if provided.
-        String requestId;
+        // Get the truncation request ID if provided.
+        final String truncReqId;
         try {
-            requestId = new String(m_zk.getData(event.getPath(), true, null), "UTF-8");
+            byte[] data = m_zk.getData(event.getPath(), true, null);
+            if (data != null) {
+                truncReqId = new String(data, "UTF-8");
+            }
+            else {
+                truncReqId = "";
+            }
         } catch (Exception e) {
             loggingLog.error("Unable to retrieve truncation snapshot request ID from ZK, log can't be truncated");
             return;
@@ -522,7 +528,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("path", snapshotPath );
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
-            jsObj.put("requestId", requestId != null ? requestId : "");
+            jsObj.put("truncReqId", truncReqId != null ? truncReqId : "");
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -596,7 +602,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
-                                                                      hostId, true)) {
+                                                                      hostId, true, truncReqId)) {
                         SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId, hostId);
                     }
 

@@ -159,10 +159,10 @@ public class SnapshotCompletionMonitor {
         int totalNodesFinished = jsonObj.getInt("finishedHosts");
         String nonce = jsonObj.getString("nonce");
         boolean truncation = jsonObj.getBoolean("isTruncation");
-        // A request ID is not always provided. It's used for truncation
+        // A truncation request ID is not always provided. It's used for
         // snapshots triggered indirectly via ZooKeeper so that the
         // triggerer can recognize the snapshot when it finishes.
-        String requestId = jsonObj.optString("requestId");
+        String truncReqId = jsonObj.optString("truncReqId");
 
         if (hosts.length() == totalNodesFinished) {
             long partitionTxnIds[] = null;
@@ -178,7 +178,7 @@ public class SnapshotCompletionMonitor {
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
                 interest.snapshotCompleted(nonce, txnId, Arrays.copyOf(partitionTxnIds,
-                                           partitionTxnIds.length), truncation, requestId);
+                                           partitionTxnIds.length), truncation, truncReqId);
             }
         }
     }
