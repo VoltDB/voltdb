@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,7 +43,6 @@ import org.voltdb.utils.CompressionService;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
 
 /**
  * A stream snapshot target for sending snapshot data directly to a rejoining
@@ -66,6 +66,10 @@ implements SnapshotDataTarget {
     private final long m_destHSId;
     // input and output threads
     private final AckReceiver m_in;
+    private final SnapshotSender m_out;
+
+    // list of send work in order
+    private final LinkedBlockingQueue<SendWork> m_sendQueue = new LinkedBlockingQueue<SendWork>();
 
     // Skip all subsequent writes if one fails
     private final AtomicBoolean m_writeFailed = new AtomicBoolean(false);
@@ -89,9 +93,6 @@ implements SnapshotDataTarget {
     private Exception m_lastAckReceiverException = null;
     private Exception m_lastSenderException = null;
 
-    // cache this here
-    private static final ListeningExecutorService m_es = VoltDB.instance().getComputationService();
-
     public StreamSnapshotDataTarget(long hsId, Map<Integer, byte[]> schemas) throws IOException {
         super();
         m_schemas = schemas;
@@ -101,6 +102,10 @@ implements SnapshotDataTarget {
         m_in = new AckReceiver();
         m_in.setDaemon(true);
         m_in.start();
+
+        m_out = new SnapshotSender();
+        m_out.setDaemon(true);
+        m_out.start();
 
         // start a periodic task to look for timed out connections
         VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
@@ -286,7 +291,7 @@ implements SnapshotDataTarget {
     class AckReceiver extends Thread {
         @Override
         public void run() {
-            rejoinLog.info("Starting ack receiver thread");
+            rejoinLog.trace("Starting ack receiver thread");
 
             try {
                 while (!m_closed.get()) {
@@ -329,6 +334,39 @@ implements SnapshotDataTarget {
 
         // releases the BBContainers and cleans up
         work.discard();
+    }
+
+    /**
+     * Thread that blocks on the receipt of Acks.
+     *
+     * When the mailbox is killed, the blocking ends and
+     * a thread-killing exception is thrown.
+     */
+    class SnapshotSender extends Thread {
+        @Override
+        public void run() {
+            rejoinLog.trace("Starting stream sender thread");
+
+            try {
+                while (!m_closed.get()) {
+                    rejoinLog.trace("Blocking on sending work queue");
+                    SendWork work = m_sendQueue.poll(5, TimeUnit.SECONDS);
+                    if (work != null) {
+                        work.call();
+                    }
+                }
+            }
+            catch (Exception e) {
+                if (m_closed.get()) {
+                    return;
+                }
+                m_lastSenderException = e;
+                rejoinLog.error("Error sending a recovery stream message", e);
+            }
+            finally {
+                rejoinLog.trace("Stream sender thread exiting");
+            }
+        }
     }
 
     @Override
@@ -419,7 +457,7 @@ implements SnapshotDataTarget {
         SendWork sendWork = new SendWork(blockIndex, schemaContainer, chunk);
         m_outstandingWork.put(blockIndex, sendWork);
         m_outstandingWorkCount.incrementAndGet();
-        m_es.submit(sendWork);
+        m_sendQueue.add(sendWork);
     }
 
     @Override
