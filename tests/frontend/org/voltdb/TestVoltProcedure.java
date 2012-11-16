@@ -454,7 +454,8 @@ public class TestVoltProcedure extends TestCase {
             // get some catalog shortcuts ready
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
-            m_context = new CatalogContext(System.currentTimeMillis(), catalog, null, 0, 0, 0);
+            long now = System.currentTimeMillis();
+            m_context = new CatalogContext( now, now, catalog, null, 0, 0, 0);
             m_tracker = tracker;
         }
     }

@@ -324,7 +324,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     }
                     //Forward the sequence number to the EE
                     context.getSiteProcedureConnection().exportAction(
-                            false,
+                            true,
                             0,
                             sequenceNumber,
                             myPartitionId,
@@ -1115,7 +1115,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
             HOST_LOG.info("Requesting truncation snapshot to make data loaded by snapshot restore durable.");
             zk.create(
-                    "/request_truncation_snapshot",
+                    VoltZK.request_truncation_snapshot,
                     null,
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT,

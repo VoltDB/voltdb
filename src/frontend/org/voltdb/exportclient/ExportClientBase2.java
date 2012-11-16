@@ -16,11 +16,13 @@
  */
 package org.voltdb.exportclient;
 
+import java.util.Properties;
+
 public abstract class ExportClientBase2 extends ExportClientBase {
     public ExportClientBase2(boolean useAdminPorts, int throughputDisplayPeriod, boolean autodiscoverTopology) {
         super(useAdminPorts, throughputDisplayPeriod, autodiscoverTopology);
     }
 
-
-    public abstract void configure(byte config[]) throws Exception;
+    public abstract void configure( Properties config) throws Exception;
+    public abstract void shutdown( );
 }

@@ -242,4 +242,8 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     public List<File> listFiles(File path) throws IOException {
         throw new UnsupportedOperationException();
     }
+    @Override
+    public File[] getPathInSubroots(File path) throws IOException {
+        throw new UnsupportedOperationException();
+    }
 }

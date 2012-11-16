@@ -229,15 +229,35 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
-                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId);
+                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, false);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);
     }
 
     @Override
     public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
-        // MP initiate tasks are never repaired.
-        throw new RuntimeException("Impossible code path through MPI repair.");
+        // just reforward the Iv2InitiateTaskMessage for the txn being restarted
+        // this copy may be unnecessary
+        final String procedureName = message.getStoredProcedureName();
+        Iv2InitiateTaskMessage mp =
+            new Iv2InitiateTaskMessage(
+                    message.getInitiatorHSId(),
+                    message.getCoordinatorHSId(),
+                    message.getTruncationHandle(),
+                    message.getTxnId(),
+                    message.getTimestamp(),
+                    message.isReadOnly(),
+                    message.isSinglePartition(),
+                    message.getStoredProcedureInvocation(),
+                    message.getClientInterfaceHandle(),
+                    message.getConnectionId(),
+                    message.isForReplay());
+        // Multi-partition initiation (at the MPI)
+        final MpProcedureTask task =
+            new MpProcedureTask(m_mailbox, procedureName,
+                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, true);
+        m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
+        m_pendingTasks.offer(task);
     }
 
     // The MpScheduler will see InitiateResponseMessages from the Partition masters when

@@ -66,7 +66,6 @@ function exportserver() {
         license $LICENSE host $HOST
 }
 
-
 # run the client that drives the example
 function client() {
     async-benchmark
@@ -79,6 +78,7 @@ function async-benchmark-help() {
     java -classpath obj:$CLASSPATH:obj voltkvqa.AsyncBenchmark --help
 }
 
+#        --servers=volt3d,volt3e,volt3f \
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
@@ -86,7 +86,6 @@ function async-benchmark() {
         --displayinterval=5 \
         --duration=60 \
         --servers=localhost \
-        --port=21212 \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.9 \
@@ -97,13 +96,62 @@ function async-benchmark() {
         --usecompression=false \
         --ratelimit=100000 \
         --autotune=true \
+        --multisingleratio=0.1 \
+        --recover=false \
         --latencytarget=10
 }
 
+# Multi-threaded synchronous benchmark sample
+# Use this target for argument help
+function sync-benchmark-help() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj voltkvqa.SyncBenchmark --help
+}
 
+function sync-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkvqa.SyncBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+        --threads=40
+}
+
+# JDBC benchmark sample
+# Use this target for argument help
+function jdbc-benchmark-help() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj voltkvqa.JDBCBenchmark --help
+}
+
+function jdbc-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkvqa.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost:21212 \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+        --threads=40
+}
 
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
+    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line

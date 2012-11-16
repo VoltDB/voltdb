@@ -1212,6 +1212,7 @@ TEST CASES
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
                 <!-- <exclude name="**/TestHSQLBackend.class" /> -->
                 <!-- <exclude name="**/TestAdHocQueries.class" /> -->
                 <!-- <exclude name="**/TestJSONInterface.class" /> -->
@@ -1333,6 +1334,7 @@ TEST CASES
                 <exclude name="**/TestPartitionDetection.class"  />
                 <exclude name="**/TestSystemProcedureSuite.class"  />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
             </fileset>
         </tests>
     </run_junit>
@@ -1352,6 +1354,7 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
             </fileset>
         </tests>
     </run_junit>

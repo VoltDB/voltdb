@@ -20,6 +20,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.InputHandler;
@@ -33,62 +34,82 @@ import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase2;
 import org.voltdb.exportclient.ExportDecoderBase;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 
 public class GuestProcessor implements ExportDataProcessor {
 
+    public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
+
     private ExportGeneration m_generation;
     private ExportClientBase2 m_client;
-    private String m_exportClientClass = "org.voltdb.exportclient.ExportToFileClient";
-    private String m_guestConfig = "{\"type\":\"tsv\",\"batched\":true,\"with-schema\":true,\"nonce\":\"zorag\"}";
+    private VoltLogger m_logger;
 
     private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders =
             new ArrayList<Pair<ExportDecoderBase, AdvertisedDataSource>>();
 
+
+    // Instantiated at ExportManager
     public GuestProcessor() {
-        try {
-            final Class<?> clientClass = Class.forName(m_exportClientClass);
-            m_client = (ExportClientBase2)clientClass.newInstance();
-            m_client.configure(m_guestConfig.getBytes("UTF-8"));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     @Override
     public void addLogger(VoltLogger logger) {
-        // TODO Auto-generated method stub
+        m_logger = logger;
+    }
 
+    @Override
+    public void setProcessorConfig( Properties config) {
+        String exportClientClass = config.getProperty(EXPORT_TO_TYPE);
+        Preconditions.checkNotNull(exportClientClass, "export to type is undefined");
+
+        try {
+            final Class<?> clientClass = Class.forName(exportClientClass);
+            m_client = (ExportClientBase2)clientClass.newInstance();
+            m_client.configure(config);
+        } catch( Throwable t) {
+            Throwables.propagate(t);
+        }
     }
 
     @Override
     public void setExportGeneration(ExportGeneration generation) {
         m_generation = generation;
-
     }
 
     @Override
     public void readyForData() {
+        Preconditions.checkState(m_client != null, "processor was not configured with setProcessorConfig()");
+
         for (HashMap<String, ExportDataSource> sources : m_generation.m_dataSourcesByPartition.values()) {
+
             for (final ExportDataSource source : sources.values()) {
-                ArrayList<VoltType> types = new ArrayList<VoltType>();
-                for (int type : source.m_columnTypes) {
-                    types.add(VoltType.get((byte)type));
-                }
-                AdvertisedDataSource ads =
-                        new AdvertisedDataSource(
-                                source.getPartitionId(),
-                                source.getSignature(),
-                                source.getTableName(),
-                                System.currentTimeMillis(),
-                                source.getGeneration(),
-                                source.m_columnNames,
-                                types);
-                ExportDecoderBase edb = m_client.constructExportDecoder(ads);
-                m_decoders.add(Pair.of(edb, ads));
-                final ListenableFuture<BBContainer> fut = source.poll();
-                constructListener( source, fut, edb, ads);
+                source.setOnMastership(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        ArrayList<VoltType> types = new ArrayList<VoltType>();
+                        for (int type : source.m_columnTypes) {
+                            types.add(VoltType.get((byte)type));
+                        }
+                        AdvertisedDataSource ads =
+                                new AdvertisedDataSource(
+                                        source.getPartitionId(),
+                                        source.getSignature(),
+                                        source.getTableName(),
+                                        System.currentTimeMillis(),
+                                        source.getGeneration(),
+                                        source.m_columnNames,
+                                        types);
+                        ExportDecoderBase edb = m_client.constructExportDecoder(ads);
+                        m_decoders.add(Pair.of(edb, ads));
+                        final ListenableFuture<BBContainer> fut = source.poll();
+                        constructListener( source, fut, edb, ads);
+
+                    }
+                });
             }
         }
     }
@@ -111,19 +132,22 @@ public class GuestProcessor implements ExportDataProcessor {
                     }
                     try {
                         edb.onBlockStart();
-                        cont.b.order(ByteOrder.LITTLE_ENDIAN);
-                        while (cont.b.hasRemaining()) {
-                            int length = cont.b.getInt();
-                            byte[] rowdata = new byte[length];
-                            cont.b.get(rowdata, 0, length);
-                            edb.processRow(length, rowdata);
+                        try {
+                            cont.b.order(ByteOrder.LITTLE_ENDIAN);
+                            while (cont.b.hasRemaining()) {
+                                int length = cont.b.getInt();
+                                byte[] rowdata = new byte[length];
+                                cont.b.get(rowdata, 0, length);
+                                edb.processRow(length, rowdata);
+                            }
+                        } finally {
+                            edb.onBlockCompletion();
                         }
-                        edb.onBlockCompletion();
                     } finally {
                         cont.discard();
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    m_logger.error("Error processing export block", e);
                 }
                 constructListener(source, source.poll(), edb, ads);
             }
@@ -132,7 +156,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     @Override
     public void queueWork(Runnable r) {
-        r.run();
+        new Thread(r, "GuestProcessor gen " + m_generation + " shutdown task").start();
     }
 
     @Override
@@ -148,6 +172,7 @@ public class GuestProcessor implements ExportDataProcessor {
                 p.getFirst().sourceNoLongerAdvertised(p.getSecond());
             }
         }
+        m_client.shutdown();
     }
 
     @Override

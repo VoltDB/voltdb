@@ -78,7 +78,7 @@ class JavaProc:
     }
 
     def __init__(self, jpsline):
-        self.pid, self.classname = jpsline.split()[:2]
+        self.pid, self.classname = (list(jpsline.split()) + ['_unknown_'])[:2]
         self.pid = int(self.pid)
 
         self.processType = "[unknown java process]"

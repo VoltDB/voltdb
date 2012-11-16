@@ -101,7 +101,7 @@ public interface VoltDBInterface
      * @param deploymentCRC The CRC of the deployment file
      */
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands, byte[] newCatalogBytes,
-           int expectedCatalogVersion, long currentTxnId, long deploymentCRC);
+           int expectedCatalogVersion, long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
