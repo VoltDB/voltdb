@@ -41,13 +41,43 @@ public class CheckMultiMultiIntGTEFailure extends VoltProcedure {
     public final SQLStmt insertBingoBoard =
             new SQLStmt("INSERT INTO BINGO_BOARD VALUES (?, ?, ?)");
 
-    public final SQLStmt selectFromBingoBoard =
-        new SQLStmt("SELECT * FROM BINGO_BOARD WHERE T_ID =?");
+    public final SQLStmt selectFromBingoBoardEQ =
+            new SQLStmt("SELECT * FROM BINGO_BOARD WHERE T_ID =?");
+
+    public final SQLStmt selectFromBingoBoardGTE =
+            new SQLStmt("SELECT * FROM BINGO_BOARD WHERE T_ID >=?");
+
+    public final SQLStmt selectFromBingoBoardGT =
+            new SQLStmt("SELECT * FROM BINGO_BOARD WHERE T_ID >?");
+
+    public final SQLStmt selectFromBingoBoardLTE =
+            new SQLStmt("SELECT * FROM BINGO_BOARD WHERE T_ID <=?");
+
+    public final SQLStmt selectFromBingoBoardLT =
+            new SQLStmt("SELECT * FROM BINGO_BOARD WHERE T_ID <?");
+
+
+    public final SQLStmt selectCountFromBingoBoardEQ =
+            new SQLStmt("SELECT COUNT(*) FROM BINGO_BOARD WHERE T_ID =?");
+
+    public final SQLStmt selectCountFromBingoBoardGTE =
+            new SQLStmt("SELECT COUNT(*) FROM BINGO_BOARD WHERE T_ID >=?");
+
+    public final SQLStmt selectCountFromBingoBoardGT =
+            new SQLStmt("SELECT COUNT(*) FROM BINGO_BOARD WHERE T_ID >?");
+
+    public final SQLStmt selectCountFromBingoBoardLTE =
+            new SQLStmt("SELECT COUNT(*) FROM BINGO_BOARD WHERE T_ID <=?");
+
+    public final SQLStmt selectCountFromBingoBoardLT =
+            new SQLStmt("SELECT COUNT(*) FROM BINGO_BOARD WHERE T_ID <?");
 
     public VoltTable[] run()
     {
+        voltQueueSQL(insertBingoBoard, -1, 0, "INITIAL VALUE");
         voltQueueSQL(insertBingoBoard, 0, 0, "INITIAL VALUE");
         voltQueueSQL(insertBingoBoard, 0, 1, "INITIAL VALUE");
+        voltQueueSQL(insertBingoBoard, 1, 1, "INITIAL VALUE");
         VoltTable results[] = voltExecuteSQL();
         if (results == null || results.length == 0) {
             return new VoltTable[0];
@@ -56,7 +86,18 @@ public class CheckMultiMultiIntGTEFailure extends VoltProcedure {
                 results[1].asScalarLong() != 1) {
             return new VoltTable[0];
         }
-        voltQueueSQL(selectFromBingoBoard, 0);
+        voltQueueSQL(selectCountFromBingoBoardEQ, 0);
+        voltQueueSQL(selectCountFromBingoBoardGTE,0);
+        voltQueueSQL(selectCountFromBingoBoardGT, 0);
+        voltQueueSQL(selectCountFromBingoBoardLTE,0);
+        voltQueueSQL(selectCountFromBingoBoardLT, 0);
+
+        voltQueueSQL(selectFromBingoBoardEQ, 0);
+        voltQueueSQL(selectFromBingoBoardGTE,0);
+        voltQueueSQL(selectFromBingoBoardGT, 0);
+        voltQueueSQL(selectFromBingoBoardLTE,0);
+        voltQueueSQL(selectFromBingoBoardLT, 0);
+
         return voltExecuteSQL();
     }
 }
