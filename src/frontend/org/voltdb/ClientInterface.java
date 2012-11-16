@@ -1801,7 +1801,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // Use the current time as an identifier (nonce) that can be
                 // recognized below by the monitor so that the promote doesn't
                 // happen until our snapshot completes.
-                final String reqId = new Long(System.currentTimeMillis()).toString();
+                final String reqId = java.util.UUID.randomUUID().toString();
                 m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
                             Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 SnapshotCompletionMonitor completionMonitor =
