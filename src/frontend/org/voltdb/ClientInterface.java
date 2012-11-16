@@ -94,6 +94,7 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.BaseInitiator;
@@ -1844,7 +1845,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         org.voltdb.catalog.CommandLog logConfig = m_catalogContext.get().cluster.getLogconfig().get("log");
         Promoter promoter = new Promoter(sysProc, task, logConfig, ccxn, handler.isAdmin(),
                                          handler.m_hostname, handler.connectionId(), buf.capacity());
-        if (logConfig.getEnabled() && VoltDB.instance().getSiteTracker().isFirstHost()) {
+        // The site tracker may be null when running under mocked unit tests.
+        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
+        if (logConfig.getEnabled() && (siteTracker == null || siteTracker.isFirstHost())) {
             promoter.truncateAndPromote();
         }
         else {
