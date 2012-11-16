@@ -122,7 +122,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                 m_config.getReplicationFactor(), enablePPD,
-                null, // XXX MAKE ME PASS!
+                null, false,
                 m_config.getTopology(m_hostIds), m_mpi);
         m_dut.onReplayCompletion();
     }
@@ -266,7 +266,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         // create a new appointer and start it up in the replay state
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
-                                    null, // XXX MAKE ME PASS!
+                                    null, false,
                                     m_config.getTopology(m_hostIds), m_mpi);
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;

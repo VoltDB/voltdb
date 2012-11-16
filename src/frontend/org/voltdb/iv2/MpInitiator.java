@@ -30,6 +30,8 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
+
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.StatsAgent;
@@ -100,6 +102,11 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 success = result.getFirst();
                 if (success) {
                     m_initiatorMailbox.setLeaderState(result.getSecond());
+                    List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
+                    if (!restartTxns.isEmpty()) {
+                        // Should only be one restarting MP txn
+                        m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
+                    }
                     tmLog.info(m_whoami
                             + "finished leader promotion. Took "
                             + (System.currentTimeMillis() - startTime) + " ms.");
