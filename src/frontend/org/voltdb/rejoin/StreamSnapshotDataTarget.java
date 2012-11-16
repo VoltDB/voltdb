@@ -284,9 +284,6 @@ implements SnapshotDataTarget {
 
     /**
      * Thread that blocks on the receipt of Acks.
-     *
-     * When the mailbox is killed, the blocking ends and
-     * a thread-killing exception is thrown.
      */
     class AckReceiver extends Thread {
         @Override
@@ -337,10 +334,7 @@ implements SnapshotDataTarget {
     }
 
     /**
-     * Thread that blocks on the receipt of Acks.
-     *
-     * When the mailbox is killed, the blocking ends and
-     * a thread-killing exception is thrown.
+     * Thread that runs send work (sending snapshot blocks)
      */
     class SnapshotSender extends Thread {
         @Override
