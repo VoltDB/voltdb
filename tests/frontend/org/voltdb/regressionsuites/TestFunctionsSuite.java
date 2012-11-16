@@ -28,7 +28,6 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -44,17 +43,12 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
 public class TestFunctionsSuite extends RegressionSuite {
 
-    /**
-     * Inner class procedure to see if we can invoke it.
-     */
-    public static class InnerProc extends VoltProcedure {
-        public long run() {
-            return 0L;
-        }
-    }
-
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
+
+    // Padding used to purposely exercise non-inline strings.
+    private static final String paddedToNonInlineLength =
+        "will you still free me (will memcheck see me) when Im sixty-four";
 
 
     public void testStringExpressionIndex() throws Exception {
@@ -450,29 +444,8 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         System.out.println("STARTING testSubstring");
         Client client = getClient();
-        ProcedureCallback callback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
-                }
-            }
-        };
-        /*
-        CREATE TABLE P1 (
-                ID INTEGER DEFAULT '0' NOT NULL,
-                DESC VARCHAR(300),
-                NUM INTEGER,
-                RATIO FLOAT,
-                PAST TIMESTAMP DEFAULT NULL,
-                PRIMARY KEY (ID)
-                );
-        */
-        for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
-            client.drain();
-        }
+        initialLoad(client, "P1");
+
         ClientResponse cr = null;
         VoltTable r = null;
 
@@ -492,6 +465,12 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
+        assertEquals("12"+paddedToNonInlineLength, r.getString(0));
+
+        cr = client.callProcedure("DISPLAY_SUBSTRING2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
         assertEquals("12", r.getString(0));
 
         // Test ORDER BY by support
@@ -504,6 +483,12 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         // Test GROUP BY by support
         cr = client.callProcedure("AGG_OF_SUBSTRING");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals("10"+paddedToNonInlineLength, r.getString(0));
+
+        cr = client.callProcedure("AGG_OF_SUBSTRING2");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
@@ -945,8 +930,23 @@ public class TestFunctionsSuite extends RegressionSuite {
             }
         };
 
-        for (int id=7; id < 15; id++) {
-            client.callProcedure(callback, tableName+".insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
+        /*
+        CREATE TABLE ??? (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        for(int id=7; id < 15; id++) {
+            client.callProcedure(callback, tableName+".insert",
+                                 - id, // ID
+                                 "X"+String.valueOf(id)+paddedToNonInlineLength, // DESC
+                                  10, // NUM
+                                  1.1, // RATIO
+                                  new Timestamp(100000000L)); // PAST
             client.drain();
         }
     }
@@ -1023,17 +1023,24 @@ public class TestFunctionsSuite extends RegressionSuite {
         // RuntimeException seems to stem from parser failure similar to ENG-2901
         // project.addStmtProcedure("ABS_OF_AGG", "select ABS(MIN(ID+9)) from P1");
 
-        project.addStmtProcedure("WHERE_SUBSTRING2", "select count(*) from P1 where SUBSTRING (DESC FROM 2) > '12'");
-        project.addStmtProcedure("WHERE_SUBSTRING3", "select count(*) from P1 where not SUBSTRING (DESC FROM 2 FOR 1) > '13'");
+        project.addStmtProcedure("WHERE_SUBSTRING2",
+                                 "select count(*) from P1 " +
+                                 "where SUBSTRING (DESC FROM 2) > '12"+paddedToNonInlineLength+"'");
+        project.addStmtProcedure("WHERE_SUBSTRING3",
+                                 "select count(*) from P1 " +
+                                 "where not SUBSTRING (DESC FROM 2 FOR 1) > '13'");
 
         // Test select support
         project.addStmtProcedure("DISPLAY_SUBSTRING", "select SUBSTRING (DESC FROM 2) from P1 where ID = -12");
+        project.addStmtProcedure("DISPLAY_SUBSTRING2", "select SUBSTRING (DESC FROM 2 FOR 2) from P1 where ID = -12");
+
 
         // Test ORDER BY by support
         project.addStmtProcedure("ORDER_SUBSTRING", "select ID+15 from P1 order by SUBSTRING (DESC FROM 2)");
 
         // Test GROUP BY by support
         project.addStmtProcedure("AGG_OF_SUBSTRING", "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
+        project.addStmtProcedure("AGG_OF_SUBSTRING2", "select MIN(SUBSTRING (DESC FROM 2 FOR 2)) from P1 where ID < -7");
 
         // Test parameterizing functions
         // next one disabled until ENG-3486

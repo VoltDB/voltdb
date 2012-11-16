@@ -184,10 +184,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Catalog Functions
         // -------------------------------------------------
-        bool loadCatalog(const int64_t txnId, const std::string &catalogPayload);
-        bool updateCatalog(const int64_t txnId, const std::string &catalogPayload);
-        bool processCatalogAdditions(bool addAll, int64_t txnId);
-        bool processCatalogDeletes(int64_t txnId);
+        bool loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
+        bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
+        bool processCatalogAdditions(bool addAll, int64_t timestamp);
+        bool processCatalogDeletes(int64_t timestamp);
         bool rebuildPlanFragmentCollections();
         bool rebuildTableCollections();
 

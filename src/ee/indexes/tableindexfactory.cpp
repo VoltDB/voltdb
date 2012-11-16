@@ -236,16 +236,21 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             if ( ! isIntegralType(exprType)) {
                 isIntsOnly = false;
             }
-            uint16_t declaredLength;
+            uint32_t declaredLength;
             if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
-                // Setting the column length to UNINLINEABLE_OBJECT_LENGTH is NOT intended to constrain the
-                // maximum length of the values or to be the basis of any kind of pre-allocation.
-                // Quite the opposite, it is intended only to convince the tuple storage code that the
-                // values MAY be too large for inlining, so all bets are off. It's not clear whether
-                // scheme.indexedExpressions[ii]->getValueSize() can or should be called for a more useful answer.
+                // Setting the column length to TUPLE_SCHEMA_COLUMN_MAX_VALUE_LENGTH constrains the
+                // maximum length of expression values that can be indexed with the same limit
+                // that gets applied to column values.
+                // In theory, indexed expression values could have an independent limit
+                // up to any length that can be allocated via ThreadLocalPool.
+                // Currently, all of these cases are constrained with the same limit,
+                // which is also the default/maximum size for variable columns defined in schema,
+                // as controlled in java by VoltType.MAX_VALUE_LENGTH.
+                // It's not clear whether scheme.indexedExpressions[ii]->getValueSize()
+                // can or should be called for a more useful answer.
                 // There's probably little to gain since expressions usually do not contain enough information
                 // to reliably determine that the result value is always small enough to "inline".
-                declaredLength = UNINLINEABLE_OBJECT_LENGTH;
+                declaredLength = TupleSchema::COLUMN_MAX_VALUE_LENGTH;
                 isInlinesOrColumnsOnly = false;
             } else {
                 declaredLength = NValue::getTupleStorageSize(exprType);

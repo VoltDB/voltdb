@@ -565,7 +565,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         }
 
         if (!m_pendingFailedSites.add(faultMessage.failedSite)) {
-            VoltDB.crashLocalVoltDB("A site id shouldn't be distributed as a fault twice", true, null);
+            VoltDB.crashLocalVoltDB("A site id shouldn't be distributed as a fault twice", false, null);
         }
 
         discoverGlobalFaultData_send();
@@ -837,7 +837,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         processMessage(lom);
                     } catch (Exception e) {
                         org.voltdb.VoltDB.crashLocalVoltDB(
-                                "Unexpected exception processing AgreementSite message", false, e);
+                                "Unexpected exception processing AgreementSite message", true, e);
                     }
                 } finally {
                     sem.release();
