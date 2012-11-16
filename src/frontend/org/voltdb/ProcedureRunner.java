@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -111,6 +112,10 @@ public class ProcedureRunner {
     // dependency ids for ad hoc
     protected final static int AGG_DEPID = 1;
 
+    // current hash of sql and params
+    protected CRC32 m_inputCRC;
+    protected boolean m_shouldComputeCRC;
+
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {
@@ -141,6 +146,9 @@ public class ProcedureRunner {
                 SysProcSelector.PROCEDURE,
                 site.getCorrespondingSiteId(),
                 m_statsCollector);
+
+        // compute a CRC for write txns that are single-partition
+        m_shouldComputeCRC = (m_catProc.getReadonly() == false) && m_catProc.getSinglepartition();
 
         reflect();
     }
@@ -182,6 +190,9 @@ public class ProcedureRunner {
         assert(m_statusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
+
+        // reset the hash of results
+        m_inputCRC = new CRC32();
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;

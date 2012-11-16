@@ -41,6 +41,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     private String appStatusString = null;
     private byte encodedAppStatusString[];
     private VoltTable[] results = new VoltTable[0];
+    Integer m_sqlHashResults = null;
 
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
@@ -182,6 +183,11 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         } else {
             m_exception = null;
         }
+        if ((presentFields & (1 << 4)) != 0) {
+            m_sqlHashResults = in.readInt();
+        } else {
+            m_sqlHashResults = null;
+        }
         results = (VoltTable[]) in.readArray(VoltTable.class);
         setProperly = true;
     }
@@ -205,6 +211,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             }
             if (m_exception != null) {
                 msgsize += m_exception.getSerializedSize();
+            }
+            if (m_sqlHashResults != null) {
+                msgsize += 4;
             }
             for (VoltTable vt : results) {
                 msgsize += vt.getSerializedSize();
@@ -232,6 +241,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         if (statusString != null) {
             presentFields |= 1 << 5;
         }
+        if (m_sqlHashResults != null) {
+            presentFields |= 1 << 4;
+        }
         buf.put(presentFields);
         buf.put(status);
         if (statusString != null) {
@@ -248,6 +260,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             final ByteBuffer b = ByteBuffer.allocate(m_exception.getSerializedSize());
             m_exception.serializeToBuffer(b);
             buf.put(b.array());
+        }
+        if (m_sqlHashResults != null) {
+            buf.putInt(m_sqlHashResults.intValue());
         }
         buf.putShort((short)results.length);
         for (VoltTable vt : results)
