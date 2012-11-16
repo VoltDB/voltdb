@@ -100,6 +100,11 @@ class TableIndexPicker
                       m_scheme.name.c_str());
             m_type = BALANCED_TREE_INDEX;
         }
+        // If any indexed expression value can not either be stored "inline" within a (GenericKey) key tuple
+        // or specifically in a non-inlined object shared with the base table (because it is a simple column value),
+        // then the GenericKey will have to reference and maintain its own persistent non-inline storage.
+        // That's exactly what the GenericPersistentKey subtype of GenericKey does. This incurs extra overhead
+        // for object copying and freeing, so is only enabled as needed.
         if (m_inlinesOrColumnsOnly) {
             return getInstanceForKeyType<GenericKey<KeySize> >();
         }

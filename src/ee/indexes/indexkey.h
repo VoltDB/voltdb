@@ -502,7 +502,7 @@ struct GenericPersistentKey : public GenericKey<keySize>
 
     // Both copy constructor and assignment operator are apparently required by CompactingMap.
     // It is now VERY IMPORTANT to only extract keys OUT of a map by const reference AND avoid
-    // using these constructor/assignment functions in that scenario
+    // using these constructor/assignment functions in scenarios like that
     // -- with a local variable as the lhs and an in-map key as the rhs.
     // That would effectively corrupt the map entry when the local variable goes out of scope
     // and/or prevent the in-map key from properly freeing its referenced objects when it got
