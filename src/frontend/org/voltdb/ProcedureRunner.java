@@ -114,7 +114,7 @@ public class ProcedureRunner {
 
     // current hash of sql and params
     protected CRC32 m_inputCRC;
-    protected boolean m_shouldComputeCRC;
+    protected boolean m_shouldComputeCRC = true;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -148,7 +148,9 @@ public class ProcedureRunner {
                 m_statsCollector);
 
         // compute a CRC for write txns that are single-partition
-        m_shouldComputeCRC = (m_catProc.getReadonly() == false) && m_catProc.getSinglepartition();
+        if (m_catProc != null) {
+            m_shouldComputeCRC = (m_catProc.getReadonly() == false) && m_catProc.getSinglepartition();
+        }
 
         reflect();
     }
