@@ -18,6 +18,8 @@
 package org.voltdb.rejoin;
 
 import java.nio.ByteBuffer;
+
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -32,6 +34,8 @@ import org.voltdb.VoltDB;
  * This class is not thread-safe.
  */
 public class StreamSnapshotSink implements RejoinSiteProcessor {
+    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+
     private Mailbox m_mb = null;
     private StreamSnapshotDataReceiver m_in = null;
     private Thread m_inThread = null;
@@ -166,11 +170,23 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
             ByteBuffer block = container.b;
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
             StreamSnapshotMessageType type = StreamSnapshotMessageType.values()[typeByte];
+            if (type == StreamSnapshotMessageType.FAILURE) {
+                VoltDB.crashLocalVoltDB("Rejoin source sent failure message.", false, null);
+
+                // for test code only
+                m_EOF = true;
+                return null;
+            }
             if (type == StreamSnapshotMessageType.END) {
+                rejoinLog.trace("Got END message");
+
                 // End of stream, no need to ack this buffer
                 m_EOF = true;
                 return null;
-            } else if (type == StreamSnapshotMessageType.SCHEMA) {
+            }
+            else if (type == StreamSnapshotMessageType.SCHEMA) {
+                rejoinLog.trace("Got SCHEMA message");
+
                 block.position(block.position() + 1);
                 m_schema = new byte[block.remaining()];
                 block.get(m_schema);
