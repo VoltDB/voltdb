@@ -63,7 +63,7 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             VoltProjectBuilder builder = getBuilderForTest();
             builder.setSecurityEnabled(true);
 
-            cluster = new LocalCluster("rejoin.jar", 1, 2, 1,
+            cluster = new LocalCluster("rejoin.jar", 3, 2, 1,
                     BackendTarget.NATIVE_EE_JNI, false, false);
             cluster.setJavaProperty("rejoindeathtest", null);
             cluster.overrideAnyRequestForValgrind();
@@ -124,6 +124,24 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             // IV1 community uses a different path that doesn't fail
             if (MiscUtils.isPro()) {
                 assertEquals(1, cluster.getLiveNodeCount());
+
+                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+
+                assertEquals(2, cluster.getLiveNodeCount());
+
+                cluster.shutDownSingleHost(1);
+
+                cluster.setJavaProperty("rejoindeathtestonrejoinside", null);
+
+                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+
+                assertEquals(1, cluster.getLiveNodeCount());
+
+                cluster.setJavaProperty("rejoindeathtestcancel", null);
+
+                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+
+                assertEquals(2, cluster.getLiveNodeCount());
             }
         }
         finally {

@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -37,6 +39,12 @@ import org.voltdb.utils.VoltFile;
  */
 public class SequentialRejoinCoordinator extends RejoinCoordinator {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+
+    // triggers specific test code for TestMidRejoinDeath
+    private static boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtestonrejoinside");
+    private static boolean m_rejoinDeathTestCancel = System.getProperties().containsKey("rejoindeathtestcancel");
+
+    private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
     // contains all sites that haven't started streaming snapshot
     private final Queue<Long> m_pendingSites;
@@ -76,6 +84,14 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
                 m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                RejoinMessage.Type.INITIATION_COMMUNITY);
         send(HSId, msg);
+
+        // exit here if one property is set and not the other
+        // awkward, but useful for testing
+        if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel &&
+                (m_sitesRejoinedCount.incrementAndGet() == 2)) {
+            // die a painful death
+            System.exit(0);
+        }
     }
 
     @Override
@@ -83,20 +99,23 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
         long firstSite = m_pendingSites.poll();
         m_rejoiningSites.add(firstSite);
         String HSIdString = CoreUtils.hsIdToString(firstSite);
-        rejoinLog.debug("Start rejoining site " + HSIdString);
+        rejoinLog.info("Initiating snapshot stream to first site: " + HSIdString);
         initiateRejoinOnSite(firstSite);
     }
 
     private void onSnapshotStreamFinished(long HSId) {
-        rejoinLog.info("Finished streaming snapshot to site " +
-                CoreUtils.hsIdToString(HSId));
-
         if (!m_pendingSites.isEmpty()) {
             long nextSite = m_pendingSites.poll();
             m_rejoiningSites.add(nextSite);
-            String HSIdString = CoreUtils.hsIdToString(nextSite);
-            rejoinLog.debug("Start rejoining site " + HSIdString);
+            rejoinLog.info("Finished streaming snapshot to site: " +
+                    CoreUtils.hsIdToString(HSId) +
+                    " and initiating snapshot stream to next site: " +
+                    CoreUtils.hsIdToString(nextSite));
             initiateRejoinOnSite(nextSite);
+        }
+        else {
+            rejoinLog.info("Finished streaming snapshot to site: " +
+                    CoreUtils.hsIdToString(HSId));
         }
     }
 
