@@ -49,8 +49,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -1318,7 +1319,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
         registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
-        registerPolicy("@Promote", new PromoteAcceptancePolicy(true));
     }
 
     private void registerPolicy(InvocationAcceptancePolicy policy) {
@@ -1805,6 +1805,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // recognized below by the monitor so that the promote doesn't
                 // happen until our snapshot completes.
                 final String reqId = java.util.UUID.randomUUID().toString();
+                m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 SnapshotCompletionMonitor completionMonitor =
                         VoltDB.instance().getSnapshotCompletionMonitor();
                 completionMonitor.addInterest(new SnapshotCompletionInterest() {
@@ -1818,8 +1820,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         return null;
                     }
                 });
-                m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
-                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             }
             catch (Exception e) {
                 VoltDB.crashGlobalVoltDB("ZK truncation snapshot request failed", false, e);
@@ -1909,7 +1909,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchSendSentinel(buf, task);
             }
             else if (task.procName.equals("@Promote")) {
-                // Map @Promote to @PromoteReplicaState for validation.
+                // Map @Promote to @PromoteReplicaState.
                 sysProc = SystemProcedureCatalog.listing.get("@PromoteReplicaStatus");
                 assert(sysProc != null);
             }
