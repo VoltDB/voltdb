@@ -76,6 +76,8 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
         "%s/%s-voltdb-voltcache-%s.tar.gz" % (releaseDir, operatingsys, version))
     get("%s/voltdb/obj/release/voltdb-voltkv-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-voltkv-%s.tar.gz" % (releaseDir, operatingsys, version))
+    get("%s/voltdb/obj/release/voltdb-tools-%s.tar.gz" % (builddir, version),
+        "%s/voltdb-tools-%s.tar.gz" % (releaseDir, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":

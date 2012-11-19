@@ -2340,7 +2340,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                              fragmentId,
                                              params);
 
-            sendDependency(currentFragResponse, dep.depId, dep.dependency);
+            if (dep != null) {
+                sendDependency(currentFragResponse, dep.depId, dep.dependency);
+            }
         }
         catch (final EEException e)
         {
