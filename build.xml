@@ -369,12 +369,6 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- populate project generator -->
-    <exec dir="src/proj_gen/" executable="python">
-        <arg line="generator_compiler.py"/>
-    </exec>
-    <move tofile="${dist.dir}/tools/generate" file="src/proj_gen/generate" />
-
     <!-- add the Project and Deployment file schemas to the dist -->
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
@@ -389,7 +383,6 @@ DISTRIBUTION
             <include name="tools/demo/launch"/>
             <include name="doc/tutorials/**/run.sh"/>
             <include name="examples/**/run.sh"/>
-            <include name="tools/generate"/>
         </fileset>
     </chmod>
 
@@ -449,7 +442,6 @@ DISTRIBUTION
             <include name="examples/voltcache/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
-            <include name="tools/generate"/>
             <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
@@ -1628,18 +1620,6 @@ TEST CASES
     <samplecheck app="voltkv" />
     <echo>checking voter</echo>
     <samplecheck app="voter" />
-
-    <!-- test the generator -->
-    <exec dir="${dist.dir}" executable='${dist.dir}/tools/generate'>
-        <arg line="foo org.foo foo"/>
-    </exec>
-    <ant
-        dir='${dist.dir}/foo'
-        inheritAll='false'
-        inheritRefs='false'
-        target='main'
-    />
-    <delete dir='${dist.dir}/foo' />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"
