@@ -101,6 +101,7 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -2590,6 +2591,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         false,  // isReadOnly
                         true);  // isForReplay
         m_mailbox.send(initiatorHSId, mppm);
+    }
+
+    /**
+     * Sends an end of log message to the master of that partition. This should
+     * only be called at the end of replay.
+     *
+     * @param partitionId
+     */
+    public void sendEOLMessage(int partitionId) {
+        assert(m_isIV2Enabled);
+        final long initiatorHSId = m_iv2Masters.get(partitionId);
+        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage();
+        m_mailbox.send(initiatorHSId, message);
     }
 
     public List<Iterator<Map.Entry<String, InvocationInfo>>> getIV2InitiatorStats() {

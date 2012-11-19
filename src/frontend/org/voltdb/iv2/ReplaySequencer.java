@@ -51,7 +51,7 @@ public class ReplaySequencer
 {
     // place holder that associates sentinel, first fragment and
     // work that follows in the transaction sequence.
-    private static class ReplayEntry {
+    private class ReplayEntry {
         Long m_sentinalTxnId = null;
         FragmentTaskMessage m_firstFragment = null;
 
@@ -60,7 +60,12 @@ public class ReplaySequencer
 
         boolean isReady()
         {
-            return m_sentinalTxnId != null && m_firstFragment != null;
+            if (m_eolReached) {
+                // End of log, no more sentinels, release first fragment
+                return m_firstFragment != null;
+            } else {
+                return m_sentinalTxnId != null && m_firstFragment != null;
+            }
         }
 
         boolean hasSentinel()
@@ -100,6 +105,15 @@ public class ReplaySequencer
     // lastPolledFragmentTxnId tracks released MP transactions; new fragments
     // for released transactions do not need further sequencing.
     long m_lastPolledFragmentTxnId = Long.MIN_VALUE;
+
+    // has reached end of log for this partition, release any MP Txns for
+    // replay if this is true.
+    boolean m_eolReached = false;
+
+    public void setEOLReached()
+    {
+        m_eolReached = true;
+    }
 
     // Return the next correctly sequenced message or null if none exists.
     public VoltMessage poll()
@@ -141,6 +155,10 @@ public class ReplaySequencer
         else if (in instanceof FragmentTaskMessage) {
             // already sequenced
             if (inTxnId <= m_lastPolledFragmentTxnId) {
+                return false;
+            }
+            // end-of-log reached, no more sentinels will come, release immediately
+            if (m_eolReached) {
                 return false;
             }
 

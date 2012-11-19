@@ -238,5 +238,37 @@ public class TestReplaySequencer extends TestCase
         assertEquals(frag1, dut.poll());
         assertEquals(null, dut.poll());
     }
+
+    @Test
+    public void testFragmentThenSetEOL()
+    {
+        boolean result;
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+
+        result = dut.offer(1L, frag);
+        assertEquals(true, result);
+        assertEquals(null, dut.poll());
+
+        dut.setEOLReached();
+        assertEquals(frag, dut.poll());
+        assertNull(dut.poll());
+    }
+
+    @Test
+    public void testSetEOLThanFragment()
+    {
+        boolean result;
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+
+        dut.setEOLReached();
+
+        result = dut.offer(1L, frag);
+        assertEquals(false, result);
+        assertNull(dut.poll());
+    }
 }
 
