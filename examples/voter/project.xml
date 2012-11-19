@@ -7,14 +7,14 @@
     </info>
     <database>
         <schemas>
-            <schema path='ddl.sql' />
+            <schema path="ddl.sql" />
         </schemas>
         <procedures>
-            <procedure class='voter.procedures.Initialize' />
-            <procedure class='voter.procedures.Results' />
-            <procedure class='voter.procedures.Vote' />
-            <procedure class='voter.procedures.ContestantWinningStates' />
-            <procedure class='voter.procedures.GetStateHeatmap' />
+            <procedure class="voter.procedures.Initialize" />
+            <procedure class="voter.procedures.Results" />
+            <procedure class="voter.procedures.Vote" />
+            <procedure class="voter.procedures.ContestantWinningStates" />
+            <procedure class="voter.procedures.GetStateHeatmap" />
         </procedures>
     </database>
 </project>
