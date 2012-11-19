@@ -863,6 +863,26 @@ import org.voltdb.types.VoltDecimalHelper;
                     }
                     crc.update(m_encodedStrings[i]);
                     break;
+                case VARBINARY:
+                    if (m_params[i] instanceof byte[]) {
+                        crc.update((byte[]) m_params[i]);
+                    }
+                    else if (m_params[i] instanceof byte[]) {
+                        for (Byte B : (Byte[]) m_params[i]) {
+                            if (B != null) {
+                                crc.update(B.byteValue());
+                            }
+                            else {
+                                crc.update(0);
+                            }
+                        }
+                    }
+                    else if (m_encodedStrings[i] != null) {
+                        crc.update(m_encodedStrings[i]);
+                    }
+                    else {
+                        throw new IOException("Failed to computer CRC of VARBINARY value: " + (String) obj);
+                    }
                 case TIMESTAMP:
                     long micros = timestampToMicroseconds(obj);
                     dos.writeLong(micros);
