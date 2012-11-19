@@ -139,6 +139,23 @@ public class ReplaySequencer
     {
         ReplayEntry found = m_replayEntries.get(inTxnId);
 
+        /*
+         * End-of-log reached. Only FragmentTaskMessage and
+         * CompleteTransactionMessage can arrive at this partition once EOL is
+         * reached.
+         *
+         * If the txn is found, meaning that found is not null, then this might
+         * be the first fragment, it needs to get through in order to free any
+         * txns queued behind it.
+         *
+         * If the txn is not found, then there will be no matching sentinel to
+         * come later, and there will be no SP txns after this MP, so release
+         * the first fragment immediately.
+         */
+        if (m_eolReached && found == null) {
+            return false;
+        }
+
         if (in instanceof MultiPartitionParticipantMessage) {
             // Incoming sentinel.
             // MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage)in;
@@ -155,10 +172,6 @@ public class ReplaySequencer
         else if (in instanceof FragmentTaskMessage) {
             // already sequenced
             if (inTxnId <= m_lastPolledFragmentTxnId) {
-                return false;
-            }
-            // end-of-log reached, no more sentinels will come, release immediately
-            if (m_eolReached) {
                 return false;
             }
 
