@@ -33,8 +33,8 @@ from voltcli import utility
     bundles = VOLT.AdminBundle(),
     description = 'Save a VoltDB database snapshot.',
     options = (
-        VOLT.BooleanOption('-n', '--non-blocking', 'nonblocking',
-                           'do not wait for snapshot to complete',
+        VOLT.BooleanOption('-b', '--blocking', 'blocking',
+                           'block transactions and wait until the snapshot completes',
                            default = False),
         VOLT.EnumOption('-f', '--format', 'format',
                         'snapshot format', 'native', 'csv',
@@ -48,10 +48,10 @@ from voltcli import utility
 def save(runner):
     uri   = 'file://%s' % urllib.quote(os.path.realpath(runner.opts.directory))
     nonce = runner.opts.nonce.replace('"', '\\"')
-    if runner.opts.nonblocking:
-        blocking = 'false'
-    else:
+    if runner.opts.blocking:
         blocking = 'true'
+    else:
+        blocking = 'false'
     json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s"}'
                     % (uri, nonce, blocking, runner.opts.format)]
     utility.verbose_info('@SnapshotSave "%s"' % json_opts)
