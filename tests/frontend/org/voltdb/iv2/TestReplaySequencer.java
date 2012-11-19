@@ -270,5 +270,24 @@ public class TestReplaySequencer extends TestCase
         assertEquals(false, result);
         assertNull(dut.poll());
     }
+
+    @Test
+    public void testSentinelThenEOLThenFragment()
+    {
+        boolean result;
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sntl = makeSentinel(1L);
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+
+        dut.offer(1L, sntl);
+
+        dut.setEOLReached();
+
+        result = dut.offer(1L, frag);
+        assertTrue(result);
+        assertEquals(frag, dut.poll());
+        assertEquals(null, dut.poll());
+    }
 }
 
