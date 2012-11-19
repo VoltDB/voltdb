@@ -936,6 +936,10 @@ public class SQLCommand
         + "  Password of the user for database login.\n"
         + "  Default: (not defined - connection made without credentials).\n"
         + "\n"
+        + "[--query=query]\n"
+        + "  Execute a non-interactive query. Multiple query options are allowed.\n"
+        + "  Default: (runs the interactive shell when no query options are present).\n"
+        + "\n"
         + "[--output-format=(fixed|csv|tab)]\n"
         + "  Format of returned resultset data (Fixed-width, CSV or Tab-delimited).\n"
         + "  Default: fixed.\n"
@@ -1096,6 +1100,7 @@ public class SQLCommand
             int port = 21212;
             String user = "";
             String password = "";
+            List<String> queries = null;
 
             // Parse out parameters
             for(int i = 0; i < args.length; i++)
@@ -1109,6 +1114,20 @@ public class SQLCommand
                     user = arg.split("=")[1];
                 else if (arg.startsWith("--password="))
                     password = arg.split("=")[1];
+                else if (arg.startsWith("--query="))
+                {
+                    List<String> argQueries = parseQuery(arg.substring(8));
+                    if (!argQueries.isEmpty()) {
+                        if (queries == null)
+                        {
+                            queries = argQueries;
+                        }
+                        else
+                        {
+                            queries.addAll(argQueries);
+                        }
+                    }
+                }
                 else if (arg.startsWith("--output-format="))
                 {
                     if (Pattern.compile("(fixed|csv|tab)", Pattern.CASE_INSENSITIVE).matcher(arg.split("=")[1].toLowerCase()).matches())
@@ -1149,8 +1168,6 @@ public class SQLCommand
             // Load user stored procs
             loadStoredProcedures(Procedures);
 
-            List<String> queries = null;
-
             in = new FileInputStream(FileDescriptor.in);
             out = new PrintWriter(new OutputStreamWriter(System.out, System.getProperty("jline.WindowsTerminal.output.encoding", System.getProperty("file.encoding"))));
             Input = new ConsoleReader(in, out);
@@ -1158,9 +1175,20 @@ public class SQLCommand
             Input.setBellEnabled(false);
             Input.addCompletor(new SimpleCompletor(new String[] {"select", "update", "insert", "delete", "exec", "file", "recall", "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" }));
 
-            // If Standard input comes loaded with data, run in non-interactive mode
+            boolean interactive = true;
+            if (queries != null && !queries.isEmpty())
+            {
+                // If queries are provided via command line options run them in
+                // non-interactive mode.
+                //TODO: Someday we should honor batching.
+                interactive = false;
+                for(int i = 0;i<queries.size();i++)
+                    executeQuery(queries.get(i));
+            }
             if (System.in.available() > 0)
             {
+                // If Standard input comes loaded with data, run in non-interactive mode
+                interactive = false;
                 queries = getQuery(false);
                 if (queries == null)
                     System.exit(0);
@@ -1168,7 +1196,7 @@ public class SQLCommand
                     for(int i = 0;i<queries.size();i++)
                         executeQuery(queries.get(i));
             }
-            else
+            if (interactive)
             {
                 // Print out welcome message
                 System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);

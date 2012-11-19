@@ -45,27 +45,27 @@ public class TestCRUDSuite extends RegressionSuite {
         final Client client = this.getClient();
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.insert", i, Integer.toHexString(i));
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.select", i);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             VoltTable vt = resp.getResults()[0];
             assertTrue(vt.advanceRow());
-            assertTrue(vt.getLong(0) == i);
+            assertEquals(i, vt.getLong(0));
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.update", i, "STR" + Integer.toHexString(i), i);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.select", i);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             VoltTable vt = resp.getResults()[0];
             assertTrue(vt.advanceRow());
             assertTrue(vt.getString(1).equals("STR" + Integer.toHexString(i)));
@@ -73,13 +73,13 @@ public class TestCRUDSuite extends RegressionSuite {
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P1.delete", i);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         ClientResponse resp = client.callProcedure("CountP1");
-        assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-        assertTrue(resp.getResults()[0].asScalarLong() == 0);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(0, resp.getResults()[0].asScalarLong());
     }
 
     public void testMultiColPk() throws Exception
@@ -94,36 +94,36 @@ public class TestCRUDSuite extends RegressionSuite {
         final Client client = this.getClient();
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.insert", i, Integer.toHexString(i), i * 100);  // z,x,y
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.select", i*100, Integer.toHexString(i), i); // y,x,z
             VoltTable vt = resp.getResults()[0];
             assertTrue(vt.advanceRow());
-            assertTrue(vt.getLong(0) == i);
+            assertEquals(i, vt.getLong(0));
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.update",
                     i*10, "STR" + Integer.toHexString(i), i*100, // z,x,y (update / table order)
                     i*100, Integer.toHexString(i), i);           // y,x,z (search / index order)
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.select", i*100, "STR" + Integer.toHexString(i), i*10); // y,x,z
             VoltTable vt = resp.getResults()[0];
             assertTrue(vt.advanceRow());
-            assertTrue(vt.getLong(0) == i*10);
+            assertEquals(i*10, vt.getLong(0));
         }
 
         for (int i=0; i < 10; i++) {
             ClientResponse resp = client.callProcedure("P4.delete", i*100, "STR" + Integer.toHexString(i), i*10); // y,x,z
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            assertTrue(resp.getResults()[0].asScalarLong() == 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
         }
 
     }

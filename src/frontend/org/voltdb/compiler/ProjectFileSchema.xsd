@@ -8,8 +8,10 @@
     project.xml. VoltCompiler processes project.xml file using
     the jaxb XML to Java bindings.
 
-    If you modify this schema, you must regenerate the jaxb
-    bindings. It's easy to do:
+    If you modify this schema, the jaxb bindings must be regenerated.
+    It is normally handled by the ant build.
+    
+    It's also easy to do manually:
 
     cd src/frontend
     xjc -p org.voltdb.compiler.projectfile org/voltdb/compiler/ProjectFileSchema.xsd
@@ -43,6 +45,8 @@
       <xsd:element name="name" type="xsd:string"/>
       <xsd:element name="version" type="xsd:string"/>
       <xsd:element name="description" type="xsd:string"/>
+      <xsd:element name="catalog" minOccurs='0' maxOccurs='1' type="xsd:string"/>
+      <xsd:element name="classpath" minOccurs='0' maxOccurs='1' type="xsd:string"/>
     </xsd:all>
   </xsd:complexType>
 

@@ -58,6 +58,34 @@ public class TestIndexesSuite extends RegressionSuite {
     // - multi-column
     // - multi-map
 
+    //
+    // Multimap multi column, indexing only on prefix key
+    // @throws IOException
+    // @throws ProcCallException
+    //
+    public void testOrderedMultiMultiPrefixOnly()
+    throws IOException, ProcCallException
+    {
+        String[] tables = {"P3", "R3"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+            String query = String.format("select * from %s T where T.NUM > 100", table);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            String queryEq = String.format("select * from %s T where T.NUM = 200", table);
+            VoltTable[] resultsEq = client.callProcedure("@AdHoc", queryEq).getResults();
+            assertEquals(2, resultsEq[0].getRowCount());
+        }
+    }
+
     public void testParameterizedLimitOnIndexScan()
     throws IOException, ProcCallException {
         String[] tables = {"P1", "R1", "P2", "R2"};
@@ -322,18 +350,101 @@ public class TestIndexesSuite extends RegressionSuite {
     {
         final Client client = getClient();
         final VoltTable results[] = client.callProcedure("CheckMultiMultiIntGTEFailure").getResults();
-        if (results == null || results.length == 0) {
+        if (results == null) {
             fail();
         }
-        assertEquals( 2, results[0].getRowCount());
-        final VoltTableRow row0 = results[0].fetchRow(0);
-        assertEquals( 0, row0.getLong(0));
-        assertEquals( 0, row0.getLong(1));
+        //
+        // Must pass 10 tests
+        //
+        assertEquals(10, results.length);
 
-        final VoltTableRow row1 = results[0].fetchRow(1);
-        assertEquals( 0, row1.getLong(0));
-        assertEquals( 1, row1.getLong(1));
-    }
+        // Start off easy, with COUNT(*)s
+        // Actually, these exercise a different (counted index) code path which has experienced its own regressions.
+        // Test 1 -- count EQ first component of compound key
+        int tableI = 0;
+        final VoltTableRow countEQ = results[tableI].fetchRow(0);
+        assertEquals( 2, countEQ.getLong(0));
+
+        // Test 2 -- count GTE first component of compound key
+        tableI++;
+        final VoltTableRow countGT = results[tableI].fetchRow(0);
+        assertEquals( 3, countGT.getLong(0));
+
+        // Test 3 -- count GT first component of compound key
+        tableI++;
+        final VoltTableRow countGTE = results[tableI].fetchRow(0);
+        assertEquals( 1, countGTE.getLong(0));
+
+        // Test 4 -- count LTE first component of compound key
+        tableI++;
+        final VoltTableRow countLTE = results[tableI].fetchRow(0);
+        assertEquals( 3, countLTE.getLong(0));
+
+        // Test 5 -- count LT first component of compound key
+        tableI++;
+        final VoltTableRow countLT = results[tableI].fetchRow(0);
+        assertEquals( 1, countLT.getLong(0));
+
+        // Test 6 -- EQ first component of compound key
+        tableI++;
+        int rowI = 0;
+        assertEquals( 2, results[tableI].getRowCount());
+        final VoltTableRow rowEQ0 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowEQ0.getLong(0));
+        assertEquals( 0, rowEQ0.getLong(1));
+
+        final VoltTableRow rowEQ1 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowEQ1.getLong(0));
+        assertEquals( 1, rowEQ1.getLong(1));
+
+        // Test 7 -- GTE first component of compound key
+        tableI++;
+        rowI = 0;
+        assertEquals( 3, results[tableI].getRowCount());
+        final VoltTableRow rowGTE0 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowGTE0.getLong(0));
+        assertEquals( 0, rowGTE0.getLong(1));
+
+        final VoltTableRow rowGTE1 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowGTE1.getLong(0));
+        assertEquals( 1, rowGTE1.getLong(1));
+
+        final VoltTableRow rowGTE2 = results[tableI].fetchRow(rowI++);
+        assertEquals( 1, rowGTE2.getLong(0));
+        assertEquals( 1, rowGTE2.getLong(1));
+
+        // Test 8 -- GT first component of compound key
+        tableI++;
+        rowI = 0;
+        assertEquals( 1, results[tableI].getRowCount());
+        final VoltTableRow rowGT0 = results[tableI].fetchRow(rowI++);
+        assertEquals( 1, rowGT0.getLong(0));
+        assertEquals( 1, rowGT0.getLong(1));
+
+        // Test 9 -- LTE first component of compound key
+        tableI++;
+        rowI = 0;
+        assertEquals( 3, results[tableI].getRowCount());
+        final VoltTableRow rowLTE0 = results[tableI].fetchRow(rowI++);
+        assertEquals( -1, rowLTE0.getLong(0));
+        assertEquals( 0, rowLTE0.getLong(1));
+
+        final VoltTableRow rowLTE1 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowLTE1.getLong(0));
+        assertEquals( 0, rowLTE1.getLong(1));
+
+        final VoltTableRow rowLTE2 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowLTE2.getLong(0));
+        assertEquals( 1, rowLTE2.getLong(1));
+
+        // Test 10 -- LT first component of compound key
+        tableI++;
+        rowI = 0;
+        assertEquals( 1, results[tableI].getRowCount());
+        final VoltTableRow rowLT0 = results[tableI].fetchRow(rowI++);
+        assertEquals( -1, rowLT0.getLong(0));
+        assertEquals( 0, rowLT0.getLong(1));
+}
 
     void callHelper(Client client, String procname, Object ...objects )
     throws InterruptedException, IOException
