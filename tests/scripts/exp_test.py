@@ -63,9 +63,15 @@ suiteDict = {'helloworld': 'HelloWorld',
              'voter': 'Voter',
              'all': 'HelloWorld, Voter, Voltcache, Voltkv'}
 tail = "tar.gz"
+# get the branch name
+if len(sys.argv) == 2:
+    branch = sys.argv[1]
+else:
+# master is the default, formerly used 'kits/candidate'
+    branch = "master"
 # http://volt0/kits/candidate/LINUX-voltdb-2.8.1.tar.gz
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
-root = 'http://volt0/kits/candidate/'
+root = "http://volt0/kits/%s/" % branch
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
 destDir = "/tmp/"
 logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
