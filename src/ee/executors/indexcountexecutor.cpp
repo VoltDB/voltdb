@@ -129,6 +129,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     // Miscellanous Information
+    m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
     if (m_numOfSearchkeys != 0) {
         m_lookupType = m_node->getLookupType();
     }
