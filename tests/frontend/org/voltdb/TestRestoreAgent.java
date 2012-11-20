@@ -286,6 +286,9 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         @Override
         public void sendSentinel(long txnId, int partitionId) {}
+
+        @Override
+        public void sendEOLMessage(int partitionId) {}
     }
 
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
