@@ -471,7 +471,7 @@ def create_rpt(info, status, msg, keyStrings, elapsed, rptf):
 if __name__ == "__main__":
     start = time.time()
     usage = "Usage: %prog [options]"
-    parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro|voltkv|voltcache|all> <-s all|helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
+    parser = OptionParser(usage="%prog [-b <branch name>] [-r <release #>] [-p <comm|pro|voltkv|voltcache|all> <-s all|helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
     parser.add_option("-r", "--release", dest="release",
                       help="VoltDB release number. If omitted, will be read from version.txt.")
     parser.add_option("-p", "--package", dest="pkg",
