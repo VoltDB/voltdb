@@ -162,7 +162,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 }
             }
 
-            String data = (String) params.toArray()[6];
+            String data = (String) params.toArray()[7];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
