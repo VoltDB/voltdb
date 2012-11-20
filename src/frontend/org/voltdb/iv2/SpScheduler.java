@@ -49,6 +49,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
@@ -228,6 +229,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
+    /**
+     * Poll the replay sequencer and process the messages until it returns null
+     */
+    private void deliverReadyTxns() {
+        VoltMessage m = m_replaySequencer.poll();
+        while(m != null) {
+            deliver2(m);
+            m = m_replaySequencer.poll();
+        }
+    }
+
     // SpInitiators will see every message type.  The Responses currently come
     // from local work, but will come from replicas when replication is
     // implemented
@@ -261,15 +273,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 deliver2(message);
             }
             else {
-                VoltMessage m = m_replaySequencer.poll();
-                while(m != null) {
-                    deliver2(m);
-                    m = m_replaySequencer.poll();
-                }
+                deliverReadyTxns();
             }
         }
-        else
-        {
+        else if (message instanceof Iv2EndOfLogMessage) {
+            m_replaySequencer.setEOLReached();
+            deliverReadyTxns();
+        }
+        else {
             deliver2(message);
         }
     }
