@@ -504,7 +504,7 @@ if __name__ == "__main__":
         releaseNum = getReleaseNum()
 
     branchName = options.branch
-    root.replace("branch", branchName)
+    root = root.replace("branch", branchName)
 
     list = None
     if(options.pkg in pkgDict):
