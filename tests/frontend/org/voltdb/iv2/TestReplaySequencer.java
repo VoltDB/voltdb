@@ -33,6 +33,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import junit.framework.TestCase;
 
 import org.junit.Test;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -56,6 +57,13 @@ public class TestReplaySequencer extends TestCase
     TransactionInfoBaseMessage makeFragment(long unused)
     {
         FragmentTaskMessage m = mock(FragmentTaskMessage.class);
+        when(m.isForReplay()).thenReturn(true);
+        return m;
+    }
+
+    TransactionInfoBaseMessage makeCompleteTxn(long unused)
+    {
+        CompleteTransactionMessage m = mock(CompleteTransactionMessage.class);
         when(m.isForReplay()).thenReturn(true);
         return m;
     }
@@ -246,13 +254,30 @@ public class TestReplaySequencer extends TestCase
         ReplaySequencer dut = new ReplaySequencer();
 
         TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage frag2 = makeFragment(1L);
+        TransactionInfoBaseMessage complete = makeCompleteTxn(1L);
+
+        TransactionInfoBaseMessage frag3 = makeFragment(2L);
 
         result = dut.offer(1L, frag);
-        assertEquals(true, result);
-        assertEquals(null, dut.poll());
+        assertTrue(result);
+        assertNull(dut.poll());
 
         dut.setEOLReached();
         assertEquals(frag, dut.poll());
+        assertNull(dut.poll());
+
+        result = dut.offer(1L, frag2);
+        assertFalse(result);
+        assertNull(dut.poll());
+
+        result = dut.offer(1L, complete);
+        assertFalse(result);
+        assertNull(dut.poll());
+
+        // another txn
+        result = dut.offer(2L, frag3);
+        assertFalse(result);
         assertNull(dut.poll());
     }
 
@@ -263,11 +288,27 @@ public class TestReplaySequencer extends TestCase
         ReplaySequencer dut = new ReplaySequencer();
 
         TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage frag2 = makeFragment(1L);
+        TransactionInfoBaseMessage complete = makeCompleteTxn(1L);
+
+        TransactionInfoBaseMessage frag3 = makeFragment(2L);
 
         dut.setEOLReached();
 
         result = dut.offer(1L, frag);
-        assertEquals(false, result);
+        assertFalse(result);
+        assertNull(dut.poll());
+
+        result = dut.offer(1L, frag2);
+        assertFalse(result);
+        assertNull(dut.poll());
+
+        result = dut.offer(1L, complete);
+        assertFalse(result);
+        assertNull(dut.poll());
+
+        result = dut.offer(2L, frag3);
+        assertFalse(result);
         assertNull(dut.poll());
     }
 
@@ -279,6 +320,8 @@ public class TestReplaySequencer extends TestCase
 
         TransactionInfoBaseMessage sntl = makeSentinel(1L);
         TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage frag2 = makeFragment(1L);
+        TransactionInfoBaseMessage complete = makeCompleteTxn(1L);
 
         dut.offer(1L, sntl);
 
@@ -287,7 +330,52 @@ public class TestReplaySequencer extends TestCase
         result = dut.offer(1L, frag);
         assertTrue(result);
         assertEquals(frag, dut.poll());
-        assertEquals(null, dut.poll());
+        assertNull(dut.poll());
+
+        result = dut.offer(1L, frag2);
+        assertFalse(result);
+        assertNull(dut.poll());
+
+        result = dut.offer(1L, complete);
+        assertFalse(result);
+        assertNull(dut.poll());
+    }
+
+    /**
+     * If the first MP txn rolled back before this partition has executed the
+     * first fragment, and the MPI sends out the first fragment of the next txn,
+     * the replay sequencer should hold on to both txns until a sentinel or the
+     * EOL arrives to release them in order.
+     */
+    @Test
+    public void testTwoTxnsThenSetEOL()
+    {
+        boolean result;
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage complete = makeCompleteTxn(1L);
+
+        TransactionInfoBaseMessage frag3 = makeFragment(2L);
+
+        result = dut.offer(1L, frag);
+        assertTrue(result);
+        assertNull(dut.poll());
+
+        result = dut.offer(1L, complete);
+        assertTrue(result);
+        assertNull(dut.poll());
+
+        result = dut.offer(2L, frag3);
+        assertTrue(result);
+        assertNull(dut.poll());
+
+        dut.setEOLReached();
+
+        assertEquals(frag, dut.poll());
+        assertEquals(complete, dut.poll());
+        assertEquals(frag3, dut.poll());
+        assertNull(dut.poll());
     }
 }
 
