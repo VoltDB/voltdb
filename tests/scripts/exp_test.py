@@ -63,15 +63,9 @@ suiteDict = {'helloworld': 'HelloWorld',
              'voter': 'Voter',
              'all': 'HelloWorld, Voter, Voltcache, Voltkv'}
 tail = "tar.gz"
-# get the branch name
-if len(sys.argv) == 2:
-    branch = sys.argv[1]
-else:
-# master is the default, formerly used 'kits/candidate'
-    branch = "master"
 # http://volt0/kits/candidate/LINUX-voltdb-2.8.1.tar.gz
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
-root = "http://volt0/kits/%s/" % branch
+root = "http://volt0/kits/branch/"
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
 destDir = "/tmp/"
 logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
@@ -486,6 +480,8 @@ if __name__ == "__main__":
                       help="Test suite name, if not set, then this framework will take all suites. If an incorrect suite name is passed in, then the test suite name is set to 'all' as a default value.")
     parser.add_option("-x","--reportxml", dest="reportfile", default="exp_test.xml",
                       help="Report file location")
+    parser.add_option("-b","--branch", dest="branch", default="master",
+                      help="Branch name to test")
 
     parser.set_defaults(pkg="all")
     parser.set_defaults(suite="all")
@@ -507,9 +503,13 @@ if __name__ == "__main__":
     if(releaseNum == None):
         releaseNum = getReleaseNum()
 
+    branchName = options.branch
+    root.replace("branch", branchName)
+
     list = None
     if(options.pkg in pkgDict):
         print sectionBreak
+        print "Testing Branch in this RUN: %s" % branchName
         print "Testing Version in this RUN: %s" % releaseNum
         print "--------------------------------------"
         if(options.pkg == "all"):
