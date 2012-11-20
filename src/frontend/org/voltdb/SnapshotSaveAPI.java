@@ -89,14 +89,12 @@ public class SnapshotSaveAPI
      * @param data
      * @param context
      * @param hostname
-     * @param truncReqId
      * @return VoltTable describing the results of the snapshot attempt
      */
     public VoltTable startSnapshotting(
             String file_path, String file_nonce, SnapshotFormat format, byte block,
             long multiPartTxnId, long partitionTxnId, long legacyPerPartitionTxnIds[],
-            String data, SystemProcedureExecutionContext context, String hostname,
-            String truncReqId)
+            String data, SystemProcedureExecutionContext context, String hostname)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
@@ -170,7 +168,6 @@ public class SnapshotSaveAPI
                         data,
                         context,
                         hostname,
-                        truncReqId,
                         result);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
@@ -415,7 +412,7 @@ public class SnapshotSaveAPI
             String file_path, String file_nonce, SnapshotFormat format,
             long txnId, List<Long> partitionTransactionIds,
             String data, SystemProcedureExecutionContext context,
-            String hostname, String truncReqId, final VoltTable result) {
+            String hostname, final VoltTable result) {
         {
             SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
@@ -424,6 +421,17 @@ public class SnapshotSaveAPI
             // non-null if targeting only one site (used for rejoin)
             // set later from the "data" JSON string
             Long targetHSid = null;
+
+            JSONObject jsData = null;
+            if (data != null) {
+                try {
+                    jsData = new JSONObject(data);
+                }
+                catch (JSONException e) {
+                    HOST_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
+                            e);
+                }
+            }
 
             MessageDigest digest;
             try {
@@ -515,13 +523,12 @@ public class SnapshotSaveAPI
                         schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
                     }
 
-                    if (format == SnapshotFormat.STREAM && data != null) {
-                        JSONObject jsObj = new JSONObject(data);
-                        long hsId = jsObj.getLong("hsId");
+                    if (format == SnapshotFormat.STREAM && jsData != null) {
+                        long hsId = jsData.getLong("hsId");
 
                         // if a target_hsid exists, set it for filtering a snapshot for a specific site
                         try {
-                            targetHSid = jsObj.getLong("target_hsid");
+                            targetHSid = jsData.getLong("target_hsid");
                         }
                         catch (JSONException e) {} // leave value as null on exception
 
@@ -726,6 +733,11 @@ public class SnapshotSaveAPI
                          */
                         VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
                                 txnId, partitionTransactionIds);
+                        // Provide the truncation request ID so the monitor can recognize a specific snapshot.
+                        String truncReqId = "";
+                        if (jsData != null && jsData.has("truncReqId")) {
+                            truncReqId = jsData.getString("truncReqId");
+                        }
                         logSnapshotStartToZK( txnId, context, file_nonce, truncReqId);
                     }
                 }

@@ -146,7 +146,6 @@ public class SnapshotSave extends VoltSystemProcedure
             byte block = (Byte)params.toArray()[4];
             SnapshotFormat format =
                     SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[5]);
-            final String truncReqId = (String) params.toArray()[6];
 
             /*
              * Filter out the partitions that are active in the cluster
@@ -162,13 +161,13 @@ public class SnapshotSave extends VoltSystemProcedure
                 }
             }
 
-            String data = (String) params.toArray()[7];
+            String data = (String) params.toArray()[6];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
                                                          context.getLastCommittedSpHandle(),
                                                          Longs.toArray(perPartitionTransactionIdsToKeep),
-                                                         data, context, hostname, truncReqId);
+                                                         data, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -338,7 +337,6 @@ public class SnapshotSave extends VoltSystemProcedure
         final String path = jsObj.getString("path");
         final String nonce = jsObj.getString("nonce");
         String formatStr = jsObj.optString("format", SnapshotFormat.NATIVE.toString());
-        final String truncReqId = jsObj.optString("truncReqId");
         final SnapshotFormat format = SnapshotFormat.getEnumIgnoreCase(formatStr);
         final String data = jsObj.optString("data");
 
@@ -407,8 +405,7 @@ public class SnapshotSave extends VoltSystemProcedure
         performQuiesce();
 
         results = performSnapshotCreationWork(path, nonce, ctx.getCurrentTxnId(), perPartitionTxnIds,
-                                              (byte)(block ? 1 : 0), format,
-                                              truncReqId, data);
+                                              (byte)(block ? 1 : 0), format, data);
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
@@ -462,7 +459,6 @@ public class SnapshotSave extends VoltSystemProcedure
             long perPartitionTxnIds[],
             byte block,
             SnapshotFormat format,
-            String truncReqId,
             String data)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
@@ -475,8 +471,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(),
-                             truncReqId, data);
+        params.setParameters(filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data);
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files
