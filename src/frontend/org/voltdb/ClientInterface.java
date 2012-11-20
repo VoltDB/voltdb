@@ -1802,8 +1802,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // recognized below by the monitor so that the promote doesn't
                 // happen until our snapshot completes.
                 final String reqId = java.util.UUID.randomUUID().toString();
-                m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
-                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 SnapshotCompletionMonitor completionMonitor =
                         VoltDB.instance().getSnapshotCompletionMonitor();
                 completionMonitor.addInterest(new SnapshotCompletionInterest() {
@@ -1817,6 +1815,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         return null;
                     }
                 });
+                m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             }
             catch (Exception e) {
                 VoltDB.crashGlobalVoltDB("ZK truncation snapshot request failed", false, e);
@@ -1844,9 +1844,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         org.voltdb.catalog.CommandLog logConfig = m_catalogContext.get().cluster.getLogconfig().get("log");
         Promoter promoter = new Promoter(sysProc, task, logConfig, ccxn, handler.isAdmin(),
                                          handler.m_hostname, handler.connectionId(), buf.capacity());
-        // The site tracker may be null when running under mocked unit tests.
-        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
-        if (logConfig.getEnabled() && (siteTracker == null || siteTracker.isFirstHost())) {
+        // This only happens on one node so we don't need to pick a leader.
+        if (logConfig.getEnabled()) {
             promoter.truncateAndPromote();
         }
         else {
