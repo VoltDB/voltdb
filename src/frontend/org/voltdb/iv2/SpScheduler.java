@@ -232,7 +232,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     /**
      * Poll the replay sequencer and process the messages until it returns null
      */
-    private void replayReadyTxns() {
+    private void deliverReadyTxns() {
         VoltMessage m = m_replaySequencer.poll();
         while(m != null) {
             deliver2(m);
@@ -273,12 +273,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 deliver2(message);
             }
             else {
-                replayReadyTxns();
+                deliverReadyTxns();
             }
         }
         else if (message instanceof Iv2EndOfLogMessage) {
             m_replaySequencer.setEOLReached();
-            replayReadyTxns();
+            deliverReadyTxns();
         }
         else {
             deliver2(message);
