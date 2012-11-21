@@ -26,6 +26,7 @@ package org.voltdb;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Random;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -34,7 +35,6 @@ import org.junit.runners.Parameterized.Parameters;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
@@ -63,7 +63,7 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             VoltProjectBuilder builder = getBuilderForTest();
             builder.setSecurityEnabled(true);
 
-            cluster = new LocalCluster("rejoin.jar", 1, 2, 1,
+            cluster = new LocalCluster("rejoin.jar", 3, 2, 1,
                     BackendTarget.NATIVE_EE_JNI, false, false);
             cluster.setJavaProperty("rejoindeathtest", null);
             cluster.overrideAnyRequestForValgrind();
@@ -75,20 +75,14 @@ public class TestMidRejoinDeath extends RejoinTestBase {
 
             cluster.startUp();
 
-            ClientResponse response;
-
             client = ClientFactory.createClient(m_cconfig);
             client.createConnection("localhost", cluster.port(0));
 
-            response = client.callProcedure("InsertSinglePartition", 0);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            response = client.callProcedure("Insert", 1);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            response = client.callProcedure("InsertReplicated", 0);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
             cluster.shutDownSingleHost(1);
             Thread.sleep(3000);
+
+            VoltTable t = TableHelper.quickTable("TEST_INLINED_STRING (PKEY:INTEGER, VALUE:VARCHAR36-N, VALUE1:VARCHAR17700-N) P(0)");
+            TableHelper.fillTableWithFirstColIntegerPkey(t, 512, client, new Random(0));
 
             // try to rejoin, but expect this to fail after 10-15 seconds
             // because the "rejoindeathtest" property is set and that will
@@ -97,26 +91,6 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             // use the same snapshot code.
             cluster.recoverOne(1, 0, "", MiscUtils.isPro());
 
-            // run some random work
-            response = client.callProcedure("SelectBlahSinglePartition", 0);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
-
-            response = client.callProcedure("SelectBlah", 1);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 1);
-
-            response = client.callProcedure("SelectBlahReplicated", 0);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            assertEquals(response.getResults()[0].fetchRow(0).getLong(0), 0);
-
-            response = client.callProcedure("InsertSinglePartition", 2);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            response = client.callProcedure("Insert", 3);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            response = client.callProcedure("InsertReplicated", 1);
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
             // try to snapshot to make sure it still works
             client.callProcedure("@SnapshotSave", "{uripath:\"file:///tmp\",nonce:\"mydb\",block:true,format:\"csv\"}");
 
@@ -124,6 +98,24 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             // IV1 community uses a different path that doesn't fail
             if (MiscUtils.isPro()) {
                 assertEquals(1, cluster.getLiveNodeCount());
+
+                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+
+                assertEquals(2, cluster.getLiveNodeCount());
+
+                cluster.shutDownSingleHost(1);
+
+                cluster.setJavaProperty("rejoindeathtestonrejoinside", null);
+
+                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+
+                assertEquals(1, cluster.getLiveNodeCount());
+
+                cluster.setJavaProperty("rejoindeathtestcancel", null);
+
+                cluster.recoverOne(1, 0, "", MiscUtils.isPro());
+
+                assertEquals(2, cluster.getLiveNodeCount());
             }
         }
         finally {
