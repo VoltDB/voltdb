@@ -423,7 +423,7 @@ public class SnapshotSaveAPI
             Long targetHSid = null;
 
             JSONObject jsData = null;
-            if (data != null) {
+            if (data != null && !data.isEmpty()) {
                 try {
                     jsData = new JSONObject(data);
                 }
