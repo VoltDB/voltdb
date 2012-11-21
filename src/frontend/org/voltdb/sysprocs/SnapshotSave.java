@@ -138,6 +138,7 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[3] != null);
             assert(params.toArray()[4] != null);
             assert(params.toArray()[5] != null);
+            assert(params.toArray()[6] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
@@ -404,8 +405,7 @@ public class SnapshotSave extends VoltSystemProcedure
         performQuiesce();
 
         results = performSnapshotCreationWork(path, nonce, ctx.getCurrentTxnId(), perPartitionTxnIds,
-                                              (byte)(block ? 1 : 0), format,
-                                              data);
+                                              (byte)(block ? 1 : 0), format, data);
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
