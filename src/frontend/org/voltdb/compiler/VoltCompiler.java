@@ -28,6 +28,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -49,6 +50,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -322,7 +324,8 @@ public class VoltCompiler {
      * @param output Where to print status/errors to, usually stdout.
      * @param procInfoOverrides Optional overridden values for procedure annotations.
      */
-    public boolean compile(final String projectFileURL, final String jarOutputPath) {
+    public boolean compile(final String projectFileURL, final String jarOutputPath,
+                           final String... ddlFilePaths) {
         m_hsql = null;
         m_projectFileURL = projectFileURL;
         m_jarOutputPath = jarOutputPath;
@@ -333,7 +336,7 @@ public class VoltCompiler {
         m_errors.clear();
 
         // do all the work to get the catalog
-        final Catalog catalog = compileCatalog(projectFileURL);
+        final Catalog catalog = compileCatalog(projectFileURL, ddlFilePaths);
         if (catalog == null) {
             compilerLog.error("Catalog compilation failed.");
             return false;
@@ -412,7 +415,7 @@ public class VoltCompiler {
     }
 
     @SuppressWarnings("unchecked")
-    public Catalog compileCatalog(final String projectFileURL)
+    public Catalog compileCatalog(final String projectFileURL, final String... ddlFilePaths)
     {
         // Compiler instance is reusable. Clear the cache.
         cachedAddedClasses.clear();
@@ -468,7 +471,7 @@ public class VoltCompiler {
         }
 
         try {
-            compileXMLRootNode(project);
+            compileXMLRootNode(project, ddlFilePaths);
         } catch (final VoltCompilerException e) {
             compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
             return null;
@@ -494,13 +497,13 @@ public class VoltCompiler {
         return m_catalog;
     }
 
-    void compileXMLRootNode(ProjectType project) throws VoltCompilerException {
+    void compileXMLRootNode(ProjectType project, String... ddlFilePaths) throws VoltCompilerException {
         m_catalog = new Catalog();
         temporaryCatalogInit();
 
         DatabaseType database = project.getDatabase();
         if (database != null) {
-            compileDatabaseNode(database);
+            compileDatabaseNode(database, ddlFilePaths);
         }
     }
 
@@ -512,9 +515,9 @@ public class VoltCompiler {
         m_catalog.getClusters().get("cluster").setSecurityenabled(false);
     }
 
-    void compileDatabaseNode(DatabaseType database) throws VoltCompilerException {
+    void compileDatabaseNode(DatabaseType database, String... ddlFilePaths) throws VoltCompilerException {
         final ArrayList<String> programs = new ArrayList<String>();
-        final ArrayList<String> schemas = new ArrayList<String>();
+        final List<String> schemas = Arrays.asList(ddlFilePaths);
         final ArrayList<ProcedureDescriptor> procedures = new ArrayList<ProcedureDescriptor>();
         final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
@@ -1339,18 +1342,33 @@ public class VoltCompiler {
 
     }
 
-    public static void main(final String[] args) {
-        // Parse arguments
+    /**
+     * Main
+     *
+     * Incoming arguments:
+     *
+     *      PROJECT JAR [ DDL ... ]
+     *
+     * PROJECT may be empty. In that case there has to be at least one DDL.
+     *
+     * @param args  PROJECT JAR [ DDL ... ] arguments (see above)
+     */
+    public static void main(final String[] args)
+    {
         if (args.length != 2) {
-            System.err.println("Usage: voltcompiler <classpath> <project-file> <output-JAR>");
+            // This is just a backup for the proper usage message that should be provided
+            // by the front end script. Users should not see this message so it's geared
+            // toward people using this directly, rather than through a standard script.
+            System.err.println("Usage: VoltCompiler.main: <project-file> <output-JAR> [ <DDL-path> ... ]");
             System.exit(1);
         }
         final String projectPath = args[0];
         final String outputJar = args[1];
+        final String[] ddlFilePaths = ArrayUtils.subarray(args, 2, args.length);
 
         // Compile and exit with error code if we failed
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(projectPath, outputJar);
+        final boolean success = compiler.compile(projectPath, outputJar, ddlFilePaths);
         if (!success) {
             compiler.summarizeErrors(System.out, null);
             System.exit(-1);

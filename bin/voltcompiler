@@ -57,19 +57,27 @@
 # resolve symlinks and canonicalize the path (make it absolute)
 pushd . > /dev/null
 this=$0
-cd `dirname $this`
+thisdir=`dirname $this`
+cd "$thisdir"
 this=`basename $this`
 while [ -L "$this" ]
 do
     this=`readlink $this`
-    cd `dirname $this`
+    cd "$thisdir"
     this=`basename $this`
 done
 this="$(pwd -P)/$this"
 popd > /dev/null
 
+echo "\
+*** DEPRECATED ***
+This script has been replaced by \"voltdb compile\".
+Run the following for more information on the new command:
+    $thisdir/voltdb compile -h
+*** DEPRECATED ***" 1>&2
+
 # the root of the VoltDB installation
-export VOLTDB_HOME=$(dirname $(dirname "$this"))
+export VOLTDB_HOME=$(dirname "$thisdir")
 
 # detect and adjust for Linux package installation vs. VoltDB distribution
 if [ -d $VOLTDB_HOME/../../lib/voltdb ]; then

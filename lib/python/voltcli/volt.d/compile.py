@@ -31,12 +31,14 @@ import os
     description = 'Run the VoltDB compiler to build the catalog.',
     options = (
         VOLT.BooleanOption('-C', '--conditional', 'conditional',
-                           'build only when the catalog file is missing')),
+                           'build only when the catalog file is missing'),
+        VOLT.StringOption(None, '--classpath', 'classpath',
+                          'additional colon-separated Java CLASSPATH directories'),
+        VOLT.StringOption('-o', '--output', 'catalog',
+                          'the application catalog jar file path',
+                          default = 'catalog.jar')),
     arguments = (
-        VOLT.StringArgument('classpath',
-                            'additional colon-separated Java CLASSPATH directories'),
-        VOLT.StringArgument('catalog',
-                            'the application catalog jar file path')))
+        VOLT.StringArgument('ddlpath', 'DDL file path(s)', min_count = 0, max_count = None)))
 def compile(runner):
     if not runner.opts.conditional or not os.path.exists(runner.opts.catalog):
         runner.java.execute('org.voltdb.compiler.VoltCompiler',
