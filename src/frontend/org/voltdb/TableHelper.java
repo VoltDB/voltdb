@@ -23,9 +23,14 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTypeUtil;
 
 /**
@@ -114,6 +119,18 @@ public class TableHelper {
         return s;
     }
 
+    static Object[] randomRow(VoltTable table, int maxStringSize, Random rand) {
+        Object[] row = new Object[table.getColumnCount()];
+        for (int col = 0; col < table.getColumnCount(); col++) {
+            boolean allowNulls = table.getColumnNullable(col);
+            int size = table.getColumnMaxSize(col);
+            if (size > maxStringSize) size = maxStringSize;
+            double nullFraction = allowNulls ? 0.05 : 0.0;
+            row[col] = VoltTypeUtil.getRandomValue(table.getColumnType(col), size, nullFraction, rand);
+        }
+        return row;
+    }
+
     /**
      * Fill a table with random values.
      * If created with TableHelper.quickTable(..), then it will respect
@@ -134,19 +151,17 @@ public class TableHelper {
         }
 
         for (int i = 0; i < rowCount; i++) {
-            Object[] row = new Object[table.getColumnCount()];
+            Object[] row;
             Tuple pkey = new Tuple(pkeyIndexes.length);
             // build the row
             boolean success = false;
             trynewrow:
             while (!success) {
                 // create a candidate row
+                row = randomRow(table, maxStringSize, rand);
+
+                // store pkey values for row
                 for (int col = 0; col < table.getColumnCount(); col++) {
-                    boolean allowNulls = table.getColumnNullable(col);
-                    int size = table.getColumnMaxSize(col);
-                    if (size > maxStringSize) size = maxStringSize;
-                    double nullFraction = allowNulls ? 0.05 : 0.0;
-                    row[col] = VoltTypeUtil.getRandomValue(table.getColumnType(col), size, nullFraction, rand);
                     int pkeyIndex = ArrayUtils.indexOf(pkeyIndexes, col);
                     if (pkeyIndex != -1) {
                         pkey.values[pkeyIndex] = row[col];
@@ -156,7 +171,7 @@ public class TableHelper {
                 // check pkey
                 if (pkeyIndexes.length > 0) {
                     if (pkeyValues.contains(pkey)) {
-                        System.err.println("randomFill: skipping tuple because of pkey violation");
+                        //System.err.println("randomFill: skipping tuple because of pkey violation");
                         continue trynewrow;
                     }
                 }
@@ -166,7 +181,7 @@ public class TableHelper {
                     Set<Object> uniqueColValues = uniqueValues.get(col);
                     if (uniqueColValues != null) {
                         if (uniqueColValues.contains(row[col])) {
-                            System.err.println("randomFill: skipping tuple because of uniqe col violation");
+                            //System.err.println("randomFill: skipping tuple because of uniqe col violation");
                             continue trynewrow;
                         }
                     }
@@ -236,6 +251,32 @@ public class TableHelper {
             }
 
             dest.addRow(row);
+        }
+    }
+
+    public static void fillTableWithFirstColIntegerPkey(VoltTable t, int mb, Client client, Random rand) throws Exception {
+        final AtomicInteger outstanding = new AtomicInteger(0);
+
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                outstanding.decrementAndGet();
+                assert(clientResponse.getStatus() == ClientResponse.SUCCESS);
+            }
+        };
+
+        int i = 0;
+        while (MiscUtils.getMBRss(client) < mb) {
+            System.out.println("Loading 10000 rows");
+            for (int j = 0; j < 10000; j++) {
+                Object[] row = randomRow(t, Integer.MAX_VALUE, rand);
+                row[0] = i++;
+                outstanding.incrementAndGet();
+                client.callProcedure(callback, t.m_name.toUpperCase() + ".insert", row);
+            }
+            while (outstanding.get() > 0) {
+                Thread.yield();
+            }
         }
     }
 }
