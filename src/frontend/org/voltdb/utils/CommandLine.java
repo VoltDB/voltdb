@@ -367,7 +367,7 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    Map<String, String> javaProperties = null;
+    public Map<String, String> javaProperties = null;
     public CommandLine setJavaProperty(String property, String value)
     {
         if (javaProperties == null) {

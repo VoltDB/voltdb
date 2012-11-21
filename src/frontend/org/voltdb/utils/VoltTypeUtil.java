@@ -83,19 +83,19 @@ public abstract class VoltTypeUtil {
             // --------------------------------
             case STRING: {
                 int size = r.nextInt(maxSize) + 1;
-                String ret_str = "";
+                char[] str = new char[size];
                 for (int ctr = 0; ctr < size; ctr++) {
-                    char data = (char)(Math.abs(r.nextInt()) % 128);
+                    char data = (char)(r.nextInt(128));
                     //
                     // Skip quotation marks
                     //
                     if (Character.isLetter(data) == false) {
                        ctr--;
                     } else {
-                       ret_str += String.valueOf(data);
+                       str[ctr] = data;
                     }
                  }
-                ret = ret_str;
+                ret = new String(str);
                 break;
             }
             // --------------------------------
