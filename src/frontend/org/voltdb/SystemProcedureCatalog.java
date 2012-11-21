@@ -131,7 +131,7 @@ public class SystemProcedureCatalog {
         builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false,  false, true,  false, true, true, false));
         builder.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, false, false, false, false));
         builder.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, false, false, false, false));
-        builder.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true, false, false, true, true));
+        builder.put("@PromoteReplicaStatus",    new Config("org.voltdb.sysprocs.PromoteReplicaStatus",     false, false, true, false, false, true, true));
         listing = builder.build();
     }
 }
