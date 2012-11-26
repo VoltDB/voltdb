@@ -251,9 +251,11 @@ public class AsyncBenchmark {
      */
     void connectToOneServerWithRetry(Client client, String server) {
         int sleep = 1000;
-        while (true) {
+        while (!shutdown.get()) {
             try {
                 client.createConnection(server);
+                clients.add(client);
+                System.out.printf("Connected to VoltDB node at: %s.\n", server);
                 break;
             }
             catch (Exception e) {
@@ -262,8 +264,6 @@ public class AsyncBenchmark {
                 if (sleep < 8000) sleep += sleep;
             }
         }
-        clients.add(client);
-        System.out.printf("Connected to VoltDB node at: %s.\n", server);
     }
 
     /**

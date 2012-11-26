@@ -172,12 +172,14 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         // recursively call recurableRun and don't allow it to shutdown
         Map<Integer, List<VoltTable>> mapResults = m_site.recursableRun(txnState);
 
-        List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
-        if (matchingTablesForId == null) {
-            assert (mapResults.size() == 0);
-            results[0] = null;
-        } else {
-            results[0] = matchingTablesForId.get(0);
+        if (mapResults != null) {
+            List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
+            if (matchingTablesForId == null) {
+                assert (mapResults.size() == 0);
+                results[0] = null;
+            } else {
+                results[0] = matchingTablesForId.get(0);
+            }
         }
 
         return results;

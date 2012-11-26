@@ -234,7 +234,7 @@ public class SnapshotSaveAPI
 
 
     private void logSnapshotStartToZK(long txnId,
-            SystemProcedureExecutionContext context, String nonce) {
+            SystemProcedureExecutionContext context, String nonce, String truncReqId) {
         /*
          * Going to send out the requests async to make snapshot init move faster
          */
@@ -288,7 +288,7 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation)) {
+        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation, truncReqId)) {
             // the node already exists, add local host ID to the list
             increaseParticipateHostCount(txnId, context.getHostId());
         }
@@ -362,12 +362,14 @@ public class SnapshotSaveAPI
      * @param txnId
      * @param hostId The local host ID
      * @param isTruncation Whether or not this is a truncation snapshot
+     * @param truncReqId Optional unique ID fed back to the monitor for identification
      * @return true if the node is created successfully, false if the node already exists.
      */
     public static boolean createSnapshotCompletionNode(String nonce,
-                                                       long txnId,
-                                                       int hostId,
-                                                       boolean isTruncation) {
+                                                          long txnId,
+                                                          int hostId,
+                                                          boolean isTruncation,
+                                                          String truncReqId) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
@@ -381,6 +383,7 @@ public class SnapshotSaveAPI
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("finishedHosts").value(0);
             stringer.key("nonce").value(nonce);
+            stringer.key("truncReqId").value(truncReqId);
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());
             nodeBytes = jsonObj.toString(4).getBytes("UTF-8");
@@ -418,6 +421,17 @@ public class SnapshotSaveAPI
             // non-null if targeting only one site (used for rejoin)
             // set later from the "data" JSON string
             Long targetHSid = null;
+
+            JSONObject jsData = null;
+            if (data != null && !data.isEmpty()) {
+                try {
+                    jsData = new JSONObject(data);
+                }
+                catch (JSONException e) {
+                    HOST_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
+                            e);
+                }
+            }
 
             MessageDigest digest;
             try {
@@ -509,13 +523,12 @@ public class SnapshotSaveAPI
                         schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
                     }
 
-                    if (format == SnapshotFormat.STREAM && data != null) {
-                        JSONObject jsObj = new JSONObject(data);
-                        long hsId = jsObj.getLong("hsId");
+                    if (format == SnapshotFormat.STREAM && jsData != null) {
+                        long hsId = jsData.getLong("hsId");
 
                         // if a target_hsid exists, set it for filtering a snapshot for a specific site
                         try {
-                            targetHSid = jsObj.getLong("target_hsid");
+                            targetHSid = jsData.getLong("target_hsid");
                         }
                         catch (JSONException e) {} // leave value as null on exception
 
@@ -720,7 +733,12 @@ public class SnapshotSaveAPI
                          */
                         VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
                                 txnId, partitionTransactionIds);
-                        logSnapshotStartToZK( txnId, context, file_nonce);
+                        // Provide the truncation request ID so the monitor can recognize a specific snapshot.
+                        String truncReqId = "";
+                        if (jsData != null && jsData.has("truncReqId")) {
+                            truncReqId = jsData.getString("truncReqId");
+                        }
+                        logSnapshotStartToZK( txnId, context, file_nonce, truncReqId);
                     }
                 }
             } catch (Exception ex) {

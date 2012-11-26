@@ -487,10 +487,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final WatchedEvent event) {
         loggingLog.info("Snapshot truncation leader received snapshot truncation request");
         String snapshotPathTemp;
+        // Get the snapshot path.
         try {
             snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
         } catch (Exception e) {
             loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
+            return;
+        }
+        // Get the truncation request ID if provided.
+        final String truncReqId;
+        try {
+            byte[] data = m_zk.getData(event.getPath(), true, null);
+            if (data != null) {
+                truncReqId = new String(data, "UTF-8");
+            }
+            else {
+                truncReqId = "";
+            }
+        } catch (Exception e) {
+            loggingLog.error("Unable to retrieve truncation snapshot request ID from ZK, log can't be truncated");
             return;
         }
         m_truncationSnapshotPath = snapshotPathTemp;
@@ -510,9 +525,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
         JSONObject jsObj = new JSONObject();
         try {
+            String sData = "";
+            if (truncReqId != null) {
+                JSONObject jsData = new JSONObject();
+                jsData.put("truncReqId", truncReqId);
+                sData = jsData.toString();
+            }
             jsObj.put("path", snapshotPath );
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            jsObj.put("data", sData);
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -586,7 +608,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
-                                                                      hostId, true)) {
+                                                                      hostId, true, truncReqId)) {
                         SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId, hostId);
                     }
 
@@ -1751,7 +1773,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(
-            final String nonce, final long txnId, final long partitionTxnIds[], final boolean truncation) {
+            final String nonce, final long txnId, final long partitionTxnIds[],
+            final boolean truncation, String requestId) {
         if (!truncation) {
             return new CountDownLatch(0);
         }
