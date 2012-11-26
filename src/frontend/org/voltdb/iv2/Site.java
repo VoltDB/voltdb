@@ -510,9 +510,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
             }
         }
-        catch (final InterruptedException e) {
-            // acceptable - this is how site blocked on an empty scheduler terminates.
-        }
         catch (OutOfMemoryError e)
         {
             // Even though OOM should be caught by the Throwable section below,
