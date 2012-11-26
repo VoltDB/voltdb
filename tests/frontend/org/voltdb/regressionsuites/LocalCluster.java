@@ -248,6 +248,10 @@ public class LocalCluster implements VoltServerConfig {
         templateCmdLine.customCmdLn(customCmdLn);
     }
 
+    public void setJavaProperty(String property, String value) {
+        templateCmdLine.setJavaProperty(property, value);
+    }
+
     @Override
     public void setCallingMethodName(String name) {
         m_callingMethodName = name;
@@ -584,7 +588,13 @@ public class LocalCluster implements VoltServerConfig {
 
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
-            m_procBuilder.command().addAll(cmdln.createCommandLine());
+            List<String> cmdlnList = cmdln.createCommandLine();
+            String cmdLineFull = "Start cmd host=" + String.valueOf(hostId) + " :";
+            for (String element : cmdlnList) {
+                cmdLineFull += " " + element;
+            }
+            log.info(cmdLineFull);
+            m_procBuilder.command().addAll(cmdlnList);
 
             // for debug, dump the command line to a file.
             //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
@@ -696,6 +706,9 @@ public class LocalCluster implements VoltServerConfig {
         long start = 0;
         try {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
+            // some tests need this
+            rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
+
             if (liveRejoin) {
                 rejoinCmdLn.startCommand(START_ACTION.LIVE_REJOIN.name());
             } else {
@@ -714,8 +727,15 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.m_internalPort = portGenerator.next();
             setPortsFromConfig(hostId, rejoinCmdLn);
 
+            List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
+            String cmdLineFull = "Rejoin cmd line:";
+            for (String element : rejoinCmdLnStr) {
+                cmdLineFull += " " + element;
+            }
+            log.info(cmdLineFull);
+
             m_procBuilder.command().clear();
-            m_procBuilder.command().addAll(rejoinCmdLn.createCommandLine());
+            m_procBuilder.command().addAll(rejoinCmdLnStr);
             Process proc = m_procBuilder.start();
             start = System.currentTimeMillis();
 

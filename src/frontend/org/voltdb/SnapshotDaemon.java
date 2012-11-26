@@ -456,7 +456,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         }, 0, 1, TimeUnit.HOURS);
         truncationRequestExistenceCheck();
-        userSnapshotRequestExistenceCheck();
+        userSnapshotRequestExistenceCheck(false);
     }
 
     /*
@@ -487,10 +487,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final WatchedEvent event) {
         loggingLog.info("Snapshot truncation leader received snapshot truncation request");
         String snapshotPathTemp;
+        // Get the snapshot path.
         try {
             snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
         } catch (Exception e) {
             loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
+            return;
+        }
+        // Get the truncation request ID if provided.
+        final String truncReqId;
+        try {
+            byte[] data = m_zk.getData(event.getPath(), true, null);
+            if (data != null) {
+                truncReqId = new String(data, "UTF-8");
+            }
+            else {
+                truncReqId = "";
+            }
+        } catch (Exception e) {
+            loggingLog.error("Unable to retrieve truncation snapshot request ID from ZK, log can't be truncated");
             return;
         }
         m_truncationSnapshotPath = snapshotPathTemp;
@@ -510,9 +525,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
         JSONObject jsObj = new JSONObject();
         try {
+            String sData = "";
+            if (truncReqId != null) {
+                JSONObject jsData = new JSONObject();
+                jsData.put("truncReqId", truncReqId);
+                sData = jsData.toString();
+            }
             jsObj.put("path", snapshotPath );
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            jsObj.put("data", sData);
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -586,7 +608,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
-                                                                      hostId, true)) {
+                                                                      hostId, true, truncReqId)) {
                         SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId, hostId);
                     }
 
@@ -710,7 +732,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                         //Reset the watch
-                        userSnapshotRequestExistenceCheck();
+                        userSnapshotRequestExistenceCheck(true);
                         return;
                     }
 
@@ -731,7 +753,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                         //Reset the watch
-                        userSnapshotRequestExistenceCheck();
+                        userSnapshotRequestExistenceCheck(true);
                         return;
                     }
                 }
@@ -808,7 +830,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                                 hostLog.error(clientResponse.getStatusString());
                                 //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
 
@@ -820,7 +842,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 /*
                                  * Don't think this should happen, reset the watch to allow later requests
                                  */
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
 
@@ -861,7 +883,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                             CreateMode.PERSISTENT);
                                 }
                                 //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 //Log the details of the failure, after resetting the watch in case of some odd NPE
                                 result.resetRowPosition();
                                 hostLog.info(result);
@@ -880,7 +902,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                             Ids.OPEN_ACL_UNSAFE,
                                             CreateMode.PERSISTENT);
                                 }
-                                userSnapshotRequestExistenceCheck();
+                                userSnapshotRequestExistenceCheck(true);
                                 return;
                             }
                         }
@@ -946,8 +968,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * Set the watch in ZK on the node that represents a user
      * request for a snapshot
      */
-    void userSnapshotRequestExistenceCheck() throws Exception {
-        m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
+    void userSnapshotRequestExistenceCheck(boolean deleteExistingRequest) throws Exception {
+        if (deleteExistingRequest) {
+            m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
+        }
         if (m_zk.exists(VoltZK.user_snapshot_request, m_userSnapshotRequestExistenceWatcher) != null) {
             processUserSnapshotRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
@@ -1749,7 +1773,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(
-            final String nonce, final long txnId, final long partitionTxnIds[], final boolean truncation) {
+            final String nonce, final long txnId, final long partitionTxnIds[],
+            final boolean truncation, String requestId) {
         if (!truncation) {
             return new CountDownLatch(0);
         }

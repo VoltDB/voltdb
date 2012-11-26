@@ -764,6 +764,10 @@ public class ProcedureRunner {
            if (e.getCause() != null)
                e = e.getCause();
        }
+       else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
+           status = ClientResponse.TXN_RESTART;
+           msg.append("TRANSACTION RESTART\n");
+       }
        else {
            msg.append("UNEXPECTED FAILURE:\n");
            expected_failure = false;

@@ -88,6 +88,12 @@ public class Iv2TransactionCreator implements TransactionCreator
     }
 
     @Override
+    public void sendEOLMessage(int partitionId)
+    {
+        m_ci.sendEOLMessage(partitionId);
+    }
+
+    @Override
     public void setSendHeartbeats(boolean val)
     {
         // Iv2 does not require heartbeating.

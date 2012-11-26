@@ -150,7 +150,7 @@ public class RejoinProducer extends SiteTasker
 
         @Override
         public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
-                long[] partitionTxnIds, boolean truncationSnapshot)
+                long[] partitionTxnIds, boolean truncationSnapshot, String requestId)
         {
             if (nonce.equals(m_snapshotNonce)) {
                 REJOINLOG.debug(m_whoami + "counting down snapshot monitor completion.");
@@ -353,6 +353,7 @@ public class RejoinProducer extends SiteTasker
         REJOINLOG.debug(m_whoami + "SnapshotResponse forwarded to RejoinProducer mbox.");
 
         Runnable action = new Runnable() {
+            @Override
             public void run() {
                 REJOINLOG.debug(m_whoami + "informing rejoinCoordinator " +
                         CoreUtils.hsIdToString(m_rejoinCoordinatorHsId) + " of REPLAY_FINISHED");

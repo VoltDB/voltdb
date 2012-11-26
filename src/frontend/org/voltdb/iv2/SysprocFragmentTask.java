@@ -119,7 +119,10 @@ public class SysprocFragmentTask extends TransactionTask
                                                          m_inputDeps,
                                                          fragmentId,
                                                          params);
-                currentFragResponse.addDependency(dep.depId, dep.dependency);
+                // @Shutdown returns null, handle it here
+                if (dep != null) {
+                    currentFragResponse.addDependency(dep.depId, dep.dependency);
+                }
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);

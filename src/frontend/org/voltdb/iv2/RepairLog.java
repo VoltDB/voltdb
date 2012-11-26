@@ -125,14 +125,18 @@ public class RepairLog
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
-            final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
-            truncate(m.getTruncationHandle(), Long.MIN_VALUE);
-            m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
-            //Restore will send a complete transaction message with a lower mp transaction id because
-            //the restore transaction precedes the loading of the right mp transaction id from the snapshot
-            //Hence Math.max
-            m_lastMpHandle = Math.max(m_lastMpHandle, m.getTxnId());
-            m_lastSpHandle = m.getSpHandle();
+            // a CompleteTransactionMessage which indicates restart is not the end of the
+            // transaction.  We don't want to log it in the repair log.
+            if (!((CompleteTransactionMessage)msg).isRestart()) {
+                final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
+                truncate(m.getTruncationHandle(), Long.MIN_VALUE);
+                m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+                //Restore will send a complete transaction message with a lower mp transaction id because
+                //the restore transaction precedes the loading of the right mp transaction id from the snapshot
+                //Hence Math.max
+                m_lastMpHandle = Math.max(m_lastMpHandle, m.getTxnId());
+                m_lastSpHandle = m.getSpHandle();
+            }
         }
         else if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;

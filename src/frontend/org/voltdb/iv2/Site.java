@@ -510,9 +510,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
             }
         }
-        catch (final InterruptedException e) {
-            // acceptable - this is how site blocked on an empty scheduler terminates.
-        }
         catch (OutOfMemoryError e)
         {
             // Even though OOM should be caught by the Throwable section below,
@@ -582,7 +579,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 if (global_replay_mpTxn != null) {
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
                     CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
-                    global_replay_mpTxn = null;
+                    if (!m.isRestart()) {
+                        global_replay_mpTxn = null;
+                    }
                     t.runFromTaskLog(this);
                 }
             }
