@@ -72,19 +72,7 @@ public class MpScheduler extends Scheduler
         // response to roll back. This function must be called with
         // the deliver lock held to be correct. The null task should
         // never run; the site thread is expected to be told to stop.
-        SiteTasker nullTask = new SiteTasker() {
-            @Override
-            public void run(SiteProcedureConnection siteConnection)
-            {
-            }
-
-            @Override
-            public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
-            throws IOException
-            {
-            }
-        };
-        m_pendingTasks.repair(nullTask, m_iv2Masters);
+        m_pendingTasks.repair(m_nullTask, m_iv2Masters);
     }
 
 
