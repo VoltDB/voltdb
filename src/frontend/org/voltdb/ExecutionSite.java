@@ -1309,8 +1309,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                        "Rejoin", false);
         Constructor<?> taskLogConstructor;
         try {
-            taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
-            m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(partition, overflowDir);
+            taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+            m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(partition, overflowDir, false);
         } catch (InvocationTargetException e) {
             VoltDB.crashLocalVoltDB("Unable to construct rejoin task log",
                                     true, e.getCause());
