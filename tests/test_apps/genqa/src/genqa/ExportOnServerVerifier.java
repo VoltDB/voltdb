@@ -224,10 +224,9 @@ public class ExportOnServerVerifier {
 
         while (!quit)
         {
-            more_rows = true;
             markCheckedUpTo();
             int dcount = 0;
-            while (dcount < 10000 && more_rows)
+            while ((dcount < 10000 || !more_txnids) && more_rows)
             {
                 row = csv.readNext();
                 if (row == null)
@@ -287,7 +286,6 @@ public class ExportOnServerVerifier {
             // no more export rows, and there are still unchecked client txnids,
             // attempt to validate as many client txnids as possible
             dcount = 0;
-            more_txnids = true;
             while ((!reachedReadUpTo() || !more_rows) && more_txnids)
             {
                 String trace = txnIdReader.readLine();
@@ -337,11 +335,19 @@ public class ExportOnServerVerifier {
                 System.exit(1);
             }
 
+            printTxCountByPartition();
+
             if (!more_rows || !more_txnids)
             {
-                quit = true;
+                if (more_rows && ! m_clientTxnIds.isEmpty())
+                {
+                    quit = false;
+                }
+                else
+                {
+                    quit = true;
+                }
             }
-            printTxCountByPartition();
 
             if (System.currentTimeMillis() - lastReportTime > 5000) {
                 StringBuilder sb = new StringBuilder();
