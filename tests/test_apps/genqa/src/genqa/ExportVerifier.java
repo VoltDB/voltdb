@@ -24,60 +24,31 @@ package genqa;
 
 import genqa.procedures.SampleRecord;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Queue;
 import java.util.Random;
 import java.util.TreeSet;
-import java.util.Vector;
 
-import org.spearce_voltpatches.jgit.transport.OpenSshConfig;
-import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
-
-import com.google.common.base.Throwables;
-import com.jcraft.jsch.ChannelSftp;
-import com.jcraft.jsch.ChannelSftp.LsEntry;
-import com.jcraft.jsch.JSch;
-import com.jcraft.jsch.Session;
-import com.jcraft.jsch.SftpATTRS;
-import com.jcraft.jsch.SftpException;
 
 public class ExportVerifier {
 
     public static long FILE_TIMEOUT_MS = 5 * 60 * 1000; // 5 mins
 
     public static long VALIDATION_REPORT_INTERVAL = 100000;
-
-    private final JSch m_jsch = new JSch();
-    private final List<RemoteHost> m_hosts = new ArrayList<RemoteHost>();
-
-    private static class RemoteHost {
-        Session session;
-        ChannelSftp channel;
-        String path;
-    }
 
     public static class ValidationErr extends Exception {
         private static final long serialVersionUID = 1L;
@@ -101,99 +72,27 @@ public class ExportVerifier {
     {
     }
 
-    void verify(String[] args) throws Exception
+    void verify(String[] args) throws IOException, ValidationErr
     {
-        String remoteHosts[] = args[0].split(",");
-        final String homeDir = "/home/" + System.getProperty("user.name");
-        final String sshDir = homeDir + "/.ssh";
-        final String sshConfigPath = sshDir + "/config";
-
-        //Oh yes...
-        loadAllPrivateKeys( new File(sshDir));
-
-        OpenSshConfig sshConfig = null;
-        if (new File(sshConfigPath).exists()) {
-            sshConfig = new OpenSshConfig(new File(sshConfigPath));
-        }
-
-        final String defaultKnownHosts = sshDir + "/known_hosts";
-        if (new File(defaultKnownHosts).exists()) {
-            m_jsch.setKnownHosts(defaultKnownHosts);
-        }
-
-
-        for (String hostString : remoteHosts) {
-            String split[] = hostString.split(":");
-            String host = split[0];
-
-            RemoteHost rh = new RemoteHost();
-            rh.path = split[1];
-
-            String user = System.getProperty("user.name") ;
-            int port = 22;
-            File identityFile = null;
-            if (sshConfig != null) {
-                OpenSshConfig.Host hostConfig = sshConfig.lookup(host);
-                if (hostConfig.getUser() != null) {
-                    user = hostConfig.getUser();
-                }
-                if (hostConfig.getPort() != -1) {
-                    port = hostConfig.getPort();
-                }
-                if (hostConfig.getIdentityFile() != null) {
-                    identityFile = hostConfig.getIdentityFile();
-                }
-            }
-
-            Session session = null;
-            if (identityFile != null) {
-                JSch jsch = new JSch();
-                jsch.addIdentity(identityFile.getAbsolutePath());
-                session = jsch.getSession(user, host, port);
-            } else {
-                session = m_jsch.getSession( user, host, port);
-            }
-
-            rh.session = session;
-            session.setConfig("StrictHostKeyChecking", "no");
-            session.connect();
-            final ChannelSftp channel = (ChannelSftp)session.openChannel("sftp");
-            rh.channel = channel;
-            channel.connect();
-
-            m_hosts.add(rh);
-        }
-
-        m_partitions = Integer.parseInt(args[1]);
+        m_partitions = Integer.parseInt(args[0]);
 
         for (int i = 0; i < m_partitions; i++)
         {
             m_rowTxnIds.put(i, new HashSet<Long>());
         }
 
+        String[] row;
         long ttlVerified = 0;
-        for (RemoteHost rh : m_hosts) {
-            boolean existsOrIsDir = true;
-            try {
-                SftpATTRS stat = rh.channel.stat(rh.path);
-                if (!stat.isDir()) {
-                    existsOrIsDir = false;
-                }
-            } catch (SftpException e) {
-                if (e.id == ChannelSftp.SSH_FX_NO_SUCH_FILE) {
-                    existsOrIsDir = false;
-                } else {
-                Throwables.propagate(e);
-                }
-            }
-            if (!existsOrIsDir) {
-                rh.channel.mkdir(rh.path);
+        m_dataPath = new File(args[1]);
+        if (!m_dataPath.exists() || !m_dataPath.isDirectory())
+        {
+            if (!m_dataPath.mkdir()) {
+                throw new IOException("Issue with export data path");
             }
         }
 
         //checkForMoreExportFiles();
-        Pair<CSVReader, Runnable> csvPair = openNextExportFile();
-        CSVReader csv = csvPair.getFirst();
+        CSVReader csv = openNextExportFile();
 
         m_clientPath = new File(args[2]);
         if (!m_clientPath.exists() || !m_clientPath.isDirectory())
@@ -205,11 +104,10 @@ public class ExportVerifier {
 
         //checkForMoreClientFiles();
         BufferedReader txnIdReader = openNextClientFile();
-        String[] row;
+
         boolean quit = false;
         boolean more_rows = true;
         boolean more_txnids = true;
-        long lastReportTime = System.currentTimeMillis();
         while (!quit)
         {
             more_rows = true;
@@ -218,9 +116,8 @@ public class ExportVerifier {
                 row = csv.readNext();
                 if (row == null)
                 {
-                    csvPair.getSecond().run();
-                    csvPair = openNextExportFile();
-                    if (csvPair == null)
+                    csv = openNextExportFile();
+                    if (csv == null)
                     {
                         System.out.println("No more export rows");
                         more_rows = false;
@@ -228,7 +125,6 @@ public class ExportVerifier {
                     }
                     else
                     {
-                        csv = csvPair.getFirst();
                         row = csv.readNext();
                     }
                 }
@@ -295,15 +191,6 @@ public class ExportVerifier {
             {
                 quit = true;
             }
-            if (System.currentTimeMillis() - lastReportTime > 5000) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(m_clientTxnIds.size()).append(' ');
-                for (HashSet<Long> txnids : m_rowTxnIds.values()) {
-                    sb.append(txnids.size()).append(' ');
-                }
-                System.out.println(sb);
-                lastReportTime = System.currentTimeMillis();
-            }
         }
         if (more_rows || more_txnids)
         {
@@ -319,72 +206,6 @@ public class ExportVerifier {
             if (total != 0 && m_clientTxnIds.size() != 0)
             {
                 System.out.println("THIS IS A REAL ERROR?!");
-            }
-        }
-    }
-
-    private void loadAllPrivateKeys(File file) throws Exception {
-        if (file.isDirectory()) {
-            for (File f : file.listFiles()) {
-                loadAllPrivateKeys(f);
-            }
-        } else {
-            FileReader fr = new FileReader(file);
-            BufferedReader br = new BufferedReader(fr);
-            final String firstLine = br.readLine();
-            if (firstLine.contains("PRIVATE KEY")) {
-                m_jsch.addIdentity(file.getAbsolutePath());
-            }
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void checkForMoreFilesRemote(Comparator<String> comparator) throws Exception
-            {
-        long start_time = System.currentTimeMillis();
-        while (m_exportFiles.isEmpty())
-        {
-            /*
-             * Collect the list of remote files at each node
-             * Sort the list from each node
-             */
-            List<Pair<ChannelSftp, List<String>>> pathsFromAllNodes = new ArrayList<Pair<ChannelSftp, List<String>>>();
-            for (RemoteHost rh : m_hosts) {
-                Vector<LsEntry> files = rh.channel.ls(rh.path);
-                List<String> paths = new ArrayList<String>();
-                for (LsEntry entry : files) {
-                    if (!entry.getFilename().contains("active") &&
-                            !entry.getFilename().equals(".") &&
-                            !entry.getFilename().equals("..") &&
-                            !entry.getAttrs().isDir()) paths.add(rh.path + "/" + entry.getFilename());
-                }
-                Collections.sort(paths);
-                if (!paths.isEmpty()) pathsFromAllNodes.add(Pair.of(rh.channel, paths));
-            }
-
-            /*
-             * Take one file from the sorted list from each node at a time
-             * and add it the global list of files to process
-             */
-            boolean hadOne;
-            do {
-                hadOne = false;
-                for (Pair<ChannelSftp, List<String>> p : pathsFromAllNodes) {
-                    final ChannelSftp c = p.getFirst();
-                    final List<String> paths = p.getSecond();
-                    if (!paths.isEmpty()) {
-                        hadOne = true;
-                        final String filePath = paths.remove(0);
-                        m_exportFiles.offer(Pair.of(c, filePath));
-                    }
-                }
-            } while (hadOne);
-            long now = System.currentTimeMillis();
-            if ((now - start_time) > FILE_TIMEOUT_MS)
-            {
-                throw new ValidationErr("Timed out waiting on new files.\n" +
-                        "This indicates a mismatch in the transaction streams between the client logs and the export data or the death of something important.",
-                        null, null);
             }
         }
     }
@@ -409,23 +230,29 @@ public class ExportVerifier {
         return files;
     }
 
-    private void checkForMoreExportFiles() throws Exception
+    private void checkForMoreExportFiles() throws ValidationErr
     {
-        Comparator<String> comparator = new Comparator<String>()
+        FileFilter acceptor = new FileFilter()
         {
-            @Override
-            public int compare(String f1, String f2)
+            public boolean accept(File pathname) {
+                return !pathname.getName().contains("active");
+            }
+        };
+
+        Comparator<File> comparator = new Comparator<File>()
+        {
+            public int compare(File f1, File f2)
             {
-                long first_ts = Long.parseLong((f1.split("-")[3]).split("\\.")[0]);
-                long second_ts = Long.parseLong((f2.split("-")[3]).split("\\.")[0]);
+                long first_ts = Long.parseLong((f1.getName().split("-")[3]).split("\\.")[0]);
+                long second_ts = Long.parseLong((f2.getName().split("-")[3]).split("\\.")[0]);
                 if (first_ts != second_ts)
                 {
                     return (int)(first_ts - second_ts);
                 }
                 else
                 {
-                    long first_txnid = Long.parseLong(f1.split("-")[1]);
-                    long second_txnid = Long.parseLong(f2.split("-")[1]);
+                    long first_txnid = Long.parseLong(f1.getName().split("-")[1]);
+                    long second_txnid = Long.parseLong(f2.getName().split("-")[1]);
                     if (first_txnid < second_txnid)
                     {
                         return -1;
@@ -442,10 +269,10 @@ public class ExportVerifier {
             }
         };
 
-        checkForMoreFilesRemote(comparator);
-        for (Pair<ChannelSftp, String> p : m_exportFiles)
+        m_exportFiles = checkForMoreFiles(m_dataPath, m_exportFiles, acceptor, comparator);
+        for (int i = 0; i < m_exportFiles.length; i++)
         {
-            System.out.println("" + p.getFirst().getSession().getHost() + " : " + p.getSecond());
+            System.out.println("" + i + ": " + m_exportFiles[i].getName());
         }
     }
 
@@ -453,7 +280,6 @@ public class ExportVerifier {
     {
         FileFilter acceptor = new FileFilter()
         {
-            @Override
             public boolean accept(File pathname) {
                 return pathname.getName().contains("dude");
             }
@@ -461,7 +287,6 @@ public class ExportVerifier {
 
         Comparator<File> comparator = new Comparator<File>()
         {
-            @Override
             public int compare(File f1, File f2)
             {
                 long first = Long.parseLong(f1.getName().split("-")[0]);
@@ -473,34 +298,25 @@ public class ExportVerifier {
         m_clientFiles = checkForMoreFiles(m_clientPath, m_clientFiles, acceptor, comparator);
     }
 
-    private Pair<CSVReader, Runnable> openNextExportFile() throws Exception
+    private CSVReader openNextExportFile() throws FileNotFoundException, ValidationErr
     {
-        if (m_exportFiles.isEmpty())
+        CSVReader exportreader = null;
+        if (m_exportIndex == m_exportFiles.length)
         {
-            checkForMoreExportFiles();
-        }
-        Pair<ChannelSftp, String> remotePair = m_exportFiles.poll();
-        if (remotePair == null) return null;
-        final ChannelSftp channel = remotePair.getFirst();
-        final String path = remotePair.getSecond();
-        System.out.println(
-                "Opening export file: " + channel.getSession().getHost() + "@" + path);
-        InputStream dataIs = channel.get(path);
-        BufferedInputStream bis = new BufferedInputStream(dataIs, 4096 * 32);
-        Reader reader = new InputStreamReader(bis);
-        final CSVReader exportreader = new CSVReader(reader);
-        Runnable r = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    exportreader.close();
-                    channel.rm(path);
-                } catch (Exception e) {
-                    Throwables.propagate(e);
-                }
+            for (int i = 0; i < m_exportIndex; i++)
+            {
+                m_exportFiles[i].delete();
             }
-        };
-        return Pair.of( exportreader, r);
+            checkForMoreExportFiles();
+            m_exportIndex = 0;
+        }
+        File data = m_exportFiles[m_exportIndex];
+        System.out.println("Opening export file: " + data.getName());
+        FileInputStream dataIs = new FileInputStream(data);
+        Reader reader = new InputStreamReader(dataIs);
+        exportreader = new CSVReader(reader);
+        m_exportIndex++;
+        return exportreader;
     }
 
     private BufferedReader openNextClientFile() throws FileNotFoundException, ValidationErr
@@ -689,16 +505,14 @@ public class ExportVerifier {
         new HashMap<Integer, HashSet<Long>>();
 
     TreeSet<Long> m_clientTxnIds = new TreeSet<Long>();
-    Queue<Pair<ChannelSftp, String>> m_exportFiles = new ArrayDeque<Pair<ChannelSftp, String>>();
+    File m_dataPath = null;
+    File[] m_exportFiles = {};
+    int m_exportIndex = 0;
     File m_clientPath = null;
     File[] m_clientFiles = {};
     int m_clientIndex = 0;
 
-    static {
-        VoltDB.setDefaultTimezone();
-    }
-
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         ExportVerifier verifier = new ExportVerifier();
         try
         {

@@ -44,7 +44,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -52,6 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -78,7 +78,7 @@ public class AsyncExportClient
         String m_txnLogPath;
         FileOutputStream m_curFile = null;
         OutputStreamWriter m_outs = null;
-        long m_count = 0;
+        AtomicLong m_count = new AtomicLong(0);
 
         public TxnIdWriter(String nonce, String txnLogPath)
         {
@@ -108,21 +108,23 @@ public class AsyncExportClient
 
         public void write(String txnId) throws IOException
         {
-            if ((m_count % CLIENT_TXNID_FILE_SIZE) == 0)
+            if ((m_count.get() % CLIENT_TXNID_FILE_SIZE) == 0)
             {
                 createNewFile();
             }
             m_outs.write(txnId);
-            m_count++;
+            m_count.incrementAndGet();
         }
     }
 
     static class AsyncCallback implements ProcedureCallback
     {
         private final TxnIdWriter m_writer;
-        public AsyncCallback(TxnIdWriter writer)
+        private final long m_rowid;
+        public AsyncCallback(TxnIdWriter writer, long rowid)
         {
             super();
+            m_rowid = rowid;
             m_writer = writer;
         }
         @Override
@@ -131,19 +133,29 @@ public class AsyncExportClient
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 TrackingResults.incrementAndGet(0);
+                long txid = clientResponse.getResults()[0].asScalarLong();
+                final String trace = String.format("%016d:%d\n", m_rowid, txid);
                 try
                 {
-                    m_writer.write(clientResponse.getResults()[0].asScalarLong() + "\n");
+                    m_writer.write(trace);
                 }
                 catch (IOException e)
                 {
-                    // TODO write down new rowid that is not randomly generated
                     e.printStackTrace();
                 }
             }
             else
             {
                 TrackingResults.incrementAndGet(1);
+                final String trace = String.format("%016d:-1\n", m_rowid);
+                try
+                {
+                    m_writer.write(trace);
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
             }
         }
     }
@@ -227,7 +239,7 @@ public class AsyncExportClient
                 .add("procedure", "procedure_name", "Procedure to call.", "JiggleExportSinglePartition")
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
+                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
                 .add("catalogswap", "Swap catalogs from the client", "true")
                 .setArguments(args)
             ;
@@ -276,19 +288,20 @@ public class AsyncExportClient
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             benchmarkStartTS = System.currentTimeMillis();
+            AtomicLong rowId = new AtomicLong(0);
 
             // Run the benchmark loop for the requested duration
             final long endTime = benchmarkStartTS + (1000l * config.duration);
-            Random rand = new Random();
             int swap_count = 0;
             boolean first_cat = false;
             while (endTime > System.currentTimeMillis())
             {
+                long currentRowId = rowId.incrementAndGet();
                 // Post the request, asynchronously
                 clientRef.get().callProcedure(
-                        new AsyncCallback(writer),
+                        new AsyncCallback(writer, currentRowId),
                         config.procedure,
-                        (long)rand.nextInt(config.poolSize),
+                        currentRowId,
                         0);
 
                 swap_count++;
