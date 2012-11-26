@@ -41,7 +41,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     private String appStatusString = null;
     private byte encodedAppStatusString[];
     private VoltTable[] results = new VoltTable[0];
-    Integer m_sqlHashResults = null;
+    private Integer m_sqlHashResults = null;
 
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
@@ -132,6 +132,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         setResults(status, results, extra);
     }
 
+    public void setSQLHash(int sqlHash) {
+        m_sqlHashResults = sqlHash;
+    }
+
     @Override
     public byte getStatus() {
         return status;
@@ -153,6 +157,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
 
     public long getClientHandle() {
         return clientHandle;
+    }
+
+    public Integer getSQLHash() {
+        return m_sqlHashResults;
     }
 
     @Override

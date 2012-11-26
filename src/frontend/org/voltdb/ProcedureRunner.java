@@ -113,8 +113,8 @@ public class ProcedureRunner {
     protected final static int AGG_DEPID = 1;
 
     // current hash of sql and params
-    protected CRC32 m_inputCRC;
-    protected boolean m_shouldComputeCRC = true;
+    protected final CRC32 m_inputCRC = new CRC32();
+    protected boolean m_shouldComputeCRC = false;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -149,7 +149,7 @@ public class ProcedureRunner {
 
         // compute a CRC for write txns that are single-partition
         if (m_catProc != null) {
-            m_shouldComputeCRC = (m_catProc.getReadonly() == false) && m_catProc.getSinglepartition();
+            m_shouldComputeCRC = (m_catProc.getReadonly() == false);
         }
 
         reflect();
@@ -194,7 +194,7 @@ public class ProcedureRunner {
         assert(m_cachedRNG == null);
 
         // reset the hash of results
-        m_inputCRC = new CRC32();
+        m_inputCRC.reset();
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
@@ -337,6 +337,9 @@ public class ProcedureRunner {
             m_seenFinalBatch = false;
         }
 
+        if (m_shouldComputeCRC) {
+            retval.setSQLHash((int) m_inputCRC.getValue());
+        }
         return retval;
     }
 
@@ -373,6 +376,21 @@ public class ProcedureRunner {
         }
     }
 
+    private void updateCRC(QueuedSQL queuedSQL) {
+        if (m_shouldComputeCRC) {
+            m_inputCRC.update(queuedSQL.stmt.sqlText);
+            try {
+                queuedSQL.params.addToCRC(m_inputCRC);
+            } catch (IOException e) {
+                log.error("Unable to compute CRC of parameters to " +
+                        "a SQL statement in procedure: " + m_procedureName, e);
+                // don't crash
+                // presumably, this will fail deterministically at all replicas
+                // just log the error and hope people report it
+            }
+        }
+    }
+
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         if (stmt == null) {
             throw new IllegalArgumentException("SQLStmt paramter to voltQueueSQL(..) was null.");
@@ -381,6 +399,8 @@ public class ProcedureRunner {
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, args);
         queuedSQL.stmt = stmt;
+
+        updateCRC(queuedSQL);
         m_batch.add(queuedSQL);
     }
 
@@ -431,8 +451,11 @@ public class ProcedureRunner {
                 }
                 queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
             }
+
+            updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             if (e instanceof ExecutionException) {
                 throw new VoltAbortException(e.getCause());
             }

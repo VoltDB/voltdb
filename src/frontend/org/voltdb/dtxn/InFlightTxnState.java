@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StoredProcedureInvocation;
@@ -95,10 +96,39 @@ public class InFlightTxnState implements Serializable {
 
         VoltTable[] currResults = r.getResults();
 
-        // Check that the replica results are the same (non-deterministic SQL)
+        // Check that the replicated procedure ran the same SQL with the same
+        // parameters for each run of the java code (non-deterministic SQL)
         // (Note that this applies for k > 0)
         // If not same, kill entire cluster and hide the bodies.
         // In all seriousness, we have no valid way to recover from a non-deterministic event
+        // The safest thing is to make the user aware and stop doing potentially corrupt work.
+        // Note that read-only procs and sysprocs just have a null hash value, so they don't
+        // trip anything up here.
+        Integer sqlHash = r.getSQLHash();
+        sqlHash = sqlHash == null ? 0 : sqlHash;
+        if (m_sqlHash != null) {
+             if (m_sqlHash.equals(sqlHash) == false) {
+                 {
+                     String msg = "Mismatched hash of SQL run for transaction ID: " + txnId;
+                     msg += "\n  while executing stored procedure: " + invocation.getProcName();
+                     msg += "\n  from execution site: " + CoreUtils.hsIdToString(coordinatorHSId);
+                     msg += "\n  Expected hash value: " + m_sqlHash;
+                     msg += "\n  Mismatched hash value: " + sqlHash;
+                     msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
+                     // die die die
+                     VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                     throw new RuntimeException(msg); // gets called only by test code
+                 }
+             }
+        }
+        else if (m_outstandingResponses > 0) {
+            m_sqlHash = sqlHash;
+        }
+
+        // Check that the replica results are the same (non-deterministic SQL)
+        // (Note that this applies for k > 0)
+        // If not same, kill entire cluster and hide the bodies.
+        // As stated above, we have no valid way to recover from a non-deterministic event
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
         // ENG-3288 - Allow non-deterministic read-only transactions to have mismatched results
         // so that LIMIT queries without ORDER BY clauses work.
@@ -109,7 +139,7 @@ public class InFlightTxnState implements Serializable {
                 {
                     String msg = "Mismatched result count received for transaction ID: " + txnId;
                     msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                    msg += "\n  from execution site: " + coordinatorHSId;
+                    msg += "\n  from execution site: " + CoreUtils.hsIdToString(coordinatorHSId);
                     msg += "\n  Expected number of results: " + m_resultsForComparison.length;
                     msg += "\n  Mismatched number of results: " + curr_results.length;
                     msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
@@ -123,7 +153,7 @@ public class InFlightTxnState implements Serializable {
                     {
                         String msg = "Mismatched results received for transaction ID: " + txnId;
                         msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                        msg += "\n  from execution site: " + coordinatorHSId;
+                        msg += "\n  from execution site: " + CoreUtils.hsIdToString(coordinatorHSId);
                         msg += "\n  Expected results: " + m_resultsForComparison[i].toString();
                         msg += "\n  Mismatched results: " + curr_results[i].toString();
                         msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
@@ -280,4 +310,6 @@ public class InFlightTxnState implements Serializable {
     // the definitive answer to the query, used to ensure
     //  all non-recovering answers match
     protected VoltTable[] m_resultsForComparison = null;
+    // the definitive hash of SQL+Params run by the proc
+    protected Integer m_sqlHash = null;
 }

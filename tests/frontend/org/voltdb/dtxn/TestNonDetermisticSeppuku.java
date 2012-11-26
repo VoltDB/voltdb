@@ -54,7 +54,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
             builder.addProcedures(NonDeterministicSPProc.class,
                                   NonDeterministic_RO_MP.class,
                                   NonDeterministic_RO_SP.class,
-                                  Deterministic_RO_MP.class);
+                                  Deterministic_RO_SP.class);
 
             cluster = new LocalCluster("det1.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
             cluster.overrideAnyRequestForValgrind();
@@ -92,6 +92,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
             client.callProcedure(
                     "NonDeterministicSPProc",
                     0,
+                    0,
                     NonDeterministicSPProc.MISMATCH_VALUES);
             fail("R/W value mismatch didn't fail?!");
         }
@@ -110,6 +111,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
             client.callProcedure(
                     "NonDeterministicSPProc",
                     0,
+                    0,
                     NonDeterministicSPProc.MISMATCH_LENGTH);
             fail("R/W length mismatch didn't fail?!");
         }
@@ -124,16 +126,17 @@ public class TestNonDetermisticSeppuku extends TestCase {
      * ENG-3288 - Expect non-deterministic read-only queries to succeed.
      */
     public void testNonDeterministic_RO_MP() throws Exception {
-        client.callProcedure(
-                "NonDeterministicSPProc",
-                0,
-                NonDeterministicSPProc.MISMATCH_INSERTION);
         try {
-            client.callProcedure("NonDeterministic_RO_MP");
-            // success!!
+            client.callProcedure(
+                    "NonDeterministicSPProc",
+                    0,
+                    0,
+                    NonDeterministicSPProc.MISMATCH_INSERTION);
+            fail("Mismatch inserstion failed");
         }
         catch (ProcCallException e) {
-            fail("R/O MP mismatch failed?! " + e.toString());
+            assertTrue(e.getMessage().contains("Connection to database"));
+            // success
         }
     }
 
@@ -145,7 +148,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
         client.callProcedure(
                 "NonDeterministicSPProc",
                 0,
-                NonDeterministicSPProc.MISMATCH_INSERTION);
+                0,
+                NonDeterministicSPProc.NO_PROBLEM);
         try {
             client.callProcedure("NonDeterministic_RO_SP", 0);
             // success!!
@@ -156,51 +160,16 @@ public class TestNonDetermisticSeppuku extends TestCase {
     }
 
     /**
-     * Do a non-deterministic insertion followed by a multi-partition ad hoc read-only operation.
-     * ENG-3288 - Expect non-deterministic read-only queries to succeed.
-     */
-    public void testNonDeterministicAdHoc_RO_MP() throws Exception {
-        client.callProcedure(
-                "NonDeterministicSPProc",
-                0,
-                NonDeterministicSPProc.MISMATCH_INSERTION);
-        try {
-            client.callProcedure("@AdHoc", "select * from kv");
-            // success!!
-        }
-        catch (ProcCallException e) {
-            fail("Ad hoc R/O MP mismatch failed?! " + e.toString());
-        }
-    }
-
-    /**
-     * Do a non-deterministic insertion followed by a single partition ad hoc read-only operation.
-     * ENG-3288 - Expect non-deterministic read-only single partition queries to succeed.
-     */
-    public void testNonDeterministicAdHoc_RO_SP() throws Exception {
-        client.callProcedure(
-                "NonDeterministicSPProc",
-                0,
-                NonDeterministicSPProc.MISMATCH_INSERTION);
-        try {
-            client.callProcedure("@AdHoc", "select * from kv where key = 0");
-            // success!!
-        }
-        catch (ProcCallException e) {
-            fail("Ad hoc R/O SP mismatch failed?! " + e.toString());
-        }
-    }
-
-    /**
      * Negative test that expects a deterministic proc to fail due to mismatched results.
      */
     public void testDeterministicProc() throws Exception {
         client.callProcedure(
                 "NonDeterministicSPProc",
                 0,
-                NonDeterministicSPProc.MISMATCH_INSERTION);
+                0,
+                NonDeterministicSPProc.NO_PROBLEM);
         try {
-            client.callProcedure("Deterministic_RO_MP");
+            client.callProcedure("Deterministic_RO_MP", 0);
             fail("Deterministic procedure succeeded for non-deterministic results?");
         }
         catch (ProcCallException e) {
@@ -209,21 +178,19 @@ public class TestNonDetermisticSeppuku extends TestCase {
     }
 
     /**
-     * For now ad hoc succeeds regardless because we don't have adequate information
-     * and always assume ad hoc is non-deterministic.
+     * Test that different whitespace fails the determinism CRC check on SQL
      */
-    public void testDeterministicAdHoc() throws Exception {
-        client.callProcedure(
+    public void testWhitespaceChanges() throws Exception {
+        try {
+            client.callProcedure(
                 "NonDeterministicSPProc",
                 0,
-                NonDeterministicSPProc.MISMATCH_INSERTION);
-        try {
-            client.callProcedure("@AdHoc", "select nondetval from kv order by nondetval");
-            // success!!
+                0,
+                NonDeterministicSPProc.MISMATCH_WHITESPACE_IN_SQL);
+            fail("Whitespace changes not picked up by determinism CRC");
         }
         catch (ProcCallException e) {
-            fail("Deterministic ad hoc query succeeded for non-deterministic results?");
+            // success!!
         }
     }
-
 }
