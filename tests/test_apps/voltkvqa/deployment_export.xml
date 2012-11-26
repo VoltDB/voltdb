@@ -6,13 +6,19 @@
     </httpd>
     <export enabled="true">
         <onserver exportto="file">
-            <configuration>
                 <property name="type">tsv</property>
                 <property name="with-schema">true</property>
                 <property name="batched">true</property>
                 <property name="nonce">zohan</property>
                 <property name="period">10</property>
-            </configuration>
         </onserver>
+<!--        <onserver exportto="jdbc">
+            <configuration>
+                <property name="jdbcurl">jdbc:postgresql://localhost/exporttest</property>-->
+                <property name="jdbcurl">jdbc:mysql://localhost</property>
+                <property name="jdbcuser">voltdb</property>
+                <property name="jdbcpassword">voltdb</property>
+            </configuration>
+        </onserver>-->
     </export>
 </deployment>

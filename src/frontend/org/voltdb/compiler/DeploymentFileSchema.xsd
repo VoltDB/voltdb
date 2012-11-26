@@ -258,6 +258,7 @@
   <xs:simpleType name="ServerExportEnum">
     <xs:restriction base="xs:token">
       <xs:enumeration value="file"/>
+      <xs:enumeration value="jdbc"/>
     </xs:restriction>
   </xs:simpleType>
 
