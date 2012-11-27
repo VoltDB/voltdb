@@ -193,6 +193,11 @@ public class ProcedureRunner {
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
 
+        // for logging later
+        long txnId = m_txnState.txnId;
+        boolean isReplicatedForDR = (m_txnState.getInvocation() != null) &&
+                m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED;
+
         // reset the hash of results
         m_inputCRC.reset();
 
@@ -339,6 +344,9 @@ public class ProcedureRunner {
 
         if (m_shouldComputeCRC) {
             retval.setSQLHash((int) m_inputCRC.getValue());
+        }
+        if (isReplicatedForDR) {
+            retval.convertResultsToHashForDeterminism();
         }
         return retval;
     }

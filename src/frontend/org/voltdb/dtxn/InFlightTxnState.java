@@ -85,6 +85,9 @@ public class InFlightTxnState implements Serializable {
     }
 
     public ClientResponseImpl addResponse(long coordinatorHSId, ClientResponseImpl r) {
+        Integer sqlHash = r.getSQLHash(); // get this and then reset it
+        r.setSQLHash(null); // this makes sure the hash doesn't get sent to clients
+
         // ensure response to send isn't null
         if (m_responseToSend == null) m_responseToSend = r;
 
@@ -104,7 +107,7 @@ public class InFlightTxnState implements Serializable {
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
         // Note that read-only procs and sysprocs just have a null hash value, so they don't
         // trip anything up here.
-        Integer sqlHash = r.getSQLHash();
+
         sqlHash = sqlHash == null ? 0 : sqlHash;
         if (m_sqlHash != null) {
              if (m_sqlHash.equals(sqlHash) == false) {

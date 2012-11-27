@@ -132,7 +132,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         setResults(status, results, extra);
     }
 
-    public void setSQLHash(int sqlHash) {
+    public void setSQLHash(Integer sqlHash) {
         m_sqlHashResults = sqlHash;
     }
 
@@ -359,5 +359,24 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             e.printStackTrace();
             return 0;
         }
+    }
+
+    /**
+     * Take the perfectly good results and convert them to a single long value
+     * that combines
+     *
+     * This presumes the DR agent has no need for results. This probably saves
+     * some small amount of bandwidth. The other proposed idea was using the status
+     * string to hold the sql hash. Tossup... this seemed slightly more performant,
+     * but also a bit icky.
+     */
+    public void convertResultsToHashForDeterminism() {
+        long hash = getHashOfTableResults() << 32;
+        if (m_sqlHashResults != null) {
+            hash |= m_sqlHashResults.intValue();
+        }
+        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
+        t.addRow(hash);
+        results = new VoltTable[] { t };
     }
 }

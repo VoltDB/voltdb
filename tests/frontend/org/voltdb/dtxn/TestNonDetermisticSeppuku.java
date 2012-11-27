@@ -116,7 +116,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
             fail("R/W length mismatch didn't fail?!");
         }
         catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("Connection to database"));
+            assertTrue(e.getMessage().contains("Connection to database") ||
+                    e.getMessage().contains("Transaction dropped"));
             // success!
         }
     }
@@ -135,7 +136,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
             fail("Mismatch inserstion failed");
         }
         catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("Connection to database"));
+            assertTrue(e.getMessage().contains("Connection to database") ||
+                    e.getMessage().contains("Transaction dropped"));
             // success
         }
     }

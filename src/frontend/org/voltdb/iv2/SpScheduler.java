@@ -25,32 +25,30 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
-import java.util.Map.Entry;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
-import org.voltdb.messaging.BorrowTaskMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
@@ -497,18 +495,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), spHandle));
                 m_repairLogTruncationHandle = spHandle;
+
+                // prune any sql hash so it doesn't get sent to the client (not in wire protocol)
+                message.getClientResponseData().setSQLHash(null);
+
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             }
             // doing duplicate suppresion: all done.
-            return;
         }
-
-        // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-        m_repairLogTruncationHandle = spHandle;
-        m_mailbox.send(message.getInitiatorHSId(), message);
+        else {
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            m_repairLogTruncationHandle = spHandle;
+            m_mailbox.send(message.getInitiatorHSId(), message);
+        }
     }
 
     // BorrowTaskMessages encapsulate a FragmentTaskMessage along with
