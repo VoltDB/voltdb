@@ -456,7 +456,11 @@ class CLIParser(ExtendedHelpOptionParser):
         if self.verb.get_argument_count() == 0:
             return ''
         rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
-        return '\nArguments:\n%s\n' % utility.format_table(rows, indent = 2)
+        lines = ['Arguments:', utility.format_table(rows, indent = 2)]
+        description2 = self.verb.cli_spec.get_attr('description2', None)
+        if description2:
+            lines.extend(('', description2))
+        return '\n%s' % ('\n'.join(lines))
 
     def _abort(self, *msgs):
         utility.error(*msgs)

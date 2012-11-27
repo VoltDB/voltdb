@@ -382,7 +382,7 @@ def run_cmd(cmd, *args):
     fullcmd = cmd
     for arg in args:
         sarg = str(arg)
-        if len(sarg.split()) > 1:
+        if len(sarg) == 0 or len(sarg.split()) > 1:
             fullcmd += ' "%s"' % sarg
         else:
             fullcmd += ' %s' % sarg

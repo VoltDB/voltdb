@@ -193,13 +193,15 @@ class VerbRunner(object):
             for verb_name in self.verbspace.verb_names:
                 verb_spec = self.verbspace.verbs[verb_name].cli_spec
                 if not verb_spec.baseverb and not verb_spec.hideverb:
-                    sys.stdout.write('\n===== Verb: %s =====\n' % verb_name)
+                    sys.stdout.write('\n===== Verb: %s =====\n\n' % verb_name)
                     self._print_verb_help(verb_name)
+                    sys.stdout.write('\n')
             for verb_name in self.verbspace.verb_names:
                 verb_spec = self.verbspace.verbs[verb_name].cli_spec
                 if verb_spec.baseverb and not verb_spec.hideverb:
-                    sys.stdout.write('\n===== Common Verb: %s =====\n' % verb_name)
+                    sys.stdout.write('\n===== Common Verb: %s =====\n\n' % verb_name)
                     self._print_verb_help(verb_name)
+                    sys.stdout.write('\n')
         else:
             if args:
                 for name in args:
@@ -326,11 +328,7 @@ the package file to an explicit python version, e.g.
         verb = self.verbspace.verbs[verb_name]
         parser = VoltCLIParser(self.verbspace)
         parser.initialize_verb(verb_name)
-        sys.stdout.write('\n')
         parser.print_help()
-        if verb.cli_spec.description2:
-            sys.stdout.write('\n')
-            sys.stdout.write('%s\n' % verb.cli_spec.description2.strip())
 
     def _create_package(self, output_dir, name, version, description, force):
         # Internal method to create a runnable Python package.

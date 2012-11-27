@@ -69,12 +69,16 @@ done
 this="$(pwd -P)/$this"
 popd > /dev/null
 
-echo "\
-*** DEPRECATED ***
-This script has been replaced by \"voltdb compile\".
-Run the following for more information on the new command:
-    $thisdir/voltdb compile -h
-*** DEPRECATED ***" 1>&2
+echo "Warning: DEPRECATED - For future development please use \"voltdb compile\" (with -h for help)." 1>&2
+
+# trap bad usage here since the VoltCompiler class has changed to support
+# a new interface with DDL arguments.
+if [ $# != 3 ]; then
+    echo "\
+Error: Exactly 3 arguments are required.
+Usage: voltcompiler <classpath> <project-file> <output-jar>" 1>&2
+    exit 1
+fi
 
 # the root of the VoltDB installation
 export VOLTDB_HOME=$(dirname "$thisdir")
