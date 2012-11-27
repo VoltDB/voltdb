@@ -186,7 +186,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void shutdown()
     {
-        // nothing to do for SP shutdown.
+        m_tasks.offer(m_nullTask);
     }
 
     // This is going to run in the BabySitter's thread.  This and deliver are synchronized by

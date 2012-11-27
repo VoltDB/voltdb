@@ -425,8 +425,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (taskLogKlass != null) {
             Constructor<?> taskLogConstructor;
             try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
-                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir);
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir, true);
             } catch (InvocationTargetException e) {
                 VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
             } catch (Exception e) {
@@ -509,9 +509,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     replayFromTaskLog();
                 }
             }
-        }
-        catch (final InterruptedException e) {
-            // acceptable - this is how site blocked on an empty scheduler terminates.
         }
         catch (OutOfMemoryError e)
         {

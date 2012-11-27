@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotDataTarget;
@@ -52,7 +53,11 @@ public class StreamSnapshotDataTarget extends StreamSnapshotBase
 implements SnapshotDataTarget {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
+    // triggers specific test code for TestMidRejoinDeath
     private static boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtest");
+
+    private static AtomicLong m_totalSnapshotTargetCount = new AtomicLong(0);
+    private final long m_snapshotProcessorId;
 
     // shortened when in test mode
     final static long WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
@@ -99,6 +104,11 @@ implements SnapshotDataTarget {
         m_destHSId = hsId;
         m_mb = VoltDB.instance().getHostMessenger().createMailbox();
 
+        m_snapshotProcessorId = m_totalSnapshotTargetCount.getAndIncrement();
+        rejoinLog.info(String.format("Initializing snapshot stream processor " +
+                "for source site id: %s, and with processorid: %d",
+                CoreUtils.hsIdToString(hsId), m_snapshotProcessorId));
+
         m_in = new AckReceiver();
         m_in.setDaemon(true);
         m_in.start();
@@ -108,7 +118,7 @@ implements SnapshotDataTarget {
         m_out.start();
 
         // start a periodic task to look for timed out connections
-        VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+        VoltDB.instance().scheduleWork(new Watchdog(m_bytesSent.get()), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
     }
 
     /**
@@ -238,17 +248,28 @@ implements SnapshotDataTarget {
      * in WRITE_TIMEOUT_MS time.
      */
     class Watchdog implements Runnable {
+
+        final long m_bytesWrittenSinceConstruction;
+
+        Watchdog(long bytesWritten) {
+            m_bytesWrittenSinceConstruction = bytesWritten;
+        }
+
         @Override
         public synchronized void run() {
             if (m_closed.get()) {
                 return;
             }
 
+            long bytesWritten = m_bytesSent.get();
+            rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
+                    CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
+
             long now = System.currentTimeMillis();
             for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
                 SendWork work = e.getValue();
                 if ((now - work.m_ts) > WRITE_TIMEOUT_MS) {
-                    rejoinLog.warn(String.format(
+                    rejoinLog.error(String.format(
                             "A snapshot write task failed after a timeout (currently %d seconds outstanding).",
                             (now - work.m_ts) / 1000));
                     m_writeFailed.set(true);
@@ -260,7 +281,7 @@ implements SnapshotDataTarget {
             }
 
             // schedule to run again
-            VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+            VoltDB.instance().scheduleWork(new Watchdog(bytesWritten), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
         }
     }
 
@@ -299,9 +320,10 @@ implements SnapshotDataTarget {
                     RejoinDataAckMessage ackMsg = (RejoinDataAckMessage) msg;
                     final int blockIndex = ackMsg.getBlockIndex();
 
-                    // a particular test ignores acks to trigger the watchdog
-                    if (m_rejoinDeathTestMode)
+                    // TestMidRejoinDeath ignores acks to trigger the watchdog
+                    if (m_rejoinDeathTestMode && (m_snapshotProcessorId == 1)) {
                         continue;
+                    }
 
                     receiveAck(blockIndex);
                 }
@@ -324,7 +346,7 @@ implements SnapshotDataTarget {
      * @param blockIndex The index of the block that is being acked.
      */
     public synchronized void receiveAck(int blockIndex) {
-        rejoinLog.trace("Recieved block ack for index " + String.valueOf(blockIndex));
+        rejoinLog.trace("Received block ack for index " + String.valueOf(blockIndex));
 
         m_outstandingWorkCount.decrementAndGet();
         SendWork work = m_outstandingWork.remove(blockIndex);
