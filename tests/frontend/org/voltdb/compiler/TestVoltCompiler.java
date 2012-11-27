@@ -2569,7 +2569,36 @@ public class TestVoltCompiler extends TestCase {
                 "export table e1;",
                 "export table E1;"
                 );
-}
+    }
+
+    public void testCompileFromDDL() throws IOException {
+        final String simpleSchema1 =
+            "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
+            "create view v_table1r_el (column2_integer, num_rows) as\n" +
+            "select column2_integer as column2_integer,\n" +
+                "count(*) as num_rows\n" +
+            "from table1r_el\n" +
+            "group by column2_integer;\n" +
+            "create view v_table1r_el2 (column2_integer, num_rows) as\n" +
+            "select column2_integer as column2_integer,\n" +
+                "count(*) as num_rows\n" +
+            "from table1r_el\n" +
+            "group by column2_integer\n;\n";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
+        final String schemaPath = schemaFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertTrue(success);
+
+        success = compiler.compileFromDDL(testout_jar, schemaPath + "???");
+        assertFalse(success);
+
+        success = compiler.compileFromDDL(testout_jar);
+        assertFalse(success);
+    }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;

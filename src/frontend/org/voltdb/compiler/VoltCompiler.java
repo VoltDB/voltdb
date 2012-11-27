@@ -29,6 +29,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -318,21 +319,35 @@ public class VoltCompiler {
     }
 
     /**
-     * Compile with this method for general use.
+     * Compile from a set of DDL files, but no project.xml.
      *
      * @param jarOutputPath The location to put the finished JAR to.
-     * @param ddlFilePaths The list of DDL files to compile.
+     * @param ddlFilePaths The array of DDL files to compile (at least one is required).
      * @return true if successful
      */
-    public boolean compile(
+    public boolean compileFromDDL(
             final String jarOutputPath,
-            final String[] ddlFilePaths)
+            final String... ddlFilePaths)
     {
         return compileInternal(null, jarOutputPath, ddlFilePaths);
     }
 
     /**
-     * Compile with this method for general legacy use when using a project.xml file.
+     * Compile from a set of DDL files, but no project.xml.
+     *
+     * @param jarOutputPath The location to put the finished JAR to.
+     * @param ddlFilePaths The collection of DDL files to compile (at least one is required).
+     * @return true if successful
+     */
+    public boolean compileFromDDL(
+            final String jarOutputPath,
+            final Collection<String> ddlFilePaths)
+    {
+        return compileInternal(null, jarOutputPath, ddlFilePaths.toArray(new String[ddlFilePaths.size()]));
+    }
+
+    /**
+     * Compile using a project.xml file (DEPRECATED).
      *
      * @param projectFileURL URL of the project file.
      * @param jarOutputPath The location to put the finished JAR to.
@@ -1427,7 +1442,7 @@ public class VoltCompiler {
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
             // The first argument is *.jar for the new syntax.
             if (args.length >= 2) {
-                    success = compiler.compile(args[0], ArrayUtils.subarray(args, 1, args.length));
+                    success = compiler.compileFromDDL(args[0], ArrayUtils.subarray(args, 1, args.length));
             }
             else {
                 System.err.printf("Usage: %s\n", usageNew);
