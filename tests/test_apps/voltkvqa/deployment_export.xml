@@ -6,12 +6,14 @@
     </httpd>
     <export enabled="true">
         <onserver exportto="file">
+            <configuration>
                 <property name="type">tsv</property>
                 <property name="with-schema">true</property>
                 <property name="batched">true</property>
                 <property name="nonce">zohan</property>
                 <property name="period">10</property>
-        </onserver>-->
+            </configuration>
+        </onserver>
 <!--        <onserver exportto="jdbc">
             <configuration>
                 <property name="jdbcurl">jdbc:postgresql://localhost/exporttest</property>
