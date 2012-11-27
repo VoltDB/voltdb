@@ -66,11 +66,11 @@ public class VoltDB {
         if (iv2 == null) {
             iv2 = System.getProperty("VOLT_ENABLEIV2");
         }
-        if (iv2 != null && iv2.equalsIgnoreCase("true")) {
-            return true;
+        if (iv2 != null && iv2.equalsIgnoreCase("false")) {
+            return false;
         }
         else {
-            return false;
+            return true;
         }
     }
 
@@ -203,7 +203,7 @@ public class VoltDB {
         public boolean m_isRejoinTest = false;
 
         /** set to true to run with iv2 initiation. Good Luck! */
-        public boolean m_enableIV2 = false;
+        public boolean m_enableIV2 = true;
 
         public Configuration() {
             m_enableIV2 = VoltDB.checkTestEnvForIv2();
