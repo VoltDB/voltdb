@@ -127,7 +127,6 @@ public class ExportOnServerVerifier {
             m_jsch.setKnownHosts(defaultKnownHosts);
         }
 
-
         for (String hostString : remoteHosts) {
             String split[] = hostString.split(":");
             String host = split[0];
@@ -138,6 +137,7 @@ public class ExportOnServerVerifier {
             String user = System.getProperty("user.name") ;
             int port = 22;
             File identityFile = null;
+            String configHost = host;
             if (sshConfig != null) {
                 OpenSshConfig.Host hostConfig = sshConfig.lookup(host);
                 if (hostConfig.getUser() != null) {
@@ -149,16 +149,18 @@ public class ExportOnServerVerifier {
                 if (hostConfig.getIdentityFile() != null) {
                     identityFile = hostConfig.getIdentityFile();
                 }
-                // TODO: use also HostName
+                if (hostConfig.getHostName() != null) {
+                    configHost = hostConfig.getHostName();
+                }
             }
 
             Session session = null;
             if (identityFile != null) {
                 JSch jsch = new JSch();
                 jsch.addIdentity(identityFile.getAbsolutePath());
-                session = jsch.getSession(user, host, port);
+                session = jsch.getSession(user, configHost, port);
             } else {
-                session = m_jsch.getSession( user, host, port);
+                session = m_jsch.getSession( user, configHost, port);
             }
 
             rh.session = session;
@@ -219,7 +221,6 @@ public class ExportOnServerVerifier {
         boolean quit = false;
         boolean more_rows = true;
         boolean more_txnids = true;
-        long lastReportTime = System.currentTimeMillis();
         int emptyRemovalCycles = 0;
 
         while (!quit)
@@ -347,16 +348,6 @@ public class ExportOnServerVerifier {
                 {
                     quit = true;
                 }
-            }
-
-            if (System.currentTimeMillis() - lastReportTime > 5000) {
-                StringBuilder sb = new StringBuilder();
-                sb.append(m_clientTxnIds.size()).append(' ');
-                for (Map<Long,Long> txnids : m_rowTxnIds.values()) {
-                    sb.append(txnids.size()).append(' ');
-                }
-                System.out.println(sb);
-                lastReportTime = System.currentTimeMillis();
             }
         }
 
@@ -617,20 +608,6 @@ public class ExportOnServerVerifier {
         clientreader = new BufferedReader(reader);
         m_clientIndex++;
         return clientreader;
-    }
-
-    private boolean canCheckClient()
-    {
-        boolean can_check = true;
-        for (int i = 0; i < m_partitions; i++)
-        {
-            if (m_rowTxnIds.get(i).size() - m_checkedUpTo.get(i) <= 0)
-            {
-                can_check = false;
-                break;
-            }
-        }
-        return can_check;
     }
 
     private boolean allActiveSeen()
