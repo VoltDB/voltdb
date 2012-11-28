@@ -94,7 +94,7 @@ class InaugurationFuture implements Future<Pair<Boolean, Long>>
     public Pair<Boolean, Long> get(long timeout, TimeUnit unit)
         throws InterruptedException, ExecutionException, TimeoutException
     {
-        m_doneLatch.await(timeout, unit);
-        return result();
+        assert false : "Inauguration future does not support timeout.";
+        throw new UnsupportedOperationException("Inauguration future does not support timeout.");
     }
 }
