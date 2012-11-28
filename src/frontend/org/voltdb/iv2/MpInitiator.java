@@ -30,13 +30,12 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
-
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
  * Subclass of Initiator to manage multi-partition operations.
@@ -72,7 +71,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           NodeDRGateway drGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
-        super.configureCommon(backend, serializedCatalog, catalogContext,
+        // note the mp initiator always uses a native site, even though it's never used for anything
+        super.configureCommon(BackendTarget.NATIVE_EE_JNI, serializedCatalog, catalogContext,
                 csp, numberOfPartitions, startAction, null, null, cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
