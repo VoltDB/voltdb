@@ -28,6 +28,7 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.TimeZone;
 
 import junit.framework.TestCase;
 
@@ -115,7 +116,8 @@ public class TestExportToFileClient extends TestCase {
                     false,
                     false,
                     0,
-                    false);
+                    false,
+                    TimeZone.getDefault());
         final ExportToFileClient exportClient2 =
                 new ExportToFileClient(
                     ',',
@@ -129,7 +131,8 @@ public class TestExportToFileClient extends TestCase {
                     false,
                     false,
                     0,
-                    false);
+                    false,
+                    TimeZone.getDefault());
 
         InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", cluster.port(0));
         InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", cluster.port(1));

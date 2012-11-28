@@ -14,5 +14,14 @@
                 <property name="period">10</property>
             </configuration>
         </onserver>
+<!--        <onserver exportto="jdbc">
+            <configuration>
+                <property name="jdbcurl">jdbc:postgresql://localhost/exporttest</property>
+                <property name="jdbcurl">jdbc:mysql://localhost/test</property>
+                <property name="jdbcuser">voltdb</property>
+                <property name="jdbcpassword">voltdb</property>
+                <property name="schema">public</property>
+            </configuration>
+        </onserver>-->
     </export>
 </deployment>
