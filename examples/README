@@ -16,9 +16,8 @@ voter
   where callers are allowed a limited number of votes.
 
 
-Each example includes a DDL file and a project.xml that lists the DDL
-file and the stored procedures names, as well as a makefile
-to simplify the build process.
+Each example includes a DDL file that defines the schema and declares
+the stored procedures.
 
 Examining the run.sh will show the available targets for each example.
 The targets "client" and "server" let you run a client and server for each example.

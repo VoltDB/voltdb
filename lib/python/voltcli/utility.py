@@ -192,6 +192,7 @@ def abort(*msgs):
     Display ERROR messages and then abort.
     """
     error(*msgs)
+    sys.stderr.write('\n')
     display_messages('Exiting.', f = sys.stderr, tag = 'FATAL')
     sys.exit(1)
 

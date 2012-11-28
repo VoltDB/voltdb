@@ -25,8 +25,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from voltcli import utility
-
 def show_snapshots(runner):
     response = runner.call_proc('@SnapshotStatus', [], [])
     print response.table(0).format_table(caption = 'Snapshot Status')

@@ -39,7 +39,7 @@ VoltCompiler = 'org.voltdb.compiler.VoltCompiler'
 
     # Command line options.
     options = (
-        VOLT.StringOption(None, '--classpath', 'classpath',
+        VOLT.StringOption('-c', '--classpath', 'classpath',
                           'additional colon-separated Java CLASSPATH directories'),
         VOLT.StringOption('-o', '--output', 'catalog',
                           'the output application catalog jar file',
@@ -59,16 +59,16 @@ def compile(runner):
 
     # Check that there's something to compile.
     if not runner.opts.project and not runner.opts.ddl:
-        utility.abort('Either project or DDL files must be specified.')
+        runner.abort_with_help('Either project or DDL files must be specified.')
 
     # Explicit extensions allow VoltCompiler.main() to discriminate between the
     # new and old style argument lists, i.e. with and without a project file.
     # Checking here enables better error messages.
     if not runner.opts.catalog.lower().endswith('.jar'):
-        utility.abort('Output catalog file "%s" does not have a ".jar" extension.'
+        runner.abort('Output catalog file "%s" does not have a ".jar" extension.'
                             % runner.opts.catalog)
     if runner.opts.project and not runner.opts.project.lower().endswith('.xml'):
-        utility.abort('Project file "%s" does not have a ".xml" extension.'
+        runner.abort('Project file "%s" does not have a ".xml" extension.'
                             % runner.opts.project)
 
     # Look for missing files.
@@ -77,17 +77,17 @@ def compile(runner):
         if not os.path.exists(path):
             missing.append(path)
     if missing:
-        utility.abort('Missing files:', missing)
+        runner.abort('Missing files:', missing)
 
     # Verbose argument display.
-    if utility.is_verbose():
+    if runner.is_verbose():
         params = ['Output catalog file: %s' % runner.opts.catalog]
         if runner.opts.project:
             params.append('Project file: %s' % runner.opts.project)
         if runner.opts.ddl:
             params.append('DDL files:')
             params.append(runner.opts.ddl)
-        utility.verbose_info('Compilation parameters:', params)
+        runner.verbose_info('Compilation parameters:', params)
 
     # Build the positional and keyword argument lists and invoke the compiler
     args = []

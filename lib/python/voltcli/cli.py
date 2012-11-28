@@ -372,7 +372,14 @@ class CLIParser(ExtendedHelpOptionParser):
         if iarg < len(args):
             utility.abort('Extra arguments were provided:', args[iarg:])
         # Abort if arguments are missing.
-        check_missing_items('argument', missing)
+        if missing:
+            if len(missing) > 1:
+                plural = 's'
+            else:
+                plural = ''
+            fmt = '%%-%ds  %%s' % max([len(o) for (o, h) in missing])
+            self._abort('Missing required argument%s:' % plural,
+                        (fmt % (o.upper(), h) for (o, h) in missing))
 
     def initialize_verb(self, verb_name):
         """
@@ -466,8 +473,8 @@ class CLIParser(ExtendedHelpOptionParser):
         utility.error(*msgs)
         sys.stdout.write('\n')
         self.print_help()
-        sys.stdout.write('\n\n')
-        utility.abort()
+        sys.stdout.write('\n')
+        sys.exit(1)
 
     def _format_verb_list(self):
         rows1 = []
@@ -536,22 +543,6 @@ class CLISpec(object):
             if a.name == dest_name:
                 return a
         return None
-
-#===============================================================================
-def check_missing_items(type_name, missing_items):
-#===============================================================================
-    """
-    Look at item list with (name, description) pairs and abort with a useful
-    error message if the list isn't empty.
-    """
-    if missing_items:
-        if len(missing_items) > 1:
-            plural = 's'
-        else:
-            plural = ''
-        fmt = '%%-%ds  %%s' % max([len(o) for (o, h) in missing_items])
-        utility.abort('Missing required %s%s:' % (type_name, plural),
-                      (fmt % (o.upper(), h) for (o, h) in missing_items))
 
 #===============================================================================
 def get_argument_usage(a):
