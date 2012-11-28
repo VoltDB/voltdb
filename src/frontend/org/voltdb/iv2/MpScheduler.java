@@ -261,9 +261,6 @@ public class MpScheduler extends Scheduler
                 m_repairLogTruncationHandle = message.getTxnId();
                 m_outstandingTxns.remove(message.getTxnId());
 
-                // prune any sql hash so it doesn't get sent to the client (not in wire protocol)
-                message.getClientResponseData().setSQLHash(null);
-
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {

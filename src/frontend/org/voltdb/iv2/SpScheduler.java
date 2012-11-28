@@ -496,9 +496,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), spHandle));
                 m_repairLogTruncationHandle = spHandle;
 
-                // prune any sql hash so it doesn't get sent to the client (not in wire protocol)
-                message.getClientResponseData().setSQLHash(null);
-
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
@@ -507,11 +504,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // doing duplicate suppresion: all done.
         }
         else {
-            if (m_isLeader) {
-                // prune any sql hash so it doesn't get sent to the client (not in wire protocol)
-                message.getClientResponseData().setSQLHash(null);
-            }
-
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_repairLogTruncationHandle = spHandle;
             m_mailbox.send(message.getInitiatorHSId(), message);

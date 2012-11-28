@@ -49,9 +49,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -94,7 +93,6 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.BaseInitiator;
@@ -1211,6 +1209,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                                             clientResponse.setClientHandle(clientData.m_clientHandle);
                                             clientResponse.setClusterRoundtrip(delta);
+                                            clientResponse.setSQLHash(null); // not part of wire protocol
 
                                             ByteBuffer results =
                                                     ByteBuffer.allocate(

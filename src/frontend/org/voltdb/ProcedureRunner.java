@@ -194,9 +194,10 @@ public class ProcedureRunner {
         assert(m_cachedRNG == null);
 
         // for logging later
-        long txnId = m_txnState.txnId;
-        boolean isReplicatedForDR = (m_txnState.getInvocation() != null) &&
-                m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED;
+        boolean isReplicatedForDR =
+                (m_txnState != null) && // may be null for tests
+                (m_txnState.getInvocation() != null) &&
+                (m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED);
 
         // reset the hash of results
         m_inputCRC.reset();
