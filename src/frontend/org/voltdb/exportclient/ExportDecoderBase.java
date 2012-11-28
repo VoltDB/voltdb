@@ -27,12 +27,23 @@ import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+
 /**
  * Provide the basic functionality of decoding tuples from our export wire
  * protocol into arrays of POJOs.
  *
  */
 public abstract class ExportDecoderBase {
+
+    public static class RestartBlockException extends Exception {
+        public final boolean requestBackoff;
+        public RestartBlockException(boolean requestBackoff) {
+            this.requestBackoff = requestBackoff;
+        }
+    }
+
     protected AdvertisedDataSource m_source;
     // This is available as a convenience, could go away.
     protected ArrayList<VoltType> m_tableSchema;
@@ -52,7 +63,7 @@ public abstract class ExportDecoderBase {
      *            a byte array containing the row data
      * @return whether or not the row processing was successful
      */
-    abstract public boolean processRow(int rowSize, byte[] rowData);
+    abstract public boolean processRow(int rowSize, byte[] rowData) throws RestartBlockException;
 
     abstract public void sourceNoLongerAdvertised(AdvertisedDataSource source);
 
@@ -60,14 +71,18 @@ public abstract class ExportDecoderBase {
      * Finalize operation upon block completion - provides a means for a
      * specific decoder to flush data to disk - virtual method
      */
-    public void onBlockCompletion() {
+    public void onBlockCompletion() throws RestartBlockException {
     }
 
     /**
      * Notify that a new block of data is going to be processed now
      */
-    public void onBlockStart() {
+    public void onBlockStart() throws RestartBlockException {
 
+    }
+
+    public ListeningExecutorService getExecutor() {
+        return MoreExecutors.sameThreadExecutor();
     }
 
     /**

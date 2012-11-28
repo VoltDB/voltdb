@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -46,6 +47,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.types.TimestampType;
@@ -75,10 +77,6 @@ public class ExportToFileClient extends ExportClientBase2 {
     // active means the folder is being written to
     private static final String ACTIVE_PREFIX = "active-";
 
-    // ODBC Datetime Format
-    // if you need microseconds, you'll have to change this code or
-    //  export a bigint representing microseconds since an epoch
-    public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
     // use thread-local to avoid SimpleDateFormat thread-safety issues
     protected ThreadLocal<SimpleDateFormat> m_ODBCDateformat;
     protected char m_delimiter;
@@ -576,7 +574,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             boolean withSchema,
             int throughputMonitorPeriod) {
         this(delimiter, nonce, outdir, period, dateformatString, fullDelimiters,
-                firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod, true);
+                firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod, true, TimeZone.getDefault());
     }
 
     public ExportToFileClient() {
@@ -594,8 +592,9 @@ public class ExportToFileClient extends ExportClientBase2 {
                               boolean batched,
                               boolean withSchema,
                               int throughputMonitorPeriod,
-                              boolean autodiscoverTopolgy) {
-        super(useAdminPorts, throughputMonitorPeriod, autodiscoverTopolgy);
+                              boolean autodiscoverTopology,
+                              TimeZone tz) {
+        super(useAdminPorts, throughputMonitorPeriod, autodiscoverTopology);
         configureInternal(
                 delimiter,
                 nonce,
@@ -605,7 +604,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                 fullDelimiters,
                 firstfield,
                 batched,
-                withSchema);
+                withSchema,
+                tz);
     }
 
     @Override
@@ -724,7 +724,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                         + "[--skipinternals] "
                         + "[--delimiters html-escaped delimiter set (4 chars)] "
                         + "[--user export_username] "
-                        + "[--password export_password]");
+                        + "[--password export_password]"
+                        + "[--timezone GMT+0]");
         System.out.println("Note that server hostnames may be appended with a specific port:");
         System.out.println("  --servers server1:port1[,server2:port2,...,serverN:portN]");
 
@@ -747,6 +748,7 @@ public class ExportToFileClient extends ExportClientBase2 {
         String fullDelimiters = null;
         int throughputMonitorPeriod = 0;
         boolean autodiscoverTopolgy = true;
+        TimeZone tz = VoltDB.GMT_TIMEZONE;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -830,6 +832,14 @@ public class ExportToFileClient extends ExportClientBase2 {
                     System.exit(-1);
                 }
                 ii++;
+            } else if (args.equals("--timezone")) {
+                if (args.length < ii + 1) {
+                    System.err.println("Error: Not enough args following --timezone");
+                    printHelpAndQuit(-1);
+                }
+                String tzId = args[ii + 1];
+                ii++;
+                tz = TimeZone.getTimeZone(tzId);
             }
             else if (arg.equals("--nonce")) {
                 if (args.length < ii + 1) {
@@ -950,7 +960,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                                                            batched,
                                                            withSchema,
                                                            throughputMonitorPeriod,
-                                                           autodiscoverTopolgy);
+                                                           autodiscoverTopolgy,
+                                                           tz);
 
         // add all of the servers specified
         for (String server : volt_servers) {
@@ -982,6 +993,9 @@ public class ExportToFileClient extends ExportClientBase2 {
     public void configure( Properties conf) throws Exception {
         String nonce = conf.getProperty("nonce");
 
+        if (nonce == null) {
+            throw new IllegalArgumentException("ExportToFile: must provide a filename nonce");
+        }
         char delimiter = '\0';
         String type = conf.getProperty("type", "").trim();
         if (type != null) {
@@ -1033,6 +1047,8 @@ public class ExportToFileClient extends ExportClientBase2 {
             }
         }
 
+        TimeZone tz = TimeZone.getTimeZone(conf.getProperty("timezone", VoltDB.GMT_TIMEZONE.getID()));
+
         configureInternal(
                 delimiter,
                 nonce,
@@ -1042,7 +1058,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                 fullDelimiters,
                 firstfield,
                 batched,
-                withSchema);
+                withSchema,
+                tz);
     }
 
     private void configureInternal(
@@ -1054,7 +1071,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                               String fullDelimiters,
                               int firstfield,
                               boolean batched,
-                              boolean withSchema) {
+                              boolean withSchema,
+                              final TimeZone tz) {
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -1073,7 +1091,9 @@ public class ExportToFileClient extends ExportClientBase2 {
         m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
             @Override
             protected SimpleDateFormat initialValue() {
-                return new SimpleDateFormat(ODBC_DATE_FORMAT_STRING);
+                SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING);
+                sdf.setTimeZone(tz);
+                return sdf;
             }
         };
         m_firstfield = firstfield;

@@ -87,13 +87,29 @@ public class VoltDB {
                startAction == VoltDB.START_ACTION.LIVE_REJOIN;
     }
 
-    public static Charset UTF8ENCODING = Charset.forName("UTF-8");
+    public static final Charset UTF8ENCODING = Charset.forName("UTF-8");
+
+    //The GMT time zone you know and love
+    public static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT+0");
+
+    //The time zone Volt is actually using, currently always GMT
+    public static final TimeZone VOLT_TIMEZONE = GMT_TIMEZONE;
+
+    //Whatever the default timezone was for this locale before we replaced it
+    public static final TimeZone REAL_DEFAULT_TIMEZONE;
+
+    // ODBC Datetime Format
+    // if you need microseconds, you'll have to change this code or
+    //  export a bigint representing microseconds since an epoch
+    public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
 
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
-        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+        TimeZone.setDefault(GMT_TIMEZONE);
     }
+
     static {
+        REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
     }
 
