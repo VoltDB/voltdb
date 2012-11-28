@@ -284,11 +284,13 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         ByteArrayCallback cb = new ByteArrayCallback();
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
+            // cb.getData() and cb.getPath() throw KeeperException
             byte payload[] = cb.getData();
             long HSId = Long.valueOf(new String(payload, "UTF-8"));
             cacheCopy.put(getPartitionIdFromZKPath(cb.getPath()), HSId);
         } catch (KeeperException.NoNodeException e) {
-            cacheCopy.remove(event.getPath());
+            // rtb: I think result's path is the same as cb.getPath()?
+            cacheCopy.remove(getPartitionIdFromZKPath(event.getPath()));
         }
         m_publicCache.set(ImmutableMap.copyOf(cacheCopy));
         if (m_cb != null) {
