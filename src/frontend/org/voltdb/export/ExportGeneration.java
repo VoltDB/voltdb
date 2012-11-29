@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
@@ -404,7 +405,11 @@ public class ExportGeneration {
                         return;
                     }
 
-                    eds.ack(ackUSO);
+                    try {
+                        eds.ack(ackUSO);
+                    } catch (RejectedExecutionException ignoreIt) {
+                        // ignore it: as it is already shutdown
+                    }
                 } else {
                     exportLog.error("Receive unexpected message " + message + " in export subsystem");
                 }
