@@ -272,7 +272,7 @@ public class AsyncExportClient
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Create a Timer task to display performance data on the procedure
-            Timer timer = new Timer(true);
+            Timer timer = new Timer();
             timer.scheduleAtFixedRate(new TimerTask()
             {
                 @Override
