@@ -599,8 +599,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
             setReplayRejoinComplete();
         }
-        else if (m_rejoinTaskLog.isEmpty()) {
-        }
     }
 
     private boolean filter(TransactionInfoBaseMessage tibm)
