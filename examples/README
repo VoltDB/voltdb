@@ -15,10 +15,9 @@ voter
   This example is a simulation of a telephone based voting process
   where callers are allowed a limited number of votes.
 
-
-Each example includes a DDL file and a project.xml that lists the DDL
-file and the stored procedures names, as well as a makefile
-to simplify the build process.
+json
+  This example shows how to use flexible schema and JSON within
+  a VoltDB application.
 
 Examining the run.sh will show the available targets for each example.
 The targets "client" and "server" let you run a client and server for each example.

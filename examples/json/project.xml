@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<project>
+    <info>
+        <name>JSON Example</name>
+        <version>2.0</version>
+        <description>Demonstrates using the JSON datatype in a session authentication scenario.</description>
+    </info>
+    <database>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+    </database>
+</project>
