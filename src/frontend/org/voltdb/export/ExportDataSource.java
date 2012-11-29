@@ -97,7 +97,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param catalogMap
      */
     public ExportDataSource(
-            final Runnable onDrain,
+            Runnable onDrain,
             String db, String tableName,
             int partitionId, long HSId, String signature, long generation,
             CatalogMap<Column> catalogMap,
@@ -107,17 +107,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         checkNotNull( onDrain, "onDrain runnable is null");
 
         m_generation = generation;
-        m_onDrain = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    onDrain.run();
-                } finally {
-                    m_onDrain = null;
-                    forwardAckToOtherReplicas(Long.MIN_VALUE);
-                }
-            }
-        };
+        m_onDrain = onDrain;
         m_database = db;
         m_tableName = tableName;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + generation + " sig " + signature, 1);
@@ -284,7 +274,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             if (m_endOfStream && m_committedBuffers.sizeInBytes() == 0) {
                 if (m_onDrain != null) {
-                    m_onDrain.run();
+                    try {
+                        m_onDrain.run();
+                    } finally {
+                        m_onDrain = null;
+                    }
                 } else {
                     hitEndOfStreamWithNoRunnable = true;
                 }
@@ -502,12 +496,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             if (m_committedBuffers.sizeInBytes() == 0) {
                 exportLog.info("Pushed EOS buffer with 0 bytes remaining");
-                if (m_pollFuture != null) {
-                    m_pollFuture.set(null);
-                    m_pollFuture = null;
-                }
-                if (m_onDrain != null) {
+                try {
+                    if (m_pollFuture != null) {
+                        m_pollFuture.set(null);
+                        m_pollFuture = null;
+                    }
                     m_onDrain.run();
+
+                } finally {
+                    m_onDrain = null;
                 }
             }
             return;
@@ -598,12 +595,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 try {
                     m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
                     if (m_committedBuffers.isEmpty() && m_endOfStream) {
-                        if (m_pollFuture != null) {
-                            m_pollFuture.set(null);
-                            m_pollFuture = null;
-                        }
-                        if (m_onDrain != null) {
-                            m_onDrain.run();
+                        try {
+                            if (m_pollFuture != null) {
+                                m_pollFuture.set(null);
+                                m_pollFuture = null;
+                            }
+                            if (m_onDrain != null) {
+                                m_onDrain.run();
+                            }
+                        } finally {
+                            m_onDrain = null;
                         }
                     }
                 } catch (IOException e) {
@@ -658,7 +659,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //Returning null indicates end of stream
                 fut.set(null);
                 if (m_onDrain != null) {
-                    m_onDrain.run();
+                    try {
+                        m_onDrain.run();
+                    } finally {
+                        m_onDrain = null;
+                    }
                 }
                 return;
             }
@@ -724,31 +729,30 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 ack(m_uso);
             } finally {
-                forwardAckToOtherReplicas(m_uso);
+                forwardAckToOtherReplicas();
             }
         }
 
-    }
+        private void forwardAckToOtherReplicas() {
+            Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+            Mailbox mbx = p.getFirst();
 
-    private void forwardAckToOtherReplicas(long uso) {
-        Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-        Mailbox mbx = p.getFirst();
+            if (mbx != null) {
+                // partition:int(4) + length:int(4) +
+                // signaturesBytes.length + ackUSO:long(8)
+                final int msgLen = 4 + 4 + m_signatureBytes.length + 8;
 
-        if (mbx != null) {
-            // partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8)
-            final int msgLen = 4 + 4 + m_signatureBytes.length + 8;
+                ByteBuffer buf = ByteBuffer.allocate(msgLen);
+                buf.putInt(m_partitionId);
+                buf.putInt(m_signatureBytes.length);
+                buf.put(m_signatureBytes);
+                buf.putLong(m_uso);
 
-            ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.putInt(m_partitionId);
-            buf.putInt(m_signatureBytes.length);
-            buf.put(m_signatureBytes);
-            buf.putLong(uso);
+                BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-
-            for( Long siteId: p.getSecond()) {
-                mbx.send(siteId, bpm);
+                for( Long siteId: p.getSecond()) {
+                    mbx.send(siteId, bpm);
+                }
             }
         }
     }
@@ -772,12 +776,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         //Assemble a list of blocks to delete so that they can be deleted
         //outside of the m_committedBuffers critical section
         ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
-
-        if (uso == Long.MIN_VALUE && m_onDrain != null) {
-            m_onDrain.run();
-            return;
-        }
-
         try {
             //Process the ack if any and add blocks to the delete list or move the released USO pointer
             if (uso > 0) {

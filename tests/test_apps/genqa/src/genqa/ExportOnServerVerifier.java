@@ -473,33 +473,12 @@ public class ExportOnServerVerifier {
         }
     }
 
-
-    private boolean sameFiles( File [] a, File [] b, Comparator<File> comparator) {
-        boolean same = true;
-        if( a == null || b == null) {
-            return b == a;
-        } else if ( a.length != b.length) {
-            return false;
-        } else {
-            Arrays.sort(a, comparator);
-            Arrays.sort(b, comparator);
-            for ( int i = 0; same && i < a.length; ++i) {
-                if( a[i] == null) {
-                    same = b[i] == null;
-                } else {
-                    same = a[i].equals(b[i]);
-                }
-            }
-        }
-        return same;
-    }
-
     private File[] checkForMoreFiles(File path, File[] files, FileFilter acceptor,
                                    Comparator<File> comparator) throws ValidationErr
     {
-        File [] oldFiles = files;
+        int old_length = files.length;
         long start_time = System.currentTimeMillis();
-        while ((sameFiles(files, oldFiles, comparator) && files.length > 0) || (files.length == 0 && !m_clientlogSeen))
+        while ((files.length == old_length && files.length > 0) || (files.length == 0 && !m_clientlogSeen))
         {
             files = path.listFiles(acceptor);
             m_clientlogSeen = m_clientlogSeen || files.length > 0;
@@ -509,11 +488,6 @@ public class ExportOnServerVerifier {
                 throw new ValidationErr("Timed out waiting on new files in " + path.getName()+ ".\n" +
                                         "This indicates a mismatch in the transaction streams between the client logs and the export data or the death of something important.",
                                         null, null);
-            } else {
-                try {
-                    Thread.sleep(1200);
-                } catch (InterruptedException ignoreIt) {
-                }
             }
         }
         Arrays.sort(files, comparator);
