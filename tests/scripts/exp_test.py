@@ -38,11 +38,11 @@ from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement
 # add the path to the volt python client, just based on knowing
 # where we are now
-sys.path.append('../../src/py_client')
+sys.path.append('../../lib/python')
 try:
     from voltdbclient import *
 except ImportError:
-    sys.path.append('./src/py_client')
+    sys.path.append('./lib/python')
     from voltdbclient import *
 from Query import VoltQueryClient
 from XMLUtils import prettify # To create a human readable xml file
@@ -65,7 +65,7 @@ suiteDict = {'helloworld': 'HelloWorld',
 tail = "tar.gz"
 # http://volt0/kits/candidate/LINUX-voltdb-2.8.1.tar.gz
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
-root = 'http://volt0/kits/candidate/'
+root = "http://volt0/kits/branch/"
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
 destDir = "/tmp/"
 logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
@@ -471,7 +471,7 @@ def create_rpt(info, status, msg, keyStrings, elapsed, rptf):
 if __name__ == "__main__":
     start = time.time()
     usage = "Usage: %prog [options]"
-    parser = OptionParser(usage="%prog [-r <release #>] [-p <comm|pro|voltkv|voltcache|all> <-s all|helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
+    parser = OptionParser(usage="%prog [-b <branch name>] [-r <release #>] [-p <comm|pro|voltkv|voltcache|all> <-s all|helloworld|voter|voltkv|voltcache>]", version="%prog 1.0")
     parser.add_option("-r", "--release", dest="release",
                       help="VoltDB release number. If omitted, will be read from version.txt.")
     parser.add_option("-p", "--package", dest="pkg",
@@ -480,6 +480,8 @@ if __name__ == "__main__":
                       help="Test suite name, if not set, then this framework will take all suites. If an incorrect suite name is passed in, then the test suite name is set to 'all' as a default value.")
     parser.add_option("-x","--reportxml", dest="reportfile", default="exp_test.xml",
                       help="Report file location")
+    parser.add_option("-b","--branch", dest="branch", default="master",
+                      help="Branch name to test")
 
     parser.set_defaults(pkg="all")
     parser.set_defaults(suite="all")
@@ -501,9 +503,13 @@ if __name__ == "__main__":
     if(releaseNum == None):
         releaseNum = getReleaseNum()
 
+    branchName = options.branch
+    root = root.replace("branch", branchName)
+
     list = None
     if(options.pkg in pkgDict):
         print sectionBreak
+        print "Testing Branch in this RUN: %s" % branchName
         print "Testing Version in this RUN: %s" % releaseNum
         print "--------------------------------------"
         if(options.pkg == "all"):

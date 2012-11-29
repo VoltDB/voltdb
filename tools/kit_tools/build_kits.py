@@ -76,6 +76,8 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
         "%s/%s-voltdb-voltcache-%s.tar.gz" % (releaseDir, operatingsys, version))
     get("%s/voltdb/obj/release/voltdb-voltkv-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-voltkv-%s.tar.gz" % (releaseDir, operatingsys, version))
+    get("%s/voltdb/obj/release/voltdb-tools-%s.tar.gz" % (builddir, version),
+        "%s/voltdb-tools-%s.tar.gz" % (releaseDir, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
@@ -144,8 +146,13 @@ if (len(sys.argv) > 3 or (len(sys.argv) == 2 and sys.argv[1] == "-h")):
 proTreeish = "master"
 voltdbTreeish = "master"
 
-#Candidate is only for newest trunk build
-createCandidate = True
+# pass -o if you want the build put in the one-offs directory
+# passing different voltdb and pro trees also forces one-off
+if '-o' in sys.argv:
+    oneOff = True
+    sys.argv.remove('-o')
+else:
+    oneOff = False
 
 if len(sys.argv) == 2:
     createCandidate = False
@@ -155,9 +162,9 @@ if len(sys.argv) == 3:
     createCandidate = False
     voltdbTreeish = sys.argv[1]
     proTreeish = sys.argv[2]
+    oneOff = True               #force on-off behavior
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
-print "Create link for releases/candidate = %s" % createCandidate
 
 versionVolt5f = "unknown"
 versionMac = "unknown"
@@ -171,11 +178,11 @@ volt12c = getSSHInfoForHost("volt12c")
 # build kits on 5f
 with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
     versionVolt5f = checkoutCode(voltdbTreeish, proTreeish)
-    if voltdbTreeish == "master":
-        releaseDir = os.getenv('HOME') + "/releases/" + versionVolt5f
-    else:
+    if oneOff:
         releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
             (os.getenv('HOME'), versionVolt5f, voltdbTreeish, proTreeish)
+    else:
+        releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
     makeReleaseDir(releaseDir)
     print "VERSION: " + versionVolt5f
     buildCommunity()
@@ -211,7 +218,5 @@ with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_
         get("voltdb-ent_%s-1_amd64.deb" % (versionVolt5f), releaseDir)
 
 computeChecksums(releaseDir)
-if createCandidate:
-    createCandidateSysmlink(releaseDir)
-archiveDir = os.getenv('HOME') + "/releases/archive/" + versionVolt5f
+archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionVolt5f)
 backupReleaseDir(releaseDir, archiveDir, versionVolt5f)

@@ -23,6 +23,10 @@ public abstract class ExportClientBase2 extends ExportClientBase {
         super(useAdminPorts, throughputDisplayPeriod, autodiscoverTopology);
     }
 
+    public ExportClientBase2(boolean useAdminPorts) {
+        super(useAdminPorts);
+    }
+
     public abstract void configure( Properties config) throws Exception;
     public abstract void shutdown( );
 }

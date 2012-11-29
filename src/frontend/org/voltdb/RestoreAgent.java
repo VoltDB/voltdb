@@ -1176,7 +1176,7 @@ SnapshotCompletionInterest
      */
     @Override
     public CountDownLatch snapshotCompleted(final String nonce, long txnId, long partitionTxnIds[],
-                                            boolean truncationSnapshot) {
+                                            boolean truncationSnapshot, String requestId) {
         if (!truncationSnapshot) {
             VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",
                                      false, null);

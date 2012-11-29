@@ -172,14 +172,6 @@ public abstract class BaseInitiator implements Initiator
         } catch (Exception e) {
             tmLog.info("Exception during shutdown.", e);
         }
-
-        try {
-            if (m_siteThread != null) {
-                m_siteThread.interrupt();
-            }
-        } catch (Exception e) {
-            tmLog.info("Exception during shutdown.");
-        }
     }
 
     @Override

@@ -425,8 +425,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (taskLogKlass != null) {
             Constructor<?> taskLogConstructor;
             try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
-                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir);
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir, true);
             } catch (InvocationTargetException e) {
                 VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
             } catch (Exception e) {
@@ -510,9 +510,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
             }
         }
-        catch (final InterruptedException e) {
-            // acceptable - this is how site blocked on an empty scheduler terminates.
-        }
         catch (OutOfMemoryError e)
         {
             // Even though OOM should be caught by the Throwable section below,
@@ -582,7 +579,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 if (global_replay_mpTxn != null) {
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
                     CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
-                    global_replay_mpTxn = null;
+                    if (!m.isRestart()) {
+                        global_replay_mpTxn = null;
+                    }
                     t.runFromTaskLog(this);
                 }
             }
@@ -599,8 +598,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // is wrong. Run MP txns fully kStateRejoining or fully kStateRunning.
         if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
             setReplayRejoinComplete();
-        }
-        else if (m_rejoinTaskLog.isEmpty()) {
         }
     }
 

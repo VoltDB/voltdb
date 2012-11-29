@@ -122,7 +122,7 @@ public class QueryPlanner {
         m_costModel = costModel;
         m_paramHints = paramHints;
         m_joinOrder = joinOrder;
-        m_fullDebug = System.getProperties().contains("compilerdebug");
+        m_fullDebug = System.getProperties().containsKey("compilerdebug");
     }
 
     /**

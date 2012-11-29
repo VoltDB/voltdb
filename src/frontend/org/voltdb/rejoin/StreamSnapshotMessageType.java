@@ -31,5 +31,10 @@ public enum StreamSnapshotMessageType {
     /*
      * Marks the end of the snapshot stream
      */
-    END;
+    END,
+
+    /*
+     * Signifies a failure to the rejoining node
+     */
+    FAILURE;
 }

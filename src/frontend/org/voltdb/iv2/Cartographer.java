@@ -65,7 +65,7 @@ public class Cartographer extends StatsSource
      * A dummy iterator that wraps an UnmodifiableIterator<Integer> and provides the
      * Iterator<Object>
      */
-    private class DummyIterator implements Iterator<Object> {
+    private static class DummyIterator implements Iterator<Object> {
         private final UnmodifiableIterator<Integer> i;
 
         private DummyIterator(UnmodifiableIterator<Integer> i) {

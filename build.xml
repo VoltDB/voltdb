@@ -60,6 +60,7 @@
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.test.dir'              location='${build.dir}/test' />
+<property name='build.admin.dir'             location='${build.dir}/admin' />
 <property name='raw.dist.dir'                location='${build.dir}' />
 <property name='dist.dir'                    location='${build.dir}/dist' />
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
@@ -230,7 +231,7 @@ PRIMARY ENTRY POINTS
     description="Create production JAR files."
 />
 <target name="dist"
-    depends="dist_client, dist_internal, dist_voltcache, dist_voltkv"
+    depends="dist_client, dist_internal, dist_voltcache, dist_voltkv, dist_tools"
     description="Create VoltDB release packages with examples and documentation."
 />
 <target name="dist_voltcache"  depends="dist_internal"
@@ -247,6 +248,33 @@ PRIMARY ENTRY POINTS
         description="Create reference application release package with app supplied in ant invocation.">
   <fail unless="appname" message="must specify an app name with -Dappname=" />
   <refapp_macro appname="${appname}" />
+</target>
+
+<target name="dist_tools" depends="buildinfo"
+        description="Create VoltDB tools release package.">
+    <exec executable="${base.dir}/bin/voltadmin">
+        <arg line="package -f -o ${dist.dir}-tools" />
+    </exec>
+    <mkdir dir="${raw.dist.dir}/voltdb-tools-${dist.version}" />
+    <copy todir="${raw.dist.dir}/voltdb-tools-${dist.version}">
+        <fileset dir="${dist.dir}">
+            <include name="LICENSE" />
+        </fileset>
+        <fileset dir="${dist.dir}-tools" defaultexcludes="yes">
+            <include name="*" />
+        </fileset>
+    </copy>
+    <exec executable="tar" failonerror="true">
+        <arg value="-cz"/>
+        <arg value="-C"/>
+        <arg value="${raw.dist.dir}"/>
+        <arg value="-f"/>
+        <arg value="${raw.dist.dir}/voltdb-tools-${dist.version}.tar.gz"/>
+        <arg value="voltdb-tools-${dist.version}"/>
+    </exec>
+    <exec dir='.' executable='/bin/sh'>
+        <arg line="-c 'rm -rfv ${raw.dist.dir}/voltdb-tools-${dist.version}'"/>
+    </exec>
 </target>
 
 <!--
@@ -369,12 +397,6 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- populate project generator -->
-    <exec dir="src/proj_gen/" executable="python">
-        <arg line="generator_compiler.py"/>
-    </exec>
-    <move tofile="${dist.dir}/tools/generate" file="src/proj_gen/generate" />
-
     <!-- add the Project and Deployment file schemas to the dist -->
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
@@ -389,7 +411,6 @@ DISTRIBUTION
             <include name="tools/demo/launch"/>
             <include name="doc/tutorials/**/run.sh"/>
             <include name="examples/**/run.sh"/>
-            <include name="tools/generate"/>
         </fileset>
     </chmod>
 
@@ -449,7 +470,6 @@ DISTRIBUTION
             <include name="examples/voltcache/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
-            <include name="tools/generate"/>
             <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
@@ -648,6 +668,7 @@ JAR BUILDING
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/mindrot/**" />
+            <include name="org/spearce_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
@@ -752,6 +773,7 @@ JAR BUILDING
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/jute_voltpatches/**" />
             <include name="org/apache/zookeeper_voltpatches/**" />
+            <include name="org/apache/spearce_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
             <include name="org/voltdb/**" />
@@ -877,7 +899,7 @@ JAVA COMPILATION
     <invoke-javac
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="org/voltcore/**/*.java,org/apache/**/*.java
-                  au/**/*.java
+                  au/**/*.java,org/spearce_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java" />
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
@@ -1174,36 +1196,35 @@ TEST CASES
 </target>
 
 <target
-    name="junit_iv2"
-    description="Tests exclusive to IV2 functionality.">
-
-    <condition property="enableiv2" value="${enableiv2}" else="true">
-        <isset property="enableiv2"/>
-    </condition>
-
+    name="junit"
+    description="Execute JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
+                <!-- Standard junit fileset -->
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
-                <include name='org/voltdb/**/Iv2Test*.class'/>
+                <include name='org/voltdb/network/**/Test*.class'/>
+                <include name='org/voltdb/messaging/**/*Test.class'/>
+                <include name='org/voltdb/network/**/*Test.class'/>
+                <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
-                <!-- pro tests -->
+                <exclude name="**/TestMaliciousClientSuite.class" />
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
+                <!-- Excluded pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
                 <exclude name="**/TestCommandLogReinitiator.class"/>
                 <exclude name="**/TestCommandLog.class"/>
                 <exclude name="**/TestLogReader.class"/>
+                <exclude name="**/TestTaskLog.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
-                <exclude name="**/TestVoltLicense.class" />
-                <exclude name="**/TestPauselessRejoinEndToEnd" />
-                <exclude name="**/TestPauselessRejoinFuzz" />
+                <exclude name="**/TestPauselessRejoinFuzz.class" />
                 <exclude name="**/TestSecondaryRejoin.class" />
                 <exclude name="**/TestSnapshotSaveTruncation.class" />
-                <!-- <exclude name="**/TestInvocationBufferServer.class" /> -->
-                <!-- <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" /> -->
-                <!-- <exclude name="**/TestPrimary.class" /> -->
-                <!-- community tests -->
+                <!-- Exclude community tests -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
@@ -1211,50 +1232,6 @@ TEST CASES
                 <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestExportBase.class"/>
-                <!-- <exclude name="**/TestHSQLBackend.class" /> -->
-                <!-- <exclude name="**/TestAdHocQueries.class" /> -->
-                <!-- <exclude name="**/TestJSONInterface.class" /> -->
-                <!-- <exclude name="**/TestRejoinEndToEnd.class" /> -->
-                <!-- <exclude name="**/TestRejoinWithCatalogUpdates.class" /> -->
-                <!-- <exclude name="**/TestReplicatedInvocation.class" /> -->
-                <!-- <exclude name="**/TestRestoreAgent.class" -->
-                <!-- <exclude name="**/TestSimpleCJK.class" /> -->
-                <!-- <exclude name="**/TestClientTimeouts.class" /> -->
-                <!-- <exclude name="**/TestExportToFileClient.class" /> -->
-                <!-- <exclude name="**/TestJDBCDriver.class" />-->
-                <!-- <exclude name="**/TestAdminMode.class" />-->
-                <!-- <exclude name="**/TestCatalogUpdateSuite.class" /> -->
-                <!-- <exclude name="**/TestCRUDSuite.class" /> -->
-                <!-- <exclude name="**/TestFailureDetectSuite.class" /> -->
-                <!-- <exclude name="**/TestExecutionSiteDeath.class" /> -->
-                <!-- <exclude name="**/TestFailuresSuite.class" /> -->
-                <!-- <exclude name="**/TestFixedSQLSuite.class" /> -->
-                <!-- <exclude name="**/TestFunctionsSuite.class" /> -->
-                <!-- <exclude name="**/TestGiantDeleteSuite.class" /> -->
-                <!-- <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
-                <!-- <exclude name="**/TestIndexesSuite.class" /> -->
-                <!-- <exclude name="**/TestLimitOffsetSuite.class" /> -->
-                <!-- <exclude name="**/TestLoadingSuite.class" /> -->
-                <!-- <exclude name="**/TestMaterializedViewSuite.class" /> -->
-                <!-- <exclude name="**/TestMultiPartitionSuite.class" /> -->
-                <!-- <exclude name="**/TestOrderBySuite.class" /> -->
-                <!-- <exclude name="**/TestPartitionDetection.class" /> -->
-                <!-- <exclude name="**/TestPlansGroupBySuite.class" /> -->
-                <!-- <exclude name="**/TestReplicationSuite.class" /> -->
-                <!-- <exclude name="**/TestRollbackSuite.class" /> -->
-                <!-- <exclude name="**/TestSQLFeaturesSuite.class" /> -->
-                <!-- <exclude name="**/TestSQLTypesSuite.class" /> -->
-                <!-- <exclude name="**/TestSecuritySuite.class" /> -->
-                <!-- <exclude name="**/TestSqlAggregateSuite.class" /> -->
-                <!-- <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
-                <!-- <exclude name="**/TestSqlUpdateSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemCatalogSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemInformationSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemProcedureSuite.class" /> -->
-                <!-- <exclude name="**/TestTPCCSuite.class" /> -->
-                <!-- <exclude name="**/TestBlobType.class" /> -->
             </fileset>
         </tests>
     </run_junit>
@@ -1300,47 +1277,10 @@ TEST CASES
     </sequential>
 </macrodef>
 
-<!-- Junit tests that run quickly -->
-<target name="junit_quick" description="Tests and suites that run in under 3 minutes under memcheck">
-    <run_junit>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-                <include name='org/voltdb/**/Test*.class'/>
-                <exclude name="**/*$*.class"/>
-                <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/TestExportSuite.class" />
-                <exclude name="**/TestFailuresSuite.class" />
-                <exclude name="**/TestFixedSQLSuite.class" />
-                <exclude name="**/TestPlansGroupBySuite.class" />
-                <exclude name="**/TestRejoin*.class" />
-                <exclude name="**/TestRollbackSuite.class" />
-                <exclude name="**/TestSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestSQLFeaturesSuite.class" />
-                <exclude name="**/TestSQLTypesSuite.class" />
-                <exclude name="**/TestSqlUpdateSuite.class" />
-                <exclude name="**/TestIndexesSuite.class" />
-                <exclude name="**/TestExportSuite.class" />
-                <exclude name="**/TestFailureDetectSuite.class" />
-                <exclude name="**/TestReplicationSuite.class" />
-                <exclude name="**/TestSqlAggregateSuite.class" />
-                <exclude name="**/TestOrderBySuite.class" />
-                <exclude name="**/TestTPCCSuite.class" />
-                <exclude name="**/TestCatalogUpdateSuite.class" />
-                <exclude name="**/TestGiantDeleteSuite.class"  />
-                <exclude name="**/TestMultiPartitionSuite.class"  />
-                <exclude name="**/TestReplicatedSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestAdminMode.class" />
-                <exclude name="**/TestPartitionDetection.class"  />
-                <exclude name="**/TestSystemProcedureSuite.class"  />
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestExportBase.class"/>
-            </fileset>
-        </tests>
-    </run_junit>
-</target>
-
-<target name="junit" description="Run testcases for Java classes.">
+<target name="junit_legacy" description="Run JUnit in pre-iv2 mode.">
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
+    </condition>
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1376,9 +1316,9 @@ TEST CASES
         depends="with.emma, junit, emma-report"
 />
 
-<target name='emma_junit_iv2'
-        description="run junit_iv2 target and generate coverage report"
-        depends="with.emma, junit_iv2, emma-report"
+<target name='emma_junit_legacy'
+        description="run junit_legacy target and generate coverage report"
+        depends="with.emma, junit_legacy, emma-report"
 />
 
 <target name='with.emma' description="enable code coverage analysis" >
@@ -1593,7 +1533,8 @@ TEST CASES
     <condition property="verbosereport" value="${verbosereport}" else="true">
         <isset property="verbosereport"/>
     </condition>
-    <condition property="enableiv2" value="${enableiv2}" else="false">
+    <!-- run iv2 by default. -Denableiv2=false to get legacy -->
+    <condition property="enableiv2" value="${enableiv2}" else="true">
         <isset property="enableiv2"/>
     </condition>
 
@@ -1628,18 +1569,6 @@ TEST CASES
     <samplecheck app="voltkv" />
     <echo>checking voter</echo>
     <samplecheck app="voter" />
-
-    <!-- test the generator -->
-    <exec dir="${dist.dir}" executable='${dist.dir}/tools/generate'>
-        <arg line="foo org.foo foo"/>
-    </exec>
-    <ant
-        dir='${dist.dir}/foo'
-        inheritAll='false'
-        inheritRefs='false'
-        target='main'
-    />
-    <delete dir='${dist.dir}/foo' />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"
