@@ -30,6 +30,10 @@ import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.Mailbox;
@@ -48,9 +52,11 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.Files;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -74,6 +80,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final int m_partitionId;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
+    public final ArrayList<Integer> m_columnLengths = new ArrayList<Integer>();
     private long m_firstUnpolledUso = 0;
     private final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
@@ -140,37 +147,54 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // catalog columns for this table.
         m_columnNames.add("VOLT_TRANSACTION_ID");
         m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
 
         m_columnNames.add("VOLT_EXPORT_TIMESTAMP");
         m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
 
         m_columnNames.add("VOLT_EXPORT_SEQUENCE_NUMBER");
         m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
 
         m_columnNames.add("VOLT_PARTITION_ID");
         m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
 
         m_columnNames.add("VOLT_SITE_ID");
         m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+        m_columnLengths.add(8);
 
         m_columnNames.add("VOLT_EXPORT_OPERATION");
         m_columnTypes.add(((int)VoltType.TINYINT.getValue()));
+        m_columnLengths.add(1);
 
         for (Column c : CatalogUtil.getSortedCatalogItems(catalogMap, "index")) {
             m_columnNames.add(c.getName());
             m_columnTypes.add(c.getType());
+            m_columnLengths.add(c.getSize());
         }
 
 
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce);
         assert(!adFile.exists());
+        byte jsonBytes[] = null;
         FastSerializer fs = new FastSerializer();
-        fs.writeLong(m_HSId);
-        fs.writeString(m_database);
-        writeAdvertisementTo(fs);
+        try {
+            JSONStringer stringer = new JSONStringer();
+            stringer.object();
+            stringer.key("hsId").value(m_HSId);
+            stringer.key("database").value(m_database);
+            writeAdvertisementTo(stringer);
+            stringer.endObject();
+            JSONObject jsObj = new JSONObject(stringer.toString());
+            jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
+        } catch (JSONException e) {
+            Throwables.propagate(e);
+        }
         FileOutputStream fos = new FileOutputStream(adFile);
-        fos.write(fs.getBytes());
+        fos.write(jsonBytes);
         fos.getFD().sync();
         fos.close();
 
@@ -190,27 +214,31 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_onDrain = onDrain;
 
         String overflowPath = adFile.getParent();
-        FileInputStream fis = new FileInputStream(adFile);
-        byte data[] = new byte[(int)adFile.length()];
-        int read = fis.read(data);
-        if (read != data.length) {
-            throw new IOException("Failed to read ad file " + adFile);
-        }
-        FastDeserializer fds = new FastDeserializer(data);
+        byte data[] = Files.toByteArray(adFile);
+        try {
+            JSONObject jsObj = new JSONObject(new String(data, Charsets.UTF_8));
 
-        m_HSId = fds.readLong();
-        m_database = fds.readString();
-        m_generation = fds.readLong();
-        m_partitionId = fds.readInt();
-        m_signature = fds.readString();
-        m_signatureBytes = m_signature.getBytes(VoltDB.UTF8ENCODING);
-        m_tableName = fds.readString();
-        fds.readLong(); // timestamp of JVM startup can be ignored
-        int numColumns = fds.readInt();
-        for (int ii=0; ii < numColumns; ++ii) {
-            m_columnNames.add(fds.readString());
-            int columnType = fds.readInt();
-            m_columnTypes.add(columnType);
+            long version = jsObj.getLong("adVersion");
+            if (version != 0) {
+                throw new IOException("Unsupported ad file version " + version);
+            }
+            m_HSId = jsObj.getLong("hsId");
+            m_database = jsObj.getString("database");
+            m_generation = jsObj.getLong("generation");
+            m_partitionId = jsObj.getInt("partitionId");
+            m_signature = jsObj.getString("signature");
+            m_signatureBytes = m_signature.getBytes(VoltDB.UTF8ENCODING);
+            m_tableName = jsObj.getString("tableName");
+            JSONArray columns = jsObj.getJSONArray("columns");
+            for (int ii = 0; ii < columns.length(); ii++) {
+                JSONObject column = columns.getJSONObject(ii);
+                m_columnNames.add(column.getString("name"));
+                int columnType = column.getInt("type");
+                m_columnTypes.add(columnType);
+                m_columnLengths.add(column.getInt("length"));
+            }
+        } catch (JSONException e) {
+            throw new IOException(e);
         }
 
         String nonce = m_signature + "_" + m_HSId + "_" + m_partitionId;
@@ -398,17 +426,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_partitionId;
     }
 
-    public void writeAdvertisementTo(FastSerializer fs) throws IOException {
-        fs.writeLong(m_generation);
-        fs.writeInt(getPartitionId());
-        fs.writeString(m_signature);
-        fs.writeString(getTableName());
-        fs.writeLong(ManagementFactory.getRuntimeMXBean().getStartTime());
-        fs.writeInt(m_columnNames.size());
+    public void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
+        stringer.key("adVersion").value(0);
+        stringer.key("generation").value(m_generation);
+        stringer.key("partitionId").value(getPartitionId());
+        stringer.key("signature").value(m_signature);
+        stringer.key("tableName").value(getTableName());
+        stringer.key("startTime").value(ManagementFactory.getRuntimeMXBean().getStartTime());
+        stringer.key("columns").array();
         for (int ii=0; ii < m_columnNames.size(); ++ii) {
-            fs.writeString(m_columnNames.get(ii));
-            fs.writeInt(m_columnTypes.get(ii));
+            stringer.object();
+            stringer.key("name").value(m_columnNames.get(ii));
+            stringer.key("type").value(m_columnTypes.get(ii));
+            stringer.key("length").value(m_columnLengths.get(ii));
+            stringer.endObject();
         }
+        stringer.endArray();
     }
 
     /**
