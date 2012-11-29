@@ -71,8 +71,12 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           NodeDRGateway drGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
-        // note the mp initiator always uses a native site, even though it's never used for anything
-        super.configureCommon(BackendTarget.NATIVE_EE_JNI, serializedCatalog, catalogContext,
+        // note the mp initiator always uses a non-ipc site, even though it's never used for anything
+        if ((backend == BackendTarget.NATIVE_EE_IPC) || (backend == BackendTarget.NATIVE_EE_VALGRIND_IPC)) {
+            backend = BackendTarget.NATIVE_EE_JNI;
+        }
+
+        super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions, startAction, null, null, cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
