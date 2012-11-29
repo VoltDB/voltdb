@@ -40,6 +40,7 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.TreeSet;
 
+import org.voltdb.VoltDB;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
@@ -520,6 +521,10 @@ public class ExportVerifier {
     File m_clientPath = null;
     File[] m_clientFiles = {};
     int m_clientIndex = 0;
+
+    static {
+        VoltDB.setDefaultTimezone();
+    }
 
     public static void main(String[] args) {
         ExportVerifier verifier = new ExportVerifier();
