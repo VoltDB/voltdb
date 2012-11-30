@@ -264,6 +264,11 @@ PRIMARY ENTRY POINTS
             <include name="*" />
         </fileset>
     </copy>
+    <chmod perm="ugo+rx">
+        <fileset dir="${raw.dist.dir}/voltdb-tools-${dist.version}">
+            <include name="voltadmin" />
+        </fileset>
+    </chmod>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
