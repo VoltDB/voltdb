@@ -65,8 +65,8 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     false, true,
                     false); // doesnt run with IV2 yet
         cluster.setMaxHeap(256);
-        String build = System.getProperties().getProperty("build", "release");
-        if (cluster.isValgrind() || build.equalsIgnoreCase("MEMCHECK")) {
+        cluster.overrideAnyRequestForValgrind();
+        if (cluster.isValgrind() || cluster.isMemcheckDefined()) {
             //Way to much data in this test. Using less data makes it redundant
             return;
         }

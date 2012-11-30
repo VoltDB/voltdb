@@ -82,7 +82,6 @@ public class CommandLine extends VoltDB.Configuration
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
         cl.debugPort = debugPort;
-        cl.ipcPortList = ipcPortList;
         cl.zkport = zkport;
         cl.buildDir = buildDir;
         cl.java_library_path = java_library_path;
@@ -211,12 +210,7 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String ipcPortList = "";
     public CommandLine ipcPort(int port) {
-        if (!ipcPortList.isEmpty()) {
-            ipcPortList += ",";
-        }
-        ipcPortList += Integer.toString(port);
         m_ipcPorts.add(port);
         return this;
     }
@@ -514,8 +508,7 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("replicationport"); cmdline.add(Integer.toString(m_drAgentPortStart));
         }
 
-        if (target().isIPC) {
-            cmdline.add("ipcports"); cmdline.add(ipcPortList);
+        if (target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             cmdline.add("valgrind");
         }
 
