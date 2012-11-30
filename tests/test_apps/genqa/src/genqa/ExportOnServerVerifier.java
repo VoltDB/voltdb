@@ -26,6 +26,7 @@ import genqa.procedures.SampleRecord;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -73,6 +74,8 @@ public class ExportOnServerVerifier {
     public static long FILE_TIMEOUT_MS = 5 * 60 * 1000; // 5 mins
 
     public static long VALIDATION_REPORT_INTERVAL = 10000;
+
+    private final static String TRACKER_FILENAME = "__active_tracker";
 
     private final JSch m_jsch = new JSch();
     private final List<RemoteHost> m_hosts = new ArrayList<RemoteHost>();
@@ -169,6 +172,7 @@ public class ExportOnServerVerifier {
             final ChannelSftp channel = (ChannelSftp)session.openChannel("sftp");
             rh.channel = channel;
             channel.connect();
+            touchActiveTracker(rh);
 
             m_hosts.add(rh);
         }
@@ -400,6 +404,15 @@ public class ExportOnServerVerifier {
         }
     }
 
+    private void touchActiveTracker(RemoteHost rh) throws Exception
+    {
+        final String trackerFileName = rh.path + "/" + TRACKER_FILENAME;
+        final ByteArrayInputStream bis = new ByteArrayInputStream(
+                new String("__DUMMY__").getBytes(VoltDB.UTF8ENCODING)
+                );
+        rh.channel.put(bis,trackerFileName);
+    }
+
     @SuppressWarnings("unchecked")
     private void checkForMoreFilesRemote(Comparator<String> comparator) throws Exception
     {
@@ -418,16 +431,37 @@ public class ExportOnServerVerifier {
                 Vector<LsEntry> files = rh.channel.ls(rh.path);
                 List<String> paths = new ArrayList<String>();
 
+                int trackerModifyTime = rh.channel.stat(rh.path + "/" + TRACKER_FILENAME).getMTime();
+
                 boolean activeInRemote = false;
 
                 for (LsEntry entry : files) {
-                    activeInRemote = activeInRemote || entry.getFilename().contains("active");
+                    activeInRemote = activeInRemote || entry.getFilename().startsWith("active");
 
-                    if (!entry.getFilename().contains("active") &&
-                            !entry.getFilename().equals(".") &&
+                    if (    !entry.getFilename().equals(".") &&
                             !entry.getFilename().equals("..") &&
-                            !entry.getAttrs().isDir()) paths.add(rh.path + "/" + entry.getFilename());
+                            !entry.getAttrs().isDir())
+                    {
+                        final String entryFileName = rh.path + "/" + entry.getFilename();
+
+                        if (!entry.getFilename().contains("active"))
+                        {
+                            paths.add(entryFileName);
+                        }
+                        else if (entry.getFilename().startsWith("active-"))
+                        {
+                            int activeModifyTime = entry.getAttrs().getMTime();
+                            if ((trackerModifyTime - activeModifyTime) > 120)
+                            {
+                                final String renamed = rh.path + "/" + entry.getFilename().substring("active-".length());
+                                rh.channel.rename(entryFileName, renamed);
+                                paths.add(renamed);
+                            }
+                        }
+                    }
                 }
+
+                touchActiveTracker(rh);
 
                 rh.activeSeen = rh.activeSeen || activeInRemote;
                 if( activeInRemote) activeFound++;

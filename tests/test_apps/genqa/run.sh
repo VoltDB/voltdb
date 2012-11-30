@@ -220,10 +220,17 @@ function export-tosqoop() {
 }
 
 
-function exportverify() {
+function export-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
         4 \
         $EXPORTDATA \
+        $CLIENTLOG
+}
+
+function export-on-server-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportOnServerVerifier \
+        $EXPORTDATAREMOTE \
+        4 \
         $CLIENTLOG
 }
 
