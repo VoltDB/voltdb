@@ -100,7 +100,7 @@ public class TestExportV2Suite extends TestExportBase {
         quiesceAndVerify(client, m_verifier);
     }
 
-    public void testExportSnapshotPreservesSequenceNumber() throws Exception {
+/*    public void testExportSnapshotPreservesSequenceNumber() throws Exception {
         System.out.println("testExportSnapshotPreservesSequenceNumber");
         Client client = getClient();
         for (int i=0; i < 10; i++) {
@@ -131,7 +131,7 @@ public class TestExportV2Suite extends TestExportBase {
 
         // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);
-    }
+    }*/
 
     // Test Export of an ADDED table.
     //
