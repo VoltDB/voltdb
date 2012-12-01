@@ -29,7 +29,7 @@ public class PortGenerator {
     final int MIN_STATIC_PORT = 10000;
     final int MAX_STATIC_PORT = 49151;
 
-    public void setNext(int port) {
+    public synchronized void setNext(int port) {
         nextPort = port;
     }
 
