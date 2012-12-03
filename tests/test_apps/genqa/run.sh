@@ -70,6 +70,15 @@ function server() {
 }
 
 # run the voltdb server locally
+function server-legacy() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment_legacy.xml \
+        license $LICENSE host $HOST
+}
+
+# run the voltdb server locally
 function server1() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
@@ -126,6 +135,7 @@ function async-export() {
     srccompile
     rm -rf $CLIENTLOG/*
     mkdir $CLIENTLOG
+    echo file:/${PWD}/../../log4j-allconsole.xml
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
         --duration=900 \
@@ -181,7 +191,8 @@ function jdbc-benchmark() {
 function export-tofile() {
     rm -rf $EXPORTDATA/*
     mkdir $EXPORTDATA
-    java -classpath obj:$CLASSPATH:obj org.voltdb.exportclient.ExportToFileClient \
+    java -Dlog4j.configuration=file:${PWD}/../../log4j-allconsole.xml \
+         -classpath obj:$CLASSPATH:obj org.voltdb.exportclient.ExportToFileClient \
         --connect client \
         --servers localhost \
         --type csv \
@@ -209,8 +220,15 @@ function export-tosqoop() {
 }
 
 
-function exportverify() {
+function export-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
+        4 \
+        $EXPORTDATA \
+        $CLIENTLOG
+}
+
+function export-on-server-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportOnServerVerifier \
         $EXPORTDATAREMOTE \
         4 \
         $CLIENTLOG

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
@@ -68,6 +69,12 @@ public class ExportManager
 
     private final COWSortedMap<Long,ExportGeneration> m_generations =
             new COWSortedMap<Long, ExportGeneration>();
+    /*
+     * When a generation is drained store a the id so
+     * we can tell if a buffer comes late
+     */
+    private final CopyOnWriteArrayList<Long> m_generationGhosts =
+            new CopyOnWriteArrayList<Long>();
 
     private final HostMessenger m_messenger;
 
@@ -126,7 +133,7 @@ public class ExportManager
 
                     synchronized (ExportManager.this) {
 
-                        m_generations.remove(m_generations.firstEntry().getKey());
+                        m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
                         exportLog.info("Finished draining generation " + generation.m_timestamp);
 
                         exportLog.info("Creating connector " + m_loaderClass);
@@ -489,10 +496,17 @@ public class ExportManager
         try {
             ExportGeneration generation = instance.m_generations.get(exportGeneration);
             if (generation == null) {
-                assert(false);
                 DBBPool.deleteCharArrayMemory(bufferPtr);
-                exportLog.error("Could not a find an export generation " + exportGeneration +
-                ". Should be impossible. Discarding export data");
+                /*
+                 * If the generation was already drained it is fine for a buffer to come late and miss it
+                 */
+                synchronized(instance) {
+                    if (!instance.m_generationGhosts.contains(exportGeneration)) {
+                        assert(false);
+                        exportLog.error("Could not a find an export generation " + exportGeneration +
+                        ". Should be impossible. Discarding export data");
+                    }
+                }
                 return;
             }
 
