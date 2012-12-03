@@ -66,6 +66,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.zk.ZKTestBase;
 import org.voltdb.RestoreAgent.SnapshotInfo;
+import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltZK.MailboxType;
@@ -122,7 +123,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                     LinkedList<SnapshotCompletionInterest> interests =
                                             new LinkedList<SnapshotCompletionInterest>(m_interests);
                                     for (SnapshotCompletionInterest i : interests) {
-                                        i.snapshotCompleted( "", 0, new long[0], true, "");
+                                        i.snapshotCompleted(
+                                                new SnapshotCompletionEvent("", 0, new long[0], true, "", null));
                                     }
                                     break;
                                 }
