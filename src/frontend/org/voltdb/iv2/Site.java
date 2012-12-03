@@ -547,19 +547,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 break;
             }
 
-            // Apply the readonly / sysproc filter. With Iv2 read optimizations,
-            // reads should not reach here; the cost of post-filtering shouldn't
-            // be particularly high (vs pre-filtering).
-            if (filter(tibm)) {
-                continue;
-            }
-
             if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m, null);
-                t.runFromTaskLog(this);
+                if (!filter(tibm)) {
+                    t.runFromTaskLog(this);
+                }
             }
             else if (tibm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage m = (FragmentTaskMessage)tibm;
@@ -571,7 +566,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             " open transaction.", false, null);
                 }
                 FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
-                t.runFromTaskLog(this);
+                if (!filter(tibm)) {
+                    t.runFromTaskLog(this);
+                }
             }
             else if (tibm instanceof CompleteTransactionMessage) {
                 // Needs improvement: completes for sysprocs aren't filterable as sysprocs.
@@ -582,7 +579,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
-                    t.runFromTaskLog(this);
+                    if (!filter(tibm)) {
+                        t.runFromTaskLog(this);
+                    }
                 }
             }
             else {
