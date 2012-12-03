@@ -592,6 +592,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             final ByteBuffer buffer,
             final boolean sync,
             final boolean endOfStream) {
+        try {
+            m_bufferPushPermits.acquire();
+        } catch (InterruptedException e) {
+            Throwables.propagate(e);
+        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
