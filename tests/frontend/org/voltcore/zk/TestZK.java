@@ -315,6 +315,66 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
+    public void testLeaderFailoverHarder() throws Exception {
+        // as above but put multiple failed nodes between the new and previous?
+        ZooKeeper zk = getClient(0);
+        ZooKeeper zk2 = getClient(1);
+        ZooKeeper zk3 = getClient(2);
+        ZooKeeper zk4 = getClient(2);
+
+        zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        final Semaphore sem2 = new Semaphore(0);
+        LeaderNoticeHandler r2 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem2.release();
+            }
+        };
+        final Semaphore sem3 = new Semaphore(0);
+        LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem3.release();
+            }
+        };
+        final Semaphore sem4 = new Semaphore(0);
+        LeaderNoticeHandler r4 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem4.release();
+            }
+        };
+
+        LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", new byte[0], r2);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", new byte[0], r3);
+        LeaderElector elector4 = new LeaderElector(zk4, "/election", "node", new byte[0], r4);
+        elector1.start(true);
+        elector2.start(true);
+        elector3.start(true);
+        elector4.start(true);
+
+        assertTrue(elector1.isLeader());
+        assertFalse(elector2.isLeader());
+        assertFalse(elector3.isLeader());
+        assertFalse(elector4.isLeader());
+
+        // 4 should become the leader
+        zk3.close();
+        zk2.close();
+        zk.close();
+
+        assertTrue(sem4.tryAcquire(5, TimeUnit.SECONDS));
+        assertTrue(elector4.isLeader());
+
+        // cleanup.
+        zk4.close();
+    }
+
+
+
+    @Test
     public void testNonLeaderFailure() throws Exception {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
