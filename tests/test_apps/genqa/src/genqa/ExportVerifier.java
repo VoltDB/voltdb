@@ -153,8 +153,8 @@ public class ExportVerifier {
             more_txnids = true;
             while ((canCheckClient() || !more_rows) && more_txnids)
             {
-                String txnId = txnIdReader.readLine();
-                if (txnId == null)
+                String trace = txnIdReader.readLine();
+                if (trace == null)
                 {
                     txnIdReader = openNextClientFile();
                     if (txnIdReader == null)
@@ -164,13 +164,18 @@ public class ExportVerifier {
                     }
                     else
                     {
-                        txnId = txnIdReader.readLine();
+                        trace = txnIdReader.readLine();
                     }
                 }
-                if (txnId != null)
+                if (trace != null && trace.length() > 17)
                 {
-                    //System.out.println("Added txnId: " + txnId + " to outstanding client");
-                    m_clientTxnIds.add(Long.parseLong(txnId));
+                    // content is [row_id]:[txid] formatted as %016d:%d
+                    long txid = Long.parseLong(trace.substring(17));
+
+                    if (txid >= 0)
+                    {
+                        m_clientTxnIds.add(txid);
+                    }
                 }
                 boolean progress = true;
                 while (!m_clientTxnIds.isEmpty() && progress)
@@ -234,6 +239,7 @@ public class ExportVerifier {
     {
         FileFilter acceptor = new FileFilter()
         {
+            @Override
             public boolean accept(File pathname) {
                 return !pathname.getName().contains("active");
             }
@@ -241,6 +247,7 @@ public class ExportVerifier {
 
         Comparator<File> comparator = new Comparator<File>()
         {
+            @Override
             public int compare(File f1, File f2)
             {
                 long first_ts = Long.parseLong((f1.getName().split("-")[3]).split("\\.")[0]);
@@ -280,6 +287,7 @@ public class ExportVerifier {
     {
         FileFilter acceptor = new FileFilter()
         {
+            @Override
             public boolean accept(File pathname) {
                 return pathname.getName().contains("dude");
             }
@@ -287,6 +295,7 @@ public class ExportVerifier {
 
         Comparator<File> comparator = new Comparator<File>()
         {
+            @Override
             public int compare(File f1, File f2)
             {
                 long first = Long.parseLong(f1.getName().split("-")[0]);

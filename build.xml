@@ -264,6 +264,11 @@ PRIMARY ENTRY POINTS
             <include name="*" />
         </fileset>
     </copy>
+    <chmod perm="ugo+rx">
+        <fileset dir="${raw.dist.dir}/voltdb-tools-${dist.version}">
+            <include name="voltadmin" />
+        </fileset>
+    </chmod>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
@@ -668,6 +673,7 @@ JAR BUILDING
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/mindrot/**" />
+            <include name="org/spearce_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
@@ -772,6 +778,7 @@ JAR BUILDING
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/jute_voltpatches/**" />
             <include name="org/apache/zookeeper_voltpatches/**" />
+            <include name="org/apache/spearce_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
             <include name="org/voltdb/**" />
@@ -897,7 +904,7 @@ JAVA COMPILATION
     <invoke-javac
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="org/voltcore/**/*.java,org/apache/**/*.java
-                  au/**/*.java
+                  au/**/*.java,org/spearce_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java" />
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
@@ -1219,7 +1226,6 @@ TEST CASES
                 <exclude name="**/TestTaskLog.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
-                <exclude name="**/TestPauselessRejoinEndToEnd.class" />
                 <exclude name="**/TestPauselessRejoinFuzz.class" />
                 <exclude name="**/TestSecondaryRejoin.class" />
                 <exclude name="**/TestSnapshotSaveTruncation.class" />

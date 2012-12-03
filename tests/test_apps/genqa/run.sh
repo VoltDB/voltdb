@@ -26,8 +26,8 @@ VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
-
 EXPORTDATA="exportdata"
+EXPORTDATAREMOTE="localhost:${PWD}/${EXPORTDATA}"
 CLIENTLOG="clientlog"
 
 # remove build artifacts
@@ -68,6 +68,32 @@ function server() {
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE host $HOST
 }
+
+# run the voltdb server locally
+function server1() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
+        license $LICENSE host $HOST:3021 internalport 3024 enableiv2
+}
+
+function server2() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
+        license $LICENSE host $HOST:3021 internalport 3022 adminport 21215 port 21216 zkport 2182 enableiv2
+}
+
+function server3() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment_multinode.xml \
+        license $LICENSE host $HOST:3021 internalport 3023 adminport 21213 port 21214 zkport 2183 enableiv2
+}
+
 
 # run the client that drives the example
 function client() {
@@ -184,9 +210,9 @@ function export-tosqoop() {
 
 
 function exportverify() {
-    java -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.ExportVerifier \
+        $EXPORTDATAREMOTE \
         4 \
-        $EXPORTDATA \
         $CLIENTLOG
 }
 

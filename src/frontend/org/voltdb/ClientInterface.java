@@ -1286,7 +1286,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         for (Iv2InFlight inFlight : transactions) {
             ClientResponseImpl response =
                     new ClientResponseImpl(
-                            ClientResponseImpl.GRACEFUL_FAILURE,
+                            ClientResponseImpl.RESPONSE_UNKNOWN,
                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                             null,
                             new VoltTable[0],

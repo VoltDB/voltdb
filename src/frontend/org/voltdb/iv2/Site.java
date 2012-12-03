@@ -599,8 +599,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
             setReplayRejoinComplete();
         }
-        else if (m_rejoinTaskLog.isEmpty()) {
-        }
     }
 
     private boolean filter(TransactionInfoBaseMessage tibm)
@@ -641,7 +639,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_ee.release();
             }
             if (m_snapshotter != null) {
-                m_snapshotter.shutdown();
+                try {
+                    m_snapshotter.shutdown();
+                } catch (InterruptedException e) {
+                    hostLog.warn("Interrupted during shutdown", e);
+                }
             }
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);
