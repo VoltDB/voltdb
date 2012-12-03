@@ -25,8 +25,6 @@ package voltcache.procedures;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 
-import voltcache.api.VoltCacheResult;
-
 @ProcInfo(singlePartition = false)
 
 public class Cleanup extends VoltCacheProcBase
@@ -36,6 +34,6 @@ public class Cleanup extends VoltCacheProcBase
     {
         voltQueueSQL(cleanup, now());
         voltExecuteSQL(true);
-        return VoltCacheResult.OK;
+        return Result.OK;
     }
 }

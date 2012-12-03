@@ -681,7 +681,7 @@ public class VoltProjectBuilder {
         if (m_diagnostics != null) {
             compiler.enableDetailedCapture();
         }
-        boolean success = compiler.compile(projectPath, jarPath);
+        boolean success = compiler.compileWithProjectXML(projectPath, jarPath);
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
