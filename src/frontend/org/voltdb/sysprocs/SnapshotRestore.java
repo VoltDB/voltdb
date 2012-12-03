@@ -1833,16 +1833,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             partitioned_tables[partition].add(loadedTable);
         }
 
-        /*
-         * Get all hands on deck for compression, do it async to minimize latency
-         */
-        ArrayList<Future<byte[]>> compressTableTasks = new ArrayList<Future<byte[]>>();
-        for (int ii = 0; ii < number_of_partitions; ii++) {
-            compressTableTasks.add(partitioned_tables[ii].getCompressedBytesAsync());
-        }
         byte compressedTables[][] = new byte[number_of_partitions][];
         for (int ii = 0; ii < compressedTables.length; ii++) {
-            compressedTables[ii] = compressTableTasks.get(ii).get();
+            compressedTables[ii] = partitioned_tables[ii].getCompressedBytes();
         }
         return compressedTables;
     }

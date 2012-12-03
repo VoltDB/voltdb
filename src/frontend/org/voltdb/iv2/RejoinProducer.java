@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,12 +29,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
-
-import org.voltdb.iv2.RejoinProducer;
-import org.voltdb.iv2.RejoinProducer;
 import org.voltdb.PrivateVoltTableFactory;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotFormat;
@@ -47,6 +41,7 @@ import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.StreamSnapshotSink;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
@@ -231,7 +226,7 @@ public class RejoinProducer extends SiteTasker
         new AtomicReference<Pair<Integer, ByteBuffer>>();
 
     /**
-     * Runs when the RejoinCoordinator decides this site should star5t
+     * Runs when the RejoinCoordinator decides this site should start
      * rejoin.
      */
     void doInitiation(RejoinMessage message)

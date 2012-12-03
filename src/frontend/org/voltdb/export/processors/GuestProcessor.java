@@ -107,7 +107,8 @@ public class GuestProcessor implements ExportDataProcessor {
                                         System.currentTimeMillis(),
                                         source.getGeneration(),
                                         source.m_columnNames,
-                                        types);
+                                        types,
+                                        new ArrayList<Integer>(source.m_columnLengths));
                         ExportDecoderBase edb = m_client.constructExportDecoder(ads);
                         m_decoders.add(Pair.of(edb, ads));
                         final ListenableFuture<BBContainer> fut = source.poll();
