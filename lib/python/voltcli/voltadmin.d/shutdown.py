@@ -25,8 +25,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from voltcli import utility
-
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
     description = 'Shut down the running VoltDB cluster.'

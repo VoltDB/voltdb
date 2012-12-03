@@ -28,8 +28,6 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
 
-import voltcache.api.VoltCacheResult;
-
 @ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
 
 public class Prepend extends VoltCacheProcBase
@@ -44,7 +42,7 @@ public class Prepend extends VoltCacheProcBase
         voltQueueSQL(check, key, now);
         VoltTable checkResult = voltExecuteSQL()[1];
         if (checkResult.getRowCount() == 0)
-            return VoltCacheResult.NOT_STORED;
+            return Result.NOT_STORED;
 
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         try
@@ -54,7 +52,7 @@ public class Prepend extends VoltCacheProcBase
             stream.write(old, 0, old.length);
             voltQueueSQL(update, stream.toByteArray(), key);
             voltExecuteSQL(true);
-            return VoltCacheResult.STORED;
+            return Result.STORED;
         }
         catch(Exception x)
         {

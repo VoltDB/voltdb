@@ -31,6 +31,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.regex.Pattern;
 
+import voltcache.procedures.VoltCacheProcBase;
+
 public class MemcachedTextProtocolService implements Runnable
 {
     // Connection Id generator
@@ -44,16 +46,16 @@ public class MemcachedTextProtocolService implements Runnable
     public static final String EXECUTION_EXCEPTION    = "Exception while executing request: %s";
 
     // Preserialized Responses and Response Fragments
-    private static final byte[] RESPONSE_STORED       = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.STORED) + "\r\n");
-    private static final byte[] RESPONSE_NOT_STORED   = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.NOT_STORED) + "\r\n");
-    private static final byte[] RESPONSE_EXISTS       = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.EXISTS) + "\r\n");
-    private static final byte[] RESPONSE_NOT_FOUND    = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.NOT_FOUND) + "\r\n");
-    private static final byte[] RESPONSE_DELETED      = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.DELETED) + "\r\n");
-    private static final byte[] RESPONSE_ERROR        = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.ERROR) + "\r\n");
-    private static final byte[] RESPONSE_CLIENT_ERROR = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.CLIENT_ERROR) + "\r\n");
-    private static final byte[] RESPONSE_SERVER_ERROR = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.SERVER_ERROR) + "\r\n");
-    private static final byte[] RESPONSE_OK           = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.OK) + "\r\n");
-    private static final byte[] RESPONSE_SUBMITTED    = getResponseBytes(VoltCacheResult.getName(VoltCacheResult.SUBMITTED) + "\r\n");
+    private static final byte[] RESPONSE_STORED       = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.STORED) + "\r\n");
+    private static final byte[] RESPONSE_NOT_STORED   = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.NOT_STORED) + "\r\n");
+    private static final byte[] RESPONSE_EXISTS       = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.EXISTS) + "\r\n");
+    private static final byte[] RESPONSE_NOT_FOUND    = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.NOT_FOUND) + "\r\n");
+    private static final byte[] RESPONSE_DELETED      = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.DELETED) + "\r\n");
+    private static final byte[] RESPONSE_ERROR        = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.ERROR) + "\r\n");
+    private static final byte[] RESPONSE_CLIENT_ERROR = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.CLIENT_ERROR) + "\r\n");
+    private static final byte[] RESPONSE_SERVER_ERROR = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.SERVER_ERROR) + "\r\n");
+    private static final byte[] RESPONSE_OK           = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.OK) + "\r\n");
+    private static final byte[] RESPONSE_SUBMITTED    = getResponseBytes(VoltCacheProcBase.Result.getName(VoltCacheProcBase.Result.SUBMITTED) + "\r\n");
     private static final byte[][] RESPONSES = new byte[][] { RESPONSE_STORED, RESPONSE_NOT_STORED, RESPONSE_EXISTS, RESPONSE_NOT_FOUND, RESPONSE_DELETED, RESPONSE_ERROR, RESPONSE_CLIENT_ERROR, RESPONSE_SERVER_ERROR, RESPONSE_OK, RESPONSE_SUBMITTED };
 
     private static byte[] RESPONSE_VALUE = getResponseBytes("VALUE ");
@@ -511,7 +513,7 @@ public class MemcachedTextProtocolService implements Runnable
         this.reply("SERVER_ERROR " + String.format(format, parameters).replaceAll("\r\n","\n") + "\r\n");
     }
 
-    private void replyData(VoltCacheResult response) throws Exception
+    private void replyData(VoltCacheProcBase.Result response) throws Exception
     {
         if (response.data != null)
         {
@@ -551,7 +553,7 @@ public class MemcachedTextProtocolService implements Runnable
         this.out.flush();
     }
 
-    private void replyData(String key, VoltCacheResult response) throws Exception
+    private void replyData(String key, VoltCacheProcBase.Result response) throws Exception
     {
         if (response.data != null)
         {
@@ -592,20 +594,20 @@ public class MemcachedTextProtocolService implements Runnable
 
     }
 
-    private void replyIncrDecr(VoltCacheResult response, boolean noreply) throws Exception
+    private void replyIncrDecr(VoltCacheProcBase.Result response, boolean noreply) throws Exception
     {
         if (noreply)
             this.replyStatus(response);
         else
         {
-            if (response.code == VoltCacheResult.NOT_FOUND)
+            if (response.code == VoltCacheProcBase.Result.NOT_FOUND)
                 this.reply(RESPONSE_NOT_FOUND);
             else
                 this.reply(Long.toString(response.incrDecrValue) + "\r\n");
         }
     }
 
-    private void replyStatus(VoltCacheResult response) throws Exception
+    private void replyStatus(VoltCacheProcBase.Result response) throws Exception
     {
         this.reply(RESPONSES[(int)response.code]);
     }

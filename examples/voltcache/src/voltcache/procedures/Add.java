@@ -25,8 +25,6 @@ package voltcache.procedures;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 
-import voltcache.api.VoltCacheResult;
-
 @ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
 
 public class Add extends VoltCacheProcBase
@@ -41,11 +39,11 @@ public class Add extends VoltCacheProcBase
         // Pre-check for item existence => Fail w/ NOT_STORED status if the record exists (whether active or queued for deletion)
         voltQueueSQL(check, key, now);
         if (voltExecuteSQL()[1].getRowCount() > 0)
-            return VoltCacheResult.NOT_STORED;
+            return Result.NOT_STORED;
 
         // Insert new item
         voltQueueSQL(insert, key, expirationTimestamp(expires), flags, value);
         voltExecuteSQL(true);
-        return VoltCacheResult.STORED;
+        return Result.STORED;
     }
 }

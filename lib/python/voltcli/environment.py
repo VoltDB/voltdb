@@ -37,7 +37,7 @@ import shlex
 
 from voltcli import utility
 
-re_voltdb_jar = re.compile('^voltdb(client)?-2[.0-9]+[.]jar$')
+re_voltdb_jar = re.compile('^voltdb(client)?-[.0-9]+[.]jar$')
 
 # Filled in during startup.
 standalone   = None
