@@ -1422,7 +1422,7 @@ public class VoltCompiler {
     }
 
     // Usage messages for new and legacy syntax.
-    static final String usageNew    = "VoltCompiler <output-JAR> <ddl-file> ...";
+    static final String usageNew    = "VoltCompiler <output-JAR> <input-DDL> ...";
     static final String usageLegacy = "VoltCompiler <project-file> <output-JAR>";
 
     /**
@@ -1430,7 +1430,7 @@ public class VoltCompiler {
      *
      * Incoming arguments:
      *
-     *         New syntax: OUTPUT_JAR DDL_FILE ...
+     *         New syntax: OUTPUT_JAR INPUT_DDL ...
      *      Legacy syntax: PROJECT_FILE OUTPUT_JAR
      *
      * @param args  arguments (see above)
@@ -1442,7 +1442,14 @@ public class VoltCompiler {
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
             // The first argument is *.jar for the new syntax.
             if (args.length >= 2) {
-                    success = compiler.compileFromDDL(args[0], ArrayUtils.subarray(args, 1, args.length));
+                // Check for accidental .jar or .xml files specified for argument 2
+                // to catch accidental incomplete use of the legacy syntax.
+                if (args[1].toLowerCase().endsWith(".xml") || args[1].toLowerCase().endsWith(".jar")) {
+                    System.err.println("Error: Expecting a DDL file as the second argument.\n"
+                                     + "      .xml and .jar are invalid DDL file extensions.");
+                    System.exit(-1);
+                }
+                success = compiler.compileFromDDL(args[0], ArrayUtils.subarray(args, 1, args.length));
             }
             else {
                 System.err.printf("Usage: %s\n", usageNew);
