@@ -206,6 +206,9 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         {
             if (!serializedParams.isReadOnly())
             {
+                // if position can be non-zero, then the dup/rewind logic below
+                // would be wrong?
+                assert(serializedParams.position() == 0);
                 buf.put(serializedParams.array(),
                         serializedParams.position() + serializedParams.arrayOffset(),
                         serializedParams.remaining());
@@ -213,6 +216,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             else
             {
                 // duplicate for thread-safety
+                assert(serializedParams.position() == 0);
                 ByteBuffer dup = serializedParams.duplicate();
                 dup.rewind();
                 buf.put(dup);
