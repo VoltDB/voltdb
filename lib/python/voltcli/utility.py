@@ -973,7 +973,7 @@ class VoltTableWrapper(object):
     """
     def __init__(self, table):
         self.table = table
-    def tuple_count(self, index):
+    def tuple_count(self):
         return len(self.table.tuples)
     def tuple(self, index):
         if index < 0 or index >= len(self.table.tuples):
