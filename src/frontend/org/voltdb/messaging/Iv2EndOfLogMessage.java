@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltdb.messaging.VoltDbMessageFactory;
+
 /**
  * Informs the SPI that the command log for this partition has reached the end.
  * The SPI should release any MP txn for replay immediately when it sees the
@@ -37,7 +39,10 @@ public class Iv2EndOfLogMessage extends VoltMessage {
     protected void initFromBuffer(ByteBuffer buf) throws IOException {}
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf) throws IOException {}
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
+    {
+        buf.put(VoltDbMessageFactory.IV2_EOL_ID);
+    }
 
     @Override
     public String toString() {

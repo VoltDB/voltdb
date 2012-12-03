@@ -48,8 +48,8 @@ public class TestExportV2Suite extends TestExportBase {
     private void quiesceAndVerify(final Client client, ExportToFileVerifier tester)
             throws Exception
             {
-                Thread.sleep(2000);
                 quiesce(client);
+                Thread.sleep(2000);
                 tester.verifyRows();
     }
 
@@ -252,6 +252,7 @@ public class TestExportV2Suite extends TestExportBase {
          */
         config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true);
+        config.setMaxHeap(256);
         project = new VoltProjectBuilder();
         project.addGroups(GROUPS);
         project.addUsers(USERS);
@@ -278,6 +279,7 @@ public class TestExportV2Suite extends TestExportBase {
          */
         config = new LocalCluster("export-ddl-addedtable.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI,  LocalCluster.FailureState.ALL_RUNNING, true);
+        config.setMaxHeap(256);
         project = new VoltProjectBuilder();
         project.addGroups(GROUPS);
         project.addUsers(USERS);

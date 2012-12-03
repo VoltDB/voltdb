@@ -343,11 +343,17 @@ public class SnapshotSiteProcessor {
                 assert(m_snapshotTargets != null);
                 m_snapshotTargets.add(task.m_target);
             }
-            if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
-                hostLog.error("Attempted to activate copy on write mode for table "
-                        + task.m_name + " and failed");
-                hostLog.error(task);
-                VoltDB.crashLocalVoltDB("No additional info", false, null);
+            /*
+             * Why do the extra work for a /dev/null target
+             * Check if it is dev null and don't activate COW
+             */
+            if (!task.m_isDevNull) {
+                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
+                    hostLog.error("Attempted to activate copy on write mode for table "
+                            + task.m_name + " and failed");
+                    hostLog.error(task);
+                    VoltDB.crashLocalVoltDB("No additional info", false, null);
+                }
             }
         }
         /*
@@ -395,17 +401,25 @@ public class SnapshotSiteProcessor {
             final SnapshotTableTask currentTask = m_snapshotTableTasks.peek();
             assert(currentTask != null);
             final int headerSize = currentTask.m_target.getHeaderSize();
+            int serialized = 0;
             final BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
             assert(snapshotBuffer != null);
             snapshotBuffer.b.clear();
             snapshotBuffer.b.position(headerSize);
-            final int serialized =
-                ee.tableStreamSerializeMore(
-                    snapshotBuffer,
-                    currentTask.m_tableId,
-                    TableStreamType.SNAPSHOT);
-            if (serialized < 0) {
-                VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
+
+            /*
+             * For a dev null target don't do the work. The table wasn't
+             * put in COW mode anyway so this will fail
+             */
+            if (!currentTask.m_isDevNull) {
+                serialized =
+                    ee.tableStreamSerializeMore(
+                        snapshotBuffer,
+                        currentTask.m_tableId,
+                        TableStreamType.SNAPSHOT);
+                if (serialized < 0) {
+                    VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
+                }
             }
 
             /**

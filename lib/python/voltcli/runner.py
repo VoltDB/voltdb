@@ -174,13 +174,65 @@ class VerbRunner(object):
         """
         return os.path.exists(self.get_catalog())
 
+    def is_dryrun(self):
+        """
+        Return True if dry-run is enabled.
+        """
+        return utility.is_dryrun()
+
+    def is_verbose(self):
+        """
+        Return True if verbose messages are enabled.
+        """
+        return utility.is_verbose()
+
+    def is_debug(self):
+        """
+        Return True if debug messages are enabled.
+        """
+        return utility.is_debug()
+
+    def info(self, *msgs):
+        """
+        Display INFO level messages.
+        """
+        utility.info(*msgs)
+
+    def verbose_info(self, *msgs):
+        """
+        Display verbose INFO level messages if enabled.
+        """
+        utility.verbose_info(*msgs)
+
+    def debug(self, *msgs):
+        """
+        Display DEBUG level message(s) if debug is enabled.
+        """
+        utility.debug(*msgs)
+
+    def warning(self, *msgs):
+        """
+        Display WARNING level messages.
+        """
+        utility.warning(*msgs)
+
+    def error(self, *msgs):
+        """
+        Display ERROR level messages.
+        """
+        utility.error(*msgs)
+
     def abort(self, *msgs):
         """
         Display errors (optional) and abort execution.
         """
-        utility.error('Fatal error in "%s" command.' % self.verb.name, *msgs)
-        self.help()
-        utility.abort()
+        self._abort(False, *msgs)
+
+    def abort_with_help(self, *msgs):
+        """
+        Display errors and help and abort execution.
+        """
+        self._abort(True, *msgs)
 
     def help(self, *args, **kwargs):
         """
@@ -193,19 +245,23 @@ class VerbRunner(object):
             for verb_name in self.verbspace.verb_names:
                 verb_spec = self.verbspace.verbs[verb_name].cli_spec
                 if not verb_spec.baseverb and not verb_spec.hideverb:
-                    sys.stdout.write('\n===== Verb: %s =====\n' % verb_name)
+                    sys.stdout.write('\n===== Verb: %s =====\n\n' % verb_name)
                     self._print_verb_help(verb_name)
+                    sys.stdout.write('\n')
             for verb_name in self.verbspace.verb_names:
                 verb_spec = self.verbspace.verbs[verb_name].cli_spec
                 if verb_spec.baseverb and not verb_spec.hideverb:
-                    sys.stdout.write('\n===== Common Verb: %s =====\n' % verb_name)
+                    sys.stdout.write('\n===== Common Verb: %s =====\n\n' % verb_name)
                     self._print_verb_help(verb_name)
+                    sys.stdout.write('\n')
         else:
             if args:
                 for name in args:
                     for verb_name in self.verbspace.verb_names:
                         if verb_name == name.lower():
+                            sys.stdout.write('\n')
                             self._print_verb_help(verb_name)
+                            sys.stdout.write('\n')
                             break
                     else:
                         utility.error('Verb "%s" was not found.' % name)
@@ -269,6 +325,15 @@ the package file to an explicit python version, e.g.
         """
         return VoltCLIParser(self.verbspace).get_usage_string()
 
+    def verb_usage(self):
+        """
+        Display usage for active verb.
+        """
+        if self.verb:
+            sys.stdout.write('\n')
+            self._print_verb_help(self.verb.name)
+            sys.stdout.write('\n')
+
     def set_default_func(self, default_func):
         """
         Called by a Verb object to set the default function.
@@ -326,11 +391,8 @@ the package file to an explicit python version, e.g.
         verb = self.verbspace.verbs[verb_name]
         parser = VoltCLIParser(self.verbspace)
         parser.initialize_verb(verb_name)
-        sys.stdout.write('\n')
         parser.print_help()
-        if verb.cli_spec.description2:
-            sys.stdout.write('\n')
-            sys.stdout.write('%s\n' % verb.cli_spec.description2.strip())
+        sys.stdout.write('\n')
 
     def _create_package(self, output_dir, name, version, description, force):
         # Internal method to create a runnable Python package.
@@ -364,6 +426,17 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
         command = parser.parse(*args)
         runner = VerbRunner(command, verbspace, self.internal_verbspaces, self.config, **kwargs)
         runner.execute()
+
+    def _abort(self, show_help, *msgs):
+        if self.verb:
+            utility.error('Fatal error in "%s" command.' % self.verb.name, *msgs)
+            if show_help:
+                self.verb_usage()
+        else:
+            utility.error(*msgs)
+            if show_help:
+                self.help()
+        sys.exit(1)
 
 #===============================================================================
 class VOLT(object):

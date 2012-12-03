@@ -21,7 +21,6 @@ fi
 
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
 VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
@@ -44,7 +43,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -64,14 +63,6 @@ function rejoin() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB deployment deployment.xml \
-        license $LICENSE host $HOST
-}
-
-function serverlegacy() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE host $HOST
 }
 

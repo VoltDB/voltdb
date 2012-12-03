@@ -32,6 +32,7 @@ import java.util.Arrays;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
+import org.voltdb.VoltDB;
 import org.voltdb.exportclient.ExportToFileClient;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
@@ -44,7 +45,7 @@ public class ExportToFileTestVerifier {
     protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
         @Override
         protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat(ExportToFileClient.ODBC_DATE_FORMAT_STRING);
+            return new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING);
         }
     };
 

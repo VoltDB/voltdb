@@ -21,6 +21,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import org.json_voltpatches.JSONString;
+import org.voltdb.VoltDB;
 
 public class TimestampType implements JSONString, Comparable<TimestampType> {
     /**
@@ -126,7 +127,7 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
      */
     @Override
     public String toString() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING);
         String format = sdf.format(m_date);
         // zero-pad so 1 or 2 digit usecs get appended correctly
         return format + String.format("%03d", m_usecs);

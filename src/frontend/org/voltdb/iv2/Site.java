@@ -425,8 +425,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (taskLogKlass != null) {
             Constructor<?> taskLogConstructor;
             try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
-                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir);
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir, true);
             } catch (InvocationTargetException e) {
                 VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
             } catch (Exception e) {
@@ -547,19 +547,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 break;
             }
 
-            // Apply the readonly / sysproc filter. With Iv2 read optimizations,
-            // reads should not reach here; the cost of post-filtering shouldn't
-            // be particularly high (vs pre-filtering).
-            if (filter(tibm)) {
-                continue;
-            }
-
             if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m, null);
-                t.runFromTaskLog(this);
+                if (!filter(tibm)) {
+                    t.runFromTaskLog(this);
+                }
             }
             else if (tibm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage m = (FragmentTaskMessage)tibm;
@@ -571,7 +566,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             " open transaction.", false, null);
                 }
                 FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
-                t.runFromTaskLog(this);
+                if (!filter(tibm)) {
+                    t.runFromTaskLog(this);
+                }
             }
             else if (tibm instanceof CompleteTransactionMessage) {
                 // Needs improvement: completes for sysprocs aren't filterable as sysprocs.
@@ -582,7 +579,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
-                    t.runFromTaskLog(this);
+                    if (!filter(tibm)) {
+                        t.runFromTaskLog(this);
+                    }
                 }
             }
             else {
@@ -598,8 +597,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // is wrong. Run MP txns fully kStateRejoining or fully kStateRunning.
         if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
             setReplayRejoinComplete();
-        }
-        else if (m_rejoinTaskLog.isEmpty()) {
         }
     }
 
@@ -641,7 +638,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_ee.release();
             }
             if (m_snapshotter != null) {
-                m_snapshotter.shutdown();
+                try {
+                    m_snapshotter.shutdown();
+                } catch (InterruptedException e) {
+                    hostLog.warn("Interrupted during shutdown", e);
+                }
             }
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);

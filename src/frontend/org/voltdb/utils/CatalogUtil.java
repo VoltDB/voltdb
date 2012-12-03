@@ -1086,6 +1086,7 @@ public abstract class CatalogUtil {
             prop.setName(GuestProcessor.EXPORT_TO_TYPE);
             switch( exportOnServer.getExportto()) {
             case FILE: prop.setValue(ExportToFileClient.class.getName()); break;
+            case JDBC: prop.setValue("org.voltdb.exportclient.JDBCExportClient"); break;
             }
 
             ExportConfigurationType exportConfiguration = exportOnServer.getConfiguration();

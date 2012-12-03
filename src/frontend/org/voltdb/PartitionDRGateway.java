@@ -87,9 +87,8 @@ public class PartitionDRGateway {
     public void onSuccessfulProcedureCall(long txnId, long timestamp,
                                           StoredProcedureInvocation spi,
                                           ClientResponseImpl response) {}
-    public void onSuccessfulProcedureCall(long txnId, long timestamp,
-                                          boolean isMultipart,
-                                          StoredProcedureInvocation spi,
-                                          ClientResponseImpl response) {}
+    public void onSuccessfulMPCall(long spHandle, long txnId, long timestamp,
+                                   StoredProcedureInvocation spi,
+                                   ClientResponseImpl response) {}
     public void tick(long txnId) {}
 }

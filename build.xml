@@ -264,6 +264,11 @@ PRIMARY ENTRY POINTS
             <include name="*" />
         </fileset>
     </copy>
+    <chmod perm="ugo+rx">
+        <fileset dir="${raw.dist.dir}/voltdb-tools-${dist.version}">
+            <include name="voltadmin" />
+        </fileset>
+    </chmod>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
@@ -668,6 +673,7 @@ JAR BUILDING
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/mindrot/**" />
+            <include name="org/spearce_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
@@ -772,6 +778,7 @@ JAR BUILDING
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/jute_voltpatches/**" />
             <include name="org/apache/zookeeper_voltpatches/**" />
+            <include name="org/apache/spearce_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
             <include name="org/voltdb/**" />
@@ -897,7 +904,7 @@ JAVA COMPILATION
     <invoke-javac
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="org/voltcore/**/*.java,org/apache/**/*.java
-                  au/**/*.java
+                  au/**/*.java,org/spearce_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java" />
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
@@ -1194,36 +1201,35 @@ TEST CASES
 </target>
 
 <target
-    name="junit_iv2"
-    description="Tests exclusive to IV2 functionality.">
-
-    <condition property="enableiv2" value="${enableiv2}" else="true">
-        <isset property="enableiv2"/>
-    </condition>
-
+    name="junit"
+    description="Execute JUnit test suites.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
+                <!-- Standard junit fileset -->
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
-                <include name='org/voltdb/**/Iv2Test*.class'/>
+                <include name='org/voltdb/network/**/Test*.class'/>
+                <include name='org/voltdb/messaging/**/*Test.class'/>
+                <include name='org/voltdb/network/**/*Test.class'/>
+                <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
-                <!-- pro tests -->
+                <exclude name="**/TestMaliciousClientSuite.class" />
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestExportBase.class"/>
+                <!-- Excluded pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
                 <exclude name="**/TestCommandLogReinitiator.class"/>
                 <exclude name="**/TestCommandLog.class"/>
                 <exclude name="**/TestLogReader.class"/>
+                <exclude name="**/TestTaskLog.class"/>
                 <exclude name="**/TestResponseSampler.class" />
                 <exclude name="**/TestRestoreWithReplay.class" />
-                <exclude name="**/TestVoltLicense.class" />
-                <exclude name="**/TestPauselessRejoinEndToEnd" />
-                <exclude name="**/TestPauselessRejoinFuzz" />
+                <exclude name="**/TestPauselessRejoinFuzz.class" />
                 <exclude name="**/TestSecondaryRejoin.class" />
                 <exclude name="**/TestSnapshotSaveTruncation.class" />
-                <!-- <exclude name="**/TestInvocationBufferServer.class" /> -->
-                <!-- <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" /> -->
-                <!-- <exclude name="**/TestPrimary.class" /> -->
-                <!-- community tests -->
+                <!-- Exclude community tests -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
@@ -1231,50 +1237,6 @@ TEST CASES
                 <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestExportBase.class"/>
-                <!-- <exclude name="**/TestHSQLBackend.class" /> -->
-                <!-- <exclude name="**/TestAdHocQueries.class" /> -->
-                <!-- <exclude name="**/TestJSONInterface.class" /> -->
-                <!-- <exclude name="**/TestRejoinEndToEnd.class" /> -->
-                <!-- <exclude name="**/TestRejoinWithCatalogUpdates.class" /> -->
-                <!-- <exclude name="**/TestReplicatedInvocation.class" /> -->
-                <!-- <exclude name="**/TestRestoreAgent.class" -->
-                <!-- <exclude name="**/TestSimpleCJK.class" /> -->
-                <!-- <exclude name="**/TestClientTimeouts.class" /> -->
-                <!-- <exclude name="**/TestExportToFileClient.class" /> -->
-                <!-- <exclude name="**/TestJDBCDriver.class" />-->
-                <!-- <exclude name="**/TestAdminMode.class" />-->
-                <!-- <exclude name="**/TestCatalogUpdateSuite.class" /> -->
-                <!-- <exclude name="**/TestCRUDSuite.class" /> -->
-                <!-- <exclude name="**/TestFailureDetectSuite.class" /> -->
-                <!-- <exclude name="**/TestExecutionSiteDeath.class" /> -->
-                <!-- <exclude name="**/TestFailuresSuite.class" /> -->
-                <!-- <exclude name="**/TestFixedSQLSuite.class" /> -->
-                <!-- <exclude name="**/TestFunctionsSuite.class" /> -->
-                <!-- <exclude name="**/TestGiantDeleteSuite.class" /> -->
-                <!-- <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
-                <!-- <exclude name="**/TestIndexesSuite.class" /> -->
-                <!-- <exclude name="**/TestLimitOffsetSuite.class" /> -->
-                <!-- <exclude name="**/TestLoadingSuite.class" /> -->
-                <!-- <exclude name="**/TestMaterializedViewSuite.class" /> -->
-                <!-- <exclude name="**/TestMultiPartitionSuite.class" /> -->
-                <!-- <exclude name="**/TestOrderBySuite.class" /> -->
-                <!-- <exclude name="**/TestPartitionDetection.class" /> -->
-                <!-- <exclude name="**/TestPlansGroupBySuite.class" /> -->
-                <!-- <exclude name="**/TestReplicationSuite.class" /> -->
-                <!-- <exclude name="**/TestRollbackSuite.class" /> -->
-                <!-- <exclude name="**/TestSQLFeaturesSuite.class" /> -->
-                <!-- <exclude name="**/TestSQLTypesSuite.class" /> -->
-                <!-- <exclude name="**/TestSecuritySuite.class" /> -->
-                <!-- <exclude name="**/TestSqlAggregateSuite.class" /> -->
-                <!-- <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
-                <!-- <exclude name="**/TestSqlUpdateSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemCatalogSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemInformationSuite.class" /> -->
-                <!-- <exclude name="**/TestSystemProcedureSuite.class" /> -->
-                <!-- <exclude name="**/TestTPCCSuite.class" /> -->
-                <!-- <exclude name="**/TestBlobType.class" /> -->
             </fileset>
         </tests>
     </run_junit>
@@ -1320,47 +1282,10 @@ TEST CASES
     </sequential>
 </macrodef>
 
-<!-- Junit tests that run quickly -->
-<target name="junit_quick" description="Tests and suites that run in under 3 minutes under memcheck">
-    <run_junit>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-                <include name='org/voltdb/**/Test*.class'/>
-                <exclude name="**/*$*.class"/>
-                <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/TestExportSuite.class" />
-                <exclude name="**/TestFailuresSuite.class" />
-                <exclude name="**/TestFixedSQLSuite.class" />
-                <exclude name="**/TestPlansGroupBySuite.class" />
-                <exclude name="**/TestRejoin*.class" />
-                <exclude name="**/TestRollbackSuite.class" />
-                <exclude name="**/TestSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestSQLFeaturesSuite.class" />
-                <exclude name="**/TestSQLTypesSuite.class" />
-                <exclude name="**/TestSqlUpdateSuite.class" />
-                <exclude name="**/TestIndexesSuite.class" />
-                <exclude name="**/TestExportSuite.class" />
-                <exclude name="**/TestFailureDetectSuite.class" />
-                <exclude name="**/TestReplicationSuite.class" />
-                <exclude name="**/TestSqlAggregateSuite.class" />
-                <exclude name="**/TestOrderBySuite.class" />
-                <exclude name="**/TestTPCCSuite.class" />
-                <exclude name="**/TestCatalogUpdateSuite.class" />
-                <exclude name="**/TestGiantDeleteSuite.class"  />
-                <exclude name="**/TestMultiPartitionSuite.class"  />
-                <exclude name="**/TestReplicatedSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestAdminMode.class" />
-                <exclude name="**/TestPartitionDetection.class"  />
-                <exclude name="**/TestSystemProcedureSuite.class"  />
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestExportBase.class"/>
-            </fileset>
-        </tests>
-    </run_junit>
-</target>
-
-<target name="junit" description="Run testcases for Java classes.">
+<target name="junit_legacy" description="Run JUnit in pre-iv2 mode.">
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
+    </condition>
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1396,9 +1321,9 @@ TEST CASES
         depends="with.emma, junit, emma-report"
 />
 
-<target name='emma_junit_iv2'
-        description="run junit_iv2 target and generate coverage report"
-        depends="with.emma, junit_iv2, emma-report"
+<target name='emma_junit_legacy'
+        description="run junit_legacy target and generate coverage report"
+        depends="with.emma, junit_legacy, emma-report"
 />
 
 <target name='with.emma' description="enable code coverage analysis" >
@@ -1613,7 +1538,8 @@ TEST CASES
     <condition property="verbosereport" value="${verbosereport}" else="true">
         <isset property="verbosereport"/>
     </condition>
-    <condition property="enableiv2" value="${enableiv2}" else="false">
+    <!-- run iv2 by default. -Denableiv2=false to get legacy -->
+    <condition property="enableiv2" value="${enableiv2}" else="true">
         <isset property="enableiv2"/>
     </condition>
 

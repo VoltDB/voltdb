@@ -24,6 +24,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -44,6 +45,7 @@ public class SnapshotConverter {
         File outdir = null;
         String type = null;
         char delimiter = '\0';
+
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
             if (arg.equals("--help")) {
@@ -73,6 +75,14 @@ public class SnapshotConverter {
                 if (invalidDir) {
                     System.exit(-1);
                 }
+            } else if (arg.equals("--timezone")) {
+                if (args.length < ii + 1) {
+                    System.err.println("Error: Not enough args following --timezone");
+                    printHelpAndQuit(-1);
+                }
+                String tzId = args[ii + 1];
+                ii++;
+                VoltTableUtil.tz = TimeZone.getTimeZone(tzId);
             } else if (arg.equals("--table")) {
                 if (args.length < ii + 1) {
                     System.err.println("Error: Not enough args following --tables");
@@ -293,7 +303,7 @@ public class SnapshotConverter {
     private static void printHelpAndQuit( int code) {
         System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --help");
         System.out.println("java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotConverter --dir dir1 --dir dir2 --dir dir3" +
-                "--table table1 --table table2 --table table3 --type CSV|TSV --outdir dir snapshot_name");
+                "--table table1 --table table2 --table table3 --type CSV|TSV --outdir dir snapshot_name --timezone GMT+0");
         System.exit(code);
     }
 }

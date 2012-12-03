@@ -63,7 +63,7 @@ function exportserver() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment_export.xml \
-        license $LICENSE host $HOST
+        license $LICENSE host $HOST enableiv2
 }
 
 # run the client that drives the example
