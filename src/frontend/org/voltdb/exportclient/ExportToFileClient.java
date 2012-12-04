@@ -116,7 +116,7 @@ public class ExportToFileClient extends ExportClientBase2 {
     public void notifyRollIsComplete(File[] files) {}
 
     class PeriodicExportContext {
-        final File m_dirContainingFiles;
+        File m_dirContainingFiles;
         final Map<FileHandle, CSVWriter> m_writers = new TreeMap<FileHandle, CSVWriter>();
         boolean m_hasClosed = false;
         protected Date start;
