@@ -221,6 +221,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                 }
             }
             else {
+                start = new Date();
                 m_dirContainingFiles = m_outDir;
             }
         }
