@@ -386,7 +386,12 @@ public class VoltDB {
 
             // If no action is specified, issue an error.
             if (null == m_startAction) {
-                hostLog.fatal("You must specify an action, either CREATE, RECOVER, or REJOIN.");
+                if (org.voltdb.utils.MiscUtils.isPro()) {
+                    hostLog.fatal("You must specify an action, either create, recover, replica or rejoin.");
+                } else
+                {
+                    hostLog.fatal("You must specify an action, either create, recover or rejoin.");
+                }
                 usage();
                 System.exit(-1);
             }
@@ -492,7 +497,6 @@ public class VoltDB {
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
             hostLog.info(message);
             // Don't bother logging these for log4j, only dump them to the designated stream.
-            os.println("If action is not specified the default is to 'recover' the database if a snapshot is present otherwise 'create'.");
             os.println("If no deployment is specified, a default 1 node cluster deployment will be configured.");
         }
 
