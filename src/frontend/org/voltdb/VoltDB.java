@@ -78,7 +78,7 @@ public class VoltDB {
     public static final String ANON_STMT_NAME = "sql";
 
     public enum START_ACTION {
-        CREATE, RECOVER, START, REJOIN, LIVE_REJOIN
+        CREATE, RECOVER, REJOIN, LIVE_REJOIN
     }
 
     public static boolean createForRejoin(VoltDB.START_ACTION startAction)
@@ -169,7 +169,7 @@ public class VoltDB {
         public int m_deadHostTimeoutMS = 10000;
 
         /** start up action */
-        public START_ACTION m_startAction = START_ACTION.START;
+        public START_ACTION m_startAction = null;
 
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
@@ -327,8 +327,6 @@ public class VoltDB {
                     m_startAction = START_ACTION.CREATE;
                 } else if (arg.equals("recover")) {
                     m_startAction = START_ACTION.RECOVER;
-                } else if (arg.equals("start")) {
-                    m_startAction = START_ACTION.START;
                 } else if (arg.equals("rejoin")) {
                     m_startAction = START_ACTION.REJOIN;
                 } else if (arg.startsWith("live rejoin")) {
@@ -384,6 +382,13 @@ public class VoltDB {
                     usage();
                     System.exit(-1);
                 }
+            }
+
+            // If no action is specified, issue an error.
+            if (null == m_startAction) {
+                hostLog.fatal("You must specify an action, either CREATE, RECOVER, or REJOIN.");
+                usage();
+                System.exit(-1);
             }
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
@@ -474,12 +479,12 @@ public class VoltDB {
             // GettingStarted.pdf).
             String message = "";
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
+                message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
+                        + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb replica [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
                         + "       voltdb [live] rejoin host <hostname>\n";
             } else {
-                message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>\n"
+                message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb rejoin host <hostname>\n";
             }

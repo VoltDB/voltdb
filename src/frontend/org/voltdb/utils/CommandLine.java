@@ -148,7 +148,7 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine startCommand(String command)
     {
         String upcmd = command.toUpperCase();
-        VoltDB.START_ACTION action = VoltDB.START_ACTION.START;
+        VoltDB.START_ACTION action = VoltDB.START_ACTION.CREATE;
         try {
             action = VoltDB.START_ACTION.valueOf(upcmd);
         }

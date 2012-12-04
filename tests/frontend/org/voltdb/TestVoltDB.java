@@ -45,7 +45,6 @@ public class TestVoltDB extends TestCase {
         assertEquals(null, blankConfig.m_pathToCatalog);
         assertEquals(null, blankConfig.m_pathToDeployment);
         assertEquals(VoltDB.DEFAULT_PORT, blankConfig.m_port);
-        assertEquals(START_ACTION.START, blankConfig.m_startAction);
 
         String args1[] = { "noloadlib" };
         assertTrue(new VoltDB.Configuration(args1).m_noLoadLibVOLTDB);
@@ -86,7 +85,6 @@ public class TestVoltDB extends TestCase {
         assertEquals(START_ACTION.RECOVER, cfg15.m_startAction);
         String args16[] = { "start" };
         VoltDB.Configuration cfg16 = new VoltDB.Configuration(args16);
-        assertEquals(START_ACTION.START, cfg16.m_startAction);
 
         String args17[] = { "replica" };
         VoltDB.Configuration cfg17 = new VoltDB.Configuration(args17);
@@ -104,7 +102,6 @@ public class TestVoltDB extends TestCase {
         String[] args1 = {};
         config = new VoltDB.Configuration(args1);
         assertTrue(config.validate());
-        assertEquals(START_ACTION.START, config.m_startAction);
 
         // missing leader provided deployment - not okay.
         String[] argsya = {"catalog", "qwerty", "deployment", "qwerty"};
