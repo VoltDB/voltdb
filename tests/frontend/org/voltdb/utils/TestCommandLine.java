@@ -86,8 +86,6 @@ public class TestCommandLine
     public void testStartCommand()
     {
         CommandLine cl = new CommandLine();
-        cl.startCommand("START");
-        assertTrue(cl.toString().contains("start"));
         cl.startCommand("CREATE");
         assertTrue(cl.toString().contains("create"));
         cl.startCommand("RECOVER");
