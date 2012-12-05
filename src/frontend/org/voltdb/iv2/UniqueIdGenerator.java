@@ -189,7 +189,7 @@ public class UniqueIdGenerator {
                     // note, the loop should stop once lastUsedTime is PASSED, not current
                     while ((currentTime <= lastUsedTime) && (count-- > 0)) {
                         try {
-                            m_clock.sleep(lastUsedTime - currentTime + 1);
+                            m_clock.sleep(1);
                         } catch (InterruptedException e) {}
                         currentTime = m_clock.get();
                     }
@@ -215,7 +215,7 @@ public class UniqueIdGenerator {
                             " (getUniqueId, getTransactionId, getTransactionTime) " +
                             "will not correctly reflect wall clock time as reported by the system clock." +
                             " For severe shifts you could see duplicate " +
-                            "IDs or time moving backwards when the server is " +
+                            "IDs or time moving backwards when the server is" +
                             " restarted causing the offset to be discarded.",
                             offsetSeconds);
                     log.error(msg);
