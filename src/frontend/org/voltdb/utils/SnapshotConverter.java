@@ -164,7 +164,7 @@ public class SnapshotConverter {
             printHelpAndQuit(-1);
         }
 
-        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
+        Map<String, Snapshot> snapshots = new TreeMap<String, Snapshot>();
         HashSet<String> snapshotNames = new HashSet<String>();
         snapshotNames.add(snapshotName);
         SpecificSnapshotFilter filter = new SpecificSnapshotFilter(snapshotNames);
@@ -175,13 +175,13 @@ public class SnapshotConverter {
         if (snapshots.size() > 1) {
             System.err.println("Error: Found " + snapshots.size() + " snapshots with specified name");
             int ii = 0;
-            for (Map.Entry<Long, Snapshot> entry : snapshots.entrySet()) {
-                System.err.println("Snapshot " + ii + " taken " + new Date(entry.getKey()));
+            for (Snapshot entry : snapshots.values()) {
+                System.err.println("Snapshot " + ii + " taken " + new Date(entry.getInstanceId().getTimestamp()));
                 System.err.println("Files: ");
-                for (File digest : entry.getValue().m_digests) {
+                for (File digest : entry.m_digests) {
                     System.err.println("\t" + digest.getPath());
                 }
-                for (Map.Entry<String, TableFiles> e2 : entry.getValue().m_tableFiles.entrySet()) {
+                for (Map.Entry<String, TableFiles> e2 : entry.m_tableFiles.entrySet()) {
                     System.err.println("\t" + e2.getKey());
                     for (File tableFile : e2.getValue().m_files) {
                         System.err.println("\t\t" + tableFile.getPath());
