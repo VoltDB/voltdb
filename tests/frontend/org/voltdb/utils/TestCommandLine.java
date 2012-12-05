@@ -33,6 +33,7 @@ import java.util.Map;
 
 import org.junit.Test;
 import org.voltdb.VoltDB.START_ACTION;
+import org.voltdb.client.ProcCallException;
 
 public class TestCommandLine
 {
@@ -90,8 +91,14 @@ public class TestCommandLine
         assertTrue(cl.toString().contains("create"));
         cl.startCommand("RECOVER");
         assertTrue(cl.toString().contains("recover"));
-        cl.startCommand("NONSENSE");
-        assertTrue(cl.toString().contains("start"));
+        try
+        {
+            cl.startCommand("NONSENSE");
+        }
+        catch (RuntimeException rte)
+        {
+            assertTrue(rte.getMessage().contains("Unknown action"));
+        }
     }
 
     @Test

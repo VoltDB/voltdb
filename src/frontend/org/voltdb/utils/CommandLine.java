@@ -154,7 +154,7 @@ public class CommandLine extends VoltDB.Configuration
         catch (IllegalArgumentException iae)
         {
             // command wasn't a valid enum type;  Abort.
-            String msg = "Unknown start command: " + command + ". ";
+            String msg = "Unknown action: " + command + ". ";
             hostLog.warn(msg);
             throw new RuntimeException(msg);
         }
