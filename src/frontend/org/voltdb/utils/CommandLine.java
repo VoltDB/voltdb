@@ -148,18 +148,16 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine startCommand(String command)
     {
         String upcmd = command.toUpperCase();
-        VoltDB.START_ACTION action = VoltDB.START_ACTION.CREATE;
         try {
-            action = VoltDB.START_ACTION.valueOf(upcmd);
+            VoltDB.START_ACTION action = VoltDB.START_ACTION.valueOf(upcmd);
         }
         catch (IllegalArgumentException iae)
         {
-            // command wasn't a valid enum type;  default to START and warn
-            // the user
-            hostLog.warn("Unknown start command: " + command +
-                         ".  CommandLine will default to START");
+            // command wasn't a valid enum type;  Abort.
+            String msg = "Unknown start command: " + command + ". ";
+            hostLog.warn(msg);
+            throw new RuntimeException(msg);
         }
-        m_startAction = action;
         return this;
     }
 
