@@ -187,7 +187,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public ClientResponse callProcedure(
             long originalTxnId,
-            long originalTimestamp,
+            long originalUniqueId,
             String procName,
             Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException
@@ -195,7 +195,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalTimestamp,
+            new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
         return callProcedure(cb, invocation);
@@ -263,7 +263,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(
             long originalTxnId,
-            long originalTimestamp,
+            long originalUniqueId,
             ProcedureCallback callback,
             String procName,
             Object... parameters)
@@ -272,7 +272,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             ((ProcedureArgumentCacher)callback).setArgs(parameters);
         }
         ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalTimestamp,
+            new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
         return private_callProcedure(callback, 0, invocation);

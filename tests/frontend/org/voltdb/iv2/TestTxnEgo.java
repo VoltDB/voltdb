@@ -74,7 +74,6 @@ public class TestTxnEgo extends TestCase
         long then = System.currentTimeMillis();
         Thread.sleep(100);
         TxnEgo te = new TxnEgo(TxnEgo.SEQUENCE_ZERO, 16000);
-        assertTrue(te.getWallClock() > then);
         assertEquals(TxnEgo.SEQUENCE_ZERO, te.getSequence());
         assertEquals(16000, te.getPartitionId());
     }

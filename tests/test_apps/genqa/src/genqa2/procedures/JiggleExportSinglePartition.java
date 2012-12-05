@@ -51,7 +51,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
 
         voltQueueSQL(
                       insert
-                    , getTransactionId()
+                    , getVoltPrivateRealTransactionIdDontUseMe()
                     , rowid
                     , record.rowid_group
                     , record.type_null_tinyint
@@ -78,7 +78,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
         */
         voltQueueSQL(
                      export
-                     , getTransactionId()
+                     , getVoltPrivateRealTransactionIdDontUseMe()
                      , rowid
                      , record.rowid_group
                      , record.type_null_tinyint
@@ -107,6 +107,6 @@ public class JiggleExportSinglePartition extends VoltProcedure {
         voltExecuteSQL(true);
 
         // Retun to caller
-        return getTransactionId();
+        return getVoltPrivateRealTransactionIdDontUseMe();
     }
 }

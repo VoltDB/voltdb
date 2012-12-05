@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,8 +28,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -42,6 +39,7 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 
 public class MpScheduler extends Scheduler
 {
@@ -54,6 +52,8 @@ public class MpScheduler extends Scheduler
 
     private final List<Long> m_iv2Masters;
     private final long m_buddyHSId;
+    //Generator of pre-IV2ish timestamp based unique IDs
+    private final UniqueIdGenerator m_uniqueIdGenerator;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -63,6 +63,7 @@ public class MpScheduler extends Scheduler
         super(partitionId, taskQueue);
         m_buddyHSId = buddyHSId;
         m_iv2Masters = new ArrayList<Long>();
+        m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
     @Override
@@ -157,15 +158,17 @@ public class MpScheduler extends Scheduler
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
          */
         long mpTxnId;
+        //Timestamp is actually a pre-IV2ish style time based transaction id
         long timestamp;
         if (message.isForReplay()) {
             mpTxnId = message.getTxnId();
-            timestamp = message.getTimestamp();
+            timestamp = message.getUniqueId();
             setMaxSeenTxnId(mpTxnId);
+            m_uniqueIdGenerator.updateMostRecentlyGeneratedTransactionId(timestamp);
         } else {
             TxnEgo ego = advanceTxnEgo();
             mpTxnId = ego.getTxnId();
-            timestamp = ego.getWallClock();
+            timestamp = m_uniqueIdGenerator.getNextUniqueTransactionId();
         }
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
@@ -233,7 +236,7 @@ public class MpScheduler extends Scheduler
                     message.getCoordinatorHSId(),
                     message.getTruncationHandle(),
                     message.getTxnId(),
-                    message.getTimestamp(),
+                    message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
                     message.getStoredProcedureInvocation(),

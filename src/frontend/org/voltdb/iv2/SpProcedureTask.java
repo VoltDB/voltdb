@@ -23,14 +23,13 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
-
-import org.voltdb.rejoin.TaskLog;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.PartitionDRGateway;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -72,7 +71,7 @@ public class SpProcedureTask extends ProcedureTask
 
         // Log invocation to DR
         if (m_drGateway != null && !m_txn.isReadOnly() && !m_txn.needsRollback()) {
-            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.timestamp,
+            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.uniqueId,
                                                   txn.getInvocation(),
                                                   response.getClientResponseData());
         }

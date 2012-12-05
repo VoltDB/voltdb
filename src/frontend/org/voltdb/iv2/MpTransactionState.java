@@ -27,16 +27,15 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-
-import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpTransactionState extends TransactionState
 {
@@ -228,7 +227,7 @@ public class MpTransactionState extends TransactionState
             m_remoteWork = new FragmentTaskMessage(m_localWork.getInitiatorHSId(),
                     m_localWork.getCoordinatorHSId(),
                     m_localWork.getTxnId(),
-                    m_localWork.getTimestamp(),
+                    m_localWork.getUniqueId(),
                     m_localWork.isReadOnly(),
                     false,
                     false);
