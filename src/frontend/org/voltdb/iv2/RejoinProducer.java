@@ -20,6 +20,9 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.json_voltpatches.JSONException;
@@ -60,6 +63,8 @@ public class RejoinProducer extends SiteTasker
     private final int m_partitionId;
     private final String m_snapshotNonce;
     private final String m_whoami;
+    private final ScheduledThreadPoolExecutor m_timer;
+    private ScheduledFuture<?> m_timeFuture;
     private InitiatorMailbox m_mailbox;
     private long m_rejoinCoordinatorHsId;
     private RejoinSiteProcessor m_rejoinSiteProcessor;
@@ -103,7 +108,6 @@ public class RejoinProducer extends SiteTasker
     // Non-blocking rejoin will release the queue and reschedule
     // the producer with the site to incrementally transfer
     // snapshot data.
-
     //
     // In both cases, the site is responding with REJOINING to
     // all incoming tasks.
@@ -121,6 +125,10 @@ public class RejoinProducer extends SiteTasker
     // When both of these events have been observed, the Site
     // is handed a ReplayCompletionAction and instructed to
     // complete its portion of rejoin.
+    //
+    // The rejoin producer times out the snapshot block arrival.
+    // If a block does not arrive within 60s, the RejoinProducer
+    // will terminate the current node.
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -189,6 +197,27 @@ public class RejoinProducer extends SiteTasker
         }
     }
 
+    // Run by m_timer if the timer isn't cancelled within the timeout
+    // period.
+    private static class TimerCallback implements Runnable
+    {
+        private final String m_whoami;
+
+        TimerCallback(String whoami)
+        {
+            m_whoami = whoami;
+        }
+
+        @Override
+        public void run()
+        {
+            VoltDB.crashLocalVoltDB(
+                    m_whoami + " timed out. Terminating rejoin.",
+                    false, null);
+        }
+    }
+
+
     public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_partitionId = partitionId;
@@ -197,6 +226,7 @@ public class RejoinProducer extends SiteTasker
         m_completionMonitorAwait = new CountDownLatch(1);
         m_snapshotAdapterAwait = new CountDownLatch(1);
         m_whoami = "Rejoin producer:" + m_partitionId + " ";
+        m_timer = CoreUtils.getScheduledThreadPoolExecutor("Rejoin Producer Timer", 1, 2048);
         REJOINLOG.debug(m_whoami + "created.");
     }
 
@@ -442,7 +472,7 @@ public class RejoinProducer extends SiteTasker
             } catch (InterruptedException crashme) {
                 VoltDB.crashLocalVoltDB("Interrupted awaiting snapshot completion.", true, crashme);
             }
-            siteConnection.setRejoinComplete(m_replayCompleteAction);
+            setRejoinComplete(siteConnection);
         }
     }
 
@@ -494,11 +524,17 @@ public class RejoinProducer extends SiteTasker
         } catch (InterruptedException crashme) {
             VoltDB.crashLocalVoltDB("Interrupted awaiting snapshot completion.", true, crashme);
         }
-        siteConnection.setRejoinComplete(m_replayCompleteAction);
+        setRejoinComplete(siteConnection);
     }
 
+    // Received a datablock. Reset the watchdog timer and hand the block to the Site.
     void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork, SiteProcedureConnection siteConnection)
     {
+        if (m_timeFuture != null) {
+            m_timeFuture.cancel(false);
+        }
+        m_timeFuture = m_timer.schedule(new TimerCallback(m_whoami), 60, TimeUnit.SECONDS);
+
         int tableId = rejoinWork.getFirst();
         ByteBuffer buffer = rejoinWork.getSecond();
         VoltTable table =
@@ -510,6 +546,13 @@ public class RejoinProducer extends SiteTasker
         siteConnection.loadTable(Long.MIN_VALUE, tableId, table);
     }
 
-
-
+    // Completed all criteria: Kill the watchdog and inform the site.
+    void setRejoinComplete(SiteProcedureConnection siteConnection)
+    {
+        if (m_timeFuture != null) {
+            m_timeFuture.cancel(false);
+        }
+        m_timer.shutdown();
+        siteConnection.setRejoinComplete(m_replayCompleteAction);
+    }
 }
