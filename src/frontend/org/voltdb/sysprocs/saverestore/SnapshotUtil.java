@@ -368,12 +368,10 @@ public class SnapshotUtil {
                 m_instanceId = id;
             }
             else if (!m_instanceId.equals(id)) {
-                try {
-                    System.out.println("Mismatching instance IDs: " + m_instanceId.serializeToJSONObject() +
-                            ", " + id.serializeToJSONObject());
-                } catch (JSONException e) {
-                    // Oh well
-                }
+                throw new RuntimeException("Snapshot named " + m_nonce +
+                        " has digests with conflicting cluster instance IDs." +
+                        " Please ensure that there is only one snapshot named " + m_nonce + " in your" +
+                        " cluster nodes' VOLTDBROOT directories and try again.");
             }
         }
 
