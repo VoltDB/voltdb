@@ -223,7 +223,7 @@ PRIMARY ENTRY POINTS
 </target>
 
 <target name="all"
-    depends="compile, ee, junit, eecheck, javadoc, jars, bin_tools"
+    depends="compile, ee, junit, eecheck, javadoc, jars, bindoc"
     description="Do all tasks."
 />
 <target name="jars"
@@ -250,18 +250,15 @@ PRIMARY ENTRY POINTS
   <refapp_macro appname="${appname}" />
 </target>
 
-<target name="bin_tools" depends="buildinfo"
-        description="Generate stand-alone executables in bin for some Python scripts in tools.">
-    <exec executable="${base.dir}/tools/voltadmin">
-        <arg line="package -f -o ${base.dir}/bin" />
-    </exec>
-    <exec executable="mv" failonerror="true">
-        <arg value="${base.dir}/bin/README.voltadmin"/>
-        <arg value="${base.dir}"/>
+<target name="bindoc" depends="buildinfo"
+        description="Generate README for certain bin programs.">
+    <exec executable="/bin/sh">
+        <arg value="-c" />
+        <arg value="${base.dir}/bin/voltadmin help &gt; ${base.dir}/README.voltadmin" />
     </exec>
 </target>
 
-<target name="dist_tools" depends="buildinfo, bin_tools"
+<target name="dist_tools" depends="buildinfo, bindoc"
         description="Create VoltDB tools release package.">
 
     <!-- add tools and support files -->
@@ -271,7 +268,7 @@ PRIMARY ENTRY POINTS
     <copy todir="${dist.dir}-tools" file="${dist.dir}/LICENSE"/>
 
     <!-- tools/volt is unwanted for now in the tools distribution -->
-    <delete file="${dist.dir}-tools/tools/volt" failonerror="true" />
+    <delete dir="${dist.dir}-tools/tools" failonerror="false" />
 
     <!-- copy recursively to the tarball staging directory -->
     <copy todir="${raw.dist.dir}/voltdb-tools-${dist.version}">
@@ -370,7 +367,7 @@ DISTRIBUTION
 
 <!-- dist_internal_core populates the core distribution components needed by all
      distributions except tools. -->
-<target name="dist_internal_core" depends="compile, ee, javadoc, voltdb.jar, voltdbclient.jar, bin_tools">
+<target name="dist_internal_core" depends="compile, ee, javadoc, voltdb.jar, voltdbclient.jar, bindoc">
     <!-- prepare release directory for new content -->
     <delete includeemptydirs="true" failonerror='false'>
         <fileset dir="${dist.dir}" includes="**/*" />
@@ -384,9 +381,10 @@ DISTRIBUTION
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
             <include name="doc/**"/>
-            <include name="lib/**"/>
+            <include name="lib/*"/>
             <include name="voltdb/**"/>
             <exclude name=".gitignore"/>
+            <exclude name="lib/python" />
         </fileset>
     </copy>
 
@@ -407,6 +405,10 @@ DISTRIBUTION
             <include name="third_party/cpp/jnilib/libjzmq*" />
         </fileset>
     </copy>
+
+    <!-- add the Project and Deployment file schemas to the dist -->
+    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
+    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
 
     <!-- OS-specific preparation of libvoltdb* -->
     <antcall target="dist_libvoltdb" />
@@ -432,7 +434,9 @@ DISTRIBUTION
             <include name="Click Here to Start.html"/>
             <include name="bin/**"/>
             <include name="examples/**"/>
+            <include name="lib/python/**"/>
             <include name="tools/demo/**"/>
+            <exclude name="**/*.pyc" />
         </fileset>
     </copy>
 
@@ -463,15 +467,10 @@ DISTRIBUTION
         <fileset dir="${dist.dir}" defaultexcludes="yes">
             <include name="bin/*"/>
             <include name="tools/demo/launch"/>
-            <include name="tools/voltadmin"/>
             <include name="tools/volt"/>
             <include name="examples/**/run.sh"/>
         </fileset>
     </chmod>
-
-    <!-- add the Project and Deployment file schemas to the dist -->
-    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
-    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
 
     <!-- create an archive for distribution -->
     <exec executable="mv" failonerror="true">
@@ -663,7 +662,6 @@ DISTRIBUTION
     <attribute name="distlabel"/>
     <sequential>
         <mkdir dir="${dist.dir}@{distlabel}/bin" />
-        <mkdir dir="${dist.dir}@{distlabel}/tools" />
         <mkdir dir="${dist.dir}@{distlabel}/lib" />
         <mkdir dir="${raw.dist.dir}/voltdb-@{distlabel}-${dist.version}" />
         <copy todir="${dist.dir}@{distlabel}">
@@ -681,23 +679,23 @@ DISTRIBUTION
         </copy>
         <copy todir="${dist.dir}@{distlabel}/tools">
             <fileset dir="${base.dir}/tools">
-                <include name="voltadmin" />
                 <include name="volt" />
             </fileset>
         </copy>
         <copy todir="${dist.dir}@{distlabel}/lib">
             <fileset dir="${base.dir}/lib">
                 <include name="python/**" />
+                <exclude name="**/*.pyc" />
             </fileset>
         </copy>
         <chmod perm="ugo+rx">
             <fileset dir="${dist.dir}@{distlabel}/bin">
-                <include name="*" />
+                <include name="voltadmin" />
             </fileset>
         </chmod>
         <chmod perm="ugo+rx">
             <fileset dir="${dist.dir}@{distlabel}/tools">
-                <include name="*" />
+                <include name="volt" />
             </fileset>
         </chmod>
     </sequential>
@@ -711,7 +709,7 @@ CLEANING
 
 <target name='clean'
 	description="Remove all compiled and generated files."
-	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package">
+	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package, clean_bindoc">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -744,6 +742,10 @@ CLEANING
   <exec dir='.' executable='/bin/sh' failonerror='false'>
     <arg line="-c 'rm -rf /tmp/myApp*.tmp *.vpt *.digest'"/>
   </exec>
+</target>
+
+<target name="clean_bindoc" description="Remove generated READMEs.">
+    <delete file="${base.dir}/README.voltadmin" failonerror="false" />
 </target>
 
 <!--
