@@ -474,7 +474,8 @@ public class CommandLine extends VoltDB.Configuration
             // annoying, have to special case live rejoin
             cmdline.add("live rejoin");
         } else {
-            cmdline.add(m_startAction.toString().toLowerCase());
+            if (null != m_startAction)
+                cmdline.add(m_startAction.toString().toLowerCase());
         }
 
         cmdline.add("host"); cmdline.add(m_leader);
