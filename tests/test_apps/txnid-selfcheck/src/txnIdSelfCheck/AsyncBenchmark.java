@@ -386,7 +386,7 @@ public class AsyncBenchmark {
                     crash(response.getStatusString());
                 }
             } else if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
-                crash(response.getStatusString());
+                System.out.println(response.getStatusString());
             } else {
                 // Could be server connection lost
                 //System.err.println("updateReplicated failed: " + response.getStatusString());
@@ -405,7 +405,7 @@ public class AsyncBenchmark {
             c.incrementAndGet();
 
             if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
-                crash(response.getStatusString());
+                System.out.println(response.getStatusString());
             }
         }
     }
