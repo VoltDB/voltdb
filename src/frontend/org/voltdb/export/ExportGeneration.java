@@ -340,7 +340,7 @@ public class ExportGeneration {
     }
 
     private void handleLeaderChildrenUpdate(Integer partition, List<String> children) {
-        if (m_drainedSources.get() == m_numSources) {
+        if (m_drainedSources.get() == m_numSources || children.isEmpty()) {
             return;
         }
 

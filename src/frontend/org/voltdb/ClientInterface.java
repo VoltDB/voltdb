@@ -49,9 +49,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -94,7 +93,6 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.BaseInitiator;
@@ -1810,10 +1808,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         VoltDB.instance().getSnapshotCompletionMonitor();
                 completionMonitor.addInterest(new SnapshotCompletionInterest() {
                     @Override
-                    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
-                            long[] partitionTxnIds, boolean truncationSnapshot, String reqIdCmp) {
+                    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
                         // Is this our snapshot?
-                        if (truncationSnapshot && reqId.equals(reqIdCmp)) {
+                        if (event.truncationSnapshot && reqId.equals(event.requestId)) {
                             promote();
                         }
                         return null;
