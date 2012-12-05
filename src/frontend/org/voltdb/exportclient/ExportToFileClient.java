@@ -106,6 +106,8 @@ public class ExportToFileClient extends ExportClientBase2 {
 
     protected final ReentrantReadWriteLock m_batchLock = new ReentrantReadWriteLock();
 
+    private static final Object m_batchDirNamingLock = new Object();
+
     // timer used to roll batches
     protected ScheduledExecutorService m_ses;
     /**
@@ -114,11 +116,10 @@ public class ExportToFileClient extends ExportClientBase2 {
     public void notifyRollIsComplete(File[] files) {}
 
     class PeriodicExportContext {
-        final File m_dirContainingFiles;
+        File m_dirContainingFiles;
         final Map<FileHandle, CSVWriter> m_writers = new TreeMap<FileHandle, CSVWriter>();
         boolean m_hasClosed = false;
-        protected final Date start;
-        protected Date end = null;
+        protected Date start;
         protected final Set<String> m_batchSchemasWritten = new HashSet<String>();
 
         class FileHandle implements Comparable<FileHandle> {
@@ -186,11 +187,32 @@ public class ExportToFileClient extends ExportClientBase2 {
             }
         }
 
-        PeriodicExportContext(Date batchStart) {
-            start = batchStart;
-
+        PeriodicExportContext() {
             if (m_batched) {
-                m_dirContainingFiles = new VoltFile(getPathOfBatchDir(ACTIVE_PREFIX));
+                /*
+                 * The batch dir name is by default only named to second granularity.
+                 * What can happen is that when using on server export the client
+                 * can be rapidly cycled sub-second resulting in collisions with the previous
+                 * client. Spin here until a new one can be generated.
+                 *
+                 * Going to do this under a global lock to ensure that if this ends
+                 * up being done in parallel it is properly sequenced
+                 */
+                synchronized (m_batchDirNamingLock) {
+                    File dirContainingFiles = null;
+                    do {
+                        start = new Date();
+                        dirContainingFiles = new VoltFile(getPathOfBatchDir(ACTIVE_PREFIX));
+                        if (dirContainingFiles.exists()) {
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                Throwables.propagate(e);
+                            }
+                        }
+                    } while (dirContainingFiles.exists());
+                    m_dirContainingFiles = dirContainingFiles;
+                }
                 m_logger.trace(String.format("Creating dir for batch at %s", m_dirContainingFiles.getPath()));
                 m_dirContainingFiles.mkdirs();
                 if (m_dirContainingFiles.exists() == false) {
@@ -199,6 +221,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                 }
             }
             else {
+                start = new Date();
                 m_dirContainingFiles = m_outDir;
             }
         }
@@ -649,13 +672,11 @@ public class ExportToFileClient extends ExportClientBase2 {
      * be active until all writers have finished writing their current blocks
      * to it.
      */
-    void roll(final Date rollTime) {
+    void roll() {
         m_batchLock.writeLock().lock();
         final PeriodicExportContext previous = m_current;
         try {
-            m_current.end = rollTime;
-
-            m_current = new PeriodicExportContext(rollTime);
+            m_current = new PeriodicExportContext();
 
             m_logger.trace("Rolling batch.");
 
@@ -1113,7 +1134,7 @@ public class ExportToFileClient extends ExportClientBase2 {
 
         // init the batch system with the first batch
         assert(m_current == null);
-        m_current = new PeriodicExportContext(new Date());
+        m_current = new PeriodicExportContext();
 
 
         // schedule rotations every m_period minutes
@@ -1121,7 +1142,7 @@ public class ExportToFileClient extends ExportClientBase2 {
             @Override
             public void run() {
                 try {
-                    roll(new Date());
+                    roll();
                 } catch (Throwable t) {
                     t.printStackTrace();
                 }

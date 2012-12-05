@@ -29,6 +29,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.TreeMap;
@@ -57,7 +59,7 @@ public class ExportToFileVerifier {
         ExportToFileTestVerifier verifier = m_verifiers.get(tableName + partition);
         if (verifier == null)
         {
-            verifier = new ExportToFileTestVerifier();
+            verifier = new ExportToFileTestVerifier(partition);
             m_verifiers.put(tableName + partition, verifier);
         }
         verifier.addRow(data);
@@ -89,6 +91,14 @@ public class ExportToFileVerifier {
          * Process the row data in each file
          */
         for (List<File> generationFiles : generations.values()) {
+            Collections.sort(generationFiles, new Comparator<File>() {
+
+                @Override
+                public int compare(File o1, File o2) {
+                    return new Long(o1.lastModified()).compareTo(o2.lastModified());
+                }
+
+            });
             for (File f : generationFiles) {
                 System.out.println("Processing " + f);
                 String tableName;

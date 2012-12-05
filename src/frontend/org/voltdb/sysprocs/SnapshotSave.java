@@ -155,7 +155,7 @@ public class SnapshotSave extends VoltSystemProcedure
              */
             List<Long> perPartitionTransactionIdsToKeep = new ArrayList<Long>();
             for (long txnid : perPartitionTxnIds) {
-                int partitionId = (int)TxnEgo.getPartitionId(txnid);
+                int partitionId = TxnEgo.getPartitionId(txnid);
                 if (partitionId >= context.getNumberOfPartitions() && partitionId != MpInitiator.MP_INIT_PID) {
                     perPartitionTransactionIdsToKeep.add(txnid);
                 }

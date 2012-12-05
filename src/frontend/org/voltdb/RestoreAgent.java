@@ -1194,14 +1194,13 @@ SnapshotCompletionInterest
      * snapshot.
      */
     @Override
-    public CountDownLatch snapshotCompleted(final String nonce, long txnId, long partitionTxnIds[],
-                                            boolean truncationSnapshot, String requestId) {
-        if (!truncationSnapshot) {
+    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
+        if (!event.truncationSnapshot) {
             VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",
                                      false, null);
         } else {
-            m_truncationSnapshot = txnId;
-            m_truncationSnapshotPerPartition = partitionTxnIds;
+            m_truncationSnapshot = event.multipartTxnId;
+            m_truncationSnapshotPerPartition = event.partitionTxnIds;
             m_replayAgent.returnAllSegments();
             changeState();
         }

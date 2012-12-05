@@ -91,7 +91,7 @@ public class SnapshotUtil {
         String nonce,
         List<Table> tables,
         int hostId,
-        Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers,
+        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         List<Long> partitionTransactionIds,
         InstanceId instanceId)
     throws IOException
@@ -115,16 +115,17 @@ public class SnapshotUtil {
             }
             stringer.endArray();
             stringer.key("exportSequenceNumbers").array();
-            for (Map.Entry<String, List<Pair<Integer, Long>>> entry : exportSequenceNumbers.entrySet()) {
+            for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : exportSequenceNumbers.entrySet()) {
                 stringer.object();
 
                 stringer.key("exportTableName").value(entry.getKey());
 
                 stringer.key("sequenceNumberPerPartition").array();
-                for (Pair<Integer, Long> sequenceNumber : entry.getValue()) {
+                for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
                     stringer.object();
-                    stringer.key("partition").value(sequenceNumber.getFirst());
-                    stringer.key("exportSequenceNumber").value(sequenceNumber.getSecond());
+                    stringer.key("partition").value(sequenceNumber.getKey());
+                    //First value is the ack offset which matters for pauseless rejoin, but not persistence
+                    stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
                     stringer.endObject();
                 }
                 stringer.endArray();

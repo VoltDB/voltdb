@@ -34,7 +34,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
-import org.voltdb.regressionsuites.VoltServerConfig;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
@@ -97,39 +96,6 @@ public class TestExportV2Suite extends TestExportBase {
             params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
-        quiesceAndVerify(client, m_verifier);
-    }
-
-    public void testExportSnapshotPreservesSequenceNumber() throws Exception {
-        System.out.println("testExportSnapshotPreservesSequenceNumber");
-        Client client = getClient();
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow( "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
-        Thread.sleep(2000);
-        quiesce(client);
-
-        client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
-
-        m_config.shutDown();
-        m_config.startUp(false);
-
-        client = getClient();
-
-        client.callProcedure("@SnapshotRestore", "/tmp/" + System.getProperty("user.name"), "testnonce");
-
-        for (int i=10; i < 20; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow( "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
-        client.drain();
-
-        // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);
     }
 
