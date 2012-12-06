@@ -486,7 +486,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == START_ACTION.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
-                    hostLog.info("Using iv2 community rejoin");
+                    if (m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+                        hostLog.info("Using live rejoin.");
+                    }
+                    else {
+                        hostLog.info("Using blocking rejoin.");
+                    }
                 }
                 else if (isRejoin && m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
                     SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
