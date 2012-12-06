@@ -22,7 +22,6 @@ import java.util.TreeSet;
 import java.util.Iterator;
 
 import org.voltdb.SnapshotFormat;
-import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
@@ -45,6 +44,7 @@ public class SnapshotRegistry {
 
     public static class Snapshot {
         public final long txnId;
+        public final long timeStarted;
         public final long timeFinished;
 
         public final String path;
@@ -56,10 +56,11 @@ public class SnapshotRegistry {
 
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
-        private Snapshot(long txnId, int hostId, String path, String nonce,
+        private Snapshot(long txnId, long timeStarted, int hostId, String path, String nonce,
                          SnapshotFormat format,
                          org.voltdb.catalog.Table tables[]) {
             this.txnId = txnId;
+            this.timeStarted = timeStarted;
             this.path = path;
             this.nonce = nonce;
             this.format = format;
@@ -81,6 +82,7 @@ public class SnapshotRegistry {
 
         private Snapshot(Snapshot incomplete, long timeFinished) {
             txnId = incomplete.txnId;
+            timeStarted = incomplete.timeStarted;
             path = incomplete.path;
             nonce = incomplete.nonce;
             format = incomplete.format;
@@ -158,7 +160,8 @@ public class SnapshotRegistry {
             String nonce,
             SnapshotFormat format,
             org.voltdb.catalog.Table tables[]) {
-        final Snapshot s = new Snapshot(txnId, hostId, path, nonce, format, tables);
+        final Snapshot s = new Snapshot(txnId, System.currentTimeMillis(),
+                hostId, path, nonce, format, tables);
 
         m_snapshots.add(s);
         if (m_snapshots.size() > m_maxStatusHistory) {
