@@ -50,6 +50,8 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Select;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.UpdateDecimal;
 
+import com.google.common.base.Charsets;
+
 public class TestSQLTypesSuite extends RegressionSuite {
 
     // used to generate unique pkeys
@@ -266,13 +268,13 @@ public class TestSQLTypesSuite extends RegressionSuite {
                    ""),
         new Column("A_INLINE_B", VoltType.VARBINARY, false,
                    VoltType.NULL_STRING_OR_VARBINARY,
-                   new String("ABCDEFABCDEF0123"),
+                   new String("ABCDEFABCDEF0123").getBytes(Charsets.UTF_8),
                    new byte[] { 0 },
                    new byte[] { 'a', 'b', 'c' },
-                   new String("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").getBytes()),
+                   new String("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").getBytes(Charsets.UTF_8)),
         new Column("A_POOL_B", VoltType.VARBINARY, false,
                    VoltType.NULL_STRING_OR_VARBINARY,
-                   new String("ABCDEFABCDEF0123456789"),
+                   new String("ABCDEFABCDEF0123456789").getBytes(Charsets.UTF_8),
                    new byte[] { 0 },
                    new byte[] { 'a', 'b', 'c' },
                    new byte[] {}),

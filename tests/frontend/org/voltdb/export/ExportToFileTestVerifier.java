@@ -71,7 +71,7 @@ public class ExportToFileTestVerifier {
             if (cval == null) {
                 row[i] = "NULL";
             } else if (cval instanceof byte[]) {
-                row[i] = Encoder.hexEncode((byte[])cval);
+                row[i] = Encoder.base64Encode((byte[])cval);
             } else if (cval instanceof String) {
                 row[i] = (String)cval;
             } else if (cval instanceof TimestampType) {
