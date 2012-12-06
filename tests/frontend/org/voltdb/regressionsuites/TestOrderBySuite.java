@@ -589,7 +589,7 @@ public class TestOrderBySuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("testorderby-cluster.jar", 3, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("testorderby-cluster.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
