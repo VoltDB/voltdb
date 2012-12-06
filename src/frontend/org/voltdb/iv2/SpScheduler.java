@@ -25,32 +25,30 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
-import java.util.Map.Entry;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
-import org.voltdb.messaging.BorrowTaskMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
@@ -746,10 +744,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     @Override
-    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
-            long[] partitionTxnIds, boolean truncationSnapshot, String requestId)
+    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
     {
-        if (truncationSnapshot) {
+        if (event.truncationSnapshot) {
             writeIv2ViableReplayEntry();
         }
         return new CountDownLatch(0);

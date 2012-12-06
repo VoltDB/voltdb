@@ -845,6 +845,7 @@ JAR BUILDING
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
+            <include name="jsr166y/**" />
         </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
