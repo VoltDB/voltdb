@@ -385,6 +385,7 @@ DISTRIBUTION
             <include name="voltdb/**"/>
             <exclude name=".gitignore"/>
             <exclude name="lib/python" />
+            <exclude name="doc/tutorials/**" />
         </fileset>
     </copy>
 
@@ -433,6 +434,7 @@ DISTRIBUTION
         <fileset dir="." defaultexcludes="yes">
             <include name="Click Here to Start.html"/>
             <include name="bin/**"/>
+            <include name="doc/tutorials/**" />
             <include name="examples/**"/>
             <include name="lib/python/**"/>
             <include name="tools/demo/**"/>
