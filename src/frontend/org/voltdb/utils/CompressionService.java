@@ -24,10 +24,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.utils.Base64;
 import org.xerial.snappy.Snappy;
 
 public final class CompressionService {
@@ -220,7 +220,7 @@ public final class CompressionService {
     public static byte[][] compressBytes(byte bytes[][], final boolean base64Encode) throws Exception {
         if (bytes.length == 1) {
             if (base64Encode) {
-                return new byte[][] {Base64.encodeBytesToBytes(compressBytes(bytes[0]))};
+                return new byte[][] {Base64.encodeToByte(compressBytes(bytes[0]), false)};
             } else {
                 return new byte[][] {compressBytes(bytes[0])};
             }
@@ -232,7 +232,7 @@ public final class CompressionService {
                 @Override
                 public byte[] call() throws Exception {
                     if (base64Encode) {
-                        return Base64.encodeBytesToBytes(compressBytes(bts));
+                        return Base64.encodeToByte(compressBytes(bts), false);
                     } else {
                         return compressBytes(bts);
                     }
