@@ -136,7 +136,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 success = result.getFirst();
                 if (success) {
                     m_initiatorMailbox.setLeaderState(result.getSecond());
-                    tmLog.info(m_whoami
+                    tmLog.debug(m_whoami
                             + "finished leader promotion. Took "
                             + (System.currentTimeMillis() - startTime) + " ms.");
 

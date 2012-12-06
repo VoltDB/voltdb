@@ -111,9 +111,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
                         // Should only be one restarting MP txn
                         m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
                     }
-                    tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                    tmLog.debug(m_whoami
+                              + "finished leader promotion. Took "
+                              + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.

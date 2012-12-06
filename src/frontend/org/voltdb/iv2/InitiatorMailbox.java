@@ -226,7 +226,7 @@ public class InitiatorMailbox implements Mailbox
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
-        tmLog.info(""
+        tmLog.debug(""
             + CoreUtils.hsIdToString(getHSId())
             + " handling repair log request id " + req.getRequestId()
             + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");
