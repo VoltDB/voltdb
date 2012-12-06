@@ -1105,7 +1105,7 @@ public class ExportToFileClient extends ExportClientBase2 {
         TimeZone tz = TimeZone.getTimeZone(conf.getProperty("timezone", VoltDB.GMT_TIMEZONE.getID()));
 
         BinaryEncoding encoding = BinaryEncoding.valueOf(
-                conf.getProperty("binaryencoding", "BASE64").trim().toUpperCase());
+                conf.getProperty("binaryencoding", "HEX").trim().toUpperCase());
 
         configureInternal(
                 delimiter,
