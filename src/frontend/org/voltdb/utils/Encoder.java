@@ -129,7 +129,7 @@ public class Encoder {
     }
 
     public static String decodeBase64AndDecompress(String string) {
-        byte bytes[] = Base64.decode(string);
+        byte bytes[] = Base64.decodeFast(string);
         ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
         InflaterInputStream dis = new InflaterInputStream(bais);
 
