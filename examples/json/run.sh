@@ -53,7 +53,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB start catalog $APPNAME.jar deployment deployment.xml \
+    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE host $HOST
 }
 
@@ -71,10 +71,7 @@ function json-client-help() {
 
 function json-client() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj:gson-2.2.2.jar -Dlog4j.configuration=file://$LOG4J \
-        json.JSONClient \
-        --duration=10 \
-        --servers=localhost:21212
+    java -classpath obj:$CLASSPATH:obj:gson-2.2.2.jar -Dlog4j.configuration=file://$LOG4J json.JSONClient
 }
 
 

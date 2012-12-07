@@ -63,8 +63,6 @@ import com.google.gson.*;
 
 public class JSONClient {
 
-    // validated command line configuration
-    final LoginConfig config;
     // Reference to the database connection we will use
     final Client client;
     // Random record generator
@@ -77,29 +75,6 @@ public class JSONClient {
     // Statistics counters
     AtomicLong acceptedLogins = new AtomicLong(0);
     AtomicLong badLogins = new AtomicLong(0);
-
-    /**
-     * Uses included {@link CLIConfig} class to
-     * declaratively state command line options with defaults
-     * and validation.
-     */
-    static class LoginConfig extends CLIConfig {
-        @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 10;
-
-        @Option(desc = "Comma separated list of the form server[:port] to connect to.")
-        String servers = "localhost";
-
-        @Option(desc = "Number of concurrent threads synchronously calling procedures.")
-        int threads = 10;
-
-        @Override
-        public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (duration < 0) exitWithMessageAndUsage("duration must be >= 0");
-            if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
-        }
-    }
 
     /*
      * This class generates random login records.  For this sample, we have three different
@@ -130,47 +105,43 @@ public class JSONClient {
             // associated with that login.  We don't know the schema of this data ahead of time so we'll
             // store it in a json field.
             Gson gson = new Gson();
-            SiteBase site = null;
+            SessionBase site = null;
 
-            switch (random.nextInt(2)) {
-            case 0:  AmazonSite asite = new AmazonSite();
-                     switch (random.nextInt(3))
-                     {
-                         case 0:
-                             asite.addToCart("Kindle Fire", "B007T36PSM");
-                             break;
-                         case 1:
-                             asite.addToCart("iPod Touch", "B0097BEF0O");
-                             break;
-                         case 2:
-                             asite.addToCart("The Hobbit", "0395177111");
-                             break;
-                         case 3:
-                             asite.addToCart("TaylorMade R11 S Driver", "B006SU1122");
-                             break;
-                         default:
-                             asite.addToCart("Sony Bravia 40-inch TV", "B006U1VG74");
-                             break;
-                     }
-                     site = asite;
+            switch (random.nextInt(3)) {
+                case 0:  site = new BlogSession();
                      break;
-            case 1:  site = new GmailSite();
+                case 1:  site = new ManagementSession();
                      break;
-            default: site = new VoltDBSite();
+                default: site = new ForumSession();
                      break;
             }
             site.props.put("last-login", new Long(System.currentTimeMillis()).toString());
+
+            // This sample uses the Google GSON library to conveniently convert a Java object (the Session objects above) into a JSON
+            // string encoding. For example, a sample JSON representation of a ForumSession object would be as follows:
+            //
+            // { "moderator":true,
+            //   "download_count":1,
+            //   "site":"VoltDB Forum",
+            //   "props": { "last-login":"1354912929504",
+            //              "download_version":"v3.0",
+            //              "client_language":"Java"
+            //            }
+            //  }
+            //
+            // Once we've created the JSON representation of the data, we'll insert it into a VoltDB row in the "json_data" column.
+            // Later on in this sample, once the database is populated, we'll execute SQL queries on elements of this JSON data.
+            // For example, we'll query on all sessions where the download_version is 'v3.0' and the client language is 'Java'.
 
             // Return the generated user login
             return new LoginRecord("user-" + random.nextInt(100000), "pwd", gson.toJson(site));
         }
 
         // A unique record is created so that the sample queries can target specific records.
-        public LoginRecord createUniqueLogin(String username, String version, String prop, String val)
+        public LoginRecord createUniqueLogin(String username, String prop, String val)
         {
             Gson gson = new Gson();
-            VoltDBSite site = new VoltDBSite();
-            site.download_version = version;
+            ForumSession site = new ForumSession();
             site.props.put("last-login", new Long(System.currentTimeMillis()).toString());
             site.props.put(prop, val);
             // Return the generated login
@@ -197,9 +168,7 @@ public class JSONClient {
      *
      * @param config Parsed & validated CLI options.
      */
-    public JSONClient(LoginConfig config) {
-        this.config = config;
-
+    public JSONClient() {
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         client = ClientFactory.createClient(clientConfig);
 
@@ -325,7 +294,7 @@ public class JSONClient {
      */
     public void createUniqueData()
     {
-        LoginGenerator.LoginRecord unique_login = random_login_generator.createUniqueLogin("voltdb", "v2.8", "download-count", "3");
+        LoginGenerator.LoginRecord unique_login = random_login_generator.createUniqueLogin("voltdb", "download-count", "3");
         doLogin(unique_login);
     }
 
@@ -336,8 +305,9 @@ public class JSONClient {
      */
     public void loadDatabase() throws Exception {
         // create/start the requested number of threads
-        Thread[] loginThreads = new Thread[config.threads];
-        for (int i = 0; i < config.threads; ++i) {
+        int thread_count = 10;
+        Thread[] loginThreads = new Thread[thread_count];
+        for (int i = 0; i < thread_count; ++i) {
             loginThreads[i] = new Thread(new LoginThread());
             loginThreads[i].start();
         }
@@ -345,9 +315,9 @@ public class JSONClient {
         // Initialize the statistics
         fullStatsContext.fetchAndResetBaseline();
 
-        // Run the data loading the specified duration
+        // Run the data loading for 10 seconds
         System.out.println("\nLoading database...");
-        Thread.sleep(1000l * config.duration);
+        Thread.sleep(1000l * 10);
 
         // stop the threads
         loadComplete.set(true);
@@ -387,27 +357,18 @@ public class JSONClient {
         printResults(resp.getResults()[0]);
         System.out.println();
 
-        // Select some sessions that have logged into site Amazon.com
-        System.out.println("Select logins that have been made to amazon.com, limit results to 10:");
-        SQL = "SELECT username, json_data FROM user_session_table WHERE field(json_data, 'site')='amazon.com' ORDER BY username LIMIT 10";
+        // Select some sessions that have logged into site VoltDB Forum
+        System.out.println("Select logins that have been made to the VoltDB Forum, limit results to 10:");
+        SQL = "SELECT username, json_data FROM user_session_table WHERE field(json_data, 'site')='VoltDB Forum' ORDER BY username LIMIT 10";
         resp = client.callProcedure("@AdHoc", SQL);
         System.out.println("SQL query: " + SQL);
         System.out.println();
         printResults(resp.getResults()[0]);
         System.out.println();
 
-        // Select Amazon users who have a Kindle Fire in their shopping cart
-        System.out.println("Select Amazon sessions that have a Kindle Fire in their shopping cart:");
-        SQL = "SELECT username, json_data FROM user_session_table WHERE field(json_data, 'site')='amazon.com' AND field(json_data, 'shopping_cart') like '%Fire%' order by username limit 10;";
-        resp = client.callProcedure("@AdHoc", SQL);
-        System.out.println("SQL query: " + SQL);
-        System.out.println();
-        printResults(resp.getResults()[0]);
-        System.out.println();
-
-        // Drill deeper into the JSON data looking for a specific record
-        System.out.println("Look for all records of voltdb logins who have downloaded v2.8.  There should only be 1:");
-        SQL = "SELECT username, json_data FROM user_session_table WHERE field(json_data, 'download_version')='v2.8' ORDER BY username";
+        // Select VoltDB Forum sessions that are moderators
+        System.out.println("Select VoltDB Forum sessions that are moderators:");
+        SQL = "SELECT username, json_data FROM user_session_table WHERE field(json_data, 'site')='VoltDB Forum' AND field(json_data, 'moderator')='true' ORDER BY username LIMIT 10;";
         resp = client.callProcedure("@AdHoc", SQL);
         System.out.println("SQL query: " + SQL);
         System.out.println();
@@ -415,8 +376,17 @@ public class JSONClient {
         System.out.println();
 
         // Nest field() functions to drill into the JSON
-        System.out.println("Look deep into the JSON data for all records of voltdb logins who have a download count of 3.  There should only be 1:");
-        SQL = "SELECT username, json_data FROM user_session_table WHERE field(field(json_data, 'props'), 'download-count')='3' ORDER BY username";
+        System.out.println("Look deep into the JSON data for all records of VoltDB Forum logins who have downloaded version v3.0 and have specified a client language of Java. ");
+        SQL = "SELECT username, json_data FROM user_session_table WHERE field(field(json_data, 'props'), 'download_version')='v3.0' and field(field(json_data, 'props'), 'client_language')='Java' ORDER BY username LIMIT 10";
+        resp = client.callProcedure("@AdHoc", SQL);
+        System.out.println("SQL query: " + SQL);
+        System.out.println();
+        printResults(resp.getResults()[0]);
+        System.out.println();
+
+        // Use LIKE to pattern match.a
+        System.out.println("User pattern matching (SQL LIKE) to look for all records of VoltDB Forum logins who have downloaded version v2.x. ");
+        SQL = "SELECT username, json_data FROM user_session_table WHERE field(field(json_data, 'props'), 'download_version') LIKE 'v2%' ORDER BY username LIMIT 10";
         resp = client.callProcedure("@AdHoc", SQL);
         System.out.println("SQL query: " + SQL);
         System.out.println();
@@ -446,8 +416,8 @@ public class JSONClient {
 
     public void initialize() throws Exception
     {
-        // connect to one or more servers, loop until success
-        connect(config.servers);
+        // connect to the database on the local machine
+        connect("localhost:21212");
     }
 
     public void shutdown() throws Exception
@@ -573,10 +543,7 @@ public class JSONClient {
      * @see {@link LoginConfig}
      */
     public static void main(String[] args) throws Exception {
-        // create a configuration from the arguments
-        LoginConfig config = new LoginConfig();
-        config.parse(JSONClient.class.getName(), args);
-        JSONClient app = new JSONClient(config);
+        JSONClient app = new JSONClient();
 
         // Initialize connections
         app.initialize();
