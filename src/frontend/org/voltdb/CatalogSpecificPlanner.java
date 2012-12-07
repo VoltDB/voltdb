@@ -18,9 +18,10 @@ package org.voltdb;
 
 import java.util.Arrays;
 
-import org.voltdb.compiler.AsyncCompilerAgent;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 
@@ -42,7 +43,8 @@ public class CatalogSpecificPlanner {
         m_catalogContext = context;
     }
 
-    public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql, boolean multipart) {
+    public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql, boolean multipart,
+            ProcedureInvocationType type, long originalTxnId, long originalTs) {
         /*
          * If this is multi-part, don't give the planner a partition param AND
          * tell it not to infer whether the plan is single part. Those optimizations
@@ -54,6 +56,7 @@ public class CatalogSpecificPlanner {
             new AdHocPlannerWork(
                     -1, false, 0, 0, "", false, null, //none of the params on this line are used
                     sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true, !multipart,
+                    type, originalTxnId, originalTs,
                     new AsyncCompilerWorkCompletionHandler() {
 
                         @Override
