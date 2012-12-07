@@ -153,11 +153,6 @@ public class ProcedureRunner {
                 site.getCorrespondingSiteId(),
                 m_statsCollector);
 
-        // compute a CRC for write txns that are single-partition
-        /*if (m_catProc != null) {
-            m_shouldComputeCRC = (m_catProc.getReadonly() == false);
-        }*/
-
         reflect();
     }
 
@@ -328,7 +323,6 @@ public class ProcedureRunner {
                         null);
 
             int hash = (int) m_inputCRC.getValue();
-            log.info("At the end of proc: " + String.valueOf(m_procedureName) + " hash was " + String.valueOf(hash));
             if ((retval.getStatus() == ClientResponse.SUCCESS) && (hash != 0)) {
                 retval.setHash(hash);
             }
@@ -336,7 +330,6 @@ public class ProcedureRunner {
                 (m_txnState.getInvocation() != null) &&
                 (m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED))
             {
-                log.info("Converting results to hash (replicated)");
                 retval.convertResultsToHashForDeterminism();
             }
         }

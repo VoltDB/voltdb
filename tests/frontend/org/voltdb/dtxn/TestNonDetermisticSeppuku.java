@@ -26,6 +26,7 @@ package org.voltdb.dtxn;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
@@ -88,6 +89,9 @@ public class TestNonDetermisticSeppuku extends TestCase {
      * one row, but with different values at different replicas.
      */
     public void testMismatchValueDeath() throws Exception {
+        // iv2 no longer does this check
+        if (VoltDB.checkTestEnvForIv2()) return;
+
         try {
             client.callProcedure(
                     "NonDeterministicSPProc",
@@ -123,17 +127,16 @@ public class TestNonDetermisticSeppuku extends TestCase {
     }
 
     /**
-     * Do a non-deterministic insertion followed by a multi-partition read-only operation.
-     * ENG-3288 - Expect non-deterministic read-only queries to succeed.
+     * Do a non-deterministic insertion
      */
-    public void testNonDeterministic_RO_MP() throws Exception {
+    public void testNonDeterministicInsert() throws Exception {
         try {
             client.callProcedure(
                     "NonDeterministicSPProc",
                     0,
                     0,
                     NonDeterministicSPProc.MISMATCH_INSERTION);
-            fail("Mismatch inserstion failed");
+            fail("Mismatch insertion failed");
         }
         catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Connection to database") ||

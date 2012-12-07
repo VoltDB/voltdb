@@ -118,7 +118,7 @@ public class TestInFlightTxnState extends TestCase
 
     }
 
-    public void testHashDeterminsimChecks() {
+    public void testHashDeterminismChecks() {
         VoltDB.ignoreCrash = true;
 
         // Test hash mismatch on read-only

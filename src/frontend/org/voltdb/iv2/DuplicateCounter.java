@@ -99,7 +99,7 @@ public class DuplicateCounter
     {
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
-        long hash = message.getClientResponseData().getHashOfTableResults() << 32;
+        long hash = r.getHashOfTableResults() << 32;
         Integer sqlHash = r.getHash();
         if (sqlHash != null) {
             hash |= sqlHash.intValue();

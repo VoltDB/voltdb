@@ -61,7 +61,6 @@ public class SpProcedureTask extends ProcedureTask
         SpTransactionState txn = (SpTransactionState)m_txn;
         final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         int hash = m_txn.getHash();
-        hostLog.debug("SpProcedureTask run SQL hash: " + String.valueOf(hash));
         if (!response.shouldCommit()) {
             m_txn.setNeedsRollback();
         }

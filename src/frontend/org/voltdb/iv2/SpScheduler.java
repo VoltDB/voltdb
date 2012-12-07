@@ -29,7 +29,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -54,8 +53,6 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
-    private static final VoltLogger log = new VoltLogger("HOST");
-
     static class DuplicateCounterKey implements Comparable<DuplicateCounterKey>
     {
         private final long m_txnId;
@@ -253,8 +250,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void deliver(VoltMessage message)
     {
-        //log.info("SpScheduler got " + message.toString());
-
         long sequenceWithTxnId = Long.MIN_VALUE;
 
         boolean sequenceForCommandLog =

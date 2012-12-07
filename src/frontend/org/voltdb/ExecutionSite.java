@@ -1499,7 +1499,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 if (!txnState.needsRollback()) {
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
                                                                    ts,
-                                                                   txnState.getResults().getHash(),
+                                                                   txnState.getHash(),
                                                                    invocation,
                                                                    txnState.getResults());
                 }

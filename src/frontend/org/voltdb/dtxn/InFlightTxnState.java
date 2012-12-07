@@ -108,6 +108,7 @@ public class InFlightTxnState implements Serializable {
         // Note that read-only procs and sysprocs just have a null hash value, so they don't
         // trip anything up here.
 
+        // ensure the hash is non-null
         sqlHash = sqlHash == null ? 0 : sqlHash;
         if (m_sqlHash != null) {
              if (m_sqlHash.equals(sqlHash) == false) {

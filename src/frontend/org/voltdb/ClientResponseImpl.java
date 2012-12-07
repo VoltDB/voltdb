@@ -363,7 +363,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
 
     /**
      * Take the perfectly good results and convert them to a single long value
-     * that combines
+     * that stores the hash for determinism.
      *
      * This presumes the DR agent has no need for results. This probably saves
      * some small amount of bandwidth. The other proposed idea was using the status

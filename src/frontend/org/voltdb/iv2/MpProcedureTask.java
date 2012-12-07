@@ -157,8 +157,6 @@ public class MpProcedureTask extends ProcedureTask
                 false,
                 m_msg.isForReplay());
 
-        log.info("Created CompleteTransactionMessage with hash: " + String.valueOf(m_txn.getHash()));
-
         complete.setTruncationHandle(m_msg.getTruncationHandle());
         complete.setOriginalTxnId(m_msg.getOriginalTxnId());
         m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);

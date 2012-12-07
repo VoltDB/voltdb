@@ -337,8 +337,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                            false,
                                            false);
 
-        hostLog.info("Created CompleteTransactionMessage with hash: " + String.valueOf(getHash()));
-
         return ft;
     }
 
