@@ -351,11 +351,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     newSpHandle = message.getTxnId();
                     uniqueId = message.getUniqueId();
                     setMaxSeenTxnId(newSpHandle);
-                    m_uniqueIdGenerator.updateMostRecentlyGeneratedTransactionId(uniqueId);
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
                 } else if (m_isLeader) {
                     TxnEgo ego = advanceTxnEgo();
                     newSpHandle = ego.getTxnId();
-                    uniqueId = m_uniqueIdGenerator.getNextUniqueTransactionId();
+                    uniqueId = m_uniqueIdGenerator.getNextUniqueId();
                 } else {
                     /*
                      * The short circuit read case. Since we are not a master
@@ -366,7 +366,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     uniqueId = UniqueIdGenerator.makeIdFromComponents(
                             Math.max(System.currentTimeMillis(), m_uniqueIdGenerator.lastUsedTime),
                             0,
-                            m_uniqueIdGenerator.initiatorId);
+                            m_uniqueIdGenerator.partitionId);
                     //Don't think it wise to make a new one for a short circuit read
                     newSpHandle = getCurrentTxnId();
                 }
@@ -469,6 +469,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 message.getTxnId(), expectedHSIds);
         m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
             needsRepair.remove(m_mailbox.getHSId());
@@ -613,7 +614,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
-            m_uniqueIdGenerator.updateMostRecentlyGeneratedTransactionId(msg.getUniqueId());
         }
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);

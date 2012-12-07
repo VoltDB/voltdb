@@ -164,11 +164,11 @@ public class MpScheduler extends Scheduler
             mpTxnId = message.getTxnId();
             timestamp = message.getUniqueId();
             setMaxSeenTxnId(mpTxnId);
-            m_uniqueIdGenerator.updateMostRecentlyGeneratedTransactionId(timestamp);
+            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
         } else {
             TxnEgo ego = advanceTxnEgo();
             mpTxnId = ego.getTxnId();
-            timestamp = m_uniqueIdGenerator.getNextUniqueTransactionId();
+            timestamp = m_uniqueIdGenerator.getNextUniqueId();
         }
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
@@ -243,6 +243,7 @@ public class MpScheduler extends Scheduler
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
                     message.isForReplay());
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,

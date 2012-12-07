@@ -24,17 +24,17 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 
 /**
- * <p>The TransactionIdManager creates Transaction ids that
- * get assigned to VoltDB timestamps. A transaction id contains
+ * <p>The UniqueIdGenerator creates unique ids that
+ * is assigned to VoltDB transactions. A unique id contains
  * three fields, the time of creation, a counter to ensure local
- * ordering, and the siteid of the generating site.</p>
+ * ordering, and the partition id of the generating site.</p>
  *
  * <p>This class also contains methods to examine the embedded values of
- * transaction ids.</p>
+ * unique ids.</p>
  *
  * <p>If the clocks of two different machines are reasonably in sync,
- * txn ids created at the same time on different machines will be reasonably
- * close in value. Thus transaction ids can be used for a global ordering.</p>
+ * unique ids created at the same time on different machines will be reasonably
+ * close in value.</p>
  *
  */
 public class UniqueIdGenerator {
@@ -43,7 +43,7 @@ public class UniqueIdGenerator {
     // signed / unsigned conversions easier.
     static final long TIMESTAMP_BITS = 40;
     static final long COUNTER_BITS = 9;
-    static final long INITIATORID_BITS = 14;
+    static final long PARTITIONID_BITS = 14;
 
     // VOLT_EPOCH holds the time in millis since 1/1/2008 at 12am.
     // The current time - VOLT_EPOCH should fit nicely in 40 bits
@@ -64,18 +64,18 @@ public class UniqueIdGenerator {
     // used for bit-shifts and error checking
     static final long TIMESTAMP_MAX_VALUE = (1L << TIMESTAMP_BITS) - 1L;
     static final long COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
-    static final long INITIATORID_MAX_VALUE = (1L << INITIATORID_BITS) - 1L;
+    static final long PARTITIONID_MAX_VALUE = (1L << PARTITIONID_BITS) - 1L;
 
     // the local siteid
-    long initiatorId;
-    // the time of the previous txn id generation
+    long partitionId;
+    // the time of the previous unique id generation
     long lastUsedTime = -1;
-    // the number of txns generated during the same value
+    // the number of unique ids generated during the same value
     // for System.currentTimeMillis()
     long counterValue = 0;
 
-    // remembers the last txn generated
-    long lastTxnId = 0;
+    // remembers the last unique id generated
+    long lastUniqueId = 0;
 
 
     // salt used for testing to simulate clock skew
@@ -100,8 +100,8 @@ public class UniqueIdGenerator {
 
     private final Clock m_clock;
 
-    public UniqueIdGenerator(long initiatorId, long timestampTestingSalt) {
-        this(initiatorId, timestampTestingSalt, new Clock() {
+    public UniqueIdGenerator(long partitionId, long timestampTestingSalt) {
+        this(partitionId, timestampTestingSalt, new Clock() {
             @Override
             public long get() {
                 return System.currentTimeMillis();
@@ -115,12 +115,12 @@ public class UniqueIdGenerator {
     }
 
     /**
-     * Initialize the TransactionIdManager for this site
-     * @param initiatorId The siteId of the current site.
+     * Initialize the UniqueIdManager for this site
+     * @param partitionId The partitionId of the site generating ids
      * @param timestampTestingSalt Value of the salt used to skew a clock in testing.
      */
-    public UniqueIdGenerator(long initiatorId, long timestampTestingSalt, Clock clock) {
-        this.initiatorId = initiatorId;
+    public UniqueIdGenerator(long partitionId, long timestampTestingSalt, Clock clock) {
+        this.partitionId = partitionId;
 
         m_timestampTestingSalt = timestampTestingSalt;
         m_clock = clock;
@@ -129,24 +129,30 @@ public class UniqueIdGenerator {
         // this should only be used for testing
         if (m_timestampTestingSalt != 0) {
             VoltLogger log = new VoltLogger("HOST");
-            log.warn(String.format("Initiator (id=%d) running in test mode with non-zero timestamp testing value: %d",
-                     initiatorId, timestampTestingSalt));
+            log.warn(String.format("Partition (id=%d) running in test mode with non-zero timestamp testing value: %d",
+                     partitionId, timestampTestingSalt));
         }
     }
 
-    public void updateMostRecentlyGeneratedTransactionId(long txnId) {
-        lastTxnId = Math.max(lastTxnId, txnId);
-        counterValue = UniqueIdGenerator.getSequenceNumberFromTransactionId(lastTxnId);
-        lastUsedTime = UniqueIdGenerator.getTimestampFromTransactionId(lastTxnId);
+    public void updateMostRecentlyGeneratedUniqueId(long uniqueId) {
+        final long partitionId = UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId);
+        if (this.partitionId != partitionId) {
+            VoltDB.crashLocalVoltDB(
+                    "UniqueIdGenerator for partition " + this.partitionId +
+                    " received a unique id from partition " + partitionId, true, null);
+        }
+        lastUniqueId = Math.max(lastUniqueId, uniqueId);
+        counterValue = UniqueIdGenerator.getSequenceNumberFromUniqueId(lastUniqueId);
+        lastUsedTime = UniqueIdGenerator.getTimestampFromUniqueId(lastUniqueId);
     }
 
     /**
      * Generate a unique id that contains a timestamp, a counter
      * and a siteid packed into a 64-bit long value. Subsequent calls
      * to this method will return strictly larger long values.
-     * @return The newly generated transaction id.
+     * @return The newly generated unique id.
      */
-    public long getNextUniqueTransactionId() {
+    public long getNextUniqueId() {
         // get the current time, usually the salt value is zero
         // in testing it is used to simulate clock skew
         long currentTime = m_clock.get() + m_timestampTestingSalt;
@@ -176,7 +182,7 @@ public class UniqueIdGenerator {
                  */
                 VoltLogger log = new VoltLogger("HOST");
                 double diffSeconds = (lastUsedTime - currentTime) / 1000.0;
-                String msg = String.format("Initiator time moved backwards from: %d to %d, a difference of %.2f seconds.",
+                String msg = String.format("UniqueIdGenerator time moved backwards from: %d to %d, a difference of %.2f seconds.",
                         lastUsedTime, currentTime, diffSeconds);
                 log.error(msg);
                 System.err.println(msg);
@@ -235,76 +241,76 @@ public class UniqueIdGenerator {
             counterValue = 0;
         }
 
-        lastTxnId = makeIdFromComponents(currentTime, counterValue, initiatorId);
+        lastUniqueId = makeIdFromComponents(currentTime, counterValue, partitionId);
 
-        return lastTxnId;
+        return lastUniqueId;
     }
 
-    public static long makeIdFromComponents(long ts, long seqNo, long initiatorId) {
+    public static long makeIdFromComponents(long ts, long seqNo, long partitionId) {
         // compute the time in millis since VOLT_EPOCH
-        long txnId = ts - VOLT_EPOCH;
+        long uniqueId = ts - VOLT_EPOCH;
         // verify all fields are the right size
-        assert(txnId <= TIMESTAMP_MAX_VALUE);
+        assert(uniqueId <= TIMESTAMP_MAX_VALUE);
         assert(seqNo <= COUNTER_MAX_VALUE);
-        assert(initiatorId <= INITIATORID_MAX_VALUE);
+        assert(partitionId <= PARTITIONID_MAX_VALUE);
 
         // put this time value in the right offset
-        txnId = txnId << (COUNTER_BITS + INITIATORID_BITS);
+        uniqueId = uniqueId << (COUNTER_BITS + PARTITIONID_BITS);
         // add the counter value at the right offset
-        txnId |= seqNo << INITIATORID_BITS;
+        uniqueId |= seqNo << PARTITIONID_BITS;
         // finally add the siteid at the end
-        txnId |= initiatorId;
+        uniqueId |= partitionId;
 
-        return txnId;
+        return uniqueId;
     }
 
     /**
-     * Given a transaction id, return the time of its creation
+     * Given a unique id, return the time of its creation
      * by examining the embedded timestamp.
-     * @param txnId The transaction id value to examine.
-     * @return The Date object representing the time this transaction
+     * @param uniqueId The unique id value to examine.
+     * @return The Date object representing the time this unique
      * id was created.
      */
-    public static Date getDateFromTransactionId(long txnId) {
-        long time = txnId >> (COUNTER_BITS + INITIATORID_BITS);
+    public static Date getDateFromUniqueId(long uniqueId) {
+        long time = uniqueId >> (COUNTER_BITS + PARTITIONID_BITS);
         time += VOLT_EPOCH;
         return new Date(time);
     }
 
     /**
-     * Given a transaction id, return the time of its creation
+     * Given a unique id, return the time of its creation
      * by examining the embedded timestamp.
-     * @param txnId The transaction id value to examine.
-     * @return The integer representing the time this transaction
+     * @param uniqueId The unique id value to examine.
+     * @return The integer representing the time this unique
      * id was created.
      */
-    public static long getTimestampFromTransactionId(long txnId) {
-        long time = txnId >> (COUNTER_BITS + INITIATORID_BITS);
+    public static long getTimestampFromUniqueId(long uniqueId) {
+        long time = uniqueId >> (COUNTER_BITS + PARTITIONID_BITS);
         time += VOLT_EPOCH;
         return time;
     }
 
     /**
-     * Given a transaction id, return the embedded site id.
-     * @param txnId The transaction id value to examine.
-     * @return The site id embedded within the transaction id.
+     * Given a unique id, return the embedded site id.
+     * @param uniqueId The unique id value to examine.
+     * @return The site id embedded within the unique id.
      */
-    public static long getInitiatorIdFromTransactionId(long txnId) {
-        return txnId & INITIATORID_MAX_VALUE;
+    public static long getPartitionIdFromUniqueId(long uniqueId) {
+        return uniqueId & PARTITIONID_MAX_VALUE;
     }
 
-    public static long getSequenceNumberFromTransactionId(long txnId) {
-        long seq = txnId >> INITIATORID_BITS;
+    public static long getSequenceNumberFromUniqueId(long uniqueId) {
+        long seq = uniqueId >> PARTITIONID_BITS;
         seq = seq & COUNTER_MAX_VALUE;
         return seq;
     }
 
     /**
-     * Get the last txn id generated.
-     * @return The last txn id generated.
+     * Get the last unique id generated.
+     * @return The last unique id generated.
      */
-    public long getLastTxnId() {
-        return lastTxnId;
+    public long getLastUniqueId() {
+        return lastUniqueId;
     }
 
     public long getLastUsedTime() {
@@ -312,23 +318,23 @@ public class UniqueIdGenerator {
     }
 
     /**
-     * Get a string representation of the TxnId
+     * Get a string representation of the uniqueId
      */
-    public static String toString(long txnId) {
+    public static String toString(long uniqueId) {
         final StringBuilder sb = new StringBuilder(128);
-        sb.append("TxnId: ").append(txnId);
-        sb.append(" Timestamp: ").append(getTimestampFromTransactionId(txnId));
-        sb.append(".").append(getSequenceNumberFromTransactionId(txnId));
-        sb.append(" InititatorId: ").append(getInitiatorIdFromTransactionId(txnId));
-        sb.append(" Date: ").append(getDateFromTransactionId(txnId));
+        sb.append("UniqueId: ").append(uniqueId);
+        sb.append(" Timestamp: ").append(getTimestampFromUniqueId(uniqueId));
+        sb.append(".").append(getSequenceNumberFromUniqueId(uniqueId));
+        sb.append(" PartitionId: ").append(getPartitionIdFromUniqueId(uniqueId));
+        sb.append(" Date: ").append(getDateFromUniqueId(uniqueId));
         return sb.toString();
     }
 
-    public static String toBitString(long txnId) {
+    public static String toBitString(long uniqueId) {
         String retval = "";
         long mask = 0x8000000000000000L;
         for(int i = 0; i < 64; i++) {
-            if ((txnId & mask) == 0) retval += "0";
+            if ((uniqueId & mask) == 0) retval += "0";
             else retval += "1";
             mask >>>= 1;
         }

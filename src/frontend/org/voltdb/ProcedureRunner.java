@@ -360,9 +360,9 @@ public class ProcedureRunner {
     public Date getTransactionTime() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
         if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
-            return new Date(UniqueIdGenerator.getTimestampFromTransactionId(invocation.getOriginalUniqueId()));
+            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(invocation.getOriginalUniqueId()));
         } else {
-            return new Date(UniqueIdGenerator.getTimestampFromTransactionId(m_txnState.uniqueId));
+            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(m_txnState.uniqueId));
         }
     }
 
