@@ -1772,10 +1772,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     @Override
-    public CountDownLatch snapshotCompleted(
-            final String nonce, final long txnId, final long partitionTxnIds[],
-            final boolean truncation, String requestId) {
-        if (!truncation) {
+    public CountDownLatch snapshotCompleted(final SnapshotCompletionEvent event) {
+        if (!event.truncationSnapshot) {
             return new CountDownLatch(0);
         }
         final CountDownLatch latch = new CountDownLatch(1);
@@ -1783,10 +1781,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             @Override
             public void run() {
                 try {
-                    TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(txnId);
+                    TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(event.multipartTxnId);
                     if (snapshotAttempt == null) {
                         snapshotAttempt = new TruncationSnapshotAttempt();
-                        m_truncationSnapshotAttempts.put(txnId, snapshotAttempt);
+                        m_truncationSnapshotAttempts.put(event.multipartTxnId, snapshotAttempt);
                     }
                     snapshotAttempt.finished = true;
                     groomTruncationSnapshots();

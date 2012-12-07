@@ -25,8 +25,6 @@ package voltcache.procedures;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 
-import voltcache.api.VoltCacheResult;
-
 @ProcInfo(singlePartition = false)
 
 public class FlushAll extends VoltCacheProcBase
@@ -45,6 +43,6 @@ public class FlushAll extends VoltCacheProcBase
             voltQueueSQL(update, expirationTimestamp(expires));
         }
         voltExecuteSQL(true);
-        return VoltCacheResult.OK;
+        return Result.OK;
     }
 }

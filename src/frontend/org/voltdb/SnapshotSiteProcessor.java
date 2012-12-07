@@ -24,7 +24,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeSet;
@@ -40,6 +39,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -94,8 +94,17 @@ public class SnapshotSiteProcessor {
      * Sequence numbers for export tables. This is repopulated before each snapshot by each execution site
      * that reaches the snapshot.
      */
-    private static final Map<String, List<Pair<Integer, Long>>> m_exportSequenceNumbers =
-        new HashMap<String, List<Pair<Integer, Long>>>();
+    private static final Map<String, Map<Integer, Pair<Long, Long>>> m_exportSequenceNumbers =
+        new HashMap<String, Map<Integer, Pair<Long, Long>>>();
+
+    /**
+     * This field is the same values as m_exportSequenceNumbers once they have been extracted
+     * in SnapshotSaveAPI.createSetup and then passed back in to SSS.initiateSnapshots. The only
+     * odd thing is that setting up a snapshot can fail in which case values will have been populated into
+     * m_exportSequenceNumbers and kept until the next snapshot is started in which case they are repopulated.
+     * Decoupling them seems like a good idea in case snapshot code is every re-organized.
+     */
+    private Map<String, Map<Integer, Pair<Long,Long>>> m_exportSequenceNumbersToLogOnCompletion;
 
     /*
      * Do some random tasks that are deferred to the snapshot termination thread.
@@ -184,24 +193,25 @@ public class SnapshotSiteProcessor {
             if (!CatalogUtil.isTableExportOnly(database, t))
                 continue;
 
-            List<Pair<Integer, Long>> sequenceNumbers = m_exportSequenceNumbers.get(t.getTypeName());
+            Map<Integer, Pair<Long,Long>> sequenceNumbers = m_exportSequenceNumbers.get(t.getTypeName());
             if (sequenceNumbers == null) {
-                sequenceNumbers = new ArrayList<Pair<Integer,Long>>();
+                sequenceNumbers = new HashMap<Integer, Pair<Long, Long>>();
                 m_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
             long[] ackOffSetAndSequenceNumber =
                 context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
-            sequenceNumbers.add(
-                    Pair.of(
+            sequenceNumbers.put(
                             context.getPartitionId(),
-                            ackOffSetAndSequenceNumber[1]));
+                            Pair.of(
+                                ackOffSetAndSequenceNumber[0],
+                                ackOffSetAndSequenceNumber[1]));
         }
     }
 
-    public static Map<String, List<Pair<Integer, Long>>> getExportSequenceNumbers() {
-        HashMap<String, List<Pair<Integer,Long>>> sequenceNumbers =
-            new HashMap<String, List<Pair<Integer, Long>>>(m_exportSequenceNumbers);
+    public static Map<String, Map<Integer, Pair<Long, Long>>> getExportSequenceNumbers() {
+        HashMap<String, Map<Integer, Pair<Long, Long>>> sequenceNumbers =
+            new HashMap<String, Map<Integer, Pair<Long, Long>>>(m_exportSequenceNumbers);
         m_exportSequenceNumbers.clear();
         return sequenceNumbers;
     }
@@ -328,7 +338,12 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    public void initiateSnapshots(ExecutionEngine ee, Deque<SnapshotTableTask> tasks, long txnId, int numHosts) {
+    public void initiateSnapshots(
+            ExecutionEngine ee,
+            Deque<SnapshotTableTask> tasks,
+            long txnId,
+            int numHosts,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
         m_lastSnapshotSucceded = true;
@@ -337,17 +352,24 @@ public class SnapshotSiteProcessor {
         m_snapshotTableTasks = new ArrayDeque<SnapshotTableTask>(tasks);
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
+        m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
         for (final SnapshotTableTask task : tasks) {
             if ((!task.m_isReplicated) || (!task.m_target.getFormat().isTableBased())) {
                 assert(task != null);
                 assert(m_snapshotTargets != null);
                 m_snapshotTargets.add(task.m_target);
             }
-            if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
-                hostLog.error("Attempted to activate copy on write mode for table "
-                        + task.m_name + " and failed");
-                hostLog.error(task);
-                VoltDB.crashLocalVoltDB("No additional info", false, null);
+            /*
+             * Why do the extra work for a /dev/null target
+             * Check if it is dev null and don't activate COW
+             */
+            if (!task.m_isDevNull) {
+                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
+                    hostLog.error("Attempted to activate copy on write mode for table "
+                            + task.m_name + " and failed");
+                    hostLog.error(task);
+                    VoltDB.crashLocalVoltDB("No additional info", false, null);
+                }
             }
         }
         /*
@@ -395,17 +417,25 @@ public class SnapshotSiteProcessor {
             final SnapshotTableTask currentTask = m_snapshotTableTasks.peek();
             assert(currentTask != null);
             final int headerSize = currentTask.m_target.getHeaderSize();
+            int serialized = 0;
             final BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
             assert(snapshotBuffer != null);
             snapshotBuffer.b.clear();
             snapshotBuffer.b.position(headerSize);
-            final int serialized =
-                ee.tableStreamSerializeMore(
-                    snapshotBuffer,
-                    currentTask.m_tableId,
-                    TableStreamType.SNAPSHOT);
-            if (serialized < 0) {
-                VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
+
+            /*
+             * For a dev null target don't do the work. The table wasn't
+             * put in COW mode anyway so this will fail
+             */
+            if (!currentTask.m_isDevNull) {
+                serialized =
+                    ee.tableStreamSerializeMore(
+                        snapshotBuffer,
+                        currentTask.m_tableId,
+                        TableStreamType.SNAPSHOT);
+                if (serialized < 0) {
+                    VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
+                }
             }
 
             /**
@@ -490,6 +520,9 @@ public class SnapshotSiteProcessor {
             if (result == 0) {
                 final long txnId = m_lastSnapshotTxnId;
                 final int numHosts = m_lastSnapshotNumHosts;
+                final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
+                        m_exportSequenceNumbersToLogOnCompletion;
+                m_exportSequenceNumbersToLogOnCompletion = null;
                 final Thread terminatorThread =
                     new Thread("Snapshot terminator") {
                     @Override
@@ -531,7 +564,11 @@ public class SnapshotSiteProcessor {
                             }
                         } finally {
                             try {
-                                logSnapshotCompleteToZK(txnId, numHosts, m_lastSnapshotSucceded);
+                                logSnapshotCompleteToZK(
+                                        txnId,
+                                        numHosts,
+                                        m_lastSnapshotSucceded,
+                                        exportSequenceNumbers);
                             } finally {
                                 /**
                                  * Set it to -1 indicating the system is ready to perform another snapshot.
@@ -552,7 +589,11 @@ public class SnapshotSiteProcessor {
     }
 
 
-    private static void logSnapshotCompleteToZK(long txnId, int numHosts, boolean snapshotSuccess) {
+    private static void logSnapshotCompleteToZK(
+            long txnId,
+            int numHosts,
+            boolean snapshotSuccess,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
@@ -580,7 +621,7 @@ public class SnapshotSiteProcessor {
                     hostLog.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
                 }
-
+                mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
                 zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
                 continue;
@@ -617,6 +658,65 @@ public class SnapshotSiteProcessor {
             hostLog.warn("Expect the snapshot node to already exist during deletion", e);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+    }
+
+    /*
+     * When recording snapshot completion we also record export sequence numbers
+     * as JSON. Need to merge our sequence numbers with existing numbers
+     * since multiple replicas will submit the sequence number
+     */
+    private static void mergeExportSequenceNumbers(JSONObject jsonObj,
+            Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) throws JSONException {
+        JSONObject tableSequenceMap;
+        if (jsonObj.has("exportSequenceNumbers")) {
+            tableSequenceMap = jsonObj.getJSONObject("exportSequenceNumbers");
+        } else {
+            tableSequenceMap = new JSONObject();
+            jsonObj.put("exportSequenceNumbers", tableSequenceMap);
+        }
+
+        for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> tableEntry : exportSequenceNumbers.entrySet()) {
+            JSONObject sequenceNumbers;
+            final String tableName = tableEntry.getKey();
+            if (tableSequenceMap.has(tableName)) {
+                sequenceNumbers = tableSequenceMap.getJSONObject(tableName);
+            } else {
+                sequenceNumbers = new JSONObject();
+                tableSequenceMap.put(tableName, sequenceNumbers);
+            }
+
+            for (Map.Entry<Integer, Pair<Long, Long>> partitionEntry : tableEntry.getValue().entrySet()) {
+                final Integer partitionId = partitionEntry.getKey();
+                final String partitionIdString = partitionId.toString();
+                final Long ackOffset = partitionEntry.getValue().getFirst();
+                final Long partitionSequenceNumber = partitionEntry.getValue().getSecond();
+
+                /*
+                 * Check that the sequence number is the same everywhere and log if it isn't.
+                 * Not going to crash because we are worried about poison pill transactions.
+                 */
+                if (sequenceNumbers.has(partitionIdString)) {
+                    JSONObject existingEntry = sequenceNumbers.getJSONObject(partitionIdString);
+                    Long existingSequenceNumber = existingEntry.getLong("sequenceNumber");
+                    if (!existingSequenceNumber.equals(partitionSequenceNumber)) {
+                        hostLog.error("Found a mismatch in export sequence numbers while recording snapshot metadata " +
+                                " for partition " + partitionId +
+                                " the sequence number should be the same at all replicas, but one had " +
+                                existingSequenceNumber
+                                + " and another had " + partitionSequenceNumber);
+                    }
+                    existingEntry.put(partitionIdString, Math.max(existingSequenceNumber, partitionSequenceNumber));
+
+                    Long existingAckOffset = existingEntry.getLong("ackOffset");
+                    existingEntry.put("ackOffset", Math.max(ackOffset, existingAckOffset));
+                } else {
+                    JSONObject newObj = new JSONObject();
+                    newObj.put("sequenceNumber", partitionSequenceNumber);
+                    newObj.put("ackOffset", ackOffset);
+                    sequenceNumbers.put(partitionIdString, newObj);
+                }
+            }
         }
     }
 

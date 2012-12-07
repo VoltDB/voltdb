@@ -72,7 +72,7 @@ public class SnapshotVerifier {
             directories.add(".");
         }
 
-        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
+        Map<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         for (String directory : directories) {
             SnapshotUtil.retrieveSnapshotFiles( new File(directory), snapshots, filter, 0, true);
         }
@@ -81,8 +81,8 @@ public class SnapshotVerifier {
             System.out.println("Snapshot corrupted");
             System.out.println("No files found");
         }
-        for (Map.Entry<Long, Snapshot> s : snapshots.entrySet()) {
-            System.out.println(SnapshotUtil.generateSnapshotReport(s.getKey(), s.getValue()).getSecond());
+        for (Snapshot s : snapshots.values()) {
+            System.out.println(SnapshotUtil.generateSnapshotReport(s.getTxnId(), s).getSecond());
         }
     }
 

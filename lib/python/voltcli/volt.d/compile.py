@@ -26,22 +26,75 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+from voltcli import utility
 
+# Main Java class.
+VoltCompiler = 'org.voltdb.compiler.VoltCompiler'
+
+# Command meta-data.
 @VOLT.Command(
-    description = 'Run the VoltDB compiler to build the catalog.',
+    # Descriptions for help screen.
+    description  = 'Run the VoltDB compiler to build the catalog.',
+    description2 = 'At least one DDL file is required unless a project file is provided.',
+
+    # Command line options.
     options = (
-        VOLT.BooleanOption('-C', '--conditional', 'conditional',
-                           'build only when the catalog file is missing')),
+        VOLT.StringOption('-c', '--classpath', 'classpath',
+                          'additional colon-separated Java CLASSPATH directories'),
+        VOLT.StringOption('-o', '--output', 'catalog',
+                          'the output application catalog jar file',
+                          default = 'catalog.jar'),
+        VOLT.StringOption('-p', '--project', 'project',
+                          'the project file, e.g. project.xml (deprecated)')
+    ),
+
+    # Command line arguments.
     arguments = (
-        VOLT.StringArgument('classpath',
-                            'additional colon-separated Java CLASSPATH directories'),
-        VOLT.StringArgument('catalog',
-                            'the application catalog jar file path')))
+        VOLT.StringArgument('ddl', 'DDL file(s)', min_count = 0, max_count = None)
+    )
+)
+
+# Command implementation.
 def compile(runner):
-    if not runner.opts.conditional or not os.path.exists(runner.opts.catalog):
-        runner.java.execute('org.voltdb.compiler.VoltCompiler',
-                            None,
-                            runner.project_path,
-                            runner.opts.catalog,
-                            classpath = runner.opts.classpath,
-                            *runner.args)
+
+    # Check that there's something to compile.
+    if not runner.opts.project and not runner.opts.ddl:
+        runner.abort_with_help('Either project or DDL files must be specified.')
+
+    # Explicit extensions allow VoltCompiler.main() to discriminate between the
+    # new and old style argument lists, i.e. with and without a project file.
+    # Checking here enables better error messages.
+    if not runner.opts.catalog.lower().endswith('.jar'):
+        runner.abort('Output catalog file "%s" does not have a ".jar" extension.'
+                            % runner.opts.catalog)
+    if runner.opts.project and not runner.opts.project.lower().endswith('.xml'):
+        runner.abort('Project file "%s" does not have a ".xml" extension.'
+                            % runner.opts.project)
+
+    # Look for missing files.
+    missing = []
+    for path in utility.flatten(runner.opts.project, runner.opts.ddl):
+        if not os.path.exists(path):
+            missing.append(path)
+    if missing:
+        runner.abort('Missing files:', missing)
+
+    # Verbose argument display.
+    if runner.is_verbose():
+        params = ['Output catalog file: %s' % runner.opts.catalog]
+        if runner.opts.project:
+            params.append('Project file: %s' % runner.opts.project)
+        if runner.opts.ddl:
+            params.append('DDL files:')
+            params.append(runner.opts.ddl)
+        runner.verbose_info('Compilation parameters:', params)
+
+    # Build the positional and keyword argument lists and invoke the compiler
+    args = []
+    if runner.opts.project:
+        args.append(runner.opts.project)
+    args.append(runner.opts.catalog)
+    if runner.opts.ddl:
+        args.extend(runner.opts.ddl)
+    kwargs = dict(classpath = runner.opts.classpath)
+    runner.java.execute(VoltCompiler, None, *args, **kwargs)

@@ -24,9 +24,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 
+import jsr166y.ThreadLocalRandom;
+
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
+import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltcore.logging.VoltLogger;
+
+import com.google.common.base.Throwables;
 
 /**
  * Represents the export connection to a single export table in the database for
@@ -162,17 +167,44 @@ public class ExportDataSink {
                 return;
             }
 
-            m_decoder.onBlockStart();
-            // run the verifier until m.getData() is consumed
-            while (m.getData().hasRemaining()) {
-                int length = m.getData().getInt();
-                byte[] rowdata = new byte[length];
-                m.getData().get(rowdata, 0, length);
-                m_decoder.processRow(length, rowdata);
-            }
+            //Position to restart at on error
+            final int startPosition = m.getData().position();
 
-            // Perform completion work on the decoder
-            m_decoder.onBlockCompletion();
+            //Track the amount of backoff to use next time, will be updated on repeated failure
+            int backoffQuantity = 10 + (int)(10 * ThreadLocalRandom.current().nextDouble());
+
+            while (true) {
+                m.getData().position(startPosition);
+
+                try {
+                    m_decoder.onBlockStart();
+                    // run the verifier until m.getData() is consumed
+                    while (m.getData().hasRemaining()) {
+                        int length = m.getData().getInt();
+                        byte[] rowdata = new byte[length];
+                        m.getData().get(rowdata, 0, length);
+                        m_decoder.processRow(length, rowdata);
+                    }
+
+                    // Perform completion work on the decoder
+                    m_decoder.onBlockCompletion();
+                    break;
+                } catch (RestartBlockException e) {
+                    if (e.requestBackoff) {
+                        try {
+                            Thread.sleep(backoffQuantity);
+                        } catch (InterruptedException e2) {
+                            Throwables.propagate(e2);
+                        }
+                        //Cap backoff to 8 seconds, then double modulo some randomness
+                        if (backoffQuantity < 8000) {
+                            backoffQuantity += (backoffQuantity * .5);
+                            backoffQuantity +=
+                                    (backoffQuantity * .5 * ThreadLocalRandom.current().nextDouble());
+                        }
+                    }
+                }
+            }
 
             // ack the old block and poll the next
             pollAndAck(m);

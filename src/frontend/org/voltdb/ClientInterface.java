@@ -1809,10 +1809,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         VoltDB.instance().getSnapshotCompletionMonitor();
                 completionMonitor.addInterest(new SnapshotCompletionInterest() {
                     @Override
-                    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
-                            long[] partitionTxnIds, boolean truncationSnapshot, String reqIdCmp) {
+                    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
                         // Is this our snapshot?
-                        if (truncationSnapshot && reqId.equals(reqIdCmp)) {
+                        if (event.truncationSnapshot && reqId.equals(event.requestId)) {
                             promote();
                         }
                         return null;

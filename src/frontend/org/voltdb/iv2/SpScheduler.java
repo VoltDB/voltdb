@@ -745,10 +745,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     @Override
-    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
-            long[] partitionTxnIds, boolean truncationSnapshot, String requestId)
+    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
     {
-        if (truncationSnapshot) {
+        if (event.truncationSnapshot) {
             writeIv2ViableReplayEntry();
         }
         return new CountDownLatch(0);

@@ -48,6 +48,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -74,6 +75,12 @@ public class SnapshotSaveAPI
 
     // ugh, ick, ugh
     public static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
+
+    /*
+     * Ugh!, needs to be visible to all the threads doing the snapshot,
+     * pbulished under the snapshot create lock.
+     */
+    private static Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
 
     /**
      * The only public method: do all the work to start a snapshot.
@@ -142,10 +149,10 @@ public class SnapshotSaveAPI
                      * it isn't fatal we can just skip it.
                      */
                     for (long txnId : legacyPerPartitionTxnIds) {
-                        final int legacyPartition = (int)TxnEgo.getPartitionId(txnId);
+                        final int legacyPartition = TxnEgo.getPartitionId(txnId);
                         boolean isDup = false;
                         for (long existingId : partitionTransactionIds) {
-                            final int existingPartition = (int)TxnEgo.getPartitionId(existingId);
+                            final int existingPartition = TxnEgo.getPartitionId(existingId);
                             if (existingPartition == legacyPartition) {
                                 HOST_LOG.warn("While saving a snapshot and propagating legacy " +
                                         "transaction ids found an id that matches currently active partition" +
@@ -158,7 +165,7 @@ public class SnapshotSaveAPI
                         }
                     }
                 }
-
+                exportSequenceNumbers = SnapshotSiteProcessor.getExportSequenceNumbers();
                 createSetup(
                         file_path,
                         file_nonce,
@@ -168,7 +175,8 @@ public class SnapshotSaveAPI
                         data,
                         context,
                         hostname,
-                        result);
+                        result,
+                        exportSequenceNumbers);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -189,7 +197,8 @@ public class SnapshotSaveAPI
                 context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
                         multiPartTxnId,
-                        context.getSiteTrackerForSnapshot().getAllHosts().size());
+                        context.getSiteTrackerForSnapshot().getAllHosts().size(),
+                        exportSequenceNumbers);
             }
         }
 
@@ -384,6 +393,7 @@ public class SnapshotSaveAPI
             stringer.key("finishedHosts").value(0);
             stringer.key("nonce").value(nonce);
             stringer.key("truncReqId").value(truncReqId);
+            stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());
             nodeBytes = jsonObj.toString(4).getBytes("UTF-8");
@@ -412,7 +422,8 @@ public class SnapshotSaveAPI
             String file_path, String file_nonce, SnapshotFormat format,
             long txnId, List<Long> partitionTransactionIds,
             String data, SystemProcedureExecutionContext context,
-            String hostname, final VoltTable result) {
+            String hostname, final VoltTable result,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         {
             SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
@@ -443,7 +454,7 @@ public class SnapshotSaveAPI
             /*
              * List of partitions to include if this snapshot is
              * going to be deduped. Attempts to break up the work
-             * by seeding an RNG selecting
+             * by seeding and RNG selecting
              * a random replica to do the work. Will not work in failure
              * cases, but we don't use dedupe when we want durability.
              *
@@ -483,7 +494,9 @@ public class SnapshotSaveAPI
                 assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1);
 
                 final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
-
+                /*
+                 * For a file based snapshot
+                 */
                 if (format.isFileBased()) {
                     Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                                                   txnId,
@@ -492,7 +505,7 @@ public class SnapshotSaveAPI
                                                   file_nonce,
                                                   tables,
                                                   context.getHostId(),
-                                                  SnapshotSiteProcessor.getExportSequenceNumbers(),
+                                                  exportSequenceNumbers,
                                                   partitionTransactionIds,
                                                   VoltDB.instance().getHostMessenger().getInstanceId());
                     if (completionTask != null) {
@@ -610,7 +623,7 @@ public class SnapshotSaveAPI
                                     final SnapshotRegistry.Snapshot completed =
                                         SnapshotRegistry.finishSnapshot(snapshotRecord);
                                     final double duration =
-                                        (completed.timeFinished - org.voltdb.TransactionIdManager.getTimestampFromTransactionId(completed.txnId)) / 1000.0;
+                                        (completed.timeFinished - completed.timeStarted) / 1000.0;
                                     HOST_LOG.info(
                                             "Snapshot " + snapshotRecord.nonce + " finished at " +
                                              completed.timeFinished + " and took " + duration

@@ -19,17 +19,14 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
-import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.TimeZone;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
@@ -42,11 +39,22 @@ public class VoltTableUtil {
     // String used to indicate NULL value in the output CSV file
     private static final String CSV_NULL = "\\N";
 
+    /*
+     * Ugly hack to allow SnapshotConverter which
+     * shares this code with the server to specify it's own time zone.
+     * You wouldn't want to convert to anything other then GMT if you want to get the data back into
+     * Volt using the CSV loader because that relies on the server to coerce the date string
+     * and the server only supports GMT.
+     */
+    public static TimeZone tz = VoltDB.VOLT_TIMEZONE;
+
     private static final ThreadLocal<SimpleDateFormat> m_sdf = new ThreadLocal<SimpleDateFormat>() {
         @Override
         public SimpleDateFormat initialValue() {
-            return new SimpleDateFormat(
-                    "yyyy-MM-dd HH:mm:ss.SSS");
+            SimpleDateFormat sdf = new SimpleDateFormat(
+                    VoltDB.ODBC_DATE_FORMAT_STRING);
+            sdf.setTimeZone(tz);
+            return sdf;
         }
     };
 
