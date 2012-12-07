@@ -623,7 +623,7 @@ public class SnapshotSaveAPI
                                     final SnapshotRegistry.Snapshot completed =
                                         SnapshotRegistry.finishSnapshot(snapshotRecord);
                                     final double duration =
-                                        (completed.timeFinished - org.voltdb.TransactionIdManager.getTimestampFromTransactionId(completed.txnId)) / 1000.0;
+                                        (completed.timeFinished - completed.timeStarted) / 1000.0;
                                     HOST_LOG.info(
                                             "Snapshot " + snapshotRecord.nonce + " finished at " +
                                              completed.timeFinished + " and took " + duration

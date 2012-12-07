@@ -571,6 +571,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                     } catch (Exception e) {
                         failure.incrementAndGet();
                     }
+
+                    agent.exitRestore();
                 }
             });
         }

@@ -500,7 +500,7 @@ SnapshotCompletionInterest
      * Exists the restore process. Waits for all other hosts to complete first.
      * This method blocks.
      */
-    private void exitRestore() {
+    void exitRestore() {
         try {
             m_zk.delete(m_generatedRestoreBarrier2, -1);
         } catch (Exception e) {
