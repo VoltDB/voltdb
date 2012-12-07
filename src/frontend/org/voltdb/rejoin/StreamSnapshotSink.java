@@ -23,7 +23,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltDB;
 
 /**
@@ -115,7 +114,7 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         outputBuffer.put(m_schema);
         outputBuffer.put(buf);
         outputBuffer.flip();
-        System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(outputBuffer, true));
+
         return outputBuffer;
     }
 

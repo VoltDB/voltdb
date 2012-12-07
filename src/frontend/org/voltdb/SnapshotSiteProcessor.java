@@ -416,11 +416,12 @@ public class SnapshotSiteProcessor {
         while (!m_snapshotTableTasks.isEmpty()) {
             final SnapshotTableTask currentTask = m_snapshotTableTasks.peek();
             assert(currentTask != null);
+            final int headerSize = currentTask.m_target.getHeaderSize();
             int serialized = 0;
             final BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
             assert(snapshotBuffer != null);
             snapshotBuffer.b.clear();
-            snapshotBuffer.b.position(0);
+            snapshotBuffer.b.position(headerSize);
 
             /*
              * For a dev null target don't do the work. The table wasn't
@@ -473,7 +474,7 @@ public class SnapshotSiteProcessor {
             /**
              * The block from the EE will contain raw tuple data with no length prefix etc.
              */
-            snapshotBuffer.b.limit(serialized);
+            snapshotBuffer.b.limit(serialized + headerSize);
             snapshotBuffer.b.position(0);
             Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
             for (SnapshotDataFilter filter : currentTask.m_filters) {
