@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 # This script assumes a relative location in a root subdirectory of a voltdb
-# source layout.  The logic is intentionally minimal since almost all of the
+# distribution. The logic is intentionally minimal since almost all of the
 # heavy lifting happens in runner.main(). The script name determines the verbs
 # that are loaded from <name>.d subdirectories. It loads the version number
 # from version.txt in the script's parent directory. It can be copied to other
