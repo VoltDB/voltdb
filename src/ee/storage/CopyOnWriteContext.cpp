@@ -22,7 +22,7 @@
 #include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>
-#include <boost/crc.hpp>
+#include <crc/crc32c.h>
 
 namespace voltdb {
 
@@ -38,11 +38,12 @@ CopyOnWriteContext::CopyOnWriteContext(PersistentTable *table, TupleSerializer *
              m_tuplesSerialized(0) {}
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
-    boost::crc_32_type crc;
-    boost::crc_32_type partitionIdCRC;
+    uint32_t crc = vdbcrc::crc32cInit();
+    uint32_t partitionIdCRC = vdbcrc::crc32cInit();
     out->writeInt(m_partitionId);
-    partitionIdCRC.process_bytes(out->data() + out->position() - 4, 4);
-    out->writeInt(partitionIdCRC.checksum());
+    partitionIdCRC = vdbcrc::crc32c( partitionIdCRC, out->data() + out->position() - 4, 4);
+    partitionIdCRC = vdbcrc::crc32cFinish(partitionIdCRC);
+    out->writeInt(partitionIdCRC);
     const std::size_t crcPosition = out->reserveBytes(4);//For CRC
     int rowsSerialized = 0;
 
@@ -66,8 +67,9 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         if (!hadMore) {
             if (m_finishedTableScan) {
                 out->writeInt(rowsSerialized);
-                crc.process_bytes(out->data() + out->position() - 4, 4);
-                out->writeIntAt(crcPosition, crc.checksum());
+                crc = vdbcrc::crc32c( crc, out->data() + out->position() - 4, 4);
+                crc = vdbcrc::crc32cFinish(crc);
+                out->writeIntAt(crcPosition, crc);
                 return false;
             } else {
                 m_finishedTableScan = true;
@@ -79,7 +81,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         const std::size_t tupleStartPosition = out->position();
         m_serializer->serializeTo( tuple, out);
         const std::size_t tupleEndPosition = out->position();
-        crc.process_block(out->data() + tupleStartPosition, out->data() + tupleEndPosition);
+        crc = vdbcrc::crc32c( crc, out->data() + tupleStartPosition, tupleEndPosition - tupleStartPosition);
         m_tuplesSerialized++;
         rowsSerialized++;
 
@@ -112,8 +114,9 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
      * to match the table serialization format when chunk is read later.
      */
     out->writeInt(rowsSerialized);
-    crc.process_bytes(out->data() + out->position() - 4, 4);
-    out->writeIntAt(crcPosition, crc.checksum());
+    crc = vdbcrc::crc32c( crc, out->data() + out->position() - 4, 4);
+    crc = vdbcrc::crc32cFinish(crc);
+    out->writeIntAt(crcPosition, crc);
     return true;
 }
 

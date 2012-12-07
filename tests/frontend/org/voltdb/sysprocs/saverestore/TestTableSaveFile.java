@@ -27,20 +27,20 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.zip.CRC32;
 
 import junit.framework.TestCase;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.DeprecatedDefaultSnapshotDataTarget;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.messaging.FastSerializer;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.Pair;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 import com.google.common.util.concurrent.Callables;
 
@@ -78,7 +78,7 @@ public class TestTableSaveFile extends TestCase {
                 + target.getHeaderSize());
         chunkBuffer.position(target.getHeaderSize());
         chunkBuffer.mark();
-        final CRC32 partitionIdCRC = new CRC32();
+        final PureJavaCrc32C partitionIdCRC = new PureJavaCrc32C();
         chunkBuffer.putInt(partitionId);
         chunkBuffer.reset();
         byte partitionIdBytes[] = new byte[4];
@@ -90,7 +90,7 @@ public class TestTableSaveFile extends TestCase {
         chunkBuffer.put(b);
         chunkBuffer.putInt(rowCount);
         chunkBuffer.position(crcPosition + 4);
-        final int crc = DBBPool.getBufferCRC32(chunkBuffer, chunkBuffer.position(), chunkBuffer.remaining());
+        final int crc = DBBPool.getBufferCRC32C(chunkBuffer, chunkBuffer.position(), chunkBuffer.remaining());
         chunkBuffer.position(crcPosition);
         chunkBuffer.putInt(crc);
         chunkBuffer.position(0);

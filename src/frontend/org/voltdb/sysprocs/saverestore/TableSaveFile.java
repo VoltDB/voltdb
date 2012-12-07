@@ -19,8 +19,8 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.nio.BufferUnderflowException;
 import java.nio.BufferOverflowException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
@@ -28,16 +28,18 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
-import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.CompressionService;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONArray;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.utils.CompressionService;
 
 /**
  * An abstraction around a table's save file for restore.  Deserializes the
@@ -48,6 +50,10 @@ import org.json_voltpatches.JSONArray;
  */
 public class TableSaveFile
 {
+
+    public static enum ChecksumType {
+        CRC32, CRC32C
+    }
 
     public class Container extends BBContainer {
         public final int partitionId;
@@ -103,11 +109,11 @@ public class TableSaveFile
             m_saveFile = dataIn;
             m_continueOnCorruptedChunk = continueOnCorruptedChunk;
 
-            final CRC32 crc = new CRC32();
+            final PureJavaCrc32 crc = new PureJavaCrc32();
             /*
              * If the CRC check fails because the file wasn't completed
              */
-            final CRC32 secondCRC = new CRC32();
+            final PureJavaCrc32 secondCRC = new PureJavaCrc32();
 
             /*
              * Get the header with the save restore specific information
@@ -225,6 +231,7 @@ public class TableSaveFile
                 m_tableName = fd.readString();
                 m_isReplicated = fd.readBoolean();
                 m_isCompressed = false;
+                m_checksumType = ChecksumType.CRC32;
                 if (!m_isReplicated) {
                     m_partitionIds = (int[])fd.readArray(int.class);
                     if (!m_completed) {
@@ -256,6 +263,7 @@ public class TableSaveFile
                 m_tableName = obj.getString("tableName");
                 m_isReplicated = obj.getBoolean("isReplicated");
                 m_isCompressed = obj.optBoolean("isCompressed", false);
+                m_checksumType = ChecksumType.valueOf(obj.optString("checksumType", "CRC32"));
                 if (!m_isReplicated) {
                     JSONArray partitionIds = obj.getJSONArray("partitionIds");
                     m_partitionIds = new int[partitionIds.length()];
@@ -442,6 +450,7 @@ public class TableSaveFile
     private ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
     private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();
     private final HashSet<Integer> m_relevantPartitionIds;
+    private final ChecksumType m_checksumType;
 
     /**
      * Maintain a list of corrupted partitions. It is possible for uncorrupted partitions
@@ -506,14 +515,14 @@ public class TableSaveFile
                      * continue processing chunks from other partitions if only one partition
                      * has corrupt chunks in the file.
                      */
-                    final CRC32 partitionIdCRC = new CRC32();
+                    final Checksum partitionIdCRC = m_checksumType == ChecksumType.CRC32C ? new PureJavaCrc32C() : new PureJavaCrc32();
                     chunkLengthB.mark();
                     final int nextChunkPartitionId = chunkLengthB.getInt();
                     final int nextChunkPartitionIdCRC = chunkLengthB.getInt();
                     chunkLengthB.reset();
                     byte partitionIdBytes[] = new byte[4];
                     chunkLengthB.get(partitionIdBytes);
-                    partitionIdCRC.update(partitionIdBytes);
+                    partitionIdCRC.update(partitionIdBytes, 0, partitionIdBytes.length);
                     int generatedValue = (int)partitionIdCRC.getValue();
                     if (generatedValue != nextChunkPartitionIdCRC) {
                         chunkLengthB.position(0);
@@ -638,7 +647,10 @@ public class TableSaveFile
                      * Validate the rest of the chunk. This can fail if the data is corrupted
                      * or the length value was corrupted.
                      */
-                    final int calculatedCRC = DBBPool.getBufferCRC32(c.b, c.b.position(), c.b.remaining());
+                    final int calculatedCRC =
+                            m_checksumType == ChecksumType.CRC32C  ?
+                                    DBBPool.getCRC32C(c.address, c.b.position(), c.b.remaining()) :
+                                        DBBPool.getCRC32(c.address, c.b.position(), c.b.remaining());
                     if (calculatedCRC != nextChunkCRC) {
                         m_corruptedPartitions.add(nextChunkPartitionId);
                         if (m_continueOnCorruptedChunk) {

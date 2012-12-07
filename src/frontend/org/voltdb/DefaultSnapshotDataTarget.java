@@ -34,15 +34,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotTableTask;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CompressionService;
 
@@ -165,6 +164,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             stringer.key("tableName").value(tableName.toUpperCase());
             stringer.key("isReplicated").value(isReplicated);
             stringer.key("isCompressed").value(true);
+            stringer.key("checksumType").value("CRC32C");
             if (!isReplicated) {
                 stringer.key("partitionIds").array();
                 for (int partitionId : partitionIds) {
@@ -192,7 +192,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
         final byte schemaBytes[] = schemaTable.getSchemaBytes();
 
-        final CRC32 crc = new CRC32();
+        final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaBytes.length);
         aggregateBuffer.put(container.b);
         aggregateBuffer.put(schemaBytes);

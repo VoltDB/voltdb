@@ -54,8 +54,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -1168,7 +1168,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             "Deployment file could not be found locally or remotely at "
                             + m_config.m_pathToDeployment);
                 }
-                CRC32 crc = new CRC32();
+                PureJavaCrc32 crc = new PureJavaCrc32();
                 crc.update(deploymentBytes);
                 final long checksumHere = crc.getValue();
                 crc.reset();

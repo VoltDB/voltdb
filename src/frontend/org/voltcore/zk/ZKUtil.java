@@ -31,10 +31,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.zip.CRC32;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -172,7 +172,7 @@ public class ZKUtil {
 
         byte resultBuffers[][] = new byte[chunks.size() - 1][];
         int ii = 0;
-        CRC32 crc = getCRC ? new CRC32() : null;
+        PureJavaCrc32 crc = getCRC ? new PureJavaCrc32() : null;
         for (String chunk : chunks) {
             if (chunk.endsWith("_complete")) continue;
             resultBuffers[ii] = zk.getData(chunk, false, null);
