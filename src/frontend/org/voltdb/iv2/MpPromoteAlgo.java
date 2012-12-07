@@ -273,6 +273,7 @@ public class MpPromoteAlgo implements RepairAlgo
                         ftm.getCoordinatorHSId(),
                         ftm.getTxnId(),
                         ftm.isReadOnly(),
+                        0,
                         true,   // Force rollback as our repair operation.
                         false,  // no acks in iv2.
                         true,   // Indicate rollback for repair.

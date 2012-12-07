@@ -41,7 +41,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     private String appStatusString = null;
     private byte encodedAppStatusString[];
     private VoltTable[] results = new VoltTable[0];
-    private Integer m_sqlHashResults = null;
+    private Integer m_hash = null;
 
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
@@ -132,8 +132,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         setResults(status, results, extra);
     }
 
-    public void setSQLHash(Integer sqlHash) {
-        m_sqlHashResults = sqlHash;
+    public void setHash(Integer hash) {
+        m_hash = hash;
     }
 
     @Override
@@ -159,8 +159,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return clientHandle;
     }
 
-    public Integer getSQLHash() {
-        return m_sqlHashResults;
+    public Integer getHash() {
+        return m_hash;
     }
 
     @Override
@@ -192,9 +192,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             m_exception = null;
         }
         if ((presentFields & (1 << 4)) != 0) {
-            m_sqlHashResults = in.readInt();
+            m_hash = in.readInt();
         } else {
-            m_sqlHashResults = null;
+            m_hash = null;
         }
         results = (VoltTable[]) in.readArray(VoltTable.class);
         setProperly = true;
@@ -220,7 +220,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             if (m_exception != null) {
                 msgsize += m_exception.getSerializedSize();
             }
-            if (m_sqlHashResults != null) {
+            if (m_hash != null) {
                 msgsize += 4;
             }
             for (VoltTable vt : results) {
@@ -249,7 +249,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         if (statusString != null) {
             presentFields |= 1 << 5;
         }
-        if (m_sqlHashResults != null) {
+        if (m_hash != null) {
             presentFields |= 1 << 4;
         }
         buf.put(presentFields);
@@ -269,8 +269,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             m_exception.serializeToBuffer(b);
             buf.put(b.array());
         }
-        if (m_sqlHashResults != null) {
-            buf.putInt(m_sqlHashResults.intValue());
+        if (m_hash != null) {
+            buf.putInt(m_hash.intValue());
         }
         buf.putShort((short)results.length);
         for (VoltTable vt : results)
@@ -371,10 +371,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
      * but also a bit icky.
      */
     public void convertResultsToHashForDeterminism() {
-        long hash = getHashOfTableResults() << 32;
-        if (m_sqlHashResults != null) {
-            hash |= m_sqlHashResults.intValue();
-        }
+        int hash = m_hash == null ? 0 : m_hash;
+
         VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
         t.addRow(hash);
         results = new VoltTable[] { t };

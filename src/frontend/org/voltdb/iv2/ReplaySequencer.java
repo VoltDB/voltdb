@@ -21,9 +21,9 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.TreeMap;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -49,6 +49,8 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  */
 public class ReplaySequencer
 {
+    private static final VoltLogger log = new VoltLogger("HOST");
+
     // place holder that associates sentinel, first fragment and
     // work that follows in the transaction sequence.
     private class ReplayEntry {
@@ -119,24 +121,29 @@ public class ReplaySequencer
     public VoltMessage poll()
     {
         if (m_replayEntries.isEmpty()) {
+            log.info("Replay Sequencer poll returning null 1");
             return null;
         }
         if (m_replayEntries.firstEntry().getValue().isEmpty()) {
             m_replayEntries.pollFirstEntry();
         }
         if (m_replayEntries.isEmpty()) {
+            log.info("Replay Sequencer poll returning null 2");
             return null;
         }
         VoltMessage m = m_replayEntries.firstEntry().getValue().poll();
         if (m instanceof FragmentTaskMessage) {
             m_lastPolledFragmentTxnId = m_replayEntries.firstEntry().getKey();
         }
+        log.info("Replay Sequencer poll returning " + String.valueOf(m));
         return m;
     }
 
     // Offer a new message. Return false if the offered message can be run immediately.
     public boolean offer(long inTxnId, TransactionInfoBaseMessage in)
     {
+        log.info("Replay Sequencer got: " + in.toString());
+
         ReplayEntry found = m_replayEntries.get(inTxnId);
 
         /*
@@ -153,6 +160,7 @@ public class ReplaySequencer
          * the first fragment immediately.
          */
         if (m_eolReached && found == null) {
+            log.info("Replay Sequencer returning false");
             return false;
         }
 
@@ -172,6 +180,7 @@ public class ReplaySequencer
         else if (in instanceof FragmentTaskMessage) {
             // already sequenced
             if (inTxnId <= m_lastPolledFragmentTxnId) {
+                log.info("Replay Sequencer returning false 2");
                 return false;
             }
 
@@ -192,6 +201,7 @@ public class ReplaySequencer
         else if (in instanceof CompleteTransactionMessage) {
             // already sequenced
             if (inTxnId <= m_lastPolledFragmentTxnId) {
+                log.info("Replay Sequencer returning false 3");
                 return false;
             }
             if (found != null) {
@@ -202,6 +212,7 @@ public class ReplaySequencer
                 // where CompleteTransactionMessages may arrive for transactions that this site hasn't
                 // done/won't do, so just tell the caller that we can't do anything with it and hope
                 // the right thing happens.
+                log.info("Replay Sequencer returning false 4");
                 return false;
             }
 
@@ -209,6 +220,7 @@ public class ReplaySequencer
         else {
             if (m_replayEntries.isEmpty() || !m_replayEntries.lastEntry().getValue().hasSentinel()) {
                 // not-blocked work; rejected and not queued.
+                log.info("Replay Sequencer returning false 5");
                 return false;
             }
             else {
@@ -216,6 +228,7 @@ public class ReplaySequencer
                 m_replayEntries.lastEntry().getValue().addBlockedMessage(in);
             }
         }
+        log.info("Replay Sequencer returning true");
         return true;
     }
 }

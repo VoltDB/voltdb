@@ -114,7 +114,6 @@ public class ProcedureRunner {
 
     // current hash of sql and params
     protected final CRC32 m_inputCRC = new CRC32();
-    protected boolean m_shouldComputeCRC = false;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -128,7 +127,14 @@ public class ProcedureRunner {
                     SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
-        m_procedureName = procedure.getClass().getSimpleName();
+        assert(m_inputCRC.getValue() == 0L);
+
+        if (procedure instanceof StmtProcedure) {
+            m_procedureName = catProc.getTypeName();
+        }
+        else {
+            m_procedureName = procedure.getClass().getSimpleName();
+        }
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
@@ -148,9 +154,9 @@ public class ProcedureRunner {
                 m_statsCollector);
 
         // compute a CRC for write txns that are single-partition
-        if (m_catProc != null) {
+        /*if (m_catProc != null) {
             m_shouldComputeCRC = (m_catProc.getReadonly() == false);
-        }
+        }*/
 
         reflect();
     }
@@ -192,12 +198,6 @@ public class ProcedureRunner {
         assert(m_statusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
-
-        // for logging later
-        boolean isReplicatedForDR =
-                (m_txnState != null) && // may be null for tests
-                (m_txnState.getInvocation() != null) &&
-                (m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED);
 
         // reset the hash of results
         m_inputCRC.reset();
@@ -327,10 +327,16 @@ public class ProcedureRunner {
                         results,
                         null);
 
-            if ((retval.getStatus() == ClientResponse.SUCCESS) && (m_shouldComputeCRC)) {
-                retval.setSQLHash((int) m_inputCRC.getValue());
+            int hash = (int) m_inputCRC.getValue();
+            log.info("At the end of proc: " + String.valueOf(m_procedureName) + " hash was " + String.valueOf(hash));
+            if ((retval.getStatus() == ClientResponse.SUCCESS) && (hash != 0)) {
+                retval.setHash(hash);
             }
-            if (isReplicatedForDR) {
+            if ((m_txnState != null) && // may be null for tests
+                (m_txnState.getInvocation() != null) &&
+                (m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED))
+            {
+                log.info("Converting results to hash (replicated)");
                 retval.convertResultsToHashForDeterminism();
             }
         }
@@ -387,7 +393,7 @@ public class ProcedureRunner {
     }
 
     private void updateCRC(QueuedSQL queuedSQL) {
-        if (m_shouldComputeCRC) {
+        if (!queuedSQL.stmt.isReadOnly()) {
             m_inputCRC.update(queuedSQL.stmt.sqlText);
             try {
                 queuedSQL.params.addToCRC(m_inputCRC);
@@ -442,6 +448,7 @@ public class ProcedureRunner {
                     plannedStatement.core.aggregatorFragment,
                     plannedStatement.core.collectorFragment,
                     plannedStatement.core.isReplicatedTableDML,
+                    plannedStatement.core.readOnly,
                     plannedStatement.core.parameterTypes);
             if (plannedStatement.extractedParamValues.size() == 0) {
                 // case handles if there were parameters OR

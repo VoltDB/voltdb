@@ -1026,11 +1026,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_isIV2Enabled) {
             final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
+            boolean t = invocation.getProcName().equals("InsertSP");
+
+            if (t) log.info("CI: " + invocation.toString());
+
             Long initiatorHSId = null;
             boolean isShortCircuitRead = false;
 
             if (invocation.getType() == ProcedureInvocationType.REPLICATED)
             {
+                if (t) log.info("Insert SP Replicated");
+
                 int partitionId;
                 if (isSinglePartition) {
                     partitionId = partitions[0];
@@ -1049,13 +1055,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
                             invocation.getOriginalTxnId() <= lastTxnId)
                     {
-                        hostLog.debug("Dropping duplicate replicated transaction, txnid: " +
+                        hostLog.info("Dropping duplicate replicated transaction " + invocation.getProcName() + ", txnid: " +
                                 invocation.getOriginalTxnId() + ", last seen: " + lastTxnId);
                         return false;
                     }
                 }
                 m_partitionTxnIds.put(partitionId, invocation.getOriginalTxnId());
             }
+
+            if (t) log.info("A1");
 
             /*
              * If this is a read only single part, check if there is a local replica,
@@ -1076,14 +1084,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
             }
 
+            if (t) log.info("A2");
+
             if (initiatorHSId == null) {
                 hostLog.error("Failed to find master initiator for partition: "
                         + Integer.toString(partitions[0]) + ". Transaction not initiated.");
                 return false;
             }
 
+            if (t) log.info("A3");
+
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
                     messageSize, now, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
+
+            if (t) log.info("A4");
 
             Iv2InitiateTaskMessage workRequest =
                 new Iv2InitiateTaskMessage(m_siteId,
@@ -1098,8 +1112,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         connectionId,
                         isForReplay);
 
+            if (t) log.info("A5");
+
             Iv2Trace.logCreateTransaction(workRequest);
             m_mailbox.send(initiatorHSId, workRequest);
+
+            if (t) log.info("A6");
+
             return true;
         } else {
             return m_initiator.createTransaction(connectionId,
@@ -1209,7 +1228,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                                             clientResponse.setClientHandle(clientData.m_clientHandle);
                                             clientResponse.setClusterRoundtrip(delta);
-                                            clientResponse.setSQLHash(null); // not part of wire protocol
+                                            clientResponse.setHash(null); // not part of wire protocol
 
                                             ByteBuffer results =
                                                     ByteBuffer.allocate(

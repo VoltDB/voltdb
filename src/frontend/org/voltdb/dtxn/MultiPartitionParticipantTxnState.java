@@ -331,10 +331,13 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                            coordinatorSiteId,
                                            txnId,
                                            true,
+                                           getHash(),
                                            rollback,
                                            requiresAck,
                                            false,
                                            false);
+
+        hostLog.info("Created CompleteTransactionMessage with hash: " + String.valueOf(getHash()));
 
         return ft;
     }

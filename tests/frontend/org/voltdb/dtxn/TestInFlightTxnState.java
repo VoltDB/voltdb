@@ -125,8 +125,8 @@ public class TestInFlightTxnState extends TestCase
         InFlightTxnState state =  createTxnState(1, new int[] {3,1}, true, true);
         ClientResponseImpl cri1 = new ClientResponseImpl();
         ClientResponseImpl cri2 = new ClientResponseImpl();
-        cri1.setSQLHash(0);
-        cri2.setSQLHash(1);
+        cri1.setHash(0);
+        cri2.setHash(1);
         state.addResponse(1, cri1);
         try {
             state.addResponse(3, cri2);
@@ -141,8 +141,8 @@ public class TestInFlightTxnState extends TestCase
         state =  createTxnState(1, new int[] {3,1}, true, false);
         cri1 = new ClientResponseImpl();
         cri2 = new ClientResponseImpl();
-        cri1.setSQLHash(0);
-        cri2.setSQLHash(1);
+        cri1.setHash(0);
+        cri2.setHash(1);
         state.addResponse(1, cri1);
         try {
             state.addResponse(3, cri2);
@@ -157,8 +157,8 @@ public class TestInFlightTxnState extends TestCase
         state =  createTxnState(1, new int[] {3,1}, false, false);
         cri1 = new ClientResponseImpl();
         cri2 = new ClientResponseImpl();
-        cri1.setSQLHash(0);
-        cri2.setSQLHash(1);
+        cri1.setHash(0);
+        cri2.setHash(1);
         state.addResponse(1, cri1);
         try {
             state.addResponse(3, cri2);
@@ -173,8 +173,8 @@ public class TestInFlightTxnState extends TestCase
         state =  createTxnState(1, new int[] {3,1}, false, false);
         cri1 = new ClientResponseImpl();
         cri2 = new ClientResponseImpl();
-        cri1.setSQLHash(1);
-        cri2.setSQLHash(1);
+        cri1.setHash(1);
+        cri2.setHash(1);
         state.addResponse(1, cri1);
         state.addResponse(3, cri2);
         assertFalse(VoltDB.wasCrashCalled);

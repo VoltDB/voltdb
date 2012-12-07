@@ -29,6 +29,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_requiresAck;
     boolean m_rollbackForFault;
 
+    int m_hash;
     int m_flags = 0;
     static final int ISROLLBACK = 0;
     static final int REQUIRESACK = 1;
@@ -67,11 +68,12 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
      * @param isRestart   Does this CompleteTransactionMessage indicate a restart of this transaction?
      */
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId,
-                                      long txnId, boolean isReadOnly,
+                                      long txnId, boolean isReadOnly, int hash,
                                       boolean isRollback, boolean requiresAck,
                                       boolean isRestart, boolean isForReplay)
     {
         super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, isForReplay);
+        m_hash = hash;
         setBit(ISROLLBACK, isRollback);
         setBit(REQUIRESACK, requiresAck);
         setBit(ISRESTART, isRestart);
@@ -92,11 +94,15 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         return getBit(ISRESTART);
     }
 
+    public int getHash() {
+        return m_hash;
+    }
+
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4;
+        msgsize += 4 + 4;
         return msgsize;
     }
 
@@ -105,6 +111,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     {
         buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_ID);
         super.flattenToBuffer(buf);
+        buf.putInt(m_hash);
         buf.putInt(m_flags);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -114,6 +121,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         super.initFromBuffer(buf);
+        m_hash = buf.getInt();
         m_flags = buf.getInt();
         assert(buf.capacity() == buf.position());
     }
@@ -127,6 +135,8 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
         sb.append("\n  FLAGS: ").append(m_flags);
+
+        sb.append("\n  HASH: " + String.valueOf(m_hash));
 
         if (isRollback())
             sb.append("\n  THIS IS AN ROLLBACK REQUEST");

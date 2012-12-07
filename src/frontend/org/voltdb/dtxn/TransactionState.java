@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.jfree.util.Log;
 import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -61,6 +62,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
     protected final boolean m_isForReplay;
+    protected int m_hash = -1; // -1 shows where the value comes from (they only have to match)
 
     // is this transaction run during a rejoin
     protected RejoinState m_rejoinState = RejoinState.NORMAL;
@@ -136,6 +138,10 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_isForReplay;
     }
 
+    public int getHash() {
+        return m_hash;
+    }
+
     /**
      * Indicate whether or not the transaction represented by this
      * TransactionState is single-partition.  Should be overridden to provide
@@ -150,6 +156,12 @@ public abstract class TransactionState extends OrderableTransaction  {
     public abstract boolean hasTransactionalWork();
 
     public abstract boolean doWork(boolean rejoining);
+
+    public void setHash(Integer hash) {
+        m_hash = hash == null ? 0 : hash; // don't allow null
+
+        Log.info("Stored hash with value: " + String.valueOf(m_hash));
+    }
 
     public void storeResults(ClientResponseImpl response) {
         m_response = response;

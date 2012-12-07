@@ -85,8 +85,8 @@ public class InFlightTxnState implements Serializable {
     }
 
     public ClientResponseImpl addResponse(long coordinatorHSId, ClientResponseImpl r) {
-        Integer sqlHash = r.getSQLHash(); // get this and then reset it
-        r.setSQLHash(null); // this makes sure the hash doesn't get sent to clients
+        Integer sqlHash = r.getHash(); // get this and then reset it
+        r.setHash(null); // this makes sure the hash doesn't get sent to clients
 
         // ensure response to send isn't null
         if (m_responseToSend == null) m_responseToSend = r;
