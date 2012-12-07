@@ -19,9 +19,11 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -45,8 +47,6 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 
-import com.google.common.collect.UnmodifiableIterator;
-
 /**
  * Cartographer provides answers to queries about the components in a cluster.
  * It provides the StatsSource interface for the TOPO statistics selector, but
@@ -60,15 +60,16 @@ public class Cartographer extends StatsSource
     private final LeaderCacheReader m_iv2Mpi;
     private final ZooKeeper m_zk;
     private final int m_numberOfPartitions;
+    private final Set<Integer> m_allMasters = new HashSet<Integer>();
 
     /**
      * A dummy iterator that wraps an UnmodifiableIterator<Integer> and provides the
      * Iterator<Object>
      */
     private static class DummyIterator implements Iterator<Object> {
-        private final UnmodifiableIterator<Integer> i;
+        private final Iterator<Integer> i;
 
-        private DummyIterator(UnmodifiableIterator<Integer> i) {
+        private DummyIterator(Iterator<Integer> i) {
             this.i = i;
         }
 
@@ -115,13 +116,24 @@ public class Cartographer extends StatsSource
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
-        return new DummyIterator(m_iv2Masters.pointInTimeCache().keySet().iterator());
+        m_allMasters.clear();
+        m_allMasters.addAll(m_iv2Masters.pointInTimeCache().keySet());
+        m_allMasters.add(MpInitiator.MP_INIT_PID);
+        return new DummyIterator(m_allMasters.iterator());
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        long leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
-        List<Long> sites = getReplicasForPartition((Integer)rowKey);
+        long leader;
+        List<Long> sites = new ArrayList<Long>();
+        if (rowKey.equals(MpInitiator.MP_INIT_PID)) {
+            leader = getHSIdForMultiPartitionInitiator();
+            sites.add(leader);
+        }
+        else {
+            leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
+            sites.addAll(getReplicasForPartition((Integer)rowKey));
+        }
 
         rowValues[columnNameToIndex.get("Partition")] = rowKey;
         rowValues[columnNameToIndex.get("Sites")] = CoreUtils.hsIdCollectionToString(sites);
