@@ -1049,7 +1049,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
                             invocation.getOriginalTxnId() <= lastTxnId)
                     {
-                        hostLog.info("Dropping duplicate replicated transaction " + invocation.getProcName() + ", txnid: " +
+                        hostLog.debug("Dropping duplicate replicated transaction " + invocation.getProcName() + ", txnid: " +
                                 invocation.getOriginalTxnId() + ", last seen: " + lastTxnId);
                         return false;
                     }

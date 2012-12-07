@@ -76,8 +76,6 @@ import org.voltdb.types.VoltDecimalHelper;
     public void setParameters(Object... params) {
         this.m_params = params;
 
-        m_encodedStrings = new byte[params.length][];
-        m_encodedStringArrays = new byte[params.length][][];
         // create encoded copies of strings and calculate size
         m_serializedSize = calculateSerializedSize();
     }
@@ -481,8 +479,8 @@ import org.voltdb.types.VoltDecimalHelper;
      * @return
      */
     private int calculateSerializedSize() {
-        if (m_encodedStringArrays == null) m_encodedStringArrays = new byte[m_params.length][][];
-        if (m_encodedStrings == null) m_encodedStrings = new byte[m_params.length][];
+        m_encodedStringArrays = new byte[m_params.length][][];
+        m_encodedStrings = new byte[m_params.length][];
 
         if (m_serializedSize != 2) {
             throw new RuntimeException("Trying to calculate the serialized size " +
