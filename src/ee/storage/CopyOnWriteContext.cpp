@@ -22,7 +22,6 @@
 #include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>
-#include <crc/crc32c.h>
 
 namespace voltdb {
 
@@ -38,14 +37,9 @@ CopyOnWriteContext::CopyOnWriteContext(PersistentTable *table, TupleSerializer *
              m_tuplesSerialized(0) {}
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
-    uint32_t crc = vdbcrc::crc32cInit();
-    uint32_t partitionIdCRC = vdbcrc::crc32cInit();
     out->writeInt(m_partitionId);
-    partitionIdCRC = vdbcrc::crc32c( partitionIdCRC, out->data() + out->position() - 4, 4);
-    partitionIdCRC = vdbcrc::crc32cFinish(partitionIdCRC);
-    out->writeInt(partitionIdCRC);
-    const std::size_t crcPosition = out->reserveBytes(4);//For CRC
     int rowsSerialized = 0;
+    const std::size_t rowCountPosition = out->reserveBytes(4);
 
     TableTuple tuple(m_table->schema());
     if (out->remaining() < (m_maxTupleLength + sizeof(int32_t))) {
@@ -66,10 +60,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
          */
         if (!hadMore) {
             if (m_finishedTableScan) {
-                out->writeInt(rowsSerialized);
-                crc = vdbcrc::crc32c( crc, out->data() + out->position() - 4, 4);
-                crc = vdbcrc::crc32cFinish(crc);
-                out->writeIntAt(crcPosition, crc);
+                out->writeIntAt( rowCountPosition, rowsSerialized);
                 return false;
             } else {
                 m_finishedTableScan = true;
@@ -81,7 +72,6 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         const std::size_t tupleStartPosition = out->position();
         m_serializer->serializeTo( tuple, out);
         const std::size_t tupleEndPosition = out->position();
-        crc = vdbcrc::crc32c( crc, out->data() + tupleStartPosition, tupleEndPosition - tupleStartPosition);
         m_tuplesSerialized++;
         rowsSerialized++;
 
@@ -113,10 +103,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
      * can be included in the CRC. It will be moved back to the front
      * to match the table serialization format when chunk is read later.
      */
-    out->writeInt(rowsSerialized);
-    crc = vdbcrc::crc32c( crc, out->data() + out->position() - 4, 4);
-    crc = vdbcrc::crc32cFinish(crc);
-    out->writeIntAt(crcPosition, crc);
+    out->writeIntAt( rowCountPosition, rowsSerialized);
     return true;
 }
 

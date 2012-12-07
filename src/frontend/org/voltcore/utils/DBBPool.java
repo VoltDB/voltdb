@@ -18,6 +18,7 @@
 package org.voltcore.utils;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
@@ -153,6 +154,47 @@ public final class DBBPool {
 
     private final long bytesAllocatedLocally = 0;
     private final long bytesLoanedLocally = 0;
+
+    private static final COWMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
+            new COWMap<Integer, ConcurrentLinkedQueue<BBContainer>>();
+
+    /*
+     * Allocate a DirectByteBuffer from a global lock free pool
+     */
+    public static BBContainer allocateDirectAndPool(final Integer capacity) {
+        ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(capacity);
+        if (pooledBuffers == null) {
+            pooledBuffers = new ConcurrentLinkedQueue<BBContainer>();
+            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) == null) {
+                pooledBuffers = m_pooledBuffers.get(capacity);
+            }
+        }
+
+        BBContainer cont = pooledBuffers.poll();
+        if (cont == null) {
+            //Create an origin container
+            ByteBuffer b = ByteBuffer.allocateDirect(capacity);
+            cont = new BBContainer( b, DBBPool.getBufferAddress(b)) {
+                @Override
+                public void discard() {
+                    try {
+                        DirectMemoryUtils.destroyDirectByteBuffer(b);
+                    } catch (Throwable e) {
+                        VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
+                    }
+                }
+            };
+        }
+        final BBContainer origin = cont;
+        cont = new BBContainer(origin.b, origin.address) {
+            @Override
+            public void discard() {
+                m_pooledBuffers.get(b.capacity()).offer(origin);
+            }
+        };
+        cont.b.clear();
+        return cont;
+    }
 
     public static BBContainer allocateDirect(final int capacity) {
         final ByteBuffer retval = ByteBuffer.allocateDirect(capacity);

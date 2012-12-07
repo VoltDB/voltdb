@@ -23,6 +23,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltDB;
 
 /**
@@ -107,17 +108,14 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
      * @return
      */
     private ByteBuffer getNextChunk(ByteBuffer buf) {
+        buf.position(buf.position() + 4);//skip partition id
         int length = m_schema.length + buf.remaining();
-        int rowCount = buf.getInt(buf.limit() - 4);
-        buf.limit(buf.limit() - 4);
-        // skip partition ID, partition ID CRC, and content CRC
-        buf.position(buf.position() + 12);
 
         ByteBuffer outputBuffer = getOutputBuffer(length);
         outputBuffer.put(m_schema);
-        outputBuffer.putInt(rowCount);
         outputBuffer.put(buf);
         outputBuffer.flip();
+        System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(outputBuffer, true));
         return outputBuffer;
     }
 

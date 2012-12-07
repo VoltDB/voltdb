@@ -36,6 +36,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
@@ -124,7 +125,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 partitionIds,
                 schemaTable,
                 txnId,
-                new int[] { 0, 0, 0, 1 });
+                new int[] { 0, 0, 0, 2 });
     }
 
     public DefaultSnapshotDataTarget(
@@ -315,12 +316,23 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
         m_outstandingWriteTasks.incrementAndGet();
 
-        Future<byte[]> compressionTask = null;
+        Future<BBContainer> compressionTask = null;
         if (prependLength) {
-            tupleData.b.position(tupleData.b.position() + 12);
-            compressionTask = CompressionService.compressBufferAsync(tupleData.b);
+            BBContainer cont =
+                    DBBPool.allocateDirectAndPool(
+                            CompressionService.maxCompressedLength(SnapshotSiteProcessor.m_snapshotBufferLength));
+            //Skip 4-bytes so the partition ID is not compressed
+            //That way if we detect a corruption we know what partition is bad
+            tupleData.b.position(tupleData.b.position() + 4);
+            /*
+             * Leave 12 bytes, it's going to be a 4-byte length prefix, a 4-byte partition id,
+             * and a 4-byte CRC32C of just the header bytes, in addition to the compressed payload CRC
+             * that is 16 bytes, but 4 of those are done by CompressionService
+             */
+            cont.b.position(12);
+            compressionTask = CompressionService.compressAndCRC32cBufferAsync(tupleData.b, cont);
         }
-        final Future<byte[]> compressionTaskFinal = compressionTask;
+        final Future<BBContainer> compressionTaskFinal = compressionTask;
 
         ListenableFuture<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
@@ -339,20 +351,36 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
                     int totalWritten = 0;
                     if (prependLength) {
-                        final ByteBuffer payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get());
+                        BBContainer payloadContainer = compressionTaskFinal.get();
+                        try {
+                            final ByteBuffer payloadBuffer = payloadContainer.b;
+                            payloadBuffer.position(0);
 
-                        ByteBuffer lengthPrefix = ByteBuffer.allocate(16);
-                        m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining() + 16);
-                        lengthPrefix.putInt(payloadBuffer.remaining());
-                        lengthPrefix.putInt(tupleData.b.getInt(0));
-                        lengthPrefix.putInt(tupleData.b.getInt(4));
-                        lengthPrefix.putInt(tupleData.b.getInt(8));
-                        lengthPrefix.flip();
-                        while (lengthPrefix.hasRemaining()) {
-                            totalWritten += m_channel.write(lengthPrefix);
-                        }
-                        while (payloadBuffer.hasRemaining()) {
-                            totalWritten += m_channel.write(payloadBuffer);
+                            ByteBuffer lengthPrefix = ByteBuffer.allocate(12);
+                            m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining());
+                            //Length prefix does not include 4 header items, just compressd payload
+                            //that follows
+                            lengthPrefix.putInt(payloadBuffer.remaining() - 16);//length prefix
+                            lengthPrefix.putInt(tupleData.b.getInt(0)); // partitionId
+
+                            /*
+                             * Checksum the header and put it in the payload buffer
+                             */
+                            PureJavaCrc32C crc = new PureJavaCrc32C();
+                            crc.update(lengthPrefix.array(), 0, 8);
+                            lengthPrefix.putInt((int)crc.getValue());
+                            lengthPrefix.flip();
+                            payloadBuffer.put(lengthPrefix);
+                            payloadBuffer.position(0);
+
+                            /*
+                             * Write payload to file
+                             */
+                            while (payloadBuffer.hasRemaining()) {
+                                totalWritten += m_channel.write(payloadBuffer);
+                            }
+                        } finally {
+                            payloadContainer.discard();
                         }
                     } else {
                         while (tupleData.b.hasRemaining()) {
@@ -367,14 +395,17 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_writeFailed = true;
                     throw e;
                 } finally {
-                    tupleData.discard();
-                    m_outstandingWriteTasksLock.lock();
                     try {
-                        if (m_outstandingWriteTasks.decrementAndGet() == 0) {
-                            m_noMoreOutstandingWriteTasksCondition.signalAll();
-                        }
+                        tupleData.discard();
                     } finally {
-                        m_outstandingWriteTasksLock.unlock();
+                        m_outstandingWriteTasksLock.lock();
+                        try {
+                            if (m_outstandingWriteTasks.decrementAndGet() == 0) {
+                                m_noMoreOutstandingWriteTasksCondition.signalAll();
+                            }
+                        } finally {
+                            m_outstandingWriteTasksLock.unlock();
+                        }
                     }
                 }
                 return null;

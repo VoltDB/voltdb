@@ -26,6 +26,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.xerial.snappy.Snappy;
@@ -97,6 +99,27 @@ public final class CompressionService {
             @Override
             public byte[] call() throws Exception {
                 return compressBuffer(buffer);
+            }
+
+        });
+    }
+
+    public static Future<BBContainer> compressAndCRC32cBufferAsync(final ByteBuffer inBuffer, final BBContainer outBuffer) {
+        assert(inBuffer.isDirect());
+        assert(outBuffer.b.isDirect());
+        return submitCompressionTask(new Callable<BBContainer>() {
+
+            @Override
+            public BBContainer call() throws Exception {
+                //Reserve 4-bytes for the CRC
+                final int crcPosition = outBuffer.b.position();
+                outBuffer.b.position(outBuffer.b.position() + 4);
+                final int crcCalcStart = outBuffer.b.position();
+                compressBuffer(inBuffer, outBuffer.b);
+                final int crc32c =
+                        DBBPool.getCRC32C( outBuffer.address, crcCalcStart, outBuffer.b.limit() - crcCalcStart);
+                outBuffer.b.putInt(crcPosition, crc32c);
+                return outBuffer;
             }
 
         });
@@ -303,7 +326,7 @@ public final class CompressionService {
         });
     }
 
-    public static Future<byte[]> submitCompressionTask(Callable<byte[]> task) {
+    public static <T> Future<T> submitCompressionTask(Callable<T> task) {
         VoltDBInterface instance = VoltDB.instance();
         if (VoltDB.instance() != null) {
             ExecutorService es = instance.getComputationService();
