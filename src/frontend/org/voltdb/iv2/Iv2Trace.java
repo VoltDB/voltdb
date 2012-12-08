@@ -38,7 +38,7 @@ public class Iv2Trace
     public static void logTopology(long leaderHSId, List<Long> replicas, int partitionId)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("topology partition %d leader %s replicas (%s)");
+            String logmsg = "topology partition %d leader %s replicas (%s)";
             iv2log.trace(String.format(logmsg, partitionId, CoreUtils.hsIdToString(leaderHSId),
                     CoreUtils.hsIdCollectionToString(replicas)));
         }
@@ -47,7 +47,7 @@ public class Iv2Trace
     public static void logCreateTransaction(Iv2InitiateTaskMessage msg)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("createTxn %s ciHandle %s initHSId %s proc %s");
+            String logmsg = "createTxn %s ciHandle %s initHSId %s proc %s";
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(msg.getInitiatorHSId()),
                         ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
                         CoreUtils.hsIdToString(msg.getCoordinatorHSId()),
@@ -58,7 +58,7 @@ public class Iv2Trace
     public static void logFinishTransaction(InitiateResponseMessage msg, long localHSId)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("finishTxn %s ciHandle %s initHSId %s status %s");
+            String logmsg = "finishTxn %s ciHandle %s initHSId %s status %s";
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
                         CoreUtils.hsIdToString(msg.getCoordinatorHSId()),
@@ -117,7 +117,7 @@ public class Iv2Trace
         if (iv2log.isTraceEnabled()) {
             if (msg instanceof InitiateResponseMessage) {
                 InitiateResponseMessage iresp = (InitiateResponseMessage)msg;
-                String logmsg = new String("rxInitRsp %s from %s ciHandle %s txnId %s spHandle %s status %s");
+                String logmsg = "rxInitRsp %s from %s ciHandle %s txnId %s spHandle %s status %s";
                 iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                             CoreUtils.hsIdToString(iresp.m_sourceHSId),
                             ClientInterfaceHandleManager.handleToString(iresp.getClientInterfaceHandle()),
@@ -127,7 +127,7 @@ public class Iv2Trace
             }
             else if (msg instanceof FragmentResponseMessage) {
                 FragmentResponseMessage fresp = (FragmentResponseMessage)msg;
-                String logmsg = new String("rxFragRsp %s from %s txnId %s spHandle %s status %s");
+                String logmsg = "rxFragRsp %s from %s txnId %s spHandle %s status %s";
                 iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                             CoreUtils.hsIdToString(fresp.m_sourceHSId),
                             txnIdToString(fresp.getTxnId()),
@@ -141,7 +141,7 @@ public class Iv2Trace
             long spHandle)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("rxInitMsg %s from %s ciHandle %s txnId %s spHandle %s trunc %s");
+            String logmsg = "rxInitMsg %s from %s ciHandle %s txnId %s spHandle %s trunc %s";
             if (itask.getTxnId() != Long.MIN_VALUE && itask.getTxnId() != txnid) {
                 iv2log.error("Iv2InitiateTaskMessage TXN ID conflict.  Message: " + itask.getTxnId() +
                         ", locally held: " + txnid);
@@ -163,7 +163,7 @@ public class Iv2Trace
             long txnId)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("rxSntlMsg %s from %s txnId %s");
+            String logmsg = "rxSntlMsg %s from %s txnId %s";
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(message.m_sourceHSId),
                         txnIdToString(txnId)));
@@ -182,7 +182,7 @@ public class Iv2Trace
                 iv2log.error("FragmentTaskMessage SP HANDLE conflict.  Message: " + ftask.getSpHandle() +
                         ", locally held: " + spHandle);
             }
-            String logmsg = new String("%s %s from %s txnId %s spHandle %s trunc %s");
+            String logmsg = "%s %s from %s txnId %s spHandle %s trunc %s";
             iv2log.trace(String.format(logmsg, label, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(ftask.m_sourceHSId),
                         txnIdToString(ftask.getTxnId()),
@@ -194,7 +194,7 @@ public class Iv2Trace
     public static void logTransactionTaskQueueOffer(TransactionTask task)
     {
         if (iv2queuelog.isTraceEnabled()) {
-            String logmsg = new String ("txnQOffer txnId %s spHandle %s type %s");
+            String logmsg = "txnQOffer txnId %s spHandle %s type %s";
             iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
                         txnIdToString(task.getSpHandle()),
                     task.m_txn.isSinglePartition() ? "SP" : "MP"));
@@ -204,7 +204,7 @@ public class Iv2Trace
     public static void logSiteTaskerQueueOffer(TransactionTask task)
     {
         if (iv2queuelog.isTraceEnabled()) {
-            String logmsg = new String ("tskQOffer txnId %s spHandle %s type %s");
+            String logmsg = "tskQOffer txnId %s spHandle %s type %s";
             iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
                             txnIdToString(task.getSpHandle()),
                     task.m_txn.isSinglePartition() ? "SP" : "MP"));

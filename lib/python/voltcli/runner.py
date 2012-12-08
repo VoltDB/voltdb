@@ -47,7 +47,7 @@ base_cli_spec = cli.CLISpec(
 Specific actions are provided by verbs.  Run "%prog help VERB" to display full
 usage for a verb, including its options and arguments.
 ''',
-    usage = '%prog VERB [ ARGUMENTS ... ]',
+    usage = '%prog VERB [ OPTIONS ... ] [ ARGUMENTS ... ]',
     options = (
         cli.BooleanOption(None, '--debug', 'debug',
                           'display debug messages'),
@@ -59,6 +59,36 @@ usage for a verb, including its options and arguments.
 
 # Internal command names that get added to the VOLT namespace of user scripts.
 internal_commands = ['volt', 'voltadmin']
+
+# Written to the README file when the packaged executable is created.
+compatibility_warning = '''\
+The program package in the bin directory requires Python version 2.6 or greater.
+It will crash with older Python versions that fail to detect and run compressed
+Python executable packages.
+
+The following two alternatives allow the tool to function on systems with older
+Python versions, as long is it is version 2.4 or later.
+
+1) Run the source script having the same name in the tools directory. For
+   example:
+
+      tools/%(name)s VERB [ OPTIONS ... ] [ ARGUMENTS ... ]
+
+2) Pass the full command line including the executable package path as arguments
+   to an explicit python version. For example:
+
+      python2.6 bin/%(name)s VERB [ OPTIONS ... ] [ ARGUMENTS ... ]'''
+
+# README file template.
+readme_template = '''
+=== %(name)s README ===
+
+%(usage)s
+
+-- WARNING --
+
+%(warning)s
+'''
 
 #===============================================================================
 class JavaRunner(object):
@@ -174,13 +204,65 @@ class VerbRunner(object):
         """
         return os.path.exists(self.get_catalog())
 
+    def is_dryrun(self):
+        """
+        Return True if dry-run is enabled.
+        """
+        return utility.is_dryrun()
+
+    def is_verbose(self):
+        """
+        Return True if verbose messages are enabled.
+        """
+        return utility.is_verbose()
+
+    def is_debug(self):
+        """
+        Return True if debug messages are enabled.
+        """
+        return utility.is_debug()
+
+    def info(self, *msgs):
+        """
+        Display INFO level messages.
+        """
+        utility.info(*msgs)
+
+    def verbose_info(self, *msgs):
+        """
+        Display verbose INFO level messages if enabled.
+        """
+        utility.verbose_info(*msgs)
+
+    def debug(self, *msgs):
+        """
+        Display DEBUG level message(s) if debug is enabled.
+        """
+        utility.debug(*msgs)
+
+    def warning(self, *msgs):
+        """
+        Display WARNING level messages.
+        """
+        utility.warning(*msgs)
+
+    def error(self, *msgs):
+        """
+        Display ERROR level messages.
+        """
+        utility.error(*msgs)
+
     def abort(self, *msgs):
         """
         Display errors (optional) and abort execution.
         """
-        utility.error('Fatal error in "%s" command.' % self.verb.name, *msgs)
-        self.help()
-        utility.abort()
+        self._abort(False, *msgs)
+
+    def abort_with_help(self, *msgs):
+        """
+        Display errors and help and abort execution.
+        """
+        self._abort(True, *msgs)
 
     def help(self, *args, **kwargs):
         """
@@ -193,19 +275,23 @@ class VerbRunner(object):
             for verb_name in self.verbspace.verb_names:
                 verb_spec = self.verbspace.verbs[verb_name].cli_spec
                 if not verb_spec.baseverb and not verb_spec.hideverb:
-                    sys.stdout.write('\n===== Verb: %s =====\n' % verb_name)
+                    sys.stdout.write('\n===== Verb: %s =====\n\n' % verb_name)
                     self._print_verb_help(verb_name)
+                    sys.stdout.write('\n')
             for verb_name in self.verbspace.verb_names:
                 verb_spec = self.verbspace.verbs[verb_name].cli_spec
                 if verb_spec.baseverb and not verb_spec.hideverb:
-                    sys.stdout.write('\n===== Common Verb: %s =====\n' % verb_name)
+                    sys.stdout.write('\n===== Common Verb: %s =====\n\n' % verb_name)
                     self._print_verb_help(verb_name)
+                    sys.stdout.write('\n')
         else:
             if args:
                 for name in args:
                     for verb_name in self.verbspace.verb_names:
                         if verb_name == name.lower():
+                            sys.stdout.write('\n')
                             self._print_verb_help(verb_name)
+                            sys.stdout.write('\n')
                             break
                     else:
                         utility.error('Verb "%s" was not found.' % name)
@@ -236,13 +322,7 @@ class VerbRunner(object):
             self._create_package(output_dir, self.verbspace.name, self.verbspace.version,
                                  self.verbspace.description, force)
         # Warn for Python version < 2.6.
-        compat_msg = ('''\
-The program package requires Python version 2.6 or greater.  It will
-crash with older Python versions that can't detect and run zip
-packages. If a newer Python is not the default you can run by passing
-the package file to an explicit python version, e.g.
-
-    python2.6 %s''' % self.verbspace.name)
+        compat_msg = compatibility_warning % dict(name = self.verbspace.name)
         if sys.version_info[0] == 2 and sys.version_info[1] < 6:
             utility.warning(compat_msg)
         # Generate README.<tool> file.
@@ -250,7 +330,9 @@ the package file to an explicit python version, e.g.
         readme_file = utility.File(readme_path, mode = 'w')
         readme_file.open()
         try:
-            readme_file.write('%s\n\nWARNING: %s\n' % (self.get_usage(), compat_msg))
+            readme_file.write(readme_template % dict(name    = self.verbspace.name,
+                                                     usage   = self.get_usage(),
+                                                     warning = compat_msg))
         finally:
             readme_file.close()
 
@@ -268,6 +350,15 @@ the package file to an explicit python version, e.g.
         Get usage string.
         """
         return VoltCLIParser(self.verbspace).get_usage_string()
+
+    def verb_usage(self):
+        """
+        Display usage for active verb.
+        """
+        if self.verb:
+            sys.stdout.write('\n')
+            self._print_verb_help(self.verb.name)
+            sys.stdout.write('\n')
 
     def set_default_func(self, default_func):
         """
@@ -326,11 +417,8 @@ the package file to an explicit python version, e.g.
         verb = self.verbspace.verbs[verb_name]
         parser = VoltCLIParser(self.verbspace)
         parser.initialize_verb(verb_name)
-        sys.stdout.write('\n')
         parser.print_help()
-        if verb.cli_spec.description2:
-            sys.stdout.write('\n')
-            sys.stdout.write('%s\n' % verb.cli_spec.description2.strip())
+        sys.stdout.write('\n')
 
     def _create_package(self, output_dir, name, version, description, force):
         # Internal method to create a runnable Python package.
@@ -364,6 +452,17 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
         command = parser.parse(*args)
         runner = VerbRunner(command, verbspace, self.internal_verbspaces, self.config, **kwargs)
         runner.execute()
+
+    def _abort(self, show_help, *msgs):
+        if self.verb:
+            utility.error('Fatal error in "%s" command.' % self.verb.name, *msgs)
+            if show_help:
+                self.verb_usage()
+        else:
+            utility.error(*msgs)
+            if show_help:
+                self.help()
+        sys.exit(1)
 
 #===============================================================================
 class VOLT(object):

@@ -102,7 +102,7 @@ public class TestExportGeneration {
 
         VoltCompiler compiler = new VoltCompiler();
 
-        boolean success = compiler.compile(projectPath, testout_jar);
+        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue("failed compilation",success);
 
         m_connector = compiler

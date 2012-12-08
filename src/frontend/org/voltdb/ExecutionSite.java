@@ -218,13 +218,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
         @Override
-        public CountDownLatch snapshotCompleted(String nonce,
-                                                long txnId,
-                                                long partitionTxnIds[],
-                                                boolean truncationSnapshot,
-                                                String requestId) {
+        public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
             if (m_rejoinSnapshotTxnId != -1) {
-                if (m_rejoinSnapshotTxnId == txnId) {
+                if (m_rejoinSnapshotTxnId == event.multipartTxnId) {
                     m_rejoinLog.debug("Rejoin snapshot for site " + getSiteId() +
                                         " is finished");
                     VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
@@ -2375,16 +2371,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         currentFragResponse.addDependency(dependencyId, dependency);
     }
 
+    @Override
+    public void initiateSnapshots(
+            Deque<SnapshotTableTask> tasks,
+            long txnId,
+            int numLiveHosts,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+        m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
+    }
 
     /*
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
      */
-    @Override
-    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
-        m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts);
-    }
-
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
         return m_snapshotter.completeSnapshotWork(ee);
@@ -2920,7 +2919,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     @Override
-    public void setRejoinComplete(org.voltdb.iv2.RejoinProducer.ReplayCompletionAction ignored) {
+    public void setRejoinComplete(
+            org.voltdb.iv2.RejoinProducer.ReplayCompletionAction ignored,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 

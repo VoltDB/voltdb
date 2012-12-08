@@ -29,9 +29,11 @@ import java.util.concurrent.TimeoutException;
 
 import org.voltdb.client.ClientResponse;
 
-public class VoltCacheFuture implements Future<VoltCacheResult>
+import voltcache.procedures.VoltCacheProcBase;
+
+public class VoltCacheFuture implements Future<VoltCacheProcBase.Result>
 {
-    protected static VoltCacheFuture cast(VoltCacheResult.Type type, Future<ClientResponse> source)
+    protected static VoltCacheFuture cast(VoltCacheProcBase.Result.Type type, Future<ClientResponse> source)
     {
         return new VoltCacheFuture(type, source);
     }
@@ -41,8 +43,8 @@ public class VoltCacheFuture implements Future<VoltCacheResult>
     }
 
     private final Future<ClientResponse> source;
-    private final VoltCacheResult.Type type;
-    private VoltCacheFuture(VoltCacheResult.Type type, Future<ClientResponse> source)
+    private final VoltCacheProcBase.Result.Type type;
+    private VoltCacheFuture(VoltCacheProcBase.Result.Type type, Future<ClientResponse> source)
     {
         this.type = type;
         this.source = source;
@@ -50,7 +52,7 @@ public class VoltCacheFuture implements Future<VoltCacheResult>
     private VoltCacheFuture()
     {
         this.source = null;
-        this.type = VoltCacheResult.Type.CODE;
+        this.type = VoltCacheProcBase.Result.Type.CODE;
     }
     @Override
     public boolean cancel(boolean mayInterruptIfRunning)
@@ -60,18 +62,18 @@ public class VoltCacheFuture implements Future<VoltCacheResult>
         return source.cancel(mayInterruptIfRunning);
     }
     @Override
-    public VoltCacheResult get() throws InterruptedException, ExecutionException
+    public VoltCacheProcBase.Result get() throws InterruptedException, ExecutionException
     {
         if (this.source == null)
-            return VoltCacheResult.ERROR();
-        return VoltCacheResult.get(this.type, source.get());
+            return VoltCacheProcBase.Result.ERROR();
+        return VoltCache.getResult(this.type, source.get());
     }
     @Override
-    public VoltCacheResult get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
+    public VoltCacheProcBase.Result get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
     {
         if (this.source == null)
-            return VoltCacheResult.ERROR();
-        return VoltCacheResult.get(this.type, source.get(timeout, unit));
+            return VoltCacheProcBase.Result.ERROR();
+        return VoltCache.getResult(this.type, source.get(timeout, unit));
     }
     @Override
     public boolean isCancelled()

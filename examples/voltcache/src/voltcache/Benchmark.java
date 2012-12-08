@@ -51,7 +51,7 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 
 import voltcache.api.VoltCache;
-import voltcache.api.VoltCacheResult;
+import voltcache.procedures.VoltCacheProcBase;
 
 public class Benchmark {
 
@@ -330,7 +330,7 @@ public class Benchmark {
                     // Get a key/value pair, synchronously
                     try {
                         String key = processor.generateRandomKeyForRetrieval();
-                        VoltCacheResult result = cache.get(key);
+                        VoltCacheProcBase.Result result = cache.get(key);
                         // Cache miss (Key does not exist)
                         if (result.data.size() == 0)
                             missedGets.incrementAndGet();

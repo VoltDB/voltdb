@@ -126,7 +126,7 @@ public class RegressionSuite extends TestCase {
     }
 
     public Client getClient() throws IOException {
-        return getClient(1000 * 120);
+        return getClient(1000 * 60 * 10); // 10 minute default
     }
 
     /**
