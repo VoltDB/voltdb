@@ -1217,7 +1217,7 @@ public class DDLCompiler {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
                     // Limitation to the current implementation.
-                    if (colType == VoltType.STRING) {
+                    if (colType == VoltType.STRING && ! (expression instanceof TupleValueExpression)) {
                         String msg = "VARCHAR expressions are not currently supported as index keys.";
                         throw this.m_compiler.new VoltCompilerException(msg);
                     }
