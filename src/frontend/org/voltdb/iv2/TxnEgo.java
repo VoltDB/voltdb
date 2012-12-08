@@ -162,14 +162,14 @@ final public class TxnEgo {
     }
 
     public String toBitString() {
-        String retval = "";
+        StringBuffer retval = new StringBuffer();
         long mask = 0x8000000000000000L;
         for(int i = 0; i < 64; i++) {
-            if ((getTxnId() & mask) == 0) retval += "0";
-            else retval += "1";
+            if ((getTxnId() & mask) == 0) retval.append("0");
+            else retval.append("1");
             mask >>>= 1;
         }
-        return retval;
+        return retval.toString();
     }
 
     public static String txnIdToString(long txnId)

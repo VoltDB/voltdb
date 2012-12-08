@@ -154,12 +154,6 @@ public class TestReplicationSuite extends RegressionSuite
         config.compile(project);
         builder.addServerConfig(config);
 
-        // CLUSTER, 3 hosts, each with one site, replication of 1
-        config = new LocalCluster("replication-odd-cluster.jar", 1, 3,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
         return builder;
     }
 }

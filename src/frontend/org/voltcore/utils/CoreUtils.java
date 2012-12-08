@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -87,7 +88,16 @@ public class CoreUtils {
         return ses;
     }
 
-    public static ListeningExecutorService getListeningExecutorService(final String name, final int threads) {
+    public static ListeningExecutorService getListeningExecutorService(
+            final String name,
+            final int threads) {
+        return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>());
+    }
+
+    public static ListeningExecutorService getListeningExecutorService(
+            final String name,
+            final int threads,
+            final BlockingQueue<Runnable> queue) {
         if (threads < 1) {
             throw new IllegalArgumentException("Must specify > 0 threads");
         }
@@ -97,7 +107,7 @@ public class CoreUtils {
         return MoreExecutors.listeningDecorator(
                 new ThreadPoolExecutor(threads, threads,
                         0L, TimeUnit.MILLISECONDS,
-                        new LinkedTransferQueue<Runnable>(),
+                        queue,
                         new ThreadFactory() {
                             private int threadIndex = 0;
                             @Override

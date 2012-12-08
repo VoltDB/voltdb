@@ -37,7 +37,7 @@ import shlex
 
 from voltcli import utility
 
-re_voltdb_jar = re.compile('^voltdb(client)?-2[.0-9]+[.]jar$')
+re_voltdb_jar = re.compile('^voltdb(client)?-[.0-9]+[.]jar$')
 
 # Filled in during startup.
 standalone   = None
@@ -124,6 +124,7 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
             # Try to set VOLTDB_VOLTDB if not set. Look for the voltdb jar file.
             if not os.environ.get('VOLTDB_VOLTDB', '') or voltdb_jar is None:
                 for subdir in ('voltdb', os.path.join('lib', 'voltdb')):
+                    # Need the hyphen to avoid the volt client jar.
                     glob_chk = os.path.join(os.path.realpath(os.path.join(dir, subdir)),
                                             'voltdb-*.jar')
                     voltdb_search_globs.append(glob_chk)

@@ -27,7 +27,6 @@
 
 import os
 import urllib
-from voltcli import utility
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -54,7 +53,7 @@ def save(runner):
         blocking = 'false'
     json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s"}'
                     % (uri, nonce, blocking, runner.opts.format)]
-    utility.verbose_info('@SnapshotSave "%s"' % json_opts)
+    runner.verbose_info('@SnapshotSave "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
     response = runner.call_proc('@SnapshotSave', columns, json_opts)
     print response.table(0).format_table(caption = 'Snapshot Save Results')

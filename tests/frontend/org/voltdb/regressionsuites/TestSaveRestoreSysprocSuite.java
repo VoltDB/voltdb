@@ -377,6 +377,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testPropagateIV2TransactionIds()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         if (!VoltDB.instance().isIV2Enabled()) return;
 
 
@@ -455,6 +457,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testDistributeReplicatedTable()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testDistributeReplicatedTable");
         m_config.shutDown();
 
@@ -517,6 +521,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testQueueUserSnapshot() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Staring testQueueUserSnapshot.");
         Client client = getClient();
 
@@ -600,6 +606,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
      */
     public void testQueueFailedUserSnapshot() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Staring testQueueFailedUserSnapshot.");
         Client client = getClient();
 
@@ -667,6 +675,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestore12Snapshot()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         Client client = getClient();
         byte snapshotTarBytes[] = new byte[1024 * 1024 * 3];
         InputStream is =
@@ -710,6 +720,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testSaveRestoreJumboRows()
     throws IOException, InterruptedException, ProcCallException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testSaveRestoreJumboRows.");
         Client client = getClient();
         byte firstStringBytes[] = new byte[1048576];
@@ -754,6 +766,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testTSVConversion() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Staring testTSVConversion.");
         Client client = getClient();
 
@@ -782,6 +796,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testCSVConversion() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testCSVConversion");
         Client client = getClient();
 
@@ -820,6 +836,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testBadSnapshotParams() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testBadSnapshotParams");
         Client client = getClient();
 
@@ -925,6 +943,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
      */
     public void testSnapshotSave() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testSnapshotSave");
         Client client = getClient();
 
@@ -1195,6 +1215,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testIdleOnlineSnapshot() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testIdleOnlineSnapshot");
         Client client = getClient();
 
@@ -1231,6 +1253,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testSaveAndRestoreReplicatedTable()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testSaveAndRestoreReplicatedTable");
         int num_replicated_items_per_chunk = 200;
         int num_replicated_chunks = 10;
@@ -1325,6 +1349,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testSaveAndRestorePartitionedTable()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testSaveAndRestorePartitionedTable");
         int num_partitioned_items_per_chunk = 120; // divisible by 3
         int num_partitioned_chunks = 10;
@@ -1537,6 +1563,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreMissingFiles()
     throws IOException, InterruptedException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testRestoreMissingFile");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -1575,6 +1603,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testCorruptedFiles()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testCorruptedFiles");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -1634,6 +1664,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testCorruptedFilesRandom()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testCorruptedFilesRandom");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -1689,6 +1721,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreMissingPartitionFile()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
 
@@ -1721,6 +1755,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRepartition()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testRepartition");
         int num_replicated_items_per_chunk = 100;
         int num_replicated_chunks = 10;
@@ -1786,6 +1822,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testChangeDDL()
     throws IOException, InterruptedException, ProcCallException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testChangeDDL");
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
@@ -1883,6 +1921,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testGoodChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testGoodChangeAttributeTypes");
         Client client = getClient();
 
@@ -1953,6 +1993,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testBadChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testBadChangeAttributeTypes");
         Client client = getClient();
 

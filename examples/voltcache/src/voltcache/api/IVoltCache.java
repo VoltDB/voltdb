@@ -25,6 +25,8 @@ package voltcache.api;
 import java.io.Closeable;
 import java.util.concurrent.Future;
 
+import voltcache.procedures.VoltCacheProcBase;
+
 public interface IVoltCache extends Closeable
 {
     /**
@@ -36,7 +38,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response - operation will return immediately.
      * @returns Result of the operation
      */
-    VoltCacheResult add(String key, int flags, int exptime, byte[] data, boolean noreply);
+    VoltCacheProcBase.Result add(String key, int flags, int exptime, byte[] data, boolean noreply);
 
     /**
      * Asynchronously Adds a cache item.
@@ -46,7 +48,7 @@ public interface IVoltCache extends Closeable
      * @param data Raw byte data for the item.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncAdd(String key, int flags, int exptime, byte[] data);
+    Future<VoltCacheProcBase.Result> asyncAdd(String key, int flags, int exptime, byte[] data);
 
     /**
      * Appends data to and existing cache item.
@@ -55,7 +57,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult append(String key, byte[] data, boolean noreply);
+    VoltCacheProcBase.Result append(String key, byte[] data, boolean noreply);
 
     /**
      * Asynchronously Appends data to and existing cache item.
@@ -63,7 +65,7 @@ public interface IVoltCache extends Closeable
      * @param data Raw byte data to append to the current item's data.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncAppend(String key, byte[] data);
+    Future<VoltCacheProcBase.Result> asyncAppend(String key, byte[] data);
 
     /**
      * Checks and Sets a cache item.
@@ -77,7 +79,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult cas(String key, int flags, int exptime, byte[] data, long casVersion, boolean noreply);
+    VoltCacheProcBase.Result cas(String key, int flags, int exptime, byte[] data, long casVersion, boolean noreply);
 
     /**
      * Asynchronously Checks and Sets a cache item.
@@ -90,20 +92,20 @@ public interface IVoltCache extends Closeable
      *        requested update will not be performed (other thread's value, set earlier, wins).
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncCas(String key, int flags, int exptime, byte[] data, long casVersion);
+    Future<VoltCacheProcBase.Result> asyncCas(String key, int flags, int exptime, byte[] data, long casVersion);
 
     /**
      * Cleans up all expired item (effectively deleting them from the cache).
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult cleanup(boolean noreply);
+    VoltCacheProcBase.Result cleanup(boolean noreply);
 
     /**
      * Asynchronously Cleans up all expired item (effectively deleting them from the cache).
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncCleanup();
+    Future<VoltCacheProcBase.Result> asyncCleanup();
 
     /**
      * Deletes a cache item.
@@ -112,7 +114,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult delete(String key, int exptime, boolean noreply);
+    VoltCacheProcBase.Result delete(String key, int exptime, boolean noreply);
 
     /**
      * Asynchronously Deletes a cache item.
@@ -120,7 +122,7 @@ public interface IVoltCache extends Closeable
      * @param exptime Time delay before the delete operation (number of second, up to 30 days), or UNIX time in seconds - use <= 0 for immediate deletion.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncDelete(String key, int exptime);
+    Future<VoltCacheProcBase.Result> asyncDelete(String key, int exptime);
 
     /**
      * Flushes out all items in the cache.  Items that had already expired are immediately reclaimed.  If a delay is given, the other
@@ -129,7 +131,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult flushAll(int exptime, boolean noreply);
+    VoltCacheProcBase.Result flushAll(int exptime, boolean noreply);
 
     /**
      * Asynchronously Flushes out all items in the cache.  Items that had already expired are immediately reclaimed.  If a delay is given, the other
@@ -137,35 +139,35 @@ public interface IVoltCache extends Closeable
      * @param exptime Time delay before the delete operation (number of second, up to 30 days), or UNIX time in seconds - use <= 0 for immediate deletion.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncFlushAll(int exptime);
+    Future<VoltCacheProcBase.Result> asyncFlushAll(int exptime);
 
     /**
      * Gets a single cache item.
      * @param key Key of the cache item to retrieve.
      * @returns Result of the operation
      */
-    VoltCacheResult get(String key);
+    VoltCacheProcBase.Result get(String key);
 
     /**
      * Asynchronously Gets a single cache item.
      * @param key Key of the cache item to retrieve.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncGet(String key);
+    Future<VoltCacheProcBase.Result> asyncGet(String key);
 
     /**
      * Gets a multiple cache items.
      * @param keys Array of key for the cache items to retrieve.
      * @returns Result of the operation
      */
-    VoltCacheResult get(String[] keys);
+    VoltCacheProcBase.Result get(String[] keys);
 
     /**
      * Asynchronously Gets a multiple cache items.
      * @param keys Array of key for the cache items to retrieve.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncGet(String[] keys);
+    Future<VoltCacheProcBase.Result> asyncGet(String[] keys);
 
     /**
      * Increments or Decrements an Int64 value to a given cache item representing an Int64 value.
@@ -175,7 +177,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult incrDecr(String key, long by, boolean increment, boolean noreply);
+    VoltCacheProcBase.Result incrDecr(String key, long by, boolean increment, boolean noreply);
 
     /**
      * Asynchronously Increments or Decrements an Int64 value to a given cache item representing an Int64 value.
@@ -184,7 +186,7 @@ public interface IVoltCache extends Closeable
      * @param increment Flag indicating true for increment, false for decrement.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncIncrDecr(String key, long by, boolean increment);
+    Future<VoltCacheProcBase.Result> asyncIncrDecr(String key, long by, boolean increment);
 
     /**
      * Prepends data to and existing cache item.
@@ -193,7 +195,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult prepend(String key, byte[] data, boolean noreply);
+    VoltCacheProcBase.Result prepend(String key, byte[] data, boolean noreply);
 
     /**
      * Asynchronously Prepends data to and existing cache item.
@@ -201,7 +203,7 @@ public interface IVoltCache extends Closeable
      * @param data Raw byte data to prepend to the current item's data.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncPrepend(String key, byte[] data);
+    Future<VoltCacheProcBase.Result> asyncPrepend(String key, byte[] data);
 
     /**
      * Replaces a cache item.
@@ -212,7 +214,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult replace(String key, int flags, int exptime, byte[] data, boolean noreply);
+    VoltCacheProcBase.Result replace(String key, int flags, int exptime, byte[] data, boolean noreply);
 
     /**
      * Asynchronously Replaces a cache item.
@@ -222,7 +224,7 @@ public interface IVoltCache extends Closeable
      * @param data Raw byte data for the item.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncReplace(String key, int flags, int exptime, byte[] data);
+    Future<VoltCacheProcBase.Result> asyncReplace(String key, int flags, int exptime, byte[] data);
 
     /**
      * Adds or Replaces a cache item.
@@ -233,7 +235,7 @@ public interface IVoltCache extends Closeable
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    VoltCacheResult set(String key, int flags, int exptime, byte[] data, boolean noreply);
+    VoltCacheProcBase.Result set(String key, int flags, int exptime, byte[] data, boolean noreply);
 
     /**
      * Asynchronously Adds or Replaces a cache item.
@@ -243,6 +245,6 @@ public interface IVoltCache extends Closeable
      * @param data Raw byte data for the item.
      * @returns Future result of the operation.
      */
-    Future<VoltCacheResult> asyncSet(String key, int flags, int exptime, byte[] data);
+    Future<VoltCacheProcBase.Result> asyncSet(String key, int flags, int exptime, byte[] data);
 }
 

@@ -190,6 +190,12 @@ public class TestAdminMode extends RegressionSuite
     // Somewhat hacky test of the LIVECLIENTS @Statistics selector
     public void testBacklogAndPolling() throws Exception
     {
+        if (isValgrind()) {
+            // no reasonable way to get the timing right in valgrind
+            // also, this test isn't really about c++ code
+            return;
+        }
+
         ClientConfig config = new ClientConfig();
         config.setProcedureCallTimeout(600000);
         final Client adminclient = ClientFactory.createClient(config);
