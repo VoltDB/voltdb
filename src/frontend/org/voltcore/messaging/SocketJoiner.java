@@ -43,6 +43,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 
 /**
@@ -88,8 +89,7 @@ public class SocketJoiner {
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    private final ExecutorService m_es = Executors.newSingleThreadExecutor(
-            org.voltcore.utils.CoreUtils.getThreadFactory("Socket Joiner", 1024 * 128));
+    private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("Socket Joiner");
 
     InetSocketAddress m_coordIp = null;
     int m_localHostId = 0;

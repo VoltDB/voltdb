@@ -43,6 +43,8 @@ import org.eclipse.jetty.server.bio.SocketConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.eclipse.jetty.util.thread.ThreadPool;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
@@ -348,6 +350,15 @@ public class HTTPAdminListener {
             });
 
             m_server.setHandler(handlers);
+
+            /*
+             * Don't force us to look at a huge pile of threads
+             */
+            final QueuedThreadPool qtp = new QueuedThreadPool(8);
+            qtp.setMaxIdleTimeMs(15000);
+            qtp.setMinThreads(1);
+            m_server.setThreadPool(qtp);
+
             m_server.start();
             m_jsonEnabled = jsonEnabled;
         }
@@ -355,7 +366,7 @@ public class HTTPAdminListener {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
             try { m_server.destroy(); } catch (Exception e2) {}
-            throw e;
+            throw new Exception(e);
         }
     }
 

@@ -58,11 +58,22 @@ import com.google.common.util.concurrent.MoreExecutors;
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    public static ListeningExecutorService getCachedSingleThreadExecutor(String name, long keepAlive) {
+        return MoreExecutors.listeningDecorator(new ThreadPoolExecutor(
+                0,
+                1,
+                keepAlive,
+                TimeUnit.MILLISECONDS,
+                new LinkedTransferQueue<Runnable>(),
+                CoreUtils.getThreadFactory(null, name, 128 * 1024, false)));
+    }
+
     /**
      * Create an unbounded single threaded executor
      */
     public static ListeningExecutorService getSingleThreadExecutor(String name) {
-        ExecutorService ste = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(name));
+        ExecutorService ste =
+                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, 128 * 1024, false));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -82,7 +93,7 @@ public class CoreUtils {
      * futures.
      */
     public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize, int stackSize) {
-        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
+        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(null, name, stackSize, poolSize > 1));
         ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
         return ses;
@@ -108,16 +119,7 @@ public class CoreUtils {
                 new ThreadPoolExecutor(threads, threads,
                         0L, TimeUnit.MILLISECONDS,
                         queue,
-                        new ThreadFactory() {
-                            private int threadIndex = 0;
-                            @Override
-                            public synchronized Thread  newThread(Runnable r) {
-                                String nameToUse = threads == 1 ? name : name + " - " + threadIndex++;
-                                Thread t = new Thread(null, r, nameToUse, 131072);
-                                t.setDaemon(true);
-                                return t;
-                            }
-                        }));
+                        getThreadFactory(null, name, 128 * 1024, threads > 1 ? true : false)));
     }
 
     public static ThreadFactory getThreadFactory(String name) {
@@ -125,11 +127,11 @@ public class CoreUtils {
     }
 
     public static ThreadFactory getThreadFactory(String groupName, String name) {
-        return getThreadFactory(groupName, name, 131072);
+        return getThreadFactory(groupName, name, 131072, true);
     }
 
     public static ThreadFactory getThreadFactory(String name, int stackSize) {
-        return getThreadFactory(null, name, stackSize);
+        return getThreadFactory(null, name, stackSize, true);
     }
 
     /**
@@ -142,7 +144,8 @@ public class CoreUtils {
      * @param stackSize
      * @return
      */
-    public static ThreadFactory getThreadFactory(final String groupName, final String name, final int stackSize) {
+    public static ThreadFactory getThreadFactory(final String groupName, final String name, final int stackSize,
+            final boolean incrementThreadNames) {
         ThreadGroup group = null;
         if (groupName != null) {
             group = new ThreadGroup(Thread.currentThread().getThreadGroup(), groupName);
@@ -154,7 +157,8 @@ public class CoreUtils {
             private final ThreadGroup m_group = finalGroup;
             @Override
             public Thread newThread(final Runnable r) {
-                final String threadName = name + " - " + m_createdThreadCount.getAndIncrement();
+                final String threadName = name +
+                        (incrementThreadNames ? " - " + m_createdThreadCount.getAndIncrement() : "");
                 Runnable runnable = new Runnable() {
                     @Override
                     public void run() {
