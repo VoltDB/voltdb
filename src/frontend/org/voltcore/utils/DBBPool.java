@@ -174,11 +174,13 @@ public final class DBBPool {
         if (cont == null) {
             //Create an origin container
             ByteBuffer b = ByteBuffer.allocateDirect(capacity);
+            bytesAllocatedGlobally.getAndAdd(capacity);
             cont = new BBContainer( b, DBBPool.getBufferAddress(b)) {
                 @Override
                 public void discard() {
                     try {
                         DirectMemoryUtils.destroyDirectByteBuffer(b);
+                        bytesAllocatedGlobally.addAndGet(-capacity);
                     } catch (Throwable e) {
                         VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
                     }
@@ -196,6 +198,10 @@ public final class DBBPool {
         return cont;
     }
 
+    /*
+     * The only reason to not retrieve the address is that network code shared
+     * with the java client shouldn't have a dependency on the native library
+     */
     public static BBContainer allocateDirect(final int capacity) {
         final ByteBuffer retval = ByteBuffer.allocateDirect(capacity);
         bytesAllocatedGlobally.getAndAdd(capacity);
@@ -206,6 +212,26 @@ public final class DBBPool {
             public void discard() {
                 try {
                     DirectMemoryUtils.destroyDirectByteBuffer(retval);
+                    bytesAllocatedGlobally.getAndAdd(-capacity);
+                } catch (Throwable e) {
+                    VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
+                }
+            }
+
+        };
+    }
+
+    public static BBContainer allocateDirectWithAddress(final int capacity) {
+        final ByteBuffer retval = ByteBuffer.allocateDirect(capacity);
+        bytesAllocatedGlobally.getAndAdd(capacity);
+
+        return new BBContainer(retval, DBBPool.getBufferAddress(retval)) {
+
+            @Override
+            public void discard() {
+                try {
+                    DirectMemoryUtils.destroyDirectByteBuffer(retval);
+                    bytesAllocatedGlobally.getAndAdd(-capacity);
                 } catch (Throwable e) {
                     VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
                 }
