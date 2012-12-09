@@ -1188,7 +1188,9 @@ public class ExportToFileClient extends ExportClientBase2 {
                 }
             }
         };
-        m_ses = CoreUtils.getScheduledThreadPoolExecutor("Export file rotate timer for nonce " + nonce, 1, 131072);
+        m_ses =
+                CoreUtils.getScheduledThreadPoolExecutor(
+                        "Export file rotate timer for nonce " + nonce, 1, CoreUtils.SMALL_STACK_SIZE);
         m_ses.scheduleWithFixedDelay(rotator, m_period, m_period, TimeUnit.MINUTES);
     }
 }

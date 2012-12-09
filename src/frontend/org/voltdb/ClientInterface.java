@@ -51,6 +51,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import java.util.concurrent.ThreadFactory;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -544,7 +545,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Schedule a timeout to close the socket in case there is no response for the timeout
              * period. This will wake up the current thread that is blocked on reading the login message
              */
-            ScheduledFuture<?> timeoutFuture = VoltDB.instance().scheduleWork(new Runnable() {
+            ScheduledFuture<?> timeoutFuture = VoltDB.instance().schedulePriorityWork(new Runnable() {
                                                     @Override
                                                     public void run() {
                                                         try {
@@ -2307,40 +2308,68 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return ft;
     }
 
-    /**
-     * Tick counter used to perform dead client detection every N ticks
+    /*
+     * A new thread is created to process each catalog update
+     * Lock on this object to ensure that the previous thread has finished
      */
-    private long m_tickCounter = 0;
-
-    public final void processPeriodicWork() {
-        long time;
-        if (m_isIV2Enabled) {
-            time = System.currentTimeMillis();
-        }
-        else {
-            time = m_initiator.tick();
-        }
-        m_tickCounter++;
-        if (m_tickCounter % 20 == 0) {
-            checkForDeadConnections(time);
-        }
-
-        // check for catalog updates
-        if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
-            m_catalogContext.set(VoltDB.instance().getCatalogContext());
-            /*
-             * Update snapshot daemon settings.
-             *
-             * Don't do it if the system is still initializing (CL replay),
-             * because snapshot daemon may call @SnapshotScan on activation and
-             * it will mess replaying txns up.
-             */
-            if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
-                mayActivateSnapshotDaemon();
+    private final Object m_catalogUpdateBarrier = new Object();
+    public void schedulePeriodicWorks() {
+        VoltDB.instance().scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    //Using the current time makes this vulnerable to NTP weirdness...
+                    checkForDeadConnections(System.currentTimeMillis());
+                } catch (Exception ex) {
+                    log.warn("Exception while checking for dead connections", ex);
+                }
             }
-        }
+        }, 200, 200, TimeUnit.MILLISECONDS);
+        /*
+         * Schedule it in the priority thread, but on update do the work in a new thread
+         */
+        VoltDB.instance().schedulePriorityWork(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
+                                ThreadFactory tf = CoreUtils.getThreadFactory(
+                                        null, "Client interface catalog update " + System.currentTimeMillis(),
+                                        CoreUtils.SMALL_STACK_SIZE, false);
+                                tf.newThread(
+                                    new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            synchronized (m_catalogUpdateBarrier) {
+                                                m_catalogContext.set(VoltDB.instance().getCatalogContext());
+                                                /*
+                                                 * Update snapshot daemon settings.
+                                                 *
+                                                 * Don't do it if the system is still initializing (CL replay),
+                                                 * because snapshot daemon may call @SnapshotScan on activation and
+                                                 * it will mess replaying txns up.
+                                                 */
+                                                if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
+                                                    mayActivateSnapshotDaemon();
+                                                }
+                                            }
+                                        }
+                                    }).start();
+                            }
+                        } catch (Exception ex) {
+                            log.warn("Exception in ClientInterface while checking for catalog update");
+                        }
+                    }
+                }, 5, 5, TimeUnit.MILLISECONDS);
 
-        return;
+    }
+
+    /*
+     * This is now a pre-IV2 only method
+     */
+    public final void processPeriodicWork() {
+        m_initiator.tick();
     }
 
     /**

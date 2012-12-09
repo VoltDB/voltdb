@@ -175,7 +175,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_drGateway = gateway;
         if (m_drGateway != null) {
             // Schedules to be fired every 5ms
-            VoltDB.instance().scheduleWork(new Runnable() {
+            VoltDB.instance().schedulePriorityWork(new Runnable() {
                 @Override
                 public void run() {
                     // Send a DR task to the site

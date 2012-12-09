@@ -58,6 +58,8 @@ import com.google.common.util.concurrent.MoreExecutors;
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    public static final int SMALL_STACK_SIZE = 1024 * 128;
+
     public static ListeningExecutorService getCachedSingleThreadExecutor(String name, long keepAlive) {
         return MoreExecutors.listeningDecorator(new ThreadPoolExecutor(
                 0,
@@ -65,7 +67,7 @@ public class CoreUtils {
                 keepAlive,
                 TimeUnit.MILLISECONDS,
                 new LinkedTransferQueue<Runnable>(),
-                CoreUtils.getThreadFactory(null, name, 128 * 1024, false)));
+                CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false)));
     }
 
     /**
@@ -73,7 +75,7 @@ public class CoreUtils {
      */
     public static ListeningExecutorService getSingleThreadExecutor(String name) {
         ExecutorService ste =
-                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, 128 * 1024, false));
+                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -119,15 +121,15 @@ public class CoreUtils {
                 new ThreadPoolExecutor(threads, threads,
                         0L, TimeUnit.MILLISECONDS,
                         queue,
-                        getThreadFactory(null, name, 128 * 1024, threads > 1 ? true : false)));
+                        getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false)));
     }
 
     public static ThreadFactory getThreadFactory(String name) {
-        return getThreadFactory(name, 131072);
+        return getThreadFactory(name, SMALL_STACK_SIZE);
     }
 
     public static ThreadFactory getThreadFactory(String groupName, String name) {
-        return getThreadFactory(groupName, name, 131072, true);
+        return getThreadFactory(groupName, name, SMALL_STACK_SIZE, true);
     }
 
     public static ThreadFactory getThreadFactory(String name, int stackSize) {

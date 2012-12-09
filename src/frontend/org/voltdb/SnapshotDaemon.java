@@ -87,7 +87,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
     private final ScheduledThreadPoolExecutor m_es =
-            new ScheduledThreadPoolExecutor(1, CoreUtils.getThreadFactory("SnapshotDaemon"),
+            new ScheduledThreadPoolExecutor(1,
+                    CoreUtils.getThreadFactory(null, "SnapshotDaemon", CoreUtils.SMALL_STACK_SIZE, false),
                                             new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
 
     private ZooKeeper m_zk;
