@@ -46,9 +46,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
-
 import jsr166y.LinkedTransferQueue;
+
+import org.voltcore.logging.VoltLogger;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -60,6 +60,13 @@ public class CoreUtils {
 
     public static final int SMALL_STACK_SIZE = 1024 * 128;
 
+    /**
+     * Get a single thread executor that caches it's thread meaning that the thread will terminate
+     * after keepAlive milliseconds. A new thread will be created the next time a task arrives and that will be kept
+     * around for keepAlive milliseconds. On creation no thread is allocated, the first task creates a thread.
+     *
+     * Uses LinkedTransferQueue to accept tasks and has a small stack.
+     */
     public static ListeningExecutorService getCachedSingleThreadExecutor(String name, long keepAlive) {
         return MoreExecutors.listeningDecorator(new ThreadPoolExecutor(
                 0,
