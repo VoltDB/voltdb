@@ -163,10 +163,9 @@ public:
                 char *storage = new char[size];
 #endif
                 m_oversizeChunks.push_back(Chunk(nexthigher(size), storage));
-                Chunk *newChunk = &(*(m_oversizeChunks.end()));
-                newChunk->m_offset = size;
-
-                return newChunk->m_chunkData;
+                Chunk &newChunk = m_oversizeChunks.back();
+                newChunk.m_offset = size;
+                return newChunk.m_chunkData;
             }
 
             /*
@@ -196,9 +195,9 @@ public:
                 char *storage = new char[m_allocationSize];
 #endif
                 m_chunks.push_back(Chunk(m_allocationSize, storage));
-                currentChunk = &(*(m_chunks.rbegin()));
-                currentChunk->m_offset = size;
-                return currentChunk->m_chunkData;
+                Chunk &newChunk = m_chunks.back();
+                newChunk.m_offset = size;
+                return newChunk.m_chunkData;
             }
         }
 
@@ -206,7 +205,7 @@ public:
          * Get the offset into the current chunk. Then increment the
          * offset counter by the amount being allocated.
          */
-        void *retval = &currentChunk->m_chunkData[currentChunk->m_offset];
+        void *retval = currentChunk->m_chunkData + currentChunk->m_offset;
         currentChunk->m_offset += size;
 
         //Ensure 8 byte alignment of future allocations
