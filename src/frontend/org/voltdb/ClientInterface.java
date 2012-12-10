@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,7 +52,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import java.util.concurrent.ThreadFactory;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -1598,7 +1598,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 false, task.clientHandle, handler.connectionId(),
                 handler.m_hostname, handler.isAdmin(), ccxn,
                 sql, sqlStatements, partitionParam, null, false, true,
-                task.type, task.originalTxnId, task.originalTs,
+                task.type, task.originalTxnId, task.originalUniqueId,
                 m_adhocCompletionHandler);
         if( isExplain ){
             ahpw.setIsExplainWork();
@@ -2099,7 +2099,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // DR stuff
         task.type = plannedStmtBatch.type;
         task.originalTxnId = plannedStmtBatch.originalTxnId;
-        task.originalTs = plannedStmtBatch.originalTs;
+        task.originalUniqueId = plannedStmtBatch.originalUniqueId;
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
@@ -2215,7 +2215,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             true,
                                             plannedStmtBatch.type,
                                             plannedStmtBatch.originalTxnId,
-                                            plannedStmtBatch.originalTs,
+                                            plannedStmtBatch.originalUniqueId,
                                             m_adhocCompletionHandler));
 
                             m_mailbox.send(m_plannerSiteId, work);
