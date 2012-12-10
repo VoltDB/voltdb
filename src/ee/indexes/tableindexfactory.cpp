@@ -49,6 +49,7 @@
 #include "common/SerializableEEException.h"
 #include "common/types.h"
 #include "catalog/index.h"
+#include "expressions/tuplevalueexpression.h"
 #include "indexes/tableindex.h"
 #include "indexes/indexkey.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
@@ -219,18 +220,17 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             }
             keyColumnTypes.push_back(exprType);
             if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
-                // There's not enough information to reliably determine that the value is small enough to "inline".
-                // Setting the column length to UNINLINEABLE_OBJECT_LENGTH is NOT intended to constrain the
-                // maximum length of the values or to be the basis of any kind of pre-allocation.
-                // Quite the opposite, it is intended only to convince the tuple storage code that the
-                // values MAY be too large for inlining, so all bets are off. It's not clear whether
-                // scheme.indexedExpressions[ii]->getValueSize() can or should be called for a more useful answer.
-                keyColumnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH);
-                // Short term, there is no support for non-inline types, for lack of proper memory management
-                // (persisting non-inline storage for calculated values not that is not a column value managed by
-                // a persistent table tuple.
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "TableIndexFactory::getInstance detected expression-based index on non-numeric value");
+                TupleValueExpression* tve = dynamic_cast<TupleValueExpression*>(scheme.indexedExpressions[ii]);
+                if (tve) {
+                    int columnIndex = tve->getColumnId();
+                    keyColumnLengths.push_back(tupleSchema->columnLength(columnIndex));
+                } else {
+                    // Short term, there is no support for non-inline types, for lack of proper memory management
+                    // (persisting non-inline storage for calculated values not that is not a column value managed by
+                    // a persistent table tuple).
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                                  "TableIndexFactory::getInstance detected expression-based index on non-numeric value");
+                }
             } else {
                 keyColumnLengths.push_back(NValue::getTupleStorageSize(exprType));
             }
