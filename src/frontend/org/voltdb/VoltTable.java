@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -1087,6 +1088,119 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
 
         assert(verifyTableInvariants());
         return buffer.toString();
+    }
+
+    // Display formatting utility functions
+    private static String paddingString(String s, int n, char c, boolean paddingLeft)
+    {
+        if (s == null)
+            return s;
+
+        int add = n - s.length();
+
+        if(add <= 0)
+            return s;
+
+        StringBuffer str = new StringBuffer(s);
+        char[] ch = new char[add];
+        Arrays.fill(ch, c);
+        if(paddingLeft)
+            str.insert(0, ch);
+        else
+            str.append(ch);
+
+
+       return str.toString();
+    }
+
+    private static String byteArrayToHexString(byte[] data)
+    {
+        StringBuffer hexString = new StringBuffer();
+        for (int i=0;i<data.length;i++)
+        {
+            String hex = Integer.toHexString(0xFF & data[i]);
+            if (hex.length() == 1)
+                hexString.append('0');
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+
+    /**
+     * Return a "pretty print" representation of this table.  Output will be formatted
+     * in a tabular textual format suitable for display.
+     * @return A string containing a pretty-print formatted representation of this table.
+     */
+    public String toFormattedString() {
+        StringBuffer sb = new StringBuffer();
+
+        int columnCount = this.getColumnCount();
+        int[] padding = new int[columnCount];
+        String[] fmt = new String[columnCount];
+        for (int i = 0; i < columnCount; i++)
+            padding[i] = this.getColumnName(i).length();
+        this.resetRowPosition();
+        while(this.advanceRow())
+        {
+            for (int i = 0; i < columnCount; i++)
+            {
+                Object v = this.get(i, this.getColumnType(i));
+                if (this.wasNull())
+                    v = "NULL";
+                int l = 0;  // length
+                if (this.getColumnType(i) == VoltType.VARBINARY && !this.wasNull()) {
+                    l = ((byte[])v).length*2;
+                }
+                else {
+                    l= v.toString().length();
+                }
+
+                if (padding[i] < l)
+                    padding[i] = l;
+            }
+        }
+        for (int i = 0; i < columnCount; i++)
+        {
+            padding[i] += 1;
+            fmt[i] = "%1$" +
+                ((this.getColumnType(i) == VoltType.STRING ||
+                  this.getColumnType(i) == VoltType.TIMESTAMP ||
+                  this.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
+                + padding[i] + "s";
+        }
+        for (int i = 0; i < columnCount; i++)
+        {
+            sb.append(String.format("%1$-" + padding[i] + "s", this.getColumnName(i)));
+            if (i < columnCount - 1)
+                sb.append(" ");
+        }
+        sb.append("\n");
+        for (int i = 0; i < columnCount; i++)
+        {
+            sb.append(paddingString("", padding[i], '-', false));
+            if (i < columnCount - 1)
+                sb.append(" ");
+        }
+        sb.append("\n");
+        this.resetRowPosition();
+        while(this.advanceRow())
+        {
+            for (int i = 0; i < columnCount; i++)
+            {
+                Object v = this.get(i, this.getColumnType(i));
+                if (this.wasNull())
+                    v = "NULL";
+                else if (this.getColumnType(i) == VoltType.VARBINARY)
+                    v = byteArrayToHexString((byte[])v);
+                else
+                    v = v.toString();
+                sb.append(String.format(fmt[i], v));
+                if (i < columnCount - 1)
+                    sb.append(" ");
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 
     /**

@@ -354,7 +354,7 @@ public class JSONClient {
         ClientResponse resp = client.callProcedure("@AdHoc", SQL);
         System.out.println("SQL query: " + SQL);
         System.out.println();
-        printResults(resp.getResults()[0]);
+        System.out.println(resp.getResults()[0].toFormattedString());
         System.out.println();
 
         // Select some sessions that have logged into site VoltDB Forum
@@ -363,7 +363,7 @@ public class JSONClient {
         resp = client.callProcedure("@AdHoc", SQL);
         System.out.println("SQL query: " + SQL);
         System.out.println();
-        printResults(resp.getResults()[0]);
+        System.out.println(resp.getResults()[0].toFormattedString());
         System.out.println();
 
         // Select VoltDB Forum sessions that are moderators
@@ -372,7 +372,7 @@ public class JSONClient {
         resp = client.callProcedure("@AdHoc", SQL);
         System.out.println("SQL query: " + SQL);
         System.out.println();
-        printResults(resp.getResults()[0]);
+        System.out.println(resp.getResults()[0].toFormattedString());
         System.out.println();
 
         // Nest field() functions to drill into the JSON
@@ -381,7 +381,7 @@ public class JSONClient {
         resp = client.callProcedure("@AdHoc", SQL);
         System.out.println("SQL query: " + SQL);
         System.out.println();
-        printResults(resp.getResults()[0]);
+        System.out.println(resp.getResults()[0].toFormattedString());
         System.out.println();
 
         // Use LIKE to pattern match.a
@@ -390,7 +390,7 @@ public class JSONClient {
         resp = client.callProcedure("@AdHoc", SQL);
         System.out.println("SQL query: " + SQL);
         System.out.println();
-        printResults(resp.getResults()[0]);
+        System.out.println(resp.getResults()[0].toFormattedString());
         System.out.println();
 
         // Display the results as JSON.
@@ -426,113 +426,6 @@ public class JSONClient {
         client.close();
     }
 
-    // Display formatting utility functions
-    public static String paddingString(String s, int n, char c, boolean paddingLeft)
-    {
-        if (s == null)
-            return s;
-
-        int add = n - s.length();
-
-        if(add <= 0)
-            return s;
-
-        StringBuffer str = new StringBuffer(s);
-        char[] ch = new char[add];
-        Arrays.fill(ch, c);
-        if(paddingLeft)
-            str.insert(0, ch);
-        else
-            str.append(ch);
-
-
-       return str.toString();
-    }
-
-    private static String byteArrayToHexString(byte[] data)
-    {
-        StringBuffer hexString = new StringBuffer();
-        for (int i=0;i<data.length;i++)
-        {
-            String hex = Integer.toHexString(0xFF & data[i]);
-            if (hex.length() == 1)
-                hexString.append('0');
-            hexString.append(hex);
-        }
-        return hexString.toString();
-    }
-
-    // Print pretty results
-    public void printResults(VoltTable t)
-    {
-        int columnCount = t.getColumnCount();
-        int[] padding = new int[columnCount];
-        String[] fmt = new String[columnCount];
-        for (int i = 0; i < columnCount; i++)
-            padding[i] = t.getColumnName(i).length();
-        t.resetRowPosition();
-        while(t.advanceRow())
-        {
-            for (int i = 0; i < columnCount; i++)
-            {
-                Object v = t.get(i, t.getColumnType(i));
-                if (t.wasNull())
-                    v = "NULL";
-                int l = 0;  // length
-                if (t.getColumnType(i) == VoltType.VARBINARY && !t.wasNull()) {
-                    l = ((byte[])v).length*2;
-                }
-                else {
-                    l= v.toString().length();
-                }
-
-                if (padding[i] < l)
-                    padding[i] = l;
-            }
-        }
-        for (int i = 0; i < columnCount; i++)
-        {
-            padding[i] += 1;
-            fmt[i] = "%1$" +
-                ((t.getColumnType(i) == VoltType.STRING ||
-                  t.getColumnType(i) == VoltType.TIMESTAMP ||
-                  t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                + padding[i] + "s";
-        }
-        for (int i = 0; i < columnCount; i++)
-        {
-            System.out.printf("%1$-" + padding[i] + "s", t.getColumnName(i));
-            if (i < columnCount - 1)
-                System.out.print(" ");
-        }
-        System.out.print("\n");
-        for (int i = 0; i < columnCount; i++)
-        {
-            System.out.print(paddingString("", padding[i], '-', false));
-            if (i < columnCount - 1)
-                System.out.print(" ");
-        }
-        System.out.print("\n");
-        t.resetRowPosition();
-        while(t.advanceRow())
-        {
-            for (int i = 0; i < columnCount; i++)
-            {
-                Object v = t.get(i, t.getColumnType(i));
-                if (t.wasNull())
-                    v = "NULL";
-                else if (t.getColumnType(i) == VoltType.VARBINARY)
-                    v = byteArrayToHexString((byte[])v);
-                else
-                    v = v.toString();
-                System.out.printf(fmt[i], v);
-                if (i < columnCount - 1)
-                    System.out.print(" ");
-            }
-            System.out.print("\n");
-        }
-        System.out.printf("\n(%d row(s) affected)\n", t.getRowCount());
-    }
 
     /**
      * Main routine creates a client instance, loads the database, then executes example
