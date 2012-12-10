@@ -23,6 +23,13 @@
 
 package org.voltdb.compiler;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,16 +38,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import org.mockito.verification.VerificationMode;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
 
 public class TestAsyncCompilerAgent {
     // this object is spied on using mockito
@@ -99,6 +102,7 @@ public class TestAsyncCompilerAgent {
             AdHocPlannerWork work =
                     new AdHocPlannerWork(100l, false, 0, 0, "localhost", false, null,
                             "select * from a", Arrays.asList(new String[] {"select * from a"}), 0, null, false, true,
+                            ProcedureInvocationType.ORIGINAL, 0, 0,
                             new AsyncCompilerWorkCompletionHandler() {
 
                                 @Override

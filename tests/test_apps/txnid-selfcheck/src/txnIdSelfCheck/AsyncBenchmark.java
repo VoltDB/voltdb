@@ -251,9 +251,11 @@ public class AsyncBenchmark {
      */
     void connectToOneServerWithRetry(Client client, String server) {
         int sleep = 1000;
-        while (true) {
+        while (!shutdown.get()) {
             try {
                 client.createConnection(server);
+                clients.add(client);
+                System.out.printf("Connected to VoltDB node at: %s.\n", server);
                 break;
             }
             catch (Exception e) {
@@ -262,8 +264,6 @@ public class AsyncBenchmark {
                 if (sleep < 8000) sleep += sleep;
             }
         }
-        clients.add(client);
-        System.out.printf("Connected to VoltDB node at: %s.\n", server);
     }
 
     /**
@@ -385,6 +385,8 @@ public class AsyncBenchmark {
                 if (response.getAppStatus() != updateReplicated.AbortStatus.NORMAL.ordinal()) {
                     crash(response.getStatusString());
                 }
+            } else if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
+                crash(response.getStatusString());
             } else {
                 // Could be server connection lost
                 //System.err.println("updateReplicated failed: " + response.getStatusString());
@@ -402,9 +404,8 @@ public class AsyncBenchmark {
         public void clientCallback(ClientResponse response) throws Exception {
             c.incrementAndGet();
 
-            if (response.getStatus() != ClientResponse.SUCCESS) {
-//                System.err.println("doTxn for cid " + cid + " failed: " +
-//                        response.getStatusString());
+            if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
+                crash(response.getStatusString());
             }
         }
     }

@@ -32,6 +32,7 @@ import java.util.Arrays;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
+import org.voltdb.VoltDB;
 import org.voltdb.exportclient.ExportToFileClient;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
@@ -44,11 +45,14 @@ public class ExportToFileTestVerifier {
     protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
         @Override
         protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat(ExportToFileClient.ODBC_DATE_FORMAT_STRING);
+            return new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING);
         }
     };
 
-    public ExportToFileTestVerifier() {
+    private final int partitionId;
+
+    public ExportToFileTestVerifier(int partitionId) {
+        this.partitionId = partitionId;
     }
 
     void addRow( String [] data) {
@@ -112,8 +116,9 @@ public class ExportToFileTestVerifier {
                         d.appendText("{ expected sequence " ).appendDescriptionOf(seqMatcher);
                         seqMatcher.describeMismatch(rowSeq, d);
                         d.appendText(" }");
+                    } else {
+                        m_sequenceNumber++;
                     }
-                    m_sequenceNumber++;
                 }
                 if (match) {
                    String [] toBeMatched = Arrays.copyOfRange(
@@ -126,6 +131,7 @@ public class ExportToFileTestVerifier {
                    }
                 }
                 d.appendText("]");
+                System.out.println("Validated partition id " + partitionId + " sequence " + m_sequenceNumber);
                 return match;
             }
         };

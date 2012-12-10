@@ -66,6 +66,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.zk.ZKTestBase;
 import org.voltdb.RestoreAgent.SnapshotInfo;
+import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltZK.MailboxType;
@@ -122,7 +123,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                     LinkedList<SnapshotCompletionInterest> interests =
                                             new LinkedList<SnapshotCompletionInterest>(m_interests);
                                     for (SnapshotCompletionInterest i : interests) {
-                                        i.snapshotCompleted( "", 0, new long[0], true);
+                                        i.snapshotCompleted(
+                                                new SnapshotCompletionEvent("", 0, new long[0], true, "", null));
                                     }
                                     break;
                                 }
@@ -162,17 +164,23 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
      */
     class MockInitiator extends TransactionInitiator {
         private final Map<String, Long> procCounts = new HashMap<String, Long>();
+        private final Map<String, ParameterSet> procParams = new HashMap<String, ParameterSet>();
 
         public MockInitiator(Set<String> procNames) {
             if (procNames != null) {
                 for (String proc : procNames) {
                     procCounts.put(proc, 0l);
+                    procParams.put(proc, null);
                 }
             }
         }
 
         public Map<String, Long> getProcCounts() {
             return procCounts;
+        }
+
+        public Map<String, ParameterSet> getProcParams() {
+            return procParams;
         }
 
         @Override
@@ -217,6 +225,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                 m_unexpectedSPIs.add(procName);
             } else {
                 procCounts.put(procName, procCounts.get(procName) + 1);
+                procParams.put(procName, invocation.getParams());
             }
 
             // Fake success
@@ -286,6 +295,9 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         @Override
         public void sendSentinel(long txnId, int partitionId) {}
+
+        @Override
+        public void sendEOLMessage(int partitionId) {}
     }
 
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
@@ -390,7 +402,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
      * Take a snapshot
      * @throws IOException
      */
-    void snapshot() throws Exception {
+    void snapshot(String nonce) throws Exception {
         String path = context.cluster.getVoltroot() + File.separator + "snapshots";
         ClientConfig clientConfig = new ClientConfig();
         Client client = ClientFactory.createClient(clientConfig);
@@ -400,7 +412,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             try {
                 response = client.callProcedure("@SnapshotSave",
                                                 path,
-                                                "hello",
+                                                nonce,
                                                 1);
             } catch (ProcCallException e) {
                 fail(e.getMessage());
@@ -559,6 +571,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                     } catch (Exception e) {
                         failure.incrementAndGet();
                     }
+
+                    agent.exitRestore();
                 }
             });
         }
@@ -617,7 +631,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     @Test
-    public void testSingleHostSnapshotRestore() throws Exception {
+    public void testSingleHostSnapshotRestoreNewestSnapshot() throws Exception {
         m_hostCount = 1;
         buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
         ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
@@ -628,7 +642,25 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
         server.waitForInitialization();
-        snapshot();
+        snapshot("bonjour");
+        // Now take a couple more for good measure
+        snapshot("sacrebleu");
+        snapshot("oolalacestcher");
+        server.shutdown();
+
+        // Now get a newer instance ID
+        server = new ServerThread(catalogJarFile.getAbsolutePath(),
+                                               deploymentPath,
+                                               TEST_SERVER_BASE_PORT + 2,
+                                               TEST_SERVER_BASE_PORT + 1,
+                                               TEST_ZK_BASE_PORT,
+                                               BackendTarget.NATIVE_EE_JNI);
+        server.start();
+        server.waitForInitialization();
+        snapshot("hello");
+        // Now take a couple more for good measure
+        snapshot("goodday");
+        snapshot("isaidgooddaysir");
         server.shutdown();
 
         HashSet<String> procs = new HashSet<String>();
@@ -646,11 +678,48 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
+            // We'd better have restored the newest snapshot
+            assertEquals("isaidgooddaysir", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
         } else {
             createCheck(initiator);
         }
     }
 
+    @Test
+    public void testSingleHostSnapshotRestore() throws Exception {
+        m_hostCount = 1;
+        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
+        ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
+                                               deploymentPath,
+                                               TEST_SERVER_BASE_PORT + 2,
+                                               TEST_SERVER_BASE_PORT + 1,
+                                               TEST_ZK_BASE_PORT,
+                                               BackendTarget.NATIVE_EE_JNI);
+        server.start();
+        server.waitForInitialization();
+        snapshot("hello");
+        server.shutdown();
+
+        HashSet<String> procs = new HashSet<String>();
+        procs.add("@SnapshotRestore");
+        MockInitiator initiator = new MockInitiator(procs);
+        RestoreAgent restoreAgent = getRestoreAgent(initiator, 0);
+        restoreAgent.restore();
+        while (!m_done) {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {}
+        }
+
+        if (action != START_ACTION.CREATE) {
+            Long count = initiator.getProcCounts().get("@SnapshotRestore");
+            assertEquals(new Long(1), count);
+            assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
+            assertEquals("hello", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+        } else {
+            createCheck(initiator);
+        }
+    }
     @Test
     public void testSingleHostSnapshotRestoreCatalogChange() throws Exception {
         m_hostCount = 1;
@@ -664,7 +733,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
         server.waitForInitialization();
-        snapshot();
+        snapshot("hello");
         server.shutdown();
 
         buildCatalog(m_hostCount, 8, 0, voltroot, true, true);
@@ -701,7 +770,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                BackendTarget.NATIVE_EE_JNI);
         server.start();
         server.waitForInitialization();
-        snapshot();
+        snapshot("hello");
         server.shutdown();
 
         m_hostCount = 3;

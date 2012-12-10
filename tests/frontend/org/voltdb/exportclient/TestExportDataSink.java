@@ -69,7 +69,7 @@ public class TestExportDataSink extends TestCase {
                            new TestExportDecoder(new AdvertisedDataSource(PARTITION_ID,
                                                                           TABLE_SIGNATURE,
                                                                           "coffeetable", 0, 32,
-                                                                          null, null)));
+                                                                          null, null, null)));
         dut.addExportConnection(CONN_NAME, 0);
         assertNull(dut.getTxQueue(CONN_NAME).peek());
         dut.work();

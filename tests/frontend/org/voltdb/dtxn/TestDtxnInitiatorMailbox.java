@@ -200,6 +200,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
         @Override
         public void sendSentinel(long txnId, int partitionId) {}
+
+        @Override
+        public void sendEOLMessage(int partitionId) {}
     }
 
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,

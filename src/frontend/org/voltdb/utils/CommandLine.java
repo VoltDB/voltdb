@@ -21,7 +21,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
@@ -79,7 +82,6 @@ public class CommandLine extends VoltDB.Configuration
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
         cl.debugPort = debugPort;
-        cl.ipcPortList = ipcPortList;
         cl.zkport = zkport;
         cl.buildDir = buildDir;
         cl.java_library_path = java_library_path;
@@ -92,6 +94,13 @@ public class CommandLine extends VoltDB.Configuration
         cl.jmxPort = jmxPort;
         cl.jmxHost = jmxHost;
         cl.customCmdLn = customCmdLn;
+        // deep copy the propety map if it exists
+        if (javaProperties != null) {
+            cl.javaProperties = new TreeMap<String, String>();
+            for (Entry<String, String> e : javaProperties.entrySet()) {
+                cl.javaProperties.put(e.getKey(), e.getValue());
+            }
+        }
 
         return cl;
     }
@@ -201,12 +210,7 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String ipcPortList = "";
     public CommandLine ipcPort(int port) {
-        if (!ipcPortList.isEmpty()) {
-            ipcPortList += ",";
-        }
-        ipcPortList += Integer.toString(port);
         m_ipcPorts.add(port);
         return this;
     }
@@ -357,6 +361,16 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public Map<String, String> javaProperties = null;
+    public CommandLine setJavaProperty(String property, String value)
+    {
+        if (javaProperties == null) {
+            javaProperties = new TreeMap<String, String>();
+        }
+        javaProperties.put(property, value);
+        return this;
+    }
+
     public void dumpToFile(String filename) {
         try {
             FileWriter out = new FileWriter(filename);
@@ -424,6 +438,17 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Dvolt.rmi.server.hostname=" + jmxHost);
         }
 
+        if (javaProperties != null) {
+            for (Entry<String, String> e : javaProperties.entrySet()) {
+                if (e.getValue() != null) {
+                    cmdline.add("-D" + e.getKey() + "=" + e.getValue());
+                }
+                else {
+                    cmdline.add("-D" + e.getKey());
+                }
+            }
+        }
+
         if (debugPort > -1) {
             cmdline.add("-Xdebug");
             cmdline.add("-agentlib:jdwp=transport=dt_socket,address=" + debugPort + ",server=y,suspend=n");
@@ -483,8 +508,7 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("replicationport"); cmdline.add(Integer.toString(m_drAgentPortStart));
         }
 
-        if (target().isIPC) {
-            cmdline.add("ipcports"); cmdline.add(ipcPortList);
+        if (target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             cmdline.add("valgrind");
         }
 

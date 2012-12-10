@@ -27,6 +27,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
@@ -41,6 +42,7 @@ public class CatalogContext {
     public final Cluster cluster;
     public final Database database;
     public final CatalogMap<Procedure> procedures;
+    public final CatalogMap<Table> tables;
     public final AuthSystem authSystem;
     public final int catalogVersion;
     private final long catalogCRC;
@@ -95,6 +97,7 @@ public class CatalogContext {
         cluster = catalog.getClusters().get("cluster");
         database = cluster.getDatabases().get("database");
         procedures = database.getProcedures();
+        tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         this.deploymentCRC = deploymentCRC;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);

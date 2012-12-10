@@ -66,3 +66,17 @@ CREATE TABLE BID_EXPORT (
 );
 
 PARTITION TABLE BID_EXPORT ON COLUMN ITEMID;
+
+CREATE PROCEDURE FROM CLASS com.auctionexample.InsertIntoCategory;
+CREATE PROCEDURE FROM CLASS com.auctionexample.InsertIntoUser;
+CREATE PROCEDURE FROM CLASS com.auctionexample.InsertIntoItemAndBid;
+CREATE PROCEDURE FROM CLASS com.auctionexample.AuctionStatus;
+CREATE PROCEDURE FROM CLASS com.auctionexample.BidOnAuction;
+CREATE PROCEDURE FROM CLASS com.auctionexample.GetAuctionInfo;
+CREATE PROCEDURE FROM CLASS com.auctionexample.debug.SelectBids;
+CREATE PROCEDURE FROM CLASS com.auctionexample.debug.SelectCategory;
+CREATE PROCEDURE FROM CLASS com.auctionexample.debug.SelectItem;
+CREATE PROCEDURE FROM CLASS com.auctionexample.debug.SelectUser;
+
+EXPORT TABLE ITEM_EXPORT;
+EXPORT TABLE BID_EXPORT;

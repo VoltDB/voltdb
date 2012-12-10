@@ -622,8 +622,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             String table_name = (String) params.toArray()[0];
             long site_id = (Long) params.toArray()[1];
             int dependency_id = (Integer) params.toArray()[2];
-            TRACE_LOG.trace("Distributing replicated table: " + table_name +
-                    " to: " + site_id);
+            TRACE_LOG.trace(CoreUtils.hsIdToString(context.getSiteId()) + " distributing replicated table: " + table_name +
+                    " to: " + CoreUtils.hsIdToString(site_id));
             VoltTable result = performDistributeReplicatedTable(table_name, site_id);
             return new DependencyPair(dependency_id, result);
         }
@@ -636,7 +636,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             String table_name = (String) params.toArray()[0];
             int dependency_id = (Integer) params.toArray()[1];
             byte compressedTable[] = (byte[]) params.toArray()[2];
-            TRACE_LOG.trace("Received replicated table: " + table_name);
+            TRACE_LOG.trace("Received replicated table at " + CoreUtils.hsIdToString(context.getSiteId()) +
+                    " dependency id " + dependency_id);
             String result_str = "SUCCESS";
             String error_msg = "";
             try
@@ -667,7 +668,10 @@ public class SnapshotRestore extends VoltSystemProcedure
         {
             assert(params.toArray()[0] != null);
             int dependency_id = (Integer) params.toArray()[0];
-            TRACE_LOG.trace("Received confirmmation of successful replicated table load");
+            TRACE_LOG.trace(
+                    "Received confirmation of successful replicated table load at " +
+                            CoreUtils.hsIdToString(context.getSiteId()));
+
             VoltTable result = constructResultsTable();
             for (int dep_id : dependencies.keySet())
             {
@@ -810,9 +814,12 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(paramsArray.length == 1);
             assert(paramsArray[0] instanceof Long);
             long coordinatorHSId = (Long)paramsArray[0];
-
             Mailbox m = VoltDB.instance().getHostMessenger().createMailbox();
             m_mbox = m;
+            TRACE_LOG.trace(
+                    "Entering async run loop at " + CoreUtils.hsIdToString(context.getSiteId()) +
+                    " listening on mbox " + CoreUtils.hsIdToString(m.getHSId()));
+
 
             /*
              * Send the generated mailbox id to the coordinator mapping
@@ -855,6 +862,9 @@ public class SnapshotRestore extends VoltSystemProcedure
 
                 if (vm instanceof FragmentTaskMessage) {
                     FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
+                    TRACE_LOG.trace(
+                            CoreUtils.hsIdToString(context.getSiteId()) + " received fragment id " +
+                    ftm.getFragmentId(0));
                     DependencyPair dp =
                             m_runner.executePlanFragment(
                                     m_runner.getTxnState(),
@@ -1823,16 +1833,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             partitioned_tables[partition].add(loadedTable);
         }
 
-        /*
-         * Get all hands on deck for compression, do it async to minimize latency
-         */
-        ArrayList<Future<byte[]>> compressTableTasks = new ArrayList<Future<byte[]>>();
-        for (int ii = 0; ii < number_of_partitions; ii++) {
-            compressTableTasks.add(partitioned_tables[ii].getCompressedBytesAsync());
-        }
         byte compressedTables[][] = new byte[number_of_partitions][];
         for (int ii = 0; ii < compressedTables.length; ii++) {
-            compressedTables[ii] = compressTableTasks.get(ii).get();
+            compressedTables[ii] = partitioned_tables[ii].getCompressedBytes();
         }
         return compressedTables;
     }

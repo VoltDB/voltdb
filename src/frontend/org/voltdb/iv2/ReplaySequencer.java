@@ -51,7 +51,7 @@ public class ReplaySequencer
 {
     // place holder that associates sentinel, first fragment and
     // work that follows in the transaction sequence.
-    private static class ReplayEntry {
+    private class ReplayEntry {
         Long m_sentinalTxnId = null;
         FragmentTaskMessage m_firstFragment = null;
 
@@ -60,7 +60,12 @@ public class ReplaySequencer
 
         boolean isReady()
         {
-            return m_sentinalTxnId != null && m_firstFragment != null;
+            if (m_eolReached) {
+                // End of log, no more sentinels, release first fragment
+                return m_firstFragment != null;
+            } else {
+                return m_sentinalTxnId != null && m_firstFragment != null;
+            }
         }
 
         boolean hasSentinel()
@@ -101,6 +106,15 @@ public class ReplaySequencer
     // for released transactions do not need further sequencing.
     long m_lastPolledFragmentTxnId = Long.MIN_VALUE;
 
+    // has reached end of log for this partition, release any MP Txns for
+    // replay if this is true.
+    boolean m_eolReached = false;
+
+    public void setEOLReached()
+    {
+        m_eolReached = true;
+    }
+
     // Return the next correctly sequenced message or null if none exists.
     public VoltMessage poll()
     {
@@ -124,6 +138,23 @@ public class ReplaySequencer
     public boolean offer(long inTxnId, TransactionInfoBaseMessage in)
     {
         ReplayEntry found = m_replayEntries.get(inTxnId);
+
+        /*
+         * End-of-log reached. Only FragmentTaskMessage and
+         * CompleteTransactionMessage can arrive at this partition once EOL is
+         * reached.
+         *
+         * If the txn is found, meaning that found is not null, then this might
+         * be the first fragment, it needs to get through in order to free any
+         * txns queued behind it.
+         *
+         * If the txn is not found, then there will be no matching sentinel to
+         * come later, and there will be no SP txns after this MP, so release
+         * the first fragment immediately.
+         */
+        if (m_eolReached && found == null) {
+            return false;
+        }
 
         if (in instanceof MultiPartitionParticipantMessage) {
             // Incoming sentinel.

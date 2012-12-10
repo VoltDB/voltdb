@@ -8,8 +8,10 @@
     deployment.xml. org.voltdb.VoltDB processes deployment.xml file using
     the jaxb XML to Java bindings.
 
-    If you modify this schema, you must regenerate the jaxb
-    bindings. It's easy to do:
+    If you modify this schema, the jaxb bindings must be regenerated.
+    It is normally handled by the ant build.
+    
+    It's also easy to do manually:
 
     cd src/frontend
     xjc -p org.voltdb.compiler.deploymentfile org/voltdb/compiler/DeploymentFileSchema.xsd
@@ -258,6 +260,7 @@
   <xs:simpleType name="ServerExportEnum">
     <xs:restriction base="xs:token">
       <xs:enumeration value="file"/>
+      <xs:enumeration value="jdbc"/>
     </xs:restriction>
   </xs:simpleType>
 

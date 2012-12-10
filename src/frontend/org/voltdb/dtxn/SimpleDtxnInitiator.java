@@ -536,4 +536,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public void sendSentinel(long txnId, int partitionId) {
         //Does nothing pre-IV2
     }
+
+    @Override
+    public void sendEOLMessage(int partitionId) {
+        // Does nothing pre-IV2
+    }
 }
