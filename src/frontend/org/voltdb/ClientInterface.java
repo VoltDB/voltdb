@@ -42,9 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
@@ -117,6 +115,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -155,9 +154,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
-
-    /** If this is true, update the catalog */
-    private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
     /**
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
@@ -1411,14 +1407,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (VoltDB.instance().getSiteTracker().isFirstHost() &&
             schedule != null && schedule.getEnabled())
         {
-            Future<Void> future = m_snapshotDaemon.makeActive(schedule);
-            try {
-                future.get();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            } catch (ExecutionException e) {
-                throw new RuntimeException(e.getCause());
-            }
+            final ListenableFuture<Void> future = m_snapshotDaemon.makeActive(schedule);
+            future.addListener(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        future.get();
+                    } catch (InterruptedException e) {
+                        VoltDB.crashLocalVoltDB("Failed to make SnapshotDaemon active", false, e);
+                    } catch (ExecutionException e) {
+                        VoltDB.crashLocalVoltDB("Failed to make SnapshotDaemon active", false, e);
+                    }
+                }
+            }, MoreExecutors.sameThreadExecutor());
         } else {
             m_snapshotDaemon.makeInactive();
         }
@@ -1429,7 +1430,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * catalog when it's threadsafe.
      */
     public void notifyOfCatalogUpdate() {
-        m_shouldUpdateCatalog.set(true);
+        m_catalogContext.set(VoltDB.instance().getCatalogContext());
+        /*
+         * Update snapshot daemon settings.
+         *
+         * Don't do it if the system is still initializing (CL replay),
+         * because snapshot daemon may call @SnapshotScan on activation and
+         * it will mess replaying txns up.
+         */
+        if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
+            mayActivateSnapshotDaemon();
+        }
     }
 
     private ClientResponseImpl errorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {
@@ -2317,11 +2328,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return ft;
     }
 
-    /*
-     * A new thread is created to process each catalog update
-     * Lock on this object to ensure that the previous thread has finished
-     */
-    private final Object m_catalogUpdateBarrier = new Object();
     public void schedulePeriodicWorks() {
         VoltDB.instance().scheduleWork(new Runnable() {
             @Override
@@ -2334,44 +2340,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
         }, 200, 200, TimeUnit.MILLISECONDS);
-        /*
-         * Schedule it in the priority thread, but on update do the work in a new thread
-         */
-        VoltDB.instance().schedulePriorityWork(
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
-                                ThreadFactory tf = CoreUtils.getThreadFactory(
-                                        null, "Client interface catalog update " + System.currentTimeMillis(),
-                                        CoreUtils.SMALL_STACK_SIZE, false);
-                                tf.newThread(
-                                    new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            synchronized (m_catalogUpdateBarrier) {
-                                                m_catalogContext.set(VoltDB.instance().getCatalogContext());
-                                                /*
-                                                 * Update snapshot daemon settings.
-                                                 *
-                                                 * Don't do it if the system is still initializing (CL replay),
-                                                 * because snapshot daemon may call @SnapshotScan on activation and
-                                                 * it will mess replaying txns up.
-                                                 */
-                                                if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
-                                                    mayActivateSnapshotDaemon();
-                                                }
-                                            }
-                                        }
-                                    }).start();
-                            }
-                        } catch (Exception ex) {
-                            log.warn("Exception in ClientInterface while checking for catalog update");
-                        }
-                    }
-                }, 5, 5, TimeUnit.MILLISECONDS);
-
     }
 
     /*
