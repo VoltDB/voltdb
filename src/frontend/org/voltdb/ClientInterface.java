@@ -1596,7 +1596,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_siteId,
                 false, task.clientHandle, handler.connectionId(),
                 handler.m_hostname, handler.isAdmin(), ccxn,
-                sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler);
+                sql, sqlStatements, partitionParam, null, false, true,
+                task.type, task.originalTxnId, task.originalTs,
+                m_adhocCompletionHandler);
         if( isExplain ){
             ahpw.setIsExplainWork();
         }
@@ -2093,6 +2095,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
+        // DR stuff
+        task.type = plannedStmtBatch.type;
+        task.originalTxnId = plannedStmtBatch.originalTxnId;
+        task.originalTs = plannedStmtBatch.originalTs;
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
@@ -2206,6 +2212,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             null,
                                             false,
                                             true,
+                                            plannedStmtBatch.type,
+                                            plannedStmtBatch.originalTxnId,
+                                            plannedStmtBatch.originalTs,
                                             m_adhocCompletionHandler));
 
                             m_mailbox.send(m_plannerSiteId, work);
