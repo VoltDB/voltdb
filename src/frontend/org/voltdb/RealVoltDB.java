@@ -2179,6 +2179,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         m_rejoining = false;
     }
 
+    /**
+     * See comment on {@link VoltDBInterface#scheduleWork(Runnable, long, long, TimeUnit)} vs
+     * {@link VoltDBInterface#schedulePriorityWork(Runnable, long, long, TimeUnit)}
+     */
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work,
             long initialDelay,
@@ -2402,6 +2406,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return retval;
     }
 
+    /**
+     * See comment on {@link VoltDBInterface#schedulePriorityWork(Runnable, long, long, TimeUnit)} vs
+     * {@link VoltDBInterface#scheduleWork(Runnable, long, long, TimeUnit)}
+     */
     @Override
     public ScheduledFuture<?> schedulePriorityWork(Runnable work,
             long initialDelay,
