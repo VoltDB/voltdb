@@ -192,6 +192,7 @@ def abort(*msgs):
     Display ERROR messages and then abort.
     """
     error(*msgs)
+    sys.stderr.write('\n')
     display_messages('Exiting.', f = sys.stderr, tag = 'FATAL')
     sys.exit(1)
 
@@ -382,7 +383,7 @@ def run_cmd(cmd, *args):
     fullcmd = cmd
     for arg in args:
         sarg = str(arg)
-        if len(sarg.split()) > 1:
+        if len(sarg) == 0 or len(sarg.split()) > 1:
             fullcmd += ' "%s"' % sarg
         else:
             fullcmd += ' %s' % sarg
@@ -972,7 +973,7 @@ class VoltTableWrapper(object):
     """
     def __init__(self, table):
         self.table = table
-    def tuple_count(self, index):
+    def tuple_count(self):
         return len(self.table.tuples)
     def tuple(self, index):
         if index < 0 or index >= len(self.table.tuples):

@@ -553,7 +553,13 @@ public class LocalCluster implements VoltServerConfig {
             if (m_target == BackendTarget.NATIVE_EE_IPC) {
                 // set 1 port per site
                 for (int i = 0; i < m_siteCount; i++) {
-                    cmdln.m_ipcPorts.add(portGenerator.next());
+                    cmdln.ipcPort(portGenerator.next());
+                }
+            }
+            if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+                for (EEProcess proc : m_eeProcs.get(hostId)) {
+                    assert(proc != null);
+                    cmdln.ipcPort(proc.port());
                 }
             }
 
@@ -564,13 +570,6 @@ public class LocalCluster implements VoltServerConfig {
 
             if (m_debug) {
                 cmdln.debugPort(portGenerator.next());
-            }
-
-            if (cmdln.target().isIPC) {
-                for (EEProcess proc : m_eeProcs.get(hostId)) {
-                    assert(proc != null);
-                    cmdln.ipcPort(portGenerator.next());
-                }
             }
 
             cmdln.zkport(portGenerator.next());
@@ -1109,12 +1108,12 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_leader = config.m_leader;
     }
 
-    protected boolean isMemcheckDefined() {
+    public boolean isMemcheckDefined() {
         final String buildType = System.getenv().get("BUILD");
         if (buildType == null) {
             return false;
         }
-        return buildType.startsWith("memcheck");
+        return buildType.toLowerCase().startsWith("memcheck");
     }
 
     @Override

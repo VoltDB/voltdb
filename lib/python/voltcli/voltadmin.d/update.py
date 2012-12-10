@@ -42,4 +42,4 @@ def update(runner):
     params     = [catalog, deployment]
     # call_proc() aborts with an error if the update failed.
     runner.call_proc('@UpdateApplicationCatalog', columns, params)
-    utility.info('The catalog update succeeded.')
+    runner.info('The catalog update succeeded.')

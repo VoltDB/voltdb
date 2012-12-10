@@ -34,6 +34,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.lang3.StringUtils;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -43,6 +45,10 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.utils.MiscUtils;
+
+import voltcache.procedures.VoltCacheProcBase;
+import voltcache.procedures.VoltCacheProcBase.Result;
+import voltcache.procedures.VoltCacheProcBase.Result.Type;
 
 public class VoltCache implements IVoltCache
 {
@@ -216,6 +222,7 @@ public class VoltCache implements IVoltCache
     /**
      * Closes the VoltCache connection.
      */
+    @Override
     public void close()
     {
         try {
@@ -252,9 +259,9 @@ public class VoltCache implements IVoltCache
      * @param parameters Ordered list of procedure parameters
      * @returns Result of the operation
      */
-    private VoltCacheResult execute(VoltCacheResult.Type type, boolean noreply, String procedure, Object... parameters)
+    private VoltCacheProcBase.Result execute(VoltCacheProcBase.Result.Type type, boolean noreply, String procedure, Object... parameters)
     {
-        VoltCacheResult results = null;
+        VoltCacheProcBase.Result results = null;
         try
         {
             if (noreply) {
@@ -262,22 +269,67 @@ public class VoltCache implements IVoltCache
                                                      VoltCache.nullCallback
                                                    , procedure
                                                    , parameters
-                                                   ) ? VoltCacheResult.SUBMITTED() : VoltCacheResult.ERROR();
+                                                   ) ? VoltCacheProcBase.Result.SUBMITTED() : VoltCacheProcBase.Result.ERROR();
             } else {
-                results = VoltCacheResult.get(
-                                            type
-                                          , this.client.callProcedure(
-                                                                     procedure
-                                                                   , parameters
-                                                                   )
-                                          );
+                results = getResult(
+                                    type
+                                    , this.client.callProcedure(
+                                                                 procedure
+                                                               , parameters
+                                                               )
+                                   );
             }
         }
         catch(Exception x)
         {
-            results= VoltCacheResult.ERROR();
+            results= VoltCacheProcBase.Result.ERROR();
         }
                 return results;
+    }
+
+    public static VoltCacheProcBase.Result getResult(Type type, ClientResponse response)
+    {
+        if (type == Type.CODE)
+        {
+            return VoltCacheProcBase.Result.getResult((int)response.getResults()[0].asScalarLong());
+        }
+        else if (type == Type.DATA)
+        {
+            final VoltTable data = response.getResults()[0];
+            if (data.getRowCount() > 0)
+            {
+                final Result result = Result.OK();
+                result.data = new HashMap<String,VoltCacheItem>();
+                while(data.advanceRow())
+                    result.data.put(
+                                     data.getString(0)
+                                   , new VoltCacheItem(
+                                                        data.getString(0)
+                                                      , (int)data.getLong(1)
+                                                      , data.getVarbinary(2)
+                                                      , data.getLong(3)
+                                                      , (int)data.getLong(4)
+                                                      )
+                                   );
+                return result;
+            }
+            else
+                return Result.NOT_FOUND();
+        }
+        else if (type == Type.IDOP)
+        {
+            final long value = response.getResults()[0].asScalarLong();
+            if (value == VoltType.NULL_BIGINT)
+                return Result.NOT_FOUND();
+            else
+            {
+                final Result result = Result.OK();
+                result.incrDecrValue = value;
+                return result;
+            }
+        }
+        else
+            throw new RuntimeException("Invalid Result Type: " + type);
     }
 
     /**
@@ -287,11 +339,12 @@ public class VoltCache implements IVoltCache
      * @param parameters Ordered list of procedure parameters
      * @returns Future result of the operation
      */
-    private Future<VoltCacheResult> asyncExecute(VoltCacheResult.Type type, final String procedure, final Object... parameters)
+    private Future<VoltCacheProcBase.Result> asyncExecute(VoltCacheProcBase.Result.Type type, final String procedure, final Object... parameters)
     {
         try
         {
                 Callable<ClientResponse> callable = new Callable<ClientResponse>() {
+                        @Override
                         public ClientResponse call() {
                                 ClientResponse response = null;
                                         try {
@@ -326,9 +379,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response - operation will return immediately.
      * @returns Result of the operation
      */
-    public VoltCacheResult add(String key, int flags, int exptime, byte[] data, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result add(String key, int flags, int exptime, byte[] data, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "Add", key, flags, exptime, data);
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "Add", key, flags, exptime, data);
     }
 
     /**
@@ -339,9 +393,10 @@ public class VoltCache implements IVoltCache
      * @param data Raw byte data for the item.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncAdd(String key, int flags, int exptime, byte[] data)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncAdd(String key, int flags, int exptime, byte[] data)
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "Add", key, flags, exptime, data);
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "Add", key, flags, exptime, data);
     }
 
     /**
@@ -351,9 +406,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult append(String key, byte[] data, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result append(String key, byte[] data, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "Append", key, data);
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "Append", key, data);
     }
 
     /**
@@ -362,9 +418,10 @@ public class VoltCache implements IVoltCache
      * @param data Raw byte data to append to the current item's data.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncAppend(String key, byte[] data)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncAppend(String key, byte[] data)
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "Append", key, data);
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "Append", key, data);
     }
 
     /**
@@ -379,9 +436,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult cas(String key, int flags, int exptime, byte[] data, long casVersion, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result cas(String key, int flags, int exptime, byte[] data, long casVersion, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "CheckAndSet", key, flags, exptime, data, casVersion);
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "CheckAndSet", key, flags, exptime, data, casVersion);
     }
 
     /**
@@ -395,9 +453,10 @@ public class VoltCache implements IVoltCache
      *        requested update will not be performed (other thread's value, set earlier, wins).
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncCas(String key, int flags, int exptime, byte[] data, long casVersion)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncCas(String key, int flags, int exptime, byte[] data, long casVersion)
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "CheckAndSet", key, flags, exptime, data, casVersion);
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "CheckAndSet", key, flags, exptime, data, casVersion);
     }
 
     /**
@@ -405,18 +464,20 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult cleanup(boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result cleanup(boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "Cleanup");
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "Cleanup");
     }
 
     /**
      * Asynchronously Cleans up all expired item (effectively deleting them from the cache).
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncCleanup()
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncCleanup()
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "Cleanup");
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "Cleanup");
     }
 
     /**
@@ -426,9 +487,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult delete(String key, int exptime, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result delete(String key, int exptime, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "Delete", key, exptime);
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "Delete", key, exptime);
     }
 
     /**
@@ -437,9 +499,10 @@ public class VoltCache implements IVoltCache
      * @param exptime Time delay before the delete operation (number of second, up to 30 days), or UNIX time in seconds - use <= 0 for immediate deletion.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncDelete(String key, int exptime)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncDelete(String key, int exptime)
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "Delete", key, exptime);
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "Delete", key, exptime);
     }
 
     /**
@@ -449,9 +512,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult flushAll(int exptime, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result flushAll(int exptime, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "FlushAll", exptime);
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "FlushAll", exptime);
     }
 
     /**
@@ -460,9 +524,10 @@ public class VoltCache implements IVoltCache
      * @param exptime Time delay before the delete operation (number of second, up to 30 days), or UNIX time in seconds - use <= 0 for immediate deletion.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncFlushAll(int exptime)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncFlushAll(int exptime)
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "FlushAll", exptime);
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "FlushAll", exptime);
     }
 
     /**
@@ -470,9 +535,10 @@ public class VoltCache implements IVoltCache
      * @param key Key of the cache item to retrieve.
      * @returns Result of the operation
      */
-    public VoltCacheResult get(String key)
+    @Override
+    public VoltCacheProcBase.Result get(String key)
     {
-        return execute(VoltCacheResult.Type.DATA, false, "Get", key);
+        return execute(VoltCacheProcBase.Result.Type.DATA, false, "Get", key);
     }
 
     /**
@@ -480,9 +546,10 @@ public class VoltCache implements IVoltCache
      * @param key Key of the cache item to retrieve.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncGet(String key)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncGet(String key)
     {
-        return asyncExecute(VoltCacheResult.Type.DATA, "Get", key);
+        return asyncExecute(VoltCacheProcBase.Result.Type.DATA, "Get", key);
     }
 
     /**
@@ -490,9 +557,10 @@ public class VoltCache implements IVoltCache
      * @param keys Array of key for the cache items to retrieve.
      * @returns Result of the operation
      */
-    public VoltCacheResult get(String[] keys)
+    @Override
+    public VoltCacheProcBase.Result get(String[] keys)
     {
-        return execute(VoltCacheResult.Type.DATA, false, "Gets", (Object)keys);
+        return execute(VoltCacheProcBase.Result.Type.DATA, false, "Gets", (Object)keys);
     }
 
     /**
@@ -500,9 +568,10 @@ public class VoltCache implements IVoltCache
      * @param keys Array of key for the cache items to retrieve.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncGet(String[] keys)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncGet(String[] keys)
     {
-        return asyncExecute(VoltCacheResult.Type.DATA, "Gets", (Object)keys);
+        return asyncExecute(VoltCacheProcBase.Result.Type.DATA, "Gets", (Object)keys);
     }
 
     /**
@@ -513,9 +582,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult incrDecr(String key, long by, boolean increment, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result incrDecr(String key, long by, boolean increment, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.IDOP, noreply, "IncrDecr", key, by, (byte)(increment ? 1 : 0));
+        return execute(VoltCacheProcBase.Result.Type.IDOP, noreply, "IncrDecr", key, by, (byte)(increment ? 1 : 0));
     }
 
     /**
@@ -525,9 +595,10 @@ public class VoltCache implements IVoltCache
      * @param increment Flag indicating true for increment, false for decrement.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncIncrDecr(String key, long by, boolean increment)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncIncrDecr(String key, long by, boolean increment)
     {
-        return asyncExecute(VoltCacheResult.Type.IDOP, "IncrDecr", key, by, (byte)(increment ? 1 : 0));
+        return asyncExecute(VoltCacheProcBase.Result.Type.IDOP, "IncrDecr", key, by, (byte)(increment ? 1 : 0));
     }
 
     /**
@@ -537,9 +608,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult prepend(String key, byte[] data, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result prepend(String key, byte[] data, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "Prepend", key, data);
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "Prepend", key, data);
     }
 
     /**
@@ -548,9 +620,10 @@ public class VoltCache implements IVoltCache
      * @param data Raw byte data to prepend to the current item's data.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncPrepend(String key, byte[] data)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncPrepend(String key, byte[] data)
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "Prepend", key, data);
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "Prepend", key, data);
     }
 
     /**
@@ -562,9 +635,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult replace(String key, int flags, int exptime, byte[] data, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result replace(String key, int flags, int exptime, byte[] data, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "Replace", key, flags, exptime, data);
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "Replace", key, flags, exptime, data);
     }
 
     /**
@@ -575,9 +649,10 @@ public class VoltCache implements IVoltCache
      * @param data Raw byte data for the item.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncReplace(String key, int flags, int exptime, byte[] data)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncReplace(String key, int flags, int exptime, byte[] data)
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "Replace", key, flags, exptime, data);
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "Replace", key, flags, exptime, data);
     }
 
     /**
@@ -589,9 +664,10 @@ public class VoltCache implements IVoltCache
      * @param noreply Flag indicating the client doesn't care about receiving a response- SUBMITTED will be returned unless an error occurs.
      * @returns Result of the operation
      */
-    public VoltCacheResult set(String key, int flags, int exptime, byte[] data, boolean noreply)
+    @Override
+    public VoltCacheProcBase.Result set(String key, int flags, int exptime, byte[] data, boolean noreply)
     {
-        return execute(VoltCacheResult.Type.CODE, noreply, "Set", key, flags, exptime, data);
+        return execute(VoltCacheProcBase.Result.Type.CODE, noreply, "Set", key, flags, exptime, data);
     }
 
     /**
@@ -602,9 +678,10 @@ public class VoltCache implements IVoltCache
      * @param data Raw byte data for the item.
      * @returns Future result of the operation.
      */
-    public Future<VoltCacheResult> asyncSet(String key, int flags, int exptime, byte[] data)
+    @Override
+    public Future<VoltCacheProcBase.Result> asyncSet(String key, int flags, int exptime, byte[] data)
     {
-        return asyncExecute(VoltCacheResult.Type.CODE, "Set", key, flags, exptime, data);
+        return asyncExecute(VoltCacheProcBase.Result.Type.CODE, "Set", key, flags, exptime, data);
     }
 
 

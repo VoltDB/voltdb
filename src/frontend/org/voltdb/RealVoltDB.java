@@ -417,6 +417,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
                     if (isRejoin) {
                         List<Integer> partitionsToReplace = m_cartographer.getIv2PartitionsToReplace(topo);
+                        if (partitionsToReplace.size() == 0) {
+                            VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
+                                    "the requested k-safety factor of " +
+                                    iv2config.getReplicationFactor() + ".\n" +
+                                    "No more nodes can join.", false, null);
+                        }
                         m_iv2InitiatorStartingTxnIds = new long[partitionsToReplace.size()];
                         for (int ii = 0; ii < partitionsToReplace.size(); ii++) {
                             m_iv2InitiatorStartingTxnIds[ii] = TxnEgo.makeZero(partitionsToReplace.get(ii)).getTxnId();
@@ -486,7 +492,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == START_ACTION.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
-                    hostLog.info("Using iv2 community rejoin");
+                    if (m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+                        hostLog.info("Using live rejoin.");
+                    }
+                    else {
+                        hostLog.info("Using blocking rejoin.");
+                    }
                 }
                 else if (isRejoin && m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
                     SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());

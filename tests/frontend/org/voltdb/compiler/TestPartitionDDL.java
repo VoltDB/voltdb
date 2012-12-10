@@ -189,7 +189,7 @@ public class TestPartitionDDL extends TestCase {
 
             // Compile the catalog.
             final VoltCompiler compiler = new VoltCompiler();
-            boolean success = compiler.compile(xmlPath, testout_jar);
+            boolean success = compiler.compileWithProjectXML(xmlPath, testout_jar);
 
             // Check for expected compilation success or failure.
             String s = getMessages(compiler, false);

@@ -49,6 +49,7 @@
 #include "common/SerializableEEException.h"
 #include "common/types.h"
 #include "catalog/index.h"
+#include "expressions/tuplevalueexpression.h"
 #include "indexes/tableindex.h"
 #include "indexes/indexkey.h"
 #include "indexes/CompactingTreeUniqueIndex.h"

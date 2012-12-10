@@ -381,7 +381,8 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition()).get();
+            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition(),
+                    ProcedureInvocationType.ORIGINAL, 0, 0).get();
             if (paw.errorMsg != null) {
                 throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + paw.errorMsg);
             }

@@ -49,9 +49,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -94,7 +93,6 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.BaseInitiator;
@@ -1598,7 +1596,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_siteId,
                 false, task.clientHandle, handler.connectionId(),
                 handler.m_hostname, handler.isAdmin(), ccxn,
-                sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler);
+                sql, sqlStatements, partitionParam, null, false, true,
+                task.type, task.originalTxnId, task.originalTs,
+                m_adhocCompletionHandler);
         if( isExplain ){
             ahpw.setIsExplainWork();
         }
@@ -1810,10 +1810,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         VoltDB.instance().getSnapshotCompletionMonitor();
                 completionMonitor.addInterest(new SnapshotCompletionInterest() {
                     @Override
-                    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
-                            long[] partitionTxnIds, boolean truncationSnapshot, String reqIdCmp) {
+                    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
                         // Is this our snapshot?
-                        if (truncationSnapshot && reqId.equals(reqIdCmp)) {
+                        if (event.truncationSnapshot && reqId.equals(event.requestId)) {
                             promote();
                         }
                         return null;
@@ -2096,6 +2095,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
+        // DR stuff
+        task.type = plannedStmtBatch.type;
+        task.originalTxnId = plannedStmtBatch.originalTxnId;
+        task.originalTs = plannedStmtBatch.originalTs;
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
@@ -2209,6 +2212,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             null,
                                             false,
                                             true,
+                                            plannedStmtBatch.type,
+                                            plannedStmtBatch.originalTxnId,
+                                            plannedStmtBatch.originalTs,
                                             m_adhocCompletionHandler));
 
                             m_mailbox.send(m_plannerSiteId, work);

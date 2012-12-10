@@ -26,6 +26,7 @@ import genqa.procedures.SampleRecord;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -73,6 +74,8 @@ public class ExportOnServerVerifier {
     public static long FILE_TIMEOUT_MS = 5 * 60 * 1000; // 5 mins
 
     public static long VALIDATION_REPORT_INTERVAL = 10000;
+
+    private final static String TRACKER_FILENAME = "__active_tracker";
 
     private final JSch m_jsch = new JSch();
     private final List<RemoteHost> m_hosts = new ArrayList<RemoteHost>();
@@ -165,10 +168,12 @@ public class ExportOnServerVerifier {
 
             rh.session = session;
             session.setConfig("StrictHostKeyChecking", "no");
+            session.setDaemonThread(true);
             session.connect();
             final ChannelSftp channel = (ChannelSftp)session.openChannel("sftp");
             rh.channel = channel;
             channel.connect();
+            touchActiveTracker(rh);
 
             m_hosts.add(rh);
         }
@@ -400,6 +405,15 @@ public class ExportOnServerVerifier {
         }
     }
 
+    private void touchActiveTracker(RemoteHost rh) throws Exception
+    {
+        final String trackerFileName = rh.path + "/" + TRACKER_FILENAME;
+        final ByteArrayInputStream bis = new ByteArrayInputStream(
+                new String("__DUMMY__").getBytes(VoltDB.UTF8ENCODING)
+                );
+        rh.channel.put(bis,trackerFileName);
+    }
+
     @SuppressWarnings("unchecked")
     private void checkForMoreFilesRemote(Comparator<String> comparator) throws Exception
     {
@@ -418,16 +432,37 @@ public class ExportOnServerVerifier {
                 Vector<LsEntry> files = rh.channel.ls(rh.path);
                 List<String> paths = new ArrayList<String>();
 
+                int trackerModifyTime = rh.channel.stat(rh.path + "/" + TRACKER_FILENAME).getMTime();
+
                 boolean activeInRemote = false;
 
                 for (LsEntry entry : files) {
-                    activeInRemote = activeInRemote || entry.getFilename().contains("active");
+                    activeInRemote = activeInRemote || entry.getFilename().startsWith("active");
 
-                    if (!entry.getFilename().contains("active") &&
-                            !entry.getFilename().equals(".") &&
+                    if (    !entry.getFilename().equals(".") &&
                             !entry.getFilename().equals("..") &&
-                            !entry.getAttrs().isDir()) paths.add(rh.path + "/" + entry.getFilename());
+                            !entry.getAttrs().isDir())
+                    {
+                        final String entryFileName = rh.path + "/" + entry.getFilename();
+
+                        if (!entry.getFilename().contains("active"))
+                        {
+                            paths.add(entryFileName);
+                        }
+                        else if (entry.getFilename().startsWith("active-"))
+                        {
+                            int activeModifyTime = entry.getAttrs().getMTime();
+                            if ((trackerModifyTime - activeModifyTime) > 120)
+                            {
+                                final String renamed = rh.path + "/" + entry.getFilename().substring("active-".length());
+                                rh.channel.rename(entryFileName, renamed);
+                                paths.add(renamed);
+                            }
+                        }
+                    }
                 }
+
+                touchActiveTracker(rh);
 
                 rh.activeSeen = rh.activeSeen || activeInRemote;
                 if( activeInRemote) activeFound++;
@@ -473,12 +508,33 @@ public class ExportOnServerVerifier {
         }
     }
 
+
+    private boolean sameFiles( File [] a, File [] b, Comparator<File> comparator) {
+        boolean same = true;
+        if( a == null || b == null) {
+            return b == a;
+        } else if ( a.length != b.length) {
+            return false;
+        } else {
+            Arrays.sort(a, comparator);
+            Arrays.sort(b, comparator);
+            for ( int i = 0; same && i < a.length; ++i) {
+                if( a[i] == null) {
+                    same = b[i] == null;
+                } else {
+                    same = a[i].equals(b[i]);
+                }
+            }
+        }
+        return same;
+    }
+
     private File[] checkForMoreFiles(File path, File[] files, FileFilter acceptor,
                                    Comparator<File> comparator) throws ValidationErr
     {
-        int old_length = files.length;
+        File [] oldFiles = files;
         long start_time = System.currentTimeMillis();
-        while ((files.length == old_length && files.length > 0) || (files.length == 0 && !m_clientlogSeen))
+        while ((sameFiles(files, oldFiles, comparator) && files.length > 0) || (files.length == 0 && !m_clientlogSeen))
         {
             files = path.listFiles(acceptor);
             m_clientlogSeen = m_clientlogSeen || files.length > 0;
@@ -488,6 +544,11 @@ public class ExportOnServerVerifier {
                 throw new ValidationErr("Timed out waiting on new files in " + path.getName()+ ".\n" +
                                         "This indicates a mismatch in the transaction streams between the client logs and the export data or the death of something important.",
                                         null, null);
+            } else {
+                try {
+                    Thread.sleep(1200);
+                } catch (InterruptedException ignoreIt) {
+                }
             }
         }
         Arrays.sort(files, comparator);
@@ -669,6 +730,7 @@ public class ExportOnServerVerifier {
         Collections.sort(m_clientTxnIdOrphans);
 
         int matchCount = 0;
+        int staleCount = 0;
         for (int i = 0; i < m_partitions; ++i)
         {
             Iterator<Map.Entry<Long, Long>> txitr = m_rowTxnIds.get(i).entrySet().iterator();
@@ -680,6 +742,7 @@ public class ExportOnServerVerifier {
                 {
                     txitr.remove();
                     m_clientTxnIds.remove(e.getKey()); // noop bynk
+                    ++staleCount;
                 }
                 else if (m_clientTxnIds.remove(e.getKey()))
                 {
@@ -701,9 +764,11 @@ public class ExportOnServerVerifier {
                 }
             }
         }
-        System.out.println("!_!_! DEBUG !_!_! *MATCHED* " + matchCount + " exported records");
+        System.out.println("!_!_! DEBUG !_!_! *MATCHED* " + matchCount
+                + " exported records, with *STALE* " + staleCount + " records removed"
+                );
 
-        return matchCount > 0;
+        return (matchCount + staleCount) > 0;
     }
 
     private void processClientIdOverFlow()
@@ -727,49 +792,61 @@ public class ExportOnServerVerifier {
 
     private void verifyRow(String[] row) throws ValidationErr {
         int col = 5; // col offset is always pre-incremented.
-        Long txnid = Long.parseLong(row[++col]);
-        Long rowid = Long.parseLong(row[++col]);
+        Long txnid = Long.parseLong(row[++col]); // col 6
+        Long rowid = Long.parseLong(row[++col]); // col 7
+
+        if (row.length < 29)
+            error("invalid number of columns in the row", row.length, 29);
 
         // matches VoltProcedure.getSeededRandomNumberGenerator()
         Random prng = new Random(txnid);
         SampleRecord valid = new SampleRecord(rowid, prng);
 
+        // col 8
         Byte rowid_group = Byte.parseByte(row[++col]);
         if (rowid_group != valid.rowid_group)
             error("rowid_group invalid", rowid_group, valid.rowid_group);
 
+        // col 9
         Byte type_null_tinyint = row[++col].equals("NULL") ? null : Byte.valueOf(row[col]);
         if ( (!(type_null_tinyint == null && valid.type_null_tinyint == null)) &&
              (!type_null_tinyint.equals(valid.type_null_tinyint)) )
             error("type_not_null_tinyint", type_null_tinyint, valid.type_null_tinyint);
 
+        // col 10
         Byte type_not_null_tinyint = Byte.valueOf(row[++col]);
         if (!type_not_null_tinyint.equals(valid.type_not_null_tinyint))
             error("type_not_null_tinyint", type_not_null_tinyint, valid.type_not_null_tinyint);
 
+        // col 11
         Short type_null_smallint = row[++col].equals("NULL") ? null : Short.valueOf(row[col]);
         if ( (!(type_null_smallint == null && valid.type_null_smallint == null)) &&
              (!type_null_smallint.equals(valid.type_null_smallint)) )
             error("type_null_smallint", type_null_smallint, valid.type_null_smallint);
 
+        // col 12
         Short type_not_null_smallint = Short.valueOf(row[++col]);
         if (!type_not_null_smallint.equals(valid.type_not_null_smallint))
             error("type_null_smallint", type_not_null_smallint, valid.type_not_null_smallint);
 
+        // col 13
         Integer type_null_integer = row[++col].equals("NULL") ? null : Integer.valueOf(row[col]);
         if ( (!(type_null_integer == null && valid.type_null_integer == null)) &&
              (!type_null_integer.equals(valid.type_null_integer)) )
             error("type_null_integer", type_null_integer, valid.type_null_integer);
 
+        // col 14
         Integer type_not_null_integer = Integer.valueOf(row[++col]);
         if (!type_not_null_integer.equals(valid.type_not_null_integer))
             error("type_not_null_integer", type_not_null_integer, valid.type_not_null_integer);
 
+        // col 15
         Long type_null_bigint = row[++col].equals("NULL") ? null : Long.valueOf(row[col]);
         if ( (!(type_null_bigint == null && valid.type_null_bigint == null)) &&
              (!type_null_bigint.equals(valid.type_null_bigint)) )
             error("type_null_bigint", type_null_bigint, valid.type_null_bigint);
 
+        // col 16
         Long type_not_null_bigint = Long.valueOf(row[++col]);
         if (!type_not_null_bigint.equals(valid.type_not_null_bigint))
             error("type_not_null_bigint", type_not_null_bigint, valid.type_not_null_bigint);
@@ -777,7 +854,7 @@ public class ExportOnServerVerifier {
         // The ExportToFileClient truncates microseconds. Construct a TimestampType here
         // that also truncates microseconds.
         TimestampType type_null_timestamp;
-        if (row[++col].equals("NULL")) {
+        if (row[++col].equals("NULL")) {  // col 17
             type_null_timestamp = null;
         } else {
             TimestampType tmp = new TimestampType(row[col]);
@@ -793,19 +870,23 @@ public class ExportOnServerVerifier {
             error("type_null_timestamp", type_null_timestamp, valid.type_null_timestamp);
         }
 
+        // col 18
         TimestampType type_not_null_timestamp = new TimestampType(row[++col]);
         if (!type_not_null_timestamp.equals(valid.type_not_null_timestamp))
             error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
 
+        // col 19
         BigDecimal type_null_decimal = row[++col].equals("NULL") ? null : new BigDecimal(row[col]);
         if ( (!(type_null_decimal == null && valid.type_null_decimal == null)) &&
              (!type_null_decimal.equals(valid.type_null_decimal)) )
             error("type_null_decimal", type_null_decimal, valid.type_null_decimal);
 
+        // col 20
         BigDecimal type_not_null_decimal = new BigDecimal(row[++col]);
         if (!type_not_null_decimal.equals(valid.type_not_null_decimal))
             error("type_not_null_decimal", type_not_null_decimal, valid.type_not_null_decimal);
 
+        // col 21
         Double type_null_float = row[++col].equals("NULL") ? null : Double.valueOf(row[col]);
         if ( (!(type_null_float == null && valid.type_null_float == null)) &&
              (!type_null_float.equals(valid.type_null_float)) )
@@ -818,33 +899,40 @@ public class ExportOnServerVerifier {
             error("type_null_float", type_null_float, valid.type_null_float);
         }
 
+        // col 22
         Double type_not_null_float = Double.valueOf(row[++col]);
         if (!type_not_null_float.equals(valid.type_not_null_float))
             error("type_not_null_float", type_not_null_float, valid.type_not_null_float);
 
+        // col 23
         String type_null_varchar25 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar25 == valid.type_null_varchar25 ||
               type_null_varchar25.equals(valid.type_null_varchar25)))
             error("type_null_varchar25", type_null_varchar25, valid.type_null_varchar25);
 
+        // col 24
         String type_not_null_varchar25 = row[++col];
         if (!type_not_null_varchar25.equals(valid.type_not_null_varchar25))
-
             error("type_not_null_varchar25", type_not_null_varchar25, valid.type_not_null_varchar25);
+
+        // col 25
         String type_null_varchar128 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar128 == valid.type_null_varchar128 ||
               type_null_varchar128.equals(valid.type_null_varchar128)))
             error("type_null_varchar128", type_null_varchar128, valid.type_null_varchar128);
 
+        // col 26
         String type_not_null_varchar128 = row[++col];
         if (!type_not_null_varchar128.equals(valid.type_not_null_varchar128))
             error("type_not_null_varchar128", type_not_null_varchar128, valid.type_not_null_varchar128);
 
+        // col 27
         String type_null_varchar1024 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar1024 == valid.type_null_varchar1024 ||
               type_null_varchar1024.equals(valid.type_null_varchar1024)))
             error("type_null_varchar1024", type_null_varchar1024, valid.type_null_varchar1024);
 
+        // col 28
         String type_not_null_varchar1024 = row[++col];
         if (!type_not_null_varchar1024.equals(valid.type_not_null_varchar1024))
             error("type_not_null_varchar1024", type_not_null_varchar1024, valid.type_not_null_varchar1024);

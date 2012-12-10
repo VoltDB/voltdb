@@ -91,7 +91,7 @@ public class SnapshotUtil {
         String nonce,
         List<Table> tables,
         int hostId,
-        Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers,
+        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         List<Long> partitionTransactionIds,
         InstanceId instanceId)
     throws IOException
@@ -115,16 +115,17 @@ public class SnapshotUtil {
             }
             stringer.endArray();
             stringer.key("exportSequenceNumbers").array();
-            for (Map.Entry<String, List<Pair<Integer, Long>>> entry : exportSequenceNumbers.entrySet()) {
+            for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : exportSequenceNumbers.entrySet()) {
                 stringer.object();
 
                 stringer.key("exportTableName").value(entry.getKey());
 
                 stringer.key("sequenceNumberPerPartition").array();
-                for (Pair<Integer, Long> sequenceNumber : entry.getValue()) {
+                for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
                     stringer.object();
-                    stringer.key("partition").value(sequenceNumber.getFirst());
-                    stringer.key("exportSequenceNumber").value(sequenceNumber.getSecond());
+                    stringer.key("partition").value(sequenceNumber.getKey());
+                    //First value is the ack offset which matters for pauseless rejoin, but not persistence
+                    stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
                     stringer.endObject();
                 }
                 stringer.endArray();
@@ -172,6 +173,44 @@ public class SnapshotUtil {
                 }
             }
         };
+    }
+
+    /**
+     * Get the nonce from the filename of the digest file.
+     * @param filename The filename of the digest file
+     * @return The nonce
+     */
+    public static String parseNonceFromDigestFilename(String filename) {
+        if (filename == null || !filename.endsWith(".digest")) {
+            throw new IllegalArgumentException("Bad digest filename: " + filename);
+        }
+
+        return parseNonceFromSnapshotFilename(filename);
+    }
+
+    /**
+     * Get the nonce from any snapshot-related file.
+     */
+    public static String parseNonceFromSnapshotFilename(String filename)
+    {
+        if (filename == null) {
+            throw new IllegalArgumentException("Bad snapshot filename: " + filename);
+        }
+
+        // For the snapshot catalog
+        if (filename.endsWith(".jar")) {
+            return filename.substring(0, filename.indexOf(".jar"));
+        }
+        // for everything else valid in new format or volt1.2 or earlier table files
+        else if (filename.indexOf("-") > 0) {
+           return filename.substring(0, filename.indexOf("-"));
+        }
+        // volt 1.2 and earlier digest filename
+        else if (filename.endsWith(".digest")) {
+            return filename.substring(0, filename.indexOf(".digest"));
+        }
+
+        throw new IllegalArgumentException("Bad snapshot filename: " + filename);
     }
 
     public static List<JSONObject> retrieveDigests(String path,
@@ -318,9 +357,42 @@ public class SnapshotUtil {
      * Storage for information about files that are part of a specific snapshot
      */
     public static class Snapshot {
+        public Snapshot(String nonce, long txnId)
+        {
+            m_nonce = nonce;
+            m_txnId = txnId;
+        }
+
+        public void setInstanceId(InstanceId id)
+        {
+            if (m_instanceId == null) {
+                m_instanceId = id;
+            }
+            else if (!m_instanceId.equals(id)) {
+                throw new RuntimeException("Snapshot named " + m_nonce +
+                        " has digests with conflicting cluster instance IDs." +
+                        " Please ensure that there is only one snapshot named " + m_nonce + " in your" +
+                        " cluster nodes' VOLTDBROOT directories and try again.");
+            }
+        }
+
+        public InstanceId getInstanceId()
+        {
+            return m_instanceId;
+        }
+
+        public long getTxnId()
+        {
+            return m_txnId;
+        }
+
         public final List<File> m_digests = new ArrayList<File>();
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
+
+        private String m_nonce;
+        private InstanceId m_instanceId = null;
+        private long m_txnId;
     }
 
     /**
@@ -376,6 +448,7 @@ public class SnapshotUtil {
             }
 
             for (String snapshotName : snapshotNames) {
+                // izzy: change this to use parseNonceFromSnapshotFilename at some point
                 if (pathname.getName().startsWith(snapshotName + "-")  ||
                         pathname.getName().equals(snapshotName + ".digest")) {
                     return true;
@@ -398,7 +471,7 @@ public class SnapshotUtil {
      */
     public static void retrieveSnapshotFiles(
             File directory,
-            Map<Long, Snapshot> snapshots,
+            Map<String, Snapshot> namedSnapshots,
             FileFilter filter,
             int recursion,
             boolean validate) {
@@ -424,7 +497,7 @@ public class SnapshotUtil {
                     System.err.println("Warning: Skipping directory " + f.getPath()
                             + " due to lack of read permission");
                 } else {
-                    retrieveSnapshotFiles( f, snapshots, filter, recursion++, validate);
+                    retrieveSnapshotFiles( f, namedSnapshots, filter, recursion++, validate);
                 }
                 continue;
             }
@@ -445,18 +518,24 @@ public class SnapshotUtil {
                 if (f.getName().endsWith(".digest")) {
                     JSONObject digest = CRCCheck(f);
                     Long snapshotTxnId = digest.getLong("txnId");
-                    Snapshot s = snapshots.get(snapshotTxnId);
-                    if (s == null) {
-                        s = new Snapshot();
-                        snapshots.put(snapshotTxnId, s);
+                    String nonce = parseNonceFromSnapshotFilename(f.getName());
+                    Snapshot named_s = namedSnapshots.get(nonce);
+                    if (named_s == null) {
+                        named_s = new Snapshot(nonce, snapshotTxnId);
+                        namedSnapshots.put(nonce, named_s);
                     }
+                    InstanceId iid = new InstanceId(0,0);
+                    if (digest.has("instanceId")) {
+                        iid = new InstanceId(digest.getJSONObject("instanceId"));
+                    }
+                    named_s.setInstanceId(iid);
                     TreeSet<String> tableSet = new TreeSet<String>();
                     JSONArray tables = digest.getJSONArray("tables");
                     for (int ii = 0; ii < tables.length(); ii++) {
                         tableSet.add(tables.getString(ii));
                     }
-                    s.m_digestTables.add(tableSet);
-                    s.m_digests.add(f);
+                    named_s.m_digestTables.add(tableSet);
+                    named_s.m_digests.add(f);
                 } else {
                     HashSet<Integer> partitionIds = new HashSet<Integer>();
                     TableSaveFile saveFile = new TableSaveFile(fis.getChannel(), 1, null, true);
@@ -473,22 +552,23 @@ public class SnapshotUtil {
                             }
                         }
                         partitionIds.removeAll(saveFile.getCorruptedPartitionIds());
-                        Snapshot s = snapshots.get(saveFile.getTxnId());
-                        if (s == null) {
-                            s = new Snapshot();
-                            snapshots.put(saveFile.getTxnId(), s);
+                        String nonce = parseNonceFromSnapshotFilename(f.getName());
+                        Snapshot named_s = namedSnapshots.get(nonce);
+                        if (named_s == null) {
+                            named_s = new Snapshot(nonce, saveFile.getTxnId());
+                            namedSnapshots.put(nonce, named_s);
                         }
 
-                        TableFiles tableFiles = s.m_tableFiles.get(saveFile.getTableName());
-                        if (tableFiles == null) {
-                            tableFiles = new TableFiles(saveFile.isReplicated());
-                            s.m_tableFiles.put(saveFile.getTableName(), tableFiles);
+                        TableFiles namedTableFiles = named_s.m_tableFiles.get(saveFile.getTableName());
+                        if (namedTableFiles == null) {
+                            namedTableFiles = new TableFiles(saveFile.isReplicated());
+                            named_s.m_tableFiles.put(saveFile.getTableName(), namedTableFiles);
                         }
-                        tableFiles.m_files.add(f);
-                        tableFiles.m_completed.add(saveFile.getCompleted());
-                        tableFiles.m_validPartitionIds.add(partitionIds);
-                        tableFiles.m_corruptParititionIds.add(saveFile.getCorruptedPartitionIds());
-                        tableFiles.m_totalPartitionCounts.add(saveFile.getTotalPartitions());
+                        namedTableFiles.m_files.add(f);
+                        namedTableFiles.m_completed.add(saveFile.getCompleted());
+                        namedTableFiles.m_validPartitionIds.add(partitionIds);
+                        namedTableFiles.m_corruptParititionIds.add(saveFile.getCorruptedPartitionIds());
+                        namedTableFiles.m_totalPartitionCounts.add(saveFile.getTotalPartitions());
                     } finally {
                         saveFile.close();
                     }

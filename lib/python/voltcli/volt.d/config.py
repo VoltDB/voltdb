@@ -25,8 +25,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from voltcli import utility
-
 @VOLT.Command(description = 'Configure project settings.',
               arguments = (
                   VOLT.StringArgument('keyvalue', 'KEY=VALUE assignment',
@@ -37,11 +35,11 @@ def config(runner):
         if arg.find('=') == -1:
             bad.append(arg)
     if bad:
-        utility.abort('Bad arguments (must be KEY=VALUE format):', bad)
+        runner.abort('Bad arguments (must be KEY=VALUE format):', bad)
     for arg in runner.opts.keyvalue:
         key, value = [s.strip() for s in arg.split('=', 1)]
         # Default to 'volt.' if simple name is given.
         if key.find('.') == -1:
             key = 'volt.%s' % key
         runner.config.set_local(key, value)
-        utility.info('Configuration: %s=%s' % (key, value))
+        runner.info('Configuration: %s=%s' % (key, value))

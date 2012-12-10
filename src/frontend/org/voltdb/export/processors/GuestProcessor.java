@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 import jsr166y.ThreadLocalRandom;
@@ -42,7 +41,6 @@ import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.MoreExecutors;
 
 public class GuestProcessor implements ExportDataProcessor {
 
@@ -107,7 +105,8 @@ public class GuestProcessor implements ExportDataProcessor {
                                         System.currentTimeMillis(),
                                         source.getGeneration(),
                                         source.m_columnNames,
-                                        types);
+                                        types,
+                                        new ArrayList<Integer>(source.m_columnLengths));
                         ExportDecoderBase edb = m_client.constructExportDecoder(ads);
                         m_decoders.add(Pair.of(edb, ads));
                         final ListenableFuture<BBContainer> fut = source.poll();
@@ -218,6 +217,7 @@ public class GuestProcessor implements ExportDataProcessor {
                 //It's okay, means it was already shut down
             }
         }
+        m_client.shutdown();
     }
 
     @Override

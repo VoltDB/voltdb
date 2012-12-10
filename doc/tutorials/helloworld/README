@@ -12,7 +12,7 @@ The commands to process these files (not using run.sh) are the following:
 
         (compile application catalog)
 
-  $ java org.voltdb.compiler.VoltCompiler project.xml helloworld.jar
+  $ java org.voltdb.compiler.VoltCompiler helloworld.jar helloworld.sql
 
         (create database)
 

@@ -325,6 +325,12 @@ public class MpTransactionState extends TransactionState
         // Remove the distributed fragment for this site from remoteDeps
         // for the dependency Id depId.
         Set<Long> localRemotes = m_remoteDeps.get(depId);
+        if (localRemotes == null && m_isRestart) {
+            // Tolerate weird deps showing up on restart
+            // After Ariel separates unique ID from transaction ID, rewrite restart to restart with
+            // a new transaction ID and make this and the fake distributed fragment stuff go away.
+            return;
+        }
         Object needed = localRemotes.remove(hsid);
         if (needed != null) {
             // add table to storage
@@ -336,7 +342,6 @@ public class MpTransactionState extends TransactionState
             tables.add(table);
         }
         else {
-            // TODO: need an error path here.
             System.out.println("No remote dep for local site: " + hsid);
         }
     }
