@@ -34,7 +34,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.eclipse.jetty.server.AsyncContinuation;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
@@ -44,14 +43,12 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.eclipse.jetty.util.thread.ThreadPool;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.zk.CoreZK;
 
 public class HTTPAdminListener {
 
@@ -354,7 +351,7 @@ public class HTTPAdminListener {
             /*
              * Don't force us to look at a huge pile of threads
              */
-            final QueuedThreadPool qtp = new QueuedThreadPool(8);
+            final QueuedThreadPool qtp = new QueuedThreadPool();
             qtp.setMaxIdleTimeMs(15000);
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
