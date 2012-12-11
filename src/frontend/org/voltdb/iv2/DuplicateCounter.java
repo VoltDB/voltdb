@@ -23,6 +23,7 @@ import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.utils.MiscUtils;
@@ -96,7 +97,13 @@ public class DuplicateCounter
 
     int offer(InitiateResponseMessage message)
     {
-        long hash = message.getClientResponseData().getHashOfTableResults();
+        ClientResponseImpl r = message.getClientResponseData();
+        // get the hash of sql run
+        long hash = r.getHashOfTableResults() << 32;
+        Integer sqlHash = r.getHash();
+        if (sqlHash != null) {
+            hash |= sqlHash.intValue();
+        }
         return checkCommon(hash, message.isRecovering(), message);
     }
 

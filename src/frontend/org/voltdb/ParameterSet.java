@@ -17,13 +17,14 @@
 
 package org.voltdb;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.zip.CRC32;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -53,8 +54,8 @@ import org.voltdb.types.VoltDecimalHelper;
      * Once created, they are not mutated. So it should be safe to not
      * synchronize on them.
      */
-    private final LinkedList<byte[]> m_encodedStrings = new LinkedList<byte[]>();
-    private final LinkedList<byte[][]> m_encodedStringArrays = new LinkedList<byte[][]>();
+    private byte[][] m_encodedStrings = null;
+    private byte[][][] m_encodedStringArrays = null;
     // memoized serialized size (start assuming valid size for empty ParameterSet)
     private int m_serializedSize = 2;
 
@@ -74,6 +75,7 @@ import org.voltdb.types.VoltDecimalHelper;
     /** Sets the internal array to params. Note: this does *not* copy the argument. */
     public void setParameters(Object... params) {
         this.m_params = params;
+
         // create encoded copies of strings and calculate size
         m_serializedSize = calculateSerializedSize();
     }
@@ -477,6 +479,9 @@ import org.voltdb.types.VoltDecimalHelper;
      * @return
      */
     private int calculateSerializedSize() {
+        m_encodedStringArrays = new byte[m_params.length][][];
+        m_encodedStrings = new byte[m_params.length][];
+
         if (m_serializedSize != 2) {
             throw new RuntimeException("Trying to calculate the serialized size " +
                                        "of the parameter set twice");
@@ -539,7 +544,7 @@ import org.voltdb.types.VoltDecimalHelper;
                                 size += 4 + encodedStrings[zz].length;
                             }
                         }
-                        m_encodedStringArrays.add(encodedStrings);
+                        m_encodedStringArrays[ii] = encodedStrings;
                         break;
                     case TIMESTAMP:
                         size += 8 * ((TimestampType[])obj).length;
@@ -601,7 +606,7 @@ import org.voltdb.types.VoltDecimalHelper;
                     try {
                         byte encodedString[] = ((String)obj).getBytes("UTF-8");
                         size += 4 + encodedString.length;
-                        m_encodedStrings.add(encodedString);
+                        m_encodedStrings[ii] = encodedString;
                     } catch (UnsupportedEncodingException e) {
                         VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
                     }
@@ -624,11 +629,11 @@ import org.voltdb.types.VoltDecimalHelper;
     }
 
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        Iterator<byte[][]> strArrayIter = m_encodedStringArrays.iterator();
-        Iterator<byte[]> strIter = m_encodedStrings.iterator();
+
         buf.putShort((short)m_params.length);
 
-        for (Object obj : m_params) {
+        for (int i = 0; i < m_params.length; i++) {
+            Object obj = m_params[i];
             if ((obj == null) || (obj == JSONObject.NULL)) {
                 VoltType type = VoltType.NULL;
                 buf.put(type.getValue());
@@ -680,19 +685,18 @@ import org.voltdb.types.VoltDecimalHelper;
                         FastSerializer.writeArray((double[]) obj, buf);
                         break;
                     case STRING:
-                        if (!strArrayIter.hasNext()) {
+                        if (m_encodedStringArrays[i] == null) {
                             // should not happen
                             throw new IOException("String array not encoded");
                         }
-                        byte encodedStrings[][] = strArrayIter.next();
                         // This check used to be done by FastSerializer.writeArray(), but things changed?
-                        if (encodedStrings.length > Short.MAX_VALUE) {
+                        if (m_encodedStringArrays[i].length > Short.MAX_VALUE) {
                             throw new IOException("Array exceeds maximum length of "
                                                   + Short.MAX_VALUE + " bytes");
                         }
-                        buf.putShort((short)encodedStrings.length);
-                        for (int zz = 0; zz < encodedStrings.length; zz++) {
-                            FastSerializer.writeString(encodedStrings[zz], buf);
+                        buf.putShort((short)m_encodedStringArrays[i].length);
+                        for (int zz = 0; zz < m_encodedStringArrays[i].length; zz++) {
+                            FastSerializer.writeString(m_encodedStringArrays[i][zz], buf);
                         }
                         break;
                     case TIMESTAMP:
@@ -755,11 +759,11 @@ import org.voltdb.types.VoltDecimalHelper;
                         throw new RuntimeException("Can't cast parameter type to Double");
                     break;
                 case STRING:
-                    if (!strIter.hasNext()) {
+                    if (m_encodedStrings[i] == null) {
                         // should not happen
                         throw new IOException("String not encoded: " + (String) obj);
                     }
-                    FastSerializer.writeString(strIter.next(), buf);
+                    FastSerializer.writeString(m_encodedStrings[i], buf);
                     break;
                 case TIMESTAMP:
                     long micros = timestampToMicroseconds(obj);
@@ -770,6 +774,121 @@ import org.voltdb.types.VoltDecimalHelper;
                     break;
                 case VOLTTABLE:
                     ((VoltTable)obj).flattenToBuffer(buf);
+                    break;
+                default:
+                    throw new RuntimeException("FIXME: Unsupported type " + type);
+            }
+        }
+    }
+
+    /**
+     * Used to get a CRC of params on their way to the EE.
+     * Assumes scalar values compatible with the EE (i.e. no VoltTables)
+     * @param crc
+     * @throws IOException
+     */
+    void addToCRC(CRC32 crc) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(8);
+        DataOutputStream dos = new DataOutputStream(bos);
+        byte[] b;
+
+        for (int i = 0; i < m_params.length; i++) {
+            Object obj = m_params[i];
+
+            if ((obj == null) || (obj == JSONObject.NULL)) {
+                crc.update(new byte[] { 0 });
+                continue;
+            }
+
+            Class<?> cls = obj.getClass();
+
+            // Handle NULL mappings not encoded by type.min_value convention
+            if (obj == VoltType.NULL_TIMESTAMP) {
+                crc.update(new byte[] { 0 });
+                continue;
+            }
+            else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
+                crc.update(new byte[] { 0 });
+                continue;
+            }
+            else if (obj == VoltType.NULL_DECIMAL) {
+                crc.update(new byte[] { 0 });
+                continue;
+            }
+
+            bos.reset();
+
+            VoltType type = VoltType.typeFromClass(cls);
+            switch (type) {
+                case TINYINT:
+                    dos.writeLong((Byte) obj);
+                    b = bos.toByteArray();
+                    crc.update(b);
+                    break;
+                case SMALLINT:
+                    dos.writeLong((Short) obj);
+                    b = bos.toByteArray();
+                    crc.update(b);
+                    break;
+                case INTEGER:
+                    dos.writeLong((Integer) obj);
+                    b = bos.toByteArray();
+                    crc.update(b);
+                    break;
+                case BIGINT:
+                    dos.writeLong((Long) obj);
+                    b = bos.toByteArray();
+                    crc.update(b);
+                    break;
+                case FLOAT:
+                    if (cls == Float.class) {
+                        dos.writeInt(0);
+                        dos.writeFloat((Float) obj);
+                    }
+                    else if (cls == Double.class) {
+                        dos.writeDouble((Double) obj);
+                    }
+                    else {
+                        throw new RuntimeException("Can't cast parameter type to Double");
+                    }
+                    b = bos.toByteArray();
+                    crc.update(b);
+                    break;
+                case STRING:
+                    if (m_encodedStrings[i] == null) {
+                        // should not happen
+                        throw new IOException("String not encoded: " + (String) obj);
+                    }
+                    crc.update(m_encodedStrings[i]);
+                    break;
+                case VARBINARY:
+                    if (m_params[i] instanceof byte[]) {
+                        crc.update((byte[]) m_params[i]);
+                    }
+                    else if (m_params[i] instanceof byte[]) {
+                        for (Byte B : (Byte[]) m_params[i]) {
+                            if (B != null) {
+                                crc.update(B.byteValue());
+                            }
+                            else {
+                                crc.update(0);
+                            }
+                        }
+                    }
+                    else if (m_encodedStrings[i] != null) {
+                        crc.update(m_encodedStrings[i]);
+                    }
+                    else {
+                        throw new IOException("Failed to computer CRC of VARBINARY value: " + (String) obj);
+                    }
+                case TIMESTAMP:
+                    long micros = timestampToMicroseconds(obj);
+                    dos.writeLong(micros);
+                    b = bos.toByteArray();
+                    crc.update(b);
+                    break;
+                case DECIMAL:
+                    crc.update(VoltDecimalHelper.getUnscaledBytes((BigDecimal) obj));
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);

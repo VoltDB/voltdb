@@ -29,13 +29,20 @@ import junit.framework.TestCase;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.client.ClientResponse;
 
 public class TestInFlightTxnState extends TestCase
 {
-    InFlightTxnState createTxnState(long txnId, int[] coordIds)
-    {
+    InFlightTxnState createTxnState(long txnId, int[] coordIds) {
+        return createTxnState(txnId, coordIds, false, false);
+    }
+
+    InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly, boolean allowMismatched) {
         InFlightTxnState retval = new InFlightTxnState(txnId, coordIds[0], null, new long[]{},
-                false, true, new StoredProcedureInvocation(), new Object(), 0, 0, 0, "", false, false);
+                readOnly, true, new StoredProcedureInvocation(), new Object(), 0, 0, 0, "", false, allowMismatched);
         for (int i = 1; i < coordIds.length; i++) {
             retval.addCoordinator(coordIds[i]);
         }
@@ -46,29 +53,29 @@ public class TestInFlightTxnState extends TestCase
     {
         // Add a single transaction state
         InFlightTxnState state1 =  createTxnState(1, new int[] {2,3,1});
-        assertEquals(3, state1.outstandingCoordinators.size());
-        assertEquals(3, state1.outstandingResponses);
+        assertEquals(3, state1.m_outstandingCoordinators.size());
+        assertEquals(3, state1.m_outstandingResponses);
         assertFalse(state1.hasAllResponses());
 
         InFlightTxnState state2 = createTxnState(2, new int[] {2});
-        assertEquals(1, state2.outstandingCoordinators.size());
-        assertEquals(1, state2.outstandingResponses);
+        assertEquals(1, state2.m_outstandingCoordinators.size());
+        assertEquals(1, state2.m_outstandingResponses);
         assertFalse(state2.hasAllResponses());
 
         ClientResponseImpl cri = new ClientResponseImpl();
         state1.addFailedOrRecoveringResponse(3);
-        assertEquals(2, state1.outstandingCoordinators.size());
-        assertEquals(2, state1.outstandingResponses);
+        assertEquals(2, state1.m_outstandingCoordinators.size());
+        assertEquals(2, state1.m_outstandingResponses);
         assertFalse(state1.hasAllResponses());
 
         state1.addResponse(2, cri);
-        assertEquals(1, state1.outstandingCoordinators.size());
-        assertEquals(1, state1.outstandingResponses);
+        assertEquals(1, state1.m_outstandingCoordinators.size());
+        assertEquals(1, state1.m_outstandingResponses);
         assertFalse(state1.hasAllResponses());
 
         state1.addResponse(1, cri);
-        assertEquals(0, state1.outstandingCoordinators.size());
-        assertEquals(0, state1.outstandingResponses);
+        assertEquals(0, state1.m_outstandingCoordinators.size());
+        assertEquals(0, state1.m_outstandingResponses);
         assertTrue(state1.hasAllResponses());
         assertTrue(state1.hasSentResponse());
     }
@@ -109,5 +116,128 @@ public class TestInFlightTxnState extends TestCase
             }
         }
 
+    }
+
+    public void testHashDeterminismChecks() {
+        VoltDB.ignoreCrash = true;
+
+        // Test hash mismatch on read-only
+        InFlightTxnState state =  createTxnState(1, new int[] {3,1}, true, true);
+        ClientResponseImpl cri1 = new ClientResponseImpl();
+        ClientResponseImpl cri2 = new ClientResponseImpl();
+        cri1.setHash(0);
+        cri2.setHash(1);
+        state.addResponse(1, cri1);
+        try {
+            state.addResponse(3, cri2);
+            fail("Mismatched hash in response should have failed");
+        }
+        catch (AssertionError e) {
+            // success
+        }
+        VoltDB.wasCrashCalled = false;
+
+        // Test hash mismatch on read-only with no mismatches
+        state =  createTxnState(1, new int[] {3,1}, true, false);
+        cri1 = new ClientResponseImpl();
+        cri2 = new ClientResponseImpl();
+        cri1.setHash(0);
+        cri2.setHash(1);
+        state.addResponse(1, cri1);
+        try {
+            state.addResponse(3, cri2);
+            fail("Mismatched hash in response should have failed");
+        }
+        catch (AssertionError e) {
+            // success
+        }
+        VoltDB.wasCrashCalled = false;
+
+        // Test hash mismatch on read-write with no mismatches
+        state =  createTxnState(1, new int[] {3,1}, false, false);
+        cri1 = new ClientResponseImpl();
+        cri2 = new ClientResponseImpl();
+        cri1.setHash(0);
+        cri2.setHash(1);
+        state.addResponse(1, cri1);
+        try {
+            state.addResponse(3, cri2);
+            fail("Mismatched hash in response should have failed");
+        }
+        catch (AssertionError e) {
+            // success
+        }
+        VoltDB.wasCrashCalled = false;
+
+        // Test hash match on non-failing case
+        state =  createTxnState(1, new int[] {3,1}, false, false);
+        cri1 = new ClientResponseImpl();
+        cri2 = new ClientResponseImpl();
+        cri1.setHash(1);
+        cri2.setHash(1);
+        state.addResponse(1, cri1);
+        state.addResponse(3, cri2);
+        assertFalse(VoltDB.wasCrashCalled);
+
+        VoltDB.ignoreCrash = false;
+    }
+
+    public void testContentDeterminsimChecks() {
+        VoltDB.ignoreCrash = true;
+
+        VoltTable t1 = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
+        t1.addRow(7);
+        VoltTable t2 = new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT));
+        t2.addRow(6);
+
+        // Test hash mismatch on read-only
+        InFlightTxnState state =  createTxnState(1, new int[] {3,1}, true, true);
+        ClientResponseImpl cri1 = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { t1 }, "");
+        ClientResponseImpl cri2 = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { t2 }, "");
+        state.addResponse(1, cri1);
+        state.addResponse(3, cri2);
+        assertFalse(VoltDB.wasCrashCalled);
+
+        // Test hash mismatch on read-only with no mismatches
+        state =  createTxnState(1, new int[] {3,1}, true, false);
+        cri1 = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { t1 }, "");
+        cri2 = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { t2 }, "");
+        state.addResponse(1, cri1);
+        try {
+            state.addResponse(3, cri2);
+            fail("Mismatched hash in response should have failed");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+        catch (AssertionError e) {
+            // success
+        }
+        VoltDB.wasCrashCalled = false;
+
+        // Test hash mismatch on read-write with no mismatches
+        state =  createTxnState(1, new int[] {3,1}, false, false);
+        cri1 = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { t1 }, "");
+        cri2 = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { t2 }, "");
+        state.addResponse(1, cri1);
+        try {
+            state.addResponse(3, cri2);
+            fail("Mismatched hash in response should have failed");
+        }
+        catch (AssertionError e) {
+            // success
+        }
+        VoltDB.wasCrashCalled = false;
+
+        // Test hash match on non-failing case
+        state =  createTxnState(1, new int[] {3,1}, false, false);
+        cri1 = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { t1 }, "");
+        cri2 = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { t1 }, "");
+        state.addResponse(1, cri1);
+        state.addResponse(3, cri2);
+        assertFalse(VoltDB.wasCrashCalled);
+
+        VoltDB.ignoreCrash = false;
     }
 }

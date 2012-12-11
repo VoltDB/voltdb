@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StoredProcedureInvocation;
@@ -65,66 +66,99 @@ public class InFlightTxnState implements Serializable {
         this.isAdmin = isAdmin;
         this.allowMismatchedResults = allowMismatchedResults;
 
-        outstandingResponses = 1;
+        m_outstandingResponses = 1;
 
         if (isSinglePartition) {
-            outstandingCoordinators = new HashSet<Long>();
-            outstandingCoordinators.add(firstCoordinatorId);
+            m_outstandingCoordinators = new HashSet<Long>();
+            m_outstandingCoordinators.add(firstCoordinatorId);
         }
     }
 
     public void addCoordinator(long coordinatorId) {
         assert(isSinglePartition);
-        if (outstandingCoordinators.add(coordinatorId))
-            outstandingResponses++;
+        if (m_outstandingCoordinators.add(coordinatorId))
+            m_outstandingResponses++;
     }
 
     public int countOutstandingResponses() {
-        return outstandingResponses;
+        return m_outstandingResponses;
     }
 
     public ClientResponseImpl addResponse(long coordinatorHSId, ClientResponseImpl r) {
+        Integer sqlHash = r.getHash(); // get this and then reset it
+        r.setHash(null); // this makes sure the hash doesn't get sent to clients
+
         // ensure response to send isn't null
-        if (responseToSend == null) responseToSend = r;
+        if (m_responseToSend == null) m_responseToSend = r;
 
         // remove this coordinator from the outstanding list
-        if (outstandingCoordinators != null)
-            outstandingCoordinators.remove(coordinatorHSId);
+        if (m_outstandingCoordinators != null)
+            m_outstandingCoordinators.remove(coordinatorHSId);
 
-        outstandingResponses--;
+        m_outstandingResponses--;
 
         VoltTable[] currResults = r.getResults();
 
-        // Check that the replica results are the same (non-deterministic SQL)
+        // Check that the replicated procedure ran the same SQL with the same
+        // parameters for each run of the java code (non-deterministic SQL)
         // (Note that this applies for k > 0)
         // If not same, kill entire cluster and hide the bodies.
         // In all seriousness, we have no valid way to recover from a non-deterministic event
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
+        // Note that read-only procs and sysprocs just have a null hash value, so they don't
+        // trip anything up here.
+
+        // ensure the hash is non-null
+        sqlHash = sqlHash == null ? 0 : sqlHash;
+        if (m_sqlHash != null) {
+             if (m_sqlHash.equals(sqlHash) == false) {
+                 {
+                     String msg = "Mismatched hash of SQL run for transaction ID: " + txnId;
+                     msg += "\n  while executing stored procedure: " + invocation.getProcName();
+                     msg += "\n  from execution site: " + CoreUtils.hsIdToString(coordinatorHSId);
+                     msg += "\n  Expected hash value: " + m_sqlHash;
+                     msg += "\n  Mismatched hash value: " + sqlHash;
+                     msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
+                     // die die die
+                     VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                     throw new RuntimeException(msg); // gets called only by test code
+                 }
+             }
+        }
+        else if (m_outstandingResponses > 0) {
+            m_sqlHash = sqlHash;
+        }
+
+        // Check that the replica results are the same (non-deterministic SQL)
+        // (Note that this applies for k > 0)
+        // If not same, kill entire cluster and hide the bodies.
+        // As stated above, we have no valid way to recover from a non-deterministic event
+        // The safest thing is to make the user aware and stop doing potentially corrupt work.
         // ENG-3288 - Allow non-deterministic read-only transactions to have mismatched results
         // so that LIMIT queries without ORDER BY clauses work.
-        if (resultsForComparison != null) {
+        if (m_resultsForComparison != null) {
             if (!allowMismatchedResults) {
                 VoltTable[] curr_results = r.getResults();
-                if (resultsForComparison.length != curr_results.length)
+                if (m_resultsForComparison.length != curr_results.length)
                 {
                     String msg = "Mismatched result count received for transaction ID: " + txnId;
                     msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                    msg += "\n  from execution site: " + coordinatorHSId;
-                    msg += "\n  Expected number of results: " + resultsForComparison.length;
+                    msg += "\n  from execution site: " + CoreUtils.hsIdToString(coordinatorHSId);
+                    msg += "\n  Expected number of results: " + m_resultsForComparison.length;
                     msg += "\n  Mismatched number of results: " + curr_results.length;
                     msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
                     // die die die
                     VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
                     throw new RuntimeException(msg); // gets called only by test code
                 }
-                for (int i = 0; i < resultsForComparison.length; ++i)
+                for (int i = 0; i < m_resultsForComparison.length; ++i)
                 {
-                    if (!curr_results[i].hasSameContents(resultsForComparison[i]))
+                    if (!curr_results[i].hasSameContents(m_resultsForComparison[i]))
                     {
                         String msg = "Mismatched results received for transaction ID: " + txnId;
                         msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                        msg += "\n  from execution site: " + coordinatorHSId;
-                        msg += "\n  Expected results: " + resultsForComparison[i].toString();
+                        msg += "\n  from execution site: " + CoreUtils.hsIdToString(coordinatorHSId);
+                        msg += "\n  Expected results: " + m_resultsForComparison[i].toString();
                         msg += "\n  Mismatched results: " + curr_results[i].toString();
                         msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
                         // die die die
@@ -135,30 +169,30 @@ public class InFlightTxnState implements Serializable {
             }
         }
         // store these results for any future results to compare to
-        else if (outstandingResponses > 0) {
-            resultsForComparison = new VoltTable[currResults.length];
+        else if (m_outstandingResponses > 0) {
+            m_resultsForComparison = new VoltTable[currResults.length];
             // Create shallow copies of all the VoltTables to avoid
             // race conditions with the ByteBuffer metadata
             for (int i = 0; i < currResults.length; ++i)
             {
                 if (currResults[i] == null) {
-                    resultsForComparison[i] = null;
+                    m_resultsForComparison[i] = null;
                 }
                 else {
-                    resultsForComparison[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(
+                    m_resultsForComparison[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(
                             currResults[i].getTableDataReference(), true);
                 }
             }
         }
 
         // decide if it's safe to send a response to the client
-        if (isReadOnly && (!hasSentResponse)) {
-            hasSentResponse = true;
-            return responseToSend;
+        if (isReadOnly && (!m_hasSentResponse)) {
+            m_hasSentResponse = true;
+            return m_responseToSend;
         }
-        else if ((!isReadOnly) && (outstandingResponses == 0)) {
-            hasSentResponse = true;
-            return responseToSend;
+        else if ((!isReadOnly) && (m_outstandingResponses == 0)) {
+            m_hasSentResponse = true;
+            return m_responseToSend;
         }
 
         // if this is a post-send read or a pre-send write
@@ -167,20 +201,20 @@ public class InFlightTxnState implements Serializable {
 
     public ClientResponseImpl addFailedOrRecoveringResponse(long coordinatorId) {
         // verify this transaction has the right coordinator
-        if (outstandingCoordinators != null) {
-            boolean success = outstandingCoordinators.remove(coordinatorId);
+        if (m_outstandingCoordinators != null) {
+            boolean success = m_outstandingCoordinators.remove(coordinatorId);
             assert(success);
         }
         else assert(coordinatorId == firstCoordinatorId);
 
         // if you're out of coordinators and haven't sent a response
-        if (((--outstandingResponses) == 0) && (!hasSentResponse)) {
+        if (((--m_outstandingResponses) == 0) && (!m_hasSentResponse)) {
             // this might be null...
             // if it is, you're totally hosed because that means
             // the transaction might have committed but you don't have
             // a message from the failed to coordinator to tell you if so
-            hasSentResponse = responseToSend != null;
-            return responseToSend;
+            m_hasSentResponse = m_responseToSend != null;
+            return m_responseToSend;
         }
 
         // this failure hasn't messed anything up royally...
@@ -188,17 +222,17 @@ public class InFlightTxnState implements Serializable {
     }
 
     public boolean hasSentResponse() {
-        return hasSentResponse;
+        return m_hasSentResponse;
     }
 
     public boolean hasAllResponses() {
-        return outstandingResponses == 0;
+        return m_outstandingResponses == 0;
     }
 
     public boolean siteIsCoordinator(long coordinatorId) {
         // for single-partition txns
-        if (outstandingCoordinators != null)
-            return outstandingCoordinators.contains(coordinatorId);
+        if (m_outstandingCoordinators != null)
+            return m_outstandingCoordinators.contains(coordinatorId);
         // for multi-partition txns
         return firstCoordinatorId == coordinatorId;
     }
@@ -211,7 +245,7 @@ public class InFlightTxnState implements Serializable {
         sb.append("IN_FLIGHT_TXN_STATE");
         sb.append("\n  TXN_ID: " + txnId);
         sb.append("\n  OUTSTANDING_COORDINATOR_IDS: ");
-        for (long id : outstandingCoordinators)
+        for (long id : m_outstandingCoordinators)
             sb.append(id).append(" ");
 
         sb.append("\n  OTHER_SITE_IDS: ");
@@ -257,21 +291,21 @@ public class InFlightTxnState implements Serializable {
 
     public final ArrayList<Long> coordinatorReplicas;
 
-    protected int outstandingResponses = 1;
+    protected int m_outstandingResponses = 1;
 
     // set to true once an answer is sent to the client
-    protected boolean hasSentResponse = false;
+    protected boolean m_hasSentResponse = false;
 
     //////////////////////////////////////////////////
     // BELOW HERE USED IF single partition
     //////////////////////////////////////////////////
 
     // list of coordinators that have not responded
-    Set<Long> outstandingCoordinators = null;
+    Set<Long> m_outstandingCoordinators = null;
 
     // the response queued to be sent to the client
     // note, this is only needed for write transactions
-    protected ClientResponseImpl responseToSend = null;
+    protected ClientResponseImpl m_responseToSend = null;
 
     //////////////////////////////////////////////////
     // BELOW HERE USED IF single partition AND k > 0
@@ -279,5 +313,7 @@ public class InFlightTxnState implements Serializable {
 
     // the definitive answer to the query, used to ensure
     //  all non-recovering answers match
-    protected VoltTable[] resultsForComparison = null;
+    protected VoltTable[] m_resultsForComparison = null;
+    // the definitive hash of SQL+Params run by the proc
+    protected Integer m_sqlHash = null;
 }

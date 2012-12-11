@@ -37,15 +37,26 @@ import org.voltdb.VoltType;
 )
 public class NonDeterministicSPProc extends VoltProcedure {
 
-    static final int MISMATCH_VALUES = 0;
-    static final int MISMATCH_LENGTH = 1;
-    static final int MISMATCH_INSERTION = 2;
+    static final int NO_PROBLEM = 0;
+    static final int MISMATCH_VALUES = 1;
+    static final int MISMATCH_LENGTH = 2;
+    static final int MISMATCH_INSERTION = 3;
+    static final int MISMATCH_WHITESPACE_IN_SQL = 4;
 
     public static final SQLStmt sql = new SQLStmt("insert into kv values ?, ?");
+    public static final SQLStmt sql2 = new SQLStmt("insert into  kv values ?, ?");
 
-    public VoltTable run(long key, int failType) {
+    public VoltTable run(long key, long value, int failType) {
         long id = VoltDB.instance().getHostMessenger().getHostId();
-        voltQueueSQL(sql, key, id);
+        if (failType == MISMATCH_INSERTION) {
+            voltQueueSQL(sql, key, id);
+        }
+        else if ((failType == MISMATCH_WHITESPACE_IN_SQL) && (id % 2 == 0)) {
+            voltQueueSQL(sql2, key, value);
+        }
+        else {
+            voltQueueSQL(sql, key, value);
+        }
         voltExecuteSQL();
 
         VoltTable retval = new VoltTable(new ColumnInfo("", VoltType.BIGINT));
@@ -59,14 +70,6 @@ public class NonDeterministicSPProc extends VoltProcedure {
         else if (failType == MISMATCH_VALUES) {
             retval.addRow(id);
         }
-        else if (failType == MISMATCH_INSERTION) {
-            // do nada
-        }
-        else {
-            assert(false);
-            throw new VoltAbortException("failType param is unknown value.");
-        }
-
 
         return retval;
     }
