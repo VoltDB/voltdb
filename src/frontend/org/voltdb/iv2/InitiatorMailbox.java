@@ -330,8 +330,12 @@ public class InitiatorMailbox implements Mailbox
      * work needs to do duplicate counting; MPI can simply broadcast the
      * repair to the needs repair units -- where the SP will do the rest.
      */
-    synchronized void repairReplicasWith(List<Long> needsRepair, VoltMessage repairWork)
+    void repairReplicasWith(List<Long> needsRepair, VoltMessage repairWork)
     {
+        //For an SpInitiator the lock should already have been acquire since
+        //this method is reach via SpPromoteAlgo.deliver which is reached by InitiatorMailbox.deliver
+        //which should already have acquire the lock
+        assert(Thread.holdsLock(this));
         repairReplicasWithInternal(needsRepair, repairWork);
     }
 

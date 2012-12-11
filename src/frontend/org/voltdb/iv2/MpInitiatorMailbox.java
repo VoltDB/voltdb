@@ -40,10 +40,12 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     private final LinkedTransferQueue<Runnable> m_taskQueue = new LinkedTransferQueue<Runnable>();
     @SuppressWarnings("serial")
     private static class TerminateThreadException extends RuntimeException {};
+    private long m_taskThreadId = 0;
     private final Thread m_taskThread = new Thread(null,
                     new Runnable() {
                         @Override
                         public void run() {
+                            m_taskThreadId = Thread.currentThread().getId();
                             while (true) {
                                 try {
                                     m_taskQueue.take().run();
@@ -215,21 +217,28 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     @Override
     void repairReplicasWith(final List<Long> needsRepair, final VoltMessage repairWork)
     {
-        final CountDownLatch cdl = new CountDownLatch(1);
-        m_taskQueue.offer(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    repairReplicasWithInternal( needsRepair, repairWork);
-                } finally {
-                    cdl.countDown();
+        if (Thread.currentThread().getId() == m_taskThreadId) {
+            //When called from MpPromoteAlgo which should be entered from deliver
+            repairReplicasWithInternal(needsRepair, repairWork);
+        } else {
+            //When called from MpInitiator.acceptPromotion
+            final CountDownLatch cdl = new CountDownLatch(1);
+            m_taskQueue.offer(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        repairReplicasWithInternal( needsRepair, repairWork);
+                    } finally {
+                        cdl.countDown();
+                    }
                 }
+            });
+            try {
+                cdl.await();
+            } catch (InterruptedException e) {
+                Throwables.propagate(e);
             }
-        });
-        try {
-            cdl.await();
-        } catch (InterruptedException e) {
-            Throwables.propagate(e);
         }
+
     }
 }
