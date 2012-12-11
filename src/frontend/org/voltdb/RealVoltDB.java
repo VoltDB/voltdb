@@ -1756,6 +1756,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_mailboxPublisher = null;
 
                 AdHocCompilerCache.clearVersionCache();
+                org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 // probably unnecessary
                 System.gc();
