@@ -170,7 +170,7 @@ public class InitiatorMailbox implements Mailbox
                 }
                 first = false;
             }
-            VoltDB.crashLocalVoltDB(msg, false, null);
+            VoltDB.crashLocalVoltDB(msg, true, null);
         }
         return true;
     }
