@@ -21,7 +21,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.jfree.util.Log;
 import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -159,8 +158,6 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public void setHash(Integer hash) {
         m_hash = hash == null ? 0 : hash; // don't allow null
-
-        Log.info("Stored hash with value: " + String.valueOf(m_hash));
     }
 
     public void storeResults(ClientResponseImpl response) {
