@@ -1049,7 +1049,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
                             invocation.getOriginalTxnId() <= lastTxnId)
                     {
-                        hostLog.debug("Dropping duplicate replicated transaction, txnid: " +
+                        hostLog.debug("Dropping duplicate replicated transaction " + invocation.getProcName() + ", txnid: " +
                                 invocation.getOriginalTxnId() + ", last seen: " + lastTxnId);
                         return false;
                     }
@@ -1209,6 +1209,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                                             clientResponse.setClientHandle(clientData.m_clientHandle);
                                             clientResponse.setClusterRoundtrip(delta);
+                                            clientResponse.setHash(null); // not part of wire protocol
 
                                             ByteBuffer results =
                                                     ByteBuffer.allocate(
