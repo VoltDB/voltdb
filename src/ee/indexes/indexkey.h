@@ -518,12 +518,28 @@ struct GenericPersistentKey : public GenericKey<keySize>
 
     const GenericPersistentKey& operator=( const GenericPersistentKey& other )
     {
-        // Should not be overwriting an actively-in-use persistent key -- this will leak!
-        assert( ! m_keySchema);
-        m_keySchema = other.m_keySchema;
+        // To avoid leaking data, "*this" and "other" -- typically a temp -- actually SWAP state
+        // so that data memory management becomes a simple matter of running the expected
+        // destructors.  If overwriting a full-blown actively-in-use persistent key,
+        // its previous value (presumably obsolete) will go out of scope with other!
+        // This data memory management is only a concern for "full-blown" keys
+        // that have m_keySchema -- not a problem for ephemeral search keys that just "borrow" memory.
+        const TupleSchema *keptKeySchema = this->m_keySchema;
+        char keptData[keySize];
+        if (keptKeySchema) {
+            ::memcpy(keptData, this->data, keySize);
+        }
+        this->m_keySchema = other.m_keySchema;
         ::memcpy(this->data, other.data, keySize);
-        // Only one key, this, can own the tuple and its objects.
-        const_cast<GenericPersistentKey&>(other).m_keySchema = NULL;
+        // Exactly one full-blown key must own each tuple and its objects.
+        // So either use other as a lifeboat for the prior value of *this.
+        // It's destructor will deal with the old value of "this", probably VERY SOON.
+        // Or mark it as ephemeral if that's what *this was.
+        GenericPersistentKey& writableOther = const_cast<GenericPersistentKey&>(other);
+        writableOther.m_keySchema = keptKeySchema;
+        if (keptKeySchema) {
+            ::memcpy(writableOther.data, keptData, keySize);
+        }
         return *this;
     }
 
