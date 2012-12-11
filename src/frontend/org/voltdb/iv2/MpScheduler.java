@@ -41,6 +41,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpScheduler extends Scheduler
@@ -139,6 +140,9 @@ public class MpScheduler extends Scheduler
         }
         else if (message instanceof FragmentResponseMessage) {
             handleFragmentResponseMessage((FragmentResponseMessage)message);
+        }
+        else if (message instanceof Iv2EndOfLogMessage) {
+            handleEOLMessage();
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -307,6 +311,20 @@ public class MpScheduler extends Scheduler
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         throw new RuntimeException("MpScheduler should never see a CompleteTransactionMessage");
+    }
+
+    /**
+     * Inject a task into the transaction task queue to flush it. When it
+     * executes, it will send out MPI end of log messages to all partition
+     * initiators.
+     */
+    public void handleEOLMessage()
+    {
+        Iv2EndOfLogMessage msg = new Iv2EndOfLogMessage(true);
+        MPIEndOfLogTransactionState txnState = new MPIEndOfLogTransactionState(msg);
+        MPIEndOfLogTask task = new MPIEndOfLogTask(m_mailbox, m_pendingTasks,
+                                                   txnState, m_iv2Masters);
+        m_pendingTasks.offer(task);
     }
 
     @Override

@@ -22,19 +22,14 @@ import java.util.HashSet;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-public class SpTransactionState extends TransactionState
-{
-    final Iv2InitiateTaskMessage m_task;
-    protected SpTransactionState(TransactionInfoBaseMessage notice)
+/**
+ *
+ */
+public class MPIEndOfLogTransactionState extends TransactionState {
+    public MPIEndOfLogTransactionState(TransactionInfoBaseMessage notice)
     {
         super(null, notice);
-        if (notice instanceof Iv2InitiateTaskMessage) {
-            m_task = (Iv2InitiateTaskMessage)notice;
-        } else {
-            m_task = null;
-        }
     }
 
     @Override
@@ -46,37 +41,33 @@ public class SpTransactionState extends TransactionState
     @Override
     public boolean isCoordinator()
     {
-        return true;
+        return false;
     }
 
     @Override
     public boolean isBlocked()
     {
-        return true;
+        return false;
     }
 
-    // Per SinglePartitonTxnState.java
     @Override
     public boolean hasTransactionalWork()
     {
-        return true;
+        return false;
     }
 
     @Override
-    public boolean doWork(boolean recovering)
+    public boolean doWork(boolean rejoining)
     {
-        throw new RuntimeException("Do not expect doWork() in IV2");
+        return false;
     }
 
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        return m_task.getStoredProcedureInvocation();
+        return null;
     }
 
     @Override
-    public void handleSiteFaults(HashSet<Long> failedSites)
-    {
-        throw new RuntimeException("Do not expect handleSiteFaults in IV2");
-    }
+    public void handleSiteFaults(HashSet<Long> failedSites) {}
 }

@@ -26,6 +26,7 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 /**
@@ -60,7 +61,10 @@ public class ReplaySequencer
 
         boolean isReady()
         {
-            if (m_eolReached) {
+            if (m_mpiEOLReached) {
+                // no more MP fragments will arrive
+                return true;
+            } else if (m_eolReached) {
                 // End of log, no more sentinels, release first fragment
                 return m_firstFragment != null;
             } else {
@@ -81,7 +85,7 @@ public class ReplaySequencer
         VoltMessage poll()
         {
             if (isReady()) {
-               if(!m_servedFragment) {
+               if(!m_servedFragment && m_firstFragment != null) {
                    m_servedFragment = true;
                    return m_firstFragment;
                }
@@ -109,10 +113,13 @@ public class ReplaySequencer
     // has reached end of log for this partition, release any MP Txns for
     // replay if this is true.
     boolean m_eolReached = false;
+    // has reached end of log for the MPI, no more MP fragments will come,
+    // release all txns.
+    boolean m_mpiEOLReached = false;
 
-    public void setEOLReached()
+    public boolean isMPIEOLReached()
     {
-        m_eolReached = true;
+        return m_mpiEOLReached;
     }
 
     // Return the next correctly sequenced message or null if none exists.
@@ -121,7 +128,12 @@ public class ReplaySequencer
         if (m_replayEntries.isEmpty()) {
             return null;
         }
-        if (m_replayEntries.firstEntry().getValue().isEmpty()) {
+        /*
+         * If the MPI has sent EOL message to this partition, leave the
+         * unfinished MP entry there so that future SPs will be offered to the
+         * backlog and they will not get executed.
+         */
+        if (!m_mpiEOLReached && m_replayEntries.firstEntry().getValue().isEmpty()) {
             m_replayEntries.pollFirstEntry();
         }
         if (m_replayEntries.isEmpty()) {
@@ -138,6 +150,15 @@ public class ReplaySequencer
     public boolean offer(long inTxnId, TransactionInfoBaseMessage in)
     {
         ReplayEntry found = m_replayEntries.get(inTxnId);
+
+        if (in instanceof Iv2EndOfLogMessage) {
+            if (((Iv2EndOfLogMessage) in).isMP()) {
+                m_mpiEOLReached = true;
+            } else {
+                m_eolReached = true;
+            }
+            return true;
+        }
 
         /*
          * End-of-log reached. Only FragmentTaskMessage and
@@ -159,7 +180,13 @@ public class ReplaySequencer
         if (in instanceof MultiPartitionParticipantMessage) {
             // Incoming sentinel.
             // MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage)in;
-            if (found == null) {
+            if (m_mpiEOLReached) {
+                /*
+                 * MPI sent end of log. No more fragments or complete transaction
+                 * messages will arrive. Ignore all sentinels.
+                 */
+            }
+            else if (found == null) {
                 ReplayEntry newEntry = new ReplayEntry();
                 newEntry.m_sentinalTxnId = inTxnId;
                 m_replayEntries.put(inTxnId, newEntry);

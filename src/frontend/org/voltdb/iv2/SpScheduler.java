@@ -35,18 +35,20 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -244,6 +246,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    /**
+     * Poll the replay sequencer and respond to all SPs with an IGNORED response
+     */
+    private void drainReplaySequencer()
+    {
+        VoltMessage m = m_replaySequencer.poll();
+        while (m != null) {
+            if (m instanceof Iv2InitiateTaskMessage) {
+                // Send IGNORED response for all SPs
+                Iv2InitiateTaskMessage task = (Iv2InitiateTaskMessage) m;
+                final InitiateResponseMessage response = new InitiateResponseMessage(task);
+                response.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
+                                                           new VoltTable[0],
+                                                           ClientResponseImpl.IGNORED_TRANSACTION));
+                m_mailbox.send(response.getInitiatorHSId(), response);
+            }
+            m = m_replaySequencer.poll();
+        }
+    }
+
     // SpInitiators will see every message type.  The Responses currently come
     // from local work, but will come from replicas when replication is
     // implemented
@@ -263,6 +285,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         boolean sequenceForSentinel = m_isLeader &&
             (message instanceof MultiPartitionParticipantMessage);
 
+        boolean sequenceForReplay =
+                sequenceForCommandLog || sequenceForSentinel || sequenceForDR;
+
         assert(!(sequenceForCommandLog && sequenceForDR));
 
         if (sequenceForCommandLog || sequenceForSentinel) {
@@ -272,17 +297,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
         }
 
-        if (sequenceWithTxnId != Long.MIN_VALUE) {
+        if (sequenceForReplay) {
             if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage)message)) {
                 deliver2(message);
+            }
+            else if (m_replaySequencer.isMPIEOLReached()) {
+                drainReplaySequencer();
             }
             else {
                 deliverReadyTxns();
             }
-        }
-        else if (message instanceof Iv2EndOfLogMessage) {
-            m_replaySequencer.setEOLReached();
-            deliverReadyTxns();
         }
         else {
             deliver2(message);

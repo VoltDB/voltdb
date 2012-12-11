@@ -2708,8 +2708,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void sendEOLMessage(int partitionId) {
         assert(m_isIV2Enabled);
-        final long initiatorHSId = m_iv2Masters.get(partitionId);
-        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage();
+        final long initiatorHSId;
+        if (partitionId == MpInitiator.MP_INIT_PID) {
+            initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
+        } else {
+            initiatorHSId = m_iv2Masters.get(partitionId);
+        }
+        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(false);
         m_mailbox.send(initiatorHSId, message);
     }
 
