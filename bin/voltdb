@@ -72,6 +72,11 @@ popd > /dev/null
 export VOLTDB_HOME=$(dirname $(dirname "$this"))
 #echo $VOLTDB_HOME
 
+# compilation is handled by tools/volt
+if [ "$1" = "compile" ]; then
+    exec $VOLTDB_HOME/tools/volt "$@"
+fi
+
 # detect and adjust for Linux package installation vs. VoltDB distribution
 if [ -d "$VOLTDB_HOME/../../lib/voltdb" ]; then
     # Linux package installation puts all libraries in /usr/lib/voltdb
@@ -113,7 +118,7 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   fi
 fi
 
-VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
+VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-3.*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=$VOLTDBJAR
 else

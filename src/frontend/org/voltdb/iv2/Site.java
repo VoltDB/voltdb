@@ -19,10 +19,8 @@ package org.voltdb.iv2;
 
 import java.io.File;
 import java.io.IOException;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -32,10 +30,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -43,15 +41,9 @@ import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
-
-import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotSiteProcessor;
@@ -59,8 +51,6 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
-
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.TableStats;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -76,7 +66,12 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -425,8 +420,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (taskLogKlass != null) {
             Constructor<?> taskLogConstructor;
             try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
-                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir);
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir, true);
             } catch (InvocationTargetException e) {
                 VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
             } catch (Exception e) {
@@ -510,9 +505,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
             }
         }
-        catch (final InterruptedException e) {
-            // acceptable - this is how site blocked on an empty scheduler terminates.
-        }
         catch (OutOfMemoryError e)
         {
             // Even though OOM should be caught by the Throwable section below,
@@ -550,19 +542,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 break;
             }
 
-            // Apply the readonly / sysproc filter. With Iv2 read optimizations,
-            // reads should not reach here; the cost of post-filtering shouldn't
-            // be particularly high (vs pre-filtering).
-            if (filter(tibm)) {
-                continue;
-            }
-
             if (tibm instanceof Iv2InitiateTaskMessage) {
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m, null);
-                t.runFromTaskLog(this);
+                if (!filter(tibm)) {
+                    t.runFromTaskLog(this);
+                }
             }
             else if (tibm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage m = (FragmentTaskMessage)tibm;
@@ -574,7 +561,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             " open transaction.", false, null);
                 }
                 FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
-                t.runFromTaskLog(this);
+                if (!filter(tibm)) {
+                    t.runFromTaskLog(this);
+                }
             }
             else if (tibm instanceof CompleteTransactionMessage) {
                 // Needs improvement: completes for sysprocs aren't filterable as sysprocs.
@@ -582,8 +571,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 if (global_replay_mpTxn != null) {
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
                     CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
-                    global_replay_mpTxn = null;
-                    t.runFromTaskLog(this);
+                    if (!m.isRestart()) {
+                        global_replay_mpTxn = null;
+                    }
+                    if (!filter(tibm)) {
+                        t.runFromTaskLog(this);
+                    }
                 }
             }
             else {
@@ -599,8 +592,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // is wrong. Run MP txns fully kStateRejoining or fully kStateRunning.
         if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
             setReplayRejoinComplete();
-        }
-        else if (m_rejoinTaskLog.isEmpty()) {
         }
     }
 
@@ -642,7 +633,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_ee.release();
             }
             if (m_snapshotter != null) {
-                m_snapshotter.shutdown();
+                try {
+                    m_snapshotter.shutdown();
+                } catch (InterruptedException e) {
+                    hostLog.warn("Interrupted during shutdown", e);
+                }
             }
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);
@@ -653,8 +648,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // SiteSnapshotConnection interface
     //
     @Override
-    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
-        m_snapshotter.initiateSnapshots(m_ee, tasks, txnId, numLiveHosts);
+    public void initiateSnapshots(
+            Deque<SnapshotTableTask> tasks,
+            long txnId,
+            int numLiveHosts,
+            Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
+        m_snapshotter.initiateSnapshots(m_ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
     }
 
     /*
@@ -909,7 +908,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setRejoinComplete(RejoinProducer.ReplayCompletionAction replayComplete) {
+    public void setRejoinComplete(
+            RejoinProducer.ReplayCompletionAction replayComplete,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
         // live rejoin, will transfer to kStateRunning as usual
@@ -918,6 +919,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         if (replayComplete == null) {
             throw new RuntimeException("Null Replay Complete Action.");
+        }
+
+        for (Map.Entry<String, Map<Integer, Pair<Long,Long>>> tableEntry : exportSequenceNumbers.entrySet()) {
+            final Table catalogTable = m_context.tables.get(tableEntry.getKey());
+            if (catalogTable == null) {
+                VoltDB.crashLocalVoltDB(
+                        "Unable to find catalog entry for table named " + tableEntry.getKey(),
+                        true,
+                        null);
+            }
+            Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+            exportAction(
+                    true,
+                    sequenceNumbers.getFirst().intValue(),
+                    sequenceNumbers.getSecond(),
+                    m_partitionId,
+                    catalogTable.getSignature());
         }
 
         m_rejoinState = kStateReplayingRejoin;

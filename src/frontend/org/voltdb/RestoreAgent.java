@@ -316,6 +316,37 @@ SnapshotCompletionInterest
             }
             throw new RuntimeException("impossible.");
         }
+
+        public boolean isNewerThan(SnapshotInfo other)
+        {
+            if (other.instanceId.getTimestamp() > instanceId.getTimestamp()) {
+                return false;
+            }
+            else if (other.instanceId.getTimestamp() < instanceId.getTimestamp()) {
+                return true;
+            }
+            // Same instance ID timestamps, compare all the partition txn IDs until we find
+            // some hint that one ran longer than the other
+            if (other.txnId > txnId) {
+                return false;
+            }
+            else if (other.txnId < txnId) {
+                return true;
+            }
+            for (Entry<Integer, Long> e : other.partitionToTxnId.entrySet()) {
+                if (partitionToTxnId.containsKey(e.getKey())) {
+                    if (e.getValue() > partitionToTxnId.get(e.getKey())) {
+                        return false;
+                    }
+                    else if (e.getValue() < partitionToTxnId.get(e.getKey())) {
+                        return true;
+                    }
+                }
+                // When we start adding/removing partitions on the fly this
+                // missing else will need to do something
+            }
+            return false;
+        }
     }
 
     /**
@@ -469,7 +500,7 @@ SnapshotCompletionInterest
      * Exists the restore process. Waits for all other hosts to complete first.
      * This method blocks.
      */
-    private void exitRestore() {
+    void exitRestore() {
         try {
             m_zk.delete(m_generatedRestoreBarrier2, -1);
         } catch (Exception e) {
@@ -526,7 +557,7 @@ SnapshotCompletionInterest
      *             has failed. Should crash the cluster.
      */
     SnapshotInfo generatePlans() throws Exception {
-        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, SnapshotUtil.Snapshot>();
+        Map<String, Snapshot> snapshots = new HashMap<String, SnapshotUtil.Snapshot>();
 
         // Only scan if startup might require a snapshot restore.
         if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
@@ -535,7 +566,7 @@ SnapshotCompletionInterest
 
         final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
         Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
-        for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
+        for (Snapshot e : snapshots.values()) {
             if (!VoltDB.instance().isIV2Enabled()) {
                 /*
                  * If the txn of the snapshot is before the latest txn
@@ -544,12 +575,12 @@ SnapshotCompletionInterest
                  * taken and the beginning of the log. So the snapshot is
                  * not viable for replay.
                  */
-                if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
+                if (maxLastSeenTxn != null && e.getTxnId() < maxLastSeenTxn) {
                     continue;
                 }
             }
 
-            SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
+            SnapshotInfo info = checkSnapshotIsComplete(e.getTxnId(), e);
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
             if (m_replayAgent.getInstanceId() != null && info != null &&
                 !m_replayAgent.getInstanceId().equals(info.instanceId)) {
@@ -599,8 +630,7 @@ SnapshotCompletionInterest
         sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
 
         // Negotiate with other hosts about which snapshot to restore
-        Set<SnapshotInfo> lastSnapshot = getRestorePlan();
-        SnapshotInfo infoWithMinHostId = consolidateSnapshotInfos(lastSnapshot);
+        SnapshotInfo infoWithMinHostId = getRestorePlan();
 
         /*
          * Generate the replay plan here so that we don't have to wait until the
@@ -680,7 +710,7 @@ SnapshotCompletionInterest
 
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
-                    parseDigestFilename(digest.getName()),
+                    SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
                     partitionCount, catalog_crc, m_hostId, instanceId);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
@@ -831,7 +861,7 @@ SnapshotCompletionInterest
      * @return The snapshot to restore from, null if none.
      * @throws Exception
      */
-    private Set<SnapshotInfo> getRestorePlan() throws Exception {
+    private SnapshotInfo getRestorePlan() throws Exception {
         // Wait for ZK to publish the snapshot fragment/info structures.
         List<String> children = waitOnVoltZK_restore();
 
@@ -840,7 +870,7 @@ SnapshotCompletionInterest
             return null;
         }
 
-        TreeMap<Long, Set<SnapshotInfo>> snapshotFragments = new TreeMap<Long, Set<SnapshotInfo>>();
+        Map<String, Set<SnapshotInfo>> snapshotFragments = new HashMap<String, Set<SnapshotInfo>>();
         Long clStartTxnId = deserializeRestoreInformation(children, snapshotFragments);
 
         // If command log has no snapshot requirement clear the fragment set directly
@@ -851,16 +881,17 @@ SnapshotCompletionInterest
         LOG.debug("There are " + snapshotFragments.size() + " restore candidate snapshots available in the cluster");
 
         // Find the last complete snapshot and use it
-        HashMap<Long, Map<String, Set<Integer>>> snapshotTablePartitions =
-            new HashMap<Long, Map<String,Set<Integer>>>();
-        Iterator<Entry<Long, Set<SnapshotInfo>>> it = snapshotFragments.entrySet().iterator();
+        HashMap<String, Map<String, Set<Integer>>> snapshotTablePartitions =
+            new HashMap<String, Map<String,Set<Integer>>>();
+        Iterator<Entry<String, Set<SnapshotInfo>>> it = snapshotFragments.entrySet().iterator();
+        SnapshotInfo newest = null;
         while (it.hasNext()) {
-            Entry<Long, Set<SnapshotInfo>> e = it.next();
-            long txnId = e.getKey();
-            Map<String, Set<Integer>> tablePartitions = snapshotTablePartitions.get(txnId);
+            Entry<String, Set<SnapshotInfo>> e = it.next();
+            String nonce = e.getKey();
+            Map<String, Set<Integer>> tablePartitions = snapshotTablePartitions.get(nonce);
             if (tablePartitions == null) {
                 tablePartitions = new HashMap<String, Set<Integer>>();
-                snapshotTablePartitions.put(txnId, tablePartitions);
+                snapshotTablePartitions.put(nonce, tablePartitions);
             }
 
             int totalPartitions = -1;
@@ -899,6 +930,12 @@ SnapshotCompletionInterest
             if (inconsistent) {
                 it.remove();
             }
+            else {
+                SnapshotInfo current = consolidateSnapshotInfos(fragments);
+                if (newest == null || current.isNewerThan(newest)) {
+                    newest = current;
+                }
+            }
         }
 
         // If we have a command log and it requires a snapshot but no snapshot
@@ -911,7 +948,7 @@ SnapshotCompletionInterest
         if (snapshotFragments.isEmpty()) {
             return null;
         } else {
-            return snapshotFragments.lastEntry().getValue();
+            return newest;
         }
     }
 
@@ -922,7 +959,7 @@ SnapshotCompletionInterest
      * And, it errors if the remote start action does not match the local action.
      */
     private Long deserializeRestoreInformation(List<String> children,
-            Map<Long, Set<SnapshotInfo>> snapshotFragments) throws Exception
+            Map<String, Set<SnapshotInfo>> snapshotFragments) throws Exception
     {
         try {
             int recover = m_action.ordinal();
@@ -954,10 +991,10 @@ SnapshotCompletionInterest
                 for (int i=0; i < snapInfoCnt; i++) {
                     JSONObject jsonInfo = snapInfos.getJSONObject(i);
                     SnapshotInfo info = new SnapshotInfo(jsonInfo);
-                    Set<SnapshotInfo> fragments = snapshotFragments.get(info.txnId);
+                    Set<SnapshotInfo> fragments = snapshotFragments.get(info.nonce);
                     if (fragments == null) {
                         fragments = new HashSet<SnapshotInfo>();
-                        snapshotFragments.put(info.txnId, fragments);
+                        snapshotFragments.put(info.nonce, fragments);
                     }
                     fragments.add(info);
                 }
@@ -1128,7 +1165,7 @@ SnapshotCompletionInterest
      *
      * @return All snapshots
      */
-    private TreeMap<Long, Snapshot> getSnapshots() {
+    private Map<String, Snapshot> getSnapshots() {
         /*
          * Use the individual snapshot directories instead of voltroot, because
          * they can be set individually
@@ -1142,7 +1179,7 @@ SnapshotCompletionInterest
         if (m_snapshotPath != null) {
             paths.add(m_snapshotPath);
         }
-        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
+        HashMap<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
         for (String path : paths) {
@@ -1153,36 +1190,17 @@ SnapshotCompletionInterest
     }
 
     /**
-     * Get the nonce from the filename of the digest file.
-     * @param filename The filename of the digest file
-     * @return The nonce
-     */
-    private static String parseDigestFilename(String filename) {
-        if (filename == null || !filename.endsWith(".digest")) {
-            throw new IllegalArgumentException();
-        }
-
-        String nonce = filename.substring(0, filename.indexOf(".digest"));
-        if (nonce.contains("-host_")) {
-            nonce = nonce.substring(0, nonce.indexOf("-host_"));
-        }
-
-        return nonce;
-    }
-
-    /**
      * All nodes will be notified about the completion of the truncation
      * snapshot.
      */
     @Override
-    public CountDownLatch snapshotCompleted(final String nonce, long txnId, long partitionTxnIds[],
-                                            boolean truncationSnapshot) {
-        if (!truncationSnapshot) {
+    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
+        if (!event.truncationSnapshot) {
             VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",
                                      false, null);
         } else {
-            m_truncationSnapshot = txnId;
-            m_truncationSnapshotPerPartition = partitionTxnIds;
+            m_truncationSnapshot = event.multipartTxnId;
+            m_truncationSnapshotPerPartition = event.partitionTxnIds;
             m_replayAgent.returnAllSegments();
             changeState();
         }

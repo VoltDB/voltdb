@@ -21,11 +21,17 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltcore.utils.Pair;
+
+import com.google.common.base.Charsets;
 
 
 
@@ -64,6 +70,7 @@ public class ExportProtoMessage
         final public long systemStartTimestamp;
         final public ArrayList<String> columnNames = new ArrayList<String>();
         final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
+        final public List<Integer> columnLengths = new ArrayList<Integer>();
 
         @Override
         public int hashCode() {
@@ -87,7 +94,8 @@ public class ExportProtoMessage
                                     long systemStartTimestamp,
                                     long generation,
                                     ArrayList<String> names,
-                                    ArrayList<VoltType> types)
+                                    ArrayList<VoltType> types,
+                                    List<Integer> lengths)
         {
             partitionId = p_id;
             signature = t_signature;
@@ -100,6 +108,9 @@ public class ExportProtoMessage
                 columnNames.addAll(names);
             if (types != null)
                 columnTypes.addAll(types);
+            if (lengths != null) {
+                columnLengths.addAll(lengths);
+            }
         }
 
         public VoltType columnType(int index) {
@@ -108,6 +119,10 @@ public class ExportProtoMessage
 
         public String columnName(int index) {
             return columnNames.get(index);
+        }
+
+        public Integer columnLength(int index) {
+            return columnLengths.get(index);
         }
 
         @Override
@@ -291,34 +306,48 @@ public class ExportProtoMessage
         Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>> retval =
             new Pair<ArrayList<AdvertisedDataSource>,ArrayList<String>>(sources, nodes);
 
-        FastDeserializer fds = new FastDeserializer(m_data);
+        byte stringBytes[] = new byte[m_data.remaining()];
+        m_data.get(stringBytes);
+        try {
+            JSONObject jsObj = new JSONObject(new String(stringBytes, Charsets.UTF_8));
 
-        // deserialize the data sources
-        int count = m_data.getInt();
-        for (int i=0; i < count; i++) {
-            ArrayList<VoltType> types = new ArrayList<VoltType>();
-            ArrayList<String> names = new ArrayList<String>();
+            JSONArray sourcesArray = jsObj.getJSONArray("sources");
+            for (int i=0; i < sourcesArray.length(); i++) {
+                JSONObject source = sourcesArray.getJSONObject(i);
+                long version = source.getLong("adVersion");
+                if (version != 0) {
+                    throw new IOException("Unexpected ad version " + version);
+                }
+                JSONArray columns = source.getJSONArray("columns");
+                ArrayList<VoltType> types = new ArrayList<VoltType>(columns.length());
+                ArrayList<String> names = new ArrayList<String>(columns.length());
+                ArrayList<Integer> lengths = new ArrayList<Integer>(columns.length());
 
-            long generation = fds.readLong();
-            int p_id = fds.readInt();
-            String t_signature = fds.readString();
-            String t_name = fds.readString();
-            long sysStartTimestamp = fds.readLong();
-            int colcnt = fds.readInt();
-            for (int jj = 0; jj < colcnt; jj++) {
-                names.add(fds.readString());
-                types.add(VoltType.get((byte)fds.readInt()));
+                long generation = source.getLong("generation");
+                int p_id = source.getInt("partitionId");
+                String t_signature = source.getString("signature");
+                String t_name = source.getString("tableName");
+                long sysStartTimestamp = source.getLong("startTime");
+
+                for (int jj = 0; jj < columns.length(); jj++) {
+                    JSONObject column = columns.getJSONObject(jj);
+                    names.add(column.getString("name"));
+                    types.add(VoltType.get((byte)column.getInt("type")));
+                    lengths.add(column.getInt("length"));
+                }
+                sources.add(new AdvertisedDataSource(p_id, t_signature, t_name,
+                                                     sysStartTimestamp, generation, names, types, lengths));
             }
-            sources.add(new AdvertisedDataSource(p_id, t_signature, t_name,
-                                                 sysStartTimestamp, generation, names, types));
-        }
 
-        // deserialize the list of running hosts
-        count = m_data.getInt();
-        for (int i=0; i < count; i++) {
-            String hostname = fds.readString();
+            // deserialize the list of running hosts
+            JSONArray hostsArray = jsObj.getJSONArray("clusterMetadata");
+            for (int i=0; i < hostsArray.length(); i++) {
+                String hostname = hostsArray.getString(i);
 
-            nodes.add(hostname);
+                nodes.add(hostname);
+            }
+        } catch (JSONException e) {
+            throw new IOException(e);
         }
 
         return retval;
@@ -343,8 +372,8 @@ public class ExportProtoMessage
     private static int FIXED_PAYLOAD_LENGTH =
         (Short.SIZE/8 * 2) + (Integer.SIZE/8 * 2) + (Long.SIZE/8 * 2);
 
-    // message version. Currently all messages are version 1.
-    short m_version = 1;
+    // message version.
+    short m_version = 2;
 
     // bitmask of protocol actions in this message.
     short m_type = 0;

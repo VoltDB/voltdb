@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
@@ -60,6 +61,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -97,7 +99,40 @@ public class ExportGeneration {
             int numSourcesDrained = m_drainedSources.incrementAndGet();
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
-                m_onAllSourcesDrained.run();
+                if (m_partitionLeaderZKName.isEmpty()) {
+                    m_onAllSourcesDrained.run();
+                } else {
+                    ListenableFuture<?> removeLeadership = m_childUpdatingThread.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            for (Map.Entry<Integer, String> entry : m_partitionLeaderZKName.entrySet()) {
+                                m_zk.delete(
+                                        m_leadersZKPath + "/" + entry.getKey() + "/" + entry.getValue(),
+                                        -1,
+                                        new AsyncCallback.VoidCallback() {
+
+                                            @Override
+                                            public void processResult(int rc,
+                                                    String path, Object ctx) {
+                                                KeeperException.Code code = KeeperException.Code.get(rc);
+                                                if (code != KeeperException.Code.OK) {
+                                                    VoltDB.crashLocalVoltDB(
+                                                            "Error in export leader election giving up leadership of "
+                                                            + path,
+                                                            true,
+                                                            KeeperException.create(code));
+                                                }
+                                            }},
+                                        null);
+                            }
+                        }
+                    }, null);
+                    removeLeadership.addListener(
+                            m_onAllSourcesDrained,
+                            MoreExecutors.sameThreadExecutor());
+                }
+
+                ;
             }
         }
     };
@@ -270,6 +305,9 @@ public class ExportGeneration {
         return new Watcher() {
             @Override
             public void process(final WatchedEvent event) {
+                if (m_drainedSources.get() == m_numSources) {
+                    return;
+                }
                 m_zk.getChildren(
                         m_leadersZKPath + "/" + partition,
                         constructLeaderChildWatcher(partition),
@@ -302,6 +340,10 @@ public class ExportGeneration {
     }
 
     private void handleLeaderChildrenUpdate(Integer partition, List<String> children) {
+        if (m_drainedSources.get() == m_numSources || children.isEmpty()) {
+            return;
+        }
+
         String leader = Collections.min(children);
         if (m_partitionLeaderZKName.get(partition).equals(leader)) {
             if (m_partitionsIKnowIAmTheLeader.add(partition)) {
@@ -363,7 +405,11 @@ public class ExportGeneration {
                         return;
                     }
 
-                    eds.ack(ackUSO);
+                    try {
+                        eds.ack(ackUSO);
+                    } catch (RejectedExecutionException ignoreIt) {
+                        // ignore it: as it is already shutdown
+                    }
                 } else {
                     exportLog.error("Receive unexpected message " + message + " in export subsystem");
                 }

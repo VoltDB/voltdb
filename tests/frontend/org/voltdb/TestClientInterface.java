@@ -37,6 +37,7 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -48,6 +49,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
@@ -56,7 +59,6 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.ClientInterface.ClientInputHandler;
@@ -64,6 +66,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -86,6 +89,7 @@ public class TestClientInterface {
     private TransactionInitiator m_initiator;
     private ClientInputHandler m_handler;
     private Cartographer m_cartographer;
+    private ZooKeeper m_zk;
 
     // real context
     private static CatalogContext m_context = null;
@@ -93,7 +97,7 @@ public class TestClientInterface {
     // real CI, but spied on using mockito
     private static ClientInterface m_ci = null;
     // the mailbox in CI
-    private static Mailbox m_mb = null;
+    //private static Mailbox m_mb = null;
 
     private static int[] m_allPartitions = new int[] {0, 1, 2};
 
@@ -112,6 +116,7 @@ public class TestClientInterface {
         m_initiator = mock(TransactionInitiator.class);
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
+        m_zk = mock(ZooKeeper.class);
 
         /*
          * Setup the mock objects so that they return expected objects in CI
@@ -122,7 +127,7 @@ public class TestClientInterface {
         doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
         doReturn(m_messenger).when(m_volt).getHostMessenger();
         doReturn(mock(VoltNetworkPool.class)).when(m_messenger).getNetwork();
-        doReturn(mock(ZooKeeper.class)).when(m_messenger).getZK();
+        doReturn(m_zk).when(m_messenger).getZK();
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
@@ -130,7 +135,7 @@ public class TestClientInterface {
                                        m_context, m_messenger, ReplicationRole.NONE, m_initiator,
                                        m_cartographer, m_allPartitions));
 
-        m_mb = m_ci.m_mailbox;
+        //m_mb = m_ci.m_mailbox;
     }
 
     private static void buildCatalog() throws IOException {
@@ -293,7 +298,7 @@ public class TestClientInterface {
 
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
-                "select * from a", null, 0, 0, "localhost", false, null);
+                "select * from a", null, 0, 0, "localhost", false, ProcedureInvocationType.ORIGINAL, 0, 0, null);
         AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(VoltDB.UTF8ENCODING),
                                                             new CorePlan(new byte[0],
                                                                          new byte[0],
@@ -500,4 +505,29 @@ public class TestClientInterface {
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
     }
 
+    @Test
+    public void testPromoteWithoutCommandLogging() throws Exception {
+        final ByteBuffer msg = createMsg("@Promote");
+        m_ci.handleRead(msg, m_handler, null);
+        // Verify that the truncation request node was not created.
+        verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
+                                     eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
+    }
+
+    @Test
+    public void testPromoteWithCommandLogging() throws Exception {
+        org.voltdb.catalog.CommandLog logConfig = m_context.cluster.getLogconfig().get("log");
+        boolean wasEnabled = logConfig.getEnabled();
+        logConfig.setEnabled(true);
+        try {
+            final ByteBuffer msg = createMsg("@Promote");
+            m_ci.handleRead(msg, m_handler, null);
+            // Verify that the truncation request node was created.
+            verify(m_zk).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
+                                eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
+        }
+        finally {
+            logConfig.setEnabled(wasEnabled);
+        }
+    }
 }

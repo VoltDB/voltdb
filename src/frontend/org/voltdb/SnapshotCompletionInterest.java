@@ -16,12 +16,37 @@
  */
 package org.voltdb;
 
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
+import org.voltcore.utils.Pair;
+
 public interface SnapshotCompletionInterest {
+
+    public static class SnapshotCompletionEvent {
+        public final String nonce;
+        public final long multipartTxnId;
+        public final long partitionTxnIds[];
+        public final boolean truncationSnapshot;
+        public final String requestId;
+        public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
+
+        public SnapshotCompletionEvent(
+                String nonce,
+                final long multipartTxnId,
+                final long partitionTxnIds[],
+                final boolean truncationSnapshot,
+                final String requestId,
+                final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
+            this.nonce = nonce;
+            this.multipartTxnId = multipartTxnId;
+            this.partitionTxnIds = partitionTxnIds;
+            this.truncationSnapshot = truncationSnapshot;
+            this.requestId = requestId;
+            this.exportSequenceNumbers = exportSequenceNumbers;
+        }
+    }
+
     public CountDownLatch snapshotCompleted(
-            String nonce,
-            long multipartTxnId,
-            long partitionTxnIds[],
-            boolean truncationSnapshot);
+            SnapshotCompletionEvent event);
 }

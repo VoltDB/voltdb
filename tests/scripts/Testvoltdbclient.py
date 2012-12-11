@@ -26,7 +26,7 @@
 import sys
 # add the path to the volt python client, just based on knowing
 # where we are now
-sys.path.append('../../src/py_client')
+sys.path.append('../../lib/python')
 
 import signal
 import unittest

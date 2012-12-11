@@ -35,6 +35,9 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.net.HostAndPort;
@@ -601,5 +604,24 @@ public class MiscUtils {
             }
         }
         file.delete();
+    }
+
+    /**
+     * Get the resident set size, in mb for the voltdb server on the other end of the client
+     */
+    public static long getMBRss(Client client) {
+        assert(client != null);
+        try {
+            ClientResponse r = client.callProcedure("@Statistics", "MEMORY", 0);
+            VoltTable stats = r.getResults()[0];
+            stats.advanceRow();
+            long rss = stats.getLong("RSS") / 1024;
+            return rss;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            System.exit(-1);
+            return 0;
+        }
     }
 }

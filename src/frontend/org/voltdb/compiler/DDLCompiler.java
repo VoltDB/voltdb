@@ -1017,7 +1017,7 @@ public class DDLCompiler {
                 if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
                     throw m_compiler.new VoltCompilerException("Table name " + name + " column " + c.getName() +
                             " has a maximum size of " + c.getSize() + " bytes" +
-                            " but the maximum supported size is " + VoltType.MAX_VALUE_LENGTH_STR);
+                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
                 }
                 maxRowSize += 4 + c.getSize();
             } else {
@@ -1217,7 +1217,7 @@ public class DDLCompiler {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
                     // Limitation to the current implementation.
-                    if (colType == VoltType.STRING) {
+                    if (colType == VoltType.STRING && ! (expression instanceof TupleValueExpression)) {
                         String msg = "VARCHAR expressions are not currently supported as index keys.";
                         throw this.m_compiler.new VoltCompilerException(msg);
                     }

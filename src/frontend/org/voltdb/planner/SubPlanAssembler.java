@@ -394,9 +394,18 @@ public abstract class SubPlanAssembler {
                 // GT scans pose a problem in that any compound key in the index that was an exact
                 // equality match on the filtered key component(s) and had a non-null value for any
                 // remaining component(s) would be mistaken for a match.
-                //TODO: Various workarounds for this issue are possible. See ENG-3913.
-                // For now, disqualify use of this index.
-                return null;
+                // The current work-around for this is to add (back) the GT condition to the set of
+                // "other" filter expressions that get evaluated for each tuple found in the index scan.
+                // This will eliminate the initial entries that are equal on the prefix key.
+                // This is not as efficient as getting the index scan to start in the "correct" place,
+                // but it puts off having to change the EE code.
+                // TODO: ENG-3913 describes more ambitious alternative solutions that include:
+                //  - padding with MAX values rather than null/MIN values for GT scans.
+                //  - adding the GT condition as a special "initialExpr" post-condition
+                //    that disables itself as soon as it evaluates to true for any row
+                //    -- it would be expected to always evaluate to true after that.
+                AbstractExpression comparator = startingBoundExpr.getFilter();
+                retval.otherExprs.add(comparator);
             }
         }
 
@@ -620,10 +629,11 @@ public abstract class SubPlanAssembler {
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
-        // build the list of search-keys for the index in question
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
+        // Build the list of search-keys for the index in question
+        // They are the rhs expressions of the normalized indexExpr comparisons.
         for (AbstractExpression expr : path.indexExprs) {
-            AbstractExpression expr2 = TupleValueExpression.getOtherTableExpression(expr, table);
+            AbstractExpression expr2 = expr.getRight();
             assert(expr2 != null);
             scanNode.addSearchKeyExpression(expr2);
         }
@@ -633,23 +643,12 @@ public abstract class SubPlanAssembler {
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
         scanNode.setSortDirection(path.sortDirection);
+        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
+        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+
         scanNode.setTargetTableName(table.getTypeName());
         scanNode.setTargetTableAlias(table.getTypeName());
         scanNode.setTargetIndexName(index.getTypeName());
-        if (path.sortDirection != SortDirectionType.DESC) {
-            List<AbstractExpression> predicate = new ArrayList<AbstractExpression>();
-            predicate.addAll(path.indexExprs);
-            predicate.addAll(path.otherExprs);
-            scanNode.setPredicate(ExpressionUtil.combine(predicate));
-            scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
-        }
-        else {
-            List<AbstractExpression> predicate = new ArrayList<AbstractExpression>();
-            predicate.addAll(path.indexExprs);
-            predicate.addAll(path.endExprs);
-            predicate.addAll(path.otherExprs);
-            scanNode.setPredicate(ExpressionUtil.combine(predicate));
-        }
         return scanNode;
     }
 }

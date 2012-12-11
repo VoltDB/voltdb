@@ -57,10 +57,12 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         LastInitiatorData() {
             m_lastSeenTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
             m_lastSafeTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
+            m_firstSafeTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID; // -1
         }
 
         long m_lastSeenTxnId;
         long m_lastSafeTxnId;
+        long m_firstSafeTxnId;
     }
 
     final LinkedHashMap<Long, LastInitiatorData> m_initiatorData = new LinkedHashMap<Long, LastInitiatorData>();
@@ -216,6 +218,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
             lid.m_lastSeenTxnId = txnId;
         if (lid.m_lastSafeTxnId < lastSafeTxnIdFromInitiator)
             lid.m_lastSafeTxnId = lastSafeTxnIdFromInitiator;
+        if (lid.m_firstSafeTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID) {
+            lid.m_firstSafeTxnId = lastSafeTxnIdFromInitiator;
+        }
 
         /*
          * Why aren't we asserting that the txnId is > then the last seen/last safe
@@ -427,23 +432,26 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
     /**
      * Determine if it is safe to recover and if it is, what txnid it is safe to recover at.
      * Recovery is initiated by the recovering source partition. It can't be initiated until the recovering
-     * partition has heard from every initiator. This is because it is not possible to pick a point
+     * partition has seen a safe transaction from every initiator. This is because it is not possible to pick a point
      * in the global txn ordering for the recovery to start at where all subsequent procedure invocations
      * that need to be applied after recovery are available unless every initiator has been heard from.
      *
-     * Once the initiators have all been heard from it is necessary to pick the lowest txnid possible for all pending
-     * work. This means taking the min of the newest candidate transaction | the txnid of the next txn in the queue.
+     * Once the initiators have all been heard from, we can't actually pick a
+     * recovery point until the head of the queue is after the initiator safe
+     * point.  At that point, we can choose either the head of the queue or the newest candidate transaction ID.
      *
      * The newest candidate transaction is used if there are no pending txns so recovery can start when
      * the system is idle.
      */
     public Long safeToRecover() {
         boolean safe = true;
+        long maxFirstSafeTxnId = Long.MIN_VALUE;
         for (LastInitiatorData data : m_initiatorData.values()) {
-            final long lastSeenTxnId = data.m_lastSeenTxnId;
-            if (lastSeenTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID) {
+            final long firstSafeTxnId = data.m_firstSafeTxnId;
+            if (firstSafeTxnId == DtxnConstants.DUMMY_LAST_SEEN_TXN_ID) {
                 safe = false;
             }
+            maxFirstSafeTxnId = Math.max(maxFirstSafeTxnId, firstSafeTxnId);
         }
         if (!safe) {
             return null;
@@ -465,9 +473,12 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
                     " the source site. Consider killing the recovering node and trying again");
             return null; // unreachable
         }
-        else {
+        else if (next.txnId >= maxFirstSafeTxnId) {
             // bingo - have a real transaction to return as the recovery point
             return next.txnId;
+        }
+        else {
+            return null;
         }
     }
 

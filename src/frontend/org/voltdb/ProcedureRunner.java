@@ -381,7 +381,8 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition()).get();
+            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition(),
+                    ProcedureInvocationType.ORIGINAL, 0, 0).get();
             if (paw.errorMsg != null) {
                 throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + paw.errorMsg);
             }
@@ -763,6 +764,10 @@ public class ProcedureRunner {
            msg.append("HSQL-BACKEND ERROR\n");
            if (e.getCause() != null)
                e = e.getCause();
+       }
+       else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
+           status = ClientResponse.TXN_RESTART;
+           msg.append("TRANSACTION RESTART\n");
        }
        else {
            msg.append("UNEXPECTED FAILURE:\n");

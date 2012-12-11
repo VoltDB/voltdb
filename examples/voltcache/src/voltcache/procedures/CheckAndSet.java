@@ -26,8 +26,6 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
 
-import voltcache.api.VoltCacheResult;
-
 @ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
 
 public class CheckAndSet extends VoltCacheProcBase
@@ -42,13 +40,13 @@ public class CheckAndSet extends VoltCacheProcBase
         voltQueueSQL(check, key, now);
         VoltTable checkResult = voltExecuteSQL()[1];
         if (checkResult.getRowCount() == 0)
-            return VoltCacheResult.NOT_FOUND;
+            return Result.NOT_FOUND;
 
         if (checkResult.fetchRow(0).getLong(0) != casVersion)
-            return VoltCacheResult.EXISTS;
+            return Result.EXISTS;
 
         voltQueueSQL(update, expirationTimestamp(expires), flags, value, key, casVersion);
         voltExecuteSQL(true);
-        return VoltCacheResult.STORED;
+        return Result.STORED;
     }
 }

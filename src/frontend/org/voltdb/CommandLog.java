@@ -72,11 +72,6 @@ public interface CommandLog {
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
-    /**
-     * IV2-only method.  Write this MP transaction fault to the fault log portion of the command lawg.
-     */
-    public abstract void logIv2MPFault(final long txnId);
-
     public abstract void logHeartbeat(final long txnId);
 
     public abstract long getFaultSequenceNumber();

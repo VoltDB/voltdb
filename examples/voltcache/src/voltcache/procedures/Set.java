@@ -26,8 +26,6 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
 
-import voltcache.api.VoltCacheResult;
-
 @ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
 
 public class Set extends VoltCacheProcBase
@@ -46,7 +44,7 @@ public class Set extends VoltCacheProcBase
         {
             // If invalidated return success immediately (without doing anything though: invalidated item cannot be retrieved)
             if (checkResult.fetchRow(0).getLong(0) == -1)
-                return VoltCacheResult.STORED;
+                return Result.STORED;
             else
                 voltQueueSQL(update, expirationTimestamp(expires), flags, value, key);
         }
@@ -54,6 +52,6 @@ public class Set extends VoltCacheProcBase
             voltQueueSQL(insert, key, expirationTimestamp(expires), flags, value);
 
         voltExecuteSQL(true);
-        return VoltCacheResult.STORED;
+        return Result.STORED;
     }
 }

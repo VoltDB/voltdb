@@ -35,9 +35,8 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
@@ -64,6 +63,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
@@ -373,9 +373,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
      * test is sufficient to test restore as well because the transactions ids are published
      * to ZK and retrieved by the snapshot daemon for each @SnapshotSave invocation.
      */
+    @SuppressWarnings("unchecked")
     public void testPropagateIV2TransactionIds()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         if (!VoltDB.instance().isIV2Enabled()) return;
 
 
@@ -394,29 +397,23 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         saveTablesWithDefaultOptions(client);
 
-
-        /*
-         * It's really hard to derive/access these values, so I pulled them
-         * from the generated digest. They won't be changing often, but if they
-         * do you will have to update them from the generated digest unless
-         * it is a genuine failure where the values are missing or contain incorrect
-         * partition information.
-         */
-        Map<Integer, Long> expectedTransactionIds = new HashMap<Integer, Long>();
-        expectedTransactionIds.put(0, 3619631924101120L);
-        expectedTransactionIds.put(1, 3619631924084737L);
-        expectedTransactionIds.put(MpInitiator.MP_INIT_PID, 3619631923249151L);
-        expectedTransactionIds.put(2, 3619631924084738L);
-
         JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"));
         JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
         System.out.println("TRANSACTION IDS: " + transactionIds.toString());
-        assertEquals( expectedTransactionIds.size(), transactionIds.length());
+        assertEquals( 4, transactionIds.length());
 
-        for (Map.Entry<Integer, Long> expectedValues : expectedTransactionIds.entrySet()) {
-            final long foundTxnId = transactionIds.getLong(expectedValues.getKey().toString());
-            assertEquals(expectedValues.getValue().longValue(), foundTxnId);
+        Set<Integer> partitions = new HashSet<Integer>();
+        Iterator<String> keys = transactionIds.keys();
+        while (keys.hasNext()) {
+            final long foundTxnId = transactionIds.getLong(keys.next());
+            //The txnids should be non-zero and there should be one for each partition
+            partitions.add(TxnEgo.getPartitionId(foundTxnId));
+            assertTrue(foundTxnId > TxnEgo.makeZero(TxnEgo.getPartitionId(foundTxnId)).getTxnId());
         }
+        assertTrue(partitions.contains(0));
+        assertTrue(partitions.contains(1));
+        assertTrue(partitions.contains(2));
+        assertTrue(partitions.contains(MpInitiator.MP_INIT_PID));
 
         m_config.shutDown();
 
@@ -432,19 +429,21 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             saveTables(client, TMPDIR, TESTNONCE + 2, true, false);
 
             digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"));
-            transactionIds = digest.getJSONObject("partitionTransactionIds");
-            assertEquals(expectedTransactionIds.size(), transactionIds.length());
-            for (Map.Entry<Integer, Long> expectedValues : expectedTransactionIds.entrySet()) {
-                final long txnid = transactionIds.getLong(expectedValues.getKey().toString());
-                final int partitionId = expectedValues.getKey();
+            JSONObject newTransactionIds = digest.getJSONObject("partitionTransactionIds");
+            assertEquals(transactionIds.length(), newTransactionIds.length());
+
+            keys = transactionIds.keys();
+            while (keys.hasNext()) {
+                String partitionId = keys.next();
+                final long txnid = newTransactionIds.getLong(partitionId);
 
                 //Because these are no longer part of the cluster they should be unchanged
-                if (partitionId == 2 || partitionId == 1) {
-                    assertEquals(txnid, expectedValues.getValue().longValue());
-                } else if (partitionId == MpInitiator.MP_INIT_PID || partitionId == 1) {
-                    //These should be > then the one from the other snapshot
+                if (partitionId.equals("2") || partitionId.equals("1")) {
+                    assertEquals(txnid, transactionIds.getLong(partitionId));
+                } else if (partitionId.equals(Integer.toString(MpInitiator.MP_INIT_PID)) || partitionId.equals(1)) {
+                    //These should be > than the one from the other snapshot
                     //because it picked up where it left off on restore and did more work
-                    assertTrue(txnid > expectedValues.getValue().longValue());
+                    assertTrue(txnid > transactionIds.getLong(partitionId));
                 }
             }
         } finally {
@@ -458,6 +457,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testDistributeReplicatedTable()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testDistributeReplicatedTable");
         m_config.shutDown();
 
@@ -520,6 +521,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testQueueUserSnapshot() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Staring testQueueUserSnapshot.");
         Client client = getClient();
 
@@ -603,6 +606,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
      */
     public void testQueueFailedUserSnapshot() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Staring testQueueFailedUserSnapshot.");
         Client client = getClient();
 
@@ -670,6 +675,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestore12Snapshot()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         Client client = getClient();
         byte snapshotTarBytes[] = new byte[1024 * 1024 * 3];
         InputStream is =
@@ -713,6 +720,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testSaveRestoreJumboRows()
     throws IOException, InterruptedException, ProcCallException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testSaveRestoreJumboRows.");
         Client client = getClient();
         byte firstStringBytes[] = new byte[1048576];
@@ -757,6 +766,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testTSVConversion() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Staring testTSVConversion.");
         Client client = getClient();
 
@@ -785,6 +796,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testCSVConversion() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testCSVConversion");
         Client client = getClient();
 
@@ -823,6 +836,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testBadSnapshotParams() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testBadSnapshotParams");
         Client client = getClient();
 
@@ -928,6 +943,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
      */
     public void testSnapshotSave() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testSnapshotSave");
         Client client = getClient();
 
@@ -1198,6 +1215,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     public void testIdleOnlineSnapshot() throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testIdleOnlineSnapshot");
         Client client = getClient();
 
@@ -1234,6 +1253,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testSaveAndRestoreReplicatedTable()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testSaveAndRestoreReplicatedTable");
         int num_replicated_items_per_chunk = 200;
         int num_replicated_chunks = 10;
@@ -1328,6 +1349,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testSaveAndRestorePartitionedTable()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testSaveAndRestorePartitionedTable");
         int num_partitioned_items_per_chunk = 120; // divisible by 3
         int num_partitioned_chunks = 10;
@@ -1540,6 +1563,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreMissingFiles()
     throws IOException, InterruptedException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testRestoreMissingFile");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -1578,6 +1603,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testCorruptedFiles()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testCorruptedFiles");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -1637,6 +1664,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testCorruptedFilesRandom()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testCorruptedFilesRandom");
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
@@ -1692,6 +1721,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRestoreMissingPartitionFile()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
 
@@ -1724,6 +1755,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testRepartition()
     throws Exception
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testRepartition");
         int num_replicated_items_per_chunk = 100;
         int num_replicated_chunks = 10;
@@ -1789,6 +1822,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testChangeDDL()
     throws IOException, InterruptedException, ProcCallException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testChangeDDL");
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
@@ -1886,6 +1921,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testGoodChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testGoodChangeAttributeTypes");
         Client client = getClient();
 
@@ -1956,6 +1993,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     public void testBadChangeAttributeTypes()
     throws IOException, InterruptedException, ProcCallException
     {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
         System.out.println("Starting testBadChangeAttributeTypes");
         Client client = getClient();
 

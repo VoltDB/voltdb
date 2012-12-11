@@ -51,7 +51,8 @@ public class InstanceId
         return m_timestamp;
     }
 
-    public long getHash()
+    @Override
+    public int hashCode()
     {
         ByteBuffer buf = ByteBuffer.allocate(12);
         buf.putLong(m_timestamp);
@@ -70,7 +71,7 @@ public class InstanceId
         }
         md.update(buf);
         byte[] digest = md.digest();
-        return ByteBuffer.wrap(digest).getLong();
+        return ByteBuffer.wrap(digest).getInt();
     }
 
     public JSONObject serializeToJSONObject() throws JSONException

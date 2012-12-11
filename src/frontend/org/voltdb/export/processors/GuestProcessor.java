@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.RejectedExecutionException;
+
+import jsr166y.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.InputHandler;
@@ -33,11 +36,11 @@ import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClientBase2;
 import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.MoreExecutors;
 
 public class GuestProcessor implements ExportDataProcessor {
 
@@ -102,7 +105,8 @@ public class GuestProcessor implements ExportDataProcessor {
                                         System.currentTimeMillis(),
                                         source.getGeneration(),
                                         source.m_columnNames,
-                                        types);
+                                        types,
+                                        new ArrayList<Integer>(source.m_columnLengths));
                         ExportDecoderBase edb = m_client.constructExportDecoder(ads);
                         m_decoders.add(Pair.of(edb, ads));
                         final ListenableFuture<BBContainer> fut = source.poll();
@@ -119,6 +123,14 @@ public class GuestProcessor implements ExportDataProcessor {
             final ListenableFuture<BBContainer> fut,
             final ExportDecoderBase edb,
             final AdvertisedDataSource ads) {
+        /*
+         * The listener runs in the thread specified by the EDB.
+         * It can be same thread executor for things like export to file where the destination
+         * is always available and there is no reason to do additional buffering.
+         *
+         * For JDBC we want a dedicated thread to block on calls to the remote database
+         * so the data source thread can overflow data to disk.
+         */
         fut.addListener(new Runnable() {
             @Override
             public void run() {
@@ -131,17 +143,41 @@ public class GuestProcessor implements ExportDataProcessor {
                         return;
                     }
                     try {
-                        edb.onBlockStart();
-                        try {
-                            cont.b.order(ByteOrder.LITTLE_ENDIAN);
-                            while (cont.b.hasRemaining()) {
-                                int length = cont.b.getInt();
-                                byte[] rowdata = new byte[length];
-                                cont.b.get(rowdata, 0, length);
-                                edb.processRow(length, rowdata);
+                        //Position to restart at on error
+                        final int startPosition = cont.b.position();
+
+                        //Track the amount of backoff to use next time, will be updated on repeated failure
+                        int backoffQuantity = 10 + (int)(10 * ThreadLocalRandom.current().nextDouble());
+
+                        /*
+                         * If there is an error processing the block the decoder thinks is recoverable
+                         * start the block from the beginning and repeat until it is processed.
+                         * Also allow the decoder to request exponential backoff
+                         */
+                        while (true) {
+                            cont.b.position(startPosition);
+                            try {
+                                edb.onBlockStart();
+                                cont.b.order(ByteOrder.LITTLE_ENDIAN);
+                                while (cont.b.hasRemaining()) {
+                                    int length = cont.b.getInt();
+                                    byte[] rowdata = new byte[length];
+                                    cont.b.get(rowdata, 0, length);
+                                    edb.processRow(length, rowdata);
+                                }
+                                edb.onBlockCompletion();
+                                break;
+                            } catch (RestartBlockException e) {
+                                if (e.requestBackoff) {
+                                    Thread.sleep(backoffQuantity);
+                                    //Cap backoff to 8 seconds, then double modulo some randomness
+                                    if (backoffQuantity < 8000) {
+                                        backoffQuantity += (backoffQuantity * .5);
+                                        backoffQuantity +=
+                                                (backoffQuantity * .5 * ThreadLocalRandom.current().nextDouble());
+                                    }
+                                }
                             }
-                        } finally {
-                            edb.onBlockCompletion();
                         }
                     } finally {
                         cont.discard();
@@ -151,7 +187,7 @@ public class GuestProcessor implements ExportDataProcessor {
                 }
                 constructListener(source, source.poll(), edb, ads);
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, edb.getExecutor());
     }
 
     @Override
@@ -167,9 +203,18 @@ public class GuestProcessor implements ExportDataProcessor {
 
     @Override
     public void shutdown() {
-        for (Pair<ExportDecoderBase, AdvertisedDataSource> p : m_decoders) {
-            synchronized (p.getSecond()) {
-                p.getFirst().sourceNoLongerAdvertised(p.getSecond());
+        for (final Pair<ExportDecoderBase, AdvertisedDataSource> p : m_decoders) {
+            try {
+                p.getFirst().getExecutor().submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        synchronized (p.getSecond()) {
+                            p.getFirst().sourceNoLongerAdvertised(p.getSecond());
+                        }
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                //It's okay, means it was already shut down
             }
         }
         m_client.shutdown();

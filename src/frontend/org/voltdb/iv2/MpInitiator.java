@@ -35,6 +35,7 @@ import org.voltdb.Promotable;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
  * Subclass of Initiator to manage multi-partition operations.
@@ -70,6 +71,11 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           NodeDRGateway drGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
+        // note the mp initiator always uses a non-ipc site, even though it's never used for anything
+        if ((backend == BackendTarget.NATIVE_EE_IPC) || (backend == BackendTarget.NATIVE_EE_VALGRIND_IPC)) {
+            backend = BackendTarget.NATIVE_EE_JNI;
+        }
+
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions, startAction, null, null, cl);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
@@ -100,6 +106,11 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 success = result.getFirst();
                 if (success) {
                     m_initiatorMailbox.setLeaderState(result.getSecond());
+                    List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
+                    if (!restartTxns.isEmpty()) {
+                        // Should only be one restarting MP txn
+                        m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
+                    }
                     tmLog.info(m_whoami
                             + "finished leader promotion. Took "
                             + (System.currentTimeMillis() - startTime) + " ms.");
