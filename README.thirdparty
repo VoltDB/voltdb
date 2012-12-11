@@ -1074,10 +1074,10 @@ Linked with or Included in VoltDB tools
 ================================================================================
 VoltDB sqlcmd uses the following third party component:
 
-JLine version 1.0
+JLine version 2.10
 http://jline.sourceforge.net/
 
-Copyright (c) 2002-2006, Marc Prud'hommeaux <mwp1@cornell.edu>
+Copyright (c) 2002-2012, Marc Prud'hommeaux <mwp1@cornell.edu>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or
