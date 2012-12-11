@@ -46,7 +46,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                         public void run() {
                             while (true) {
                                 try {
-
+                                    m_taskQueue.take().run();
                                 } catch (TerminateThreadException e) {
                                     break;
                                 } catch (Exception e) {
