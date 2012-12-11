@@ -1216,11 +1216,6 @@ public class DDLCompiler {
                 if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
-                    // Limitation to the current implementation.
-                    if (colType == VoltType.STRING && ! (expression instanceof TupleValueExpression)) {
-                        String msg = "VARCHAR expressions are not currently supported as index keys.";
-                        throw this.m_compiler.new VoltCompilerException(msg);
-                    }
                 }
                 // disallow expressions of type VARBINARY
                 if (colType == VoltType.VARBINARY) {
