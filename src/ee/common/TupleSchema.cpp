@@ -148,7 +148,7 @@ void TupleSchema::freeTupleSchema(TupleSchema *schema) {
 void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_t length, bool allowNull,
                                     uint16_t &uninlinedObjectColumnIndex)
 {
-    assert(length <= 1048576);
+    assert(length <= COLUMN_MAX_VALUE_LENGTH);
     uint32_t offset = 0;
 
     // set the type
