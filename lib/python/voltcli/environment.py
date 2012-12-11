@@ -57,7 +57,7 @@ if volt_python not in sys.path:
 
 # Java configuration
 if 'JAVA_HOME' in os.environ:
-    java = os.path.join(os.environ['JAVA_HOME'], 'java')
+    java = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
 else:
     java = utility.find_in_path('java')
 if not java:
