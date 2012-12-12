@@ -355,6 +355,7 @@ class Distributer {
 
             if (cb != null) {
                 response.setClientRoundtrip(delta);
+                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
                 try {
                     cb.clientCallback(response);
                 } catch (Exception e) {

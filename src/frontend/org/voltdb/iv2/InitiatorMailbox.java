@@ -17,7 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
@@ -37,6 +39,10 @@ import org.voltdb.messaging.RejoinMessage;
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
  * configured InitiationRole.
+ *
+ * If you add public synchronized methods that will be used on the MpInitiator then
+ * you need to override them in MpInitiator mailbox so that they
+ * occur in the correct thread instead of using synchronization
  */
 public class InitiatorMailbox implements Mailbox
 {
@@ -55,28 +61,63 @@ public class InitiatorMailbox implements Mailbox
     private long m_hsId;
     private RepairAlgo m_algo;
 
+    /*
+     * Hacky global map of initiator mailboxes to support assertions
+     * that verify the locking is kosher
+     */
+    public static final CopyOnWriteArrayList<InitiatorMailbox> m_allInitiatorMailboxes
+                                                                         = new CopyOnWriteArrayList<InitiatorMailbox>();
+
     synchronized public void setRepairAlgo(RepairAlgo algo)
     {
-        m_algo = algo;
+        setRepairAlgoInternal(algo);
     }
 
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
+        setLeaderStateInternal(maxSeenTxnId);
+    }
+
+    public synchronized void setMaxLastSeenMultipartTxnId(long txnId) {
+        setMaxLastSeenMultipartTxnIdInternal(txnId);
+    }
+
+
+    synchronized public void setMaxLastSeenTxnId(long txnId) {
+        setMaxLastSeenTxnIdInternal(txnId);
+    }
+
+    synchronized public void enableWritingIv2FaultLog() {
+        enableWritingIv2FaultLogInternal();
+    }
+
+    protected void setRepairAlgoInternal(RepairAlgo algo)
+    {
+        assert(lockingVows());
+        m_algo = algo;
+    }
+
+    protected void setLeaderStateInternal(long maxSeenTxnId)
+    {
+        assert(lockingVows());
         m_repairLog.setLeaderState(true);
         m_scheduler.setLeaderState(true);
         m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
     }
 
-    public synchronized void setMaxLastSeenMultipartTxnId(long txnId) {
+    protected void setMaxLastSeenMultipartTxnIdInternal(long txnId) {
+        assert(lockingVows());
         m_repairLog.m_lastMpHandle = txnId;
     }
 
 
-    synchronized public void setMaxLastSeenTxnId(long txnId) {
+    protected void setMaxLastSeenTxnIdInternal(long txnId) {
+        assert(lockingVows());
         m_scheduler.setMaxSeenTxnId(txnId);
     }
 
-    synchronized public void enableWritingIv2FaultLog() {
+    protected void enableWritingIv2FaultLogInternal() {
+        assert(lockingVows());
         m_scheduler.enableWritingIv2FaultLog();
     }
 
@@ -100,10 +141,47 @@ public class InitiatorMailbox implements Mailbox
             // this on the other hand seems tragic.
             VoltDB.crashLocalVoltDB("Error constructiong InitiatorMailbox.", false, crashme);
         }
+
+        /*
+         * Leaking this from a constructor, real classy.
+         * Only used for an assertion on locking.
+         */
+        m_allInitiatorMailboxes.add(this);
+    }
+
+    /*
+     * Thou shalt not lock two initiator mailboxes from the same thread, lest ye be deadlocked.
+     */
+    public static boolean lockingVows() {
+        List<InitiatorMailbox> lockedMailboxes = new ArrayList<InitiatorMailbox>();
+        for (InitiatorMailbox im : m_allInitiatorMailboxes) {
+            if (Thread.holdsLock(im)) {
+                lockedMailboxes.add(im);
+            }
+        }
+        if (lockedMailboxes.size() > 1) {
+            String msg = "Unexpected concurrency error, a thread locked two initiator mailboxes. ";
+            msg += "Mailboxes for site id/partition ids ";
+            boolean first = true;
+            for (InitiatorMailbox m : lockedMailboxes) {
+                msg += CoreUtils.hsIdToString(m.m_hsId) + "/" + m.m_partitionId;
+                if (!first) {
+                    msg += ", ";
+                }
+                first = false;
+            }
+            VoltDB.crashLocalVoltDB(msg, true, null);
+        }
+        return true;
     }
 
     synchronized public void shutdown() throws InterruptedException
     {
+        shutdownInternal();
+    }
+
+    protected void shutdownInternal() throws InterruptedException {
+        assert(lockingVows());
         m_masterLeaderCache.shutdown();
         if (m_algo != null) {
             m_algo.cancel();
@@ -114,6 +192,11 @@ public class InitiatorMailbox implements Mailbox
     // Change the replica set configuration (during or after promotion)
     public synchronized void updateReplicas(List<Long> replicas)
     {
+        updateReplicasInternal(replicas);
+    }
+
+    protected void updateReplicasInternal(List<Long> replicas) {
+        assert(lockingVows());
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
         // promotion, must cancel the term
@@ -148,6 +231,11 @@ public class InitiatorMailbox implements Mailbox
     @Override
     public synchronized void deliver(VoltMessage message)
     {
+        deliverInternal(message);
+    }
+
+    protected void deliverInternal(VoltMessage message) {
+        assert(lockingVows());
         logRxMessage(message);
         if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
@@ -220,7 +308,7 @@ public class InitiatorMailbox implements Mailbox
     }
 
     /** Produce the repair log. This is idempotent. */
-    void handleLogRequest(VoltMessage message)
+    private void handleLogRequest(VoltMessage message)
     {
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
@@ -242,8 +330,17 @@ public class InitiatorMailbox implements Mailbox
      * work needs to do duplicate counting; MPI can simply broadcast the
      * repair to the needs repair units -- where the SP will do the rest.
      */
-    synchronized void repairReplicasWith(List<Long> needsRepair, VoltMessage repairWork)
+    void repairReplicasWith(List<Long> needsRepair, VoltMessage repairWork)
     {
+        //For an SpInitiator the lock should already have been acquire since
+        //this method is reach via SpPromoteAlgo.deliver which is reached by InitiatorMailbox.deliver
+        //which should already have acquire the lock
+        assert(Thread.holdsLock(this));
+        repairReplicasWithInternal(needsRepair, repairWork);
+    }
+
+    protected  void repairReplicasWithInternal(List<Long> needsRepair, VoltMessage repairWork) {
+        assert(lockingVows());
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
@@ -257,7 +354,7 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    void logRxMessage(VoltMessage message)
+    private void logRxMessage(VoltMessage message)
     {
         Iv2Trace.logInitiatorRxMsg(message, m_hsId);
         if (LOG_RX) {
@@ -266,7 +363,7 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    void logTxMessage(VoltMessage message)
+    private void logTxMessage(VoltMessage message)
     {
         if (LOG_TX) {
             hostLog.info("TX HSID: " + CoreUtils.hsIdToString(m_hsId) +

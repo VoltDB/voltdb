@@ -495,18 +495,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), spHandle));
                 m_repairLogTruncationHandle = spHandle;
+
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             }
             // doing duplicate suppresion: all done.
-            return;
         }
-
-        // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-        m_repairLogTruncationHandle = spHandle;
-        m_mailbox.send(message.getInitiatorHSId(), message);
+        else {
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            m_repairLogTruncationHandle = spHandle;
+            m_mailbox.send(message.getInitiatorHSId(), message);
+        }
     }
 
     // BorrowTaskMessages encapsulate a FragmentTaskMessage along with
