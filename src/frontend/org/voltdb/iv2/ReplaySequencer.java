@@ -30,23 +30,29 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 /**
- * Orders work for command log replay - where fragment tasks can
- * show up before or after the partition-wise sentinels that record
- * the correct location of a multi-partition work in the partition's
- * transaction sequence.
+ * Orders work for command log replay - where fragment tasks can show up before
+ * or after the partition-wise sentinels that record the correct location of a
+ * multi-partition work in the partition's transaction sequence.
  *
- * Offer a message to the replay sequencer. If the sequencer rejects
- * this message, it is already correctly sequenced. Callers must
- * check the return code of <code>offer</code>. If offering makes
- * other messages available, they must be retrieved by calling poll()
- * until it returns null.
+ * Offer a message to the replay sequencer. If the sequencer rejects this
+ * message, it is already correctly sequenced. Callers must check the return
+ * code of <code>offer</code>. If offering makes other messages available, they
+ * must be retrieved by calling poll() until it returns null.
  *
- * NOTE: messages are sequenced according to the transactionId passed
- * in to the offer() method. This transaction id may differ from the
- * value stored in the ReplayEntry.m_firstFragment in the case of
- * DR fragment tasks. The ReplaySequencer MUST do all txnId comparisons
- * on the value passed to offer (which becomes a key in m_replayEntries
- * tree map).
+ * End of log handling: If the local partition reaches end of log first, all MPs
+ * blocked waiting for sentinels will be made safe, future MP fragments will
+ * also be safe automatically. If the MPI reaches end of log first, and there is
+ * an outstanding sentinel in the sequencer, then all SPs blocked after this
+ * sentinel will be made safe (can be polled). NOTE: Once MPI end of log message
+ * is received, NONE of the SPs polled from the sequencer can be executed, the
+ * poller must make sure that a failure response is returned appropriately
+ * instead. However, SPs rejected by offer() can always be executed.
+ *
+ * NOTE: messages are sequenced according to the transactionId passed in to the
+ * offer() method. This transaction id may differ from the value stored in the
+ * ReplayEntry.m_firstFragment in the case of DR fragment tasks. The
+ * ReplaySequencer MUST do all txnId comparisons on the value passed to offer
+ * (which becomes a key in m_replayEntries tree map).
  */
 public class ReplaySequencer
 {
