@@ -136,9 +136,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 success = result.getFirst();
                 if (success) {
                     m_initiatorMailbox.setLeaderState(result.getSecond());
-                    tmLog.debug(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                    tmLog.info(m_whoami
+                             + "finished leader promotion. Took "
+                             + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.

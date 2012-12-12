@@ -134,9 +134,9 @@ public class MpPromoteAlgo implements RepairAlgo
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
 
-        tmLog.debug(m_whoami + "found " + m_survivors.size()
-                  + " surviving leaders to repair. "
-                  + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
+        tmLog.info(m_whoami + "found " + m_survivors.size()
+                 + " surviving leaders to repair. "
+                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
