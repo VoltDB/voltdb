@@ -86,6 +86,8 @@ abstract public class ProcedureTask extends TransactionTask
                 runner.setupTransaction(m_txn);
                 cr = runner.call(task.getParameters());
 
+                m_txn.setHash(cr.getHash());
+
                 response.setResults(cr);
                 // record the results of write transactions to the transaction state
                 // this may be used to verify the DR replica cluster gets the same value

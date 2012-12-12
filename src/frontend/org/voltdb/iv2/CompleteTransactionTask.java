@@ -20,14 +20,13 @@ package org.voltdb.iv2;
 import java.io.IOException;
 
 import org.voltdb.PartitionDRGateway;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 
 public class CompleteTransactionTask extends TransactionTask
 {
@@ -65,7 +64,7 @@ public class CompleteTransactionTask extends TransactionTask
                 Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
                 assert(initiateTask != null);
                 StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
-                m_drGateway.onSuccessfulMPCall(m_txn.spHandle, m_txn.txnId, m_txn.timestamp,
+                m_drGateway.onSuccessfulMPCall(m_txn.spHandle, m_txn.txnId, m_txn.timestamp, m_msg.getHash(),
                                                invocation, m_txn.getResults());
             }
             hostLog.debug("COMPLETE: " + this);

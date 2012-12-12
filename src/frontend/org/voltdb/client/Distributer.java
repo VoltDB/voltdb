@@ -355,6 +355,7 @@ class Distributer {
 
             if (cb != null) {
                 response.setClientRoundtrip(delta);
+                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
                 try {
                     cb.clientCallback(response);
                 } catch (Exception e) {
@@ -415,7 +416,7 @@ class Distributer {
                         NodeConnection survivors[] = new NodeConnection[entry.getSecond().length - 1];
                         if (survivors.length == 0) break;
                         int zz = 0;
-                        for (int ii = 0; ii < survivors.length; ii++) {
+                        for (int ii = 0; ii < entry.getSecond().length; ii++) {
                             if (entry.getSecond()[ii] != this) {
                                 survivors[zz++] = entry.getSecond()[ii];
                             }

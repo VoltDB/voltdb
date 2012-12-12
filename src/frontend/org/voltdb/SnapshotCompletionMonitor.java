@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -37,7 +38,10 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
+import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Longs;
 
 public class SnapshotCompletionMonitor {
@@ -164,6 +168,35 @@ public class SnapshotCompletionMonitor {
         // triggerer can recognize the snapshot when it finishes.
         String truncReqId = jsonObj.optString("truncReqId");
 
+        /*
+         * Convert the JSON object containing the export sequence numbers for each
+         * table and partition to a regular map
+         */
+        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers = null;
+        final JSONObject exportSequenceJSON = jsonObj.getJSONObject("exportSequenceNumbers");
+        final ImmutableMap.Builder<String, Map<Integer, Pair<Long, Long>>> builder =
+                ImmutableMap.builder();
+        @SuppressWarnings("unchecked")
+        final Iterator<String> tableKeys = exportSequenceJSON.keys();
+        while (tableKeys.hasNext()) {
+            final String tableName = tableKeys.next();
+            final JSONObject tableSequenceNumbers = exportSequenceJSON.getJSONObject(tableName);
+            ImmutableMap.Builder<Integer, Pair<Long, Long>> tableBuilder = ImmutableMap.builder();
+            @SuppressWarnings("unchecked")
+            final Iterator<String> partitionKeys = tableSequenceNumbers.keys();
+            while (partitionKeys.hasNext()) {
+                final String partitionString = partitionKeys.next();
+                final Integer partitionId = Integer.valueOf(partitionString);
+                JSONObject sequenceNumbers = tableSequenceNumbers.getJSONObject(partitionString);
+                final Long ackOffset = sequenceNumbers.getLong("ackOffset");
+                final Long sequenceNumber = sequenceNumbers.getLong("sequenceNumber");
+                tableBuilder.put(partitionId, Pair.of(ackOffset, sequenceNumber));
+            }
+            builder.put(tableName, tableBuilder.build());
+        }
+        exportSequenceNumbers = builder.build();
+
+
         if (hosts.length() == totalNodesFinished) {
             long partitionTxnIds[] = null;
             synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
@@ -177,8 +210,15 @@ public class SnapshotCompletionMonitor {
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
-                interest.snapshotCompleted(nonce, txnId, Arrays.copyOf(partitionTxnIds,
-                                           partitionTxnIds.length), truncation, truncReqId);
+                interest.snapshotCompleted(
+                        new SnapshotCompletionEvent(
+                            nonce,
+                            txnId,
+                            Arrays.copyOf(partitionTxnIds,
+                                               partitionTxnIds.length),
+                            truncation,
+                            truncReqId,
+                            exportSequenceNumbers));
             }
         }
     }
