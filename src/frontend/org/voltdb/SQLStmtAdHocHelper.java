@@ -36,7 +36,9 @@ public class SQLStmtAdHocHelper {
                                          byte[] aggregatorFragment,
                                          byte[] collectorFragment,
                                          boolean isReplicatedTableDML,
+                                         boolean isReadOnly,
                                          VoltType[] params) {
-        return SQLStmt.createWithPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML, params);
+        return SQLStmt.createWithPlan(sqlText, aggregatorFragment, collectorFragment,
+                isReplicatedTableDML, isReadOnly, params);
     }
 }

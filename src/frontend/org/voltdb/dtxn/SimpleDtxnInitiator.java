@@ -364,7 +364,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
         m_mailbox.addPendingTxn(state);
 
-        for (long coordId : state.outstandingCoordinators) {
+        for (long coordId : state.m_outstandingCoordinators) {
             sendTransactionToCoordinator(state, coordId);
         }
     }

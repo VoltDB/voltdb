@@ -79,6 +79,7 @@ public class SQLStmt {
                                   byte[] aggregatorFragment,
                                   byte[] collectorFragment,
                                   boolean isReplicatedTableDML,
+                                  boolean isReadOnly,
                                   VoltType[] params) {
         SQLStmt stmt = new SQLStmt(sqlText);
 
@@ -93,7 +94,7 @@ public class SQLStmt {
             }
         }
 
-        stmt.plan = new SQLStmtPlan(aggregatorFragment, collectorFragment, isReplicatedTableDML);
+        stmt.plan = new SQLStmtPlan(aggregatorFragment, collectorFragment, isReplicatedTableDML, isReadOnly);
         return stmt;
     }
 
@@ -133,6 +134,12 @@ public class SQLStmt {
         // Check the catalog or the plan, depending on which (if any) is available.
         return (   (this.catStmt != null && this.catStmt.getSinglepartition())
                 || (this.plan != null && this.plan.getCollectorFragment() == null));
+    }
+
+    boolean isReadOnly() {
+        // Check the catalog or the plan, depending on which (if any) is available.
+        return (   (this.catStmt != null && this.catStmt.getReadonly())
+                || (this.plan != null && this.plan.isReadOnly()));
     }
 
     byte statementParamJavaTypes[];
