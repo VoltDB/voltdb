@@ -525,20 +525,29 @@ struct GenericPersistentKey : public GenericKey<keySize>
         // This data memory management is only a concern for "full-blown" keys
         // that have m_keySchema -- not a problem for ephemeral search keys that just "borrow" memory.
         const TupleSchema *keptKeySchema = this->m_keySchema;
-        char keptData[keySize];
-        if (keptKeySchema) {
-            ::memcpy(keptData, this->data, keySize);
-        }
         this->m_keySchema = other.m_keySchema;
-        ::memcpy(this->data, other.data, keySize);
+
         // Exactly one full-blown key must own each tuple and its objects.
         // So either use other as a lifeboat for the prior value of *this.
         // It's destructor will deal with the old value of "this", probably VERY SOON.
         // Or mark it as ephemeral if that's what *this was.
         GenericPersistentKey& writableOther = const_cast<GenericPersistentKey&>(other);
-        writableOther.m_keySchema = keptKeySchema;
+
         if (keptKeySchema) {
+            writableOther.m_keySchema = keptKeySchema;
+            // Other needs to lifeboat the original value of *this.
+            char keptData[keySize];
+            ::memcpy(keptData, this->data, keySize);
+
+            ::memcpy(this->data, other.data, keySize);
+
             ::memcpy(writableOther.data, keptData, keySize);
+        } else {
+            // *this was ephemeral, so other must become ephemeral.
+            // The state of its data on exit does not matter.
+            writableOther.m_keySchema = NULL;
+
+            ::memcpy(this->data, other.data, keySize);
         }
         return *this;
     }
