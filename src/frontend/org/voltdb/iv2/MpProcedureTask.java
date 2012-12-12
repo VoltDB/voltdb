@@ -18,25 +18,22 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.ArrayList;
 import java.util.List;
 
 import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.client.ClientResponse;
-
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
-
-import org.voltdb.VoltTable;
 
 /**
  * Implements the Multi-partition procedure ProcedureTask.
@@ -45,6 +42,8 @@ import org.voltdb.VoltTable;
  */
 public class MpProcedureTask extends ProcedureTask
 {
+    private static final VoltLogger log = new VoltLogger("HOST");
+
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters
     // when we requeue this Task to for restart
@@ -152,6 +151,7 @@ public class MpProcedureTask extends ProcedureTask
                 m_initiator.getHSId(),
                 m_txn.txnId,
                 m_txn.isReadOnly(),
+                m_txn.getHash(),
                 m_txn.needsRollback(),
                 false,  // really don't want to have ack the ack.
                 false,

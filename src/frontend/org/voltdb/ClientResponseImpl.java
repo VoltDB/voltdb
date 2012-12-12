@@ -41,6 +41,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     private String appStatusString = null;
     private byte encodedAppStatusString[];
     private VoltTable[] results = new VoltTable[0];
+    private Integer m_hash = null;
 
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
@@ -131,6 +132,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         setResults(status, results, extra);
     }
 
+    public void setHash(Integer hash) {
+        m_hash = hash;
+    }
+
     @Override
     public byte getStatus() {
         return status;
@@ -152,6 +157,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
 
     public long getClientHandle() {
         return clientHandle;
+    }
+
+    public Integer getHash() {
+        return m_hash;
     }
 
     @Override
@@ -182,6 +191,11 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         } else {
             m_exception = null;
         }
+        if ((presentFields & (1 << 4)) != 0) {
+            m_hash = in.readInt();
+        } else {
+            m_hash = null;
+        }
         results = (VoltTable[]) in.readArray(VoltTable.class);
         setProperly = true;
     }
@@ -205,6 +219,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             }
             if (m_exception != null) {
                 msgsize += m_exception.getSerializedSize();
+            }
+            if (m_hash != null) {
+                msgsize += 4;
             }
             for (VoltTable vt : results) {
                 msgsize += vt.getSerializedSize();
@@ -232,6 +249,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         if (statusString != null) {
             presentFields |= 1 << 5;
         }
+        if (m_hash != null) {
+            presentFields |= 1 << 4;
+        }
         buf.put(presentFields);
         buf.put(status);
         if (statusString != null) {
@@ -248,6 +268,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             final ByteBuffer b = ByteBuffer.allocate(m_exception.getSerializedSize());
             m_exception.serializeToBuffer(b);
             buf.put(b.array());
+        }
+        if (m_hash != null) {
+            buf.putInt(m_hash.intValue());
         }
         buf.putShort((short)results.length);
         for (VoltTable vt : results)
@@ -336,5 +359,22 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             e.printStackTrace();
             return 0;
         }
+    }
+
+    /**
+     * Take the perfectly good results and convert them to a single long value
+     * that stores the hash for determinism.
+     *
+     * This presumes the DR agent has no need for results. This probably saves
+     * some small amount of bandwidth. The other proposed idea was using the status
+     * string to hold the sql hash. Tossup... this seemed slightly more performant,
+     * but also a bit icky.
+     */
+    public void convertResultsToHashForDeterminism() {
+        int hash = m_hash == null ? 0 : m_hash;
+
+        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
+        t.addRow(hash);
+        results = new VoltTable[] { t };
     }
 }

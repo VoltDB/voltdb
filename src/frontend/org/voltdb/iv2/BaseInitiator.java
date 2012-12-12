@@ -26,14 +26,12 @@ import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
-
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-import org.voltdb.ProcedureRunnerFactory;
-import org.voltdb.iv2.Site;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
+import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
@@ -64,7 +62,6 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
-
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
     {
@@ -74,12 +71,21 @@ public abstract class BaseInitiator implements Initiator
         m_scheduler = scheduler;
         RejoinProducer rejoinProducer =
             new RejoinProducer(m_partitionId, scheduler.m_tasks);
-        m_initiatorMailbox = new InitiatorMailbox(
-                m_partitionId,
-                m_scheduler,
-                m_messenger,
-                m_repairLog,
-                rejoinProducer);
+        if (m_partitionId == MpInitiator.MP_INIT_PID) {
+            m_initiatorMailbox = new MpInitiatorMailbox(
+                    m_partitionId,
+                    m_scheduler,
+                    m_messenger,
+                    m_repairLog,
+                    rejoinProducer);
+        } else {
+            m_initiatorMailbox = new InitiatorMailbox(
+                    m_partitionId,
+                    m_scheduler,
+                    m_messenger,
+                    m_repairLog,
+                    rejoinProducer);
+        }
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);

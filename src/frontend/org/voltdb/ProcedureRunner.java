@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -111,6 +112,9 @@ public class ProcedureRunner {
     // dependency ids for ad hoc
     protected final static int AGG_DEPID = 1;
 
+    // current hash of sql and params
+    protected final CRC32 m_inputCRC = new CRC32();
+
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {
@@ -123,7 +127,14 @@ public class ProcedureRunner {
                     SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
-        m_procedureName = procedure.getClass().getSimpleName();
+        assert(m_inputCRC.getValue() == 0L);
+
+        if (procedure instanceof StmtProcedure) {
+            m_procedureName = catProc.getTypeName();
+        }
+        else {
+            m_procedureName = procedure.getClass().getSimpleName();
+        }
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
@@ -182,6 +193,9 @@ public class ProcedureRunner {
         assert(m_statusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
+
+        // reset the hash of results
+        m_inputCRC.reset();
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
@@ -307,6 +321,17 @@ public class ProcedureRunner {
                         m_statusString,
                         results,
                         null);
+
+            int hash = (int) m_inputCRC.getValue();
+            if ((retval.getStatus() == ClientResponse.SUCCESS) && (hash != 0)) {
+                retval.setHash(hash);
+            }
+            if ((m_txnState != null) && // may be null for tests
+                (m_txnState.getInvocation() != null) &&
+                (m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED))
+            {
+                retval.convertResultsToHashForDeterminism();
+            }
         }
         finally {
             // finally at the call(..) scope to ensure params can be
@@ -360,6 +385,21 @@ public class ProcedureRunner {
         }
     }
 
+    private void updateCRC(QueuedSQL queuedSQL) {
+        if (!queuedSQL.stmt.isReadOnly()) {
+            m_inputCRC.update(queuedSQL.stmt.sqlText);
+            try {
+                queuedSQL.params.addToCRC(m_inputCRC);
+            } catch (IOException e) {
+                log.error("Unable to compute CRC of parameters to " +
+                        "a SQL statement in procedure: " + m_procedureName, e);
+                // don't crash
+                // presumably, this will fail deterministically at all replicas
+                // just log the error and hope people report it
+            }
+        }
+    }
+
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         if (stmt == null) {
             throw new IllegalArgumentException("SQLStmt paramter to voltQueueSQL(..) was null.");
@@ -368,6 +408,8 @@ public class ProcedureRunner {
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, args);
         queuedSQL.stmt = stmt;
+
+        updateCRC(queuedSQL);
         m_batch.add(queuedSQL);
     }
 
@@ -400,6 +442,7 @@ public class ProcedureRunner {
                     plannedStatement.core.aggregatorFragment,
                     plannedStatement.core.collectorFragment,
                     plannedStatement.core.isReplicatedTableDML,
+                    plannedStatement.core.readOnly,
                     plannedStatement.core.parameterTypes);
             if (plannedStatement.extractedParamValues.size() == 0) {
                 // case handles if there were parameters OR
@@ -419,8 +462,11 @@ public class ProcedureRunner {
                 }
                 queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
             }
+
+            updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             if (e instanceof ExecutionException) {
                 throw new VoltAbortException(e.getCause());
             }
@@ -432,51 +478,56 @@ public class ProcedureRunner {
     }
 
     public VoltTable[] voltExecuteSQL(boolean isFinalSQL) {
-        if (m_seenFinalBatch) {
-            throw new RuntimeException("Procedure " + m_procedureName +
-                                       " attempted to execute a batch " +
-                                       "after claiming a previous batch was final " +
-                                       "and will be aborted.\n  Examine calls to " +
-                                       "voltExecuteSQL() and verify that the call " +
-                                       "with the argument value 'true' is actually " +
-                                       "the final one");
-        }
-        m_seenFinalBatch = isFinalSQL;
-
-        // memo-ize the original batch size here
-        int batchSize = m_batch.size();
-
-        // if batch is small (or reasonable size), do it in one go
-        if (batchSize <= MAX_BATCH_SIZE) {
-            return executeQueriesInABatch(m_batch, isFinalSQL);
-        }
-        // otherwise, break it into sub-batches
-        else {
-            List<VoltTable[]> results = new ArrayList<VoltTable[]>();
-
-            while (m_batch.size() > 0) {
-                int subSize = Math.min(MAX_BATCH_SIZE, m_batch.size());
-
-                // get the beginning of the batch (or all if small enough)
-                // note: this is a view into the larger list and changes to it
-                //  will mutate the larger m_batch.
-                List<QueuedSQL> subBatch = m_batch.subList(0, subSize);
-
-                // decide if this sub-batch should be marked final
-                boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
-
-                // run the sub-batch and copy the sub-results into the list of lists of results
-                // note: executeQueriesInABatch removes items from the batch as it runs.
-                //  this means subBatch will be empty after running and since subBatch is a
-                //  view on the larger batch, it removes subBatch.size() elements from m_batch.
-                results.add(executeQueriesInABatch(subBatch, finalSubBatch));
+        try {
+            if (m_seenFinalBatch) {
+                throw new RuntimeException("Procedure " + m_procedureName +
+                                           " attempted to execute a batch " +
+                                           "after claiming a previous batch was final " +
+                                           "and will be aborted.\n  Examine calls to " +
+                                           "voltExecuteSQL() and verify that the call " +
+                                           "with the argument value 'true' is actually " +
+                                           "the final one");
             }
+            m_seenFinalBatch = isFinalSQL;
 
-            // merge the list of lists into something returnable
-            VoltTable[] retval = MiscUtils.concatAll(new VoltTable[0], results);
-            assert(retval.length == batchSize);
+            // memo-ize the original batch size here
+            int batchSize = m_batch.size();
 
-            return retval;
+            // if batch is small (or reasonable size), do it in one go
+            if (batchSize <= MAX_BATCH_SIZE) {
+                return executeQueriesInABatch(m_batch, isFinalSQL);
+            }
+            // otherwise, break it into sub-batches
+            else {
+                List<VoltTable[]> results = new ArrayList<VoltTable[]>();
+
+                while (m_batch.size() > 0) {
+                    int subSize = Math.min(MAX_BATCH_SIZE, m_batch.size());
+
+                    // get the beginning of the batch (or all if small enough)
+                    // note: this is a view into the larger list and changes to it
+                    //  will mutate the larger m_batch.
+                    List<QueuedSQL> subBatch = m_batch.subList(0, subSize);
+
+                    // decide if this sub-batch should be marked final
+                    boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
+
+                    // run the sub-batch and copy the sub-results into the list of lists of results
+                    // note: executeQueriesInABatch removes items from the batch as it runs.
+                    //  this means subBatch will be empty after running and since subBatch is a
+                    //  view on the larger batch, it removes subBatch.size() elements from m_batch.
+                    results.add(executeQueriesInABatch(subBatch, finalSubBatch));
+                }
+
+                // merge the list of lists into something returnable
+                VoltTable[] retval = MiscUtils.concatAll(new VoltTable[0], results);
+                assert(retval.length == batchSize);
+
+                return retval;
+            }
+        }
+        finally {
+            m_batch.clear();
         }
     }
 
