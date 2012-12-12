@@ -18,7 +18,7 @@ voltdbpid=$(jps -l | grep -v "sun.tools.jps.Jps" | grep -v "org.apache.tools.ant
 for victim in ${voltdbpid}
 do
     jstack -l ${victim} > ${victim}.humanjstack
-    jstack -l -m ${victim} > ${victim}.mixedjstack
-    jstack -F -l -m ${victim} > ${victim}.forcedjstack
+#    jstack -l -m ${victim} > ${victim}.mixedjstack
+#    jstack -F -l -m ${victim} > ${victim}.forcedjstack
 done
 exit 0
