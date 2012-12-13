@@ -31,6 +31,7 @@ import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -300,19 +301,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         //
         // TOPO
         //
-        results = client.callProcedure("@Statistics", "TOPO", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test TOPO table: " + results[0].toString());
-        VoltTable topo = results[0];
-        // Make sure we can find the MPI, at least
-        boolean found = false;
-        while (topo.advanceRow()) {
-            if ((int)topo.getLong("Partition") == TxnEgo.MP_PARTITIONID) {
-                found = true;
+        if (VoltDB.checkTestEnvForIv2()) {
+            results = client.callProcedure("@Statistics", "TOPO", 0).getResults();
+            // one aggregate table returned
+            assertEquals(1, results.length);
+            System.out.println("Test TOPO table: " + results[0].toString());
+            VoltTable topo = results[0];
+            // Make sure we can find the MPI, at least
+            boolean found = false;
+            while (topo.advanceRow()) {
+                if ((int)topo.getLong("Partition") == TxnEgo.MP_PARTITIONID) {
+                    found = true;
+                }
             }
+            assertTrue(found);
         }
-        assertTrue(found);
     }
 
     //
