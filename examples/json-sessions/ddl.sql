@@ -7,4 +7,8 @@ CREATE TABLE user_session_table (
 );
 PARTITION TABLE user_session_table ON COLUMN username;
 
+CREATE INDEX session_site_moderator  ON user_session_table (field(json_data, 'site'), field(json_data, 'moderator'), username);
+
+CREATE INDEX session_props ON user_session_table (field(field(json_data, 'props'), 'download_version'), field(field(json_data, 'props'), 'client_language'), username);
+
 CREATE PROCEDURE FROM CLASS json.procedures.Login;

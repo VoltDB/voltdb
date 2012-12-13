@@ -1090,42 +1090,6 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         return buffer.toString();
     }
 
-    // Display formatting utility functions
-    private static String paddingString(String s, int n, char c, boolean paddingLeft)
-    {
-        if (s == null)
-            return s;
-
-        int add = n - s.length();
-
-        if(add <= 0)
-            return s;
-
-        StringBuffer str = new StringBuffer(s);
-        char[] ch = new char[add];
-        Arrays.fill(ch, c);
-        if(paddingLeft)
-            str.insert(0, ch);
-        else
-            str.append(ch);
-
-
-       return str.toString();
-    }
-
-    private static String byteArrayToHexString(byte[] data)
-    {
-        StringBuffer hexString = new StringBuffer();
-        for (int i=0;i<data.length;i++)
-        {
-            String hex = Integer.toHexString(0xFF & data[i]);
-            if (hex.length() == 1)
-                hexString.append('0');
-            hexString.append(hex);
-        }
-        return hexString.toString();
-    }
-
     /**
      * Return a "pretty print" representation of this table.  Output will be formatted
      * in a tabular textual format suitable for display.
@@ -1140,6 +1104,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         for (int i = 0; i < columnCount; i++)
             padding[i] = this.getColumnName(i).length();
         this.resetRowPosition();
+
+        // Compute the padding needed for each column of the table (note must visit every row)
         while(this.advanceRow())
         {
             for (int i = 0; i < columnCount; i++)
@@ -1147,18 +1113,20 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 Object v = this.get(i, this.getColumnType(i));
                 if (this.wasNull())
                     v = "NULL";
-                int l = 0;  // length
+                int len = 0;  // length
                 if (this.getColumnType(i) == VoltType.VARBINARY && !this.wasNull()) {
-                    l = ((byte[])v).length*2;
+                    len = ((byte[])v).length*2;
                 }
                 else {
-                    l= v.toString().length();
+                    len= v.toString().length();
                 }
 
-                if (padding[i] < l)
-                    padding[i] = l;
+                if (padding[i] < len)
+                    padding[i] = len;
             }
         }
+
+        // Determine the formatting string for each column
         for (int i = 0; i < columnCount; i++)
         {
             padding[i] += 1;
@@ -1168,6 +1136,8 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                   this.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
                 + padding[i] + "s";
         }
+
+        // Create the column headers
         for (int i = 0; i < columnCount; i++)
         {
             sb.append(String.format("%1$-" + padding[i] + "s", this.getColumnName(i)));
@@ -1175,26 +1145,32 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 sb.append(" ");
         }
         sb.append("\n");
+
+        // Create the separator between the column headers and the rows of data
         for (int i = 0; i < columnCount; i++)
         {
-            sb.append(paddingString("", padding[i], '-', false));
+            char[] underline_array = new char[padding[i]];
+            Arrays.fill(underline_array, '-');
+            sb.append(new String(underline_array));
             if (i < columnCount - 1)
                 sb.append(" ");
         }
         sb.append("\n");
+
+        // Now display each row of data.
         this.resetRowPosition();
         while(this.advanceRow())
         {
             for (int i = 0; i < columnCount; i++)
             {
-                Object v = this.get(i, this.getColumnType(i));
+                Object value = this.get(i, this.getColumnType(i));
                 if (this.wasNull())
-                    v = "NULL";
+                    value = "NULL";
                 else if (this.getColumnType(i) == VoltType.VARBINARY)
-                    v = byteArrayToHexString((byte[])v);
+                    value = Encoder.hexEncode((byte[])value);
                 else
-                    v = v.toString();
-                sb.append(String.format(fmt[i], v));
+                    value = value.toString();
+                sb.append(String.format(fmt[i], value));
                 if (i < columnCount - 1)
                     sb.append(" ");
             }
