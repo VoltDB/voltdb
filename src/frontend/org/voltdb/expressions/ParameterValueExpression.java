@@ -115,15 +115,23 @@ public class ParameterValueExpression extends AbstractValueExpression {
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
+        if (columnType == null) {
+            return;
+        }
         if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isInteger()) {
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
+        } else if (m_valueType == null) {
+            m_valueType = columnType;
+            m_valueSize = columnType.getMaxLengthInBytes();
         }
     }
 
     @Override
     public void finalizeValueTypes() {
-        if (m_valueType != VoltType.NUMERIC) {
+        // At this late stage, it's better to force a specific type than to leave one that will only
+        // cause problems in the ProcedureRunner (chokes on null or NUMERIC) or executor (chokes on NUMERIC).
+        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
         m_valueType = VoltType.FLOAT;

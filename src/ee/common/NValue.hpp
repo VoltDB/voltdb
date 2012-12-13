@@ -405,6 +405,7 @@ class NValue {
 
     // Function declarations for NValue.cpp definitions.
     void createDecimalFromString(const std::string &txt);
+    void createDecimalFromDouble(double& dbl);
     std::string createStringFromDecimal() const;
     NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
     NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
@@ -840,9 +841,23 @@ class NValue {
             return static_cast<double>(getTimestamp());
           case VALUE_TYPE_DOUBLE:
             return getDouble();
+          case VALUE_TYPE_DECIMAL:
+          {
+            double retval;
+            TTInt scaledValue = getDecimal();
+            TTInt whole(scaledValue);
+            TTInt fractional(scaledValue);
+            whole /= NValue::kMaxScaleFactor;
+            fractional %= NValue::kMaxScaleFactor;
+            retval = static_cast<double>(whole.ToInt()) + ((double)fractional.ToInt())/((double)NValue::kMaxScaleFactor);
+            //whole is with the sign.
+            /*if (whole.IsSign()) {
+               retval *= -1;
+            }*/
+            return retval;
+          }
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
-          case VALUE_TYPE_DECIMAL:
           default:
             throwCastSQLException(type, VALUE_TYPE_DOUBLE);
             return 0; // NOT REACHED

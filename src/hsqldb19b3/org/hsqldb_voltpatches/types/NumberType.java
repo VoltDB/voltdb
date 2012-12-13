@@ -1594,6 +1594,8 @@ public final class NumberType extends Type {
                 if (JavaSystem.precision(value) > precision) {
                     throw Error.error(ErrorCode.X_22003);
                 }
+                // General HSQL bug fix provided by VoltDB. setScale above does NOT update "a" in place.
+                return value; // VoltDB
             }
 
             // fall through
@@ -1629,6 +1631,8 @@ public final class NumberType extends Type {
                 if (JavaSystem.precision(value) > precision) {
                     throw Error.error(ErrorCode.X_22003);
                 }
+                // General HSQL bug fix provided by VoltDB. setScale above does NOT update "a" in place.
+                return value; // VoltDB
             }
 
             // fall through
