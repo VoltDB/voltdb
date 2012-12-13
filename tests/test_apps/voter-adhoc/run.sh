@@ -6,9 +6,9 @@ VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 
 CLASSPATH=$({ \
-    ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
-    ls -1 "$VOLTDB_LIB"/*.jar; \
-    ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 
 VOTER_BASE=$VOLTDB_BASE/examples/voter
