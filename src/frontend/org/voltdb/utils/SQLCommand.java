@@ -45,6 +45,7 @@ import java.util.regex.Pattern;
 import jline.console.ConsoleReader;
 import jline.console.KeyMap;
 import jline.console.completer.Completer;
+import jline.console.history.FileHistory;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -163,6 +164,8 @@ public class SQLCommand
 
     // Command line interaction
     private static ConsoleReader lineInputReader = null;
+    private static FileHistory historyFile = null;
+
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ListProceduresToken = Pattern.compile("^\\s*(list proc|list procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
@@ -1249,7 +1252,11 @@ public class SQLCommand
             Completer completer = new SQLCompleter();
             lineInputReader.addCompleter(completer);
 
-            // Make Ctrl-D exit.
+            // Maintain persistent history in ~/.sqlcmd_history.
+            historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
+            lineInputReader.setHistory(historyFile);
+
+            // Make Ctrl-D (EOF) exit.
             KeyMap keyMap = lineInputReader.getKeys();
             keyMap.bind(new Character(KeyMap.CTRL_D).toString(), "exit\r");
 
@@ -1259,8 +1266,7 @@ public class SQLCommand
                 public void handle(Signal arg0) {
                     try {
                         if (lineInputReader != null) {
-                            // Beep and clear the line so that it does something useful.
-                            lineInputReader.beep();
+                            // Clear the line so that it does something useful.
                             lineInputReader.setCursorPosition(0);
                             lineInputReader.killLine();
                         }
@@ -1320,6 +1326,21 @@ public class SQLCommand
         finally
         {
             try { VoltDB.close(); } catch(Exception _) {}
+            // Flush input history to a file.
+            if (historyFile != null) {
+                try {
+                    historyFile.flush();
+                }
+                catch (IOException e) {
+                    System.err.printf("* Unable to write history to \"%s\" *\n",
+                                      historyFile.getFile().getPath());
+                    e.printStackTrace();
+                }
+            }
+            // Clean up jline2 resources.
+            if (lineInputReader != null) {
+                lineInputReader.shutdown();
+            }
         }
     }
 
