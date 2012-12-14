@@ -25,8 +25,8 @@ import java.util.concurrent.FutureTask;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -310,11 +310,16 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         ParameterSet params = getParams();
         if (params != null)
             for (Object o : params.toArray()) {
-                retval += o.toString() + ", ";
+                retval += String.valueOf(o) + ", ";
             }
         else
             retval += "null";
         retval += ")";
+        retval += " type=" + String.valueOf(type);
+        retval += " clientHandle=" + String.valueOf(clientHandle);
+        retval += " originalTxnId=" + String.valueOf(originalTxnId);
+        retval += " originalTs=" + String.valueOf(originalTs);
+
         return retval;
     }
 

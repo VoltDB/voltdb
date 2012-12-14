@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,8 +28,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -42,6 +39,7 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 
 public class MpScheduler extends Scheduler
 {
@@ -262,19 +260,20 @@ public class MpScheduler extends Scheduler
                 m_duplicateCounters.remove(message.getTxnId());
                 m_repairLogTruncationHandle = message.getTxnId();
                 m_outstandingTxns.remove(message.getTxnId());
+
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
-            return;
         }
-
-        // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-        m_repairLogTruncationHandle = message.getTxnId();
-        m_outstandingTxns.remove(message.getTxnId());
-        m_mailbox.send(message.getInitiatorHSId(), message);
+        else {
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            m_repairLogTruncationHandle = message.getTxnId();
+            m_outstandingTxns.remove(message.getTxnId());
+            m_mailbox.send(message.getInitiatorHSId(), message);
+        }
     }
 
     public void handleFragmentTaskMessage(FragmentTaskMessage message,

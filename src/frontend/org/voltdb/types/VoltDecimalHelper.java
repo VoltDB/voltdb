@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -89,18 +90,9 @@ public class VoltDecimalHelper {
         out.write(NULL_INDICATOR);
     }
 
-    /**
-     * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
-     * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
-     * @param out {@link org.voltdb.messaging.FastSerializer FastSerializer} to serialize the <code>BigDecimal</code> to
-     * @throws IOException Thrown if the precision or scale is out of range
-     */
-    static public void serializeBigDecimal(BigDecimal bd, FastSerializer out)
-        throws IOException
-    {
+    static public byte[] getUnscaledBytes(BigDecimal bd) throws IOException {
         if (bd == null) {
-            serializeNull(out);
-            return;
+            return Arrays.copyOf(NULL_INDICATOR, NULL_INDICATOR.length);
         }
         final int scale = bd.scale();
         final int precision = bd.precision();
@@ -122,7 +114,19 @@ public class VoltDecimalHelper {
         if (unscaledValue.length > 16) {
             throw new IOException("Precision of " + bd + " is >38 digits");
         }
-        out.write(expandToLength16(unscaledValue, isNegative));
+        return expandToLength16(unscaledValue, isNegative);
+    }
+
+    /**
+     * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
+     * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
+     * @param out {@link org.voltdb.messaging.FastSerializer FastSerializer} to serialize the <code>BigDecimal</code> to
+     * @throws IOException Thrown if the precision or scale is out of range
+     */
+    static public void serializeBigDecimal(BigDecimal bd, FastSerializer out)
+        throws IOException
+    {
+        out.write(getUnscaledBytes(bd));
     }
 
     /**
