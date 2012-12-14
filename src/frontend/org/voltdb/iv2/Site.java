@@ -140,7 +140,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Current topology
     int m_partitionId;
 
-    private final Integer m_coreBindId;
+    private final String m_coreBindIds;
 
     // Need temporary access to some startup parameters in order to
     // initialize EEs in the right thread.
@@ -308,7 +308,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
             MemoryStats memStats,
-            Integer coreBindId)
+            String coreBindIds)
     {
         m_siteId = siteId;
         m_context = context;
@@ -325,7 +325,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
-        m_coreBindId = coreBindId;
+        m_coreBindIds = coreBindIds;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -485,9 +485,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void run()
     {
-        if (m_coreBindId != null) {
-            System.out.println("Binding execution thread(" + Thread.currentThread().getId() + ") to " + m_coreBindId);
-            PosixJNAAffinity.INSTANCE.setAffinity(1L << m_coreBindId);
+        if (m_coreBindIds != null) {
+            System.out.println("Binding execution thread(" + Thread.currentThread().getId() + ") to " + m_coreBindIds);
+            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
         initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);

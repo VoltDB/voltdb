@@ -69,7 +69,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway drGateway,
-                          Integer coreBindId)
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
@@ -78,7 +78,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindId);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),

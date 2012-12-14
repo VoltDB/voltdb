@@ -92,7 +92,7 @@ class VoltNetwork implements Runnable
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
-    private final Integer m_coreBindId;
+    private final String m_coreBindId;
 
     private final int m_networkId;
     /**
@@ -107,7 +107,7 @@ class VoltNetwork implements Runnable
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    VoltNetwork(int networkId, Integer coreBindId) {
+    VoltNetwork(int networkId, String coreBindId) {
         m_thread = new Thread(this, "Volt Network - " + networkId);
         m_networkId = networkId;
         m_thread.setDaemon(true);
@@ -267,7 +267,7 @@ class VoltNetwork implements Runnable
     public void run() {
         if (m_coreBindId != null) {
             System.out.println("Binding network thread(" + Thread.currentThread().getId() + ") to " + m_coreBindId);
-            PosixJNAAffinity.INSTANCE.setAffinity(1L << m_coreBindId);
+            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
         }
         try {
             while (m_shouldStop == false) {

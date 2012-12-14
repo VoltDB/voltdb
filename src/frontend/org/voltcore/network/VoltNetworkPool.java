@@ -44,7 +44,7 @@ public class VoltNetworkPool {
         this(1, null);
     }
 
-    public VoltNetworkPool(int numThreads, Queue<Integer> coreBindIds) {
+    public VoltNetworkPool(int numThreads, Queue<String> coreBindIds) {
         if (numThreads < 1) {
             throw new IllegalArgumentException("Must specify a postive number of threads");
         }

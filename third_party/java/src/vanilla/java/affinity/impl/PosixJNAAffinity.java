@@ -16,6 +16,8 @@
 
 package vanilla.java.affinity.impl;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -86,6 +88,54 @@ public enum PosixJNAAffinity {
         }
     }
 
+    public void setAffinity(final String affinityString) {
+        Set<Integer> cores = new HashSet<Integer>();
+        for (String affinity : affinityString.split(":")) {
+            String affinityRange[] = affinity.split("-");
+            if (affinityRange.length == 1) {
+                cores.add(Integer.valueOf(affinityRange[0]));
+            } else {
+                /*
+                 * For hyper threading, skip every other thread. God help you
+                 * if you have more then two threads per core
+                 */
+                boolean skipEveryOther = false;
+                if (affinityRange[0].startsWith("!")) {
+                    affinityRange[0] = affinityRange[0].substring(1, affinityRange[0].length());
+                    skipEveryOther = true;
+                }
+                int rangeStart = Integer.valueOf(affinityRange[0]);
+                int rangeEnd = Integer.valueOf(affinityRange[1]);
+                if (rangeEnd < rangeStart) {
+                    throw new IllegalArgumentException();
+                }
+                for (int ii = rangeStart; ii <= rangeEnd; ii++) {
+                    if (skipEveryOther) {
+                        /*
+                         * If the start of the range is even, skip the odd values
+                         */
+                        if (rangeStart % 2 == 0 && ii % 2 == 1) {
+                            continue;
+                        }
+                        /*
+                         * If the start was odd, skip the even values
+                         */
+                        if (rangeStart % 2 == 1 && ii % 2 == 0) {
+                            continue;
+                        }
+                    }
+                    cores.add(ii);
+                }
+            }
+        }
+
+        long mask = 0;
+        for (Integer core : cores) {
+            mask |= 1L << core;
+        }
+        System.out.println("Thread (" + Thread.currentThread().getId() + ") setting affinity to " + cores);
+        setAffinity(mask);
+    }
     public void setAffinity(final long affinity) {
         final CLibrary lib = CLibrary.INSTANCE;
         try {

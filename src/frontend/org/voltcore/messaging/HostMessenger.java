@@ -82,7 +82,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
-        public Queue<Integer> coreBindIds;;
+        public Queue<String> coreBindIds;;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {

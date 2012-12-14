@@ -207,9 +207,9 @@ public class VoltDB {
         /** set to true to run with iv2 initiation. Good Luck! */
         public boolean m_enableIV2 = true;
 
-        public final Queue<Integer> m_networkCoreBindings = new ArrayDeque<Integer>();
-        public final Queue<Integer> m_computationCoreBindings = new ArrayDeque<Integer>();
-        public final Queue<Integer> m_executionCoreBindings = new ArrayDeque<Integer>();
+        public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
         public Configuration() {
             m_enableIV2 = VoltDB.checkTestEnvForIv2();
         }
@@ -312,21 +312,21 @@ public class VoltDB {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
                 } else if (arg.startsWith("networkbindings")) {
                     for (String core : args[++i].split(",")) {
-                        m_networkCoreBindings.offer(Integer.valueOf(core));
+                        m_networkCoreBindings.offer(core);
                     }
                     System.out.println("Network bindings are " + m_networkCoreBindings);
                 }
                 else if (arg.startsWith("computationbindings")) {
                     for (String core : args[++i].split(",")) {
-                        m_computationCoreBindings.offer(Integer.valueOf(core));
+                        m_computationCoreBindings.offer(core);
                     }
                     System.out.println("Computation bindings are " + m_computationCoreBindings);
                 }
                 else if (arg.startsWith("executionbindings")) {
                     for (String core : args[++i].split(",")) {
-                        m_executionCoreBindings.offer(Integer.valueOf(core));
+                        m_executionCoreBindings.offer(core);
                     }
-                    System.out.println("Execution bindings are " + m_computationCoreBindings);
+                    System.out.println("Execution bindings are " + m_executionCoreBindings);
                 }
                 else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();

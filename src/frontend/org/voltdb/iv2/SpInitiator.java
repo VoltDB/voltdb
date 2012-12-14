@@ -89,7 +89,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
-                          Integer coreBindId)
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -100,7 +100,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
                 startAction,
-                agent, memStats, cl, coreBindId);
+                agent, memStats, cl, coreBindIds);
 
         m_tickProducer.start();
 

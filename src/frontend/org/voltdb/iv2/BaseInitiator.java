@@ -114,7 +114,7 @@ public abstract class BaseInitiator implements Initiator
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          Integer coreBindId)
+                          String coreBindIds)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -140,7 +140,7 @@ public abstract class BaseInitiator implements Initiator
                                        m_initiatorMailbox,
                                        agent,
                                        memStats,
-                                       coreBindId);
+                                       coreBindIds);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 

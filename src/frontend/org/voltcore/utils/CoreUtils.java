@@ -99,7 +99,7 @@ public class CoreUtils {
     public static ListeningExecutorService getListeningExecutorService(
             final String name,
             final int threads,
-            Queue<Integer> coreList) {
+            Queue<String> coreList) {
         return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>(), coreList);
     }
 
@@ -107,7 +107,7 @@ public class CoreUtils {
             final String name,
             int threadsTemp,
             final BlockingQueue<Runnable> queue,
-            final Queue<Integer> coreList) {
+            final Queue<String> coreList) {
         if (!coreList.isEmpty()) {
             threadsTemp = coreList.size();
         }
@@ -132,9 +132,9 @@ public class CoreUtils {
                                     r = new Runnable() {
                                         @Override
                                         public void run() {
-                                            Integer core = coreList.poll();
+                                            String core = coreList.poll();
                                             System.out.println("Binding computation thread(" + Thread.currentThread() + ") to " + core);
-                                            PosixJNAAffinity.INSTANCE.setAffinity(1L << core);
+                                            PosixJNAAffinity.INSTANCE.setAffinity(core);
                                             original.run();
                                         }
                                     };
