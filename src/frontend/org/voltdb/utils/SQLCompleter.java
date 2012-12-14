@@ -21,8 +21,32 @@ import java.util.List;
 
 import jline.console.completer.Completer;
 
+/**
+ * SQLCommand JLine2 Completer implementation.
+ */
 class SQLCompleter implements Completer
 {
+    /// The list of valid command prefixes, e.g. the first one or two words of a command.
+    static String[] m_commandPrefixes = null;
+    /// Maximum command prefix length calculated when the prefixes are received.
+    static int m_maxCommandPrefixLength = 0;
+
+    /**
+     * Constructor.
+     * @param commandPrefixes  valid SQL command prefixes
+     */
+    public SQLCompleter(final String[] commandPrefixes) {
+        super();
+
+        // Grab the command prefixes and determine the maximum prefix length.
+        m_commandPrefixes = commandPrefixes;
+        for (final String command : m_commandPrefixes) {
+            if (command.length() > m_maxCommandPrefixLength) {
+                m_maxCommandPrefixLength = command.length();
+            }
+        }
+    }
+
     /* (non-Javadoc)
      * @see jline.console.completer.Completer#complete(java.lang.String, int, java.util.List)
      */
@@ -32,9 +56,9 @@ class SQLCompleter implements Completer
         // For now only support tab completion at the end of the line.
         if (cursor == buffer.length()) {
             // Check for an initial token match?
-            if (cursor <= SQLCommand.m_maxCommandLength) {
+            if (cursor <= m_maxCommandPrefixLength) {
                 final String bufferu = buffer.toUpperCase();
-                for (final String command : SQLCommand.m_commands) {
+                for (final String command : m_commandPrefixes) {
                     if (command.startsWith(bufferu)) {
                         candidates.add(command);
                     }

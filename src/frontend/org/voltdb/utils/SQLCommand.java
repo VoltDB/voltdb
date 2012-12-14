@@ -176,10 +176,10 @@ public class SQLCommand
     private static List<String> Lines = new ArrayList<String>();
 
     /**
-     * The list of recognized basic tab-complete-able SQL commands.
+     * The list of recognized basic tab-complete-able SQL command prefixes.
      * Comparisons are done in uppercase.
      */
-    static final String[] m_commands = new String[] {
+    static final String[] m_commandPrefixes = new String[] {
         "DELETE",
         "EXEC",
         "EXIT",
@@ -195,19 +195,6 @@ public class SQLCommand
         "SELECT",
         "UPDATE",
     };
-
-    /**
-     *  As an optimization pre-calculate the longest possible string length
-     *  for the initial command token.
-     */
-    static int m_maxCommandLength = 0;
-    static {
-        for (final String command : m_commands) {
-            if (command.length() > m_maxCommandLength) {
-                m_maxCommandLength = command.length();
-            }
-        }
-    }
 
     private static List<String> getQuery(boolean interactive) throws Exception
     {
@@ -1220,7 +1207,7 @@ public class SQLCommand
             lineInputReader.setBellEnabled(false);
 
             // Provide a custom completer.
-            Completer completer = new SQLCompleter();
+            Completer completer = new SQLCompleter(m_commandPrefixes);
             lineInputReader.addCompleter(completer);
 
             // Maintain persistent history in ~/.sqlcmd_history.
