@@ -42,7 +42,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.console.ConsoleReader;
 import jline.console.KeyMap;
 import jline.console.completer.Completer;
 import jline.console.history.FileHistory;
@@ -163,7 +162,7 @@ public class SQLCommand
     }
 
     // Command line interaction
-    private static ConsoleReader lineInputReader = null;
+    private static SQLConsoleReader lineInputReader = null;
     private static FileHistory historyFile = null;
 
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
@@ -180,7 +179,7 @@ public class SQLCommand
      * The list of recognized basic tab-complete-able SQL commands.
      * Comparisons are done in uppercase.
      */
-    private static final String[] m_commands = new String[] {
+    static final String[] m_commands = new String[] {
         "DELETE",
         "EXEC",
         "EXIT",
@@ -201,7 +200,7 @@ public class SQLCommand
      *  As an optimization pre-calculate the longest possible string length
      *  for the initial command token.
      */
-    private static int m_maxCommandLength = 0;
+    static int m_maxCommandLength = 0;
     static {
         for (final String command : m_commands) {
             if (command.length() > m_maxCommandLength) {
@@ -1132,34 +1131,6 @@ public class SQLCommand
         VoltDB = testVoltDB;
     }
 
-    private static class SQLCompleter implements Completer
-    {
-        /* (non-Javadoc)
-         * @see jline.console.completer.Completer#complete(java.lang.String, int, java.util.List)
-         */
-        @Override
-        public int complete(String buffer, int cursor, List<CharSequence> candidates)
-        {
-            // For now only support tab completion at the end of the line.
-            if (cursor == buffer.length()) {
-                // Check for an initial token match?
-                if (cursor <= m_maxCommandLength) {
-                    final String bufferu = buffer.toUpperCase();
-                    for (final String command : m_commands) {
-                        if (command.startsWith(bufferu)) {
-                            candidates.add(command);
-                        }
-                    }
-                    if (!candidates.isEmpty()) {
-                        return 0;
-                    }
-                }
-            }
-            return cursor;
-        }
-
-    }
-
     private static InputStream in = null;
     private static OutputStream out = null;
     // Application entry point
@@ -1244,7 +1215,7 @@ public class SQLCommand
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;
-            lineInputReader = new ConsoleReader(in, out);
+            lineInputReader = new SQLConsoleReader(in, out);
 
             lineInputReader.setBellEnabled(false);
 
