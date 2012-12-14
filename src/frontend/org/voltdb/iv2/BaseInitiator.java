@@ -113,7 +113,8 @@ public abstract class BaseInitiator implements Initiator
                           VoltDB.START_ACTION startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
-                          CommandLog cl)
+                          CommandLog cl,
+                          Integer coreBindId)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -138,7 +139,8 @@ public abstract class BaseInitiator implements Initiator
                                        snapshotPriority,
                                        m_initiatorMailbox,
                                        agent,
-                                       memStats);
+                                       memStats,
+                                       coreBindId);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 

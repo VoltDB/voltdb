@@ -73,6 +73,8 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
+import vanilla.java.affinity.impl.PosixJNAAffinity;
+
 import com.google.common.collect.ImmutableMap;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
@@ -137,6 +139,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Current topology
     int m_partitionId;
+
+    private final Integer m_coreBindId;
 
     // Need temporary access to some startup parameters in order to
     // initialize EEs in the right thread.
@@ -303,7 +307,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
-            MemoryStats memStats)
+            MemoryStats memStats,
+            Integer coreBindId)
     {
         m_siteId = siteId;
         m_context = context;
@@ -320,6 +325,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
+        m_coreBindId = coreBindId;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -479,6 +485,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void run()
     {
+        if (m_coreBindId != null) {
+            System.out.println("Binding execution thread(" + Thread.currentThread().getId() + ") to " + m_coreBindId);
+            PosixJNAAffinity.INSTANCE.setAffinity(1L << m_coreBindId);
+        }
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
         initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
         m_startupConfig = null; // release the serializedCatalog bytes.

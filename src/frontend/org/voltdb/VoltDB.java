@@ -21,12 +21,14 @@ import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
@@ -205,6 +207,9 @@ public class VoltDB {
         /** set to true to run with iv2 initiation. Good Luck! */
         public boolean m_enableIV2 = true;
 
+        public final Queue<Integer> m_networkCoreBindings = new ArrayDeque<Integer>();
+        public final Queue<Integer> m_computationCoreBindings = new ArrayDeque<Integer>();
+        public final Queue<Integer> m_executionCoreBindings = new ArrayDeque<Integer>();
         public Configuration() {
             m_enableIV2 = VoltDB.checkTestEnvForIv2();
         }
@@ -305,6 +310,23 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
+                } else if (arg.startsWith("networkbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_networkCoreBindings.offer(Integer.valueOf(core));
+                    }
+                    System.out.println("Network bindings are " + m_networkCoreBindings);
+                }
+                else if (arg.startsWith("computationbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_computationCoreBindings.offer(Integer.valueOf(core));
+                    }
+                    System.out.println("Computation bindings are " + m_computationCoreBindings);
+                }
+                else if (arg.startsWith("executionbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_executionCoreBindings.offer(Integer.valueOf(core));
+                    }
+                    System.out.println("Execution bindings are " + m_computationCoreBindings);
                 }
                 else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();

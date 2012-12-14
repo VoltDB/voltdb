@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,9 +47,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import jsr166y.LinkedTransferQueue;
+
 import org.voltcore.logging.VoltLogger;
 
-import jsr166y.LinkedTransferQueue;
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -91,13 +94,24 @@ public class CoreUtils {
     public static ListeningExecutorService getListeningExecutorService(
             final String name,
             final int threads) {
-        return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>());
+        return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>(), null);
+    }
+    public static ListeningExecutorService getListeningExecutorService(
+            final String name,
+            final int threads,
+            Queue<Integer> coreList) {
+        return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>(), coreList);
     }
 
     public static ListeningExecutorService getListeningExecutorService(
             final String name,
-            final int threads,
-            final BlockingQueue<Runnable> queue) {
+            int threadsTemp,
+            final BlockingQueue<Runnable> queue,
+            final Queue<Integer> coreList) {
+        if (!coreList.isEmpty()) {
+            threadsTemp = coreList.size();
+        }
+        final int threads = threadsTemp;
         if (threads < 1) {
             throw new IllegalArgumentException("Must specify > 0 threads");
         }
@@ -113,6 +127,18 @@ public class CoreUtils {
                             @Override
                             public synchronized Thread  newThread(Runnable r) {
                                 String nameToUse = threads == 1 ? name : name + " - " + threadIndex++;
+                                if (!coreList.isEmpty()) {
+                                    final Runnable original = r;
+                                    r = new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Integer core = coreList.poll();
+                                            System.out.println("Binding computation thread(" + Thread.currentThread() + ") to " + core);
+                                            PosixJNAAffinity.INSTANCE.setAffinity(1L << core);
+                                            original.run();
+                                        }
+                                    };
+                                }
                                 Thread t = new Thread(null, r, nameToUse, 131072);
                                 t.setDaemon(true);
                                 return t;
