@@ -97,7 +97,7 @@ public enum PosixJNAAffinity {
             } else {
                 /*
                  * For hyper threading, skip every other thread. God help you
-                 * if you have more then two threads per core
+                 * if you have more than two threads per core
                  */
                 boolean skipEveryOther = false;
                 if (affinityRange[0].startsWith("!")) {
