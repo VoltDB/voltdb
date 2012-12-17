@@ -18,11 +18,15 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -191,36 +195,58 @@ public class Cartographer extends StatsSource
         return getReplicasForPartition(partition).size();
     }
 
-    public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
+    /**
+     * Utility method to sort the keys of a map by their value.  public for testing.
+     */
+    static public List<Integer> sortKeysByValue(Map<Integer, Integer> map)
     {
-        ClusterConfig clusterConfig = new ClusterConfig(topology);
-        hostLog.info("Computing partitions to replace.  Total partitions: " + m_numberOfPartitions);
-        List<Integer> repsPerPart = new ArrayList<Integer>(m_numberOfPartitions);
-        for (int i = 0; i < m_numberOfPartitions; i++) {
-            repsPerPart.add(i, getReplicaCountForPartition(i));
+        List<Entry<Integer, Integer>> entries = new ArrayList<Entry<Integer, Integer>>(map.entrySet());
+        Collections.sort(entries, new Comparator<Entry<Integer, Integer>>() {
+            public int compare(Entry<Integer, Integer> o1, Entry<Integer, Integer> o2) {
+                if (!o1.getValue().equals(o2.getValue())) {
+                    return (o1.getValue()).compareTo(o2.getValue());
+                }
+                return o1.getKey().compareTo(o2.getKey());
+            }
+        } );
+        List<Integer> keys = new ArrayList<Integer>();
+        for (Entry<Integer, Integer> entry : entries) {
+            keys.add(entry.getKey());
         }
+        return keys;
+    }
+
+    /**
+     * Given the current state of the cluster, compute the partitions which should be replicated on a single new host.
+     * Break this method out to be static and testable independent of ZK, JSON, other ugh.
+     */
+    static public List<Integer> computeReplacementPartitions(Map<Integer, Integer> repsPerPart, int kfactor,
+            int sitesPerHost, int numberOfPartitions)
+    {
         List<Integer> partitions = new ArrayList<Integer>();
-        int freeSites = clusterConfig.getSitesPerHost();
-        for (int i = 0; i < m_numberOfPartitions; i++) {
-            if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
-                partitions.add(i);
-                // pretend to be fully replicated so we don't put two copies of a
-                // partition on this host.
-                repsPerPart.set(i, clusterConfig.getReplicationFactor() + 1);
-                freeSites--;
-                if (freeSites == 0) {
+        List<Integer> partSortedByRep = sortKeysByValue(repsPerPart);
+        for (int i = 0; i < partSortedByRep.size(); i++) {
+            int leastReplicatedPart = partSortedByRep.get(i);
+            if (repsPerPart.get(leastReplicatedPart) < kfactor + 1) {
+                partitions.add(leastReplicatedPart);
+                if (partitions.size() == sitesPerHost) {
                     break;
                 }
             }
         }
-        if (freeSites > 0) {
-            // double check fully replicated?
-            for (int i = 0; i < m_numberOfPartitions; i++) {
-                if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
-                    hostLog.error("Partition " + i + " should have been replicated but wasn't");
-                }
-            }
+        return partitions;
+    }
+
+    public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
+    {
+        ClusterConfig clusterConfig = new ClusterConfig(topology);
+        hostLog.info("Computing partitions to replace.  Total partitions: " + m_numberOfPartitions);
+        Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
+        for (int i = 0; i < m_numberOfPartitions; i++) {
+            repsPerPart.put(i, getReplicaCountForPartition(i));
         }
+        List<Integer> partitions = computeReplacementPartitions(repsPerPart, clusterConfig.getReplicationFactor(),
+                clusterConfig.getSitesPerHost(), m_numberOfPartitions);
         hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
         return partitions;
     }
