@@ -49,6 +49,7 @@
 #include "common/SerializableEEException.h"
 #include "common/types.h"
 #include "catalog/index.h"
+#include "expressions/tuplevalueexpression.h"
 #include "indexes/tableindex.h"
 #include "indexes/indexkey.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
@@ -100,7 +101,15 @@ class TableIndexPicker
                       m_scheme.name.c_str());
             m_type = BALANCED_TREE_INDEX;
         }
-        return getInstanceForKeyType<GenericKey<KeySize> >();
+        // If any indexed expression value can not either be stored "inline" within a (GenericKey) key tuple
+        // or specifically in a non-inlined object shared with the base table (because it is a simple column value),
+        // then the GenericKey will have to reference and maintain its own persistent non-inline storage.
+        // That's exactly what the GenericPersistentKey subtype of GenericKey does. This incurs extra overhead
+        // for object copying and freeing, so is only enabled as needed.
+        if (m_inlinesOrColumnsOnly) {
+            return getInstanceForKeyType<GenericKey<KeySize> >();
+        }
+        return getInstanceForKeyType<GenericPersistentKey<KeySize> >();
     }
 
     template <int ColCount>
@@ -186,11 +195,13 @@ public:
         }
     }
 
-    TableIndexPicker(const TupleSchema *keySchema, bool intsOnly, const TableIndexScheme &scheme) :
+    TableIndexPicker(const TupleSchema *keySchema, bool intsOnly, bool inlinesOrColumnsOnly,
+                     const TableIndexScheme &scheme) :
         m_scheme(scheme),
         m_keySchema(keySchema),
         m_keySize(keySchema->tupleLength()),
         m_intsOnly(intsOnly),
+        m_inlinesOrColumnsOnly(inlinesOrColumnsOnly),
         m_type(scheme.type)
     {}
 
@@ -199,6 +210,7 @@ private:
     const TupleSchema *m_keySchema;
     const int m_keySize;
     bool m_intsOnly;
+    bool m_inlinesOrColumnsOnly;
     TableIndexType m_type;
 };
 
@@ -206,34 +218,46 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     const TupleSchema *tupleSchema = scheme.tupleSchema;
     assert(tupleSchema);
     bool isIntsOnly = true;
+    bool isInlinesOrColumnsOnly = true;
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
     size_t valueCount = 0;
     size_t exprCount = scheme.indexedExpressions.size();
     if (exprCount != 0) {
         valueCount = exprCount;
+        // TODO: This is where we could gain some extra runtime and space efficiency by
+        // somehow marking which indexed expressions happen to be non-inlined column expressions.
+        // This case is significant because it presents an opportunity for the GenericPersistentKey
+        // index keys to avoid a persistent allocation and copy of an already persistent value.
+        // This could be implemented as a bool attribute of TupleSchema::ColumnInfo that is only
+        // set to true in this special case. It would universally disable deep copying of that
+        // particular "tuple column"'s referenced object.
         for (size_t ii = 0; ii < valueCount; ++ii) {
             ValueType exprType = scheme.indexedExpressions[ii]->getValueType();
             if ( ! isIntegralType(exprType)) {
                 isIntsOnly = false;
             }
-            keyColumnTypes.push_back(exprType);
+            uint32_t declaredLength;
             if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
-                // There's not enough information to reliably determine that the value is small enough to "inline".
-                // Setting the column length to UNINLINEABLE_OBJECT_LENGTH is NOT intended to constrain the
-                // maximum length of the values or to be the basis of any kind of pre-allocation.
-                // Quite the opposite, it is intended only to convince the tuple storage code that the
-                // values MAY be too large for inlining, so all bets are off. It's not clear whether
-                // scheme.indexedExpressions[ii]->getValueSize() can or should be called for a more useful answer.
-                keyColumnLengths.push_back(UNINLINEABLE_OBJECT_LENGTH);
-                // Short term, there is no support for non-inline types, for lack of proper memory management
-                // (persisting non-inline storage for calculated values not that is not a column value managed by
-                // a persistent table tuple.
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "TableIndexFactory::getInstance detected expression-based index on non-numeric value");
+                // Setting the column length to TUPLE_SCHEMA_COLUMN_MAX_VALUE_LENGTH constrains the
+                // maximum length of expression values that can be indexed with the same limit
+                // that gets applied to column values.
+                // In theory, indexed expression values could have an independent limit
+                // up to any length that can be allocated via ThreadLocalPool.
+                // Currently, all of these cases are constrained with the same limit,
+                // which is also the default/maximum size for variable columns defined in schema,
+                // as controlled in java by VoltType.MAX_VALUE_LENGTH.
+                // It's not clear whether scheme.indexedExpressions[ii]->getValueSize()
+                // can or should be called for a more useful answer.
+                // There's probably little to gain since expressions usually do not contain enough information
+                // to reliably determine that the result value is always small enough to "inline".
+                declaredLength = TupleSchema::COLUMN_MAX_VALUE_LENGTH;
+                isInlinesOrColumnsOnly = false;
             } else {
-                keyColumnLengths.push_back(NValue::getTupleStorageSize(exprType));
+                declaredLength = NValue::getTupleStorageSize(exprType);
             }
+            keyColumnTypes.push_back(exprType);
+            keyColumnLengths.push_back(declaredLength);
         }
     } else {
         valueCount = scheme.columnIndices.size();
@@ -250,7 +274,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
     assert(keySchema);
     VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
-    TableIndexPicker picker(keySchema, isIntsOnly, scheme);
+    TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);
     TableIndex *retval = picker.getInstance();
     return retval;
 }

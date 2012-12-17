@@ -21,6 +21,11 @@
 #include <iostream>
 #include "common/SQLException.h"
 
+// This needs to be >= the VoltType.MAX_VALUE_LENGTH defined in java, currently 1048576.
+// The rationale for making it any larger would be to allow calculating wider "temp" values
+// for use in situations where they are not being stored as column values.
+static const int POOLED_MAX_VALUE_LENGTH = 1048576;
+
 namespace voltdb {
 /**
  * Thread local key for storing thread specific memory pools
@@ -156,8 +161,8 @@ ThreadLocalPool::getAllocationSizeForObject(std::size_t length) {
     } else if (length <= 524288 + 262144) {
         return 524288 + 262144;
         //Need space for a length prefix and a backpointer
-    } else if (length <= 1048576 + sizeof(int32_t) + sizeof(void*)) {
-        return 1048576 + sizeof(int32_t) + sizeof(void*);
+    } else if (length <= POOLED_MAX_VALUE_LENGTH + sizeof(int32_t) + sizeof(void*)) {
+        return POOLED_MAX_VALUE_LENGTH + sizeof(int32_t) + sizeof(void*);
     } else {
         // Do this so that we can use this method to compute allocation sizes.
         // Expect callers to check for 0 and throw a FatalException for

@@ -34,3 +34,4 @@ src/frontend/org/voltdb/compiler/projectfile/
 src/frontend/org/voltdb/compiler/deploymentfile/
 doc/tutorials/*/*.jar
 doc/tutorials/auction/csvloader_*.csv
+/README.voltadmin

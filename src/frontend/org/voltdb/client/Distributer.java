@@ -355,6 +355,7 @@ class Distributer {
 
             if (cb != null) {
                 response.setClientRoundtrip(delta);
+                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
                 try {
                     cb.clientCallback(response);
                 } catch (Exception e) {
@@ -415,7 +416,7 @@ class Distributer {
                         NodeConnection survivors[] = new NodeConnection[entry.getSecond().length - 1];
                         if (survivors.length == 0) break;
                         int zz = 0;
-                        for (int ii = 0; ii < survivors.length; ii++) {
+                        for (int ii = 0; ii < entry.getSecond().length; ii++) {
                             if (entry.getSecond()[ii] != this) {
                                 survivors[zz++] = entry.getSecond()[ii];
                             }
@@ -803,11 +804,15 @@ class Distributer {
     }
 
     private void updateAffinityTopology(VoltTable vt) {
-        int numPartitions = vt.getRowCount();
+        // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
+        int numPartitions = vt.getRowCount() - 1;
         TheHashinator.initialize(numPartitions);
         m_hashinatorInitialized = true;
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
+        // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
+        // hash to it.  Go ahead and include it in the maps, we can use it at some point to
+        // route MP transactions directly to the MPI node.
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
 

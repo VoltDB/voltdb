@@ -127,7 +127,7 @@ public class TestReplicatedInvocation {
         callback.waitForResponse();
         ClientResponse response = callback.getResponse();
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        VoltTable result = response.getResults()[0];
+        VoltTable result = VoltTable.fromJSONString(response.getAppStatusString());
         result.advanceRow();
         assertEquals(3, result.getLong("txnId"));
         assertEquals(4, result.getLong("timestamp"));

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
@@ -135,7 +136,14 @@ public interface SiteProcedureConnection {
      */
     public ProcedureRunner getProcedureRunner(String procedureName);
 
-    public void setRejoinComplete(org.voltdb.iv2.RejoinProducer.ReplayCompletionAction action);
+    /*
+     * This isn't just a simple setter, it has behavior side effects
+     * as well because it causes the Site to start replaying log data
+     * if configured to do so and it will also set export sequence numbers
+     */
+    public void setRejoinComplete(
+            org.voltdb.iv2.RejoinProducer.ReplayCompletionAction action,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);
 

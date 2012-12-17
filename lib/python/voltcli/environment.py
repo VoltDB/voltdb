@@ -57,7 +57,7 @@ if volt_python not in sys.path:
 
 # Java configuration
 if 'JAVA_HOME' in os.environ:
-    java = os.path.join(os.environ['JAVA_HOME'], 'java')
+    java = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
 else:
     java = utility.find_in_path('java')
 if not java:
@@ -124,6 +124,7 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
             # Try to set VOLTDB_VOLTDB if not set. Look for the voltdb jar file.
             if not os.environ.get('VOLTDB_VOLTDB', '') or voltdb_jar is None:
                 for subdir in ('voltdb', os.path.join('lib', 'voltdb')):
+                    # Need the hyphen to avoid the volt client jar.
                     glob_chk = os.path.join(os.path.realpath(os.path.join(dir, subdir)),
                                             'voltdb-*.jar')
                     voltdb_search_globs.append(glob_chk)
