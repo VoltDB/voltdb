@@ -250,5 +250,6 @@ public class Cartographer extends StatsSource
     public void shutdown() throws InterruptedException
     {
         m_iv2Masters.shutdown();
+        m_iv2Mpi.shutdown();
     }
 }
