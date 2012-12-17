@@ -25,19 +25,19 @@ package org.voltdb.dtxn;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
 @ProcInfo (
-    singlePartition = false
+        partitionInfo = "kv.key: 0",
+        singlePartition = true
 )
-public class Deterministic_RO_MP extends VoltProcedure {
+public class Deterministic_RO_SP extends VoltProcedure {
 
     public static final SQLStmt sql = new SQLStmt("select nondetval from kv order by nondetval");
 
-    public VoltTable run() {
-        voltQueueSQL(sql);
-        return voltExecuteSQL()[0];
+    public long run(long key) {
+        return VoltDB.instance().getHostMessenger().getHostId();
     }
 
 }

@@ -364,6 +364,7 @@ if whichtests in ("${eetestsuite}", "common"):
      undolog_test
      valuearray_test
      nvalue_test
+     pool_test
      tabletuple_test
     """
 

@@ -75,6 +75,25 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
+
+    /*
+     * This lock is extremely dangerous to use without known the pattern.
+     * It is the intrinsic lock on the InitiatorMailbox. For an SpInitiator
+     * this is a real thing, but for the MpInitiator the intrinsic lock isn't used
+     * because it uses MpInitiatorMailbox (as subclass of InitiatorMailbox)
+     * which uses a dedicated thread instead of locking.
+     *
+     * In the MpInitiator case locking on this will not provide any isolation because
+     * the InitiatorMailbox thread doesn't use the lock.
+     *
+     * Right now this lock happens to only be used to gain isolation for
+     * command logging while submitting durable tasks. Only SpInitiators log
+     * so this is fine.
+     *
+     * Think twice and ask around before using it for anything else.
+     * You should probably be going through InitiatorMailbox.deliver which automatically
+     * handles the transition between locking vs. submitting to the MpInitiatorMailbox task queue.
+     */
     protected Object m_lock;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)

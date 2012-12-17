@@ -42,7 +42,10 @@ public class ReplicatedProcedure extends VoltProcedure {
 
         VoltTable result = new VoltTable(new ColumnInfo("txnId", VoltType.BIGINT),
                                          new ColumnInfo("timestamp", VoltType.BIGINT));
-        result.addRow(getVoltPrivateRealTransactionIdDontUseMe(), getUniqueId());
+        result.addRow(getVoltPrivateRealTransactionIdDontUseMe(), getTransactionTime().getTime());
+
+        // replicated txns get their results replaced by a hash... so stash this here
+        setAppStatusString(result.toJSONString());
         return result;
     }
 }

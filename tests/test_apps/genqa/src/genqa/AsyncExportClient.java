@@ -76,9 +76,10 @@ public class AsyncExportClient
     {
         String m_nonce;
         String m_txnLogPath;
-        FileOutputStream m_curFile = null;
+        FileOutputStream m_curFOS = null;
         OutputStreamWriter m_outs = null;
         AtomicLong m_count = new AtomicLong(0);
+        private File m_curFile;
 
         public TxnIdWriter(String nonce, String txnLogPath)
         {
@@ -95,15 +96,11 @@ public class AsyncExportClient
 
         public void createNewFile() throws IOException
         {
-            if (m_curFile != null)
-            {
-                m_outs.close();
-                m_curFile.flush();
-                m_curFile.close();
-            }
-            File blah = new File(m_txnLogPath, m_count + "-" + m_nonce + "-txns");
-            m_curFile = new FileOutputStream(blah);
-            m_outs = new OutputStreamWriter(m_curFile);
+            close();
+
+            m_curFile = new File(m_txnLogPath, "active-" + m_count + "-" + m_nonce + "-txns");
+            m_curFOS = new FileOutputStream(m_curFile);
+            m_outs = new OutputStreamWriter(m_curFOS);
         }
 
         public void write(String txnId) throws IOException
@@ -114,6 +111,20 @@ public class AsyncExportClient
             }
             m_outs.write(txnId);
             m_count.incrementAndGet();
+        }
+        public void close() throws IOException
+        {
+            if (m_curFOS != null)
+            {
+                m_outs.close();
+                m_curFOS.flush();
+                m_curFOS.close();
+                File renamed = new File(
+                        m_txnLogPath,
+                        m_curFile.getName().substring("active-".length())
+                        );
+                m_curFile.renameTo(renamed);
+            }
         }
     }
 
@@ -323,6 +334,7 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
+            writer.close();
 
             // Now print application results:
 

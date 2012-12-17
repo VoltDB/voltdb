@@ -266,19 +266,20 @@ public class MpScheduler extends Scheduler
                 m_duplicateCounters.remove(message.getTxnId());
                 m_repairLogTruncationHandle = message.getTxnId();
                 m_outstandingTxns.remove(message.getTxnId());
+
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
-            return;
         }
-
-        // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-        m_repairLogTruncationHandle = message.getTxnId();
-        m_outstandingTxns.remove(message.getTxnId());
-        m_mailbox.send(message.getInitiatorHSId(), message);
+        else {
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            m_repairLogTruncationHandle = message.getTxnId();
+            m_outstandingTxns.remove(message.getTxnId());
+            m_mailbox.send(message.getInitiatorHSId(), message);
+        }
     }
 
     public void handleFragmentTaskMessage(FragmentTaskMessage message,

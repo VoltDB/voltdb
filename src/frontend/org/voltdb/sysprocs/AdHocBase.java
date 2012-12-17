@@ -102,6 +102,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                     statement.core.aggregatorFragment,
                     statement.core.collectorFragment,
                     statement.core.isReplicatedTableDML,
+                    statement.core.readOnly,
                     statement.core.parameterTypes);
 
             voltQueueSQL(stmt, statement.extractedParamValues.toArray());

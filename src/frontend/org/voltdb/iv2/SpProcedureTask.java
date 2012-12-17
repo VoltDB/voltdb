@@ -60,6 +60,7 @@ public class SpProcedureTask extends ProcedureTask
         // cast up here .. ugly.
         SpTransactionState txn = (SpTransactionState)m_txn;
         final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
+        int hash = m_txn.getHash();
         if (!response.shouldCommit()) {
             m_txn.setNeedsRollback();
         }
@@ -71,7 +72,7 @@ public class SpProcedureTask extends ProcedureTask
 
         // Log invocation to DR
         if (m_drGateway != null && !m_txn.isReadOnly() && !m_txn.needsRollback()) {
-            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.uniqueId,
+            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.uniqueId, hash,
                                                   txn.getInvocation(),
                                                   response.getClientResponseData());
         }
