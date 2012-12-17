@@ -192,4 +192,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
     }
+
+    @Override
+    public void shutdown() {
+        try {
+            m_leaderCache.shutdown();
+        } catch (InterruptedException e) {
+            tmLog.info("Interrupted during shutdown", e);
+        }
+        super.shutdown();
+    }
 }
