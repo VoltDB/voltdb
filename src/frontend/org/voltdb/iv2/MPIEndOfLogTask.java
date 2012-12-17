@@ -18,35 +18,24 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 
-/**
- * Implements the Single-partition everywhere procedure ProcedureTask.
- * Creates one SP transaction per partition. These are produced on
- * the MPI so that all involved SPs have the same happens-before
- * relationship with concurrent MPs.
- */
-public class EveryPartitionTask extends TransactionTask
+public class MPIEndOfLogTask extends TransactionTask
 {
     final long[] m_initiatorHSIds;
-    final TransactionInfoBaseMessage m_msg;
     final Mailbox m_mailbox;
 
-    EveryPartitionTask(Mailbox mailbox, TransactionTaskQueue queue,
-                  TransactionInfoBaseMessage msg, List<Long> pInitiators)
+    MPIEndOfLogTask(Mailbox mailbox, TransactionTaskQueue queue,
+                    MPIEndOfLogTransactionState txnState, List<Long> pInitiators)
     {
-        super(new SpTransactionState(msg), queue);
-        m_msg = msg;
+        super(txnState, queue);
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
         m_mailbox = mailbox;
     }
@@ -56,7 +45,7 @@ public class EveryPartitionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        m_mailbox.send(m_initiatorHSIds, m_msg);
+        m_mailbox.send(m_initiatorHSIds, m_txn.getNotice());
         m_queue.flush();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
@@ -66,22 +55,20 @@ public class EveryPartitionTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        throw new RuntimeException("MPI asked to execute everysite proc. while rejoining.");
+        throw new RuntimeException("MPI asked to execute MPI end of log task while rejoining.");
     }
 
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        throw new RuntimeException("MPI asked to execute everysite proc from task log while rejoining.");
+        throw new RuntimeException("MPI asked to execute MPI end of log task from task log while rejoining.");
     }
 
     @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append("EveryPartitionTask:");
-        sb.append("  TXN ID: ").append(getTxnId());
-        sb.append("  SP HANDLE ID: ").append(getSpHandle());
+        sb.append("MPIEndOfLogTask:");
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_mailbox.getHSId()));
         return sb.toString();
     }

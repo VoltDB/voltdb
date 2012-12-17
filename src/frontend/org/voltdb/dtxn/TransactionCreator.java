@@ -70,9 +70,8 @@ public interface TransactionCreator
     public void sendSentinel(long txnId, int partitionId);
 
     /**
-     * Only used in IV2. Send an end-of-log message to the SPI of the partition,
-     * so that he SPI can release any MP txns for replay when it sees the first
-     * fragment.
+     * Only used in IV2. Send an end-of-log message to the partition initiator,
+     * so that he SPI can release any blocked txns for replay appropriately.
      *
      * @param partitionId
      */
