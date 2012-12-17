@@ -22,7 +22,7 @@ fi
 
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
 VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
+VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
@@ -50,8 +50,8 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
-    $VOLTCOMPILER obj project2.xml $APPNAME2.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
+    $VOLTDB compile --classpath obj -o $APPNAME2.jar -p project2.xml
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA

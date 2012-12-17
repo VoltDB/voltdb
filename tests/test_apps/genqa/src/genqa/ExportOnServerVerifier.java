@@ -100,6 +100,11 @@ public class ExportOnServerVerifier {
             this.expected = expected;
         }
 
+        public ValidationErr(String string) {
+            this.msg = string;
+            this.value = "[not provided]";
+            this.expected = "[not provided]";
+        }
         @Override
         public String toString() {
             return msg + " Value: " + value + " Expected: " + expected;
@@ -226,6 +231,7 @@ public class ExportOnServerVerifier {
         boolean quit = false;
         boolean more_rows = true;
         boolean more_txnids = true;
+        boolean expect_export_eof = false;
         int emptyRemovalCycles = 0;
 
         while (!quit)
@@ -237,6 +243,7 @@ public class ExportOnServerVerifier {
                 row = csv.readNext();
                 if (row == null)
                 {
+                    expect_export_eof = false;
                     csvPair.getSecond().run();
                     csvPair = openNextExportFile();
                     if (csvPair == null)
@@ -251,8 +258,13 @@ public class ExportOnServerVerifier {
                         row = csv.readNext();
                     }
                 }
+                else if (expect_export_eof)
+                {
+                    throw new ValidationErr("previously logged row had unexpected number of columns");
+                }
 
                 verifyRow(row);
+                expect_export_eof = row.length < 29;
                 dcount++;
                 /*
                  * client dude has only confirmed tx id, on asynch writer exceptions we
@@ -384,8 +396,39 @@ public class ExportOnServerVerifier {
         System.out.println("\n==================================================================");
         System.out.println(sb.toString());
         System.out.println("client tx id list size is " + m_clientTxnIds.size());
-        System.out.println("orphaned client row id list size is " + m_clientTxnIdOrphans.size());
+        int [] txByPart    = new int [m_partitions]; Arrays.fill(txByPart, 0);
+        int [] staleByPart = new int [m_partitions]; Arrays.fill(staleByPart, 0);
+        for( Long tx: m_clientTxnIds)
+        {
+            int partid = TxnEgo.getPartitionId(tx);
+            ++txByPart[partid];
+            if (tx < m_maxPartTxId.get(partid)) ++staleByPart[partid];
+        }
+        sb.delete(0, sb.length()).append(" -- ");
+        for (int i = 0; i < m_partitions; ++i)
+        {
+            if (i>0) sb.append(", ");
+            sb.append(txByPart[i]).append("[").append(staleByPart[i]).append("]");
+        }
+        System.out.println(sb.toString());
         System.out.println("overflow txid id list size is " + m_clientOverFlow.size());
+        Arrays.fill(txByPart, 0);
+        Arrays.fill(staleByPart, 0);
+        for( Long tx: m_clientOverFlow)
+        {
+            int partid = TxnEgo.getPartitionId(tx);
+            ++txByPart[partid];
+            if (tx < m_maxPartTxId.get(partid)) ++staleByPart[partid];
+        }
+        sb.delete(0, sb.length()).append(" -- ");
+        for (int i = 0; i < m_partitions; ++i)
+        {
+            if (i>0) sb.append(", ");
+            sb.append(txByPart[i]).append("[").append(staleByPart[i]).append("]");
+        }
+        System.out.println(sb.toString());
+        System.out.println("orphaned client row id list size is " + m_clientTxnIdOrphans.size());
+        System.out.println("stale client txid id list size is " + m_staleTxnIds.size());
         System.out.println("==================================================================\n");
 
     }
@@ -533,10 +576,12 @@ public class ExportOnServerVerifier {
                                    Comparator<File> comparator) throws ValidationErr
     {
         File [] oldFiles = files;
+        int emptyRetries = 50;
         long start_time = System.currentTimeMillis();
-        while ((sameFiles(files, oldFiles, comparator) && files.length > 0) || (files.length == 0 && !m_clientlogSeen))
+        while (sameFiles(files, oldFiles, comparator) || ( files.length == 0 && emptyRetries >=0))
         {
             files = path.listFiles(acceptor);
+            emptyRetries = (files.length > 0 ? 50 : emptyRetries - 1);
             m_clientlogSeen = m_clientlogSeen || files.length > 0;
             long now = System.currentTimeMillis();
             if ((now - start_time) > FILE_TIMEOUT_MS)
@@ -601,7 +646,7 @@ public class ExportOnServerVerifier {
         {
             @Override
             public boolean accept(File pathname) {
-                return pathname.getName().contains("dude");
+                return pathname.getName().contains("dude") && !pathname.getName().startsWith("active-");
             }
         };
 
@@ -731,6 +776,19 @@ public class ExportOnServerVerifier {
 
         int matchCount = 0;
         int staleCount = 0;
+        int dupStaleCount = 0;
+
+        Iterator<Long> staleitr = m_staleTxnIds.iterator();
+        while (staleitr.hasNext())
+        {
+            long staletx = staleitr.next();
+            if (m_clientTxnIds.remove(staletx))
+            {
+                ++matchCount;
+                staleitr.remove();
+                System.out.println(" *** Resurfaced stale tx " + staletx + " found in the client tx list");
+            }
+        }
         for (int i = 0; i < m_partitions; ++i)
         {
             Iterator<Map.Entry<Long, Long>> txitr = m_rowTxnIds.get(i).entrySet().iterator();
@@ -738,24 +796,35 @@ public class ExportOnServerVerifier {
             {
                 Map.Entry<Long, Long> e = txitr.next();
 
-                if (e.getKey() <= m_maxPartTxId.get(i))
-                {
-                    txitr.remove();
-                    m_clientTxnIds.remove(e.getKey()); // noop bynk
-                    ++staleCount;
-                }
-                else if (m_clientTxnIds.remove(e.getKey()))
+                if (m_clientTxnIds.remove(e.getKey()))
                 {
                     txitr.remove();
                     ++matchCount;
-                    m_maxPartTxId.put(i, e.getKey());
+                    m_clientOverFlow.remove(e.getKey());
+                    if (e.getKey() > m_maxPartTxId.get(i))
+                    {
+                        m_maxPartTxId.put(i, e.getKey());
+                    }
+                    if (m_staleTxnIds.remove(e.getKey()))
+                    {
+                        System.out.println(" *** Matched stale tx " + e.getKey() + " found in the client tx list");
+                    }
+                }
+                else if (e.getKey() <= m_maxPartTxId.get(i))
+                {
+                    txitr.remove();
+                    if (!m_staleTxnIds.add(e.getKey()))
+                    {
+                        ++dupStaleCount;
+                    }
+                    ++staleCount;
                 }
                 else
                 {
                     long bsidx = Collections.binarySearch(m_clientTxnIdOrphans, e.getValue());
                     if( bsidx >= 0)
                     {
-                        System.out.println("Found unrecorded txid " + e.getKey() + " for rowId " + e.getValue());
+                        System.out.println(" *** Found unrecorded txid " + e.getKey() + " for rowId " + e.getValue());
 
                         txitr.remove();
                         m_clientTxnIdOrphans.remove(bsidx);
@@ -764,8 +833,10 @@ public class ExportOnServerVerifier {
                 }
             }
         }
+
         System.out.println("!_!_! DEBUG !_!_! *MATCHED* " + matchCount
-                + " exported records, with *STALE* " + staleCount + " records removed"
+                + " exported records, with *STALE* " + staleCount + " of which  "
+                + dupStaleCount + " are duplicate"
                 );
 
         return (matchCount + staleCount) > 0;
@@ -779,11 +850,7 @@ public class ExportOnServerVerifier {
             long txnId = ovfitr.next();
             int partid = TxnEgo.getPartitionId(txnId);
 
-            if (txnId <= m_maxPartTxId.get(partid))
-            {
-                ovfitr.remove();
-            }
-            else if (m_readUpTo.get(partid).decrementAndGet() > 0)
+            if (m_readUpTo.get(partid).decrementAndGet() > 0)
             {
                 ovfitr.remove();
             }
@@ -796,8 +863,13 @@ public class ExportOnServerVerifier {
         Long rowid = Long.parseLong(row[++col]); // col 7
 
         if (row.length < 29)
-            error("invalid number of columns in the row", row.length, 29);
-
+        {
+            System.err.println("ERROR: Unexpected number of columns for the following row:\n\t" + Arrays.toString(row));
+            if (row.length < 8) {
+                error("row column count", row.length, 29);
+            }
+            return;
+        }
         // matches VoltProcedure.getSeededRandomNumberGenerator()
         Random prng = new Random(txnid);
         SampleRecord valid = new SampleRecord(rowid, prng);
@@ -953,7 +1025,8 @@ public class ExportOnServerVerifier {
     ArrayList<Long> m_clientTxnIdOrphans = new ArrayList<Long>();
     HashMap<Integer,AtomicLong> m_readUpTo = new HashMap<Integer, AtomicLong>();
     HashMap<Integer,Integer> m_checkedUpTo = new HashMap<Integer, Integer>();
-    ArrayList<Long> m_clientOverFlow = new ArrayList<Long>();
+    TreeSet<Long> m_clientOverFlow = new TreeSet<Long>();
+    TreeSet<Long> m_staleTxnIds = new TreeSet<Long>();
 
     Queue<Pair<ChannelSftp, String>> m_exportFiles = new ArrayDeque<Pair<ChannelSftp, String>>();
     File m_clientPath = null;
@@ -970,6 +1043,11 @@ public class ExportOnServerVerifier {
         try
         {
             verifier.verify(args);
+            if (verifier.m_clientTxnIds.size() > 0)
+            {
+                System.err.println("ERROR: not all client txids were matched against exported txids");
+                System.exit(1);
+            }
         }
         catch(IOException e) {
             e.printStackTrace(System.err);

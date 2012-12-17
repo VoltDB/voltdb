@@ -265,8 +265,18 @@ public class MpPromoteAlgo implements RepairAlgo
         }
         else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();
-            assert(ftm.getInitiateTask() != null);
-            m_interruptedTxns.add(ftm.getInitiateTask());
+            // We currently don't want to restart read-only MP transactions because:
+            // 1) We're not writing the Iv2InitiateTaskMessage to the first
+            // FragmentTaskMessage in read-only case in the name of some unmeasured
+            // performance impact,
+            // 2) We don't want to perturb command logging and/or DR this close to the 3.0 release
+            // 3) We don't guarantee the restarted results returned to the client
+            // anyway, so not restarting the read is currently harmless.
+            boolean restart = !ftm.isReadOnly();
+            if (restart) {
+                assert(ftm.getInitiateTask() != null);
+                m_interruptedTxns.add(ftm.getInitiateTask());
+            }
             CompleteTransactionMessage rollback =
                 new CompleteTransactionMessage(
                         ftm.getInitiatorHSId(),
@@ -276,11 +286,10 @@ public class MpPromoteAlgo implements RepairAlgo
                         0,
                         true,   // Force rollback as our repair operation.
                         false,  // no acks in iv2.
-                        true,   // Indicate rollback for repair.
+                        restart,   // Indicate rollback for repair as appropriate
                         ftm.isForReplay());
             rollback.setOriginalTxnId(ftm.getOriginalTxnId());
             return rollback;
         }
     }
-
 }
