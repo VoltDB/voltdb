@@ -804,11 +804,15 @@ class Distributer {
     }
 
     private void updateAffinityTopology(VoltTable vt) {
-        int numPartitions = vt.getRowCount();
+        // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
+        int numPartitions = vt.getRowCount() - 1;
         TheHashinator.initialize(numPartitions);
         m_hashinatorInitialized = true;
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
+        // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
+        // hash to it.  Go ahead and include it in the maps, we can use it at some point to
+        // route MP transactions directly to the MPI node.
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
 

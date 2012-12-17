@@ -163,9 +163,12 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     for var in ('VOLTDB_LIB', 'VOLTDB_VOLTDB', 'LOG4J_CONFIG_PATH'):
         utility.verbose_info('Environment: %s=%s' % (var, os.environ[var]))
 
-    # Classpath is the voltdb jar and all the jars in VOLTDB_LIB.
+    # Classpath is the voltdb jar and all the jars in VOLTDB_LIB, and if present,
+    # any user supplied jars under VOLTDB/lib/extension
     global classpath
     classpath = [voltdb_jar]
     for path in glob.glob(os.path.join(os.environ['VOLTDB_LIB'], '*.jar')):
+        classpath.append(path)
+    for path in glob.glob(os.path.join(os.environ['VOLTDB_LIB'], 'extension', '*.jar')):
         classpath.append(path)
     utility.verbose_info('Classpath: %s' % ':'.join(classpath))

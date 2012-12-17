@@ -112,8 +112,16 @@ public class MpProcedureTask extends ProcedureTask
             return;
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
-        if (response.getClientResponseData().getStatus() != ClientResponse.TXN_RESTART) {
-
+        // We currently don't want to restart read-only MP transactions because:
+        // 1) We're not writing the Iv2InitiateTaskMessage to the first
+        // FragmentTaskMessage in read-only case in the name of some unmeasured
+        // performance impact,
+        // 2) We don't want to perturb command logging and/or DR this close to the 3.0 release
+        // 3) We don't guarantee the restarted results returned to the client
+        // anyway, so not restarting the read is currently harmless.
+        // We could actually restart this here, since we have the invocation, but let's be consistent?
+        int status = response.getClientResponseData().getStatus();
+        if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
             if (!response.shouldCommit()) {
                 txn.setNeedsRollback();
             }
