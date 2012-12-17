@@ -148,8 +148,9 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine startCommand(String command)
     {
         String upcmd = command.toUpperCase();
+        VoltDB.START_ACTION action = VoltDB.START_ACTION.CREATE;
         try {
-            VoltDB.START_ACTION action = VoltDB.START_ACTION.valueOf(upcmd);
+            action = VoltDB.START_ACTION.valueOf(upcmd);
         }
         catch (IllegalArgumentException iae)
         {
@@ -158,6 +159,7 @@ public class CommandLine extends VoltDB.Configuration
             hostLog.warn(msg);
             throw new IllegalArgumentException(msg);
         }
+        m_startAction = action;
         return this;
     }
 
@@ -464,16 +466,11 @@ public class CommandLine extends VoltDB.Configuration
         //
         cmdline.add("org.voltdb.VoltDB");
 
-        if (m_isEnterprise) {
-            cmdline.add("license"); cmdline.add(m_pathToLicense);
-        }
-
         if (m_startAction == START_ACTION.LIVE_REJOIN) {
             // annoying, have to special case live rejoin
             cmdline.add("live rejoin");
         } else {
-            if (null != m_startAction)
-                cmdline.add(m_startAction.toString().toLowerCase());
+            cmdline.add(m_startAction.toString().toLowerCase());
         }
 
         cmdline.add("host"); cmdline.add(m_leader);
@@ -524,6 +521,10 @@ public class CommandLine extends VoltDB.Configuration
         if (m_enableIV2)
         {
             cmdline.add("enableiv2");
+        }
+
+        if (m_isEnterprise) {
+            cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
 
         if (customCmdLn != null && !customCmdLn.trim().isEmpty())
