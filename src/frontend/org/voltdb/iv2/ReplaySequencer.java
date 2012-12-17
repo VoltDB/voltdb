@@ -42,10 +42,13 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  * blocked waiting for sentinels will be made safe, future MP fragments will
  * also be safe automatically. If the MPI reaches end of log first, and there is
  * an outstanding sentinel in the sequencer, then all SPs blocked after this
- * sentinel will be made safe (can be polled). NOTE: Once MPI end of log message
- * is received, NONE of the SPs polled from the sequencer can be executed, the
- * poller must make sure that a failure response is returned appropriately
- * instead. However, SPs rejected by offer() can always be executed.
+ * sentinel will be made safe (can be polled). There cannot be any fragments in
+ * the replay sequencer when the MPI EOL arrives, because the MPI will only send
+ * EOLs when it has finished all previous MP work. NOTE: Once MPI end of log
+ * message is received, NONE of the SPs polled from the sequencer can be
+ * executed, the poller must make sure that a failure response is returned
+ * appropriately instead. However, SPs rejected by offer() can always be
+ * executed.
  *
  * NOTE: messages are sequenced according to the transactionId passed in to the
  * offer() method. This transaction id may differ from the value stored in the
