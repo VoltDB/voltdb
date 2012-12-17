@@ -133,7 +133,7 @@ public enum PosixJNAAffinity {
         for (Integer core : cores) {
             mask |= 1L << core;
         }
-        System.out.println("Thread (" + Thread.currentThread().getId() + ") setting affinity to " + cores);
+        System.out.println("Thread (" + Thread.currentThread().getName() + ") setting affinity to " + cores);
         setAffinity(mask);
     }
     public void setAffinity(final long affinity) {

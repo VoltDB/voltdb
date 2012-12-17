@@ -828,7 +828,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
                 //completes at which point the node will mark itself as actually recovered.
                 m_commandLog.initForRejoin(
-                        m_catalogContext, Long.MIN_VALUE, m_iv2InitiatorStartingTxnIds, true);
+                        m_catalogContext,
+                        Long.MIN_VALUE,
+                        m_iv2InitiatorStartingTxnIds,
+                        true,
+                        m_config.m_commandLogBinding);
             }
 
             /*
@@ -2105,7 +2109,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds);
+            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds, m_config.m_commandLogBinding);
         }
 
         /*

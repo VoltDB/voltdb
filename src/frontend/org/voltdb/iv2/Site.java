@@ -486,7 +486,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void run()
     {
         if (m_coreBindIds != null) {
-            System.out.println("Binding execution thread(" + Thread.currentThread().getId() + ") to " + m_coreBindIds);
+            System.out.println("Binding execution thread(" + Thread.currentThread().getName() + ") to " + m_coreBindIds);
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));

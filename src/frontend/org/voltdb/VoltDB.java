@@ -210,6 +210,8 @@ public class VoltDB {
         public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
         public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
+        public String m_commandLogBinding = null;
+
         public Configuration() {
             m_enableIV2 = VoltDB.checkTestEnvForIv2();
         }
@@ -327,6 +329,13 @@ public class VoltDB {
                         m_executionCoreBindings.offer(core);
                     }
                     System.out.println("Execution bindings are " + m_executionCoreBindings);
+                } else if (arg.startsWith("commandlogbinding")) {
+                    String binding = args[++i];
+                    if (binding.split(",").length > 1) {
+                        throw new RuntimeException("Command log only supports a single set of bindings");
+                    }
+                    m_commandLogBinding = binding;
+                    System.out.println("Commanglog binding is " + m_commandLogBinding);
                 }
                 else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();

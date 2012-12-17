@@ -108,7 +108,7 @@ public class CoreUtils {
             int threadsTemp,
             final BlockingQueue<Runnable> queue,
             final Queue<String> coreList) {
-        if (!coreList.isEmpty()) {
+        if (coreList != null && !coreList.isEmpty()) {
             threadsTemp = coreList.size();
         }
         final int threads = threadsTemp;
@@ -127,13 +127,13 @@ public class CoreUtils {
                             @Override
                             public synchronized Thread  newThread(Runnable r) {
                                 String nameToUse = threads == 1 ? name : name + " - " + threadIndex++;
-                                if (!coreList.isEmpty()) {
+                                if (coreList != null && !coreList.isEmpty()) {
                                     final Runnable original = r;
                                     r = new Runnable() {
                                         @Override
                                         public void run() {
                                             String core = coreList.poll();
-                                            System.out.println("Binding computation thread(" + Thread.currentThread() + ") to " + core);
+                                            System.out.println("Binding computation thread(" + Thread.currentThread().getName() + ") to " + core);
                                             PosixJNAAffinity.INSTANCE.setAffinity(core);
                                             original.run();
                                         }
