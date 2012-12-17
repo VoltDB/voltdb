@@ -1425,11 +1425,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
         // replay command line args that we can see
         List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-        StringBuilder sb = new StringBuilder("Available JVM arguments:");
+        StringBuilder sb = new StringBuilder(2048).append("Available JVM arguments:");
         for (String iarg : iargs)
             sb.append(" ").append(iarg);
         if (iargs.size() > 0) hostLog.info(sb.toString());
         else hostLog.info("No JVM command line args known.");
+
+        sb.delete(0, sb.length()).append("JVM class path: ");
+        sb.append(System.getProperty("java.class.path", "[not available]"));
+        hostLog.info(sb.toString());
 
         // java heap size
         long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
