@@ -139,6 +139,13 @@ for f in $VOLTDB_LIB/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
+# if present include user supplied jars
+if \ls -1 $VOLTDB_LIB/extension | egrep -q '\.jar$'; then
+  for f in $VOLTDB_LIB/extension/*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+fi
+
 # run it
 export CMDVAL="$JAVA -server -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp "
 export CMDVAL=$CMDVAL"-XX:-ReduceInitialCardMarks $JAVA_HEAP_MAX $VOLTDB_OPTS "
