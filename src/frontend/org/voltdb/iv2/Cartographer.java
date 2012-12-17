@@ -224,14 +224,12 @@ public class Cartographer extends StatsSource
             int sitesPerHost, int numberOfPartitions)
     {
         List<Integer> partitions = new ArrayList<Integer>();
-        int freeSites = sitesPerHost;
         List<Integer> partSortedByRep = sortKeysByValue(repsPerPart);
-        for (int i = 0; i < numberOfPartitions; i++) {
+        for (int i = 0; i < partSortedByRep.size(); i++) {
             int leastReplicatedPart = partSortedByRep.get(i);
             if (repsPerPart.get(leastReplicatedPart) < kfactor + 1) {
                 partitions.add(leastReplicatedPart);
-                freeSites--;
-                if (freeSites == 0) {
+                if (partitions.size() == sitesPerHost) {
                     break;
                 }
             }
