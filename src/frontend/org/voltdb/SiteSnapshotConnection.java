@@ -19,8 +19,9 @@ package org.voltdb;
 
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.Map;
 
-import org.voltdb.SnapshotSiteProcessor;
+import org.voltcore.utils.Pair;
 
 /**
  * Defines the interface between a site and the snapshot
@@ -29,7 +30,11 @@ import org.voltdb.SnapshotSiteProcessor;
 public interface SiteSnapshotConnection
 {
 
-    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts);
+    public void initiateSnapshots(
+            Deque<SnapshotTableTask> tasks,
+            long txnId,
+            int numLiveHosts,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
 
 }

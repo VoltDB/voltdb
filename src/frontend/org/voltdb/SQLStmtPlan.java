@@ -22,6 +22,7 @@ public class SQLStmtPlan {
     private final byte[] aggregatorFragment;
     private final byte[] collectorFragment;
     private final boolean isReplicatedTableDML;
+    private final boolean isReadOnly;
 
     /**
      * Constructor
@@ -29,12 +30,14 @@ public class SQLStmtPlan {
      * @param aggregatorFragment    Compiled plan aggregator fragment
      * @param collectorFragment     Compiled plan collector fragment
      * @param isReplicatedTableDML  True if replicated
+     * @param isReadOnly            True if read only
      */
     public SQLStmtPlan(byte[] aggregatorFragment, byte[] collectorFragment,
-            boolean isReplicatedTableDML) {
+            boolean isReplicatedTableDML, boolean isReadOnly) {
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.isReplicatedTableDML = isReplicatedTableDML;
+        this.isReadOnly = isReadOnly;
     }
 
     /**
@@ -59,5 +62,13 @@ public class SQLStmtPlan {
      */
     public boolean isReplicatedTableDML() {
         return isReplicatedTableDML;
+    }
+
+    /**
+     * Get the read only flag
+     * @return  true if read only
+     */
+    public boolean isReadOnly() {
+        return isReadOnly;
     }
 }

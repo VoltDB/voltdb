@@ -28,9 +28,9 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -100,7 +100,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         commands,
                         catalogBytes,
                         expectedCatalogVersion,
-                        getTransactionId(),
+                        getVoltPrivateRealTransactionIdDontUseMe(),
                         getTransactionTime().getTime(),
                         deploymentCRC);
         ctx.updateCatalog(commands, p.getFirst(), p.getSecond());

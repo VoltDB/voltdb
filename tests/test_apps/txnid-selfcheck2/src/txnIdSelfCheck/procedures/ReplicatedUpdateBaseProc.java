@@ -21,23 +21,23 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.dtxn;
+package txnIdSelfCheck.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
-public class Deterministic_RO_MP extends VoltProcedure {
+public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
 
-    public static final SQLStmt sql = new SQLStmt("select nondetval from kv order by nondetval");
+    public final SQLStmt r_getCIDData = new SQLStmt(
+            "SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;");
 
-    public VoltTable run() {
-        voltQueueSQL(sql);
-        return voltExecuteSQL()[0];
+    public final SQLStmt r_cleanUp = new SQLStmt(
+            "DELETE FROM replicated WHERE cid = ? and cnt < ?;");
+
+    public final SQLStmt r_insert = new SQLStmt(
+            "INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
+
+    @Override
+    public long run() {
+        return 0; // never called in base procedure
     }
-
 }

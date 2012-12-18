@@ -36,25 +36,25 @@ public class ProcedureInvocation {
 
     // used for replicated procedure invocations
     private final long m_originalTxnId;
-    private final long m_originalTs;
+    private final long m_originalUniqueId;
     private final ProcedureInvocationType m_type;
 
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
         this(-1, -1, handle, procName, parameters);
     }
 
-    ProcedureInvocation(long originalTxnId, long originalTs, long handle,
+    ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
                         String procName, Object... parameters) {
         super();
         m_originalTxnId = originalTxnId;
-        m_originalTs = originalTs;
+        m_originalUniqueId = originalUniqueId;
         m_clientHandle = handle;
         m_procName = procName;
         m_parameters = new ParameterSet();
         m_parameters.setParameters(parameters);
 
         // auto-set the type if both txn IDs are set
-        if (m_originalTxnId == -1 && m_originalTs == -1) {
+        if (m_originalTxnId == -1 && m_originalUniqueId == -1) {
             m_type = ProcedureInvocationType.ORIGINAL;
         } else {
             m_type = ProcedureInvocationType.REPLICATED;
@@ -88,7 +88,7 @@ public class ProcedureInvocation {
         buf.put(m_type.getValue());//Version
         if (m_type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(m_originalTxnId);
-            buf.putLong(m_originalTs);
+            buf.putLong(m_originalUniqueId);
         }
         FastSerializer.writeString(m_procNameBytes, buf);
         buf.putLong(m_clientHandle);

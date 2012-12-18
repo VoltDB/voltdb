@@ -23,7 +23,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }

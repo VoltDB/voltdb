@@ -47,7 +47,7 @@ base_cli_spec = cli.CLISpec(
 Specific actions are provided by verbs.  Run "%prog help VERB" to display full
 usage for a verb, including its options and arguments.
 ''',
-    usage = '%prog VERB [ ARGUMENTS ... ]',
+    usage = '%prog VERB [ OPTIONS ... ] [ ARGUMENTS ... ]',
     options = (
         cli.BooleanOption(None, '--debug', 'debug',
                           'display debug messages'),
@@ -59,6 +59,36 @@ usage for a verb, including its options and arguments.
 
 # Internal command names that get added to the VOLT namespace of user scripts.
 internal_commands = ['volt', 'voltadmin']
+
+# Written to the README file when the packaged executable is created.
+compatibility_warning = '''\
+The program package in the bin directory requires Python version 2.6 or greater.
+It will crash with older Python versions that fail to detect and run compressed
+Python executable packages.
+
+The following two alternatives allow the tool to function on systems with older
+Python versions, as long is it is version 2.4 or later.
+
+1) Run the source script having the same name in the tools directory. For
+   example:
+
+      tools/%(name)s VERB [ OPTIONS ... ] [ ARGUMENTS ... ]
+
+2) Pass the full command line including the executable package path as arguments
+   to an explicit python version. For example:
+
+      python2.6 bin/%(name)s VERB [ OPTIONS ... ] [ ARGUMENTS ... ]'''
+
+# README file template.
+readme_template = '''
+=== %(name)s README ===
+
+%(usage)s
+
+-- WARNING --
+
+%(warning)s
+'''
 
 #===============================================================================
 class JavaRunner(object):
@@ -292,13 +322,7 @@ class VerbRunner(object):
             self._create_package(output_dir, self.verbspace.name, self.verbspace.version,
                                  self.verbspace.description, force)
         # Warn for Python version < 2.6.
-        compat_msg = ('''\
-The program package requires Python version 2.6 or greater.  It will
-crash with older Python versions that can't detect and run zip
-packages. If a newer Python is not the default you can run by passing
-the package file to an explicit python version, e.g.
-
-    python2.6 %s''' % self.verbspace.name)
+        compat_msg = compatibility_warning % dict(name = self.verbspace.name)
         if sys.version_info[0] == 2 and sys.version_info[1] < 6:
             utility.warning(compat_msg)
         # Generate README.<tool> file.
@@ -306,7 +330,9 @@ the package file to an explicit python version, e.g.
         readme_file = utility.File(readme_path, mode = 'w')
         readme_file.open()
         try:
-            readme_file.write('%s\n\nWARNING: %s\n' % (self.get_usage(), compat_msg))
+            readme_file.write(readme_template % dict(name    = self.verbspace.name,
+                                                     usage   = self.get_usage(),
+                                                     warning = compat_msg))
         finally:
             readme_file.close()
 

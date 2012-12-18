@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.VoltDB;
+import org.voltdb.client.ProcedureInvocationType;
 
 /**
  * Holds a batch of planned SQL statements.
@@ -35,6 +36,11 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
 
     // not persisted across serializations
     public final String sqlBatchText;
+
+    // for DR
+    public final ProcedureInvocationType type;
+    public final long originalTxnId;
+    public final long originalUniqueId;
 
     // May be reassigned if the planner infers single partition work.
     // Also not persisted across serializations
@@ -74,6 +80,9 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             long connectionId,
             String hostname,
             boolean adminConnection,
+            ProcedureInvocationType type,
+            long originalTxnId,
+            long originalUniqueId,
             Object clientData) {
         this.sqlBatchText = sqlBatchText;
         this.partitionParam = partitionParam;
@@ -82,6 +91,9 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         this.hostname = hostname;
         this.adminConnection = adminConnection;
         this.clientData = clientData;
+        this.type = type;
+        this.originalTxnId = originalTxnId;
+        this.originalUniqueId = originalUniqueId;
     }
 
     @Override

@@ -404,7 +404,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
             if (out.position() == 0) {
                 break;
             }
-            int ii = 16;//skip partition id and row count and first tuple length
+            int ii = 12;//skip partition id and row count and first tuple length
             while (ii < (serialized - 4)) {
                 int32_t value = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 const bool inserted =

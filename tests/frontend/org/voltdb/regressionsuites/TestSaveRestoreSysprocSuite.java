@@ -717,6 +717,51 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
     }
 
+    public void testRestore2dot8dot4dot1Snapshot()
+    throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        Client client = getClient();
+        byte snapshotTarBytes[] = new byte[1024 * 1024 * 3];
+        InputStream is =
+            org.voltdb_testprocs.regressionsuites.saverestore.MatView.class.
+            getResource("voltdb_2.8.4.1_snapshot.tar.gz").openConnection().getInputStream();
+        GZIPInputStream gis = new GZIPInputStream(is);
+        int totalRead = 0;
+        int readLastTime = 0;
+        while (readLastTime != -1 && totalRead != snapshotTarBytes.length) {
+            readLastTime = gis.read(snapshotTarBytes, totalRead, snapshotTarBytes.length - totalRead);
+            if (readLastTime == -1) {
+                break;
+            }
+            totalRead += readLastTime;
+        }
+        assertTrue(totalRead > 0);
+        assertFalse(totalRead == snapshotTarBytes.length);
+
+        ProcessBuilder pb = new ProcessBuilder(new String[]{ "tar", "--directory", TMPDIR, "-x"});
+        Process proc = pb.start();
+        OutputStream os = proc.getOutputStream();
+        os.write(snapshotTarBytes, 0, totalRead);
+        os.close();
+        assertEquals(0, proc.waitFor());
+        validateSnapshot(true);
+
+        byte firstStringBytes[] = new byte[1048576];
+        java.util.Arrays.fill(firstStringBytes, (byte)'c');
+        byte secondStringBytes[] = new byte[1048564];
+        java.util.Arrays.fill(secondStringBytes, (byte)'a');
+
+        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+
+        VoltTable results[] = client.callProcedure("JumboSelect", 0).getResults();
+        assertEquals(results.length, 1);
+        assertTrue(results[0].advanceRow());
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
+    }
+
     public void testSaveRestoreJumboRows()
     throws IOException, InterruptedException, ProcCallException
     {

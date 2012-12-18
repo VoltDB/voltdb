@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.util.List;
 
 import org.voltdb.CatalogContext;
+import org.voltdb.client.ProcedureInvocationType;
 
 
 public class AdHocPlannerWork extends AsyncCompilerWork {
@@ -31,12 +32,16 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     final CatalogContext catalogContext;
     final boolean allowParameterization;
     final boolean inferSinglePartition;
+    final ProcedureInvocationType type;
+    final long originalTxnId;
+    final long originalUniqueId;
     private boolean isExplainWork = false;
 
     public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection, Object clientData,
             String sqlBatchText, List<String> sqlStatements, Object partitionParam, CatalogContext context,
             boolean allowParameterization, final boolean inferSinglePartition,
+            ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, shouldShutdown, clientHandle, connectionId, hostname,
@@ -47,6 +52,9 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
         this.catalogContext = context;
         this.allowParameterization = allowParameterization;
         this.inferSinglePartition = inferSinglePartition;
+        this.type = type;
+        this.originalUniqueId = originalUniqueId;
+        this.originalTxnId = originalTxnId;
     }
 
     @Override

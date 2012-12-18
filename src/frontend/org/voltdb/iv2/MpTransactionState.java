@@ -27,16 +27,15 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-
-import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpTransactionState extends TransactionState
 {
@@ -228,7 +227,7 @@ public class MpTransactionState extends TransactionState
             m_remoteWork = new FragmentTaskMessage(m_localWork.getInitiatorHSId(),
                     m_localWork.getCoordinatorHSId(),
                     m_localWork.getTxnId(),
-                    m_localWork.getTimestamp(),
+                    m_localWork.getUniqueId(),
                     m_localWork.isReadOnly(),
                     false,
                     false);
@@ -325,6 +324,12 @@ public class MpTransactionState extends TransactionState
         // Remove the distributed fragment for this site from remoteDeps
         // for the dependency Id depId.
         Set<Long> localRemotes = m_remoteDeps.get(depId);
+        if (localRemotes == null && m_isRestart) {
+            // Tolerate weird deps showing up on restart
+            // After Ariel separates unique ID from transaction ID, rewrite restart to restart with
+            // a new transaction ID and make this and the fake distributed fragment stuff go away.
+            return;
+        }
         Object needed = localRemotes.remove(hsid);
         if (needed != null) {
             // add table to storage
@@ -336,7 +341,6 @@ public class MpTransactionState extends TransactionState
             tables.add(table);
         }
         else {
-            // TODO: need an error path here.
             System.out.println("No remote dep for local site: " + hsid);
         }
     }

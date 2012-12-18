@@ -49,7 +49,10 @@ public class ExportToFileTestVerifier {
         }
     };
 
-    public ExportToFileTestVerifier() {
+    private final int partitionId;
+
+    public ExportToFileTestVerifier(int partitionId) {
+        this.partitionId = partitionId;
     }
 
     void addRow( String [] data) {
@@ -113,8 +116,9 @@ public class ExportToFileTestVerifier {
                         d.appendText("{ expected sequence " ).appendDescriptionOf(seqMatcher);
                         seqMatcher.describeMismatch(rowSeq, d);
                         d.appendText(" }");
+                    } else {
+                        m_sequenceNumber++;
                     }
-                    m_sequenceNumber++;
                 }
                 if (match) {
                    String [] toBeMatched = Arrays.copyOfRange(
@@ -127,6 +131,7 @@ public class ExportToFileTestVerifier {
                    }
                 }
                 d.appendText("]");
+                System.out.println("Validated partition id " + partitionId + " sequence " + m_sequenceNumber);
                 return match;
             }
         };
