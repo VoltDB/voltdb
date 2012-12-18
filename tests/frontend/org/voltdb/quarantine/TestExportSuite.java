@@ -202,7 +202,8 @@ public class TestExportSuite extends TestExportBase {
               false,
               false,
               false,
-              0);
+              0,
+              ExportToFileClient.BinaryEncoding.HEX);
         exportClient.addServerInfo(new InetSocketAddress("localhost", port(0)));
         exportClient.addCredentials("export", "export");
         final Thread currentThread = Thread.currentThread();
@@ -392,7 +393,8 @@ public class TestExportSuite extends TestExportBase {
               false,
               false,
               false,
-              0);
+              0,
+              ExportToFileClient.BinaryEncoding.HEX);
       exportClient.addServerInfo(new InetSocketAddress("localhost", port(0)));
       exportClient.addCredentials("export", "export");
       final Thread currentThread = Thread.currentThread();

@@ -51,7 +51,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 public class MailboxTracker {
     private final ZooKeeper m_zk;
     private final MailboxUpdateHandler m_handler;
-    private final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("Mailbox tracker");
+    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("Mailbox tracker", 15000);
 
     private byte m_lastChecksum[] = null;
 

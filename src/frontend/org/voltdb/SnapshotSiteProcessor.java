@@ -314,7 +314,7 @@ public class SnapshotSiteProcessor {
                                     (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
                         } else {
                             //Schedule it to happen after the quiet period has elapsed
-                            VoltDB.instance().scheduleWork(
+                            VoltDB.instance().schedulePriorityWork(
                                     m_onPotentialSnapshotWork,
                                     quietUntil - now,
                                     0,
@@ -379,7 +379,7 @@ public class SnapshotSiteProcessor {
          */
         if (m_isIV2Enabled) {
             for (int ii = 0; ii < m_availableSnapshotBuffers.size(); ii++) {
-                VoltDB.instance().scheduleWork(
+                VoltDB.instance().schedulePriorityWork(
                         m_onPotentialSnapshotWork,
                         (m_quietUntil + (5 * m_snapshotPriority) - now),
                         0,
@@ -474,7 +474,7 @@ public class SnapshotSiteProcessor {
             /**
              * The block from the EE will contain raw tuple data with no length prefix etc.
              */
-            snapshotBuffer.b.limit(headerSize + serialized);
+            snapshotBuffer.b.limit(serialized + headerSize);
             snapshotBuffer.b.position(0);
             Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
             for (SnapshotDataFilter filter : currentTask.m_filters) {

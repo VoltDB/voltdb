@@ -110,6 +110,14 @@ public class ExportToFileClient extends ExportClientBase2 {
 
     // timer used to roll batches
     protected ScheduledExecutorService m_ses;
+
+    public static enum BinaryEncoding {
+        BASE64,
+        HEX
+    }
+
+    private BinaryEncoding m_binaryEncoding;
+
     /**
     *
     */
@@ -520,7 +528,11 @@ public class ExportToFileClient extends ExportClientBase2 {
                     if (row[i] == null) {
                         fields[i - m_firstfield] = "NULL";
                     } else if (m_tableSchema.get(i) == VoltType.VARBINARY) {
-                        fields[i - m_firstfield] = Encoder.hexEncode((byte[]) row[i]);
+                        if (m_binaryEncoding == BinaryEncoding.HEX) {
+                            fields[i - m_firstfield] = Encoder.hexEncode((byte[]) row[i]);
+                        } else {
+                            fields[i - m_firstfield] = Encoder.base64Encode((byte[]) row[i]);
+                        }
                     } else if (m_tableSchema.get(i) == VoltType.STRING) {
                         fields[i - m_firstfield] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
@@ -595,9 +607,11 @@ public class ExportToFileClient extends ExportClientBase2 {
             boolean useAdminPorts,
             boolean batched,
             boolean withSchema,
-            int throughputMonitorPeriod) {
+            int throughputMonitorPeriod,
+            BinaryEncoding be) {
         this(delimiter, nonce, outdir, period, dateformatString, fullDelimiters,
-                firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod, true, TimeZone.getDefault());
+                firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod,
+                true, TimeZone.getDefault(), be);
     }
 
     public ExportToFileClient() {
@@ -616,7 +630,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                               boolean withSchema,
                               int throughputMonitorPeriod,
                               boolean autodiscoverTopology,
-                              TimeZone tz) {
+                              TimeZone tz,
+                              BinaryEncoding be) {
         super(useAdminPorts, throughputMonitorPeriod, autodiscoverTopology);
         configureInternal(
                 delimiter,
@@ -628,7 +643,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                 firstfield,
                 batched,
                 withSchema,
-                tz);
+                tz,
+                be);
     }
 
     @Override
@@ -746,7 +762,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                         + "[--delimiters html-escaped delimiter set (4 chars)] "
                         + "[--user export_username] "
                         + "[--password export_password]"
-                        + "[--timezone GMT+0]");
+                        + "[--timezone GMT+0]"
+                        + "[--binaryencoding [ HEX | BASE64 ]]");
         System.out.println("Note that server hostnames may be appended with a specific port:");
         System.out.println("  --servers server1:port1[,server2:port2,...,serverN:portN]");
 
@@ -770,6 +787,7 @@ public class ExportToFileClient extends ExportClientBase2 {
         int throughputMonitorPeriod = 0;
         boolean autodiscoverTopolgy = true;
         TimeZone tz = VoltDB.GMT_TIMEZONE;
+        BinaryEncoding be = BinaryEncoding.HEX;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -925,6 +943,21 @@ public class ExportToFileClient extends ExportClientBase2 {
                     printHelpAndQuit(-1);
                 }
             }
+            else if (arg.equals("--binaryencoding")) {
+                if (args.length < ii + 1) {
+                    System.err.println("Error: Not enough args following --binaryencoding");
+                    printHelpAndQuit(-1);
+                }
+                try {
+                    be = BinaryEncoding.valueOf(args[ii + 1].trim().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    System.err.println(
+                            "The binary encoding \"" + args[ii + 1].trim().toUpperCase() +
+                            "\" is unsupported. Must be one of [ HEX | BASE64 ]");
+                    printHelpAndQuit(-1);
+                }
+                ii++;
+            }
             else if (arg.equals("--disable-topology-autodiscovery")) {
                 autodiscoverTopolgy = false;
             }
@@ -982,7 +1015,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                                                            withSchema,
                                                            throughputMonitorPeriod,
                                                            autodiscoverTopolgy,
-                                                           tz);
+                                                           tz,
+                                                           be);
 
         // add all of the servers specified
         for (String server : volt_servers) {
@@ -1070,6 +1104,9 @@ public class ExportToFileClient extends ExportClientBase2 {
 
         TimeZone tz = TimeZone.getTimeZone(conf.getProperty("timezone", VoltDB.GMT_TIMEZONE.getID()));
 
+        BinaryEncoding encoding = BinaryEncoding.valueOf(
+                conf.getProperty("binaryencoding", "HEX").trim().toUpperCase());
+
         configureInternal(
                 delimiter,
                 nonce,
@@ -1080,7 +1117,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                 firstfield,
                 batched,
                 withSchema,
-                tz);
+                tz,
+                encoding);
     }
 
     private void configureInternal(
@@ -1093,7 +1131,8 @@ public class ExportToFileClient extends ExportClientBase2 {
                               int firstfield,
                               boolean batched,
                               boolean withSchema,
-                              final TimeZone tz) {
+                              final TimeZone tz,
+                              final BinaryEncoding be) {
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -1117,6 +1156,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                 return sdf;
             }
         };
+        m_binaryEncoding = be;
         m_firstfield = firstfield;
         m_batched = batched;
         m_withSchema = withSchema;
@@ -1148,7 +1188,9 @@ public class ExportToFileClient extends ExportClientBase2 {
                 }
             }
         };
-        m_ses = CoreUtils.getScheduledThreadPoolExecutor("Export file rotate timer for nonce " + nonce, 1, 131072);
+        m_ses =
+                CoreUtils.getScheduledThreadPoolExecutor(
+                        "Export file rotate timer for nonce " + nonce, 1, CoreUtils.SMALL_STACK_SIZE);
         m_ses.scheduleWithFixedDelay(rotator, m_period, m_period, TimeUnit.MINUTES);
     }
 }

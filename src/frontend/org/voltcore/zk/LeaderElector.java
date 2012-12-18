@@ -90,7 +90,7 @@ public class LeaderElector {
         this.prefix = prefix;
         this.data = data;
         this.cb = cb;
-        es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Leader elector-" + dir));
+        es = CoreUtils.getCachedSingleThreadExecutor("Leader elector-" + dir, 15000);
     }
 
     /**

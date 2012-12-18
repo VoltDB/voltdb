@@ -22,7 +22,6 @@
 #include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>
-#include <boost/crc.hpp>
 
 namespace voltdb {
 
@@ -38,13 +37,9 @@ CopyOnWriteContext::CopyOnWriteContext(PersistentTable *table, TupleSerializer *
              m_tuplesSerialized(0) {}
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
-    boost::crc_32_type crc;
-    boost::crc_32_type partitionIdCRC;
     out->writeInt(m_partitionId);
-    partitionIdCRC.process_bytes(out->data() + out->position() - 4, 4);
-    out->writeInt(partitionIdCRC.checksum());
-    const std::size_t crcPosition = out->reserveBytes(4);//For CRC
     int rowsSerialized = 0;
+    const std::size_t rowCountPosition = out->reserveBytes(4);
 
     TableTuple tuple(m_table->schema());
     if (out->remaining() < (m_maxTupleLength + sizeof(int32_t))) {
@@ -65,9 +60,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
          */
         if (!hadMore) {
             if (m_finishedTableScan) {
-                out->writeInt(rowsSerialized);
-                crc.process_bytes(out->data() + out->position() - 4, 4);
-                out->writeIntAt(crcPosition, crc.checksum());
+                out->writeIntAt( rowCountPosition, rowsSerialized);
                 return false;
             } else {
                 m_finishedTableScan = true;
@@ -79,7 +72,6 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         const std::size_t tupleStartPosition = out->position();
         m_serializer->serializeTo( tuple, out);
         const std::size_t tupleEndPosition = out->position();
-        crc.process_block(out->data() + tupleStartPosition, out->data() + tupleEndPosition);
         m_tuplesSerialized++;
         rowsSerialized++;
 
@@ -111,9 +103,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
      * can be included in the CRC. It will be moved back to the front
      * to match the table serialization format when chunk is read later.
      */
-    out->writeInt(rowsSerialized);
-    crc.process_bytes(out->data() + out->position() - 4, 4);
-    out->writeIntAt(crcPosition, crc.checksum());
+    out->writeIntAt( rowCountPosition, rowsSerialized);
     return true;
 }
 

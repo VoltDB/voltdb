@@ -53,6 +53,8 @@ public class MpScheduler extends Scheduler
 
     private final List<Long> m_iv2Masters;
     private final long m_buddyHSId;
+    //Generator of pre-IV2ish timestamp based unique IDs
+    private final UniqueIdGenerator m_uniqueIdGenerator;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -62,6 +64,7 @@ public class MpScheduler extends Scheduler
         super(partitionId, taskQueue);
         m_buddyHSId = buddyHSId;
         m_iv2Masters = new ArrayList<Long>();
+        m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
     @Override
@@ -159,15 +162,17 @@ public class MpScheduler extends Scheduler
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
          */
         long mpTxnId;
+        //Timestamp is actually a pre-IV2ish style time based transaction id
         long timestamp;
         if (message.isForReplay()) {
             mpTxnId = message.getTxnId();
-            timestamp = message.getTimestamp();
+            timestamp = message.getUniqueId();
             setMaxSeenTxnId(mpTxnId);
+            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
         } else {
             TxnEgo ego = advanceTxnEgo();
             mpTxnId = ego.getTxnId();
-            timestamp = ego.getWallClock();
+            timestamp = m_uniqueIdGenerator.getNextUniqueId();
         }
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
@@ -235,13 +240,14 @@ public class MpScheduler extends Scheduler
                     message.getCoordinatorHSId(),
                     message.getTruncationHandle(),
                     message.getTxnId(),
-                    message.getTimestamp(),
+                    message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
                     message.isForReplay());
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,

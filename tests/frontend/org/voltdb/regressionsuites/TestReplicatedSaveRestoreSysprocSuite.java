@@ -56,7 +56,8 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
             "testBadSnapshotParams",
             "testIdleOnlineSnapshot",
             "testRestoreMissingPartitionFile",
-            "testPropagateIV2TransactionIds"));
+            "testPropagateIV2TransactionIds",
+            "testRestore2dot8dot4dot1Snapshot"));
     public TestReplicatedSaveRestoreSysprocSuite(String name) {
         super(name);
     }
@@ -125,6 +126,8 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
 
     @Override
     public void testPropagateIV2TransactionIds() {}
+    @Override
+    public void testRestore2dot8dot4dot1Snapshot() {}
 
     /**
      * Build a list of the tests to be run. Use the regression suite

@@ -40,7 +40,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     // for DR
     public final ProcedureInvocationType type;
     public final long originalTxnId;
-    public final long originalTs;
+    public final long originalUniqueId;
 
     // May be reassigned if the planner infers single partition work.
     // Also not persisted across serializations
@@ -82,7 +82,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             boolean adminConnection,
             ProcedureInvocationType type,
             long originalTxnId,
-            long originalTs,
+            long originalUniqueId,
             Object clientData) {
         this.sqlBatchText = sqlBatchText;
         this.partitionParam = partitionParam;
@@ -93,7 +93,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         this.clientData = clientData;
         this.type = type;
         this.originalTxnId = originalTxnId;
-        this.originalTs = originalTs;
+        this.originalUniqueId = originalUniqueId;
     }
 
     @Override

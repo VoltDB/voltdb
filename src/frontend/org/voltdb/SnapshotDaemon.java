@@ -59,6 +59,9 @@ import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -86,9 +89,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
-    private final ScheduledThreadPoolExecutor m_es =
-            new ScheduledThreadPoolExecutor(1, CoreUtils.getThreadFactory("SnapshotDaemon"),
+    private final ScheduledThreadPoolExecutor m_esBase =
+            new ScheduledThreadPoolExecutor(1,
+                    CoreUtils.getThreadFactory(null, "SnapshotDaemon", CoreUtils.SMALL_STACK_SIZE, false),
                                             new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
+    private final ListeningScheduledExecutorService m_es = MoreExecutors.listeningDecorator(m_esBase);
 
     private ZooKeeper m_zk;
     private DaemonInitiator m_initiator;
@@ -178,8 +183,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private State m_state = State.STARTUP;
 
     SnapshotDaemon() {
-        m_es.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
-        m_es.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        m_esBase.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+        m_esBase.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 
         m_frequencyUnit = null;
         m_retain = 0;
@@ -983,7 +988,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     /**
      * Make this SnapshotDaemon responsible for generating snapshots
      */
-    public Future<Void> makeActive(final SnapshotSchedule schedule)
+    public ListenableFuture<Void> makeActive(final SnapshotSchedule schedule)
     {
         return m_es.submit(new Callable<Void>() {
             @Override

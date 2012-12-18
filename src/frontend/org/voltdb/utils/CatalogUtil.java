@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.zip.CRC32;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -46,6 +45,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -762,7 +762,7 @@ public abstract class CatalogUtil {
             data = new byte[]{0x0}; // should generate a CRC mismatch.
         }
 
-        CRC32 crc = new CRC32();
+        PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(data);
 
         long retval = crc.getValue();

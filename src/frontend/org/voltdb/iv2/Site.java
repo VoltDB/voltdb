@@ -930,6 +930,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         null);
             }
             Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+            if (sequenceNumbers == null) {
+                VoltDB.crashLocalVoltDB(
+                        "Could not find export sequence numbers for partition " +
+                                m_partitionId + " table " +
+                                tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+            }
             exportAction(
                     true,
                     sequenceNumbers.getFirst().intValue(),
