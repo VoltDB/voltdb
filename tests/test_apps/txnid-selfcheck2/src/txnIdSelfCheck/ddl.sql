@@ -76,3 +76,6 @@ PARTITION PROCEDURE UpdatePartitionedSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateReplicatedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBothMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSP;
+PARTITION PROCEDURE ReadSP ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMP;

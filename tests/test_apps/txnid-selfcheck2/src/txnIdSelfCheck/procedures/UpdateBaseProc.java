@@ -59,7 +59,7 @@ public class UpdateBaseProc extends VoltProcedure {
         VoltTable data = results[0];
         VoltTable adhoc = results[1];
 
-        final long txnid = getTransactionId();
+        final long txnid = getUniqueId();
         final long ts = getTransactionTime().getTime();
         long prevtxnid = 0;
         long prevrid = 0;
@@ -82,18 +82,7 @@ public class UpdateBaseProc extends VoltProcedure {
             prevrid = row.getLong("rid");
         }
 
-        // make sure all cnt values are consecutive
-        data.resetRowPosition();
-        long prevCnt = 0;
-        while (data.advanceRow()) {
-            long cntValue = data.getLong("cnt");
-            if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
-                throw new VoltAbortException(getClass().getName() +
-                        " cnt values are not consecutive" +
-                        " for cid " + cid);
-            }
-            prevCnt = cntValue;
-        }
+        validateCIDData(data, getClass().getName());
 
         // check the rids monotonically increase
         if (prevrid >= rid) {
@@ -107,5 +96,25 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
         return voltExecuteSQL();
+    }
+
+    public static void validateCIDData(VoltTable data, String callerId) {
+        // empty tables are lamely valid
+        if (data.getRowCount() == 0) return;
+
+        byte cid = (byte) data.fetchRow(0).getLong("cid");
+
+        // make sure all cnt values are consecutive
+        data.resetRowPosition();
+        long prevCnt = 0;
+        while (data.advanceRow()) {
+            long cntValue = data.getLong("cnt");
+            if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
+                throw new VoltAbortException(callerId +
+                        " cnt values are not consecutive" +
+                        " for cid " + cid);
+            }
+            prevCnt = cntValue;
+        }
     }
 }

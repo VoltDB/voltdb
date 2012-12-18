@@ -289,6 +289,9 @@ public class Benchmark {
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
 
+        ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset);
+        readThread.start();
+
         AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client);
         adHocMayhemThread.start();
 
@@ -305,10 +308,12 @@ public class Benchmark {
             Thread.yield();
         }
 
+        readThread.shutdown();
         adHocMayhemThread.shutdown();
         for (ClientThread clientThread : clientThreads) {
             clientThread.shutdown();
         }
+        readThread.join();
         adHocMayhemThread.join();
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
