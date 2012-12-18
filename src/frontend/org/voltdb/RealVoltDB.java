@@ -432,7 +432,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         for (int ii = 0; ii < partitionsToReplace.size(); ii++) {
                             m_iv2InitiatorStartingTxnIds[ii] = TxnEgo.makeZero(partitionsToReplace.get(ii)).getTxnId();
                         }
-                        m_iv2Initiators = createIv2Initiators(partitionsToReplace);
+                        m_iv2Initiators = createIv2Initiators(partitionsToReplace, true);
                     }
                     else {
                         List<Integer> partitions =
@@ -441,7 +441,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         for (int ii = 0; ii < partitions.size(); ii++) {
                             m_iv2InitiatorStartingTxnIds[ii] = TxnEgo.makeZero(partitions.get(ii)).getTxnId();
                         }
-                        m_iv2Initiators = createIv2Initiators(partitions);
+                        m_iv2Initiators = createIv2Initiators(partitions, false);
                     }
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
@@ -1060,13 +1060,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return topo;
     }
 
-    private List<Initiator> createIv2Initiators(Collection<Integer> partitions)
+    private List<Initiator> createIv2Initiators(Collection<Integer> partitions, boolean forRejoin)
     {
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent,
-                    m_snapshotCompletionMonitor);
+                    m_snapshotCompletionMonitor, forRejoin);
             initiators.add(initiator);
         }
         return initiators;

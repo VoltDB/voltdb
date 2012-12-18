@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.json_voltpatches.JSONException;
@@ -68,6 +69,7 @@ public class RejoinProducer extends SiteTasker
     private final int m_partitionId;
     private final String m_snapshotNonce;
     private final String m_whoami;
+    private final AtomicBoolean m_currentlyRejoining;
     private final ScheduledThreadPoolExecutor m_timer;
     private ScheduledFuture<?> m_timeFuture;
     private InitiatorMailbox m_mailbox;
@@ -137,7 +139,6 @@ public class RejoinProducer extends SiteTasker
     // will terminate the current node. The watchdog timer, m_timer,
     // is accessed from multiple threads; synchronize on m_timer
     // to use it or to read/modify m_timeFuture;
-    //
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -226,23 +227,32 @@ public class RejoinProducer extends SiteTasker
         }
     }
 
+    // Only instantiated if it must be used. This is important because
+    // m_currentlyRejoining gates promotion to master. If the rejoin producer
+    // is instantiated, it must complete its execution and set currentlyRejoining
+    // to false.
     public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_partitionId = partitionId;
         m_taskQueue = taskQueue;
-        m_snapshotNonce = "Rejoin_" + m_partitionId + "_"
-                + System.currentTimeMillis();
+        m_snapshotNonce = "Rejoin_" + m_partitionId + "_" + System.currentTimeMillis();
         m_completionMonitorAwait = SettableFuture.create();
         m_snapshotAdapterAwait = new CountDownLatch(1);
         m_whoami = "Rejoin producer:" + m_partitionId + " ";
-        m_timer = CoreUtils.getScheduledThreadPoolExecutor(
-                "Rejoin Producer Timer", 1, 2048);
+        m_timer = CoreUtils.getScheduledThreadPoolExecutor("Rejoin Producer Timer", 1, 2048);
+        m_currentlyRejoining = new AtomicBoolean(true);
         REJOINLOG.debug(m_whoami + "created.");
     }
 
     public void setMailbox(InitiatorMailbox mailbox)
     {
         m_mailbox = mailbox;
+    }
+
+
+    public boolean acceptPromotion()
+    {
+        return m_currentlyRejoining.get();
     }
 
     public void deliver(RejoinMessage message)
@@ -420,6 +430,7 @@ public class RejoinProducer extends SiteTasker
                 RejoinMessage replay_complete = new RejoinMessage(
                         m_rejoinCoordinatorHsId, Type.REPLAY_FINISHED);
                 m_mailbox.send(m_rejoinCoordinatorHsId, replay_complete);
+                m_currentlyRejoining.set(false);
             }
         };
 
