@@ -186,6 +186,18 @@ public class ReplaySequencer
         }
 
         if (in instanceof MultiPartitionParticipantMessage) {
+            /*
+             * DR sends multiple @LoadMultipartitionTable proc calls with the
+             * same txnId, which is the snapshot txnId. For each partition,
+             * there is a sentinel paired with the @LoadMultipartitionTable
+             * call. Dedupe the sentinels the same way as we dedupe fragments,
+             * so that there won't be sentinels end up in the sequencer where
+             * matching fragments are deduped.
+             */
+            if (inTxnId <= m_lastPolledFragmentTxnId) {
+                return true;
+            }
+
             // Incoming sentinel.
             // MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage)in;
             if (m_mpiEOLReached) {
