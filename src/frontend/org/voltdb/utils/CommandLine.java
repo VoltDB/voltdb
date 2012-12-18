@@ -46,9 +46,14 @@ public class CommandLine extends VoltDB.Configuration
 
     public static final String VEM_TAG_PROPERTY = "org.voltdb.vemtag";
 
+    public CommandLine(VoltDB.START_ACTION start_action)
+    {
+        m_startAction = start_action;
+    }
+
     // Copy ctor.
     public CommandLine makeCopy() {
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(m_startAction);
         // first copy the base class fields
         cl.m_ipcPorts.addAll(m_ipcPorts);
         cl.m_backend = m_backend;
@@ -67,7 +72,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_httpPort = m_httpPort;
         // final in baseclass: cl.m_isEnterprise = m_isEnterprise;
         cl.m_deadHostTimeoutMS = m_deadHostTimeoutMS;
-        cl.m_startAction = m_startAction;
         cl.m_startMode = m_startMode;
         cl.m_replicationRole = m_replicationRole;
         cl.m_selectedRejoinInterface = m_selectedRejoinInterface;

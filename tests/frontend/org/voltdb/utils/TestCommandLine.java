@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Test;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.client.ProcCallException;
 
@@ -40,7 +41,7 @@ public class TestCommandLine
     @Test
     public void testCommandLineAndTestOpts()
     {
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(START_ACTION.CREATE);
         cl.addTestOptions(true);
         cl.setInitialHeap(2048);
         System.out.println(cl);
@@ -63,7 +64,7 @@ public class TestCommandLine
     public void testCopy()
     {
         // Check a naive copy
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(START_ACTION.CREATE);
         // Set at least the CommandLine local fields to non-defaults
         cl.addTestOptions(true);
         cl.debugPort(1234);
@@ -86,8 +87,7 @@ public class TestCommandLine
     @Test
     public void testStartCommand()
     {
-        CommandLine cl = new CommandLine();
-        cl.startCommand("CREATE");
+        CommandLine cl = new CommandLine(START_ACTION.CREATE);
         assertTrue(cl.toString().contains("create"));
         cl.startCommand("RECOVER");
         assertTrue(cl.toString().contains("recover"));
@@ -104,8 +104,7 @@ public class TestCommandLine
     @Test
     public void testRejoin()
     {
-        CommandLine cl = new CommandLine();
-        cl.startCommand("REJOIN");
+        CommandLine cl = new CommandLine(START_ACTION.REJOIN);
         cl.leader("127.0.0.1:6666");
         System.err.println(cl.toString());
         assertTrue(cl.toString().contains("rejoin host 127.0.0.1:6666"));
@@ -116,8 +115,7 @@ public class TestCommandLine
     @Test
     public void testLiveRejoin()
     {
-        CommandLine cl = new CommandLine();
-        cl.startCommand(START_ACTION.LIVE_REJOIN.name());
+        CommandLine cl = new CommandLine(START_ACTION.LIVE_REJOIN);
         cl.leader("127.0.0.1:6666");
         System.err.println(cl.toString());
         assertTrue(cl.toString().contains("live rejoin host 127.0.0.1:6666"));
@@ -128,7 +126,7 @@ public class TestCommandLine
     @Test
     public void testInterfaces()
     {
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(START_ACTION.CREATE);
         assertFalse(cl.toString().contains("internalinterface"));
         assertFalse(cl.toString().contains("externalinterface"));
         cl.internalInterface("10.0.0.10");
@@ -169,7 +167,7 @@ public class TestCommandLine
         String agentSpec = "-javaagent:/path/to/jolokia-jvm-1.0.1-agent.jar=port=11159,agentContext=/,host=0.0.0.0";
         setVoltDbOpts(agentSpec);
 
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(START_ACTION.CREATE);
         String cmd = cl.toString();
 
         assertTrue(cmd.contains(" " + agentSpec + " "));
@@ -203,7 +201,7 @@ public class TestCommandLine
                 + " -Djava.library.path=/some/diryolanda.so:/tmp/hackme.so"
                 + " sgra rehto emos"); // reverse of 'some other args'
 
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(START_ACTION.CREATE);
         String cmd = cl.toString();
 
         assertTrue(cmd.contains(" " + propOne + " "));
