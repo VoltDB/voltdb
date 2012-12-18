@@ -19,8 +19,8 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.nio.BufferUnderflowException;
 import java.nio.BufferOverflowException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
@@ -28,16 +28,18 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
-import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.CompressionService;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONArray;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.utils.CompressionService;
 
 /**
  * An abstraction around a table's save file for restore.  Deserializes the
@@ -48,6 +50,10 @@ import org.json_voltpatches.JSONArray;
  */
 public class TableSaveFile
 {
+
+    public static enum ChecksumType {
+        CRC32, CRC32C
+    }
 
     public class Container extends BBContainer {
         public final int partitionId;
@@ -103,11 +109,11 @@ public class TableSaveFile
             m_saveFile = dataIn;
             m_continueOnCorruptedChunk = continueOnCorruptedChunk;
 
-            final CRC32 crc = new CRC32();
+            final PureJavaCrc32 crc = new PureJavaCrc32();
             /*
              * If the CRC check fails because the file wasn't completed
              */
-            final CRC32 secondCRC = new CRC32();
+            final PureJavaCrc32 secondCRC = new PureJavaCrc32();
 
             /*
              * Get the header with the save restore specific information
@@ -225,6 +231,7 @@ public class TableSaveFile
                 m_tableName = fd.readString();
                 m_isReplicated = fd.readBoolean();
                 m_isCompressed = false;
+                m_checksumType = ChecksumType.CRC32;
                 if (!m_isReplicated) {
                     m_partitionIds = (int[])fd.readArray(int.class);
                     if (!m_completed) {
@@ -240,8 +247,14 @@ public class TableSaveFile
                         m_corruptedPartitions.add(0);
                     }
                 }
+                m_hasVersion2FormatChunks = false;
             } else {
-                assert(m_versionNum[3] == 1);
+                assert(m_versionNum[3] == 1 || m_versionNum[3] == 2);
+                if (m_versionNum[3] >= 2) {
+                    m_hasVersion2FormatChunks = true;
+                } else {
+                    m_hasVersion2FormatChunks = false;
+                }
                 int numJSONBytes = fd.readInt();
                 byte jsonBytes[] = new byte[numJSONBytes];
                 fd.readFully(jsonBytes);
@@ -256,6 +269,7 @@ public class TableSaveFile
                 m_tableName = obj.getString("tableName");
                 m_isReplicated = obj.getBoolean("isReplicated");
                 m_isCompressed = obj.optBoolean("isCompressed", false);
+                m_checksumType = ChecksumType.valueOf(obj.optString("checksumType", "CRC32"));
                 if (!m_isReplicated) {
                     JSONArray partitionIds = obj.getJSONArray("partitionIds");
                     m_partitionIds = new int[partitionIds.length()];
@@ -442,6 +456,14 @@ public class TableSaveFile
     private ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
     private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();
     private final HashSet<Integer> m_relevantPartitionIds;
+    private final ChecksumType m_checksumType;
+
+    /*
+     * In version 2 the layout of chunks was rejiggered to do less work
+     * in execution sites. The checksum is done after the compression so the layout
+     * of the block is very different.
+     */
+    private final boolean m_hasVersion2FormatChunks;
 
     /**
      * Maintain a list of corrupted partitions. It is possible for uncorrupted partitions
@@ -467,6 +489,210 @@ public class TableSaveFile
      * Thread to read chunks from the disk
      */
     private class ChunkReader implements Runnable {
+
+        /*
+         * The old method was out of hand. Going to start a new one with a different format
+         * that should be easier to understand and validate.
+         */
+        private void readChunksV2() {
+            //For reading the compressed input.
+            ByteBuffer fileInputBuffer =
+                    ByteBuffer.allocateDirect(CompressionService.maxCompressedLength(DEFAULT_CHUNKSIZE));
+
+            while (m_hasMoreChunks) {
+
+                /*
+                 * Limit the number of chunk materialized into memory at one time
+                 */
+                try {
+                    m_chunkReads.acquire();
+                } catch (InterruptedException e) {
+                    return;
+                }
+                boolean expectedAnotherChunk = false;
+                try {
+
+                    /*
+                     * Get the length of the next chunk, partition id, crc for partition id, and length prefix,
+                     * and then the CRC of the compressed payload
+                     */
+                    ByteBuffer chunkLengthB = ByteBuffer.allocate(16);
+                    while (chunkLengthB.hasRemaining()) {
+                        final int read = m_saveFile.read(chunkLengthB);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    int nextChunkLength = chunkLengthB.getInt(0);
+                    expectedAnotherChunk = true;
+
+                    /*
+                     * Get the partition id and its CRC (CRC now covers length prefix) and validate it. Validating the
+                     * partition ID for the chunk separately makes it possible to
+                     * continue processing chunks from other partitions if only one partition
+                     * has corrupt chunks in the file.
+                     */
+                    assert(m_checksumType == ChecksumType.CRC32C);
+                    final Checksum partitionIdCRC = new PureJavaCrc32C();
+                    final int nextChunkPartitionId = chunkLengthB.getInt(4);
+                    final int nextChunkPartitionIdCRC = chunkLengthB.getInt(8);
+
+                    partitionIdCRC.update(chunkLengthB.array(), 0, 8);
+                    int generatedValue = (int)partitionIdCRC.getValue();
+                    if (generatedValue != nextChunkPartitionIdCRC) {
+                        chunkLengthB.position(0);
+                        for (int partitionId : m_partitionIds) {
+                            m_corruptedPartitions.add(partitionId);
+                        }
+                        throw new IOException("Chunk partition ID CRC check failed. " +
+                                "This corrupts all partitions in this file");
+                    }
+
+                    /*
+                     * CRC for the data portion of the chunk
+                     */
+                    final int nextChunkCRC = chunkLengthB.getInt(12);
+
+                    /*
+                     * Sanity check the length value to ensure there isn't
+                     * a runtime exception or OOM.
+                     */
+                    if (nextChunkLength < 0) {
+                        throw new IOException("Corrupted TableSaveFile chunk has negative chunk length");
+                    }
+
+                    if (nextChunkLength > fileInputBuffer.capacity()) {
+                        throw new IOException("Corrupted TableSaveFile chunk has unreasonable length " +
+                                "> DEFAULT_CHUNKSIZE bytes");
+                    }
+
+                    /*
+                     * Go fetch the compressed data so that the uncompressed size is known
+                     * and use that to set nextChunkLength to be the uncompressed length,
+                     * the code ahead that constructs the volt table is expecting
+                     * the uncompressed size/data since it is producing an uncompressed table
+                     */
+                    fileInputBuffer.clear();
+                    fileInputBuffer.limit(nextChunkLength);
+                    while (fileInputBuffer.hasRemaining()) {
+                        final int read = m_saveFile.read(fileInputBuffer);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    fileInputBuffer.flip();
+                    nextChunkLength = CompressionService.uncompressedLength(fileInputBuffer);
+
+                    /*
+                     * Validate the rest of the chunk. This can fail if the data is corrupted
+                     * or the length value was corrupted.
+                     */
+                    final int calculatedCRC =
+                            DBBPool.getBufferCRC32C(fileInputBuffer, 0, fileInputBuffer.remaining());
+                    if (calculatedCRC != nextChunkCRC) {
+                        m_corruptedPartitions.add(nextChunkPartitionId);
+                        if (m_continueOnCorruptedChunk) {
+                            m_chunkReads.release();
+                            continue;
+                        } else {
+                            throw new IOException("CRC mismatch in saved table chunk");
+                        }
+                    }
+
+                    /*
+                     * Now allocate space to store the chunk using the VoltTable serialization representation.
+                     * The chunk will contain an integer row count preceding it so it can
+                     * be sucked straight in. There is a little funny business to overwrite the
+                     * partition id that is not part of the serialization format
+                     */
+                    Container c = getOutputBuffer(nextChunkPartitionId);
+
+                    /*
+                     * If the length value is wrong or not all data made it to disk this read will
+                     * not complete correctly. There could be overflow, underflow etc.
+                     * so use a try finally block to indicate that all partitions are now corrupt.
+                     * The enclosing exception handlers will do the right thing WRT to
+                     * propagating the error and closing the file.
+                     */
+                    boolean completedRead = false;
+                    try {
+                        /*
+                         * Assemble a VoltTable out of the chunk of tuples.
+                         * Put in the header that was cached in the constructor,
+                         * then copy the tuple data.
+                         */
+                        c.b.clear();
+                        c.b.limit(nextChunkLength  + m_tableHeader.capacity());
+                        m_tableHeader.position(0);
+                        c.b.put(m_tableHeader);
+                        //Doesn't move buffer position, does change the limit
+                        CompressionService.decompressBuffer(fileInputBuffer, c.b);
+                        completedRead = true;
+                    } finally {
+                        if (!completedRead) {
+                            for (int partitionId : m_partitionIds) {
+                                m_corruptedPartitions.add(partitionId);
+                            }
+                        }
+                    }
+
+                    /*
+                     * Skip irrelevant chunks after CRC is calculated. Always calulate the CRC
+                     * in case it is the length value that is corrupted
+                     */
+                    if (m_relevantPartitionIds != null) {
+                        if (!m_relevantPartitionIds.contains(nextChunkPartitionId)) {
+                            c.discard();
+                            m_chunkReads.release();
+                            continue;
+                        }
+                    }
+
+                    /*
+                     * VoltTable wants the buffer at the home position 0
+                     */
+                    c.b.position(0);
+
+                    synchronized (TableSaveFile.this) {
+                        m_availableChunks.offer(c);
+                        TableSaveFile.this.notifyAll();
+                    }
+                } catch (EOFException eof) {
+                    synchronized (TableSaveFile.this) {
+                        m_hasMoreChunks = false;
+                        if (expectedAnotherChunk) {
+                            m_chunkReaderException = new IOException(
+                                    "Expected to find another chunk but reached end of file instead");
+                        }
+                        TableSaveFile.this.notifyAll();
+                    }
+                } catch (IOException e) {
+                    synchronized (TableSaveFile.this) {
+                        m_hasMoreChunks = false;
+                        m_chunkReaderException = e;
+                        TableSaveFile.this.notifyAll();
+                    }
+                } catch (BufferUnderflowException e) {
+                    synchronized (TableSaveFile.this) {
+                        m_hasMoreChunks = false;
+                        m_chunkReaderException = new IOException(e);
+                        TableSaveFile.this.notifyAll();
+                    }
+                } catch (BufferOverflowException e) {
+                    synchronized (TableSaveFile.this) {
+                        m_hasMoreChunks = false;
+                        m_chunkReaderException = new IOException(e);
+                        TableSaveFile.this.notifyAll();
+                    }
+                } catch (IndexOutOfBoundsException e) {
+                    synchronized (TableSaveFile.this) {
+                        m_hasMoreChunks = false;
+                        m_chunkReaderException = new IOException(e);
+                        TableSaveFile.this.notifyAll();
+                    }
+                }
+            }
+        }
 
         private void readChunks() {
             //For reading the compressed input.
@@ -506,14 +732,14 @@ public class TableSaveFile
                      * continue processing chunks from other partitions if only one partition
                      * has corrupt chunks in the file.
                      */
-                    final CRC32 partitionIdCRC = new CRC32();
+                    final Checksum partitionIdCRC = m_checksumType == ChecksumType.CRC32C ? new PureJavaCrc32C() : new PureJavaCrc32();
                     chunkLengthB.mark();
                     final int nextChunkPartitionId = chunkLengthB.getInt();
                     final int nextChunkPartitionIdCRC = chunkLengthB.getInt();
                     chunkLengthB.reset();
                     byte partitionIdBytes[] = new byte[4];
                     chunkLengthB.get(partitionIdBytes);
-                    partitionIdCRC.update(partitionIdBytes);
+                    partitionIdCRC.update(partitionIdBytes, 0, partitionIdBytes.length);
                     int generatedValue = (int)partitionIdCRC.getValue();
                     if (generatedValue != nextChunkPartitionIdCRC) {
                         chunkLengthB.position(0);
@@ -638,7 +864,10 @@ public class TableSaveFile
                      * Validate the rest of the chunk. This can fail if the data is corrupted
                      * or the length value was corrupted.
                      */
-                    final int calculatedCRC = DBBPool.getBufferCRC32(c.b, c.b.position(), c.b.remaining());
+                    final int calculatedCRC =
+                            m_checksumType == ChecksumType.CRC32C  ?
+                                    DBBPool.getCRC32C(c.address, c.b.position(), c.b.remaining()) :
+                                        DBBPool.getCRC32(c.address, c.b.position(), c.b.remaining());
                     if (calculatedCRC != nextChunkCRC) {
                         m_corruptedPartitions.add(nextChunkPartitionId);
                         if (m_continueOnCorruptedChunk) {
@@ -741,10 +970,15 @@ public class TableSaveFile
             c = new Container(c.b, c.address, c.m_origin, nextChunkPartitionId);
             return c;
         }
+
         @Override
         public void run() {
             try {
-                readChunks();
+                if (m_hasVersion2FormatChunks) {
+                    readChunksV2();
+                } else {
+                    readChunks();
+                }
             } finally {
                 synchronized (TableSaveFile.this) {
                     m_hasMoreChunks = false;

@@ -44,7 +44,7 @@ public class JiggleExportMultiPartition extends VoltProcedure {
         SampleRecord record = new SampleRecord(rowid, rand);
         voltQueueSQL(
                       insert
-                    , getTransactionId()
+                    , getVoltPrivateRealTransactionIdDontUseMe()
                     , rowid
                     , record.rowid_group
                     , record.type_null_tinyint
@@ -73,6 +73,6 @@ public class JiggleExportMultiPartition extends VoltProcedure {
         voltExecuteSQL(true);
 
         // Retun to caller
-        return getTransactionId();
+        return getVoltPrivateRealTransactionIdDontUseMe();
     }
 }

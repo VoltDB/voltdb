@@ -389,6 +389,9 @@ DISTRIBUTION
         </fileset>
     </copy>
 
+    <!-- create, and leave empty extension directory for user supplied jars -->
+    <mkdir dir="${dist.dir}/lib/extension"/>
+
     <!-- populate java client and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="voltdb" defaultexcludes="yes">

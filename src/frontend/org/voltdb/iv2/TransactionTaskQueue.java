@@ -38,13 +38,6 @@ public class TransactionTaskQueue
      * Multi-part transactions create a backlog of tasks behind them. A queue is
      * created for each multi-part task to maintain the backlog until the next
      * multi-part task.
-     *
-     * DR uses m_drMPSentinelBacklog to queue additional sentinels than the one
-     * currently in progress because DR uses GENERIC_MP_SENTINEL value for all
-     * sentinels. When a DR multipart completes, another sentinel will be polled
-     * from m_drMPSentinelBacklog and put in this map. It is impossible to have
-     * an empty m_backlog while m_drMPSentinelBacklog has more
-     * sentinels queued.
      */
     Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 

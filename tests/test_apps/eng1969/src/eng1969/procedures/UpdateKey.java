@@ -111,13 +111,13 @@ public class UpdateKey extends VoltProcedure {
                                         rowid_group + "_" + rowid, false, null);
             }
             // System.out.println("\tMigrating key: " + rowid_group + "_" + rowid);
-            voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), rowid_group, rowid, this.getTransactionId(), oldpayload);
+            voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), rowid_group, rowid, this.getVoltPrivateRealTransactionIdDontUseMe(), oldpayload);
             voltExecuteSQL();
         }
 
         // perform in the in-memory update
         // System.out.println("Updating atime on key: " + rowid_group + "_" + rowid);
-        voltQueueSQL(update, EXPECT_SCALAR_MATCH(1), this.getTransactionId(), payload, rowid_group, rowid);
+        voltQueueSQL(update, EXPECT_SCALAR_MATCH(1), this.getVoltPrivateRealTransactionIdDontUseMe(), payload, rowid_group, rowid);
         return 0;
     }
 }

@@ -21,9 +21,9 @@ import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltTableUtil;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 /*
  * Filter that converts snapshot data to CSV format
@@ -58,17 +58,10 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                     return null;
                 }
                 try {
-                    ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b.remaining());
+                    ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b.remaining() - 4);
                     buf.put(m_schemaBytes);
-                    final int rowCountPosition = buf.position();
-                    buf.position(rowCountPosition + 4);
-                    cont.b.position(12);
-                    cont.b.limit(cont.b.limit() - 4);
+                    cont.b.position(4);
                     buf.put(cont.b);
-                    cont.b.limit(cont.b.limit() + 4);
-                    final int rowCount = cont.b.getInt();
-                    buf.putInt(rowCountPosition, rowCount);
-                    buf.flip();
 
                     VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
                     Pair<Integer, byte[]> p =

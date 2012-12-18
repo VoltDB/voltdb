@@ -30,7 +30,11 @@ public class SpTransactionState extends TransactionState
     protected SpTransactionState(TransactionInfoBaseMessage notice)
     {
         super(null, notice);
-        m_task = (Iv2InitiateTaskMessage)notice;
+        if (notice instanceof Iv2InitiateTaskMessage) {
+            m_task = (Iv2InitiateTaskMessage)notice;
+        } else {
+            m_task = null;
+        }
     }
 
     @Override

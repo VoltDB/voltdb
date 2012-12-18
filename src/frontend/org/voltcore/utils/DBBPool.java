@@ -18,9 +18,10 @@
 package org.voltcore.utils;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 
+import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 
@@ -97,6 +98,34 @@ public final class DBBPool {
     public static native long getBufferAddress( ByteBuffer b );
 
     /**
+     * Retrieve the CRC32C value of a DirectByteBuffer as a long
+     * The polynomial is different from java.util.zip.CRC32C,
+     * and matches the one used by SSE 4.2. hardware CRC instructions.
+     * The implementation will use the SSE 4.2. instruction if the native library
+     * was compiled with -msse4.2 and there is hardware support, otherwise it falls
+     * back to Intel's slicing by 8 algorithm
+     * @param b Buffer you want to retrieve the CRC32 of
+     * @param offset Offset into buffer to start calculations
+     * @param length Length of the buffer to calculate
+     * @return CRC32C of the buffer as an int.
+     */
+    public static native int getBufferCRC32C( ByteBuffer b, int offset, int length);
+
+    /**
+     * Retrieve the CRC32C value of a DirectByteBuffer as a long
+     * The polynomial is different from java.util.zip.CRC32C,
+     * and matches the one used by SSE 4.2. hardware CRC instructions.
+     * The implementation will use the SSE 4.2. instruction if the native library
+     * was compiled with -msse4.2 and there is hardware support, otherwise it falls
+     * back to Intel's slicing by 8 algorithm
+     * @param ptr Address of buffer you want to retrieve the CRC32C of
+     * @param offset Offset into buffer to start calculations
+     * @param length Length of the buffer to calculate
+     * @return CRC32C of the buffer as an int.
+     */
+    public static native int getCRC32C( long ptr, int offset, int length);
+
+    /**
      * Retrieve the CRC32 value of a DirectByteBuffer as a long
      * @param b Buffer you want to retrieve the CRC32 of
      * @param offset Offset into buffer to start calculations
@@ -107,7 +136,7 @@ public final class DBBPool {
 
     /**
      * Retrieve the CRC32 value of a DirectByteBuffer as a long
-     * @param b Buffer you want to retrieve the CRC32 of
+     * @param ptr Address of buffer you want to retrieve the CRC32 of
      * @param offset Offset into buffer to start calculations
      * @param length Length of the buffer to calculate
      * @return CRC32 of the buffer as an int.
@@ -126,6 +155,53 @@ public final class DBBPool {
     private final long bytesAllocatedLocally = 0;
     private final long bytesLoanedLocally = 0;
 
+    private static final COWMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
+            new COWMap<Integer, ConcurrentLinkedQueue<BBContainer>>();
+
+    /*
+     * Allocate a DirectByteBuffer from a global lock free pool
+     */
+    public static BBContainer allocateDirectAndPool(final Integer capacity) {
+        ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(capacity);
+        if (pooledBuffers == null) {
+            pooledBuffers = new ConcurrentLinkedQueue<BBContainer>();
+            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) == null) {
+                pooledBuffers = m_pooledBuffers.get(capacity);
+            }
+        }
+
+        BBContainer cont = pooledBuffers.poll();
+        if (cont == null) {
+            //Create an origin container
+            ByteBuffer b = ByteBuffer.allocateDirect(capacity);
+            bytesAllocatedGlobally.getAndAdd(capacity);
+            cont = new BBContainer( b, DBBPool.getBufferAddress(b)) {
+                @Override
+                public void discard() {
+                    try {
+                        DirectMemoryUtils.destroyDirectByteBuffer(b);
+                        bytesAllocatedGlobally.addAndGet(-capacity);
+                    } catch (Throwable e) {
+                        VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
+                    }
+                }
+            };
+        }
+        final BBContainer origin = cont;
+        cont = new BBContainer(origin.b, origin.address) {
+            @Override
+            public void discard() {
+                m_pooledBuffers.get(b.capacity()).offer(origin);
+            }
+        };
+        cont.b.clear();
+        return cont;
+    }
+
+    /*
+     * The only reason to not retrieve the address is that network code shared
+     * with the java client shouldn't have a dependency on the native library
+     */
     public static BBContainer allocateDirect(final int capacity) {
         final ByteBuffer retval = ByteBuffer.allocateDirect(capacity);
         bytesAllocatedGlobally.getAndAdd(capacity);
@@ -136,6 +212,26 @@ public final class DBBPool {
             public void discard() {
                 try {
                     DirectMemoryUtils.destroyDirectByteBuffer(retval);
+                    bytesAllocatedGlobally.getAndAdd(-capacity);
+                } catch (Throwable e) {
+                    VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
+                }
+            }
+
+        };
+    }
+
+    public static BBContainer allocateDirectWithAddress(final int capacity) {
+        final ByteBuffer retval = ByteBuffer.allocateDirect(capacity);
+        bytesAllocatedGlobally.getAndAdd(capacity);
+
+        return new BBContainer(retval, DBBPool.getBufferAddress(retval)) {
+
+            @Override
+            public void discard() {
+                try {
+                    DirectMemoryUtils.destroyDirectByteBuffer(retval);
+                    bytesAllocatedGlobally.getAndAdd(-capacity);
                 } catch (Throwable e) {
                     VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
                 }
