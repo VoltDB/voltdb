@@ -332,7 +332,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_runners = new ArrayList<ExecutionSiteRunner>();
             final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
             m_computationService =
-                    CoreUtils.getListeningExecutorService("Computation service thread", computationThreads);
+                    CoreUtils.getListeningExecutorService(
+                            "Computation service thread",
+                            computationThreads, m_config.m_computationCoreBindings);
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -645,7 +647,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_statsAgent,
                                 m_memoryStats,
                                 m_commandLog,
-                                m_nodeDRGateway);
+                                m_nodeDRGateway,
+                                m_config.m_executionCoreBindings.poll());
                     }
                 } catch (Exception e) {
                     Throwable toLog = e;
@@ -830,7 +833,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
                 //completes at which point the node will mark itself as actually recovered.
                 m_commandLog.initForRejoin(
-                        m_catalogContext, Long.MIN_VALUE, m_iv2InitiatorStartingTxnIds, true);
+                        m_catalogContext,
+                        Long.MIN_VALUE,
+                        m_iv2InitiatorStartingTxnIds,
+                        true,
+                        m_config.m_commandLogBinding);
             }
 
             /*
@@ -1375,6 +1382,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         hmconfig.zkInterface = m_config.m_zkInterface;
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
+        hmconfig.coreBindIds = m_config.m_networkCoreBindings;
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
@@ -2116,7 +2124,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds);
+            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds, m_config.m_commandLogBinding);
         }
 
         /*

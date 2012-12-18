@@ -25,7 +25,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
     @Override
-    public void init(CatalogContext context, long txnId, long perPartitionTxnId[]) {}
+    public void init(CatalogContext context, long txnId, long perPartitionTxnId[], String affinity) {}
 
     @Override
     public boolean needsInitialization() {
@@ -53,7 +53,7 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
-    public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin) {}
+    public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin, String affinity) {}
 
     @Override
     public boolean log(
