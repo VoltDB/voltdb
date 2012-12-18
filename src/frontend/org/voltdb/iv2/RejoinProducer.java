@@ -77,6 +77,7 @@ public class RejoinProducer extends SiteTasker
         return m_liveRejoin;
     }
 
+
     // Some notes for rtb's bad memory...
     //
     // Calculate the snapshot nonce first.
@@ -122,13 +123,16 @@ public class RejoinProducer extends SiteTasker
     // 3. The snapshot completion monitor callback must have been
     // triggered.
     //
-    // When both of these events have been observed, the Site
+    // When all of these events have been observed, the Site
     // is handed a ReplayCompletionAction and instructed to
     // complete its portion of rejoin.
     //
     // The rejoin producer times out the snapshot block arrival.
     // If a block does not arrive within 60s, the RejoinProducer
-    // will terminate the current node.
+    // will terminate the current node. The watchdog timer, m_timer,
+    // is accessed from multiple threads; synchronize on m_timer
+    // to use it or to read/modify m_timeFuture;
+    //
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -158,6 +162,7 @@ public class RejoinProducer extends SiteTasker
             if (nonce.equals(m_snapshotNonce)) {
                 REJOINLOG.debug(m_whoami + "counting down snapshot monitor completion.");
                 deregister();
+                kickWatchdog(true, false);
                 m_completionMonitorAwait.countDown();
             }
             else {
@@ -249,6 +254,23 @@ public class RejoinProducer extends SiteTasker
         else {
             VoltDB.crashLocalVoltDB("Unknown rejoin message type: " +
                     message.getType(), false, null);
+        }
+    }
+
+    // cancel and maybe rearm the snapshot data-segment watchdog.
+    private void kickWatchdog(boolean rearm, boolean shutdown)
+    {
+        synchronized (m_timer) {
+            if (m_timeFuture != null) {
+                m_timeFuture.cancel(false);
+                m_timeFuture = null;
+            }
+            if (rearm) {
+                m_timeFuture = m_timer.schedule(new TimerCallback(m_whoami), 60, TimeUnit.SECONDS);
+            }
+            if (shutdown) {
+                m_timer.shutdown();
+            }
         }
     }
 
@@ -391,6 +413,8 @@ public class RejoinProducer extends SiteTasker
         m_replayCompleteAction =
             new ReplayCompletionAction(message.getSnapshotTxnId(), action);
         m_snapshotAdapterAwait.countDown();
+
+        // start the snapshot process watchdog here.
     }
 
     /**
@@ -530,10 +554,7 @@ public class RejoinProducer extends SiteTasker
     // Received a datablock. Reset the watchdog timer and hand the block to the Site.
     void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork, SiteProcedureConnection siteConnection)
     {
-        if (m_timeFuture != null) {
-            m_timeFuture.cancel(false);
-        }
-        m_timeFuture = m_timer.schedule(new TimerCallback(m_whoami), 60, TimeUnit.SECONDS);
+        kickWatchdog(true, false);
 
         int tableId = rejoinWork.getFirst();
         ByteBuffer buffer = rejoinWork.getSecond();
@@ -549,10 +570,7 @@ public class RejoinProducer extends SiteTasker
     // Completed all criteria: Kill the watchdog and inform the site.
     void setRejoinComplete(SiteProcedureConnection siteConnection)
     {
-        if (m_timeFuture != null) {
-            m_timeFuture.cancel(false);
-        }
-        m_timer.shutdown();
+        kickWatchdog(false, true);
         siteConnection.setRejoinComplete(m_replayCompleteAction);
     }
 }
