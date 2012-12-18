@@ -21,7 +21,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
@@ -70,7 +69,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected TransactionState(Mailbox mbox,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getSpHandle(), notice.getTimestamp(), notice.getInitiatorHSId());
+        super(notice.getTxnId(), notice.getSpHandle(), notice.getUniqueId(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = null;
         m_notice = notice;
@@ -92,7 +91,7 @@ public abstract class TransactionState extends OrderableTransaction  {
                                TransactionInfoBaseMessage notice)
     {
         super(notice.getTxnId(), notice.getSpHandle(),
-                TransactionIdManager.getTimestampFromTransactionId(notice.getTxnId()),
+                notice.getTxnId(),
                 notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = site;

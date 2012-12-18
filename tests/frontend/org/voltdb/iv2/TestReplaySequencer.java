@@ -35,6 +35,7 @@ import junit.framework.TestCase;
 import org.junit.Test;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class TestReplaySequencer extends TestCase
@@ -65,6 +66,13 @@ public class TestReplaySequencer extends TestCase
     {
         CompleteTransactionMessage m = mock(CompleteTransactionMessage.class);
         when(m.isForReplay()).thenReturn(true);
+        return m;
+    }
+
+    Iv2EndOfLogMessage makeEOL(boolean isMP)
+    {
+        Iv2EndOfLogMessage m = mock(Iv2EndOfLogMessage.class);
+        when(m.isMP()).thenReturn(isMP);
         return m;
     }
 
@@ -263,7 +271,7 @@ public class TestReplaySequencer extends TestCase
         assertTrue(result);
         assertNull(dut.poll());
 
-        dut.setEOLReached();
+        assertTrue(dut.offer(0L, makeEOL(false)));
         assertEquals(frag, dut.poll());
         assertNull(dut.poll());
 
@@ -293,7 +301,7 @@ public class TestReplaySequencer extends TestCase
 
         TransactionInfoBaseMessage frag3 = makeFragment(2L);
 
-        dut.setEOLReached();
+        assertTrue(dut.offer(0L, makeEOL(false)));
 
         result = dut.offer(1L, frag);
         assertFalse(result);
@@ -325,7 +333,7 @@ public class TestReplaySequencer extends TestCase
 
         dut.offer(1L, sntl);
 
-        dut.setEOLReached();
+        assertTrue(dut.offer(0L, makeEOL(false)));
 
         result = dut.offer(1L, frag);
         assertTrue(result);
@@ -370,11 +378,137 @@ public class TestReplaySequencer extends TestCase
         assertTrue(result);
         assertNull(dut.poll());
 
-        dut.setEOLReached();
+        assertTrue(dut.offer(0L, makeEOL(false)));
 
         assertEquals(frag, dut.poll());
         assertEquals(complete, dut.poll());
         assertEquals(frag3, dut.poll());
+        assertNull(dut.poll());
+    }
+
+    @Test
+    public void testMPIEOLWithSentinels()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(101L);
+        TransactionInfoBaseMessage sentinel1 = makeSentinel(1L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(102L);
+        TransactionInfoBaseMessage init3 = makeIv2InitTask(103L);
+
+        assertFalse(dut.offer(101L, init1));
+        assertNull(dut.poll());
+
+        assertTrue(dut.offer(1L, sentinel1));
+        assertNull(dut.poll());
+
+        // SPs blocked by the sentinel
+        assertTrue(dut.offer(102L, init2));
+        assertTrue(dut.offer(103L, init3));
+        assertNull(dut.poll());
+
+        assertTrue(dut.offer(0L, makeEOL(true)));
+        assertTrue(dut.isMPIEOLReached());
+
+        // MPI EOL should release all blocked SPs
+        assertEquals(init2, dut.poll());
+        assertEquals(init3, dut.poll());
+
+        TransactionInfoBaseMessage init4 = makeIv2InitTask(104L);
+        TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
+        TransactionInfoBaseMessage init5 = makeIv2InitTask(105L);
+
+        // These SPIs should be offered after sentinel1
+        assertTrue(dut.offer(104L, init4));
+        assertTrue(dut.offer(2L, sentinel2));
+        assertTrue(dut.offer(105L, init5));
+        assertEquals(init4, dut.poll());
+        assertEquals(init5, dut.poll());
+        assertNull(dut.poll());
+    }
+
+    @Test
+    public void testMPIEOLWithoutSentinels()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(101L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(102L);
+        TransactionInfoBaseMessage init3 = makeIv2InitTask(103L);
+
+        assertFalse(dut.offer(101L, init1));
+        assertFalse(dut.offer(102L, init2));
+        assertFalse(dut.offer(103L, init3));
+        assertNull(dut.poll());
+
+        assertTrue(dut.offer(0L, makeEOL(true)));
+        assertTrue(dut.isMPIEOLReached());
+
+        TransactionInfoBaseMessage init4 = makeIv2InitTask(104L);
+        TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
+        TransactionInfoBaseMessage init5 = makeIv2InitTask(105L);
+
+        // These SPIs should not be offered
+        assertFalse(dut.offer(104L, init4));
+        assertTrue(dut.offer(2L, sentinel2));
+        assertFalse(dut.offer(105L, init5));
+        assertNull(dut.poll());
+    }
+
+    @Test
+    public void testSPIEOLThenMPIEOL()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(101L);
+        TransactionInfoBaseMessage sentinel1 = makeSentinel(1L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(102L);
+        TransactionInfoBaseMessage init3 = makeIv2InitTask(103L);
+        TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
+        TransactionInfoBaseMessage init4 = makeIv2InitTask(104L);
+        TransactionInfoBaseMessage init5 = makeIv2InitTask(105L);
+
+        assertFalse(dut.offer(101L, init1));
+        assertNull(dut.poll());
+
+        assertTrue(dut.offer(1L, sentinel1));
+        assertNull(dut.poll());
+
+        // SPs blocked by the sentinel
+        assertTrue(dut.offer(102L, init2));
+        assertTrue(dut.offer(103L, init3));
+        assertNull(dut.poll());
+
+        // SPs blocked by second sentinel
+        assertTrue(dut.offer(2L, sentinel2));
+        assertTrue(dut.offer(104L, init4));
+        assertTrue(dut.offer(105L, init5));
+        assertNull(dut.poll());
+
+        assertTrue(dut.offer(0L, makeEOL(false)));
+
+        // SPI EOL shouldn't release blocked SPs
+        assertNull(dut.poll());
+
+        TransactionInfoBaseMessage frag1 = makeFragment(1L);
+        TransactionInfoBaseMessage complete1 = makeCompleteTxn(1L);
+
+        // Offering the fragment and the complete releases init2 and init3
+        assertTrue(dut.offer(1L, frag1));
+        assertEquals(frag1, dut.poll());
+        assertEquals(init2, dut.poll());
+        assertEquals(init3, dut.poll());
+        assertNull(dut.poll());
+
+        assertFalse(dut.offer(1L, complete1));
+        assertNull(dut.poll());
+
+        assertTrue(dut.offer(0L, makeEOL(true)));
+        assertTrue(dut.isMPIEOLReached());
+
+        // All blocked SPs should be released
+        assertEquals(init4, dut.poll());
+        assertEquals(init5, dut.poll());
         assertNull(dut.poll());
     }
 }

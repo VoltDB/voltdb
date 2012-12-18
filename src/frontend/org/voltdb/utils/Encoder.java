@@ -17,9 +17,12 @@
 
 package org.voltdb.utils;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.UnsupportedEncodingException;
-import java.util.zip.GZIPOutputStream;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
+
+import com.google.common.base.Charsets;
 
 /**
  * Encode and decode strings and byte arrays to/from hexidecimal
@@ -62,14 +65,8 @@ public class Encoder {
      * @return The double-length hex encoded string.
      */
     public static String hexEncode(String string) {
-        byte[] strbytes = {};
-        try {
-            // this will need to be less "western" in the future
-            strbytes = string.getBytes("ISO-8859-1");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return hexEncode(strbytes);
+        // this will need to be less "western" in the future
+        return hexEncode(string.getBytes(Charsets.ISO_8859_1));
     }
 
     /**
@@ -99,13 +96,7 @@ public class Encoder {
      */
     public static String hexDecodeToString(String hexString) {
         byte[] decodedValue = hexDecode(hexString);
-        String retval = null;
-        try {
-            retval = new String(decodedValue, "ISO-8859-1");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return retval;
+        return new String(decodedValue, Charsets.ISO_8859_1);
     }
 
     public static boolean isHexEncodedString(String hexString) {
@@ -124,142 +115,47 @@ public class Encoder {
 
     public static String compressAndBase64Encode(String string) {
         try {
-            byte[] inBytes = string.getBytes("UTF-8");
+            byte[] inBytes = string.getBytes(Charsets.UTF_8);
             ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(string.length() * 0.7));
-            GZIPOutputStream gzos = new GZIPOutputStream(baos);
-            gzos.write(inBytes);
-            gzos.close();
+            DeflaterOutputStream dos = new DeflaterOutputStream(baos);
+            dos.write(inBytes);
+            dos.close();
             byte[] outBytes = baos.toByteArray();
-            return Base64.encodeBytes(outBytes);
+            return Base64.encodeToString(outBytes, false);
         }
         catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static byte[] compressAndBase64EncodeToBytes(String string) {
-        try {
-            byte[] inBytes = string.getBytes("UTF-8");
-            ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(string.length() * 0.7));
-            GZIPOutputStream gzos = new GZIPOutputStream(baos);
-            gzos.write(inBytes);
-            gzos.close();
-            byte[] outBytes = baos.toByteArray();
-            return Base64.encodeBytesToBytes(outBytes);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static byte[] compressAndBase64EncodeToBytes(byte inBytes[]) {
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream((int)(inBytes.length * .7));
-            GZIPOutputStream gzos = new GZIPOutputStream(baos);
-            gzos.write(inBytes);
-            gzos.close();
-            byte[] outBytes = baos.toByteArray();
-            return Base64.encodeBytesToBytes(outBytes);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String base64Encode(String string) {
-        try {
-            final byte[] inBytes = string.getBytes("UTF-8");
-            return Base64.encodeBytes(inBytes);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String base64Encode(byte[] bytes) {
-        return Base64.encodeBytes(bytes);
-    }
-
-    public static byte[] base64EncodeToBytes(String string) {
-        try {
-            final byte[] inBytes = string.getBytes("UTF-8");
-            return Base64.encodeBytesToBytes(inBytes);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static byte[] base64EncodeToBytes(byte bytes[]) {
-        try {
-            return Base64.encodeBytesToBytes(bytes);
-        } catch (Exception e) {
-            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
 
     public static String decodeBase64AndDecompress(String string) {
+        byte bytes[] = Base64.decodeFast(string);
+        ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+        InflaterInputStream dis = new InflaterInputStream(bais);
+
+        byte buffer[] = new byte[1024 * 8];
+        int length = 0;
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
-            byte[] bytes = Base64.decode(string);
-            return new String(bytes, "UTF-8");
+            while ( (length = dis.read( buffer )) >= 0) {
+                baos.write(buffer, 0, length);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        catch (Exception e) {
-            e.printStackTrace();
+        return new String(baos.toByteArray(), Charsets.UTF_8);
+    }
+
+    public static String base64Encode(String string) {
+        try {
+            final byte[] inBytes = string.getBytes(Charsets.UTF_8);
+            return Base64.encodeToString(inBytes, false);
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static byte[] decodeBase64AndDecompressToBytes(byte inbytes[]) {
-        try {
-            return Base64.decodeAndGUnzip(inbytes);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static byte[] decodeBase64AndDecompressToBytes(String string) {
-        try {
-            return Base64.decode(string);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String decodeBase64(String string) {
-        try {
-            return new String(Base64.decode(string, Base64.DONT_GUNZIP), "UTF-8");
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static byte[] decodeBase64ToBytes(String string) {
-        try {
-            return Base64.decode(string, Base64.DONT_GUNZIP);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static byte[] decodeBase64ToBytes(byte bytes[]) {
-        try {
-            return Base64.decode(bytes);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
+    public static String base64Encode(byte[] bytes) {
+        return Base64.encodeToString(bytes, false);
     }
 }

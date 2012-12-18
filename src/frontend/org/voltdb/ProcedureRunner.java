@@ -53,6 +53,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
@@ -183,7 +184,7 @@ public class ProcedureRunner {
     Random getSeededRandomNumberGenerator() {
         // this value is memoized here and reset at the beginning of call(...).
         if (m_cachedRNG == null) {
-            m_cachedRNG = new Random(getTransactionId());
+            m_cachedRNG = new Random(getUniqueId());
         }
         return m_cachedRNG;
     }
@@ -376,12 +377,32 @@ public class ProcedureRunner {
         m_statusString = statusString;
     }
 
+    /*
+     * Extract the timestamp from the timestamp field we have been passing around
+     * that is now a unique id with a timestamp encoded in the most significant bits ala
+     * a pre-IV2 transaction id.
+     */
     public Date getTransactionTime() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
         if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
-            return new Date(invocation.getOriginalTimestamp());
+            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(invocation.getOriginalUniqueId()));
         } else {
-            return new Date(m_txnState.timestamp);
+            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(m_txnState.uniqueId));
+        }
+    }
+
+    /*
+     * The timestamp field is no longer really a timestamp, it is a unique id that is time based
+     * and is similar to a pre-IV2 transaction ID except the less significant bits are set
+     * to allow matching partition counts with IV2. It's OK, still can do 512k txns/second per
+     * partition so plenty of headroom.
+     */
+    public long getUniqueId() {
+        StoredProcedureInvocation invocation = m_txnState.getInvocation();
+        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+            return invocation.getOriginalUniqueId();
+        } else {
+            return m_txnState.uniqueId;
         }
     }
 
@@ -1017,7 +1038,7 @@ public class ProcedureRunner {
            m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                  siteId,
                                                  m_txnState.txnId,
-                                                 m_txnState.timestamp,
+                                                 m_txnState.uniqueId,
                                                  m_txnState.isReadOnly(),
                                                  false,
                                                  txnState.isForReplay());
@@ -1026,7 +1047,7 @@ public class ProcedureRunner {
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        siteId,
                                                        m_txnState.txnId,
-                                                       m_txnState.timestamp,
+                                                       m_txnState.uniqueId,
                                                        m_txnState.isReadOnly(),
                                                        finalTask,
                                                        txnState.isForReplay());

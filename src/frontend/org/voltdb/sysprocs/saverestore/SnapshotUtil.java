@@ -43,8 +43,8 @@ import java.util.TreeSet;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -150,7 +150,7 @@ public class SnapshotUtil {
         sw.append(stringer.toString());
 
         final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
-        final CRC32 crc = new CRC32();
+        final PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(tableListBytes);
         ByteBuffer fileBuffer = ByteBuffer.allocate(tableListBytes.length + 4);
         fileBuffer.putInt((int)crc.getValue());
@@ -309,7 +309,7 @@ public class SnapshotUtil {
             if (obj == null) {
                 String tableList = caw.toString();
                 byte tableListBytes[] = tableList.getBytes("UTF-8");
-                CRC32 tableListCRC = new CRC32();
+                PureJavaCrc32 tableListCRC = new PureJavaCrc32();
                 tableListCRC.update(tableListBytes);
                 tableListCRC.update("\n".getBytes("UTF-8"));
                 final int calculatedValue = (int)tableListCRC.getValue();
@@ -337,7 +337,7 @@ public class SnapshotUtil {
                  */
                 String tableList = caw.toString();
                 byte tableListBytes[] = tableList.getBytes("UTF-8");
-                CRC32 tableListCRC = new CRC32();
+                PureJavaCrc32 tableListCRC = new PureJavaCrc32();
                 tableListCRC.update(tableListBytes);
                 final int calculatedValue = (int)tableListCRC.getValue();
                 if (crc != calculatedValue) {

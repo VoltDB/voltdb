@@ -61,11 +61,31 @@ import com.google.common.util.concurrent.MoreExecutors;
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    public static final int SMALL_STACK_SIZE = 1024 * 128;
+
+    /**
+     * Get a single thread executor that caches it's thread meaning that the thread will terminate
+     * after keepAlive milliseconds. A new thread will be created the next time a task arrives and that will be kept
+     * around for keepAlive milliseconds. On creation no thread is allocated, the first task creates a thread.
+     *
+     * Uses LinkedTransferQueue to accept tasks and has a small stack.
+     */
+    public static ListeningExecutorService getCachedSingleThreadExecutor(String name, long keepAlive) {
+        return MoreExecutors.listeningDecorator(new ThreadPoolExecutor(
+                0,
+                1,
+                keepAlive,
+                TimeUnit.MILLISECONDS,
+                new LinkedTransferQueue<Runnable>(),
+                CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null)));
+    }
+
     /**
      * Create an unbounded single threaded executor
      */
     public static ListeningExecutorService getSingleThreadExecutor(String name) {
-        ExecutorService ste = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(name));
+        ExecutorService ste =
+                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -85,7 +105,7 @@ public class CoreUtils {
      * futures.
      */
     public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize, int stackSize) {
-        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
+        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(null, name, stackSize, poolSize > 1, null));
         ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
         return ses;
@@ -122,40 +142,19 @@ public class CoreUtils {
                 new ThreadPoolExecutor(threads, threads,
                         0L, TimeUnit.MILLISECONDS,
                         queue,
-                        new ThreadFactory() {
-                            private int threadIndex = 0;
-                            @Override
-                            public synchronized Thread  newThread(Runnable r) {
-                                String nameToUse = threads == 1 ? name : name + " - " + threadIndex++;
-                                if (coreList != null && !coreList.isEmpty()) {
-                                    final Runnable original = r;
-                                    r = new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            String core = coreList.poll();
-                                            System.out.println("Binding computation thread(" + Thread.currentThread().getName() + ") to " + core);
-                                            PosixJNAAffinity.INSTANCE.setAffinity(core);
-                                            original.run();
-                                        }
-                                    };
-                                }
-                                Thread t = new Thread(null, r, nameToUse, 131072);
-                                t.setDaemon(true);
-                                return t;
-                            }
-                        }));
+                        getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false, coreList)));
     }
 
     public static ThreadFactory getThreadFactory(String name) {
-        return getThreadFactory(name, 131072);
+        return getThreadFactory(name, SMALL_STACK_SIZE);
     }
 
     public static ThreadFactory getThreadFactory(String groupName, String name) {
-        return getThreadFactory(groupName, name, 131072);
+        return getThreadFactory(groupName, name, SMALL_STACK_SIZE, true, null);
     }
 
     public static ThreadFactory getThreadFactory(String name, int stackSize) {
-        return getThreadFactory(null, name, stackSize);
+        return getThreadFactory(null, name, stackSize, true, null);
     }
 
     /**
@@ -168,7 +167,12 @@ public class CoreUtils {
      * @param stackSize
      * @return
      */
-    public static ThreadFactory getThreadFactory(final String groupName, final String name, final int stackSize) {
+    public static ThreadFactory getThreadFactory(
+            final String groupName,
+            final String name,
+            final int stackSize,
+            final boolean incrementThreadNames,
+            final Queue<String> coreList) {
         ThreadGroup group = null;
         if (groupName != null) {
             group = new ThreadGroup(Thread.currentThread().getThreadGroup(), groupName);
@@ -179,11 +183,20 @@ public class CoreUtils {
             private final AtomicLong m_createdThreadCount = new AtomicLong(0);
             private final ThreadGroup m_group = finalGroup;
             @Override
-            public Thread newThread(final Runnable r) {
-                final String threadName = name + " - " + m_createdThreadCount.getAndIncrement();
+            public synchronized Thread newThread(final Runnable r) {
+                final String threadName = name +
+                        (incrementThreadNames ? " - " + m_createdThreadCount.getAndIncrement() : "");
+                String coreTemp = null;
+                if (coreList != null && !coreList.isEmpty()) {
+                    coreTemp = coreList.poll();
+                }
+                final String core = coreTemp;
                 Runnable runnable = new Runnable() {
                     @Override
                     public void run() {
+                        if (core != null) {
+                            PosixJNAAffinity.INSTANCE.setAffinity(core);
+                        }
                         try {
                             r.run();
                         } catch (Throwable t) {

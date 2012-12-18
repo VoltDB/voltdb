@@ -38,6 +38,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 
@@ -52,6 +53,8 @@ public class MpScheduler extends Scheduler
 
     private final List<Long> m_iv2Masters;
     private final long m_buddyHSId;
+    //Generator of pre-IV2ish timestamp based unique IDs
+    private final UniqueIdGenerator m_uniqueIdGenerator;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -61,6 +64,7 @@ public class MpScheduler extends Scheduler
         super(partitionId, taskQueue);
         m_buddyHSId = buddyHSId;
         m_iv2Masters = new ArrayList<Long>();
+        m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
     @Override
@@ -138,6 +142,9 @@ public class MpScheduler extends Scheduler
         else if (message instanceof FragmentResponseMessage) {
             handleFragmentResponseMessage((FragmentResponseMessage)message);
         }
+        else if (message instanceof Iv2EndOfLogMessage) {
+            handleEOLMessage();
+        }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
         }
@@ -155,15 +162,17 @@ public class MpScheduler extends Scheduler
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
          */
         long mpTxnId;
+        //Timestamp is actually a pre-IV2ish style time based transaction id
         long timestamp;
         if (message.isForReplay()) {
             mpTxnId = message.getTxnId();
-            timestamp = message.getTimestamp();
+            timestamp = message.getUniqueId();
             setMaxSeenTxnId(mpTxnId);
+            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
         } else {
             TxnEgo ego = advanceTxnEgo();
             mpTxnId = ego.getTxnId();
-            timestamp = ego.getWallClock();
+            timestamp = m_uniqueIdGenerator.getNextUniqueId();
         }
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
@@ -231,13 +240,14 @@ public class MpScheduler extends Scheduler
                     message.getCoordinatorHSId(),
                     message.getTruncationHandle(),
                     message.getTxnId(),
-                    message.getTimestamp(),
+                    message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
                     message.isForReplay());
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
@@ -306,6 +316,20 @@ public class MpScheduler extends Scheduler
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         throw new RuntimeException("MpScheduler should never see a CompleteTransactionMessage");
+    }
+
+    /**
+     * Inject a task into the transaction task queue to flush it. When it
+     * executes, it will send out MPI end of log messages to all partition
+     * initiators.
+     */
+    public void handleEOLMessage()
+    {
+        Iv2EndOfLogMessage msg = new Iv2EndOfLogMessage(true);
+        MPIEndOfLogTransactionState txnState = new MPIEndOfLogTransactionState(msg);
+        MPIEndOfLogTask task = new MPIEndOfLogTask(m_mailbox, m_pendingTasks,
+                                                   txnState, m_iv2Masters);
+        m_pendingTasks.offer(task);
     }
 
     @Override

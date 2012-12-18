@@ -80,12 +80,49 @@ public abstract class VoltProcedure {
     private boolean m_initialized;
 
     /**
-     * Allow VoltProcedures access to their transaction id.
-     * @return transaction id
+     * Returns the VoltDB 3.0 transaction ID which is a sequence number instead
+     * of the time-based ID used in pre-3.0 VoltDB. It is less unique in that sequence numbers can revert
+     * if you load data from one volt database into another via CSV or other external methods
+     * that bypass the combination of snapshot restore/command log replay which maintains these per partition
+     * sequence numbers
+     * @deprecated Do not use outside of VoltDB internal code
      */
-    public long getTransactionId() {
+    @Deprecated
+    public long getVoltPrivateRealTransactionIdDontUseMe() {
         return m_runner.getTransactionId();
     }
+
+    /**
+     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
+     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     *
+     * Allow VoltProcedures access to a unique ID generated for each transaction. Synonym of getUniqueID
+     * that is kept around to support legacy applications
+     *
+     * The id consists of a time based component in the most significant bits followed
+     * by a counter, and then a generator id to allow parallel unique number generation
+     * @return transaction id
+     * @deprecated Use the synonymous getUniqueId() instead
+     */
+    @Deprecated
+    public long getTransactionId() {
+        return m_runner.getUniqueId();
+    }
+
+    /**
+     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
+     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     *
+     * Allow VoltProcedures access to a unique ID generated for each transaction.
+     *
+     * The id consists of a time based component in the most significant bits followed
+     * by a counter, and then a generator id to allow parallel unique number generation
+     * @return An ID that is unique to this transaction
+     */
+    public long getUniqueId() {
+        return m_runner.getUniqueId();
+    }
+
 
     /**
      * End users should not instantiate VoltProcedure instances.
@@ -162,6 +199,9 @@ public abstract class VoltProcedure {
     }
 
     /**
+     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
+     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     *
      * Get the time that this procedure was accepted into the VoltDB cluster. This is the
      * effective, but not always actual, moment in time this procedure executes. Use this
      * method to get the current time instead of non-deterministic methods. Note that the

@@ -64,7 +64,7 @@ public class CompleteTransactionTask extends TransactionTask
                 Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
                 assert(initiateTask != null);
                 StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
-                m_drGateway.onSuccessfulMPCall(m_txn.spHandle, m_txn.txnId, m_txn.timestamp, m_msg.getHash(),
+                m_drGateway.onSuccessfulMPCall(m_txn.spHandle, m_txn.txnId, m_txn.uniqueId, m_msg.getHash(),
                                                invocation, m_txn.getResults());
             }
             hostLog.debug("COMPLETE: " + this);

@@ -25,7 +25,6 @@ import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
@@ -33,13 +32,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotTableTask;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.util.concurrent.Callables;
@@ -188,7 +186,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
         schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length
 
-        final CRC32 crc = new CRC32();
+        final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaContainer.b.remaining());
         aggregateBuffer.put(container.b);
         aggregateBuffer.put(schemaContainer.b);

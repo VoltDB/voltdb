@@ -485,11 +485,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void run()
     {
+        Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
         if (m_coreBindIds != null) {
-            System.out.println("Binding execution thread(" + Thread.currentThread().getName() + ") to " + m_coreBindIds);
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
-        Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
         initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
         m_startupConfig = null; // release the serializedCatalog bytes.
 
@@ -940,6 +939,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         null);
             }
             Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+            if (sequenceNumbers == null) {
+                VoltDB.crashLocalVoltDB(
+                        "Could not find export sequence numbers for partition " +
+                                m_partitionId + " table " +
+                                tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+            }
             exportAction(
                     true,
                     sequenceNumbers.getFirst().intValue(),

@@ -266,7 +266,6 @@ class VoltNetwork implements Runnable
     @Override
     public void run() {
         if (m_coreBindId != null) {
-            System.out.println("Binding network thread(" + Thread.currentThread().getId() + ") to " + m_coreBindId);
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
         }
         try {
