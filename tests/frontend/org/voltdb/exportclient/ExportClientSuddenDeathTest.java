@@ -50,7 +50,8 @@ public class ExportClientSuddenDeathTest extends TestCase {
                                                          false,
                                                          false,
                                                          false,
-                                                         0);
+                                                         0,
+                                                         ExportToFileClient.BinaryEncoding.HEX);
 
         InetSocketAddress addr = new InetSocketAddress("127.0.0.1", VoltDB.DEFAULT_PORT);
         etfc.addServerInfo(addr);

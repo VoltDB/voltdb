@@ -140,7 +140,7 @@ public class AsyncCompilerAgent {
                                           work.adminConnection,
                                           work.type,
                                           work.originalTxnId,
-                                          work.originalTs,
+                                          work.originalUniqueId,
                                           work.clientData);
 
         List<String> errorMsgs = new ArrayList<String>();

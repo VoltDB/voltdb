@@ -53,7 +53,7 @@ public class SnapshotCompletionMonitor {
     private final ExecutorService m_es = new ThreadPoolExecutor(1, 1,
             0L, TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<Runnable>(),
-            CoreUtils.getThreadFactory("SnapshotCompletionMonitor"),
+            CoreUtils.getThreadFactory(null, "SnapshotCompletionMonitor", CoreUtils.SMALL_STACK_SIZE, false),
             new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
 
     private final Watcher m_newSnapshotWatcher = new Watcher() {

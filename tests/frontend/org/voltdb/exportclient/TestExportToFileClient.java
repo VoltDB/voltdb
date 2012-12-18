@@ -56,7 +56,8 @@ public class TestExportToFileClient extends TestCase {
                 false,
                 false,
                 false,
-                0);
+                0,
+                ExportToFileClient.BinaryEncoding.HEX);
         AdvertisedDataSource source0 = TestExportDecoderBase.constructTestSource(0);
         AdvertisedDataSource source1 = TestExportDecoderBase.constructTestSource(1);
         ExportToFileDecoder decoder0 = exportClient.constructExportDecoder(source0);
@@ -117,7 +118,8 @@ public class TestExportToFileClient extends TestCase {
                     false,
                     0,
                     false,
-                    TimeZone.getDefault());
+                    TimeZone.getDefault(),
+                    ExportToFileClient.BinaryEncoding.HEX);
         final ExportToFileClient exportClient2 =
                 new ExportToFileClient(
                     ',',
@@ -132,7 +134,8 @@ public class TestExportToFileClient extends TestCase {
                     false,
                     0,
                     false,
-                    TimeZone.getDefault());
+                    TimeZone.getDefault(),
+                    ExportToFileClient.BinaryEncoding.HEX);
 
         InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", cluster.port(0));
         InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", cluster.port(1));

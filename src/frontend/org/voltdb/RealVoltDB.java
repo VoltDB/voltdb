@@ -54,8 +54,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -249,8 +249,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
     }
 
-    HeartbeatThread heartbeatThread;
+    private HeartbeatThread m_heartbeatThread;
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
+    private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
     // The configured license api: use to decide enterprise/cvommunity edition feature enablement
     LicenseApi m_licenseApi;
@@ -323,6 +324,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
+            m_heartbeatThread = null;
 
             // set up site structure
             m_localSites = new COWMap<Long, ExecutionSite>();
@@ -381,7 +383,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
 
             // Create the thread pool here. It's needed by buildClusterMesh()
-            m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, 1024 * 128);
+            m_periodicWorkThread =
+                    CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
+            m_periodicPriorityWorkThread =
+                    CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
             if (m_licenseApi == null) {
@@ -860,9 +865,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         true, null);
             }
 
-            heartbeatThread = new HeartbeatThread(m_clientInterfaces);
-            heartbeatThread.start();
+            if (!isIV2Enabled()) {
+                m_heartbeatThread = new HeartbeatThread(m_clientInterfaces);
+                m_heartbeatThread.start();
+            }
             schedulePeriodicWorks();
+            m_clientInterfaces.get(0).schedulePeriodicWorks();
 
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
@@ -1179,7 +1187,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             "Deployment file could not be found locally or remotely at "
                             + m_config.m_pathToDeployment);
                 }
-                CRC32 crc = new CRC32();
+                PureJavaCrc32 crc = new PureJavaCrc32();
                 crc.update(deploymentBytes);
                 final long checksumHere = crc.getValue();
                 crc.reset();
@@ -1646,8 +1654,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_faultManager.shutDown();
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
-                heartbeatThread.interrupt();
-                heartbeatThread.join();
+                m_periodicPriorityWorkThread.shutdown();
+                if (m_heartbeatThread != null) {
+                    m_heartbeatThread.interrupt();
+                    m_heartbeatThread.join();
+                }
 
                 if (m_leaderAppointer != null) {
                     m_leaderAppointer.shutdown();
@@ -2173,6 +2184,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         m_rejoining = false;
     }
 
+    /**
+     * See comment on {@link VoltDBInterface#scheduleWork(Runnable, long, long, TimeUnit)} vs
+     * {@link VoltDBInterface#schedulePriorityWork(Runnable, long, long, TimeUnit)}
+     */
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work,
             long initialDelay,
@@ -2394,5 +2409,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }, null);
 
         return retval;
+    }
+
+    /**
+     * See comment on {@link VoltDBInterface#schedulePriorityWork(Runnable, long, long, TimeUnit)} vs
+     * {@link VoltDBInterface#scheduleWork(Runnable, long, long, TimeUnit)}
+     */
+    @Override
+    public ScheduledFuture<?> schedulePriorityWork(Runnable work,
+            long initialDelay,
+            long delay,
+            TimeUnit unit) {
+        if (delay > 0) {
+            return m_periodicPriorityWorkThread.scheduleWithFixedDelay(work,
+                    initialDelay, delay,
+                    unit);
+        } else {
+            return m_periodicPriorityWorkThread.schedule(work, initialDelay, unit);
+        }
     }
 }

@@ -23,7 +23,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.StoredProcedureInvocation;
 
 /**
@@ -57,7 +56,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long coordinatorHSId,
                         long truncationHandle,
                         long txnId,
-                        long timestamp,
+                        long uniqueId,
                         boolean isReadOnly,
                         boolean isSinglePartition,
                         StoredProcedureInvocation invocation,
@@ -65,7 +64,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long connectionId,
                         boolean isForReplay)
     {
-        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
+        super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
         super.setOriginalTxnId(invocation.getOriginalTxnId());
 
         setTruncationHandle(truncationHandle);
@@ -186,7 +185,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
         sb.append(m_txnId).append("\n");
-        sb.append(" TIMESTAMP ").append(m_timestamp).append("\n");
+        sb.append(" UNIQUE ID ").append(m_uniqueId).append("\n");
         sb.append(") TRUNC HANDLE ");
         sb.append(getTruncationHandle()).append("\n");
         sb.append("SP HANDLE: ").append(getSpHandle()).append("\n");

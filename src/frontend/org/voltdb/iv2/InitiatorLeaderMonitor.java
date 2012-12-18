@@ -49,7 +49,7 @@ public class InitiatorLeaderMonitor {
 
     private final ZooKeeper zk;
     private final ExecutorService es =
-            Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Client Interface"));
+            CoreUtils.getCachedSingleThreadExecutor("Client Interface", 15000);
     private final Map<Integer, Long> initiatorLeaders =
             Collections.synchronizedMap(new HashMap<Integer, Long>());
     private final AtomicBoolean shutdown = new AtomicBoolean(false);

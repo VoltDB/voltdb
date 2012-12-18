@@ -17,13 +17,12 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
@@ -152,6 +151,12 @@ public interface VoltDBInterface
 
     /**
      * Schedule a work to be performed once or periodically.
+     * No blocking or resource intensive work should be done
+     * from this thread. High priority tasks,
+     * that are known not to do anything risky can use
+     * schedulePriorityWork if they actually have fine grained requirements.
+     * All others should use schedule work
+     * and be aware that they may stomp on each other.
      *
      * @param work
      *            The work to be scheduled
@@ -165,6 +170,26 @@ public interface VoltDBInterface
      *            Time unit
      */
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay,
+                             TimeUnit unit);
+
+    /**
+     * Schedule a work to be performed once or periodically.
+     * This is for high priority work with fine grained scheduling requirements.
+     * Tasks submitted here must absolutely not do any work in the scheduler thread.
+     * Submit the work to be done to a different thread unless it is absolutely trivial.
+     *
+     * @param work
+     *            The work to be scheduled
+     * @param initialDelay
+     *            The initial delay before the first execution of the work
+     * @param delay
+     *            The delay between each subsequent execution of the work. If
+     *            this is negative, the work will only be executed once after
+     *            the initial delay.
+     * @param unit
+     *            Time unit
+     */
+    public ScheduledFuture<?> schedulePriorityWork(Runnable work, long initialDelay, long delay,
                              TimeUnit unit);
 
     /**

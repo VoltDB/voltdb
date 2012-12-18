@@ -131,6 +131,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
     private final DurabilityListener m_durabilityListener;
+    //Generator of pre-IV2ish timestamp based unique IDs
+    private final UniqueIdGenerator m_uniqueIdGenerator;
+
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -152,6 +155,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
             }
         };
+        m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
     @Override
@@ -173,7 +177,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_drGateway = gateway;
         if (m_drGateway != null) {
             // Schedules to be fired every 5ms
-            VoltDB.instance().scheduleWork(new Runnable() {
+            VoltDB.instance().schedulePriorityWork(new Runnable() {
                 @Override
                 public void run() {
                     // Send a DR task to the site
@@ -348,7 +352,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = message.getStoredProcedureName();
         if (message.isSinglePartition()) {
             long newSpHandle;
-            long timestamp;
+            long uniqueId;
             Iv2InitiateTaskMessage msg = message;
             if (m_isLeader || message.isReadOnly()) {
                 /*
@@ -369,20 +373,24 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                  */
                 if (message.isForReplay()) {
                     newSpHandle = message.getTxnId();
-                    timestamp = message.getTimestamp();
+                    uniqueId = message.getUniqueId();
                     setMaxSeenTxnId(newSpHandle);
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
                 } else if (m_isLeader) {
                     TxnEgo ego = advanceTxnEgo();
                     newSpHandle = ego.getTxnId();
-                    timestamp = ego.getWallClock();
+                    uniqueId = m_uniqueIdGenerator.getNextUniqueId();
                 } else {
                     /*
                      * The short circuit read case. Since we are not a master
                      * we can't create new transaction IDs, so reuse the last seen
                      * txnid. For a timestamp, might as well give a reasonable one
-                     * for a read heavy workload so time isn't bursty
+                     * for a read heavy workload so time isn't bursty.
                      */
-                    timestamp = System.currentTimeMillis();
+                    uniqueId = UniqueIdGenerator.makeIdFromComponents(
+                            Math.max(System.currentTimeMillis(), m_uniqueIdGenerator.lastUsedTime),
+                            0,
+                            m_uniqueIdGenerator.partitionId);
                     //Don't think it wise to make a new one for a short circuit read
                     newSpHandle = getCurrentTxnId();
                 }
@@ -397,7 +405,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         message.getCoordinatorHSId(),
                         m_repairLogTruncationHandle,
                         message.getTxnId(),
-                        message.getTimestamp(),
+                        message.getUniqueId(),
                         message.isReadOnly(),
                         message.isSinglePartition(),
                         message.getStoredProcedureInvocation(),
@@ -413,7 +421,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 if (SystemProcedureCatalog.listing.get(procedureName) == null ||
                     !SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
                     msg.setTxnId(newSpHandle);
-                    msg.setTimestamp(timestamp);
+                    msg.setUniqueId(uniqueId);
                 }
 
                 //Don't replicate reads, this really assumes that DML validation
@@ -424,7 +432,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                 m_mailbox.getHSId(),
                                 m_repairLogTruncationHandle,
                                 msg.getTxnId(),
-                                msg.getTimestamp(),
+                                msg.getUniqueId(),
                                 msg.isReadOnly(),
                                 msg.isSinglePartition(),
                                 msg.getStoredProcedureInvocation(),
@@ -444,7 +452,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             else {
                 setMaxSeenTxnId(msg.getSpHandle());
                 newSpHandle = msg.getSpHandle();
-                timestamp = msg.getTimestamp();
+                uniqueId = msg.getUniqueId();
             }
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
@@ -485,6 +493,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 message.getTxnId(), expectedHSIds);
         m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
             needsRepair.remove(m_mailbox.getHSId());
