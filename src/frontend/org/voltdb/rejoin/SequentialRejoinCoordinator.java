@@ -37,12 +37,14 @@ import org.voltdb.utils.VoltFile;
  * Sequentially rejoins each site.
  *
  * Thread Safety: this is a reentrant class. All mutable datastructures
- * must be thread-safe.
+ * must be thread-safe. They use m_lock to do this. DO NOT hold m_lock
+ * when leaving this class.
  */
 public class SequentialRejoinCoordinator extends RejoinCoordinator {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
-    // This lock synchronizes all data structure access.
+    // This lock synchronizes all data structure access. Do not hold this
+    // across blocking external calls.
     private final Object m_lock = new Object();
 
     // triggers specific test code for TestMidRejoinDeath
@@ -87,7 +89,7 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
      * @param HSId
      */
     private void initiateRejoinOnSite(long HSId) {
-        // Must not hold m_lock across the send() call to managed lock
+        // Must not hold m_lock across the send() call to manage lock
         // acquisition ordering with other in-process mailboxes.
         RejoinMessage msg = new RejoinMessage(getHSId(),
                 m_liveRejoin ? RejoinMessage.Type.INITIATION :
