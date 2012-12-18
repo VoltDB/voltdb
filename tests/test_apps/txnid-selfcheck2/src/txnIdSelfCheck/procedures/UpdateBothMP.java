@@ -29,9 +29,9 @@ import org.voltdb.utils.MiscUtils;
 public class UpdateBothMP extends ReplicatedUpdateBaseProc {
 
     public VoltTable[] run(byte cid, long rid, byte[] value) {
-        VoltTable[] results1 = doWork(p_getCIDData, p_cleanUp, p_insert,
+        VoltTable[] results1 = doWork(p_getCIDData, p_cleanUp, p_insert, p_getAdhocData,
                 cid, rid, value);
-        VoltTable[] results2 = doWork(r_getCIDData, r_cleanUp, r_insert,
+        VoltTable[] results2 = doWork(r_getCIDData, r_cleanUp, r_insert, r_getAdhocData,
                 cid, rid, value);
 
         assert(results1.length == 3);

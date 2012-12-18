@@ -8,8 +8,10 @@ CREATE TABLE partitioned
 , cidallhash bigint             NOT NULL
 , rid        bigint             NOT NULL
 , cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_txnid PRIMARY KEY
+, CONSTRAINT PK_id_p PRIMARY KEY
   (
     txnid
   )
@@ -28,8 +30,10 @@ CREATE TABLE replicated
 , cidallhash bigint             NOT NULL
 , rid        bigint             NOT NULL
 , cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id PRIMARY KEY
+, CONSTRAINT PK_id_r PRIMARY KEY
   (
     txnid
   )
@@ -37,11 +41,36 @@ CREATE TABLE replicated
 );
 CREATE INDEX R_CIDINDEX ON replicated (cid);
 
+-- partitioned table
+CREATE TABLE adhocp
+(
+  id         bigint             NOT NULL
+, ts         bigint             NOT NULL
+, inc        bigint             NOT NULL
+, jmp        bigint             NOT NULL
+, CONSTRAINT PK_id_ap PRIMARY KEY (id)
+);
+PARTITION TABLE adhocp ON COLUMN id;
+CREATE INDEX P_TSINDEX ON adhocp (ts DESC);
+
+-- replicated table
+CREATE TABLE adhocr
+(
+  id         bigint             NOT NULL
+, ts         bigint             NOT NULL
+, inc        bigint             NOT NULL
+, jmp        bigint             NOT NULL
+, CONSTRAINT PK_id_ar PRIMARY KEY (id)
+);
+CREATE INDEX R_TSINDEX ON adhocr (ts DESC);
+
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
 
 -- real procedures
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SetupAdHocTables;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedSP;
 PARTITION PROCEDURE UpdatePartitionedSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedMP;
