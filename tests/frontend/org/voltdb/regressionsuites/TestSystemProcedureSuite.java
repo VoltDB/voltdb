@@ -421,7 +421,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTable() throws IOException {
+    public void testLoadMultipartitionTableAndIndexStats() throws IOException {
         Client client = getClient();
 
         // try the failure case first
@@ -498,6 +498,25 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 }
             }
             assertEquals(6, foundItem);
+
+            //Wait for tick, otherwise junk stats
+            Thread.sleep(2000);
+
+            VoltTable indexStats =
+                    client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            System.out.println(indexStats);
+            long memorySum = 0;
+            while (indexStats.advanceRow()) {
+                memorySum += indexStats.getLong("MEMORY_ESTIMATE");
+            }
+            indexStats = client.callProcedure("@Statistics", "MEMORY", 0).getResults()[0];
+            System.out.println(indexStats);
+            long indexMemorySum = 0;
+            while (indexStats.advanceRow()) {
+                indexMemorySum += indexStats.getLong("INDEXMEMORY");
+            }
+            assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
+            assertEquals(memorySum, indexMemorySum);
         }
         catch (Exception e) {
             e.printStackTrace();
