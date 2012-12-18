@@ -90,7 +90,9 @@ public abstract class BaseInitiator implements Initiator
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
-        rejoinProducer.setMailbox(m_initiatorMailbox);
+        if (rejoinProducer != null) {
+            rejoinProducer.setMailbox(m_initiatorMailbox);
+        }
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
