@@ -34,8 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
@@ -114,7 +114,7 @@ public class ProcedureRunner {
     protected final static int AGG_DEPID = 1;
 
     // current hash of sql and params
-    protected final CRC32 m_inputCRC = new CRC32();
+    protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
