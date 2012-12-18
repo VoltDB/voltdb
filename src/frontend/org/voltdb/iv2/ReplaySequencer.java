@@ -205,8 +205,19 @@ public class ReplaySequencer
             }
         }
         else if (in instanceof FragmentTaskMessage) {
-            // already sequenced
-            if (inTxnId <= m_lastPolledFragmentTxnId) {
+            /*
+             * Dedupe only if there is no matching sentinel.
+             *
+             * DR sends multiple @LoadMultipartitionTable proc calls with the
+             * same txnId, which is the snapshot txnId. For each partition,
+             * there is a sentinel paired with the @LoadMultipartitionTable
+             * call. The sentinels will all enter the replay sequencer, if the
+             * sequencer dedupes the fragments thinking that they have been
+             * sequenced before, the sentinels will never be cleared. This makes
+             * sure that if there is an outstanding sentinel with the same
+             * txnId, the sequencer won't dedupe the fragments.
+             */
+            if (inTxnId <= m_lastPolledFragmentTxnId && found == null) {
                 return false;
             }
 
@@ -225,10 +236,6 @@ public class ReplaySequencer
             }
         }
         else if (in instanceof CompleteTransactionMessage) {
-            // already sequenced
-            if (inTxnId <= m_lastPolledFragmentTxnId) {
-                return false;
-            }
             if (found != null) {
                 found.addBlockedMessage(in);
             }

@@ -511,5 +511,42 @@ public class TestReplaySequencer extends TestCase
         assertEquals(init5, dut.poll());
         assertNull(dut.poll());
     }
+
+    /**
+     * DR sends multiple @LoadMultipartitionTable proc calls with the same
+     * txnId, which is the snapshot txnId. For each partition, there is a
+     * sentinel paired with the @LoadMultipartitionTable call. The sentinels
+     * will all enter the replay sequencer, if the sequencer dedupes the
+     * fragments thinking that they have been sequenced before, the sentinels
+     * will never be cleared. This test makes sure that if there is an
+     * outstanding sentinel with the same txnId, the sequencer won't dedupe the
+     * fragments.
+     */
+    @Test
+    public void testFragsWithDupeTxnId()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sentinel1 = makeSentinel(1L);
+        TransactionInfoBaseMessage frag1 = makeFragment(1L);
+        TransactionInfoBaseMessage frag2 = makeFragment(1L);
+        TransactionInfoBaseMessage complete1 = makeCompleteTxn(1L);
+
+        assertTrue(dut.offer(1L, sentinel1));
+        assertTrue(dut.offer(1L, frag1));
+        assertEquals(frag1, dut.poll());
+        assertNull(dut.poll());
+        assertFalse(dut.offer(1L, frag2));
+        assertFalse(dut.offer(1L, complete1));
+        assertNull(dut.poll());
+
+        assertTrue(dut.offer(1L, sentinel1));
+        assertTrue(dut.offer(1L, frag1));
+        assertEquals(frag1, dut.poll());
+        assertNull(dut.poll());
+        assertFalse(dut.offer(1L, frag2));
+        assertFalse(dut.offer(1L, complete1));
+        assertNull(dut.poll());
+    }
 }
 
