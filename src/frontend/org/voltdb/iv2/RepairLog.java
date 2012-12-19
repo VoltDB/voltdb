@@ -185,7 +185,7 @@ public class RepairLog
         }
 
         int ofTotal = items.size() + 1;
-        tmLog.info("Responding with " + ofTotal + " repair log parts.");
+        tmLog.debug("Responding with " + ofTotal + " repair log parts.");
         List<Iv2RepairLogResponseMessage> responses =
             new LinkedList<Iv2RepairLogResponseMessage>();
 

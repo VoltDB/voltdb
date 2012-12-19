@@ -113,8 +113,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                         m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
                     }
                     tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                             + "finished leader promotion. Took "
+                             + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
@@ -128,9 +128,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     // CrashVoltDB here means one node failure causing another.
                     // Don't create a cascading failure - just try again.
                     tmLog.info(m_whoami
-                            + "interrupted during leader promotion after "
-                            + (System.currentTimeMillis() - startTime) + " ms. of "
-                            + "trying. Retrying.");
+                             + "interrupted during leader promotion after "
+                             + (System.currentTimeMillis() - startTime) + " ms. of "
+                             + "trying. Retrying.");
                 }
             }
             super.acceptPromotion();
