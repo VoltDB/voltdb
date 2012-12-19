@@ -41,6 +41,17 @@ CREATE TABLE replicated
 );
 CREATE INDEX R_CIDINDEX ON replicated (cid);
 
+-- replicated table
+CREATE TABLE adhocr
+(
+  id         bigint             NOT NULL
+, ts         bigint             NOT NULL
+, inc        bigint             NOT NULL
+, jmp        bigint             NOT NULL
+, CONSTRAINT PK_id_ar PRIMARY KEY (id)
+);
+CREATE INDEX R_TSINDEX ON adhocr (ts DESC);
+
 -- partitioned table
 CREATE TABLE adhocp
 (
@@ -54,16 +65,21 @@ PARTITION TABLE adhocp ON COLUMN id;
 CREATE INDEX P_TSINDEX ON adhocp (ts DESC);
 
 -- replicated table
-CREATE TABLE adhocr
+CREATE TABLE bigr
 (
   id         bigint             NOT NULL
-, ts         bigint             NOT NULL
-, inc        bigint             NOT NULL
-, jmp        bigint             NOT NULL
-, CONSTRAINT PK_id_ar PRIMARY KEY (id)
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_br PRIMARY KEY (id)
 );
-CREATE INDEX R_TSINDEX ON adhocr (ts DESC);
 
+-- partitioned table
+CREATE TABLE bigp
+(
+  id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_bp PRIMARY KEY (id)
+);
+PARTITION TABLE bigp ON COLUMN id;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;

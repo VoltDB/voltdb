@@ -107,6 +107,15 @@ public class Benchmark {
         @Option(desc = "Compress values on the client side.")
         boolean usecompression = false;
 
+        @Option(desc = "Filler table blob size.")
+        int fillerrowsize = 5128;
+
+        @Option(desc = "Target data size for the filler replicated table (at each site).")
+        int replfillerrowmb = 32;
+
+        @Option(desc = "Target data size for the partitioned filler table.")
+        int partfillerrowmb = 128;
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -289,6 +298,13 @@ public class Benchmark {
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
 
+        BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+        partitionedLoader.start();
+        BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
+                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+        replicatedLoader.start();
+
         ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset);
         readThread.start();
 
@@ -308,11 +324,15 @@ public class Benchmark {
             Thread.yield();
         }
 
+        replicatedLoader.shutdown();
+        partitionedLoader.shutdown();
         readThread.shutdown();
         adHocMayhemThread.shutdown();
         for (ClientThread clientThread : clientThreads) {
             clientThread.shutdown();
         }
+        replicatedLoader.join();
+        partitionedLoader.join();
         readThread.join();
         adHocMayhemThread.join();
         for (ClientThread clientThread : clientThreads) {

@@ -43,7 +43,15 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
+
+    # primary catalog
     $VOLTDB compile --classpath obj -o $APPNAME.jar src/txnIdSelfCheck/ddl.sql
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit; fi
+
+    # alternate catalog that adds an index
+    $VOLTDB compile --classpath obj -o $APPNAME-alt.jar \
+        src/txnIdSelfCheck/ddl.sql src/txnIdSelfCheck/ddl-annex.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -76,11 +84,14 @@ function benchmark() {
         --displayinterval=1 \
         --duration=120 \
         --servers=localhost \
-        --threads=100 \
+        --threads=20 \
         --threadoffset=0 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --entropy=127 \
+        --fillerrowsize=10240 \
+        --replfillerrowmb=32 \
+        --partfillerrowmb=128 \
         --usecompression=false
 }
 
