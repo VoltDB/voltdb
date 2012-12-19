@@ -286,7 +286,6 @@ public class TestUnionSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         project.addSchema(TestUnionSuite.class.getResource("testunion-ddl.sql"));
-        project.addPartitionInfo("A", "PKEY");
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");

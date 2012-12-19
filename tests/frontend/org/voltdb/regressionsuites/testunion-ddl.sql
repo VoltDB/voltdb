@@ -4,6 +4,7 @@ CREATE TABLE A (
  I             INTEGER,
  PRIMARY KEY (PKEY)
 );
+PARTITION TABLE A ON COLUMN PKEY;
 
 -- replicated in test
 CREATE TABLE B (
@@ -11,6 +12,7 @@ CREATE TABLE B (
  I             INTEGER,
  PRIMARY KEY (PKEY)
 );
+
 
 -- replicated in test
 CREATE TABLE C (
