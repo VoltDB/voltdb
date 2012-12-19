@@ -1101,78 +1101,82 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         int columnCount = this.getColumnCount();
         int[] padding = new int[columnCount];
         String[] fmt = new String[columnCount];
-        for (int i = 0; i < columnCount; i++)
+        for (int i = 0; i < columnCount; i++) {
             padding[i] = this.getColumnName(i).length();
+        }
         this.resetRowPosition();
 
-        // Compute the padding needed for each column of the table (note must visit every row)
-        while(this.advanceRow())
-        {
-            for (int i = 0; i < columnCount; i++)
-            {
+        // Compute the padding needed for each column of the table (note must
+        // visit every row)
+        while (this.advanceRow()) {
+            for (int i = 0; i < columnCount; i++) {
                 Object v = this.get(i, this.getColumnType(i));
-                if (this.wasNull())
+                if (this.wasNull()) {
                     v = "NULL";
-                int len = 0;  // length
-                if (this.getColumnType(i) == VoltType.VARBINARY && !this.wasNull()) {
-                    len = ((byte[])v).length*2;
                 }
-                else {
-                    len= v.toString().length();
+                int len = 0; // length
+                if (this.getColumnType(i) == VoltType.VARBINARY
+                        && !this.wasNull()) {
+                    len = ((byte[]) v).length * 2;
+                } else {
+                    len = v.toString().length();
                 }
 
-                if (padding[i] < len)
+                if (padding[i] < len) {
                     padding[i] = len;
+                }
             }
         }
 
         // Determine the formatting string for each column
-        for (int i = 0; i < columnCount; i++)
-        {
+        for (int i = 0; i < columnCount; i++) {
             padding[i] += 1;
-            fmt[i] = "%1$" +
-                ((this.getColumnType(i) == VoltType.STRING ||
-                  this.getColumnType(i) == VoltType.TIMESTAMP ||
-                  this.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                + padding[i] + "s";
+            fmt[i] = "%1$"
+                    + ((this.getColumnType(i) == VoltType.STRING
+                            || this.getColumnType(i) == VoltType.TIMESTAMP || this
+                            .getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
+                    + padding[i] + "s";
         }
 
         // Create the column headers
-        for (int i = 0; i < columnCount; i++)
-        {
-            sb.append(String.format("%1$-" + padding[i] + "s", this.getColumnName(i)));
-            if (i < columnCount - 1)
+        for (int i = 0; i < columnCount; i++) {
+            sb.append(String.format("%1$-" + padding[i] + "s",
+                    this.getColumnName(i)));
+            if (i < columnCount - 1) {
                 sb.append(" ");
+            }
         }
         sb.append("\n");
 
         // Create the separator between the column headers and the rows of data
-        for (int i = 0; i < columnCount; i++)
-        {
+        for (int i = 0; i < columnCount; i++) {
             char[] underline_array = new char[padding[i]];
             Arrays.fill(underline_array, '-');
             sb.append(new String(underline_array));
-            if (i < columnCount - 1)
+            if (i < columnCount - 1) {
                 sb.append(" ");
+            }
         }
         sb.append("\n");
 
         // Now display each row of data.
         this.resetRowPosition();
-        while(this.advanceRow())
-        {
-            for (int i = 0; i < columnCount; i++)
-            {
+        while (this.advanceRow()) {
+            for (int i = 0; i < columnCount; i++) {
                 Object value = this.get(i, this.getColumnType(i));
-                if (this.wasNull())
+                if (this.wasNull()) {
                     value = "NULL";
-                else if (this.getColumnType(i) == VoltType.VARBINARY)
-                    value = Encoder.hexEncode((byte[])value);
-                else
+                }
+                else if (this.getColumnType(i) == VoltType.VARBINARY) {
+                    value = Encoder.hexEncode((byte[]) value);
+                }
+                else {
                     value = value.toString();
+                }
                 sb.append(String.format(fmt[i], value));
-                if (i < columnCount - 1)
+                if (i < columnCount - 1) {
                     sb.append(" ");
+                }
             }
             sb.append("\n");
         }

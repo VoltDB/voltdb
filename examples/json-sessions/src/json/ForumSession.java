@@ -36,33 +36,20 @@ public class ForumSession extends SessionBase {
     {
         super("VoltDB Forum");
 
-        switch (random.nextInt(10000)) {
-            case 0:  moderator = true;  // make 1 out of a 10,000 moderators.
-                 break;
+        if (random.nextInt(10000) == 0) {
+            moderator = true;  // make 1 out of a 10,000 moderators.
         }
 
         // Set versions for 1/3rd of the logins
         int version_idx = random.nextInt(version_list.length)*3;
-        switch (version_idx) {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5: setDownloadVersion(version_list[version_idx]);
-                break;
+        if (version_idx < version_list.length) {
+            setDownloadVersion(version_list[version_idx]);
         }
 
         // Set programming language for 1/10th of the logins
         int language_idx = random.nextInt(language_list.length)*10;
-        switch (language_idx) {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5: setLanguage(language_list[language_idx]);
-                break;
+        if (language_idx <= 5) {
+            setLanguage(language_list[language_idx]);
         }
     }
 
