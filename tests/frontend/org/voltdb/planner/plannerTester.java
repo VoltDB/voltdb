@@ -239,21 +239,23 @@ public class plannerTester {
         System.out.println("-sp=savePath" +
                         "\nspecify path for newly generated plan files.\n");
         System.out.println("-b=baselinePath" +
-                        "\nspecify path for ALL baseline reference plan files. Leave null for separate <configDir>/baseline dirs\n");
+                        "\nspecify path for ALL baseline reference plan files. Omit for separate <configDir>/baseline dirs\n");
         System.out.println("-r=reportFilePath " +
                         "\nSpecify report file path, default will be ./reports, report file name is plannerTester.report.\n");
         System.out.println("-i=ignorePattern" +
                         "\nSpecify a pattern to ignore, the pattern will not be recorded in the report file.\n");
-        System.out.println("-cd" +
-                        "\nSame as -cs -d -e -s.\n");
-        System.out.println("-cs" +
-                        "\nCompile queries and save in the baseline path (<config>/baseline by default.\n");
+        System.out.println("-s" +
+                        "\nSave compiled queries in the baseline path (<config>/baseline by default.\n");
         System.out.println("-d" +
                         "\nDo the diff between plan files in baseline and the current ones.\n");
-        System.out.println("-e" +
+        System.out.println("-re" +
                         "\nOutput explained plan along with diff.\n");
-        System.out.println("-s" +
+        System.out.println("-rs" +
                         "\nOutput sql statement along with diff.\n");
+        System.out.println("-dv" +
+                        "\nSame as -d -re -rs.\n");
+        System.out.println("-sv" +
+                        "\nSame as -s -re -rs.\n");
 
     }
 
