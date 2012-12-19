@@ -23,88 +23,41 @@
 
 package org.voltdb.planner;
 
-import java.util.List;
-
-import junit.framework.TestCase;
-
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 
-public class testLoadPlanNodeFromJSON extends TestCase {
-    private PlannerTestAideDeCamp aide;
-
-    private AbstractPlanNode compile(String sql, int paramCount,
-            boolean singlePartition) {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn = aide.compile(sql, paramCount, singlePartition);
-        } catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
-    }
-
+public class testLoadPlanNodeFromJSON extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(
-                TestIndexSelection.class
-                        .getResource("testplans-indexselection-ddl.sql"),
-                "testindexselectionplans");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database")
-                .getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
+        setupSchema(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"), "testindexselectionplans",
+                                                         true);
+        forceHackPartitioning();
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     public void testLoadQueryPlans() throws JSONException {
-        testLoadQueryPlanTree(
-                "select count(*) from l,t where lname=? and l.a=t.a order by l.b limit ?;",
-                3, true);
-        testLoadQueryPlanTree(
-                "select * from l,t where lname=? and l.a=t.a order by l.b limit ?;",
-                3, true);
-        testLoadQueryPlanTree(
-                "select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;",
-                3, true);
-        testLoadQueryPlanTree(
-                "select count(*) from l where lname=? and id < ?;",
-                3, true);
+        testLoadQueryPlanTree("select count(*) from l,t where lname=? and l.a=t.a order by l.b limit ?;");
+        testLoadQueryPlanTree("select * from l,t where lname=? and l.a=t.a order by l.b limit ?;");
+        testLoadQueryPlanTree("select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;");
+        testLoadQueryPlanTree("select count(*) from l where lname=? and id < ?;");
     }
 
-    public void testLoadQueryPlanTree(String sql, int paraCount,
-            boolean singlePartition) throws JSONException {
-        AbstractPlanNode pn = compile(sql, paraCount, singlePartition);
+    public void testLoadQueryPlanTree(String sql) throws JSONException {
+        AbstractPlanNode pn = compile(sql);
         PlanNodeTree pnt = new PlanNodeTree(pn);
         String str = pnt.toJSONString();
         System.out.println(str);
         JSONArray jarray = new JSONObject(str)
                 .getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
         PlanNodeTree pnt1 = new PlanNodeTree();
-        pnt1.loadFromJSONArray(jarray, aide.getDatabase());
+        pnt1.loadFromJSONArray(jarray, getDatabase());
         String str1 = pnt1.toJSONString();
         assertTrue(str.equals(str1));
     }

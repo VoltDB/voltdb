@@ -23,68 +23,29 @@
 
 package org.voltdb.planner;
 
-import java.util.List;
-
-import junit.framework.TestCase;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 
-public class TestIndexSelection extends TestCase {
-
-    private PlannerTestAideDeCamp aide;
-
-    private AbstractPlanNode compile(String sql, int paramCount,
-                                     boolean singlePartition)
-    {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn =  aide.compile(sql, paramCount, singlePartition);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
-    }
+public class TestIndexSelection extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"),
-                                         "testindexselectionplans");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
+        //TODO: consider switching to true for single-partition planning or replication to simplify resulting plans
+        final boolean planForSinglePartitionFalse = false;
+        setupSchema(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"), "testindexselectionplans",
+                    planForSinglePartitionFalse);
+        forceHackPartitioning();
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     /*public void testEng931Plan()
     {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a from t where a = ? and b = ? and c = ? and d = ? and e >= ? and e <= ?;", 6, true);
-        assertTrue(pn != null);
+        AbstractPlanNode pn = compile("select a from t where a = ? and b = ? and c = ? and d = ? and e >= ? and e <= ?;");
 
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
@@ -97,11 +58,9 @@ public class TestIndexSelection extends TestCase {
 
     public void testEng2541Plan() throws JSONException
     {
-        AbstractPlanNode pn = null;
-        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-        assertTrue(pn != null);
-
+        AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
         pn = pn.getChild(0);
+        //TODO: This test wants its teeth back. As is, it doesn't really prove much.
         //assertTrue(pn instanceof IndexScanPlanNode);
         //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
 

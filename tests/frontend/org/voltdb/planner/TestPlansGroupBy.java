@@ -23,114 +23,46 @@
 
 package org.voltdb.planner;
 
-import java.util.List;
-
-import junit.framework.TestCase;
-
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 
-public class TestPlansGroupBy extends TestCase {
-
-    private PlannerTestAideDeCamp aide;
-
-    private AbstractPlanNode compile(String sql, int paramCount) {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn =  aide.compile(sql, paramCount);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
-    }
-
-
+public class TestPlansGroupBy extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"), "testplansgroupby");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
+        setupSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"),
+                    "testplansgroupby", false);
+        forceHackPartitioning();
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
 
     public void testGroupByA1() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT A1 from T1 group by A1", 0);
-        if (pn != null)
-            System.out.println(pn.toJSONString());
+        AbstractPlanNode pn = compile("SELECT A1 from T1 group by A1");
+        System.out.println(pn.toJSONString());
     }
 
-    public void testCountA1GroupByA1() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT A1, count(A1) from T1 group by A1", 0);
-        if (pn != null) {
-            System.out.println(pn.toJSONString());
-        }
-   }
-
     public void testCountA1() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT count(A1) from T1", 0);
-        if (pn != null)
-            System.out.println(pn.toJSONString());
+        AbstractPlanNode pn = compile("SELECT count(A1) from T1");
+        System.out.println(pn.toJSONString());
     }
 
     public void testCountStar()
     {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT count(*) from T1", 0);
-        if (pn != null)
-        {
-            System.out.println(pn.toJSONString());
-        }
+        AbstractPlanNode pn = compile("SELECT count(*) from T1");
+        System.out.println(pn.toJSONString());
     }
 
    public void testCountDistinctA1() {
-       AbstractPlanNode pn = null;
-       pn = compile("SELECT count(distinct A1) from T1", 0);
-       if (pn != null)
-           System.out.println(pn.toJSONString());
+       AbstractPlanNode pn = compile("SELECT count(distinct A1) from T1");
+       System.out.println(pn.toJSONString());
    }
 
     public void testDistinctA1() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT DISTINCT A1 FROM T1", 0);
-        if (pn != null)
-                System.out.println(pn.toJSONString());
+        AbstractPlanNode pn = compile("SELECT DISTINCT A1 FROM T1");
+        System.out.println(pn.toJSONString());
     }
 
-    // This plan won't compile right until ENG-490 is fixed...
-    /*public void testGroupSingleJoin() {
-        AbstractPlanNode pn = null;
-        pn = compile(
-                        "select D1.D1_NAME, sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3) "
-                                        + "from D1, V where D1.D1_PKEY = V.V_D1_PKEY "
-                                        + "group by D1.D1_NAME", 0);
-        assert(false);
-        if (pn != null)
-                System.out.println(pn.toJSONString());
-    }*/
 }

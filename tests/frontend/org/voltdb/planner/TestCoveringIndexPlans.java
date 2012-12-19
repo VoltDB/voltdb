@@ -23,61 +23,22 @@
 
 package org.voltdb.planner;
 
-import java.util.List;
-
-import junit.framework.TestCase;
-
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.types.IndexLookupType;
 
-public class TestCoveringIndexPlans extends TestCase {
-
-    private PlannerTestAideDeCamp aide;
-
-    private AbstractPlanNode compile(String sql, int paramCount,
-                                     boolean singlePartition)
-    {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn =  aide.compile(sql, paramCount, singlePartition);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
-    }
-
+public class TestCoveringIndexPlans extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestCoveringIndexPlans.class.getResource("testplans-indexvshash-ddl.sql"),
-                                         "testindexvshashplans");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
-        System.out.println(aide.getCatalog().serialize());
+        final boolean planForSinglePartition = true;
+        setupSchema(TestCoveringIndexPlans.class.getResource("testplans-indexvshash-ddl.sql"),
+                    "testindexvshashplans", planForSinglePartition);
+        forceHackPartitioning();
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     // The planner should choose cover2_tree, which is over columns a and b.
@@ -85,11 +46,7 @@ public class TestCoveringIndexPlans extends TestCase {
     // greater-than lookup type
     public void testEng1023()
     {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a from t where a = ? and b < ?;", 2, true);
-        assertTrue(pn != null);
-
+        AbstractPlanNode pn = compile("select a from t where a = ? and b < ?;");
         pn = pn.getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
@@ -103,11 +60,7 @@ public class TestCoveringIndexPlans extends TestCase {
 
     public void testCover2ColumnsWithEquality()
     {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a from t where a = ? and b = ?;", 2, true);
-        assertTrue(pn != null);
-
+        AbstractPlanNode pn = compile("select a from t where a = ? and b = ?;");
         pn = pn.getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
@@ -121,11 +74,7 @@ public class TestCoveringIndexPlans extends TestCase {
 
     public void testCover3ColumnsInOrderWithLessThan()
     {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a from t where a = ? and c = ? and b < ?;", 3, true);
-        assertTrue(pn != null);
-
+        AbstractPlanNode pn = compile("select a from t where a = ? and c = ? and b < ?;");
         pn = pn.getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
@@ -139,11 +88,7 @@ public class TestCoveringIndexPlans extends TestCase {
 
     public void testCover3ColumnsInOrderWithLessThanAndOrderBy()
     {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a, b from t where a = ? and c = ? and b < ? order by b;", 3, true);
-        assertTrue(pn != null);
-
+        AbstractPlanNode pn = compile("select a, b from t where a = ? and c = ? and b < ? order by b;");
         pn = pn.getChild(0).getChild(0).getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
@@ -157,11 +102,7 @@ public class TestCoveringIndexPlans extends TestCase {
 
     public void testCover3ColumnsOutOfOrderWithLessThan()
     {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a from t where a = ? and b = ? and c < ?;", 3, true);
-        assertTrue(pn != null);
-
+        AbstractPlanNode pn = compile("select a from t where a = ? and b = ? and c < ?;");
         pn = pn.getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
@@ -175,15 +116,12 @@ public class TestCoveringIndexPlans extends TestCase {
 
     public void testSingleColumnLessThan()
     {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a from t where a < ?;", 1, true);
-        assertTrue(pn != null);
-
+        AbstractPlanNode pn = compile("select a from t where a < ?;");
         pn = pn.getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
         assertTrue(pn instanceof IndexScanPlanNode);
     }
+
 }
