@@ -234,8 +234,8 @@ public class plannerTester {
     }
 
     public static void printUsage() {
-        System.out.println("-C=configDir1,configDir2" +
-                        "\nSpecify the path to a config file.\n");
+        System.out.println("-C=configDir1[,configDir2,...]" +
+                        "\nSpecify the path to each config file.\n");
         System.out.println("-sp=savePath" +
                         "\nspecify path for newly generated plan files.\n");
         System.out.println("-b=baselinePath" +
