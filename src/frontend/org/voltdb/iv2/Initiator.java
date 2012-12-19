@@ -25,9 +25,9 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
-import org.voltdb.CommandLog;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 
@@ -46,7 +46,8 @@ public interface Initiator
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway nodeDRGateway)
+                          NodeDRGateway nodeDRGateway,
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException;
 
     /** Shutdown an Initiator and its sub-components. */

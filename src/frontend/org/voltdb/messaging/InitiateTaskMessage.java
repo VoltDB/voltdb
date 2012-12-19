@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
@@ -75,7 +74,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         super(initiatorHSId,
                 coordinatorHSId,
                 txnId,
-                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                txnId,
                 isReadOnly,
                 false);
         m_isSinglePartition = isSinglePartition;
@@ -94,7 +93,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         super(initiatorHSId,
                 coordinatorHSId,
                 txnId,
-                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                txnId,
                 isReadOnly,
                 false);
         m_isSinglePartition = isSinglePartition;

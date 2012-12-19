@@ -148,7 +148,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     private final String m_rootNode;
 
     // All watch processing is run serially in this thread.
-    private final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("LeaderCache");
+    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache", 15000);
 
     // previous children snapshot for internal use.
     private Set<String> m_lastChildren = new HashSet<String>();

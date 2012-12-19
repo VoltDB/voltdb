@@ -401,7 +401,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     txnState.initiatorHSId,
                     m_site.getCorrespondingSiteId(),
                     txnState.txnId,
-                    txnState.timestamp,
+                    txnState.uniqueId,
                     txnState.isReadOnly(),
                     pf.fragmentId,
                     pf.outputDepId,

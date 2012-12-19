@@ -52,7 +52,7 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
         super(frag.getInitiatorHSId(),
               frag.getCoordinatorHSId(),
               frag.getTxnId(),
-              frag.getTimestamp(),
+              frag.getUniqueId(),
               frag.isReadOnly(), false);
         m_subject = Subject.DEFAULT.getId();
         m_fragTask = frag;
@@ -102,7 +102,7 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
         sb.append(m_txnId);
 
         sb.append("\n");
-        sb.append(" TIMESTAMP ").append(m_timestamp).append("\n");
+        sb.append(" UNIQUE ID ").append(m_uniqueId).append("\n");
         if (m_isReadOnly)
             sb.append("  READ, COORD ");
         else

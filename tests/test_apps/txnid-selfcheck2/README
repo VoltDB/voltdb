@@ -1,0 +1,26 @@
+This app is built to check if transactions are dropped, executed out of order,
+or run more than once on individual partitions. It can also be used as a long
+running test because data does not grow indefinitely.
+
+The following is a list of features this app has:
+
+- Creates a set of logical clients, each with a CID value.
+- Each client gets a thread that performs synchronous operations against a
+  running VoltDB server.
+- Depending on the 10-mod of the CID, each thread will run SP, MP or hybrid
+  transactions against replication or partitioned tables.
+- All transactions run by the logical clients do the same work.
+  - They add a new row id (RID) that's supplied by the client and ensure
+    it's monotonically increasing.
+  - They add a new counter (CNT) which is incremented from within the txn.
+  - They select all data with their CID and perform a "Cheesy Checksum",
+    storing the result in the table.
+- A thread runs adhoc DML that changes both replicated and partitioned tables.
+  The most recent entry is read and re-stored by the main procedures. This means
+  the order AdHoc and regular procs run in is critical.
+
+If a transaction is run out of order, missing or run twice, these mechanisms
+should fail. This failure should be detected by:
+  - Validating data in the transaction.
+  - Validating data at the client logic.
+  - The determisim checks built into VoltDB.

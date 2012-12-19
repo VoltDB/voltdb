@@ -132,6 +132,13 @@ for f in $VOLTDB_LIB/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
+# if present include user supplied jars
+if \ls -1 $VOLTDB_LIB/extension | egrep -q '\.jar$'; then
+  for f in $VOLTDB_LIB/extension/*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+fi
+
 CLASSPATH=${CLASSPATH}:${EXTRA_CLASSPATH}
 
 # run it

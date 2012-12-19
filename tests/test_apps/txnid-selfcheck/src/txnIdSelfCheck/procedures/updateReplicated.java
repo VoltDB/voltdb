@@ -47,8 +47,8 @@ public class updateReplicated extends VoltProcedure
     public final SQLStmt selectStmt = new SQLStmt("SELECT * FROM replicated ORDER BY txnid LIMIT 10;");
 
     public VoltTable run(long rid) {
-        final long txnId = this.getTransactionId();
-        final long ts = getTransactionTime().getTime();
+        final long txnId = this.getVoltPrivateRealTransactionIdDontUseMe();
+        final long uniqueId = getUniqueId();
         final Random rand = getSeededRandomNumberGenerator();
 
         voltQueueSQL(selectStmt);
@@ -70,7 +70,7 @@ public class updateReplicated extends VoltProcedure
                                          " >= current rid " + rid);
         }
 
-        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, ts, rid, previousResult.getLong("cnt"));
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, uniqueId, rid, previousResult.getLong("cnt"));
         voltExecuteSQL();
 
         voltQueueSQL(updateStmt, EXPECT_SCALAR_MATCH(1), txnId);

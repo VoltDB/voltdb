@@ -43,6 +43,7 @@ package txnIdSelfCheck;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -190,7 +191,7 @@ public class AsyncBenchmark {
 
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+                System.err.printf(new Date() + " Connection to %s:%d was lost.\n", hostname, port);
             }
             clients.remove(this.client);
 
@@ -255,13 +256,13 @@ public class AsyncBenchmark {
             try {
                 client.createConnection(server);
                 clients.add(client);
-                System.out.printf("Connected to VoltDB node at: %s.\n", server);
+                System.out.printf(new Date() + " Connected to VoltDB node at: %s.\n", server);
                 break;
             }
             catch (Exception e) {
-                System.err.printf("Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
+                System.err.printf(new Date() + " Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
                 try { Thread.sleep(sleep); } catch (Exception interruted) {}
-                if (sleep < 8000) sleep += sleep;
+                if (sleep < 1000) sleep += sleep;
             }
         }
     }

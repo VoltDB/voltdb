@@ -64,7 +64,7 @@ public class JiggleMultiPartitionWithDeletionExport extends VoltProcedure {
                 VoltTableRow row = item.fetchRow(0);
                 voltQueueSQL(
                               export
-                            , getTransactionId()
+                            , getVoltPrivateRealTransactionIdDontUseMe()
                             , rowid
                             , row.get( 1, VoltType.TINYINT)
                             , row.get( 2, VoltType.TINYINT)

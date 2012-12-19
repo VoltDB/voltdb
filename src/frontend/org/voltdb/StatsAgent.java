@@ -35,6 +35,7 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.LocalMailbox;
@@ -60,7 +61,7 @@ public class StatsAgent {
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
     private final ScheduledThreadPoolExecutor m_es =
-        org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, 1024 * 128);
+        org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, CoreUtils.SMALL_STACK_SIZE);
 
     private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
         new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();

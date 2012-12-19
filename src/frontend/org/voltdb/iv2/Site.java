@@ -73,6 +73,8 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
+import vanilla.java.affinity.impl.PosixJNAAffinity;
+
 import com.google.common.collect.ImmutableMap;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
@@ -137,6 +139,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Current topology
     int m_partitionId;
+
+    private final String m_coreBindIds;
 
     // Need temporary access to some startup parameters in order to
     // initialize EEs in the right thread.
@@ -303,7 +307,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
-            MemoryStats memStats)
+            MemoryStats memStats,
+            String coreBindIds)
     {
         m_siteId = siteId;
         m_context = context;
@@ -320,6 +325,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
+        m_coreBindIds = coreBindIds;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -480,6 +486,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void run()
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
+        if (m_coreBindIds != null) {
+            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
+        }
         initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
         m_startupConfig = null; // release the serializedCatalog bytes.
 
@@ -930,6 +939,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         null);
             }
             Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+            if (sequenceNumbers == null) {
+                VoltDB.crashLocalVoltDB(
+                        "Could not find export sequence numbers for partition " +
+                                m_partitionId + " table " +
+                                tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+            }
             exportAction(
                     true,
                     sequenceNumbers.getFirst().intValue(),

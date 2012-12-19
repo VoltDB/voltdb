@@ -23,11 +23,11 @@ import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -39,11 +39,11 @@ import org.voltdb.utils.LogKeys;
 public class EveryPartitionTask extends TransactionTask
 {
     final long[] m_initiatorHSIds;
-    final Iv2InitiateTaskMessage m_msg;
+    final TransactionInfoBaseMessage m_msg;
     final Mailbox m_mailbox;
 
     EveryPartitionTask(Mailbox mailbox, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg, List<Long> pInitiators)
+                  TransactionInfoBaseMessage msg, List<Long> pInitiators)
     {
         super(new SpTransactionState(msg), queue);
         m_msg = msg;

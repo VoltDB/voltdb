@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.Calendar;
-import java.util.Date;
 
 /**
  * Encapsulates an Iv2 transaction id, timestamp and random number seed.
@@ -70,7 +69,6 @@ final public class TxnEgo {
 
     // per TxnEgo data.
     private final long m_txnId;
-    private final long m_wallClock;
 
     /**
      * Make the zero-valued (initial) TxnEgo for a partition
@@ -115,17 +113,11 @@ final public class TxnEgo {
         }
 
         m_txnId = (sequence << PARTITIONID_BITS) | partitionId;
-        m_wallClock = System.currentTimeMillis();
     }
 
     final public long getTxnId()
     {
         return m_txnId;
-    }
-
-    final public long getWallClock()
-    {
-        return m_wallClock;
     }
 
     public static long getSequence(long txnId) {
@@ -155,9 +147,6 @@ final public class TxnEgo {
         sb.append("TxnId: ").append(getTxnId());
         sb.append("  Sequence: ").append(getSequence());
         sb.append("  PartitionId: ").append(getPartitionId());
-        sb.append("  Wallclock: ").append(getWallClock());
-        Date date = new Date(getWallClock());
-        sb.append("  Date: ").append(date.toString());
         return sb.toString();
     }
 
