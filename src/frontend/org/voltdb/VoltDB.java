@@ -207,6 +207,9 @@ public class VoltDB {
 
         public Configuration() {
             m_enableIV2 = VoltDB.checkTestEnvForIv2();
+            // Set start action create.  The cmd line validates that an action is specified, however,
+            // defaulting it to create for local cluster test scripts
+            m_startAction = VoltDB.START_ACTION.CREATE;
         }
 
         /** Behavior-less arg used to differentiate command lines from "ps" */
