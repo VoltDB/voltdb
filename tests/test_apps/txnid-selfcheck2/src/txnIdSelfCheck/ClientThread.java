@@ -26,8 +26,11 @@ package txnIdSelfCheck;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
@@ -43,9 +46,11 @@ public class ClientThread extends Thread {
         static Type typeFromId(int id) {
             if (id % 10 == 0) return PARTITIONED_MP; // 20%
             if (id % 10 == 1) return PARTITIONED_MP;
-            if (id % 10 == 2) return REPLICATED;     // 10%
-            if (id % 10 == 3) return HYBRID;         // 10%
-            return PARTITIONED_SP;                   // 60%
+            if (id % 10 == 2) return REPLICATED;     // 20%
+            if (id % 10 == 3) return REPLICATED;
+            if (id % 10 == 4) return HYBRID;         // 20%
+            if (id % 10 == 5) return HYBRID;
+            return PARTITIONED_SP;                   // 40%
         }
     }
 
@@ -115,8 +120,27 @@ public class ClientThread extends Thread {
         while (m_shouldContinue.get()) {
             try {
                 runOne();
-            } catch (Exception e) {
+            }
+            catch (ProcCallException e) {
+                ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
+                if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
+                        (cri.getStatus() == ClientResponse.USER_ABORT)) {
+                    System.err.println("ClientThread had a proc-call exception that indicated bad data");
+                    System.err.println(cri.toJSONString());
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
+                else {
+                    // other proc call exceptions are logged, but don't stop the thread
+                    System.err.println("ClientThread had a proc-call exception that didn't indicate bad data");
+                    System.err.println(cri.toJSONString());
+                    e.printStackTrace();
+                }
+            }
+            catch (Exception e) {
+                System.err.println("ClientThread had a non proc-call exception");
                 e.printStackTrace();
+                System.exit(-1);
             }
         }
     }
