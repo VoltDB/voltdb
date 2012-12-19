@@ -23,12 +23,17 @@
 
 package txnIdSelfCheck.procedures;
 
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class UpdatePartitionedMP extends UpdateBaseProc {
+public class ReadMP extends VoltProcedure {
 
-    public VoltTable[] run(byte cid, long rid, byte[] value) {
-        return doWork(p_getCIDData, p_cleanUp, p_insert, p_getAdhocData,
-                cid, rid, value);
+    public final SQLStmt r_getCIDData = new SQLStmt(
+            "SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;");
+
+    public VoltTable[] run(byte cid) {
+        voltQueueSQL(r_getCIDData, cid);
+        return voltExecuteSQL(true);
     }
 }

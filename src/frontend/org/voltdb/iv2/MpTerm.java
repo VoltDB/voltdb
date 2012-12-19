@@ -67,9 +67,9 @@ public class MpTerm implements Term
             }
             List<Long> leaders = new ArrayList<Long>(updatedLeaders);
             tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
-            tmLog.info(m_whoami
-                    + "LeaderCache change handler updating leader list to: "
-                    + CoreUtils.hsIdCollectionToString(leaders));
+            tmLog.debug(m_whoami
+                      + "LeaderCache change handler updating leader list to: "
+                      + CoreUtils.hsIdCollectionToString(leaders));
             m_knownLeaders.clear();
             m_knownLeaders.addAll(updatedLeaders);
             m_mailbox.updateReplicas(leaders);

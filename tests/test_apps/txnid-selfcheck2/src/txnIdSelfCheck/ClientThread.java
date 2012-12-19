@@ -29,6 +29,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 
+import txnIdSelfCheck.procedures.UpdateBaseProc;
+
 public class ClientThread extends Thread {
 
     static enum Type {
@@ -96,6 +98,10 @@ public class ClientThread extends Thread {
                 m_nextRid,
                 payload).getResults();
         m_txnsRun.incrementAndGet();
+
+        assert(results.length == 3);
+        VoltTable data = results[2];
+        UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
 
         m_nextRid++;
     }

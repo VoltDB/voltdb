@@ -91,7 +91,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
     private final ScheduledThreadPoolExecutor m_esBase =
             new ScheduledThreadPoolExecutor(1,
-                    CoreUtils.getThreadFactory(null, "SnapshotDaemon", CoreUtils.SMALL_STACK_SIZE, false),
+                    CoreUtils.getThreadFactory(null, "SnapshotDaemon", CoreUtils.SMALL_STACK_SIZE, false, null),
                                             new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
     private final ListeningScheduledExecutorService m_es = MoreExecutors.listeningDecorator(m_esBase);
 

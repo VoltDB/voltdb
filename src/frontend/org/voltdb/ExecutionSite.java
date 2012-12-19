@@ -2757,6 +2757,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     // call the proc
                     runner.setupTransaction(txnState);
                     cr = runner.call(itask.getParameters());
+                    txnState.setHash(cr.getHash());
                     response.setResults(cr);
 
                     // record the results of write transactions to the transaction state

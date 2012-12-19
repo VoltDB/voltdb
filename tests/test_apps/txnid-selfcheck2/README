@@ -15,6 +15,9 @@ The following is a list of features this app has:
   - They add a new counter (CNT) which is incremented from within the txn.
   - They select all data with their CID and perform a "Cheesy Checksum",
     storing the result in the table.
+- A thread runs adhoc DML that changes both replicated and partitioned tables.
+  The most recent entry is read and re-stored by the main procedures. This means
+  the order AdHoc and regular procs run in is critical.
 
 If a transaction is run out of order, missing or run twice, these mechanisms
 should fail. This failure should be detected by:
