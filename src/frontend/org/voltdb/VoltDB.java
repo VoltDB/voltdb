@@ -168,8 +168,13 @@ public class VoltDB {
 
         public int m_deadHostTimeoutMS = 10000;
 
-        /** start up action */
-        public START_ACTION m_startAction = null;
+        /**
+         * start up action
+         * Default to create.  The cmd line validates that an action is specified, however,
+         * defaulting it to create for local cluster test scripts
+         */
+
+        public START_ACTION m_startAction = VoltDB.START_ACTION.CREATE;
 
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
