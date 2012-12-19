@@ -342,6 +342,8 @@ public class VoltDB {
                 }
 
                 else if (arg.equals("replica")) {
+                    // We're starting a replica, so we must create a new database.
+                    m_startAction = START_ACTION.CREATE;
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -429,6 +431,11 @@ public class VoltDB {
          */
         public boolean validate() {
             boolean isValid = true;
+
+            if (m_startAction == null) {
+                    isValid = false;
+                    hostLog.fatal("The start action is missing (either create, recover, replica or rejoin).");
+                }
 
             if (m_startAction == START_ACTION.CREATE &&
                 m_pathToCatalog == null) {
