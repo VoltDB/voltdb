@@ -252,7 +252,7 @@ public class RejoinProducer extends SiteTasker
 
     public boolean acceptPromotion()
     {
-        return m_currentlyRejoining.get();
+        return !m_currentlyRejoining.get();
     }
 
     public void deliver(RejoinMessage message)
