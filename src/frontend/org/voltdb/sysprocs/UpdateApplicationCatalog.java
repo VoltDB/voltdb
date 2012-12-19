@@ -73,7 +73,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
-            catalogBytes = Arrays.copyOfRange(catalogBytes, 4, catalogBytes.length - 4);
+            catalogBytes = Arrays.copyOfRange(catalogBytes, 20, catalogBytes.length - 20);
 
             Pair<CatalogContext, CatalogSpecificPlanner> p =
                     VoltDB.instance().catalogUpdate(
@@ -81,7 +81,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                             catalogBytes,
                             expectedCatalogVersion,
                             getVoltPrivateRealTransactionIdDontUseMe(),
-                            getTransactionTime().getTime(),
+                            getUniqueId(),
                             deploymentCRC);
             context.updateCatalog(commands, p.getFirst(), p.getSecond());
 
@@ -172,8 +172,10 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // others will see there is no work to do and gracefully continue.
         // then update data at the local site.
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(4 + catalogBytes.length);
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(20 + catalogBytes.length);
         versionAndBytes.putInt(expectedCatalogVersion + 1);
+        versionAndBytes.putLong(getVoltPrivateRealTransactionIdDontUseMe());
+        versionAndBytes.putLong(getUniqueId());
         versionAndBytes.put(catalogBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1, new ZKUtil.StatCallback(), null);
         versionAndBytes = null;

@@ -282,8 +282,17 @@ public class Inits {
                     buffer = null;
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
 
-                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 12);
+                    long catalogTxnId;
+                    if (m_rvdb.isIV2Enabled()) {
+                        catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+                    } else {
+                        catalogTxnId =
+                                org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                    }
+
+                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
                     versionAndBytes.putInt(0);
+                    versionAndBytes.putLong(catalogTxnId);
                     versionAndBytes.putLong(catalogUniqueId);
                     versionAndBytes.put(catalogBytes);
                     // publish the catalog bytes to ZK
@@ -315,11 +324,13 @@ public class Inits {
             byte[] catalogBytes = null;
             int version = 0;
             long catalogUniqueId = 0;
+            long catalogTxnId = 0;
             do {
                 try {
                     ByteBuffer versionAndBytes =
                         ByteBuffer.wrap(m_rvdb.getHostMessenger().getZK().getData(VoltZK.catalogbytes, false, null));
                     version = versionAndBytes.getInt();
+                    catalogTxnId = versionAndBytes.getLong();
                     catalogUniqueId = versionAndBytes.getLong();
                     catalogBytes = new byte[versionAndBytes.remaining()];
                     versionAndBytes.get(catalogBytes);
@@ -357,13 +368,6 @@ public class Inits {
             }
 
             try {
-                long catalogTxnId;
-                if (m_rvdb.isIV2Enabled()) {
-                    catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
-                } else {
-                    catalogTxnId =
-                            org.voltdb.TransactionIdManager.makeIdFromComponents(catalogUniqueId, 0, 0);
-                }
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 zk.create(
                         VoltZK.initial_catalog_txnid,
