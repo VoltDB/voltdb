@@ -499,9 +499,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             }
             assertEquals(6, foundItem);
 
-            //Wait for tick, otherwise junk stats
-            Thread.sleep(2000);
-
             VoltTable indexStats =
                     client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
             System.out.println(indexStats);
@@ -509,11 +506,27 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             while (indexStats.advanceRow()) {
                 memorySum += indexStats.getLong("MEMORY_ESTIMATE");
             }
-            indexStats = client.callProcedure("@Statistics", "MEMORY", 0).getResults()[0];
-            System.out.println(indexStats);
+
+            /*
+             * It takes about a minute to spin through this 1000 times.
+             * Should definitely give a 1 second tick time to fire
+             */
             long indexMemorySum = 0;
-            while (indexStats.advanceRow()) {
-                indexMemorySum += indexStats.getLong("INDEXMEMORY");
+            for (int ii = 0; ii < 1000; ii++) {
+                indexMemorySum = 0;
+                indexStats = client.callProcedure("@Statistics", "MEMORY", 0).getResults()[0];
+                System.out.println(indexStats);
+                while (indexStats.advanceRow()) {
+                    indexMemorySum += indexStats.getLong("INDEXMEMORY");
+                }
+                boolean success = indexMemorySum != 120;//That is a row count, not memory usage
+                if (success) {
+                    success = memorySum == indexMemorySum;
+                    if (success) {
+                        return;
+                    }
+                }
+                Thread.sleep(1);
             }
             assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
             assertEquals(memorySum, indexMemorySum);
