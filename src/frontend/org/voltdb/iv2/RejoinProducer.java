@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -70,7 +69,6 @@ public class RejoinProducer extends SiteTasker
     private final String m_snapshotNonce;
     private final String m_whoami;
     private final AtomicBoolean m_currentlyRejoining;
-    private final ScheduledThreadPoolExecutor m_timer;
     private ScheduledFuture<?> m_timeFuture;
     private InitiatorMailbox m_mailbox;
     private long m_rejoinCoordinatorHsId;
@@ -136,9 +134,8 @@ public class RejoinProducer extends SiteTasker
     //
     // The rejoin producer times out the snapshot block arrival.
     // If a block does not arrive within 60s, the RejoinProducer
-    // will terminate the current node. The watchdog timer, m_timer,
-    // is accessed from multiple threads; synchronize on m_timer
-    // to use it or to read/modify m_timeFuture;
+    // will terminate the current node. The watchdog timer
+    // is accessed from multiple threads
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -167,7 +164,7 @@ public class RejoinProducer extends SiteTasker
             if (event.nonce.equals(m_snapshotNonce)) {
                 REJOINLOG.debug(m_whoami + "counting down snapshot monitor completion.");
                 deregister();
-                kickWatchdog(true, false);
+                kickWatchdog(true);
                 m_completionMonitorAwait.set(event);
             } else {
                 REJOINLOG.debug(m_whoami
@@ -208,8 +205,7 @@ public class RejoinProducer extends SiteTasker
         }
     }
 
-    // Run by m_timer if the timer isn't cancelled within the timeout
-    // period.
+    // Run if the watchdog isn't cancelled within the timeout period
     private static class TimerCallback implements Runnable
     {
         private final String m_whoami;
@@ -239,7 +235,6 @@ public class RejoinProducer extends SiteTasker
         m_completionMonitorAwait = SettableFuture.create();
         m_snapshotAdapterAwait = new CountDownLatch(1);
         m_whoami = "Rejoin producer:" + m_partitionId + " ";
-        m_timer = CoreUtils.getScheduledThreadPoolExecutor("Rejoin Producer Timer", 1, 2048);
         m_currentlyRejoining = new AtomicBoolean(true);
         REJOINLOG.debug(m_whoami + "created.");
     }
@@ -273,19 +268,16 @@ public class RejoinProducer extends SiteTasker
     }
 
     // cancel and maybe rearm the snapshot data-segment watchdog.
-    private void kickWatchdog(boolean rearm, boolean shutdown)
+    private void kickWatchdog(boolean rearm)
     {
-        synchronized (m_timer) {
+        synchronized (this) {
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
                 m_timeFuture = null;
             }
             if (rearm) {
-                m_timeFuture = m_timer.schedule(new TimerCallback(m_whoami),
-                        60, TimeUnit.SECONDS);
-            }
-            if (shutdown) {
-                m_timer.shutdown();
+                m_timeFuture = VoltDB.instance().scheduleWork(
+                        new TimerCallback(m_whoami), 60, 0, TimeUnit.SECONDS);
             }
         }
     }
@@ -595,7 +587,7 @@ public class RejoinProducer extends SiteTasker
     void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork,
             SiteProcedureConnection siteConnection)
     {
-        kickWatchdog(true, false);
+        kickWatchdog(true);
 
         int tableId = rejoinWork.getFirst();
         ByteBuffer buffer = rejoinWork.getSecond();
@@ -611,7 +603,7 @@ public class RejoinProducer extends SiteTasker
     void setRejoinComplete(SiteProcedureConnection siteConnection,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
     {
-        kickWatchdog(false, true);
+        kickWatchdog(false);
         siteConnection.setRejoinComplete(m_replayCompleteAction, exportSequenceNumbers);
     }
 }
