@@ -48,7 +48,7 @@ public class CatalogContext {
     private final long catalogCRC;
     public final long deploymentCRC;
     public final long m_transactionId;
-    public long m_timestamp;
+    public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
 
     /*
@@ -63,14 +63,14 @@ public class CatalogContext {
 
     public CatalogContext(
             long transactionId,
-            long timestamp,
+            long uniqueId,
             Catalog catalog,
             byte[] catalogBytes,
             long deploymentCRC,
             int version,
             long prevCRC) {
         m_transactionId = transactionId;
-        m_timestamp = timestamp;
+        m_uniqueId = uniqueId;
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
         if (catalog == null)
@@ -107,7 +107,7 @@ public class CatalogContext {
 
     public CatalogContext update(
             long txnId,
-            long timestamp,
+            long uniqueId,
             byte[] catalogBytes,
             String diffCommands,
             boolean incrementVersion,
@@ -130,7 +130,7 @@ public class CatalogContext {
         CatalogContext retval =
             new CatalogContext(
                     txnId,
-                    timestamp,
+                    uniqueId,
                     newCatalog,
                     bytes,
                     realDepCRC,

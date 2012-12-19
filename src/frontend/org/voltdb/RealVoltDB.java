@@ -1833,7 +1833,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             byte[] newCatalogBytes,
             int expectedCatalogVersion,
             long currentTxnId,
-            long currentTxnTimestamp,
+            long currentTxnUniqueId,
             long deploymentCRC)
     {
         synchronized(m_catalogUpdateLock) {
@@ -1860,7 +1860,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_catalogContext =
                 m_catalogContext.update(
                         currentTxnId,
-                        currentTxnTimestamp,
+                        currentTxnUniqueId,
                         newCatalogBytes,
                         diffCommands,
                         true,
