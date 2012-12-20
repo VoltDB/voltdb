@@ -326,12 +326,14 @@ public class SystemInformation extends VoltSystemProcedure
 
         // try to get the external interface first, if none was set, use local addresses
         InetAddress addr = null;
+        int clientPort = VoltDB.DEFAULT_PORT;
         try {
             String localMetadata = VoltDB.instance().getLocalMetadata();
             JSONObject jsObj = new JSONObject(localMetadata);
             JSONArray interfaces = jsObj.getJSONArray("interfaces");
             String iface = interfaces.getString(0);
             addr = InetAddress.getByName(iface);
+            clientPort = jsObj.getInt("clientPort");
         } catch (JSONException e) {
             hostLog.error("Failed to get local metadata", e);
         } catch (UnknownHostException e) {
@@ -344,6 +346,7 @@ public class SystemInformation extends VoltSystemProcedure
         }
         vt.addRow(hostId, "IPADDRESS", addr.getHostAddress());
         vt.addRow(hostId, "HOSTNAME", addr.getHostName());
+        vt.addRow(hostId, "CLIENTPORT", Integer.toString(clientPort));
 
         // build string
         vt.addRow(hostId, "BUILDSTRING", VoltDB.instance().getBuildString());
