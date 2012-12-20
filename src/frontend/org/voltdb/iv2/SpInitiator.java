@@ -70,11 +70,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     };
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
-            SnapshotCompletionMonitor snapMonitor)
+            SnapshotCompletionMonitor snapMonitor, boolean forRejoin)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
-                "SP", agent);
+                "SP", agent, forRejoin);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }
@@ -120,6 +120,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void acceptPromotion()
     {
         try {
+
             long startTime = System.currentTimeMillis();
             Boolean success = false;
             m_term = createTerm(m_messenger.getZK(),
@@ -131,6 +132,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 repair = createPromoteAlgo(m_term.getInterestingHSIds(),
                         m_initiatorMailbox, m_whoami);
 
+                // if rejoining, a promotion can not be accepted. If the rejoin is
+                // in-progress, the loss of the master will terminate the rejoin
+                // anyway. If the rejoin has transferred data but not left the rejoining
+                // state, it will respond REJOINING to new work which will break
+                // the MPI and/or be unexpected to external clients.
+                if (!m_initiatorMailbox.acceptPromotion()) {
+                    tmLog.error(m_whoami
+                            + "rejoining site can not be promoted to leader. Terminating.");
+                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
+                    return;
+                }
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
                 Pair<Boolean, Long> result = repair.start().get();

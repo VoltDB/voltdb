@@ -56,7 +56,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     buddyHSId,
                     new SiteTaskerQueue()),
                 "MP",
-                agent);
+                agent,
+                false /* never for rejoin */);
     }
 
     @Override
