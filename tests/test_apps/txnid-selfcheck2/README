@@ -15,12 +15,24 @@ The following is a list of features this app has:
   - They add a new counter (CNT) which is incremented from within the txn.
   - They select all data with their CID and perform a "Cheesy Checksum",
     storing the result in the table.
+  - They read data from secondary tables which are updated by adhoc queries.
 - A thread runs adhoc DML that changes both replicated and partitioned tables.
   The most recent entry is read and re-stored by the main procedures. This means
   the order AdHoc and regular procs run in is critical.
+- Secondary tables that get loaded with dummy data to ensure snapshots, rejoins
+  and DR syncs are non-trivial.
+- MP and SP read operations that validate data.
 
 If a transaction is run out of order, missing or run twice, these mechanisms
 should fail. This failure should be detected by:
   - Validating data in the transaction.
   - Validating data at the client logic.
   - The determisim checks built into VoltDB.
+Procedures returning GRACEFUL FAILURE or USER_ABORT are treated as terminal failures.
+Other exceptions/errors may be logged and then the client will continue if possible.
+Some threads like the adhoc, read, or loader threads may just stop on failure,
+leaving the primary write transactions still running.
+
+Valid total simulanious thread counts for clients is 127. To run two clients at once,
+set an offset using the command line argunments so two clients don't claim the same
+range of [0,127].
