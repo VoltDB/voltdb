@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -44,10 +45,12 @@ import org.voltdb.utils.MiscUtils;
 
 public class Benchmark {
 
+    static VoltLogger log = new VoltLogger("HOST");
+
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
-            "----------" + "----------" + "----------" + "----------" + "\n";
+            "----------" + "----------" + "----------" + "----------";
 
     // validated command line configuration
     final Config config;
@@ -157,7 +160,7 @@ public class Benchmark {
 
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+                log.warn(String.format("Connection to %s:%d was lost.", hostname, port));
             }
 
             // setup for retry
@@ -183,10 +186,10 @@ public class Benchmark {
         processor = new PayloadProcessor(config.minvaluesize, config.maxvaluesize,
                                          config.entropy, config.usecompression);
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
+        log.info(HORIZONTAL_RULE);
+        log.info(" Command Line Configuration");
+        log.info(HORIZONTAL_RULE);
+        log.info(config.getConfigDumpString());
 
         StatusListener statusListener = new StatusListener();
         ClientConfig clientConfig = new ClientConfig("", "", statusListener);
@@ -206,11 +209,11 @@ public class Benchmark {
             try {
                 client.createConnection(server);
                 activeConnections.incrementAndGet();
-                System.out.printf("Connected to VoltDB node at: %s.\n", server);
+                log.info(String.format("Connected to VoltDB node at: %s.", server));
                 break;
             }
             catch (Exception e) {
-                System.err.printf("Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
+                log.warn(String.format("Connection to " + server + " failed - retrying in %d second(s).", sleep / 1000));
                 try { Thread.sleep(sleep); } catch (Exception interruted) {}
                 if (sleep < 8000) sleep += sleep;
             }
@@ -224,7 +227,7 @@ public class Benchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     private void connect() throws InterruptedException {
-        System.out.println("Connecting to VoltDB...");
+        log.info("Connecting to VoltDB...");
 
         final CountDownLatch connections = new CountDownLatch(config.parsedServers.length);
 
@@ -262,7 +265,7 @@ public class Benchmark {
      * periodically during a benchmark.
      */
     private synchronized void printStatistics() {
-        System.out.printf("Executed %d\n", c.get());
+        log.info(String.format("Executed %d", c.get()));
     }
 
     private final AtomicLong c = new AtomicLong();
@@ -273,9 +276,9 @@ public class Benchmark {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Setup & Initialization");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info(" Setup & Initialization");
+        log.info(HORIZONTAL_RULE);
 
         final int cidCount = 128;
         final long[] lastRid = new long[cidCount];
@@ -286,9 +289,9 @@ public class Benchmark {
         // connect to one or more servers, loop until success
         connect();
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println("Starting Benchmark");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info("Starting Benchmark");
+        log.info(HORIZONTAL_RULE);
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
@@ -296,7 +299,7 @@ public class Benchmark {
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
-        System.out.println("\nRunning benchmark...");
+        log.info("Running benchmark...");
 
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);

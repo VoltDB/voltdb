@@ -29,6 +29,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -38,6 +39,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 public class BigTableLoader extends Thread {
+
+    static VoltLogger log = new VoltLogger("HOST");
 
     final Client client;
     final long targetCount;
@@ -78,8 +81,8 @@ public class BigTableLoader extends Thread {
             byte status = clientResponse.getStatus();
             if ((status != ClientResponse.SUCCESS) && (status != ClientResponse.GRACEFUL_FAILURE)) {
                 // log what happened
-                System.err.println("BigTableLoader failed to insert into table " + tableName);
-                System.err.println(((ClientResponseImpl) clientResponse).toJSONString());
+                log.error("BigTableLoader failed to insert into table " + tableName);
+                log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the world
                 m_shouldContinue.set(false);
             }
@@ -113,9 +116,8 @@ public class BigTableLoader extends Thread {
         }
         catch (Exception e) {
             // on exception, log and end the thread, but don't kill the process
-            System.err.println("BigTableLoader failed a procedure call for table " + tableName +
-                    " and will now die.");
-            e.printStackTrace();
+            log.error("BigTableLoader failed a procedure call for table " + tableName +
+                    " and will now die.", e);
             return;
         }
     }

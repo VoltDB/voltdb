@@ -28,12 +28,15 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
 public class AdHocMayhemThread extends Thread {
+
+    static VoltLogger log = new VoltLogger("HOST");
 
     Random r = new Random(0);
     long counter = 0;

@@ -27,6 +27,7 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -36,6 +37,8 @@ import org.voltdb.client.ProcedureCallback;
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
 public class ReadThread extends Thread {
+
+    static VoltLogger log = new VoltLogger("HOST");
 
     Random r = new Random(0);
     long counter = 0;
@@ -60,8 +63,8 @@ public class ReadThread extends Thread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                System.err.println("Non success in ProcCallback for AdHocMayhemThread");
-                System.err.println(((ClientResponseImpl)clientResponse).toJSONString());
+                log.error("Non success in ProcCallback for ReadThread");
+                log.error(((ClientResponseImpl)clientResponse).toJSONString());
                 return;
             }
             // validate the data
@@ -70,8 +73,7 @@ public class ReadThread extends Thread {
                 UpdateBaseProc.validateCIDData(data, ReadThread.class.getName());
             }
             catch (Exception e) {
-                System.err.println("ReadThread got a bad response");
-                e.printStackTrace();
+                log.error("ReadThread got a bad response", e);
                 System.exit(-1);
             }
         }
@@ -83,8 +85,7 @@ public class ReadThread extends Thread {
             try {
                 txnsOutstanding.acquire();
             } catch (InterruptedException e) {
-                System.err.println("ReadThread interrupted while waiting for permit");
-                e.printStackTrace();
+                log.error("ReadThread interrupted while waiting for permit", e);
                 return;
             }
 
@@ -97,8 +98,7 @@ public class ReadThread extends Thread {
                 client.callProcedure(new ReadCallback(), procName, cid);
             }
             catch (Exception e) {
-                System.err.println("ReadThread failed to run an AdHoc statement");
-                e.printStackTrace();
+                log.error("ReadThread failed to run an AdHoc statement", e);
                 System.exit(-1);
             }
         }

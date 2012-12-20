@@ -88,7 +88,7 @@ public class UpdateBaseProc extends VoltProcedure {
         if (prevrid >= rid) {
             throw new VoltAbortException(getClass().getName() +
                     " previous rid " + prevrid +
-                    " larger than current rid " + rid +
+                    " >= than current rid " + rid +
                     " for cid " + cid);
         }
 
