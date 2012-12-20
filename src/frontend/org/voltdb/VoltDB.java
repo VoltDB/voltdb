@@ -395,10 +395,10 @@ public class VoltDB {
             // If no action is specified, issue an error.
             if (null == m_startAction) {
                 if (org.voltdb.utils.MiscUtils.isPro()) {
-                    hostLog.fatal("You must specify an action, either create, recover, replica or rejoin.");
+                    hostLog.fatal("You must specify a startup action, either create, recover, replica or rejoin.");
                 } else
                 {
-                    hostLog.fatal("You must specify an action, either create, recover or rejoin.");
+                    hostLog.fatal("You must specify a startup action, either create, recover or rejoin.");
                 }
                 usage();
                 System.exit(-1);
@@ -434,7 +434,7 @@ public class VoltDB {
 
             if (m_startAction == null) {
                     isValid = false;
-                    hostLog.fatal("The start action is missing (either create, recover, replica or rejoin).");
+                    hostLog.fatal("The startup action is missing (either create, recover, replica or rejoin).");
                 }
 
             if (m_startAction == START_ACTION.CREATE &&
