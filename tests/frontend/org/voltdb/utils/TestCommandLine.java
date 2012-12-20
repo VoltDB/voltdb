@@ -99,6 +99,14 @@ public class TestCommandLine
         {
             assertTrue(rte.getMessage().contains("Unknown action"));
         }
+        try
+        {
+            cl.startCommand("start");
+        }
+        catch (RuntimeException rte)
+        {
+            assertTrue(rte.getMessage().contains("Unknown action"));
+        }
     }
 
     @Test

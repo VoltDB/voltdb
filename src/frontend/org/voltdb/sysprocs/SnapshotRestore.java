@@ -1120,6 +1120,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
         final boolean isStartedWithCreateAction = startAction == VoltDB.START_ACTION.CREATE;
 
+        // I think we can remove the "isStartWithNoAutomatedRestore" code?
         if ( isCLEnabled && (isStartedWithCreateAction || isStartWithNoAutomatedRestore)) {
 
             final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();

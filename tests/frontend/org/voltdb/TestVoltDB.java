@@ -128,9 +128,6 @@ public class TestVoltDB extends TestCase {
         String[] args7 = {"create", "host", "hola", "deployment", "teststring4", "replica", "recover"};
         config = new VoltDB.Configuration(args7);
         assertFalse(config.validate());
-        // Omit "create", it should now fail!  (no longer defaults to start!)
-//        config = new VoltDB.Configuration(new String[]{"host", "l", "deployment", "d.xml", "replica", "start"});
-//        assertFalse(config.validate());
 
         // replica with explicit create
         String[] args8 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica", "create"};
@@ -146,10 +143,6 @@ public class TestVoltDB extends TestCase {
         String[] args100 = {"create", "host", "hola", "deployment", "teststring4", "catalog", "catalog.jar"};
         config = new VoltDB.Configuration(args100);
         assertTrue(config.validate());
-
-        // valid config -- assumes start, so catalog is correctly optional
-//        config = new VoltDB.Configuration(new String[]{"host", "ldr", "deployment", "d.xml"});
-//        assertTrue(config.validate());
 
         // valid rejoin config
         String[] args200 = {"rejoin", "host", "localhost"};
