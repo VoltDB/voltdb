@@ -226,12 +226,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return m_siteId;
         }
 
+        /*
+         * Expensive to compute, memoize it
+         */
+        private Boolean m_isLowestSiteId = null;
         @Override
         public boolean isLowestSiteId()
         {
-            // FUTURE: should pass this status in at construction.
-            long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
-            return m_siteId == lowestSiteId;
+            if (m_isLowestSiteId != null) {
+                return m_isLowestSiteId;
+            } else {
+                // FUTURE: should pass this status in at construction.
+                long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
+                m_isLowestSiteId = m_siteId == lowestSiteId;
+                return m_isLowestSiteId;
+            }
         }
 
 
