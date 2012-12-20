@@ -65,6 +65,7 @@ public class SQLCommand
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern SetOp = Pattern.compile("\\s*(union|except|intersect)(\\s*all)?(\\s*\\(*\\s*)(select)", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     private static final String readme = "SQLCommandReadme.txt";
 
@@ -104,9 +105,13 @@ public class SQLCommand
             stringFragmentMatcher = Extract.matcher(query);
             i++;
         }
+        
+        query = SetOp.matcher(query).replaceAll(" $1$2$3SQL_PARSER_SETOP_SELECT");
         query = AutoSplit.matcher(query).replaceAll(";$1 ");
+        query = query.replaceAll("SQL_PARSER_SETOP_SELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
-        ArrayList<String> queries = new ArrayList<String>();
+
+            ArrayList<String> queries = new ArrayList<String>();
         for(int j = 0;j<sqlFragments.length;j++)
         {
             sqlFragments[j] = sqlFragments[j].trim();
@@ -1159,6 +1164,8 @@ public class SQLCommand
             Input.addCompletor(new SimpleCompletor(new String[] {"select", "update", "insert", "delete", "exec", "file", "recall", "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" }));
 
             // If Standard input comes loaded with data, run in non-interactive mode
+            executeQuery("select idd from R1 union  select id from P1;");
+            
             if (System.in.available() > 0)
             {
                 queries = getQuery(false);
@@ -1187,7 +1194,6 @@ public class SQLCommand
                     }
                 }
             }
-
        }
         catch (Exception e)
         {
