@@ -105,13 +105,13 @@ public class SQLCommand
             stringFragmentMatcher = Extract.matcher(query);
             i++;
         }
-        
+
         query = SetOp.matcher(query).replaceAll(" $1$2$3SQL_PARSER_SETOP_SELECT");
         query = AutoSplit.matcher(query).replaceAll(";$1 ");
         query = query.replaceAll("SQL_PARSER_SETOP_SELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
-            ArrayList<String> queries = new ArrayList<String>();
+        ArrayList<String> queries = new ArrayList<String>();
         for(int j = 0;j<sqlFragments.length;j++)
         {
             sqlFragments[j] = sqlFragments[j].trim();
@@ -1164,8 +1164,6 @@ public class SQLCommand
             Input.addCompletor(new SimpleCompletor(new String[] {"select", "update", "insert", "delete", "exec", "file", "recall", "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" }));
 
             // If Standard input comes loaded with data, run in non-interactive mode
-            executeQuery("select idd from R1 union  select id from P1;");
-            
             if (System.in.available() > 0)
             {
                 queries = getQuery(false);
