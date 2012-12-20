@@ -23,7 +23,6 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -44,7 +43,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -53,6 +51,7 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -290,16 +289,13 @@ public class Inits {
                                 org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
                     }
 
-                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
-                    versionAndBytes.putInt(0);
-                    versionAndBytes.putLong(catalogTxnId);
-                    versionAndBytes.putLong(catalogUniqueId);
-                    versionAndBytes.put(catalogBytes);
-                    // publish the catalog bytes to ZK
-                    m_rvdb.getHostMessenger().getZK().create(VoltZK.catalogbytes,
-                            versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                    versionAndBytes = null;
 
+                    // publish the catalog bytes to ZK
+                    CatalogUtil.uploadCatalogToZK(
+                            m_rvdb.getHostMessenger().getZK(),
+                            0, catalogTxnId,
+                            catalogUniqueId,
+                            catalogBytes);
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
@@ -321,30 +317,20 @@ public class Inits {
 
         @Override
         public void run() {
-            byte[] catalogBytes = null;
-            int version = 0;
-            long catalogUniqueId = 0;
-            long catalogTxnId = 0;
+            CatalogAndIds catalogStuff = null;
             do {
                 try {
-                    ByteBuffer versionAndBytes =
-                        ByteBuffer.wrap(m_rvdb.getHostMessenger().getZK().getData(VoltZK.catalogbytes, false, null));
-                    version = versionAndBytes.getInt();
-                    catalogTxnId = versionAndBytes.getLong();
-                    catalogUniqueId = versionAndBytes.getLong();
-                    catalogBytes = new byte[versionAndBytes.remaining()];
-                    versionAndBytes.get(catalogBytes);
-                    versionAndBytes = null;
+                    catalogStuff = CatalogUtil.getCatalogFromZK(m_rvdb.getHostMessenger().getZK());
                 }
                 catch (org.apache.zookeeper_voltpatches.KeeperException.NoNodeException e) {
                 }
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB("System was interrupted while waiting for a catalog.", false, null);
                 }
-            } while (catalogBytes == null);
+            } while (catalogStuff == null);
 
             try {
-                m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
+                m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogStuff.bytes, hostLog);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog: " + e.getMessage(), false, null);
             }
@@ -368,19 +354,11 @@ public class Inits {
             }
 
             try {
-                ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
-                zk.create(
-                        VoltZK.initial_catalog_txnid,
-                        String.valueOf(catalogTxnId).getBytes("UTF-8"),
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
-                ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
-                zk.getData(VoltZK.initial_catalog_txnid, false, cb, null);
-                catalogTxnId = Long.valueOf(new String(cb.getData(), "UTF-8"));
                 m_rvdb.m_serializedCatalog = catalog.serialize();
                 m_rvdb.m_catalogContext = new CatalogContext(
-                        catalogTxnId,
-                        catalogUniqueId,
-                        catalog, catalogBytes, m_rvdb.m_depCRC, version, -1);
+                        catalogStuff.txnId,
+                        catalogStuff.uniqueId,
+                        catalog, catalogStuff.bytes, m_rvdb.m_depCRC, catalogStuff.version, -1);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", false, e);
             }

@@ -18,8 +18,6 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +35,8 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -69,11 +69,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
             byte catalogBytes[] = null;
             try {
-                catalogBytes = VoltDB.instance().getHostMessenger().getZK().getData(VoltZK.catalogbytes, false, null);
+                CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                catalogBytes = catalogStuff.bytes;
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
-            catalogBytes = Arrays.copyOfRange(catalogBytes, 20, catalogBytes.length - 20);
 
             Pair<CatalogContext, CatalogSpecificPlanner> p =
                     VoltDB.instance().catalogUpdate(
@@ -172,13 +172,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // others will see there is no work to do and gracefully continue.
         // then update data at the local site.
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(20 + catalogBytes.length);
-        versionAndBytes.putInt(expectedCatalogVersion + 1);
-        versionAndBytes.putLong(getVoltPrivateRealTransactionIdDontUseMe());
-        versionAndBytes.putLong(getUniqueId());
-        versionAndBytes.put(catalogBytes);
-        zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1, new ZKUtil.StatCallback(), null);
-        versionAndBytes = null;
+        CatalogUtil.setCatalogToZK(
+                zk,
+                expectedCatalogVersion + 1,
+                getVoltPrivateRealTransactionIdDontUseMe(),
+                getUniqueId(),
+                catalogBytes);
         zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
 
         performCatalogUpdateWork(
