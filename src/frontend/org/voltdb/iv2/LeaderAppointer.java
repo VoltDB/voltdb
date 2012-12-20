@@ -94,7 +94,7 @@ public class LeaderAppointer implements Promotable
     private final int m_kfactor;
     private final JSONObject m_topo;
     private final MpInitiator m_MPI;
-    private AtomicReference<AppointerState> m_state =
+    private final AtomicReference<AppointerState> m_state =
         new AtomicReference<AppointerState>(AppointerState.INIT);
     private CountDownLatch m_startupLatch = null;
     private final boolean m_partitionDetectionEnabled;
@@ -111,6 +111,7 @@ public class LeaderAppointer implements Promotable
 
     private final SnapshotResponseHandler m_snapshotHandler =
         new SnapshotResponseHandler() {
+            @Override
             public void handleResponse(ClientResponse resp)
             {
                 if (resp == null) {
@@ -245,7 +246,7 @@ public class LeaderAppointer implements Promotable
             tmLog.debug("Updated leaders: " + currentLeaders);
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 if (currentLeaders.size() == m_partitionCount) {
-                    tmLog.info("Leader appointment complete, promoting MPI and unblocking.");
+                    tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
                     m_state.set(AppointerState.DONE);
                     m_MPI.acceptPromotion();
                     m_startupLatch.countDown();

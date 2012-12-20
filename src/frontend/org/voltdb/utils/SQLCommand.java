@@ -677,27 +677,7 @@ public class SQLCommand
     // Output generation
     private static String OutputFormat = "fixed";
     private static boolean OutputShowMetadata = true;
-    public static String paddingString(String s, int n, char c, boolean paddingLeft)
-    {
-        if (s == null)
-            return s;
 
-        int add = n - s.length();
-
-        if(add <= 0)
-            return s;
-
-        StringBuffer str = new StringBuffer(s);
-        char[] ch = new char[add];
-        Arrays.fill(ch, c);
-        if(paddingLeft)
-            str.insert(0, ch);
-        else
-            str.append(ch);
-
-
-       return str.toString();
-    }
     private static boolean isUpdateResult(VoltTable table)
     {
         return ((table.getColumnName(0).length() == 0 || table.getColumnName(0).equals("modified_tuples"))&& table.getRowCount() == 1 && table.getColumnCount() == 1 && table.getColumnType(0) == VoltType.BIGINT);
@@ -716,75 +696,10 @@ public class SQLCommand
                         System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
                     continue;
                 }
-                int columnCount = t.getColumnCount();
-                int[] padding = new int[columnCount];
-                String[] fmt = new String[columnCount];
-                for (int i = 0; i < columnCount; i++)
-                    padding[i] = OutputShowMetadata ? t.getColumnName(i).length() : 0;
-                t.resetRowPosition();
-                while(t.advanceRow())
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull())
-                            v = "NULL";
-                        int l = 0;  // length
-                        if (t.getColumnType(i) == VoltType.VARBINARY && !t.wasNull()) {
-                            l = ((byte[])v).length*2;
-                        }
-                        else {
-                            l= v.toString().length();
-                        }
 
-                        if (padding[i] < l)
-                            padding[i] = l;
-                    }
-                }
-                for (int i = 0; i < columnCount; i++)
-                {
-                    padding[i] += 1;
-                    fmt[i] = "%1$" +
-                        ((t.getColumnType(i) == VoltType.STRING ||
-                          t.getColumnType(i) == VoltType.TIMESTAMP ||
-                          t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                        + padding[i] + "s";
-                }
-                if (OutputShowMetadata)
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        System.out.printf("%1$-" + padding[i] + "s", t.getColumnName(i));
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        System.out.print(paddingString("", padding[i], '-', false));
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                }
-                t.resetRowPosition();
-                while(t.advanceRow())
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull())
-                            v = "NULL";
-                        else if (t.getColumnType(i) == VoltType.VARBINARY)
-                            v = byteArrayToHexString((byte[])v);
-                        else
-                            v = v.toString();
-                        System.out.printf(fmt[i], v);
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                }
+                // Use the VoltTable pretty printer to display formatted output.
+                System.out.println(t.toFormattedString());
+
                 if (OutputShowMetadata)
                     System.out.printf("\n\n(%d row(s) affected)\n", t.getRowCount());
             }

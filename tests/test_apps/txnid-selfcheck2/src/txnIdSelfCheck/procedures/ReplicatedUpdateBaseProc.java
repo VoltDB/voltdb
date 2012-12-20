@@ -33,8 +33,11 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
     public final SQLStmt r_cleanUp = new SQLStmt(
             "DELETE FROM replicated WHERE cid = ? and cnt < ?;");
 
+    public final SQLStmt r_getAdhocData = new SQLStmt(
+            "SELECT * FROM adhocr ORDER BY ts DESC LIMIT 1");
+
     public final SQLStmt r_insert = new SQLStmt(
-            "INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     @Override
     public long run() {

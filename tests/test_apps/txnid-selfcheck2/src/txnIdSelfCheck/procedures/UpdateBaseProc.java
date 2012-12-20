@@ -37,8 +37,11 @@ public class UpdateBaseProc extends VoltProcedure {
     public final SQLStmt p_cleanUp = new SQLStmt(
             "DELETE FROM partitioned WHERE cid = ? and cnt < ?;");
 
+    public final SQLStmt p_getAdhocData = new SQLStmt(
+            "SELECT * FROM adhocp ORDER BY ts DESC LIMIT 1");
+
     public final SQLStmt p_insert = new SQLStmt(
-            "INSERT INTO partitioned VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO partitioned VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     // PLEASE SEE ReplicatedUpdateBaseProc for the replicated procs
     // that can't be listed here (or SP procs wouldn't compile)
@@ -47,17 +50,24 @@ public class UpdateBaseProc extends VoltProcedure {
         return 0; // never called in base procedure
     }
 
-    protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert,
+    protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt getAdHocData,
                                  byte cid, long rid, byte[] value)
     {
         voltQueueSQL(getCIDData, cid);
-        VoltTable data = voltExecuteSQL()[0];
+        voltQueueSQL(getAdHocData);
+        VoltTable[] results = voltExecuteSQL();
+        VoltTable data = results[0];
+        VoltTable adhoc = results[1];
 
-        final long txnid = getTransactionId();
+        final long txnid = getUniqueId();
         final long ts = getTransactionTime().getTime();
         long prevtxnid = 0;
         long prevrid = 0;
         long cnt = 0;
+
+        // read data modified by AdHocMayhemThread for later insertion
+        final long adhocInc = adhoc.fetchRow(0).getLong("inc");
+        final long adhocJmp = adhoc.fetchRow(0).getLong("jmp");
 
         // compute the cheesy checksum of all of the table's contents based on
         // this cid to subsequently store in the new row
@@ -72,30 +82,39 @@ public class UpdateBaseProc extends VoltProcedure {
             prevrid = row.getLong("rid");
         }
 
+        validateCIDData(data, getClass().getName());
+
+        // check the rids monotonically increase
+        if (prevrid >= rid) {
+            throw new VoltAbortException(getClass().getName() +
+                    " previous rid " + prevrid +
+                    " >= than current rid " + rid +
+                    " for cid " + cid);
+        }
+
+        voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
+        voltQueueSQL(cleanUp, cid, cnt - 10);
+        voltQueueSQL(getCIDData, cid);
+        return voltExecuteSQL();
+    }
+
+    public static void validateCIDData(VoltTable data, String callerId) {
+        // empty tables are lamely valid
+        if (data.getRowCount() == 0) return;
+
+        byte cid = (byte) data.fetchRow(0).getLong("cid");
+
         // make sure all cnt values are consecutive
         data.resetRowPosition();
         long prevCnt = 0;
         while (data.advanceRow()) {
             long cntValue = data.getLong("cnt");
             if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
-                throw new VoltAbortException(getClass().getName() +
+                throw new VoltAbortException(callerId +
                         " cnt values are not consecutive" +
                         " for cid " + cid);
             }
             prevCnt = cntValue;
         }
-
-        // check the rids monotonically increase
-        if (prevrid >= rid) {
-            throw new VoltAbortException(getClass().getName() +
-                    " previous rid " + prevrid +
-                    " larger than current rid " + rid +
-                    " for cid " + cid);
-        }
-
-        voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, new byte[0]);
-        voltQueueSQL(cleanUp, cid, cnt - 10);
-        voltQueueSQL(getCIDData, cid);
-        return voltExecuteSQL();
     }
 }

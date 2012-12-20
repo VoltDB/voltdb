@@ -29,9 +29,10 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
-import java.util.Set;
 import java.util.HashSet;
-import junit.framework.*;
+import java.util.Set;
+
+import junit.framework.TestCase;
 
 public class TestVoltNetwork extends TestCase {
 
@@ -232,7 +233,7 @@ public class TestVoltNetwork extends TestCase {
 
     public void testInstallInterests() throws InterruptedException {
         new MockSelector();
-        VoltNetwork vn = new VoltNetwork( 0);
+        VoltNetwork vn = new VoltNetwork( 0, null);
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
         MockSelectionKey selectionKey = new MockSelectionKey();
         vp.m_selectionKey = selectionKey;

@@ -24,8 +24,8 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -787,7 +787,7 @@ import org.voltdb.types.VoltDecimalHelper;
      * @param crc
      * @throws IOException
      */
-    void addToCRC(CRC32 crc) throws IOException {
+    void addToCRC(PureJavaCrc32C crc) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream(8);
         DataOutputStream dos = new DataOutputStream(bos);
         byte[] b;

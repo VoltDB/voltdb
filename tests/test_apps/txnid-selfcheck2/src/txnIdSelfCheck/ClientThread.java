@@ -26,10 +26,18 @@ package txnIdSelfCheck;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
+
+import txnIdSelfCheck.procedures.UpdateBaseProc;
 
 public class ClientThread extends Thread {
+
+    static VoltLogger log = new VoltLogger("HOST");
 
     static enum Type {
         PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID;
@@ -41,9 +49,11 @@ public class ClientThread extends Thread {
         static Type typeFromId(int id) {
             if (id % 10 == 0) return PARTITIONED_MP; // 20%
             if (id % 10 == 1) return PARTITIONED_MP;
-            if (id % 10 == 2) return REPLICATED;     // 10%
-            if (id % 10 == 3) return HYBRID;         // 10%
-            return PARTITIONED_SP;                   // 60%
+            if (id % 10 == 2) return REPLICATED;     // 20%
+            if (id % 10 == 3) return REPLICATED;
+            if (id % 10 == 4) return HYBRID;         // 20%
+            if (id % 10 == 5) return HYBRID;
+            return PARTITIONED_SP;                   // 40%
         }
     }
 
@@ -67,8 +77,8 @@ public class ClientThread extends Thread {
         VoltTable t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
         VoltTable t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
 
-        long pNextRid = (t1.getRowCount() == 0) ? 1 : t1.fetchRow(0).getLong("rid");
-        long rNextRid = (t2.getRowCount() == 0) ? 1 : t2.fetchRow(0).getLong("rid");
+        long pNextRid = (t1.getRowCount() == 0) ? 1 : t1.fetchRow(0).getLong("rid") + 1;
+        long rNextRid = (t2.getRowCount() == 0) ? 1 : t2.fetchRow(0).getLong("rid") + 1;
         m_nextRid = pNextRid > rNextRid ? pNextRid : rNextRid; // max
     }
 
@@ -97,6 +107,10 @@ public class ClientThread extends Thread {
                 payload).getResults();
         m_txnsRun.incrementAndGet();
 
+        assert(results.length == 3);
+        VoltTable data = results[2];
+        UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+
         m_nextRid++;
     }
 
@@ -109,8 +123,26 @@ public class ClientThread extends Thread {
         while (m_shouldContinue.get()) {
             try {
                 runOne();
-            } catch (Exception e) {
-                e.printStackTrace();
+            }
+            catch (ProcCallException e) {
+                ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
+                if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
+                        (cri.getStatus() == ClientResponse.USER_ABORT)) {
+                    log.error("ClientThread had a proc-call exception that indicated bad data", e);
+                    log.error(cri.toJSONString(), e);
+                    System.exit(-1);
+                }
+                else {
+                    // other proc call exceptions are logged, but don't stop the thread
+                    log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
+                    log.warn(cri.toJSONString());
+                    // take a breather to avoid slamming the log
+                    try { Thread.sleep(3000); } catch (InterruptedException e1) {}
+                }
+            }
+            catch (Exception e) {
+                log.error("ClientThread had a non proc-call exception", e);
+                System.exit(-1);
             }
         }
     }

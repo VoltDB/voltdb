@@ -105,7 +105,8 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final int numLocalSites = (context.getSiteTrackerForSnapshot().getLocalSites().length -
+        final SiteTracker st = context.getSiteTrackerForSnapshot();
+        final int numLocalSites = (st.getLocalSites().length -
                 recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating
@@ -176,7 +177,8 @@ public class SnapshotSaveAPI
                         context,
                         hostname,
                         result,
-                        exportSequenceNumbers);
+                        exportSequenceNumbers,
+                        st);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -423,9 +425,9 @@ public class SnapshotSaveAPI
             long txnId, List<Long> partitionTransactionIds,
             String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            SiteTracker tracker) {
         {
-            SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
                     (tracker.getLocalSites().length - recoveringSiteCount.get());
 
@@ -594,7 +596,8 @@ public class SnapshotSaveAPI
                                         table,
                                         context.getHostId(),
                                         tracker.m_numberOfPartitions,
-                                        txnId);
+                                        txnId,
+                                        tracker.getPartitionsForHost(context.getHostId()));
                         }
 
                         if (sdt == null) {
@@ -808,7 +811,8 @@ public class SnapshotSaveAPI
             Table table,
             int hostId,
             int numPartitions,
-            long txnId)
+            long txnId,
+            List<Integer> partitionsForHost)
     throws IOException
     {
         return new DefaultSnapshotDataTarget(f,
@@ -818,7 +822,7 @@ public class SnapshotSaveAPI
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             context.getSiteTrackerForSnapshot().getPartitionsForHost(hostId),
+                                             partitionsForHost,
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

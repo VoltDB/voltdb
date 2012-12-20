@@ -74,7 +74,7 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
     size_t end_bytes = length - running_length; 
 
     for (size_t li = 0; li < running_length/8; li++) {
-        crc ^= *(uint32_t*) p_buf;
+        crc ^= *(const uint32_t*) p_buf;
         p_buf += 4;
         uint32_t term1 = crc_tableil8_o88[crc & 0x000000FF] ^
                 crc_tableil8_o80[(crc >> 8) & 0x000000FF];
@@ -82,10 +82,10 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
         crc = term1 ^
               crc_tableil8_o72[term2 & 0x000000FF] ^ 
               crc_tableil8_o64[(term2 >> 8) & 0x000000FF];
-        term1 = crc_tableil8_o56[(*(uint32_t *)p_buf) & 0x000000FF] ^
-                crc_tableil8_o48[((*(uint32_t *)p_buf) >> 8) & 0x000000FF];
+        term1 = crc_tableil8_o56[(*(const uint32_t *)p_buf) & 0x000000FF] ^
+                crc_tableil8_o48[((*(const uint32_t *)p_buf) >> 8) & 0x000000FF];
 
-        term2 = (*(uint32_t *)p_buf) >> 16;
+        term2 = (*(const uint32_t *)p_buf) >> 16;
         crc = crc ^ term1 ^
                 crc_tableil8_o40[term2  & 0x000000FF] ^
                 crc_tableil8_o32[(term2 >> 8) & 0x000000FF];
