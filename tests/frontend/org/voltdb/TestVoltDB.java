@@ -134,6 +134,12 @@ public class TestVoltDB extends TestCase {
         config = new VoltDB.Configuration(args8);
         assertTrue(config.validate());
 
+        // replica with default action of create
+        String[] args9 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica"};
+        config = new VoltDB.Configuration(args9);
+        assertTrue(config.validate());
+        assertEquals(START_ACTION.CREATE, config.m_startAction);
+
         // valid config
         String[] args10 = {"create", "leader", "localhost", "deployment", "te", "catalog", "catalog.jar"};
         config = new VoltDB.Configuration(args10);
