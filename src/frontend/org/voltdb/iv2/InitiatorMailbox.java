@@ -149,6 +149,12 @@ public class InitiatorMailbox implements Mailbox
         m_allInitiatorMailboxes.add(this);
     }
 
+    // enforce restriction on not allowing promotion during rejoin.
+    public boolean acceptPromotion()
+    {
+        return m_rejoinProducer == null || m_rejoinProducer.acceptPromotion();
+    }
+
     /*
      * Thou shalt not lock two initiator mailboxes from the same thread, lest ye be deadlocked.
      */

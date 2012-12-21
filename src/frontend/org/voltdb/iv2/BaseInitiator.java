@@ -63,14 +63,15 @@ public abstract class BaseInitiator implements Initiator
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, boolean forRejoin)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        RejoinProducer rejoinProducer =
-            new RejoinProducer(m_partitionId, scheduler.m_tasks);
+        RejoinProducer rejoinProducer = forRejoin ?
+            new RejoinProducer(m_partitionId, scheduler.m_tasks) :
+            null;
         if (m_partitionId == MpInitiator.MP_INIT_PID) {
             m_initiatorMailbox = new MpInitiatorMailbox(
                     m_partitionId,
@@ -89,7 +90,9 @@ public abstract class BaseInitiator implements Initiator
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
-        rejoinProducer.setMailbox(m_initiatorMailbox);
+        if (rejoinProducer != null) {
+            rejoinProducer.setMailbox(m_initiatorMailbox);
+        }
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
