@@ -1404,9 +1404,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         String startAction = m_config.m_startAction.toString();
         String startActionLog = "Database start action is " + (startAction.substring(0, 1).toUpperCase() +
                 startAction.substring(1).toLowerCase()) + ".";
-        if (m_config.m_startAction == START_ACTION.START) {
-            startActionLog += " Will create a new database if there is nothing to recover from.";
-        }
         if (!m_rejoining) {
             hostLog.info(startActionLog);
         }

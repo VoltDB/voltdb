@@ -1758,7 +1758,7 @@ TEST CASES
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
     ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx512m -XX:+AggressiveOpts -ea
-    org.voltdb.sqlgenerator.SimpleServer hosts=${hosts}
+    org.voltdb.sqlgenerator.SimpleServer create hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
     ${debug_output}' />
     <copy todir="${build.test.dir}/org/voltdb/sqlgenerator">
