@@ -24,6 +24,8 @@
 package org.voltdb.client;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
@@ -34,7 +36,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
-public class TestClientTimeouts extends TestCase {
+public class TestClientFeatures extends TestCase {
 
     static final String SCHEMA =
             "create table kv (" +
@@ -129,5 +131,23 @@ public class TestClientTimeouts extends TestCase {
 
         client.callProcedure("ArbitraryDurationProc", 3000);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
+
+    public void testGetAddressList() throws UnknownHostException, IOException, InterruptedException {
+        CSL csl = new CSL();
+
+        ClientConfig config = new ClientConfig(null, null, csl);
+        config.setProcedureCallTimeout(0);
+        Client client = ClientFactory.createClient(config);
+
+        InetSocketAddress[] addrs = client.getConnectedHostList();
+        assertEquals(0, addrs.length);
+        client.createConnection("localhost");
+        addrs = client.getConnectedHostList();
+        assertEquals(1, addrs.length);
+        assertEquals(VoltDB.DEFAULT_PORT, addrs[0].getPort());
+        client.close();
+        addrs = client.getConnectedHostList();
+        assertEquals(0, addrs.length);
     }
 }

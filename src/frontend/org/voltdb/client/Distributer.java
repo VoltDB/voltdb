@@ -494,6 +494,10 @@ class Distributer {
             }
             return false;
         }
+
+        public InetSocketAddress getSocketAddress() {
+            return m_socketAddress;
+        }
     }
 
     void drain() throws InterruptedException {
@@ -801,6 +805,17 @@ class Distributer {
 
     public List<Long> getThreadIds() {
         return m_network.getThreadIds();
+    }
+
+    public InetSocketAddress[] getConnectedHostList() {
+        ArrayList<InetSocketAddress> addressList = new ArrayList<InetSocketAddress>();
+        for (NodeConnection conn : m_connections) {
+            InetSocketAddress addr = conn.getSocketAddress();
+            if (addr != null) {
+                addressList.add(addr);
+            }
+        }
+        return addressList.toArray(new InetSocketAddress[addressList.size()]);
     }
 
     private void updateAffinityTopology(VoltTable vt) {

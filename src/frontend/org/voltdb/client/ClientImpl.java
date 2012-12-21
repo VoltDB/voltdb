@@ -20,6 +20,7 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -528,6 +529,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                     "with a client that wasn't constructed with a username and password specified");
         }
         createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
+    }
+
+    @Override
+    public InetSocketAddress[] getConnectedHostList() {
+        return m_distributer.getConnectedHostList();
     }
 
     @Override
