@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -244,8 +245,7 @@ public class SnapshotSaveAPI
     }
 
 
-    private void logSnapshotStartToZK(long txnId,
-            SystemProcedureExecutionContext context, String nonce, String truncReqId) {
+    private void logSnapshotStartToZK(long txnId, int hostId, SiteTracker st, String nonce, String truncReqId) {
         /*
          * Going to send out the requests async to make snapshot init move faster
          */
@@ -299,9 +299,10 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation, truncReqId)) {
-            // the node already exists, add local host ID to the list
-            increaseParticipateHostCount(txnId, context.getHostId());
+        createSnapshotCompletionNode(nonce, txnId, st.getAllHosts(), isTruncation, truncReqId);
+        if (recoveringSiteCount.get() == st.getLocalSites().length) {
+            // None of the site on this node has rejoined yet, remove this node from the snapshot participant list
+            removeRejoiningHost(txnId, hostId);
         }
 
         try {
@@ -319,7 +320,7 @@ public class SnapshotSaveAPI
      * @param txnId The snapshot txnId
      * @param hostId The host ID of the host that's calling this
      */
-    public static void increaseParticipateHostCount(long txnId, int hostId) {
+    public static void removeRejoiningHost(long txnId, int hostId) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
@@ -342,19 +343,19 @@ public class SnapshotSaveAPI
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
 
-                boolean hasLocalhost = false;
+                int localHostIndex = -1;
                 JSONArray hosts = jsonObj.getJSONArray("hosts");
                 for (int i = 0; i < hosts.length(); i++) {
                     if (hosts.getInt(i) == hostId) {
-                        hasLocalhost = true;
+                        localHostIndex = i;
                         break;
                     }
                 }
-                if (!hasLocalhost) {
-                    hosts.put(hostId);
-                }
 
-                zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
+                if (localHostIndex != -1) {
+                    hosts.remove(localHostIndex);
+                    zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
+                }
             } catch (KeeperException.BadVersionException e) {
                 continue;
             } catch (Exception e) {
@@ -371,14 +372,14 @@ public class SnapshotSaveAPI
      *
      * @param nonce Nonce of the snapshot
      * @param txnId
-     * @param hostId The local host ID
+     * @param hostIds Participant hostIDs, including the rejoining host
      * @param isTruncation Whether or not this is a truncation snapshot
      * @param truncReqId Optional unique ID fed back to the monitor for identification
      * @return true if the node is created successfully, false if the node already exists.
      */
     public static boolean createSnapshotCompletionNode(String nonce,
                                                           long txnId,
-                                                          int hostId,
+                                                          Set<Integer> hostIds,
                                                           boolean isTruncation,
                                                           String truncReqId) {
         if (!(txnId > 0)) {
@@ -390,7 +391,11 @@ public class SnapshotSaveAPI
             JSONStringer stringer = new JSONStringer();
             stringer.object();
             stringer.key("txnId").value(txnId);
-            stringer.key("hosts").array().value(hostId).endArray();
+            stringer.key("hosts").array();
+            for (Integer hostId : hostIds) {
+                stringer.value(hostId);
+            }
+            stringer.endArray();
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("finishedHosts").value(0);
             stringer.key("nonce").value(nonce);
@@ -754,7 +759,7 @@ public class SnapshotSaveAPI
                         if (jsData != null && jsData.has("truncReqId")) {
                             truncReqId = jsData.getString("truncReqId");
                         }
-                        logSnapshotStartToZK( txnId, context, file_nonce, truncReqId);
+                        logSnapshotStartToZK( txnId, context.getHostId(), tracker, file_nonce, truncReqId);
                     }
                 }
             } catch (Exception ex) {
