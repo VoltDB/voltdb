@@ -23,6 +23,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -209,6 +210,8 @@ class Distributer {
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
         public NodeConnection(long ids[], InetSocketAddress socketAddress) {
+            assert(socketAddress != null);
+
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
             m_socketAddress = socketAddress;
         }
@@ -493,6 +496,10 @@ class Distributer {
                 return true;
             }
             return false;
+        }
+
+        public InetSocketAddress getSocketAddress() {
+            return m_socketAddress;
         }
     }
 
@@ -801,6 +808,14 @@ class Distributer {
 
     public List<Long> getThreadIds() {
         return m_network.getThreadIds();
+    }
+
+    public List<InetSocketAddress> getConnectedHostList() {
+        ArrayList<InetSocketAddress> addressList = new ArrayList<InetSocketAddress>();
+        for (NodeConnection conn : m_connections) {
+            addressList.add(conn.getSocketAddress());
+        }
+        return Collections.unmodifiableList(addressList);
     }
 
     private void updateAffinityTopology(VoltTable vt) {
