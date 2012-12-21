@@ -22,6 +22,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 
 /**
  *  <p>
@@ -274,7 +275,7 @@ public interface Client {
      * hosts that weren't explicitly connected to.
      * @return An array of InetSocketAddresses representing the connected hosts.
      */
-    public InetSocketAddress[] getConnectedHostList();
+    public List<InetSocketAddress> getConnectedHostList();
 
     /**
      * Write a single line of comma separated values to the file specified.

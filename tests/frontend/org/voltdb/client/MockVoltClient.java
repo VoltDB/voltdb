@@ -318,7 +318,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public InetSocketAddress[] getConnectedHostList() {
+    public List<InetSocketAddress> getConnectedHostList() {
         // TODO Auto-generated method stub
         return null;
     }

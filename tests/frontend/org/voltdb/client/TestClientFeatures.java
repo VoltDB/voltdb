@@ -26,6 +26,7 @@ package org.voltdb.client;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
@@ -140,14 +141,14 @@ public class TestClientFeatures extends TestCase {
         config.setProcedureCallTimeout(0);
         Client client = ClientFactory.createClient(config);
 
-        InetSocketAddress[] addrs = client.getConnectedHostList();
-        assertEquals(0, addrs.length);
+        List<InetSocketAddress> addrs = client.getConnectedHostList();
+        assertEquals(0, addrs.size());
         client.createConnection("localhost");
         addrs = client.getConnectedHostList();
-        assertEquals(1, addrs.length);
-        assertEquals(VoltDB.DEFAULT_PORT, addrs[0].getPort());
+        assertEquals(1, addrs.size());
+        assertEquals(VoltDB.DEFAULT_PORT, addrs.get(0).getPort());
         client.close();
         addrs = client.getConnectedHostList();
-        assertEquals(0, addrs.length);
+        assertEquals(0, addrs.size());
     }
 }

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -532,7 +533,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public InetSocketAddress[] getConnectedHostList() {
+    public List<InetSocketAddress> getConnectedHostList() {
         return m_distributer.getConnectedHostList();
     }
 
