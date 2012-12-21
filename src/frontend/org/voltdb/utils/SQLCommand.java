@@ -238,7 +238,7 @@ public class SQLCommand
                         {
                             line = Lines.get(recall);
                             lineInputReader.putString(line);
-                            out.flush();
+                            lineInputReader.flush();
                             isRecall = true;
                             continue;
                         }
