@@ -54,8 +54,9 @@ public class VoltNetworkPool {
                 m_networks[ii] = new VoltNetwork(ii, null);
             }
         } else {
-            m_networks = new VoltNetwork[coreBindIds.size()];
-            for (int ii = 0; ii < coreBindIds.size(); ii++) {
+            final int coreBindIdsSize = coreBindIds.size();
+            m_networks = new VoltNetwork[coreBindIdsSize];
+            for (int ii = 0; ii < coreBindIdsSize; ii++) {
                 m_networks[ii] = new VoltNetwork(ii, coreBindIds.poll());
             }
         }
