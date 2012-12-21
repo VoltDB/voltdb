@@ -42,8 +42,11 @@ public class JiggleSinglePartition extends VoltProcedure {
 
     public VoltTable[] run(long rowid, long ignore)
     {
+        @SuppressWarnings("deprecation")
+        long txid = getVoltPrivateRealTransactionIdDontUseMe();
+
         // Critical for proper determinism: get a cluster-wide consistent Random instance
-        Random rand = getSeededRandomNumberGenerator();
+        Random rand = new Random(txid);
 
         // Check if the record exists first
         voltQueueSQL(check, rowid);
