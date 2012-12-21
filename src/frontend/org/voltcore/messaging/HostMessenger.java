@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -81,6 +82,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
+        public Queue<String> coreBindIds;;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -199,7 +201,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             Config config)
     {
         m_config = config;
-        m_network = new VoltNetworkPool( m_config.networkThreads);
+        m_network = new VoltNetworkPool( m_config.networkThreads, m_config.coreBindIds);
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,

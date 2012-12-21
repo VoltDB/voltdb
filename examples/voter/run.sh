@@ -19,7 +19,11 @@ else
     VOLTDB_VOLTDB="`pwd`/../../voltdb"
 fi
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+CLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -53,7 +57,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB start catalog $APPNAME.jar deployment deployment.xml \
+    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE host $HOST
 }
 

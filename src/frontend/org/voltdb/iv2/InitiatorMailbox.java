@@ -149,6 +149,12 @@ public class InitiatorMailbox implements Mailbox
         m_allInitiatorMailboxes.add(this);
     }
 
+    // enforce restriction on not allowing promotion during rejoin.
+    public boolean acceptPromotion()
+    {
+        return m_rejoinProducer == null || m_rejoinProducer.acceptPromotion();
+    }
+
     /*
      * Thou shalt not lock two initiator mailboxes from the same thread, lest ye be deadlocked.
      */
@@ -314,7 +320,7 @@ public class InitiatorMailbox implements Mailbox
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
-        tmLog.info(""
+        tmLog.debug(""
             + CoreUtils.hsIdToString(getHSId())
             + " handling repair log request id " + req.getRequestId()
             + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");

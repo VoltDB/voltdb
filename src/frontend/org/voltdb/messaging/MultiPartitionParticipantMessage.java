@@ -20,7 +20,6 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 
@@ -37,7 +36,7 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
         super(initiatorHSId,
                 coordinatorHSId,
                 txnId,
-                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                txnId,
                 isReadOnly,
                 false);
     }
@@ -50,7 +49,7 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
         super(initiatorHSId,
                 coordinatorHSId,
                 txnId,
-                TransactionIdManager.getTimestampFromTransactionId(txnId),
+                txnId,
                 isReadOnly,
                 isForReplay);
     }

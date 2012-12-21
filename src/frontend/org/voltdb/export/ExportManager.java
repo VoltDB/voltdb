@@ -310,11 +310,11 @@ public class ExportManager
                     catalogContext, conn);
             ExportGeneration currentGeneration =
                 new ExportGeneration(
-                        catalogContext.m_timestamp,
+                        catalogContext.m_uniqueId,
                         m_onGenerationDrained,
                         exportOverflowDirectory);
             currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, messenger);
-            m_generations.put( catalogContext.m_timestamp, currentGeneration);
+            m_generations.put( catalogContext.m_uniqueId, currentGeneration);
             newProcessor.setExportGeneration(m_generations.firstEntry().getValue());
             newProcessor.setProcessorConfig(m_processorConfig);
             newProcessor.readyForData();
@@ -404,7 +404,7 @@ public class ExportManager
         ExportGeneration newGeneration = null;
         try {
             newGeneration = new ExportGeneration(
-                    catalogContext.m_timestamp,
+                    catalogContext.m_uniqueId,
                     m_onGenerationDrained,
                     exportOverflowDirectory);
         } catch (IOException e1) {
@@ -412,7 +412,7 @@ public class ExportManager
         }
         newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger);
 
-        m_generations.put(catalogContext.m_timestamp, newGeneration);
+        m_generations.put(catalogContext.m_uniqueId, newGeneration);
     }
 
     public void shutdown() {

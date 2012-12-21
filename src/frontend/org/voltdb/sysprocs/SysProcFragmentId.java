@@ -144,4 +144,8 @@ public class SysProcFragmentId
     public static final long PF_systemInformationAggregate = 191;
     public static final long PF_systemInformationOverview = 192;
     public static final long PF_systemInformationOverviewAggregate = 193;
+
+    // @Update application catalog
+    public static final long PF_updateCatalog = 210;
+    public static final long PF_updateCatalogAggregate = 211;
 }

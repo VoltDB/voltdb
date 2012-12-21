@@ -27,20 +27,19 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.zip.CRC32;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.DeprecatedDefaultSnapshotDataTarget;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.messaging.FastSerializer;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.Pair;
-import org.voltcore.utils.DBBPool.BBContainer;
 
 import com.google.common.util.concurrent.Callables;
 
@@ -51,6 +50,7 @@ import com.google.common.util.concurrent.Callables;
 public class TestTableSaveFile extends TestCase {
     private static int[] VERSION0 = { 0, 0, 0, 0 };
     private static int[] VERSION1 = { 0, 0, 0, 1 };
+    private static int[] VERSION2 = { 0, 0, 0, 2 };
     private static int HOST_ID = 3;
     private static long TXN_ID = org.voltdb.TransactionIdManager.makeIdFromComponents(24, 32, 96);
     private static String CLUSTER_NAME = "TEST_CLUSTER";
@@ -73,36 +73,13 @@ public class TestTableSaveFile extends TestCase {
         b.getInt();
         int headerLength = b.getInt();
         b.position(b.position() + headerLength);// at row count
-        final int rowCount = b.getInt();
-        ByteBuffer chunkBuffer = ByteBuffer.allocateDirect(b.remaining() + 16
-                + target.getHeaderSize());
-        chunkBuffer.position(target.getHeaderSize());
-        chunkBuffer.mark();
-        final CRC32 partitionIdCRC = new CRC32();
-        chunkBuffer.putInt(partitionId);
-        chunkBuffer.reset();
-        byte partitionIdBytes[] = new byte[4];
-        chunkBuffer.get(partitionIdBytes);
-        partitionIdCRC.update(partitionIdBytes);
-        chunkBuffer.putInt((int) partitionIdCRC.getValue());
-        final int crcPosition = chunkBuffer.position();
-        chunkBuffer.position(chunkBuffer.position() + 4);
-        chunkBuffer.put(b);
-        chunkBuffer.putInt(rowCount);
-        chunkBuffer.position(crcPosition + 4);
-        final int crc = DBBPool.getBufferCRC32(chunkBuffer, chunkBuffer.position(), chunkBuffer.remaining());
-        chunkBuffer.position(crcPosition);
-        chunkBuffer.putInt(crc);
-        chunkBuffer.position(0);
-        target.write(Callables.returning((BBContainer)new BBContainer(chunkBuffer, 0) {
+        BBContainer container = DBBPool.allocateDirectWithAddress(b.remaining() + 4);
+        ByteBuffer payload = container.b;
+        payload.putInt(partitionId);
+        payload.put(b);
+        payload.flip();
 
-            @Override
-            public void discard() {
-                // TODO Auto-generated method stub
-
-            }
-
-        }), null);
+        target.write(Callables.returning(container), null);
     }
 
     private Pair<VoltTable, File> generateTestTable(int numberOfItems)
@@ -124,7 +101,7 @@ public class TestTableSaveFile extends TestCase {
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
                 TOTAL_PARTITIONS, false, partIds, table,
-                TXN_ID, VERSION1);
+                TXN_ID, VERSION2);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
                 columnInfo.length);

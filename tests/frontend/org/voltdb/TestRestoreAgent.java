@@ -96,7 +96,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     @Parameters
     public static Collection<Object[]> startActions() {
         return Arrays.asList(new Object[][] {{START_ACTION.CREATE},
-                                             {START_ACTION.START},
                                              {START_ACTION.RECOVER}});
     }
 

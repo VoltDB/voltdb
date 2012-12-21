@@ -74,9 +74,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 /** Produces work for registered ports that are selected for read, write */
 class VoltNetwork implements Runnable
@@ -89,6 +92,7 @@ class VoltNetwork implements Runnable
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
+    private final String m_coreBindId;
 
     private final int m_networkId;
     /**
@@ -103,11 +107,11 @@ class VoltNetwork implements Runnable
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    VoltNetwork(int networkId) {
+    VoltNetwork(int networkId, String coreBindId) {
         m_thread = new Thread(this, "Volt Network - " + networkId);
         m_networkId = networkId;
         m_thread.setDaemon(true);
-
+        m_coreBindId = coreBindId;
         try {
             m_selector = Selector.open();
         } catch (IOException ex) {
@@ -120,6 +124,7 @@ class VoltNetwork implements Runnable
         m_thread = null;
         m_networkId = 0;
         m_selector = s;
+        m_coreBindId = null;
     }
 
     /** Instruct the network to stop after the current loop */
@@ -260,6 +265,9 @@ class VoltNetwork implements Runnable
 
     @Override
     public void run() {
+        if (m_coreBindId != null) {
+            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
+        }
         try {
             while (m_shouldStop == false) {
                 try {

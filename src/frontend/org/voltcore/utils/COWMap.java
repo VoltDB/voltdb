@@ -17,17 +17,18 @@
 package org.voltcore.utils;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.collect.ForwardingMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Key set, value set, and entry set are all immutable as are their iterators.
  * Otherwise behaves as you would expect.
  */
-public class COWMap<K, V>  extends ForwardingMap<K, V> implements Map<K, V> {
+public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<K, V> {
     private final AtomicReference<ImmutableMap<K, V>> m_map;
 
     public COWMap() {
@@ -113,5 +114,102 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements Map<K, V> {
     @Override
     protected Map<K, V> delegate() {
         return m_map.get();
+    }
+
+    @Override
+    public V putIfAbsent(K key, V value) {
+        V existingValue;
+        while ((existingValue = get(key)) == null) {
+            ImmutableMap<K, V> original = m_map.get();
+            if ((existingValue = original.get(key)) != null) break;
+
+            Builder<K, V> builder = new Builder<K, V>();
+            for (Map.Entry<K, V> entry : original.entrySet()) {
+                if (entry.getKey().equals(key)) {
+                    throw new RuntimeException("Shouldn't happen already checked");
+                } else {
+                    builder.put(entry);
+                }
+            }
+            builder.put(key, value);
+            ImmutableMap<K, V> copy = builder.build();
+            if (m_map.compareAndSet(original, copy)) {
+                break;
+            }
+        }
+        return existingValue;
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+        while (true) {
+            ImmutableMap<K, V> original = m_map.get();
+            V existingValue = original.get(key);
+            if (existingValue == null) break;
+            if (!existingValue.equals(value)) break;
+
+            Builder<K, V> builder = new Builder<K, V>();
+            for (Map.Entry<K, V> entry : original.entrySet()) {
+                if (entry.getKey().equals(key)) {
+                    continue;
+                } else {
+                    builder.put(entry);
+                }
+            }
+            ImmutableMap<K, V> copy = builder.build();
+            if (m_map.compareAndSet(original, copy)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean replace(K key, V oldValue, V newValue) {
+        while (true) {
+            ImmutableMap<K, V> original = m_map.get();
+            V existingValue = original.get(key);
+            if (existingValue == null) break;
+            if (!existingValue.equals(oldValue)) break;
+
+            Builder<K, V> builder = new Builder<K, V>();
+            for (Map.Entry<K, V> entry : original.entrySet()) {
+                if (entry.getKey().equals(key)) {
+                    continue;
+                } else {
+                    builder.put(entry);
+                }
+            }
+            builder.put(key, newValue);
+            ImmutableMap<K, V> copy = builder.build();
+            if (m_map.compareAndSet(original, copy)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public V replace(K key, V value) {
+        while (true) {
+            ImmutableMap<K, V> original = m_map.get();
+            V existingValue = original.get(key);
+            if (existingValue == null) break;
+
+            Builder<K, V> builder = new Builder<K, V>();
+            for (Map.Entry<K, V> entry : original.entrySet()) {
+                if (entry.getKey().equals(key)) {
+                    continue;
+                } else {
+                    builder.put(entry);
+                }
+            }
+            builder.put(key, value);
+            ImmutableMap<K, V> copy = builder.build();
+            if (m_map.compareAndSet(original, copy)) {
+                return existingValue;
+            }
+        }
+        return null;
     }
 }
