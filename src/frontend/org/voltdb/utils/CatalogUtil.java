@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -46,12 +47,17 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
@@ -1435,6 +1441,56 @@ public abstract class CatalogUtil {
         }
         final byte passwordHash[] = md.digest(password.getBytes());
         return Encoder.hexEncode(passwordHash);
+    }
+
+    public static void
+        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+                throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        versionAndBytes.putInt(catalogVersion);
+        versionAndBytes.putLong(txnId);
+        versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogBytes);
+        zk.create(VoltZK.catalogbytes,
+                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    }
+
+    public static void
+        setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+            throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        versionAndBytes.putInt(catalogVersion);
+        versionAndBytes.putLong(txnId);
+        versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogBytes);
+        zk.setData(VoltZK.catalogbytes,
+                versionAndBytes.array(), -1);
+    }
+
+    public static class CatalogAndIds {
+        public final long txnId;
+        public final long uniqueId;
+        public final int version;
+        public final byte bytes[];
+
+        public CatalogAndIds(long txnId, long uniqueId, int catalogVersion, byte catalogBytes[]) {
+            this.txnId = txnId;
+            this.uniqueId = uniqueId;
+            this.version = catalogVersion;
+            this.bytes = catalogBytes;
+        }
+    }
+
+    public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes =
+                ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
+        int version = versionAndBytes.getInt();
+        long catalogTxnId = versionAndBytes.getLong();
+        long catalogUniqueId = versionAndBytes.getLong();
+        byte catalogBytes[] = new byte[versionAndBytes.remaining()];
+        versionAndBytes.get(catalogBytes);
+        versionAndBytes = null;
+        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogBytes);
     }
 
 }

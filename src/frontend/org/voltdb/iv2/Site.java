@@ -329,7 +329,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinState = VoltDB.createForRejoin(startAction) ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
-        m_startupConfig = new StartupConfig(serializedCatalog, context.m_timestamp);
+        m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
         m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
@@ -1022,7 +1022,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             //Necessary to quiesce before updating the catalog
             //so export data for the old generation is pushed to Java.
             m_ee.quiesce(m_lastCommittedTxnId);
-            m_ee.updateCatalog(m_context.m_timestamp, diffCmds);
+            m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
         }
 
         return true;
