@@ -611,10 +611,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
 
                     SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
-                    SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
-                            st.getAllHosts(), true, truncReqId);
-                    // For IV2, Snapshot daemon leader is always on the same node as the MPI leader.
-                    // So this code will never be called on a node that's rejoining.
+                    int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
+                    if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
+                                                                      hostId, true, truncReqId)) {
+                        SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId, hostId);
+                    }
 
                     try {
                         TruncationSnapshotAttempt snapshotAttempt =
