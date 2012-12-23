@@ -399,8 +399,8 @@ public class TestClientInterface {
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
         assertFalse(boolValues.get(1)); // readonly
-        assertTrue(boolValues.get(2)); // single-part
-        assertTrue(boolValues.get(3)); // every site
+        assertFalse(boolValues.get(2)); // single-part
+        assertFalse(boolValues.get(3)); // every site
         assertEquals("@UpdateApplicationCatalog", invocationCaptor.getValue().getProcName());
         assertEquals("diff", invocationCaptor.getValue().getParameterAtIndex(0));
         assertTrue(Arrays.equals("blah".getBytes(), (byte[]) invocationCaptor.getValue().getParameterAtIndex(1)));
