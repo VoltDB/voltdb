@@ -890,6 +890,14 @@ public class TestVoltTable extends TestCase {
 "    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
 "     123     12345  1234567  12345678901  1.234567 aabbcc  0A1A0A     1970-01-01 00:00:00.000099   123.450000000000\n";
 
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output:");
+            System.out.println(formatted_string);
+            System.out.println("Expected output:");
+            System.out.println(expected);
+        }
+
         assertTrue(formatted_string.equals(expected));
     }
 
