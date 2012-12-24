@@ -441,8 +441,14 @@ public class SnapshotSaveAPI
         byte data[] = null;
         try {
             data = zk.getData(snapshotPath, false, stat);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("This ZK get should never fail", true, e);
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NONODE) {
+                // If snapshot creation failed for some reason, the node won't exist. ignore
+                return;
+            }
+            VoltDB.crashLocalVoltDB("Failed to get snapshot completion node", true, e);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Interrupted getting snapshot completion node", true, e);
         }
         if (data == null) {
             VoltDB.crashLocalVoltDB("Data should not be null if the node exists", false, null);
