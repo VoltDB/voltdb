@@ -130,6 +130,11 @@ import org.voltdb.types.VoltDecimalHelper;
 
     @Override
     public void writeExternal(FastSerializer out) throws IOException {
+        if (m_hasSerialization) {
+            out.write(m_serializedParams);
+            return;
+        }
+
         out.writeShort(m_params.length);
 
         for (Object obj : m_params) {
@@ -635,6 +640,7 @@ import org.voltdb.types.VoltDecimalHelper;
 
         if (m_hasSerialization) {
             buf.put(m_serializedParams);
+            return;
         }
 
         buf.putShort((short)m_params.length);
@@ -795,9 +801,9 @@ import org.voltdb.types.VoltDecimalHelper;
      * @throws IOException
      */
     void addToCRC(PureJavaCrc32C crc) throws IOException {
-        m_serializedParams = new byte[m_serializedSize];
-        ByteBuffer buf = ByteBuffer.wrap(m_serializedParams);
+        ByteBuffer buf = ByteBuffer.allocate(m_serializedSize);
         flattenToBuffer(buf);
+        m_serializedParams = buf.array();
         m_hasSerialization = true;
         crc.update(m_serializedParams);
     }
