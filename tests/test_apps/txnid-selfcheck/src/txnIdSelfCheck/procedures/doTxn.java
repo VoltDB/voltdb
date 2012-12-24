@@ -46,10 +46,10 @@ public class doTxn extends VoltProcedure {
     }
 
     public VoltTable[] run(byte cid, long rid, long oldestRid, byte[] value) {
-        final long txnId = getTransactionId();
-        final long ts = getTransactionTime().getTime();
+        final long txnId = getVoltPrivateRealTransactionIdDontUseMe();
+        final long uniqueId = getUniqueId();
 
-        voltQueueSQL(insertTxnid, txnId, ts, cid, getRid(rid), value);
+        voltQueueSQL(insertTxnid, txnId, uniqueId, cid, getRid(rid), value);
         voltQueueSQL(deleteOldTxns, cid, getRid(oldestRid));
         voltExecuteSQL();
 

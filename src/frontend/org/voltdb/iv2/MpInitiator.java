@@ -56,7 +56,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     buddyHSId,
                     new SiteTaskerQueue()),
                 "MP",
-                agent);
+                agent,
+                false /* never for rejoin */);
     }
 
     @Override
@@ -68,7 +69,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway drGateway)
+                          NodeDRGateway drGateway,
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
@@ -77,7 +79,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions, startAction, null, null, cl);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -112,8 +114,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                         m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
                     }
                     tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                             + "finished leader promotion. Took "
+                             + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
@@ -127,9 +129,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     // CrashVoltDB here means one node failure causing another.
                     // Don't create a cascading failure - just try again.
                     tmLog.info(m_whoami
-                            + "interrupted during leader promotion after "
-                            + (System.currentTimeMillis() - startTime) + " ms. of "
-                            + "trying. Retrying.");
+                             + "interrupted during leader promotion after "
+                             + (System.currentTimeMillis() - startTime) + " ms. of "
+                             + "trying. Retrying.");
                 }
             }
             super.acceptPromotion();

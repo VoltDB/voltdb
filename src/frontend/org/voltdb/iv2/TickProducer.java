@@ -41,7 +41,7 @@ public class TickProducer extends SiteTasker implements Runnable
     // start schedules a 1 second tick.
     public void start()
     {
-        VoltDB.instance().scheduleWork(
+        VoltDB.instance().schedulePriorityWork(
                 this,
                 1,
                 1,

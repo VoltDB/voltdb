@@ -37,7 +37,8 @@ import java.util.TreeMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
-import java.util.zip.CRC32;
+
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 
 /**
  * Given a jarfile, construct a map of entry name => byte array representing
@@ -172,7 +173,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
     public long getCRC() throws IOException {
 
-        CRC32 crc = new CRC32();
+        PureJavaCrc32 crc = new PureJavaCrc32();
 
         for (Entry<String, byte[]> e : super.entrySet()) {
             if (e.getKey().equals("buildinfo.txt")) {

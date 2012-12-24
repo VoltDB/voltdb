@@ -58,6 +58,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
 
     // Error string returned on duplicate replicated transaction from DR agent
     public static final String DUPE_TRANSACTION = "Rejected duplicate replicated transaction";
+    // Error string returned when a replayed clog transaction is ignored
+    public static final String IGNORED_TRANSACTION = "Ignored replayed transaction";
 
     /** opaque data optionally provided by and returned to the client */
     private long clientHandle = -1;

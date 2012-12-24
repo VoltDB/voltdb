@@ -73,6 +73,8 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
+import vanilla.java.affinity.impl.PosixJNAAffinity;
+
 import com.google.common.collect.ImmutableMap;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
@@ -137,6 +139,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Current topology
     int m_partitionId;
+
+    private final String m_coreBindIds;
 
     // Need temporary access to some startup parameters in order to
     // initialize EEs in the right thread.
@@ -222,12 +226,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return m_siteId;
         }
 
+        /*
+         * Expensive to compute, memoize it
+         */
+        private Boolean m_isLowestSiteId = null;
         @Override
         public boolean isLowestSiteId()
         {
-            // FUTURE: should pass this status in at construction.
-            long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
-            return m_siteId == lowestSiteId;
+            if (m_isLowestSiteId != null) {
+                return m_isLowestSiteId;
+            } else {
+                // FUTURE: should pass this status in at construction.
+                long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
+                m_isLowestSiteId = m_siteId == lowestSiteId;
+                return m_isLowestSiteId;
+            }
         }
 
 
@@ -303,7 +316,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
-            MemoryStats memStats)
+            MemoryStats memStats,
+            String coreBindIds)
     {
         m_siteId = siteId;
         m_context = context;
@@ -315,11 +329,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinState = VoltDB.createForRejoin(startAction) ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
-        m_startupConfig = new StartupConfig(serializedCatalog, context.m_timestamp);
+        m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
         m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
+        m_coreBindIds = coreBindIds;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -480,6 +495,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void run()
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
+        if (m_coreBindIds != null) {
+            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
+        }
         initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
         m_startupConfig = null; // release the serializedCatalog bytes.
 
@@ -839,9 +857,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 // rollup the table memory stats for this site
                 while (stats.advanceRow()) {
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     tupleCount += stats.getLong(7);
+                    assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     tupleAllocatedMem += (int) stats.getLong(8);
+                    assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
                     tupleDataMem += (int) stats.getLong(9);
+                    assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
                     stringMem += (int) stats.getLong(10);
                 }
                 stats.resetRowPosition();
@@ -858,7 +881,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 // rollup the index memory stats for this site
                 while (stats.advanceRow()) {
-                    indexMem += stats.getLong(10);
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
+                    indexMem += stats.getLong(11);
                 }
                 stats.resetRowPosition();
 
@@ -930,6 +955,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         null);
             }
             Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+            if (sequenceNumbers == null) {
+                VoltDB.crashLocalVoltDB(
+                        "Could not find export sequence numbers for partition " +
+                                m_partitionId + " table " +
+                                tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+            }
             exportAction(
                     true,
                     sequenceNumbers.getFirst().intValue(),
@@ -991,7 +1022,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             //Necessary to quiesce before updating the catalog
             //so export data for the old generation is pushed to Java.
             m_ee.quiesce(m_lastCommittedTxnId);
-            m_ee.updateCatalog(m_context.m_timestamp, diffCmds);
+            m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
         }
 
         return true;

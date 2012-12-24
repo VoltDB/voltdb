@@ -290,7 +290,7 @@ public class ExportVerifier {
         {
             @Override
             public boolean accept(File pathname) {
-                return pathname.getName().contains("dude");
+                return pathname.getName().contains("dude") && !pathname.getName().startsWith("active-");
             }
         };
 

@@ -110,7 +110,7 @@ public class LocalCluster implements VoltServerConfig {
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
     // instance.
-    private final CommandLine templateCmdLine = new CommandLine();
+    private final CommandLine templateCmdLine = new CommandLine(START_ACTION.CREATE);
 
     public LocalCluster(String jarFileName, int siteCount,
             int hostCount, int kfactor, BackendTarget target) {

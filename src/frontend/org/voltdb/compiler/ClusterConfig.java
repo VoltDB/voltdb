@@ -134,8 +134,8 @@ public class ClusterConfig
 
     private static class Partition {
         private Node m_master;
-        private Set<Node> m_replicas = new HashSet<Node>();
-        private Integer m_partitionId;
+        private final Set<Node> m_replicas = new HashSet<Node>();
+        private final Integer m_partitionId;
 
         private int m_neededReplicas;
 
@@ -486,7 +486,7 @@ public class ClusterConfig
             }
         }
 
-        hostLog.info("TOPO: " + topo.toString(2));
+        hostLog.debug("TOPO: " + topo.toString(2));
         return topo;
     }
 

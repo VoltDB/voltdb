@@ -684,9 +684,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                 // rollup the table memory stats for this site
                 while (stats.advanceRow()) {
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     tupleCount += stats.getLong(7);
+                    assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     tupleAllocatedMem += (int) stats.getLong(8);
+                    assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
                     tupleDataMem += (int) stats.getLong(9);
+                    assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
                     stringMem += (int) stats.getLong(10);
                 }
                 stats.resetRowPosition();
@@ -704,7 +709,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                 // rollup the index memory stats for this site
                 while (stats.advanceRow()) {
-                    indexMem += stats.getLong(10);
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
+                    indexMem += stats.getLong(11);
                 }
                 stats.resetRowPosition();
 
@@ -878,7 +885,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             voltdb.getBackendTargetType(),
                             serializedCatalog,
                             txnId,
-                            m_context.m_timestamp,
+                            m_context.m_uniqueId,
                             configuredNumberOfPartitions);
         }
 
@@ -1013,7 +1020,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         ee.quiesce(lastCommittedTxnId);
-        ee.updateCatalog( context.m_timestamp, catalogDiffCommands);
+        ee.updateCatalog( context.m_uniqueId, catalogDiffCommands);
 
         return true;
     }
@@ -2750,6 +2757,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     // call the proc
                     runner.setupTransaction(txnState);
                     cr = runner.call(itask.getParameters());
+                    txnState.setHash(cr.getHash());
                     response.setResults(cr);
 
                     // record the results of write transactions to the transaction state

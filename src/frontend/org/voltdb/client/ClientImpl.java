@@ -20,8 +20,10 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -187,7 +189,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public ClientResponse callProcedure(
             long originalTxnId,
-            long originalTimestamp,
+            long originalUniqueId,
             String procName,
             Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException
@@ -195,7 +197,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalTimestamp,
+            new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
         return callProcedure(cb, invocation);
@@ -263,7 +265,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(
             long originalTxnId,
-            long originalTimestamp,
+            long originalUniqueId,
             ProcedureCallback callback,
             String procName,
             Object... parameters)
@@ -272,7 +274,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             ((ProcedureArgumentCacher)callback).setArgs(parameters);
         }
         ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalTimestamp,
+            new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
         return private_callProcedure(callback, 0, invocation);
@@ -528,6 +530,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                     "with a client that wasn't constructed with a username and password specified");
         }
         createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
+    }
+
+    @Override
+    public List<InetSocketAddress> getConnectedHostList() {
+        return m_distributer.getConnectedHostList();
     }
 
     @Override

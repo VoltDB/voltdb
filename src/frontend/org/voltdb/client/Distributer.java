@@ -23,6 +23,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -209,6 +210,8 @@ class Distributer {
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
         public NodeConnection(long ids[], InetSocketAddress socketAddress) {
+            assert(socketAddress != null);
+
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
             m_socketAddress = socketAddress;
         }
@@ -494,6 +497,10 @@ class Distributer {
             }
             return false;
         }
+
+        public InetSocketAddress getSocketAddress() {
+            return m_socketAddress;
+        }
     }
 
     void drain() throws InterruptedException {
@@ -531,7 +538,7 @@ class Distributer {
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1);
+                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1, null);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
@@ -803,12 +810,24 @@ class Distributer {
         return m_network.getThreadIds();
     }
 
+    public List<InetSocketAddress> getConnectedHostList() {
+        ArrayList<InetSocketAddress> addressList = new ArrayList<InetSocketAddress>();
+        for (NodeConnection conn : m_connections) {
+            addressList.add(conn.getSocketAddress());
+        }
+        return Collections.unmodifiableList(addressList);
+    }
+
     private void updateAffinityTopology(VoltTable vt) {
-        int numPartitions = vt.getRowCount();
+        // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
+        int numPartitions = vt.getRowCount() - 1;
         TheHashinator.initialize(numPartitions);
         m_hashinatorInitialized = true;
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
+        // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
+        // hash to it.  Go ahead and include it in the maps, we can use it at some point to
+        // route MP transactions directly to the MPI node.
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
 

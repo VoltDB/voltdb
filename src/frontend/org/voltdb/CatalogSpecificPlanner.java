@@ -44,7 +44,7 @@ public class CatalogSpecificPlanner {
     }
 
     public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql, boolean multipart,
-            ProcedureInvocationType type, long originalTxnId, long originalTs) {
+            ProcedureInvocationType type, long originalTxnId, long originalUniqueId) {
         /*
          * If this is multi-part, don't give the planner a partition param AND
          * tell it not to infer whether the plan is single part. Those optimizations
@@ -56,7 +56,7 @@ public class CatalogSpecificPlanner {
             new AdHocPlannerWork(
                     -1, false, 0, 0, "", false, null, //none of the params on this line are used
                     sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true, !multipart,
-                    type, originalTxnId, originalTs,
+                    type, originalTxnId, originalUniqueId,
                     new AsyncCompilerWorkCompletionHandler() {
 
                         @Override

@@ -18,25 +18,25 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.CoreUtils;
-
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
-
-import org.voltdb.compiler.ClusterConfig;
-
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
@@ -44,8 +44,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
-
-import com.google.common.collect.UnmodifiableIterator;
+import org.voltdb.compiler.ClusterConfig;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
@@ -60,15 +59,16 @@ public class Cartographer extends StatsSource
     private final LeaderCacheReader m_iv2Mpi;
     private final ZooKeeper m_zk;
     private final int m_numberOfPartitions;
+    private final Set<Integer> m_allMasters = new HashSet<Integer>();
 
     /**
      * A dummy iterator that wraps an UnmodifiableIterator<Integer> and provides the
      * Iterator<Object>
      */
     private static class DummyIterator implements Iterator<Object> {
-        private final UnmodifiableIterator<Integer> i;
+        private final Iterator<Integer> i;
 
-        private DummyIterator(UnmodifiableIterator<Integer> i) {
+        private DummyIterator(Iterator<Integer> i) {
             this.i = i;
         }
 
@@ -115,13 +115,24 @@ public class Cartographer extends StatsSource
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
-        return new DummyIterator(m_iv2Masters.pointInTimeCache().keySet().iterator());
+        m_allMasters.clear();
+        m_allMasters.addAll(m_iv2Masters.pointInTimeCache().keySet());
+        m_allMasters.add(MpInitiator.MP_INIT_PID);
+        return new DummyIterator(m_allMasters.iterator());
     }
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        long leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
-        List<Long> sites = getReplicasForPartition((Integer)rowKey);
+        long leader;
+        List<Long> sites = new ArrayList<Long>();
+        if (rowKey.equals(MpInitiator.MP_INIT_PID)) {
+            leader = getHSIdForMultiPartitionInitiator();
+            sites.add(leader);
+        }
+        else {
+            leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
+            sites.addAll(getReplicasForPartition((Integer)rowKey));
+        }
 
         rowValues[columnNameToIndex.get("Partition")] = rowKey;
         rowValues[columnNameToIndex.get("Sites")] = CoreUtils.hsIdCollectionToString(sites);
@@ -173,42 +184,100 @@ public class Cartographer extends StatsSource
     }
 
     /**
+     * Given a set of partition IDs, return a map of partition to a list of HSIDs of all the sites with copies of each partition
+     */
+    public Map<Integer, List<Long>> getReplicasForPartitions(Set<Integer> partitions) {
+        Map<Integer, List<Long>> retval = new HashMap<Integer, List<Long>>();
+        List<Pair<Integer,ZKUtil.ChildrenCallback>> callbacks = new ArrayList<Pair<Integer, ZKUtil.ChildrenCallback>>();
+
+        for (Integer partition : partitions) {
+            String zkpath = LeaderElector.electionDirForPartition(partition);
+            ZKUtil.ChildrenCallback cb = new ZKUtil.ChildrenCallback();
+            callbacks.add(Pair.of(partition, cb));
+            m_zk.getChildren(zkpath, false, cb, null);
+        }
+
+        for (Pair<Integer, ZKUtil.ChildrenCallback> p : callbacks ) {
+            final Integer partition = p.getFirst();
+            try {
+                List<String> children = p.getSecond().getChildren();
+                List<Long> sites = new ArrayList<Long>();
+                for (String child : children) {
+                    sites.add(Long.valueOf(child.split("_")[0]));
+                }
+                retval.put(partition, sites);
+            } catch (KeeperException ke) {
+                org.voltdb.VoltDB.crashLocalVoltDB("KeeperException getting replicas for partition: " + partition,
+                        true, ke);
+            }
+            catch (InterruptedException ie) {
+                org.voltdb.VoltDB.crashLocalVoltDB("InterruptedException getting replicas for partition: " +
+                        partition, true, ie);
+            }
+        }
+        return retval;
+    }
+
+    /**
      * Convenience method to return the immediate count of replicas for the given partition
      */
     public int getReplicaCountForPartition(int partition) {
         return getReplicasForPartition(partition).size();
     }
 
-    public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
+    /**
+     * Utility method to sort the keys of a map by their value.  public for testing.
+     */
+    static public List<Integer> sortKeysByValue(Map<Integer, Integer> map)
     {
-        ClusterConfig clusterConfig = new ClusterConfig(topology);
-        hostLog.info("Computing partitions to replace.  Total partitions: " + m_numberOfPartitions);
-        List<Integer> repsPerPart = new ArrayList<Integer>(m_numberOfPartitions);
-        for (int i = 0; i < m_numberOfPartitions; i++) {
-            repsPerPart.add(i, getReplicaCountForPartition(i));
+        List<Entry<Integer, Integer>> entries = new ArrayList<Entry<Integer, Integer>>(map.entrySet());
+        Collections.sort(entries, new Comparator<Entry<Integer, Integer>>() {
+            @Override
+            public int compare(Entry<Integer, Integer> o1, Entry<Integer, Integer> o2) {
+                if (!o1.getValue().equals(o2.getValue())) {
+                    return (o1.getValue()).compareTo(o2.getValue());
+                }
+                return o1.getKey().compareTo(o2.getKey());
+            }
+        } );
+        List<Integer> keys = new ArrayList<Integer>();
+        for (Entry<Integer, Integer> entry : entries) {
+            keys.add(entry.getKey());
         }
+        return keys;
+    }
+
+    /**
+     * Given the current state of the cluster, compute the partitions which should be replicated on a single new host.
+     * Break this method out to be static and testable independent of ZK, JSON, other ugh.
+     */
+    static public List<Integer> computeReplacementPartitions(Map<Integer, Integer> repsPerPart, int kfactor,
+            int sitesPerHost, int numberOfPartitions)
+    {
         List<Integer> partitions = new ArrayList<Integer>();
-        int freeSites = clusterConfig.getSitesPerHost();
-        for (int i = 0; i < m_numberOfPartitions; i++) {
-            if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
-                partitions.add(i);
-                // pretend to be fully replicated so we don't put two copies of a
-                // partition on this host.
-                repsPerPart.set(i, clusterConfig.getReplicationFactor() + 1);
-                freeSites--;
-                if (freeSites == 0) {
+        List<Integer> partSortedByRep = sortKeysByValue(repsPerPart);
+        for (int i = 0; i < partSortedByRep.size(); i++) {
+            int leastReplicatedPart = partSortedByRep.get(i);
+            if (repsPerPart.get(leastReplicatedPart) < kfactor + 1) {
+                partitions.add(leastReplicatedPart);
+                if (partitions.size() == sitesPerHost) {
                     break;
                 }
             }
         }
-        if (freeSites > 0) {
-            // double check fully replicated?
-            for (int i = 0; i < m_numberOfPartitions; i++) {
-                if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
-                    hostLog.error("Partition " + i + " should have been replicated but wasn't");
-                }
-            }
+        return partitions;
+    }
+
+    public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
+    {
+        ClusterConfig clusterConfig = new ClusterConfig(topology);
+        hostLog.info("Computing partitions to replace.  Total partitions: " + m_numberOfPartitions);
+        Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
+        for (int i = 0; i < m_numberOfPartitions; i++) {
+            repsPerPart.put(i, getReplicaCountForPartition(i));
         }
+        List<Integer> partitions = computeReplacementPartitions(repsPerPart, clusterConfig.getReplicationFactor(),
+                clusterConfig.getSitesPerHost(), m_numberOfPartitions);
         hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
         return partitions;
     }
@@ -216,8 +285,11 @@ public class Cartographer extends StatsSource
     private List<MailboxNodeContent> getMailboxNodeContentList()
     {
         List<MailboxNodeContent> sitesList = new ArrayList<MailboxNodeContent>();
-        for (Integer partId : m_iv2Masters.pointInTimeCache().keySet()) {
-            List<Long> hsidsForPart = getReplicasForPartition(partId);
+        final Set<Integer> iv2MastersKeySet = m_iv2Masters.pointInTimeCache().keySet();
+        Map<Integer, List<Long>> hsidsForPartMap = getReplicasForPartitions(iv2MastersKeySet);
+        for (Map.Entry<Integer, List<Long>> entry : hsidsForPartMap.entrySet()) {
+            Integer partId = entry.getKey();
+            List<Long> hsidsForPart = entry.getValue();
             for (long hsid : hsidsForPart) {
                 MailboxNodeContent mnc = new MailboxNodeContent(hsid, partId);
                 sitesList.add(mnc);
@@ -238,5 +310,6 @@ public class Cartographer extends StatsSource
     public void shutdown() throws InterruptedException
     {
         m_iv2Masters.shutdown();
+        m_iv2Mpi.shutdown();
     }
 }

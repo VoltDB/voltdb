@@ -548,4 +548,10 @@ public class MockVoltDB implements VoltDBInterface
         }
         return voltconfig.m_enableIV2;
     }
+
+    @Override
+    public ScheduledFuture<?> schedulePriorityWork(Runnable work,
+            long initialDelay, long delay, TimeUnit unit) {
+        return null;
+    }
 }

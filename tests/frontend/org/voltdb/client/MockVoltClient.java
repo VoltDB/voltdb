@@ -52,6 +52,7 @@ package org.voltdb.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -314,5 +315,11 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public List<InetSocketAddress> getConnectedHostList() {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

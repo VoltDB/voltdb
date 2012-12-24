@@ -1113,7 +1113,7 @@ public class SnapshotRestore extends VoltSystemProcedure
          * we do want a truncation snapshot if CL is enabled.
          */
         final boolean isStartWithNoAutomatedRestore =
-            startAction == VoltDB.START_ACTION.START && mode != org.voltdb.OperationMode.INITIALIZING;
+            startAction == VoltDB.START_ACTION.CREATE && mode != org.voltdb.OperationMode.INITIALIZING;
 
         final boolean isCLEnabled =
             VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl");

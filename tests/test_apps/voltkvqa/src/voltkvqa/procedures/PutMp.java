@@ -83,7 +83,7 @@ public class PutMp extends VoltProcedure
             putCounter++;
             bb.putLong(0, putCounter);
             voltQueueSQL(updateStmt, bb.array(), key);
-            voltQueueSQL(exportStmt, queryresults[0].getString(0), queryresults[0].getVarbinary(1), getTransactionTime(), getTransactionId(), getSeededRandomNumberGenerator().nextDouble());
+            voltQueueSQL(exportStmt, queryresults[0].getString(0), queryresults[0].getVarbinary(1), getTransactionTime(), getVoltPrivateRealTransactionIdDontUseMe(), getSeededRandomNumberGenerator().nextDouble());
         }
         voltExecuteSQL(true);
         VoltTable t[] = new VoltTable[1];

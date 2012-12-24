@@ -389,6 +389,9 @@ DISTRIBUTION
         </fileset>
     </copy>
 
+    <!-- create, and leave empty extension directory for user supplied jars -->
+    <mkdir dir="${dist.dir}/lib/extension"/>
+
     <!-- populate java client and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="voltdb" defaultexcludes="yes">
@@ -772,6 +775,7 @@ JAR BUILDING
             <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/apache/**" />
+            <include name="vanilla/**" />
             <include name="jsr166y/**"/>
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
@@ -847,6 +851,7 @@ JAR BUILDING
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
+            <include name="vanilla/**" />
             <include name="jsr166y/**" />
         </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
@@ -884,6 +889,7 @@ JAR BUILDING
             <include name="javax/servlet_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/jute_voltpatches/**" />
+            <include name="vanilla/**" />
             <include name="org/apache/zookeeper_voltpatches/**" />
             <include name="org/apache/spearce_voltpatches/**" />
         </fileset>
@@ -1012,7 +1018,8 @@ JAVA COMPILATION
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
         includes="org/voltcore/**/*.java,org/apache/**/*.java
                   au/**/*.java,org/spearce_voltpatches/**/*.java
-                  org/json_voltpatches/**/*.java" />
+                  org/json_voltpatches/**/*.java
+                  vanilla/**/*.java" />
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
@@ -1751,7 +1758,7 @@ TEST CASES
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
     ${classpath} -Dlog4j.configuration=file://${log4j.configuration} -server -Xmx512m -XX:+AggressiveOpts -ea
-    org.voltdb.sqlgenerator.SimpleServer hosts=${hosts}
+    org.voltdb.sqlgenerator.SimpleServer create hosts=${hosts}
     sitesperhost=${sitesperhost} replicas=${replicas}
     ${debug_output}' />
     <copy todir="${build.test.dir}/org/voltdb/sqlgenerator">

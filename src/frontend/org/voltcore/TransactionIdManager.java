@@ -149,7 +149,7 @@ public class TransactionIdManager {
                     // note, the loop should stop once lastUsedTime is PASSED, not current
                     while ((currentTime <= lastUsedTime) && (count-- > 0)) {
                         try {
-                            Thread.sleep(lastUsedTime - currentTime + 1);
+                            Thread.sleep(1);
                         } catch (InterruptedException e) {}
                         currentTime = System.currentTimeMillis();
                     }

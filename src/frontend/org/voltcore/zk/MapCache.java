@@ -141,8 +141,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
 
     // All watch processing is run serially in this thread.
     private final ListeningExecutorService m_es =
-            MoreExecutors.listeningDecorator(
-                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("MapCache", 1024 * 128)));
+            CoreUtils.getCachedSingleThreadExecutor("MapCache", 15000);
 
     // previous children snapshot for internal use.
     private Set<String> m_lastChildren = new HashSet<String>();
