@@ -244,7 +244,7 @@ public class SnapshotUtil {
         catch (IOException ioe)
         {
             throw new IOException("Unable to write snapshot catalog to file: " +
-                                  path + File.separator + filename);
+                                  path + File.separator + filename, ioe);
         }
     }
 

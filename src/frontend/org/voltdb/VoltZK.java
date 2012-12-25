@@ -83,7 +83,6 @@ public class VoltZK {
     public static final String truncation_snapshot_path = "/db/truncation_snapshot_path";
     public static final String user_snapshot_request = "/db/user_snapshot_request";
     public static final String user_snapshot_response = "/db/user_snapshot_response";
-    public static final String initial_catalog_txnid = "/db/initial_catalog_txnid";
 
     // leader election
     public static final String iv2masters = "/db/iv2masters";

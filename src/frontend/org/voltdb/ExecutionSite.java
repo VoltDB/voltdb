@@ -885,7 +885,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             voltdb.getBackendTargetType(),
                             serializedCatalog,
                             txnId,
-                            m_context.m_timestamp,
+                            m_context.m_uniqueId,
                             configuredNumberOfPartitions);
         }
 
@@ -1020,7 +1020,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         ee.quiesce(lastCommittedTxnId);
-        ee.updateCatalog( context.m_timestamp, catalogDiffCommands);
+        ee.updateCatalog( context.m_uniqueId, catalogDiffCommands);
 
         return true;
     }

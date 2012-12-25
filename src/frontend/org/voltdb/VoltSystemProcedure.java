@@ -66,6 +66,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     /** Standard success return value for sysprocs returning STATUS_SCHEMA */
     protected static long STATUS_OK = 0L;
+    protected static long STATUS_FAILURE = 1L;
 
     protected int m_numberOfPartitions;
     protected Procedure m_catProc;
