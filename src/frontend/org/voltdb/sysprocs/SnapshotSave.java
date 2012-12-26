@@ -406,6 +406,8 @@ public class SnapshotSave extends VoltSystemProcedure
 
         results = performSnapshotCreationWork(path, nonce, ctx.getCurrentTxnId(), perPartitionTxnIds,
                                               (byte)(block ? 1 : 0), format, data);
+        SnapshotSaveAPI.logParticipatingHostCount(ctx.getCurrentTxnId());
+
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
