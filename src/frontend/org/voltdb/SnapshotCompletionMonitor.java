@@ -159,8 +159,7 @@ public class SnapshotCompletionMonitor {
         }
         JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
         long txnId = jsonObj.getLong("txnId");
-        JSONArray hosts = jsonObj.getJSONArray("hosts");
-        int totalNodesFinished = jsonObj.getInt("finishedHosts");
+        int hostCount = jsonObj.getInt("hostCount");
         String nonce = jsonObj.getString("nonce");
         boolean truncation = jsonObj.getBoolean("isTruncation");
         // A truncation request ID is not always provided. It's used for
@@ -168,36 +167,35 @@ public class SnapshotCompletionMonitor {
         // triggerer can recognize the snapshot when it finishes.
         String truncReqId = jsonObj.optString("truncReqId");
 
-        /*
-         * Convert the JSON object containing the export sequence numbers for each
-         * table and partition to a regular map
-         */
-        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers = null;
-        final JSONObject exportSequenceJSON = jsonObj.getJSONObject("exportSequenceNumbers");
-        final ImmutableMap.Builder<String, Map<Integer, Pair<Long, Long>>> builder =
-                ImmutableMap.builder();
-        @SuppressWarnings("unchecked")
-        final Iterator<String> tableKeys = exportSequenceJSON.keys();
-        while (tableKeys.hasNext()) {
-            final String tableName = tableKeys.next();
-            final JSONObject tableSequenceNumbers = exportSequenceJSON.getJSONObject(tableName);
-            ImmutableMap.Builder<Integer, Pair<Long, Long>> tableBuilder = ImmutableMap.builder();
+        if (hostCount == 0) {
+            /*
+             * Convert the JSON object containing the export sequence numbers for each
+             * table and partition to a regular map
+             */
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers = null;
+            final JSONObject exportSequenceJSON = jsonObj.getJSONObject("exportSequenceNumbers");
+            final ImmutableMap.Builder<String, Map<Integer, Pair<Long, Long>>> builder =
+                    ImmutableMap.builder();
             @SuppressWarnings("unchecked")
-            final Iterator<String> partitionKeys = tableSequenceNumbers.keys();
-            while (partitionKeys.hasNext()) {
-                final String partitionString = partitionKeys.next();
-                final Integer partitionId = Integer.valueOf(partitionString);
-                JSONObject sequenceNumbers = tableSequenceNumbers.getJSONObject(partitionString);
-                final Long ackOffset = sequenceNumbers.getLong("ackOffset");
-                final Long sequenceNumber = sequenceNumbers.getLong("sequenceNumber");
-                tableBuilder.put(partitionId, Pair.of(ackOffset, sequenceNumber));
+            final Iterator<String> tableKeys = exportSequenceJSON.keys();
+            while (tableKeys.hasNext()) {
+                final String tableName = tableKeys.next();
+                final JSONObject tableSequenceNumbers = exportSequenceJSON.getJSONObject(tableName);
+                ImmutableMap.Builder<Integer, Pair<Long, Long>> tableBuilder = ImmutableMap.builder();
+                @SuppressWarnings("unchecked")
+                final Iterator<String> partitionKeys = tableSequenceNumbers.keys();
+                while (partitionKeys.hasNext()) {
+                    final String partitionString = partitionKeys.next();
+                    final Integer partitionId = Integer.valueOf(partitionString);
+                    JSONObject sequenceNumbers = tableSequenceNumbers.getJSONObject(partitionString);
+                    final Long ackOffset = sequenceNumbers.getLong("ackOffset");
+                    final Long sequenceNumber = sequenceNumbers.getLong("sequenceNumber");
+                    tableBuilder.put(partitionId, Pair.of(ackOffset, sequenceNumber));
+                }
+                builder.put(tableName, tableBuilder.build());
             }
-            builder.put(tableName, tableBuilder.build());
-        }
-        exportSequenceNumbers = builder.build();
+            exportSequenceNumbers = builder.build();
 
-
-        if (hosts.length() == totalNodesFinished) {
             long partitionTxnIds[] = null;
             synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
                 List<Long> partitionTxnIdsList = m_snapshotTxnIdsToPartitionTxnIds.get(txnId);
