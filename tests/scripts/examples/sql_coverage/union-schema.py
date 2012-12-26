@@ -31,7 +31,7 @@
         "partitions": (),
         "indexes": ("ID")
         },
-    "P2": {
+    "R1": {
         "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
@@ -39,7 +39,7 @@
         "partitions": (),
         "indexes": ("ID")
         },
-    "R1": {
+    "R2": {
         "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),

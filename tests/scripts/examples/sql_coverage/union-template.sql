@@ -12,14 +12,15 @@
 --INSERT
 -- test basic INSERT
 INSERT INTO _table VALUES (@insert_vals)
---SELECT * FROM P1 INNER JOIN R1 ON P1.RATIO = R1.ID
+INSERT INTO _table VALUES (1000, 'desc_1000', 1000, 1000.5)
+INSERT INTO _table VALUES (1001, 'desc_1000', 1000, 1000.5)
+INSERT INTO _table VALUES (1010, 'desc_1010', 1010, 1010.5)
+INSERT INTO _table VALUES (1011, 'desc_1010', 1010, 1010.5)
+INSERT INTO P1 VALUES (1020, 'desc_1020', 1020, 1020.5)
+INSERT INTO R1 VALUES (1020, 'desc_1020', 1020, 1020.5)
+
 -- test SET Operations
-SELECT _variable FROM _table[@lhs] UNION SELECT _variable FROM _table[@rhs]
-SELECT _variable FROM _table[@lhs] UNION ALL SELECT _variable FROM _table[@rhs]
-SELECT _variable FROM _table[@lhs] EXCEPT SELECT _variable FROM _table[@rhs]
-SELECT _variable FROM _table[@lhs] EXCEPT ALL SELECT _variable FROM _table[@rhs]
-SELECT _variable FROM _table[@lhs] INTERSECT SELECT _variable FROM _table[@rhs]
-SELECT _variable FROM _table[@lhs] INTERSECT ALL SELECT _variable FROM _table[@rhs]
-SELECT _variable FROM _table[@lhs] UNION SELECT _variable FROM _table[@mhs] UNION SELECT _variable FROM _table[@rhs]
-(SELECT _variable FROM _table[@lhs] EXCEPT SELECT _variable FROM _table[@mhs]) UNION SELECT _variable FROM _table[@rhs]
-SELECT _variable FROM _table[@lhs] (UNION SELECT _variable FROM _table[@mhs] INTERSECT SELECT _variable FROM _table[@rhs])
+SELECT _variable FROM _table[@lhs] @set_op @optional_all SELECT _variable FROM _table[@rhs]
+SELECT _variable FROM _table[@lhs] @set_op SELECT _variable FROM _table[@mhs] @set_op SELECT _variable FROM _table[@rhs]
+(SELECT _variable FROM _table[@lhs] @set_op SELECT _variable FROM _table[@mhs]) @set_op SELECT _variable FROM _table[@rhs]
+SELECT _variable FROM _table[@lhs] (@set_op SELECT _variable FROM _table[@mhs] @set_op SELECT _variable FROM _table[@rhs])

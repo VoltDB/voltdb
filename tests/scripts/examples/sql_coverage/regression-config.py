@@ -59,7 +59,12 @@
 # which will cause the successful statements to be written to stdout.
 {
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
-    "basic-union": {"schema": "union-schema.py",
+    "basic": {"schema": "schema.py",
+              "ddl": "DDL.sql",
+              "template": "basic.sql",
+              "normalizer": "normalizer.py"},
+# THESE ALL SUCCEED, USE THE TEMPLATE INPUT
+    "basic-unions": {"schema": "union-schema.py",
               "ddl": "union-DDL.sql",
               "template": "basic-unions.sql",
               "normalizer": "normalizer.py"},
