@@ -408,7 +408,7 @@ public class ProcedureRunner {
 
     private void updateCRC(QueuedSQL queuedSQL) {
         if (!queuedSQL.stmt.isReadOnly()) {
-            m_inputCRC.update(queuedSQL.stmt.sqlText);
+            m_inputCRC.update(queuedSQL.stmt.sqlCRC);
             try {
                 queuedSQL.params.addToCRC(m_inputCRC);
             } catch (IOException e) {
