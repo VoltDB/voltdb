@@ -83,35 +83,44 @@ public class ClientThread extends Thread {
     }
 
     void runOne() throws Exception {
-        String procName = null;
-        switch (m_type) {
-        case PARTITIONED_SP:
-            procName = "UpdatePartitionedSP";
-            break;
-        case PARTITIONED_MP:
-            procName = "UpdatePartitionedMP";
-            break;
-        case REPLICATED:
-            procName = "UpdateReplicatedMP";
-            break;
-        case HYBRID:
-            procName = "UpdateBothMP";
-            break;
+        try {
+            String procName = null;
+            switch (m_type) {
+            case PARTITIONED_SP:
+                procName = "UpdatePartitionedSP";
+                break;
+            case PARTITIONED_MP:
+                procName = "UpdatePartitionedMP";
+                break;
+            case REPLICATED:
+                procName = "UpdateReplicatedMP";
+                break;
+            case HYBRID:
+                procName = "UpdateBothMP";
+                break;
+            }
+
+            byte[] payload = m_processor.generateForStore().getStoreValue();
+
+            VoltTable[] results = m_client.callProcedure(procName,
+                    m_cid,
+                    m_nextRid,
+                    payload).getResults();
+            m_txnsRun.incrementAndGet();
+
+            if (results.length != 3) {
+                log.error(String.format(
+                        "Client cid %d procedure %s returned %d results instead of 3",
+                        m_cid, procName, results.length));
+                System.exit(-1);
+            }
+            VoltTable data = results[2];
+            UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
         }
-
-        byte[] payload = m_processor.generateForStore().getStoreValue();
-
-        VoltTable[] results = m_client.callProcedure(procName,
-                m_cid,
-                m_nextRid,
-                payload).getResults();
-        m_txnsRun.incrementAndGet();
-
-        assert(results.length == 3);
-        VoltTable data = results[2];
-        UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
-
-        m_nextRid++;
+        finally {
+            // ensure rid is incremented no matter what
+            m_nextRid++;
+        }
     }
 
     void shutdown() {
@@ -136,8 +145,17 @@ public class ClientThread extends Thread {
                     // other proc call exceptions are logged, but don't stop the thread
                     log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
                     log.warn(cri.toJSONString());
-                    // take a breather to avoid slamming the log
-                    try { Thread.sleep(3000); } catch (InterruptedException e1) {}
+
+                    // take a breather to avoid slamming the log (stay paused if no connections)
+                    do {
+                        try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
+                        // bail on wakeup if we're supposed to bail
+                        if (!m_shouldContinue.get()) {
+                            return;
+                        }
+                    }
+                    while (m_client.getConnectedHostList().size() > 0);
+
                 }
             }
             catch (Exception e) {
