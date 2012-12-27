@@ -268,7 +268,6 @@ public class RejoinProducer extends SiteTasker
     private void kickWatchdog(boolean rearm)
     {
         synchronized (this) {
-            REJOINLOG.debug(m_whoami + "Updating watchdog. Rearm: " + rearm);
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
                 m_timeFuture = null;
