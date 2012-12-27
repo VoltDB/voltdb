@@ -194,16 +194,14 @@ public class SnapshotCompletionMonitor {
             }
             exportSequenceNumbers = builder.build();
 
-            ImmutableMap.Builder<Integer, Long> partitionTxnIdsBuilder = ImmutableMap.<Integer, Long>builder();
-            Map<Integer, Long> partitionTxnIdsMap = null;
+            Map<Integer, Long> partitionTxnIdsMap = ImmutableMap.of();
             synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
                 Map<Integer, Long> partitionTxnIdsList = m_snapshotTxnIdsToPartitionTxnIds.get(txnId);
                 if (partitionTxnIdsList != null) {
-                    partitionTxnIdsBuilder.putAll(partitionTxnIdsList);
-                } else {
-                    partitionTxnIdsMap = partitionTxnIdsBuilder.build();
+                    partitionTxnIdsMap = ImmutableMap.copyOf(partitionTxnIdsList);
                 }
             }
+
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
