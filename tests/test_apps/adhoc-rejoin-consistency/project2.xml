@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<project>
+    <info>
+        <name>Sequence Test</name>
+        <version>0.1</version>
+        <description>Used to test database integrity.</description>
+    </info>
+    <database>
+        <schemas>
+            <schema path='ddl2.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='AdHocRejoinConsistency.procedures.Initialize' />
+            <procedure class='AdHocRejoinConsistency.procedures.getCountFromPtn' />
+            <procedure class='AdHocRejoinConsistency.procedures.getCountFromRep' />
+            <procedure class='AdHocRejoinConsistency.procedures.getRowFromPtn' />
+            <procedure class='AdHocRejoinConsistency.procedures.getRowFromRep' />
+            <procedure class='AdHocRejoinConsistency.procedures.getCRCFromPtn' />
+            <procedure class='AdHocRejoinConsistency.procedures.getCRCFromRep' />
+            <procedure class='AdHocRejoinConsistency.procedures.getNextFromPtn' />
+            <procedure class='AdHocRejoinConsistency.procedures.MPUpdatePtn' />
+            <procedure class='AdHocRejoinConsistency.procedures.MPUpdateRep' />
+        </procedures>
+    </database>
+</project>
