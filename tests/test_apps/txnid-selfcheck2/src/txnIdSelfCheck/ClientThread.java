@@ -82,6 +82,15 @@ public class ClientThread extends Thread {
         m_nextRid = pNextRid > rNextRid ? pNextRid : rNextRid; // max
     }
 
+    class UserProcCallException extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        public ClientResponseImpl cri = null;
+        UserProcCallException(ClientResponse cr) {
+            cri = (ClientResponseImpl) cr;
+        }
+    }
+
     void runOne() throws Exception {
         try {
             String procName = null;
@@ -102,10 +111,18 @@ public class ClientThread extends Thread {
 
             byte[] payload = m_processor.generateForStore().getStoreValue();
 
-            VoltTable[] results = m_client.callProcedure(procName,
+            ClientResponse response = m_client.callProcedure(procName,
                     m_cid,
                     m_nextRid,
-                    payload).getResults();
+                    payload);
+
+            // fake a proc call exception if we think one should be thrown
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                throw new UserProcCallException(response);
+            }
+
+            VoltTable[] results = response.getResults();
+
             m_txnsRun.incrementAndGet();
 
             if (results.length != 3) {
@@ -127,6 +144,31 @@ public class ClientThread extends Thread {
         m_shouldContinue.set(false);
     }
 
+    void handleException(ClientResponseImpl cri, Exception e) {
+        if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
+                (cri.getStatus() == ClientResponse.USER_ABORT)) {
+            log.error("ClientThread had a proc-call exception that indicated bad data", e);
+            log.error(cri.toJSONString(), e);
+            System.exit(-1);
+        }
+        else {
+            // other proc call exceptions are logged, but don't stop the thread
+            log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
+            log.warn(cri.toJSONString());
+
+            // take a breather to avoid slamming the log (stay paused if no connections)
+            do {
+                try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
+                // bail on wakeup if we're supposed to bail
+                if (!m_shouldContinue.get()) {
+                    return;
+                }
+            }
+            while (m_client.getConnectedHostList().size() > 0);
+
+        }
+    }
+
     @Override
     public void run() {
         while (m_shouldContinue.get()) {
@@ -135,28 +177,11 @@ public class ClientThread extends Thread {
             }
             catch (ProcCallException e) {
                 ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
-                if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
-                        (cri.getStatus() == ClientResponse.USER_ABORT)) {
-                    log.error("ClientThread had a proc-call exception that indicated bad data", e);
-                    log.error(cri.toJSONString(), e);
-                    System.exit(-1);
-                }
-                else {
-                    // other proc call exceptions are logged, but don't stop the thread
-                    log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
-                    log.warn(cri.toJSONString());
-
-                    // take a breather to avoid slamming the log (stay paused if no connections)
-                    do {
-                        try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
-                        // bail on wakeup if we're supposed to bail
-                        if (!m_shouldContinue.get()) {
-                            return;
-                        }
-                    }
-                    while (m_client.getConnectedHostList().size() > 0);
-
-                }
+                handleException(cri, e);
+            }
+            catch (UserProcCallException e) {
+                ClientResponseImpl cri = e.cri;
+                handleException(cri, e);
             }
             catch (Exception e) {
                 log.error("ClientThread had a non proc-call exception", e);
