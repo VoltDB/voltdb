@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import java.util.ArrayDeque;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
@@ -34,7 +35,7 @@ public interface CommandLog {
     public abstract void init(
             CatalogContext context,
             long txnId,
-            long perPartitionTxnId[],
+            Map<Integer, Long> perPartitionTxnId,
             String coreBinding);
 
     /**
@@ -46,7 +47,7 @@ public interface CommandLog {
     public abstract void initForRejoin(
             CatalogContext context,
             long txnId,
-            long perPartitionTxnId[],
+            Map<Integer, Long> perPartitionTxnId,
             boolean isRejoin,
             String coreBinding);
 

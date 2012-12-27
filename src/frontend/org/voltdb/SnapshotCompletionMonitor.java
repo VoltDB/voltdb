@@ -16,7 +16,6 @@
  */
 package org.voltdb;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -40,7 +39,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.primitives.Longs;
 
 public class SnapshotCompletionMonitor {
     @SuppressWarnings("unused")
@@ -80,6 +78,7 @@ public class SnapshotCompletionMonitor {
             new HashMap<Long, Map<Integer, Long>>();
 
     public void registerPartitionTxnIdsForSnapshot(long snapshotTxnId, Map<Integer, Long> partitionTxnIds) {
+        System.out.println("Registering per partition txnids " + partitionTxnIds);
         synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
             assert(!m_snapshotTxnIdsToPartitionTxnIds.containsKey(snapshotTxnId));
             m_snapshotTxnIdsToPartitionTxnIds.put(snapshotTxnId, partitionTxnIds);
@@ -195,13 +194,14 @@ public class SnapshotCompletionMonitor {
             }
             exportSequenceNumbers = builder.build();
 
-            long partitionTxnIds[] = null;
+            ImmutableMap.Builder<Integer, Long> partitionTxnIdsBuilder = ImmutableMap.<Integer, Long>builder();
+            Map<Integer, Long> partitionTxnIdsMap = null;
             synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
                 Map<Integer, Long> partitionTxnIdsList = m_snapshotTxnIdsToPartitionTxnIds.get(txnId);
                 if (partitionTxnIdsList != null) {
-                    partitionTxnIds = Longs.toArray(partitionTxnIdsList.values());
+                    partitionTxnIdsBuilder.putAll(partitionTxnIdsList);
                 } else {
-                    partitionTxnIds = new long[0];
+                    partitionTxnIdsMap = partitionTxnIdsBuilder.build();
                 }
             }
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
@@ -211,8 +211,7 @@ public class SnapshotCompletionMonitor {
                         new SnapshotCompletionEvent(
                             nonce,
                             txnId,
-                            Arrays.copyOf(partitionTxnIds,
-                                               partitionTxnIds.length),
+                            partitionTxnIdsMap,
                             truncation,
                             truncReqId,
                             exportSequenceNumbers));

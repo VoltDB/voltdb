@@ -142,6 +142,7 @@ public class SnapshotSaveAPI
                 Map<Integer, Long>  partitionTransactionIds = new HashMap<Integer, Long>();
                 if (VoltDB.instance().isIV2Enabled()) {
                     partitionTransactionIds = SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
+                    System.out.println("Last seen partition transaction ids " + partitionTransactionIds);
                     SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
                     partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
 

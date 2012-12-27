@@ -83,7 +83,7 @@ SnapshotCompletionInterest
          *            The txnId of the truncation snapshot at the end of the
          *            restore, or Long.MIN if there is none.
          */
-        public void onRestoreCompletion(long txnId, long perPartitionTxnIds[]);
+        public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
@@ -143,7 +143,7 @@ SnapshotCompletionInterest
 
     // The txnId of the truncation snapshot generated at the end.
     private long m_truncationSnapshot = Long.MIN_VALUE;
-    private long m_truncationSnapshotPerPartition[] = new long[0];
+    private Map<Integer, Long> m_truncationSnapshotPerPartition = new HashMap<Integer, Long>();
 
     // Whether or not we have a snapshot to restore
     private boolean m_hasRestored = false;

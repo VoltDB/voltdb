@@ -26,7 +26,7 @@ public interface SnapshotCompletionInterest {
     public static class SnapshotCompletionEvent {
         public final String nonce;
         public final long multipartTxnId;
-        public final long partitionTxnIds[];
+        public final Map<Integer, Long> partitionTxnIds;
         public final boolean truncationSnapshot;
         public final String requestId;
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
@@ -34,7 +34,7 @@ public interface SnapshotCompletionInterest {
         public SnapshotCompletionEvent(
                 String nonce,
                 final long multipartTxnId,
-                final long partitionTxnIds[],
+                final Map<Integer, Long> partitionTxnIds,
                 final boolean truncationSnapshot,
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {

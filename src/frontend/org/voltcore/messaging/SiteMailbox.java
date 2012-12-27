@@ -20,6 +20,7 @@ package org.voltcore.messaging;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
@@ -32,9 +33,9 @@ public class SiteMailbox implements Mailbox {
 
     private CommandLog m_commandLog = new CommandLog() {
         @Override
-        public void init(CatalogContext context, long txnId, long perPartitionTxnId[], String affinity) {}
+        public void init(CatalogContext context, long txnId, Map<Integer, Long> perPartitionTxnId, String affinity) {}
         @Override
-        public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin, String affinity) {}
+        public void initForRejoin(CatalogContext context, long txnId, Map<Integer, Long> perPartitionTxnId, boolean isRejoin, String affinity) {}
         @Override
         public boolean needsInitialization() {
             return false;

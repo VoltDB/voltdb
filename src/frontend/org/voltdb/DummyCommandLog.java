@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
@@ -25,7 +26,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
     @Override
-    public void init(CatalogContext context, long txnId, long perPartitionTxnId[], String affinity) {}
+    public void init(CatalogContext context, long txnId, Map<Integer, Long> perPartitionTxnId, String affinity) {}
 
     @Override
     public boolean needsInitialization() {
@@ -53,7 +54,7 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
-    public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin, String affinity) {}
+    public void initForRejoin(CatalogContext context, long txnId, Map<Integer, Long> perPartitionTxnId, boolean isRejoin, String affinity) {}
 
     @Override
     public boolean log(
