@@ -29,12 +29,13 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -230,7 +231,9 @@ public class SnapshotScan extends VoltSystemProcedure {
                         if (f.canRead()) {
                             try {
                                 HashSet<String> tableNames = new HashSet<String>();
-                                JSONArray tables = SnapshotUtil.CRCCheck(f).getJSONArray("tables");
+                                JSONObject digest = SnapshotUtil.CRCCheck(f, HOST_LOG);
+                                if (digest == null) continue;
+                                JSONArray tables = digest.getJSONArray("tables");
                                 for (int ii = 0; ii < tables.length(); ii++) {
                                     tableNames.add(tables.getString(ii));
                                 }

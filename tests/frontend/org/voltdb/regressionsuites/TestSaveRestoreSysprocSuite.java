@@ -44,6 +44,7 @@ import java.util.zip.GZIPInputStream;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.VoltDB;
@@ -76,6 +77,7 @@ import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectB
  * Test the SnapshotSave and SnapshotRestore system procedures
  */
 public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
+    private final static VoltLogger LOG = new VoltLogger("CONSOLE");
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
@@ -397,7 +399,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         saveTablesWithDefaultOptions(client);
 
-        JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"));
+        JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"), LOG);
         JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
         System.out.println("TRANSACTION IDS: " + transactionIds.toString());
         assertEquals( 4, transactionIds.length());
@@ -428,7 +430,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
             saveTables(client, TMPDIR, TESTNONCE + 2, true, false);
 
-            digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"));
+            digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"), LOG);
             JSONObject newTransactionIds = digest.getJSONObject("partitionTransactionIds");
             assertEquals(transactionIds.length(), newTransactionIds.length());
 

@@ -125,7 +125,8 @@ public class SnapshotSaveAPI
                 SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.acquire();
                 if (VoltDB.instance().isIV2Enabled()) {
-                    SnapshotSiteProcessor.m_partitionLastSeenTransactionIds.add(partitionTxnId);
+                    SnapshotSiteProcessor.m_partitionLastSeenTransactionIds.put(
+                            TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
                 }
             } catch (InterruptedException e) {
                 result.addRow(
@@ -138,11 +139,12 @@ public class SnapshotSaveAPI
             }
 
             if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                List<Long>  partitionTransactionIds = new ArrayList<Long>();
+                Map<Integer, Long>  partitionTransactionIds = new HashMap<Integer, Long>();
                 if (VoltDB.instance().isIV2Enabled()) {
                     partitionTransactionIds = SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
-                    SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new ArrayList<Long>();
-                    partitionTransactionIds.add(multiPartTxnId);
+                    SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
+                    partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
+
 
                     /*
                      * Do a quick sanity check that the provided IDs
@@ -151,18 +153,12 @@ public class SnapshotSaveAPI
                      */
                     for (long txnId : legacyPerPartitionTxnIds) {
                         final int legacyPartition = TxnEgo.getPartitionId(txnId);
-                        boolean isDup = false;
-                        for (long existingId : partitionTransactionIds) {
-                            final int existingPartition = TxnEgo.getPartitionId(existingId);
-                            if (existingPartition == legacyPartition) {
-                                HOST_LOG.warn("While saving a snapshot and propagating legacy " +
-                                        "transaction ids found an id that matches currently active partition" +
-                                        existingPartition);
-                                isDup = true;
-                            }
-                        }
-                        if (!isDup) {
-                            partitionTransactionIds.add(txnId);
+                        if (partitionTransactionIds.containsKey(legacyPartition)) {
+                            HOST_LOG.warn("While saving a snapshot and propagating legacy " +
+                                    "transaction ids found an id that matches currently active partition" +
+                                    partitionTransactionIds.get(legacyPartition));
+                        } else {
+                            partitionTransactionIds.put( legacyPartition, txnId);
                         }
                     }
                 }
@@ -472,7 +468,7 @@ public class SnapshotSaveAPI
 
     private void createSetup(
             String file_path, String file_nonce, SnapshotFormat format,
-            long txnId, List<Long> partitionTransactionIds,
+            long txnId, Map<Integer, Long> partitionTransactionIds,
             String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,

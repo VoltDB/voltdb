@@ -76,8 +76,8 @@ public class SnapshotSiteProcessor {
     public static Semaphore m_snapshotCreateSetupPermit = null;
 
     //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
-    public static ArrayList<Long> m_partitionLastSeenTransactionIds =
-            new ArrayList<Long>();
+    public static Map<Integer, Long> m_partitionLastSeenTransactionIds =
+            new HashMap<Integer, Long>();
 
     /**
      * Only proceed once permits are available after setup completes

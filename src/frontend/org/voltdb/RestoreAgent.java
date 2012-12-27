@@ -677,7 +677,8 @@ SnapshotCompletionInterest
         InstanceId instanceId = new InstanceId(0, 0);
         try
         {
-            JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
+            JSONObject digest_detail = SnapshotUtil.CRCCheck(digest, LOG);
+            if (digest_detail == null) throw new IOException();
             catalog_crc = digest_detail.getLong("catalogCRC");
 
             if (digest_detail.has("partitionTransactionIds")) {
@@ -1183,7 +1184,7 @@ SnapshotCompletionInterest
         FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
         for (String path : paths) {
-            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, 0, false);
+            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, 0, false, LOG);
         }
 
         return snapshots;
