@@ -814,25 +814,35 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     {
         assert(message != null);
         assert(destinationHSIds != null);
-        final HashMap<ForeignHost, ArrayList<Long>> foreignHosts =
-            new HashMap<ForeignHost, ArrayList<Long>>(32);
-        for (long hsId : destinationHSIds) {
-            ForeignHost host = presend(hsId, message);
-            if (host == null) continue;
-            ArrayList<Long> bundle = foreignHosts.get(host);
-            if (bundle == null) {
-                bundle = new ArrayList<Long>();
-                foreignHosts.put(host, bundle);
+        /*
+         * For small numbers of destinations, don't bother aggregating into a single message for each
+         * host. Odds are it is one message per host anyways for replicating single part transactions.
+         * Saves allocating the hash map and array lists.
+         */
+        if (destinationHSIds.length < 4) {
+            for (int ii = 0; ii < destinationHSIds.length; ii++) {
+                send(destinationHSIds[ii], message);
             }
-            bundle.add(hsId);
-        }
+        } else {
+            final HashMap<ForeignHost, ArrayList<Long>> foreignHosts =
+                new HashMap<ForeignHost, ArrayList<Long>>(32);
+            for (long hsId : destinationHSIds) {
+                ForeignHost host = presend(hsId, message);
+                if (host == null) continue;
+                ArrayList<Long> bundle = foreignHosts.get(host);
+                if (bundle == null) {
+                    bundle = new ArrayList<Long>();
+                    foreignHosts.put(host, bundle);
+                }
+                bundle.add(hsId);
+            }
 
-        if (foreignHosts.size() == 0) return;
+            if (foreignHosts.size() == 0) return;
 
-        for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
-            e.getKey().send(e.getValue(), message);
+            for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
+                e.getKey().send(e.getValue(), message);
+            }
         }
-        foreignHosts.clear();
     }
 
     /**
