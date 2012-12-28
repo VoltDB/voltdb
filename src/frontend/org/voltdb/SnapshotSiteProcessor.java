@@ -29,11 +29,13 @@ import java.util.Random;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
@@ -73,7 +75,18 @@ public class SnapshotSiteProcessor {
      * of the targets and the distribution of the work.
      */
     public static final Object m_snapshotCreateLock = new Object();
-    public static Semaphore m_snapshotCreateSetupPermit = null;
+    public static CyclicBarrier m_snapshotCreateSetupBarrier = null;
+    public static final Runnable m_snapshotCreateSetupBarrierAction = new Runnable() {
+        @Override
+        public void run() {
+            Runnable r = SnapshotSiteProcessor.m_snapshotCreateSetupBarrierActualAction.getAndSet(null);
+            if (r != null) {
+                r.run();
+            }
+        }
+    };
+    public static AtomicReference<Runnable> m_snapshotCreateSetupBarrierActualAction =
+            new AtomicReference<Runnable>();
 
     //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
     public static Map<Integer, Long> m_partitionLastSeenTransactionIds =
@@ -248,7 +261,7 @@ public class SnapshotSiteProcessor {
         }
         m_snapshotBufferOrigins.clear();
         m_availableSnapshotBuffers.clear();
-        m_snapshotCreateSetupPermit = null;
+        m_snapshotCreateSetupBarrier = null;
         if (m_snapshotTargetTerminators != null) {
             for (Thread t : m_snapshotTargetTerminators) {
                 t.join();
