@@ -21,8 +21,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
@@ -557,7 +557,7 @@ public enum VoltType {
      * @return A string representation that is printable and short.
      */
     public static String varbinaryToPrintableString(byte[] bin) {
-        CRC32 crc = new CRC32();
+        PureJavaCrc32 crc = new PureJavaCrc32();
         StringBuilder sb = new StringBuilder();
         sb.append("bin[crc:");
         crc.update(bin);

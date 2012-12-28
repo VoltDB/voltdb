@@ -100,7 +100,7 @@ public class BabySitter
     public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb)
         throws InterruptedException, ExecutionException
     {
-        ExecutorService es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Babysitter-" + dir));
+        ExecutorService es = CoreUtils.getCachedSingleThreadExecutor("Babysitter-" + dir, 15000);
         return blockingFactory(zk, dir, cb, es);
     }
 

@@ -24,10 +24,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.utils.Base64;
 import org.xerial.snappy.Snappy;
 
 public final class CompressionService {
@@ -97,6 +99,27 @@ public final class CompressionService {
             @Override
             public byte[] call() throws Exception {
                 return compressBuffer(buffer);
+            }
+
+        });
+    }
+
+    public static Future<BBContainer> compressAndCRC32cBufferAsync(final ByteBuffer inBuffer, final BBContainer outBuffer) {
+        assert(inBuffer.isDirect());
+        assert(outBuffer.b.isDirect());
+        return submitCompressionTask(new Callable<BBContainer>() {
+
+            @Override
+            public BBContainer call() throws Exception {
+                //Reserve 4-bytes for the CRC
+                final int crcPosition = outBuffer.b.position();
+                outBuffer.b.position(outBuffer.b.position() + 4);
+                final int crcCalcStart = outBuffer.b.position();
+                compressBuffer(inBuffer, outBuffer.b);
+                final int crc32c =
+                        DBBPool.getCRC32C( outBuffer.address, crcCalcStart, outBuffer.b.limit() - crcCalcStart);
+                outBuffer.b.putInt(crcPosition, crc32c);
+                return outBuffer;
             }
 
         });
@@ -220,7 +243,7 @@ public final class CompressionService {
     public static byte[][] compressBytes(byte bytes[][], final boolean base64Encode) throws Exception {
         if (bytes.length == 1) {
             if (base64Encode) {
-                return new byte[][] {Base64.encodeBytesToBytes(compressBytes(bytes[0]))};
+                return new byte[][] {Base64.encodeToByte(compressBytes(bytes[0]), false)};
             } else {
                 return new byte[][] {compressBytes(bytes[0])};
             }
@@ -232,7 +255,7 @@ public final class CompressionService {
                 @Override
                 public byte[] call() throws Exception {
                     if (base64Encode) {
-                        return Base64.encodeBytesToBytes(compressBytes(bts));
+                        return Base64.encodeToByte(compressBytes(bts), false);
                     } else {
                         return compressBytes(bts);
                     }
@@ -303,7 +326,7 @@ public final class CompressionService {
         });
     }
 
-    public static Future<byte[]> submitCompressionTask(Callable<byte[]> task) {
+    public static <T> Future<T> submitCompressionTask(Callable<T> task) {
         VoltDBInterface instance = VoltDB.instance();
         if (VoltDB.instance() != null) {
             ExecutorService es = instance.getComputationService();

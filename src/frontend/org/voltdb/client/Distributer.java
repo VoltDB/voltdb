@@ -23,6 +23,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -209,6 +210,8 @@ class Distributer {
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
         public NodeConnection(long ids[], InetSocketAddress socketAddress) {
+            assert(socketAddress != null);
+
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
             m_socketAddress = socketAddress;
         }
@@ -494,6 +497,10 @@ class Distributer {
             }
             return false;
         }
+
+        public InetSocketAddress getSocketAddress() {
+            return m_socketAddress;
+        }
     }
 
     void drain() throws InterruptedException {
@@ -531,7 +538,7 @@ class Distributer {
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1);
+                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1, null);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
@@ -801,6 +808,14 @@ class Distributer {
 
     public List<Long> getThreadIds() {
         return m_network.getThreadIds();
+    }
+
+    public List<InetSocketAddress> getConnectedHostList() {
+        ArrayList<InetSocketAddress> addressList = new ArrayList<InetSocketAddress>();
+        for (NodeConnection conn : m_connections) {
+            addressList.add(conn.getSocketAddress());
+        }
+        return Collections.unmodifiableList(addressList);
     }
 
     private void updateAffinityTopology(VoltTable vt) {

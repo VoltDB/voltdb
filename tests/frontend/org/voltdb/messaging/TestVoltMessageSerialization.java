@@ -92,7 +92,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
         assertEquals(itask.getTruncationHandle(), itask2.getTruncationHandle());
         assertEquals(itask.getTxnId(), itask2.getTxnId());
-        assertEquals(itask.getTimestamp(), itask2.getTimestamp());
+        assertEquals(itask.getUniqueId(), itask2.getUniqueId());
         assertEquals(itask.isReadOnly(), itask2.isReadOnly());
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
@@ -138,7 +138,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
         assertEquals(ft.getTxnId(), ft2.getTxnId());
-        assertEquals(ft.getTimestamp(), ft2.getTimestamp());
+        assertEquals(ft.getUniqueId(), ft2.getUniqueId());
         assertEquals(ft.isReadOnly(), ft2.isReadOnly());
         assertEquals(ft.isForReplay(), ft2.isForReplay());
 
@@ -175,7 +175,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
         assertEquals(ft.getTxnId(), ft2.getTxnId());
-        assertEquals(ft.getTimestamp(), ft2.getTimestamp());
+        assertEquals(ft.getUniqueId(), ft2.getUniqueId());
         assertEquals(ft.isReadOnly(), ft2.isReadOnly());
         assertEquals(ft.isForReplay(), ft2.isForReplay());
 
@@ -232,7 +232,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
         assertEquals(ft.getTxnId(), ft2.getTxnId());
-        assertEquals(ft.getTimestamp(), ft2.getTimestamp());
+        assertEquals(ft.getUniqueId(), ft2.getUniqueId());
         assertEquals(ft.isReadOnly(), ft2.isReadOnly());
         assertEquals(ft.isForReplay(), ft2.isForReplay());
 
@@ -246,7 +246,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
         assertEquals(itask.getTruncationHandle(), itask2.getTruncationHandle());
         assertEquals(itask.getTxnId(), itask2.getTxnId());
-        assertEquals(itask.getTimestamp(), itask2.getTimestamp());
+        assertEquals(itask.getUniqueId(), itask2.getUniqueId());
         assertEquals(itask.isReadOnly(), itask2.isReadOnly());
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
@@ -379,7 +379,7 @@ public class TestVoltMessageSerialization extends TestCase {
         Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage)r2.getPayload();
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
         assertEquals(itask.getTxnId(), itask2.getTxnId());
-        assertEquals(itask.getTimestamp(), itask2.getTimestamp());
+        assertEquals(itask.getUniqueId(), itask2.getUniqueId());
         assertEquals(itask.isReadOnly(), itask2.isReadOnly());
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());

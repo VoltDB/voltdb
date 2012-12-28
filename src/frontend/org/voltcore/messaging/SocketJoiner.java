@@ -28,6 +28,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,8 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 
 /**
  * SocketJoiner runs all the time listening for new nodes in the cluster. Since it is a dedicated thread
@@ -86,8 +89,7 @@ public class SocketJoiner {
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    private final ExecutorService m_es = Executors.newSingleThreadExecutor(
-            org.voltcore.utils.CoreUtils.getThreadFactory("Socket Joiner", 1024 * 128));
+    private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("Socket Joiner");
 
     InetSocketAddress m_coordIp = null;
     int m_localHostId = 0;
@@ -270,6 +272,16 @@ public class SocketJoiner {
             final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
 
             /*
+             * Send the current time over the new connection for a clock skew check
+             */
+            ByteBuffer currentTime = ByteBuffer.allocate(8);
+            currentTime.putLong(System.currentTimeMillis());
+            currentTime.flip();
+            while (currentTime.hasRemaining()) {
+                sc.write(currentTime);
+            }
+
+            /*
              * Read a length prefixed JSON message
              */
             ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
@@ -402,6 +414,16 @@ public class SocketJoiner {
             socket.socket().setTcpNoDelay(true);
             socket.socket().setPerformancePreferences(0, 2, 1);
 
+            ByteBuffer currentTime = ByteBuffer.allocate(8);
+            while (currentTime.hasRemaining()) {
+                socket.read(currentTime);
+            }
+            currentTime.flip();
+            long skew = System.currentTimeMillis() - currentTime.getLong();
+
+            List<Long> skews = new ArrayList<Long>();
+            skews.add(skew);
+
             JSONObject jsObj = new JSONObject();
             jsObj.put("type", "REQUEST_HOSTID");
 
@@ -495,6 +517,17 @@ public class SocketJoiner {
                     }
                 }
 
+                /*
+                 * Get the clock skew value
+                 */
+                currentTime.clear();
+                while (currentTime.hasRemaining()) {
+                    hostSocket.read(currentTime);
+                }
+                currentTime.flip();
+                skew = System.currentTimeMillis() - currentTime.getLong();
+                skews.add(skew);
+
                 jsObj = new JSONObject();
                 jsObj.put("type", "PUBLISH_HOSTID");
                 jsObj.put("hostId", m_localHostId);
@@ -513,6 +546,26 @@ public class SocketJoiner {
                 hostIds[ii] = hostId;
                 hostSockets[ii] = hostSocket;
                 listeningAddresses[ii] = hostAddr;
+            }
+
+            long maxSkew = Collections.max(skews);
+            long minSkew = Collections.min(skews);
+            long overallSkew = maxSkew - minSkew;
+            if (maxSkew > 0 && minSkew > 0) {
+                overallSkew = maxSkew;
+            } else if (maxSkew < 0 && minSkew < 0) {
+                overallSkew = Math.abs(minSkew);
+            }
+            if (overallSkew > 100) {
+                VoltDB.crashLocalVoltDB("Clock skew is " + overallSkew +
+                        " which is > than the 100 millisecond limit. Make sure NTP is running.", false, null);
+            } else if (overallSkew > 10) {
+                final String msg = "Clock skew is " + overallSkew +
+                        " which is high. Ideally it should be sub-millisecond. Make sure NTP is running.";
+                hostLog.warn(msg);
+                consoleLog.warn(msg);
+            } else {
+                hostLog.info("Clock skew to across all nodes in the cluster is " + overallSkew);
             }
 
             /*

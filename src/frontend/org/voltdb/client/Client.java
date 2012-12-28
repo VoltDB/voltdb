@@ -20,7 +20,9 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 
 /**
  *  <p>
@@ -263,6 +265,17 @@ public interface Client {
      * max outstanding txns.
      */
     public int[] getThroughputAndOutstandingTxnLimits();
+
+    /**
+     * Get the list of VoltDB server hosts that this client has open TCP connections
+     * to. Note that this doesn't guarantee that those nodes are actually alive at
+     * the precise moment this method is called. There is also a race condition
+     * between calling this method and acting on the results. It is true that the list
+     * won't grow unless createConnection is called, and the list will never contain
+     * hosts that weren't explicitly connected to.
+     * @return An array of InetSocketAddresses representing the connected hosts.
+     */
+    public List<InetSocketAddress> getConnectedHostList();
 
     /**
      * Write a single line of comma separated values to the file specified.

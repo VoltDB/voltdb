@@ -49,7 +49,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
      * for determinism, we can provide them again. -1 means not set.
      */
     long originalTxnId = -1;
-    long originalTs = -1;
+    long originalUniqueId = -1;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -71,7 +71,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         copy.params = params;
         copy.procName = procName;
         copy.originalTxnId = originalTxnId;
-        copy.originalTs = originalTs;
+        copy.originalUniqueId = originalUniqueId;
         if (serializedParams != null)
         {
             copy.serializedParams = serializedParams.duplicate();
@@ -85,7 +85,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     }
 
     private void setType() {
-        if (originalTxnId == -1 && originalTs == -1) {
+        if (originalTxnId == -1 && originalUniqueId == -1) {
             type = ProcedureInvocationType.ORIGINAL;
         } else {
             type = ProcedureInvocationType.REPLICATED;
@@ -101,8 +101,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         setType();
     }
 
-    public void setOriginalTimestamp(long ts) {
-        originalTs = ts;
+    public void setOriginalUniqueId(long uniqueId) {
+        originalUniqueId = uniqueId;
         setType();
     }
 
@@ -131,8 +131,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         return originalTxnId;
     }
 
-    public long getOriginalTimestamp() {
-        return originalTs;
+    public long getOriginalUniqueId() {
+        return originalUniqueId;
     }
 
     public ParameterSet getParams() {
@@ -197,7 +197,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         buf.put(type.getValue()); //version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(originalTxnId);
-            buf.putLong(originalTs);
+            buf.putLong(originalUniqueId);
         }
         buf.putInt(procName.length());
         buf.put(procName.getBytes());
@@ -240,7 +240,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          */
         if (type == ProcedureInvocationType.REPLICATED) {
             originalTxnId = in.readLong();
-            originalTs = in.readLong();
+            originalUniqueId = in.readLong();
         }
 
         procName = in.readString();
@@ -269,7 +269,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          */
         if (type == ProcedureInvocationType.REPLICATED) {
             originalTxnId = in.readLong();
-            originalTs = in.readLong();
+            originalUniqueId = in.readLong();
         }
 
         procName = in.readString();
@@ -293,7 +293,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         out.write(type.getValue());//version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             out.writeLong(originalTxnId);
-            out.writeLong(originalTs);
+            out.writeLong(originalUniqueId);
         }
         out.writeString(procName);
         out.writeLong(clientHandle);
@@ -318,7 +318,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         retval += " type=" + String.valueOf(type);
         retval += " clientHandle=" + String.valueOf(clientHandle);
         retval += " originalTxnId=" + String.valueOf(originalTxnId);
-        retval += " originalTs=" + String.valueOf(originalTs);
+        retval += " originalUniqueId=" + String.valueOf(originalUniqueId);
 
         return retval;
     }

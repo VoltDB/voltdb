@@ -124,11 +124,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public FragmentTaskMessage(long initiatorHSId,
                                long coordinatorHSId,
                                long txnId,
-                               long timestamp,
+                               long uniqueId,
                                boolean isReadOnly,
                                boolean isFinal,
                                boolean isForReplay) {
-        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
+        super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
         m_isFinal = isFinal;
         m_subject = Subject.DEFAULT.getId();
         assert(selfCheck());
@@ -206,7 +206,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public static FragmentTaskMessage createWithOneFragment(long initiatorHSId,
                                                             long coordinatorHSId,
                                                             long txnId,
-                                                            long timestamp,
+                                                            long uniqueId,
                                                             boolean isReadOnly,
                                                             long fragmentId,
                                                             int outputDepId,
@@ -214,7 +214,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                                             boolean isFinal,
                                                             boolean isForReplay) {
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
-                                                          txnId, timestamp, isReadOnly, isFinal, isForReplay);
+                                                          txnId, uniqueId, isReadOnly, isFinal, isForReplay);
         ret.addFragment(fragmentId, outputDepId, parameterSet);
         return ret;
     }
