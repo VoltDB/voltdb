@@ -32,8 +32,8 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 @ProcInfo (
-    singlePartition = false
-)
+        singlePartition = false
+        )
 public class Initialize extends VoltProcedure
 {
 
@@ -42,7 +42,7 @@ public class Initialize extends VoltProcedure
     public final SQLStmt insert2 = new SQLStmt("INSERT INTO counters_ptn (id, counter) VALUES (?, ?);");
     public final SQLStmt insert3 = new SQLStmt("INSERT INTO counters_rep (id, counter) VALUES (?, ?);");
 
-    
+
     // Delete a counter
     public final SQLStmt delete1 = new SQLStmt("DELETE FROM joiner;");
     public final SQLStmt delete2 = new SQLStmt("DELETE FROM counters_rep;");
@@ -54,19 +54,19 @@ public class Initialize extends VoltProcedure
     public long run(int inc) {
 
         voltQueueSQL(delete1);
-    	voltQueueSQL(delete2);
-    	voltQueueSQL(delete3);
-    	voltQueueSQL(delete4);
-    	voltQueueSQL(delete5);
+        voltQueueSQL(delete2);
+        voltQueueSQL(delete3);
+        voltQueueSQL(delete4);
+        voltQueueSQL(delete5);
 
         // initialize the data
         for (int i=0; i < inc; i++) {
             voltQueueSQL(insert1, i);
-        	voltQueueSQL(insert2, i, i);
-        	voltQueueSQL(insert3, i, i);
+            voltQueueSQL(insert2, i, i);
+            voltQueueSQL(insert3, i, i);
         }
         voltExecuteSQL();
-        
+
         return 0;
     }
 }

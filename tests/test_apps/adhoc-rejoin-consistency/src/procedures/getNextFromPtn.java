@@ -37,9 +37,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 
 @ProcInfo (
-    partitionInfo = "counters_ptn.id:0",
-    singlePartition = true
-)
+        partitionInfo = "counters_ptn.id:0",
+        singlePartition = true
+        )
 public class getNextFromPtn extends VoltProcedure {
 
     // potential return codes
@@ -60,12 +60,12 @@ public class getNextFromPtn extends VoltProcedure {
         if (validation[0].getRowCount() != 1) {
             return ERR_INVALID_COUNTER;
         }
-        
+
         VoltTableRow row = validation[0].fetchRow(0);
-        
+
         // what happens when this overflows?
         long count = row.getLong(0)+inc;
-        
+
         voltQueueSQL(updateCounterStmt, EXPECT_ONE_ROW, count, id, row.getLong(0));
         VoltTable result[] = voltExecuteSQL(true);
 

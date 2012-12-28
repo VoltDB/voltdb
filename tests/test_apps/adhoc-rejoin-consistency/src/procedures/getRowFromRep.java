@@ -36,14 +36,14 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
 @ProcInfo (
-	    partitionInfo = "joiner.id:0",
-	    singlePartition = true
-	)
+        partitionInfo = "joiner.id:0",
+        singlePartition = true
+        )
 public class getRowFromRep extends VoltProcedure {
 
     // potential return codes
     public static final long ERR_INVALID_COUNTER = 1;
-    
+
     // get Counter
     public final SQLStmt getCounterStmt = new SQLStmt(
             "SELECT j.id as id, c.counter as counter FROM joiner j, counters_rep c WHERE j.id = c.id and j.id = ? order by 1;");
@@ -52,7 +52,7 @@ public class getRowFromRep extends VoltProcedure {
 
         voltQueueSQL(getCounterStmt, id);
         VoltTable[] result = voltExecuteSQL();
-        
+
         return result;
     }
 }

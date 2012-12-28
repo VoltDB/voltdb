@@ -36,9 +36,9 @@ import org.voltdb.VoltTable;
 
 
 @ProcInfo (
-	    partitionInfo = "joiner.id:0",
-	    singlePartition = true
-	)
+        partitionInfo = "joiner.id:0",
+        singlePartition = true
+        )
 
 public class getCRCFromRep extends VoltProcedure {
 
@@ -48,21 +48,21 @@ public class getCRCFromRep extends VoltProcedure {
 
     public long run(int id) {
 
-    	CRC32 crc = new CRC32();
+        CRC32 crc = new CRC32();
 
         voltQueueSQL(Stmt, id);
         VoltTable[] result = voltExecuteSQL(true);
- 
-        while (result[0].advanceRow()) {
-        	long counter = result[0].getLong("counter");
-	
-        	byte [] b = new byte[8];
-        	for(int i= 0; i < 8; i++) {
-        	   b[7 - i] = (byte)(counter >>> (i * 8));
-        	}
 
-        	crc.update(b);
-    	}
+        while (result[0].advanceRow()) {
+            long counter = result[0].getLong("counter");
+
+            byte [] b = new byte[8];
+            for(int i= 0; i < 8; i++) {
+                b[7 - i] = (byte)(counter >>> (i * 8));
+            }
+
+            crc.update(b);
+        }
         return crc.getValue();
     }
 }

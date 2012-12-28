@@ -35,29 +35,28 @@ import org.voltdb.VoltTable;
 import java.util.Random;
 
 @ProcInfo (
-    singlePartition = false
-)
+        singlePartition = false
+        )
 public class MPUpdateRep extends VoltProcedure
 {
 
     public final SQLStmt sql3 = new SQLStmt("UPDATE counters_rep set counter=counter*2;");
     public final SQLStmt sql4 = new SQLStmt("UPDATE counters_rep set counter=counter/2;");
-    
+
     Random rand = new Random();
-    
+
     public long run() {
 
-    	switch(rand.nextInt(2)) {
-	    	case 0:
-		        voltQueueSQL(sql3);
-		        break;
-	    	case 1:
-	            voltQueueSQL(sql4);
-	            break;
-    	}
+        switch(rand.nextInt(2)) {
+        case 0:
+            voltQueueSQL(sql3);
+            break;
+        case 1:
+            voltQueueSQL(sql4);
+            break;
+        }
         VoltTable result[] = voltExecuteSQL(true);
-        
+
         return 0;
     }
 }
-;
