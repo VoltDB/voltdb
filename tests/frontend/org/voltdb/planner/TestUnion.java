@@ -216,9 +216,41 @@ public class TestUnion  extends TestCase {
         catch (Exception ex) {}
 
         try {
+            // If both sides are multi-partitioned, there is no facility for pushing down the
+            // union processing below the send/receive, so each child of the union requires
+            // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
+            aide.compile("select DESC from T1 UNION select TEXT from T5", 0, false, null);
+            fail();
+        }
+        catch (Exception ex) {}
+
+        try {
+            // If ONE side is single-partitioned, it would theoretically be possible to satisfy
+            // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
+            // execute on the designated single partition.
+            // At this point, coordinator designation is only supported for single-fragment plans.
+            // So, this case must also error out.
+            aide.compile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5", 0, false, null);
+            fail();
+        }
+        catch (Exception ex) {}
+
+        try {
+            // If BOTH sides are single-partitioned, but for different partitions,
+            // it would theoretically be possible to satisfy
+            // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
+            // execute on one of the designated single partitions.
+            // At this point, coordinator designation is only supported for single-fragment plans.
+            aide.compile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2", 0, false, null);
+            fail();
+        }
+        catch (Exception ex) {}
+
+       try {
             aide.compile("select A from T1 NOUNION select B from T2", 0, false, null);
             fail();
         }
+
         catch (Exception ex) {}
 
         try {

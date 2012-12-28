@@ -579,10 +579,15 @@ public abstract class AbstractParsedStmt {
 
         // the where selection list contains all the clauses
         whereSelectionList.addAll(out);
+        this.analyzeWhereExpression(whereSelectionList);
+    }
 
+    /**
+     */
+void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
         // This next bit of code identifies which tables get classified how
         HashSet<Table> tableSet = new HashSet<Table>();
-        for (AbstractExpression expr : whereSelectionList) {
+        for (AbstractExpression expr : whereList) {
             tableSet.clear();
             getTablesForExpression(expr, tableSet);
             if (tableSet.size() == 0) {

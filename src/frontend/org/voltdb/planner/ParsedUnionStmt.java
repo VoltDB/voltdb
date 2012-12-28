@@ -135,7 +135,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);
+            // Propagate parsing results to the parent union
+            this.whereSelectionList.addAll(selectStmt.whereSelectionList);
         }
+        // Analyze children's where expressions together to identify possible identically
+        // partitioned tables
+        this.analyzeWhereExpression(this.whereSelectionList);
+
         // these just shouldn't happen right?
         assert(this.multiTableSelectionList.size() == 0);
         assert(this.noTableSelectionList.size() == 0);
