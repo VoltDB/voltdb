@@ -391,7 +391,7 @@ public class ExportManager
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
-        if (conn == null) {
+        if (conn == null || !conn.getEnabled()) {
             m_loaderClass = null;
             return;
         }
