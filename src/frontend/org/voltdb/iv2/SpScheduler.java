@@ -33,9 +33,9 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -52,6 +52,8 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
+
+import com.google.common.primitives.Longs;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -119,7 +121,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     };
 
     List<Long> m_replicaHSIds = new ArrayList<Long>();
-    List<Long> m_sendToHSIds = new ArrayList<Long>();
+    long m_sendToHSIds[] = new long[0];
+
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
@@ -203,8 +206,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
         // Update the list of remote replicas that we'll need to send to
-        m_sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
-        m_sendToHSIds.remove(m_mailbox.getHSId());
+        List<Long> sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
+        sendToHSIds.remove(m_mailbox.getHSId());
+        m_sendToHSIds = Longs.toArray(sendToHSIds);
 
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
@@ -426,7 +430,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
                 //Don't replicate reads, this really assumes that DML validation
                 //is going to be integrated soonish
-                if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.size() > 0) {
+                if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.length > 0) {
                     Iv2InitiateTaskMessage replmsg =
                         new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                 m_mailbox.getHSId(),
@@ -441,8 +445,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                 msg.isForReplay());
                     // Update the handle in the copy since the constructor doesn't set it
                     replmsg.setSpHandle(newSpHandle);
-                    m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
-                            replmsg);
+                    for (long hsId : m_sendToHSIds) {
+                        m_mailbox.send(hsId,
+                                replmsg);
+                    }
                     DuplicateCounter counter = new DuplicateCounter(
                             msg.getInitiatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
@@ -522,11 +528,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         // Send the message to the duplicate counter, if any
         final long spHandle = message.getSpHandle();
-        DuplicateCounter counter = m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), spHandle));
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(dcKey);
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), spHandle));
+                m_duplicateCounters.remove(dcKey);
                 m_repairLogTruncationHandle = spHandle;
 
                 m_mailbox.send(counter.m_destinationId, message);
@@ -616,11 +623,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * everywhere.
              * In that case don't propagate it to avoid a determinism check and extra messaging overhead
              */
-            if (m_sendToHSIds.size() > 0 && (!msg.isReadOnly() || msg.isSysProcTask())) {
+            if (m_sendToHSIds.length > 0 && (!msg.isReadOnly() || msg.isSysProcTask())) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                m_mailbox.send(m_sendToHSIds,
                         replmsg);
                 DuplicateCounter counter;
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
@@ -706,9 +713,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        if (m_sendToHSIds.size() > 0) {
+        if (m_sendToHSIds.length > 0) {
             CompleteTransactionMessage replmsg = message;
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+            m_mailbox.send(m_sendToHSIds,
                     replmsg);
         }
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
@@ -760,7 +767,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 writeIv2ViableReplayEntryInternal(faultSpHandle);
                 // Generate Iv2LogFault message and send it to replicas
                 Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                m_mailbox.send(m_sendToHSIds,
                         faultMsg);
             }
         }

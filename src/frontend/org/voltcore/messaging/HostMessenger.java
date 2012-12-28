@@ -22,7 +22,6 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,6 +53,8 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.common.primitives.Longs;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -805,8 +806,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         ForeignHost host = presend(destinationHSId, message);
         if (host != null) {
-            Long dests[] = {destinationHSId};
-            host.send(Arrays.asList(dests), message);
+            host.send(new long [] { destinationHSId }, message);
         }
     }
 
@@ -814,34 +814,23 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     {
         assert(message != null);
         assert(destinationHSIds != null);
-        /*
-         * For small numbers of destinations, don't bother aggregating into a single message for each
-         * host. Odds are it is one message per host anyways for replicating single part transactions.
-         * Saves allocating the hash map and array lists.
-         */
-        if (destinationHSIds.length < 4) {
-            for (int ii = 0; ii < destinationHSIds.length; ii++) {
-                send(destinationHSIds[ii], message);
+        final HashMap<ForeignHost, ArrayList<Long>> foreignHosts =
+            new HashMap<ForeignHost, ArrayList<Long>>(32);
+        for (long hsId : destinationHSIds) {
+            ForeignHost host = presend(hsId, message);
+            if (host == null) continue;
+            ArrayList<Long> bundle = foreignHosts.get(host);
+            if (bundle == null) {
+                bundle = new ArrayList<Long>();
+                foreignHosts.put(host, bundle);
             }
-        } else {
-            final HashMap<ForeignHost, ArrayList<Long>> foreignHosts =
-                new HashMap<ForeignHost, ArrayList<Long>>(32);
-            for (long hsId : destinationHSIds) {
-                ForeignHost host = presend(hsId, message);
-                if (host == null) continue;
-                ArrayList<Long> bundle = foreignHosts.get(host);
-                if (bundle == null) {
-                    bundle = new ArrayList<Long>();
-                    foreignHosts.put(host, bundle);
-                }
-                bundle.add(hsId);
-            }
+            bundle.add(hsId);
+        }
 
-            if (foreignHosts.size() == 0) return;
+        if (foreignHosts.size() == 0) return;
 
-            for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
-                e.getKey().send(e.getValue(), message);
-            }
+        for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
+            e.getKey().send(Longs.toArray(e.getValue()), message);
         }
     }
 
