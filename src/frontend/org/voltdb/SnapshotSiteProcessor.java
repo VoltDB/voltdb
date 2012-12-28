@@ -20,12 +20,14 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -34,7 +36,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -67,15 +68,15 @@ public class SnapshotSiteProcessor {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /** Global count of execution sites on this node performing snapshot */
-    public static final AtomicInteger ExecutionSitesCurrentlySnapshotting =
-        new AtomicInteger(-1);
-
+    public static final Set<Object> ExecutionSitesCurrentlySnapshotting =
+            Collections.synchronizedSet(new HashSet<Object>());
     /**
      * Ensure only one thread running the setup fragment does the creation
      * of the targets and the distribution of the work.
      */
     public static final Object m_snapshotCreateLock = new Object();
     public static CyclicBarrier m_snapshotCreateSetupBarrier = null;
+    public static CyclicBarrier m_snapshotCreateFinishBarrier = null;
     public static final Runnable m_snapshotCreateSetupBarrierAction = new Runnable() {
         @Override
         public void run() {
@@ -262,6 +263,7 @@ public class SnapshotSiteProcessor {
         m_snapshotBufferOrigins.clear();
         m_availableSnapshotBuffers.clear();
         m_snapshotCreateSetupBarrier = null;
+        m_snapshotCreateFinishBarrier = null;
         if (m_snapshotTargetTerminators != null) {
             for (Thread t : m_snapshotTargetTerminators) {
                 t.join();
@@ -357,6 +359,7 @@ public class SnapshotSiteProcessor {
             long txnId,
             int numHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+        ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
         m_lastSnapshotSucceded = true;
@@ -523,14 +526,24 @@ public class SnapshotSiteProcessor {
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
             m_snapshotTargets = null;
             m_snapshotTableTasks = null;
-            final int result = ExecutionSitesCurrentlySnapshotting.decrementAndGet();
+            boolean IamLast = false;
+            synchronized (ExecutionSitesCurrentlySnapshotting) {
+                if (!ExecutionSitesCurrentlySnapshotting.contains(this)) {
+                    VoltDB.crashLocalVoltDB(
+                            "Currently snapshotting site didn't find itself in set of snapshotting sites", true, null);
+                }
+                IamLast = ExecutionSitesCurrentlySnapshotting.size() == 1;
+                if (!IamLast) {
+                    ExecutionSitesCurrentlySnapshotting.remove(this);
+                }
+            }
 
             /**
              * If this is the last one then this EE must close all the SnapshotDataTargets.
              * Done in a separate thread so the EE can go and do other work. It will
              * sync every file descriptor and that may block for a while.
              */
-            if (result == 0) {
+            if (IamLast) {
                 final long txnId = m_lastSnapshotTxnId;
                 final int numHosts = m_lastSnapshotNumHosts;
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
@@ -584,11 +597,13 @@ public class SnapshotSiteProcessor {
                                         exportSequenceNumbers);
                             } finally {
                                 /**
-                                 * Set it to -1 indicating the system is ready to perform another snapshot.
-                                 * Changed to wait until all the previous snapshot work has finished so
-                                 * that snapshot initiation doesn't wait on the file system
+                                 * Remove this last site from the set here after the terminator has run
+                                 * so that new snapshots won't start until
+                                 * everything is on disk for the previous snapshot. This prevents a really long
+                                 * snapshot initiation procedure from occurring because it has to contend for
+                                 * filesystem resources
                                  */
-                                ExecutionSitesCurrentlySnapshotting.decrementAndGet();
+                                ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
                         }
                     }

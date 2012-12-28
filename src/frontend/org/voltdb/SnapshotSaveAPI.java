@@ -162,10 +162,12 @@ public class SnapshotSaveAPI
             // Create a barrier to use with the current number of sites to wait for
             // or if the barrier is already set up check if it is broken and reset if necessary
             if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numLocalSites);
                 SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
                         new CyclicBarrier(numLocalSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
             } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
                 SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();
             }
 
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
@@ -179,7 +181,27 @@ public class SnapshotSaveAPI
         }
 
         try {
-            SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await(120, TimeUnit.SECONDS);
+            SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
+            try {
+                /*
+                 * The synchronized block doesn't throw IE or BBE, but wrapping
+                 * both barriers saves writing the exception handling twice
+                 */
+                synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
+                    final Deque<SnapshotTableTask> m_taskList = SnapshotSiteProcessor.m_taskListsForSites.poll();
+                    if (m_taskList == null) {
+                        return result;
+                    } else {
+                        context.getSiteSnapshotConnection().initiateSnapshots(
+                                m_taskList,
+                                multiPartTxnId,
+                                context.getSiteTrackerForSnapshot().getAllHosts().size(),
+                                exportSequenceNumbers);
+                    }
+                }
+            } finally {
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await(120, TimeUnit.SECONDS);
+            }
         } catch (TimeoutException e) {
             VoltDB.crashLocalVoltDB(
                     "Timed out waiting 120 seconds for all threads to arrive and start snapshot", true, null);
@@ -199,20 +221,6 @@ public class SnapshotSaveAPI
                     "FAILURE",
                     CoreUtils.throwableToString(e));
             return result;
-        }
-
-        synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
-            final Deque<SnapshotTableTask> m_taskList = SnapshotSiteProcessor.m_taskListsForSites.poll();
-            if (m_taskList == null) {
-                return result;
-            } else {
-                assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
-                context.getSiteSnapshotConnection().initiateSnapshots(
-                        m_taskList,
-                        multiPartTxnId,
-                        context.getSiteTrackerForSnapshot().getAllHosts().size(),
-                        exportSequenceNumbers);
-            }
         }
 
         if (block != 0) {
@@ -554,7 +562,7 @@ public class SnapshotSaveAPI
                     new ArrayDeque<SnapshotTableTask>();
                 final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
                     new ArrayList<SnapshotTableTask>();
-                assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1);
+                assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
                 final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
                 /*
@@ -776,9 +784,14 @@ public class SnapshotSaveAPI
                 }
 
                 synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
+                    //Seems like this should be cleared out just in case
+                    //Log if there is actually anything to clear since it is unexpected
+                    if (!SnapshotSiteProcessor.m_taskListsForSites.isEmpty()) {
+                        HOST_LOG.warn("Found lingering snapshot tasks while setting up a snapshot");
+                        SnapshotSiteProcessor.m_taskListsForSites.clear();
+                    }
                     boolean aborted = false;
                     if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
-                        SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(numLocalSites);
                         for (int ii = 0; ii < numLocalSites; ii++) {
                             SnapshotSiteProcessor.m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>());
                         }

@@ -482,6 +482,7 @@ public class RejoinProducer extends SiteTasker
         }
 
         if (m_rejoinSiteProcessor.isEOF() == false) {
+            checkSnapshotBarriers();
             m_taskQueue.offer(this);
         } else {
             REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
@@ -533,15 +534,23 @@ public class RejoinProducer extends SiteTasker
          */
         while(!m_completionMonitorAwait.isDone()) {
             try {
-                if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier != null &&
-                        SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.getNumberWaiting() > 0) {
-                    SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
-                } else {
-                    Thread.sleep(1);
-                }
+                checkSnapshotBarriers();
+                Thread.sleep(1);
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
+        }
+    }
+
+    private void checkSnapshotBarriers() {
+        try {
+            if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier != null &&
+                    SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.getNumberWaiting() > 0) {
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await();
+            }
+        } catch (Exception e) {
+            Throwables.propagate(e);
         }
     }
 
