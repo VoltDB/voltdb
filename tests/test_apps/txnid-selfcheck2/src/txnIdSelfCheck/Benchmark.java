@@ -24,6 +24,7 @@
 package txnIdSelfCheck;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -37,10 +38,14 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.MiscUtils;
 
 public class Benchmark {
@@ -288,6 +293,30 @@ public class Benchmark {
 
         // connect to one or more servers, loop until success
         connect();
+
+        // get stats
+        try {
+            ClientResponse cr = client.callProcedure("Summarize");
+            if (cr.getStatus() != ClientResponse.SUCCESS) {
+                log.error("Failed to call Summarize proc at startup. Exiting.");
+                log.error(((ClientResponseImpl) cr).toJSONString());
+                System.exit(-1);
+            }
+
+            // successfully called summarize
+            VoltTable t = cr.getResults()[0];
+            long ts = t.fetchRow(0).getLong("ts");
+            String tsStr = ts == 0 ? "NO TIMESTAMPS" : String.valueOf(ts) + " / " + new Date(ts).toString();
+            long count = t.fetchRow(0).getLong("count");
+
+            log.info("STARTUP TIMESTAMP OF LAST UPDATE (GMT): " + tsStr);
+            log.info("UPDATES RUN AGAINST THIS DB TO DATE: " + count);
+        }
+        catch (ProcCallException e) {
+            log.error("Failed to call Summarize proc at startup. Exiting.", e);
+            log.error(((ClientResponseImpl) e.getClientResponse()).toJSONString());
+            System.exit(-1);
+        }
 
         log.info(HORIZONTAL_RULE);
         log.info("Starting Benchmark");

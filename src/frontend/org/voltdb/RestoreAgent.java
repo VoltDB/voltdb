@@ -560,7 +560,7 @@ SnapshotCompletionInterest
         Map<String, Snapshot> snapshots = new HashMap<String, SnapshotUtil.Snapshot>();
 
         // Only scan if startup might require a snapshot restore.
-        if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
+        if (m_action == START_ACTION.RECOVER) {
             snapshots = getSnapshots();
         }
 
@@ -636,7 +636,7 @@ SnapshotCompletionInterest
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
-        if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
+        if (m_action == START_ACTION.RECOVER) {
             m_replayAgent.generateReplayPlan();
         }
 

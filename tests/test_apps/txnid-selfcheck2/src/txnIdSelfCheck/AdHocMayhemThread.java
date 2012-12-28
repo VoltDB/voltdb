@@ -42,6 +42,7 @@ public class AdHocMayhemThread extends Thread {
     long counter = 0;
     final Client client;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
+    final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final Semaphore txnsOutstanding = new Semaphore(100);
 
     public AdHocMayhemThread(Client client) {
@@ -75,8 +76,9 @@ public class AdHocMayhemThread extends Thread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                System.err.println("Non success in ProcCallback for AdHocMayhemThread");
+                System.err.println("Non success in ProcCallback for AdHocMayhemThread (will sleep)");
                 System.err.println(((ClientResponseImpl)clientResponse).toJSONString());
+                m_needsBlock.set(true);
             }
         }
     }
@@ -93,6 +95,22 @@ public class AdHocMayhemThread extends Thread {
 
 
         while (m_shouldContinue.get()) {
+
+            // if a transaction callback has failed, sleep for 3 seconds
+            // if not, connected, continue to sleep
+            if (m_needsBlock.get()) {
+                do {
+                    try { Thread.sleep(3000); } catch (Exception e) {} // sleep for 3s
+                    // bail on wakeup if we're supposed to bail
+                    if (!m_shouldContinue.get()) {
+                        return;
+                    }
+                }
+                while (client.getConnectedHostList().size() > 0);
+                m_needsBlock.set(false);
+            }
+
+            // get a permit to send a transaction
             try {
                 txnsOutstanding.acquire();
             } catch (InterruptedException e) {
@@ -101,6 +119,7 @@ public class AdHocMayhemThread extends Thread {
                 return;
             }
 
+            // call a transaction
             String sql = nextAdHoc();
             try {
                 client.callProcedure(new AdHocCallback(), "@AdHoc", sql);

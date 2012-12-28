@@ -2271,7 +2271,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         // procedure are horrible, horrible, horrible.
                         createTransaction(changeResult.connectionId, changeResult.hostname,
                                 changeResult.adminConnection,
-                                task, false, true, true, m_allPartitions,
+                                task, false, false, false, m_allPartitions,
                                 m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
                                 EstTime.currentTimeMillis(), false);
                     }
