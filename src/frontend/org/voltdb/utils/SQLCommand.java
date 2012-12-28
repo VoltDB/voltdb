@@ -106,7 +106,7 @@ public class SQLCommand
             i++;
         }
 
-        query = SetOp.matcher(query).replaceAll(" $1$2$3$4SQL_PARSER_SETOP_SELECT");
+        query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_SETOP_SELECT");
         query = AutoSplit.matcher(query).replaceAll(";$2$4 ");
         query = query.replaceAll("SQL_PARSER_SETOP_SELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
