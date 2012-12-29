@@ -1,8 +1,8 @@
 -- DML, generate random data first
 
-INSERT INTO P1 VALUES(_value[id], _value[string], _value[int16], _value[float]);
-INSERT INTO R1 VALUES(_value[id], _value[string], _value[int16], _value[float]);
-INSERT INTO P2 VALUES(_value[id], _value[string], _value[int16], _value[int16]);
+INSERT INTO P1 VALUES(_id, _value[string], _value[int16], _value[float]);
+INSERT INTO R1 VALUES(_id, _value[string], _value[int16], _value[float]);
+INSERT INTO P2 VALUES(_id, _value[string], _value[int16], _value[int16]);
 
 -- Distributed limit on a partitioned table
 SELECT _variable[@order] FROM _table order by _variable[@order] limit _value[int:0,100];
@@ -19,9 +19,9 @@ SELECT _variable[@order], _agg(_variable[int:0,1000]) from _table group by _vari
 -- Combine an aggregate with a limit/offset, both should be pushed down.
 SELECT _variable[@order], _agg(_variable[int:0,1000]) from _table group by _variable[@order] order by _variable[@order] limit 4 offset 4;
 
--- Combine a of partitioned tables with a pushed-down limit
+-- Combine a join of partitioned tables with a pushed-down limit
 SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID < P2.P2_ID order by P1.ID, P2.P2_ID limit 10;
 SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;
--- Combine a of partitioned tables with a pushed-down limit/offset
+-- Combine a join of partitioned tables with a pushed-down limit/offset
 SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID < P2.P2_ID order by P1.ID, P2.P2_ID limit 10 offset 10;
 SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10 offset 10;

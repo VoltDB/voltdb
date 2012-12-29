@@ -110,6 +110,7 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
             break
 
         try:
+            ### print "VERBOSELY SPOUTING SENDING adhoc %s" % statement["SQL"]
             client.onecmd("adhoc " + statement["SQL"])
         except:
             print >> sys.stderr, "Error occurred while executing '%s': %s" % \
