@@ -23,4 +23,4 @@ INSERT INTO R1 VALUES (1020, 'desc_1020', 1020, 1020.5)
 SELECT _variable FROM _table[@lhs] @set_op @optional_all SELECT _variable FROM _table[@rhs]
 SELECT _variable FROM _table[@lhs] @set_op SELECT _variable FROM _table[@mhs] @set_op SELECT _variable FROM _table[@rhs]
 (SELECT _variable FROM _table[@lhs] @set_op SELECT _variable FROM _table[@mhs]) @set_op SELECT _variable FROM _table[@rhs]
-SELECT _variable FROM _table[@lhs] (@set_op SELECT _variable FROM _table[@mhs] @set_op SELECT _variable FROM _table[@rhs])
+SELECT _variable FROM _table[@lhs] @set_op (SELECT _variable FROM _table[@mhs] @set_op SELECT _variable FROM _table[@rhs])
