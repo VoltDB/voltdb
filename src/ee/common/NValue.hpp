@@ -108,6 +108,19 @@ inline void throwCastSQLValueOutOfRangeException<int64_t>(
                        msg, internalFlags);
 }
 
+inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function)
+{
+    // This is a common test for NaN, even if it fails in some configurations like "g++ -fastmath".
+    if (value == value) {
+        return;
+    }
+    if (value <= DBL_MAX && value >= -DBL_MAX) {
+        return;
+    }
+    char msg[1024];
+    snprintf(msg, 1024, "Invalid result value (%f) from floating point function %s", value, function);
+    throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg);
+}
 
 /**
  * A class to wrap all scalar values regardless of type and
