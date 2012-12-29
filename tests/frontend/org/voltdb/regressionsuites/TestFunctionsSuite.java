@@ -55,6 +55,35 @@ public class TestFunctionsSuite extends RegressionSuite {
     private static final String paddedToNonInlineLength =
         "will you still free me (will memcheck see me) when Im sixty-four";
 
+    // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
+    public void testFoundHSQLBackendOutOfRange() throws IOException, InterruptedException, ProcCallException {
+        System.out.println("STARTING testFoundHSQLBackendOutOfRange");
+        Client client = getClient();
+        ClientResponse cr = null;
+        /*
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+        */
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (0, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (2, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (4, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (6, 'WCfDDvZBPoqhanfGN', 1414568, 1.14383710279231887164e-01, NULL)");
+        cr = client.callProcedure("@AdHoc", "select (5.25 + NUM) from P1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "SELECT FLOOR(NUM + 5.25) NUMSUM FROM P1 ORDER BY NUMSUM");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // This test case requires HSQL to be taught to do (truncating) integer division of integers as VoltDB does.
+        // While not strictly required by the SQL standard, integer division is at least technically compliant,
+        // where HSQL's use of floating point division is not.
+        // cr = client.callProcedure("@AdHoc", "SELECT SUM(DISTINCT SQRT(ID / (NUM))) AS Q22 FROM P1");
+        // assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
 
     public void testStringExpressionIndex() throws Exception {
         System.out.println("STARTING testStringExpressionIndex");
