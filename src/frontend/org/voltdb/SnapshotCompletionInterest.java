@@ -25,6 +25,8 @@ public interface SnapshotCompletionInterest {
 
     public static class SnapshotCompletionEvent {
         public final String nonce;
+        // multipartTxnId is the txnId of the snapshot itself.
+        // as well as the last snapshotted MP transaction.
         public final long multipartTxnId;
         public final long partitionTxnIds[];
         public final boolean truncationSnapshot;
