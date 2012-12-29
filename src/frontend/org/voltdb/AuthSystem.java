@@ -166,7 +166,11 @@ public class AuthSystem {
                          boolean sysproc, boolean defaultproc, boolean adhoc) {
             m_sha1ShadowPassword = sha1ShadowPassword;
             m_bcryptShadowPassword = bcryptShadowPassword;
-            m_name = name.intern();
+            if (name != null) {
+                m_name = name.intern();
+            } else {
+                m_name = null;
+            }
             m_sysproc = sysproc;
             m_defaultproc = defaultproc;
             m_adhoc = adhoc;
