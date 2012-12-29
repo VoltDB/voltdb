@@ -19,6 +19,7 @@ package org.voltdb;
 import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -87,6 +88,6 @@ public interface CommandLog {
     public abstract long getFaultSequenceNumber();
 
     public interface DurabilityListener {
-        public void onDurability(ArrayDeque<Object> durableThings);
+        public void onDurability(ArrayList<Object> durableThings);
     }
 }

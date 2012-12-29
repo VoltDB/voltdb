@@ -150,7 +150,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new DurabilityListener() {
             @Override
-            public void onDurability(ArrayDeque<Object> durableThings) {
+            public void onDurability(ArrayList<Object> durableThings) {
                 synchronized (m_lock) {
                     for (Object o : durableThings) {
                         m_pendingTasks.offer((TransactionTask)o);
