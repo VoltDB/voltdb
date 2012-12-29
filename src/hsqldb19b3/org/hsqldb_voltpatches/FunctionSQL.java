@@ -756,6 +756,10 @@ public class FunctionSQL extends Expression {
                 }
 
                 double val = Math.exp(((Number) data[0]).doubleValue());
+                // VoltDB tweaked compliance with standard sql error handling
+                if (Double.isNaN(val) || Double.isInfinite(val)) {
+                    throw Error.error(ErrorCode.X_2201F);
+                }
 
                 return ValuePool.getDouble(Double.doubleToLongBits(val));
             }
@@ -783,6 +787,9 @@ public class FunctionSQL extends Expression {
                     }
                 } else {
                     val = Math.pow(base, exponent);
+                    if (Double.isNaN(val) || Double.isInfinite(val)) {
+                        throw Error.error(ErrorCode.X_2201F);
+                    }
                 }
 
                 return ValuePool.getDouble(Double.doubleToLongBits(val));
@@ -793,6 +800,10 @@ public class FunctionSQL extends Expression {
                 }
 
                 double val = Math.sqrt(((Number) data[0]).doubleValue());
+                // VoltDB tweaked compliance with standard sql error handling
+                if (Double.isNaN(val) || Double.isInfinite(val)) {
+                    throw Error.error(ErrorCode.X_2201F);
+                }
 
                 return ValuePool.getDouble(Double.doubleToLongBits(val));
             }
