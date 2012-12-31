@@ -38,7 +38,7 @@ public class UpdateBaseProc extends VoltProcedure {
             "DELETE FROM partitioned WHERE cid = ? and cnt < ?;");
 
     public final SQLStmt p_getAdhocData = new SQLStmt(
-            "SELECT * FROM adhocp ORDER BY ts DESC LIMIT 1");
+            "SELECT * FROM adhocp ORDER BY ts DESC, id LIMIT 1");
 
     public final SQLStmt p_insert = new SQLStmt(
             "INSERT INTO partitioned VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
