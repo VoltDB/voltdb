@@ -53,7 +53,7 @@ public class InitiatorMailbox implements Mailbox
     VoltLogger tmLog = new VoltLogger("TM");
 
     private final int m_partitionId;
-    private final Scheduler m_scheduler;
+    protected final Scheduler m_scheduler;
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
     private final RejoinProducer m_rejoinProducer;
@@ -345,7 +345,7 @@ public class InitiatorMailbox implements Mailbox
         repairReplicasWithInternal(needsRepair, repairWork);
     }
 
-    protected  void repairReplicasWithInternal(List<Long> needsRepair, VoltMessage repairWork) {
+    private void repairReplicasWithInternal(List<Long> needsRepair, VoltMessage repairWork) {
         assert(lockingVows());
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
