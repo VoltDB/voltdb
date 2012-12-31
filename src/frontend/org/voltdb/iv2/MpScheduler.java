@@ -230,7 +230,15 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
+    public void handleMessageRepair(List<Long> needsRepair, VoltMessage message)
+    {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
+        }
+    }
+
+    private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
+    {
         // just reforward the Iv2InitiateTaskMessage for the txn being restarted
         // this copy may be unnecessary
         final String procedureName = message.getStoredProcedureName();

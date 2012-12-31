@@ -250,7 +250,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
-            m_scheduler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
+            m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
             send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
