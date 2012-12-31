@@ -1799,7 +1799,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress());
-            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
+            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty() &&
                 snapshotMsg.crash) {
                 String msg = "Partition detection snapshot completed. Shutting down. " +
                         "Result: " + startSnapshotting.toString();

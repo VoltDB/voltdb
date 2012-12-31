@@ -17,10 +17,16 @@
 
 package org.voltdb.utils;
 
-import java.util.*;
-import java.io.*;
+import java.io.File;
+import java.io.FileFilter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 
-import org.voltdb.sysprocs.saverestore.*;
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
@@ -32,6 +38,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
  *
  */
 public class SnapshotVerifier {
+    private static final VoltLogger CONSOLE_LOG = new VoltLogger("CONSOLE");
 
     public static void main(String args[]) {
         if (args.length == 0) {
@@ -74,7 +81,7 @@ public class SnapshotVerifier {
 
         Map<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         for (String directory : directories) {
-            SnapshotUtil.retrieveSnapshotFiles( new File(directory), snapshots, filter, 0, true);
+            SnapshotUtil.retrieveSnapshotFiles( new File(directory), snapshots, filter, 0, true, CONSOLE_LOG);
         }
 
         if (snapshots.isEmpty()) {

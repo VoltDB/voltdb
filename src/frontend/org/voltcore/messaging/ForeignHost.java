@@ -23,15 +23,14 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.CoreUtils;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -174,10 +173,10 @@ public class ForeignHost {
 
     /** Send a message to the network. This public method is re-entrant. */
     void send(
-            final List<Long> destinations,
+            final long destinations[],
             final VoltMessage message)
     {
-        if (destinations.isEmpty()) {
+        if (destinations.length == 0) {
             return;
         }
 
@@ -188,14 +187,14 @@ public class ForeignHost {
                     int len = 4            /* length prefix */
                             + 8            /* source hsid */
                             + 4            /* destinationCount */
-                            + 8 * destinations.size()  /* destination list */
+                            + 8 * destinations.length  /* destination list */
                             + message.getSerializedSize();
                     ByteBuffer buf = ByteBuffer.allocate(len);
                     buf.putInt(len - 4);
                     buf.putLong(message.m_sourceHSId);
-                    buf.putInt(destinations.size());
-                    for (int ii = 0; ii < destinations.size(); ii++) {
-                        buf.putLong(destinations.get(ii));
+                    buf.putInt(destinations.length);
+                    for (int ii = 0; ii < destinations.length; ii++) {
+                        buf.putLong(destinations[ii]);
                     }
                     message.flattenToBuffer(buf);
                     buf.flip();

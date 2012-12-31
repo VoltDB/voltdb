@@ -28,7 +28,7 @@ public interface SnapshotCompletionInterest {
         // multipartTxnId is the txnId of the snapshot itself.
         // as well as the last snapshotted MP transaction.
         public final long multipartTxnId;
-        public final long partitionTxnIds[];
+        public final Map<Integer, Long> partitionTxnIds;
         public final boolean truncationSnapshot;
         public final String requestId;
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
@@ -36,7 +36,7 @@ public interface SnapshotCompletionInterest {
         public SnapshotCompletionEvent(
                 String nonce,
                 final long multipartTxnId,
-                final long partitionTxnIds[],
+                final Map<Integer, Long> partitionTxnIds,
                 final boolean truncationSnapshot,
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {

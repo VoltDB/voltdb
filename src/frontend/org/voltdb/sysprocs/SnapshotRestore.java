@@ -371,7 +371,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     TRACE_LOG.trace("Checking saved table digest state for restore of: "
                             + m_filePath + ", " + m_fileNonce);
                     List<JSONObject> digests =
-                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce);
+                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce, HOST_LOG);
 
                     for (JSONObject obj : digests) {
                         result.addRow(obj.toString(), "SUCCESS", null);

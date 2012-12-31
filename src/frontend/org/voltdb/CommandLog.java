@@ -17,7 +17,9 @@
 package org.voltdb;
 
 import java.util.ArrayDeque;
+import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -34,7 +36,7 @@ public interface CommandLog {
     public abstract void init(
             CatalogContext context,
             long txnId,
-            long perPartitionTxnId[],
+            Map<Integer, Long> perPartitionTxnId,
             String coreBinding);
 
     /**
@@ -46,7 +48,7 @@ public interface CommandLog {
     public abstract void initForRejoin(
             CatalogContext context,
             long txnId,
-            long perPartitionTxnId[],
+            Map<Integer, Long> perPartitionTxnId,
             boolean isRejoin,
             String coreBinding);
 
@@ -86,6 +88,6 @@ public interface CommandLog {
     public abstract long getFaultSequenceNumber();
 
     public interface DurabilityListener {
-        public void onDurability(ArrayDeque<Object> durableThings);
+        public void onDurability(ArrayList<Object> durableThings);
     }
 }
