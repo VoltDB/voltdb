@@ -96,11 +96,7 @@ public class SysprocFragmentTask extends TransactionTask
          * There is similar code used at fully functioning sites in SnasphotSaveAPI
          * that initializes the barrier and resets it as necessary
          */
-        if (m_task.isSysProcTask()) {
-            System.out.println("Got sysproc fragment " + m_task.getFragmentId(0));
-        }
         if (m_task.isSysProcTask() && m_task.getFragmentId(0) == SysProcFragmentId.PF_createSnapshotTargets) {
-            System.out.println("Got fragment");
             synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
                 // Create a barrier to use with the current number of sites to wait for
                 // or if the barrier is already set up check if it is broken and reset if necessary
