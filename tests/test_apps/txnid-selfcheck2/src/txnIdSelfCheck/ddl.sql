@@ -95,3 +95,4 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBothMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSP;
 PARTITION PROCEDURE ReadSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;

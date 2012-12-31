@@ -522,11 +522,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    // InitiateResponses for single-partition initiators currently get completely handled
-    // by SpInitiatorMessageHandler.  This may change when replication is added.
+    // Pass a response through the duplicate counters.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
-        // Send the message to the duplicate counter, if any
         final long spHandle = message.getSpHandle();
         final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
         DuplicateCounter counter = m_duplicateCounters.get(dcKey);
@@ -535,13 +533,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
                 m_repairLogTruncationHandle = spHandle;
-
-                m_mailbox.send(counter.m_destinationId, message);
+                m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             }
-            // doing duplicate suppresion: all done.
         }
         else {
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
