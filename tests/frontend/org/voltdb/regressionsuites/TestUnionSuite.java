@@ -147,6 +147,10 @@ public class TestUnionSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT SELECT I FROM B EXCEPT SELECT I FROM C;")
                                  .getResults()[0];
         assertEquals(1, result.getRowCount());
+
+        result = client.callProcedure("@AdHoc", "SELECT I FROM C EXCEPT SELECT I FROM A;")
+                .getResults()[0];
+        assertEquals(1, result.getRowCount());
     }
 
     /**
@@ -174,8 +178,11 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertC", 1, 5); //Eliminated (by A.PKEY=6)
         VoltTable result = client.callProcedure("@AdHoc", "SELECT I FROM A EXCEPT ALL SELECT I FROM B EXCEPT ALL SELECT I FROM C;")
                                  .getResults()[0];
-        int r = result.getRowCount();
         assertEquals(3, result.getRowCount());
+
+        result = client.callProcedure("@AdHoc", "SELECT I FROM C EXCEPT ALL SELECT I FROM B;")
+                .getResults()[0];
+        assertEquals(0, result.getRowCount());
     }
 
    /**
