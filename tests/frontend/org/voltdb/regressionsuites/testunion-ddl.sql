@@ -1,0 +1,26 @@
+CREATE TABLE A (
+ PKEY          INTEGER NOT NULL,
+ I             INTEGER,
+ PRIMARY KEY (PKEY)
+);
+PARTITION TABLE A ON COLUMN PKEY;
+
+CREATE TABLE B (
+ PKEY          INTEGER,
+ I             INTEGER,
+ PRIMARY KEY (PKEY)
+);
+
+CREATE TABLE C (
+ PKEY          INTEGER,
+ I             INTEGER,
+ PRIMARY KEY (PKEY)
+);
+
+CREATE TABLE D (
+ PKEY          INTEGER,
+ I             INTEGER,
+ PRIMARY KEY (PKEY)
+);
+
+

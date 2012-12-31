@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -37,6 +38,15 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     // schema generation: see ENG-1660.
     LinkedHashMap<Column, AbstractExpression> columns =
         new LinkedHashMap<Column, AbstractExpression>();
+
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedUpdateStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
+    }
 
     @Override
     void parse(VoltXMLElement stmtNode) {

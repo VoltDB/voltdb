@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.index.Index;
@@ -804,4 +805,32 @@ public class QueryExpression {
         leftQueryExpression.getBaseTableNames(set);
         rightQueryExpression.getBaseTableNames(set);
     }
+
+    /*************** VOLTDB *********************/
+
+    /**
+     * VoltDB added method to get a union operation type.
+     * @return int representing union operation type.
+     */
+    public int getUnionType() {
+        return unionType;
+    }
+
+    /**
+     * VoltDB added method to get the left expression.
+     * @return QueryExpression Left expression.
+     */
+    public QueryExpression getLeftQueryExpression() {
+        return leftQueryExpression;
+    }
+
+    /**
+     * VoltDB added method to get the right expression.
+     * @return QueryExpression Right expression.
+     */
+    public QueryExpression getRightQueryExpression() {
+        return rightQueryExpression;
+    }
+
+
 }
