@@ -19,7 +19,6 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.BufferedInputStream;
 import java.io.CharArrayWriter;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -68,7 +67,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -92,7 +90,7 @@ public class SnapshotUtil {
         List<Table> tables,
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-        List<Long> partitionTransactionIds,
+        Map<Integer, Long> partitionTransactionIds,
         InstanceId instanceId)
     throws IOException
     {
@@ -102,77 +100,85 @@ public class SnapshotUtil {
                 throw new IOException("Unable to write table list file " + f);
             }
         }
-        final FileOutputStream fos = new FileOutputStream(f);
-        StringWriter sw = new StringWriter();
-        JSONStringer stringer = new JSONStringer();
+        boolean success = false;
         try {
-            stringer.object();
-            stringer.key("version").value(1);
-            stringer.key("txnId").value(txnId);
-            stringer.key("tables").array();
-            for (int ii = 0; ii < tables.size(); ii++) {
-                stringer.value(tables.get(ii).getTypeName());
-            }
-            stringer.endArray();
-            stringer.key("exportSequenceNumbers").array();
-            for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : exportSequenceNumbers.entrySet()) {
+            final FileOutputStream fos = new FileOutputStream(f);
+            StringWriter sw = new StringWriter();
+            JSONStringer stringer = new JSONStringer();
+            try {
                 stringer.object();
-
-                stringer.key("exportTableName").value(entry.getKey());
-
-                stringer.key("sequenceNumberPerPartition").array();
-                for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
+                stringer.key("version").value(1);
+                stringer.key("txnId").value(txnId);
+                stringer.key("tables").array();
+                for (int ii = 0; ii < tables.size(); ii++) {
+                    stringer.value(tables.get(ii).getTypeName());
+                }
+                stringer.endArray();
+                stringer.key("exportSequenceNumbers").array();
+                for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : exportSequenceNumbers.entrySet()) {
                     stringer.object();
-                    stringer.key("partition").value(sequenceNumber.getKey());
-                    //First value is the ack offset which matters for pauseless rejoin, but not persistence
-                    stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
+
+                    stringer.key("exportTableName").value(entry.getKey());
+
+                    stringer.key("sequenceNumberPerPartition").array();
+                    for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
+                        stringer.object();
+                        stringer.key("partition").value(sequenceNumber.getKey());
+                        //First value is the ack offset which matters for pauseless rejoin, but not persistence
+                        stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
+                        stringer.endObject();
+                    }
+                    stringer.endArray();
+
                     stringer.endObject();
                 }
                 stringer.endArray();
-
-                stringer.endObject();
-            }
-            stringer.endArray();
-            if (VoltDB.instance().isIV2Enabled()) {
-                stringer.key("partitionTransactionIds").object();
-                for (Long txnid : partitionTransactionIds) {
-                    stringer.key(Long.toString(TxnEgo.getPartitionId(txnid))).value(txnid);
+                if (VoltDB.instance().isIV2Enabled()) {
+                    stringer.key("partitionTransactionIds").object();
+                    for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
+                        stringer.key(entry.getKey().toString()).value(entry.getValue());
+                    }
+                    stringer.endObject();
                 }
+                stringer.key("catalogCRC").value(catalogCRC);
+                stringer.key("instanceId").value(instanceId.serializeToJSONObject());
                 stringer.endObject();
+            } catch (JSONException e) {
+                throw new IOException(e);
             }
-            stringer.key("catalogCRC").value(catalogCRC);
-            stringer.key("instanceId").value(instanceId.serializeToJSONObject());
-            stringer.endObject();
-        } catch (JSONException e) {
-            throw new IOException(e);
-        }
 
-        sw.append(stringer.toString());
+            sw.append(stringer.toString());
 
-        final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
-        final PureJavaCrc32 crc = new PureJavaCrc32();
-        crc.update(tableListBytes);
-        ByteBuffer fileBuffer = ByteBuffer.allocate(tableListBytes.length + 4);
-        fileBuffer.putInt((int)crc.getValue());
-        fileBuffer.put(tableListBytes);
-        fileBuffer.flip();
-        fos.getChannel().write(fileBuffer);
-        return new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    fos.getChannel().force(true);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } finally {
+            final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
+            final PureJavaCrc32 crc = new PureJavaCrc32();
+            crc.update(tableListBytes);
+            ByteBuffer fileBuffer = ByteBuffer.allocate(tableListBytes.length + 4);
+            fileBuffer.putInt((int)crc.getValue());
+            fileBuffer.put(tableListBytes);
+            fileBuffer.flip();
+            fos.getChannel().write(fileBuffer);
+            success = true;
+            return new Runnable() {
+                @Override
+                public void run() {
                     try {
-                        fos.close();
+                        fos.getChannel().force(true);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
+                    } finally {
+                        try {
+                            fos.close();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
                     }
                 }
+            };
+        } finally {
+            if (!success) {
+                f.delete();
             }
-        };
+        }
     }
 
     /**
@@ -214,7 +220,7 @@ public class SnapshotUtil {
     }
 
     public static List<JSONObject> retrieveDigests(String path,
-            String nonce) throws Exception {
+            String nonce, VoltLogger logger) throws Exception {
         VoltFile directoryWithDigest = new VoltFile(path);
         ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
         if (directoryWithDigest.listFiles() == null) {
@@ -223,7 +229,10 @@ public class SnapshotUtil {
         for (File f : directoryWithDigest.listFiles()) {
             if ( f.getName().equals(nonce + ".digest") || //old style digest name
                     (f.getName().startsWith(nonce + "-host_") && f.getName().endsWith(".digest"))) {//new style
-                digests.add(CRCCheck(f));
+                JSONObject retval = CRCCheck(f, logger);
+                if (retval != null) {
+                    digests.add(retval);
+                }
             }
         }
         return digests;
@@ -262,15 +271,16 @@ public class SnapshotUtil {
      * @throws IOException
      *             If CRC does not match
      */
-    public static JSONObject CRCCheck(File f) throws IOException {
+    public static JSONObject CRCCheck(File f, VoltLogger logger) throws IOException {
         final FileInputStream fis = new FileInputStream(f);
         try {
             final BufferedInputStream bis = new BufferedInputStream(fis);
             ByteBuffer crcBuffer = ByteBuffer.allocate(4);
             if (4 != bis.read(crcBuffer.array())) {
-                throw new EOFException(
+                logger.warn(
                         "EOF while attempting to read CRC from snapshot digest " + f +
                         " on host " + CoreUtils.getHostnameOrAddress());
+                return null;
             }
             final int crc = crcBuffer.getInt();
             final InputStreamReader isr = new InputStreamReader(bis, "UTF-8");
@@ -314,7 +324,8 @@ public class SnapshotUtil {
                 tableListCRC.update("\n".getBytes("UTF-8"));
                 final int calculatedValue = (int)tableListCRC.getValue();
                 if (crc != calculatedValue) {
-                    throw new IOException("CRC of snapshot digest did not match digest contents");
+                    logger.warn("CRC of snapshot digest " + f + " did not match digest contents");
+                    return null;
                 }
 
                 String tableNames[] = tableList.split(",");
@@ -328,7 +339,8 @@ public class SnapshotUtil {
                         obj.append("tables", tableNames[ii]);
                     }
                 } catch (JSONException e) {
-                    throw new IOException(e);
+                    logger.warn("Exception parsing JSON of digest " + f, e);
+                    return null;
                 }
                 return obj;
             } else {
@@ -341,10 +353,14 @@ public class SnapshotUtil {
                 tableListCRC.update(tableListBytes);
                 final int calculatedValue = (int)tableListCRC.getValue();
                 if (crc != calculatedValue) {
-                    throw new IOException("CRC of snapshot digest did not match digest contents");
+                    logger.warn("CRC of snapshot digest " + f + " did not match digest contents");
+                    return null;
                 }
                 return obj;
             }
+        } catch (Exception e) {
+            logger.warn("Exception while parsing snapshot digest " + f, e);
+            return null;
         } finally {
             try {
                 if (fis != null)
@@ -474,7 +490,8 @@ public class SnapshotUtil {
             Map<String, Snapshot> namedSnapshots,
             FileFilter filter,
             int recursion,
-            boolean validate) {
+            boolean validate,
+            VoltLogger logger) {
         if (recursion == 32) {
             return;
         }
@@ -497,7 +514,7 @@ public class SnapshotUtil {
                     System.err.println("Warning: Skipping directory " + f.getPath()
                             + " due to lack of read permission");
                 } else {
-                    retrieveSnapshotFiles( f, namedSnapshots, filter, recursion++, validate);
+                    retrieveSnapshotFiles( f, namedSnapshots, filter, recursion++, validate, logger);
                 }
                 continue;
             }
@@ -516,7 +533,8 @@ public class SnapshotUtil {
 
             try {
                 if (f.getName().endsWith(".digest")) {
-                    JSONObject digest = CRCCheck(f);
+                    JSONObject digest = CRCCheck(f, logger);
+                    if (digest == null) continue;
                     Long snapshotTxnId = digest.getLong("txnId");
                     String nonce = parseNonceFromSnapshotFilename(f.getName());
                     Snapshot named_s = namedSnapshots.get(nonce);

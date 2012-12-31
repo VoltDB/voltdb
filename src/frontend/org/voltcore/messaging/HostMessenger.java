@@ -22,7 +22,6 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,6 +53,8 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.common.primitives.Longs;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -805,8 +806,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         ForeignHost host = presend(destinationHSId, message);
         if (host != null) {
-            Long dests[] = {destinationHSId};
-            host.send(Arrays.asList(dests), message);
+            host.send(new long [] { destinationHSId }, message);
         }
     }
 
@@ -830,9 +830,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (foreignHosts.size() == 0) return;
 
         for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
-            e.getKey().send(e.getValue(), message);
+            e.getKey().send(Longs.toArray(e.getValue()), message);
         }
-        foreignHosts.clear();
     }
 
     /**

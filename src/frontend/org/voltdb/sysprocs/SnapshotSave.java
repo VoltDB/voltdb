@@ -235,10 +235,10 @@ public class SnapshotSave extends VoltSystemProcedure
             {
                 TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
                                 + file_path + ", " + file_nonce);
-
-                if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
+                final int numSitesSnapshotting = SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.size();
+                if (numSitesSnapshotting > 0) {
                     HOST_LOG.debug("Snapshot in progress, " +
-                            SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() +
+                            numSitesSnapshotting +
                             " sites are still snapshotting");
                     result.addRow(
                                   context.getHostId(),
