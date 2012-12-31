@@ -18,24 +18,28 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.rejoin.TaskLog;
+import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.LogKeys;
+
+import com.google.common.base.Throwables;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -81,6 +85,43 @@ public class SysprocFragmentTask extends TransactionTask
     throws IOException
     {
         taskLog.logTask(m_task);
+
+        /*
+         * During rejoin all sites on the host must arrive at the barrier
+         * for any snapshots that occur. Some will arrive at the barrier here
+         *
+         * This code has to be inlined here for this fragment since the handling of the
+         * fragment during rejoin is different since the site is not recovered
+         *
+         * There is similar code used at fully functioning sites in SnasphotSaveAPI
+         * that initializes the barrier and resets it as necessary
+         */
+        if (m_task.isSysProcTask()) {
+            System.out.println("Got sysproc fragment " + m_task.getFragmentId(0));
+        }
+        if (m_task.isSysProcTask() && m_task.getFragmentId(0) == SysProcFragmentId.PF_createSnapshotTargets) {
+            System.out.println("Got fragment");
+            synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
+                // Create a barrier to use with the current number of sites to wait for
+                // or if the barrier is already set up check if it is broken and reset if necessary
+                if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
+                    final int numLocalSites = VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length;
+                    SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numLocalSites);
+                    SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
+                            new CyclicBarrier(numLocalSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
+                } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
+                    SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
+                    SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();
+                }
+            }
+            try {
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await();
+            } catch (Exception e) {
+                Throwables.propagate(e);
+            }
+        }
+
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_task, m_initiator.getHSId());
         response.setRecovering(true);
