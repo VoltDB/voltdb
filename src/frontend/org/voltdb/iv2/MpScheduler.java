@@ -235,6 +235,11 @@ public class MpScheduler extends Scheduler
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
         }
+        else {
+            // MpInitiatorMailbox should throw RuntimeException for unhandled types before we could get here
+            throw new RuntimeException("MpScheduler.handleMessageRepair() received unhandled message type." +
+                    " This should be impossible");
+        }
     }
 
     private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)

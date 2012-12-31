@@ -256,7 +256,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
         }
         else {
-            throw new RuntimeException("Invalid repair message type: " + repairWork);
+            throw new RuntimeException("During MPI repair: Invalid repair message type: " + repairWork);
         }
     }
 }
