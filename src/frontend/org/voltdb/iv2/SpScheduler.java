@@ -706,7 +706,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, resp);
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
+                VoltDB.crashLocalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
             return;
