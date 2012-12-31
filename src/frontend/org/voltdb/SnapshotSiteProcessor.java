@@ -615,8 +615,8 @@ public class SnapshotSiteProcessor {
                 if (jsonObj.getLong("txnId") != txnId) {
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
-                int numHostsFinished = jsonObj.getInt("finishedHosts") + 1;
-                jsonObj.put("finishedHosts", numHostsFinished);
+                int remainingHosts = jsonObj.getInt("hostCount") - 1;
+                jsonObj.put("hostCount", remainingHosts);
                 if (!snapshotSuccess) {
                     hostLog.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);

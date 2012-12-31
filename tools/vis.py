@@ -75,8 +75,8 @@ class Plot:
     def __init__(self, title, xlabel, ylabel, filename, w, h):
         self.filename = filename
         self.legends = {}
-        w = w == None and 800 or w
-        h = h == None and 300 or h
+        w = w == None and 1200 or w
+        h = h == None and 400 or h
         fig = plt.figure(figsize=(w / self.DPI, h / self.DPI),
                          dpi=self.DPI)
         self.ax = fig.add_subplot(111)
@@ -89,10 +89,10 @@ class Plot:
 
     def plot(self, x, y, color, marker_shape, legend):
         self.ax.plot(x, y, linestyle="-", label=str(legend),
-                     marker=marker_shape, markerfacecolor=color, markersize=4)
+                     marker=marker_shape, markerfacecolor=color, markersize=2)
 
     def close(self):
-        formatter = matplotlib.dates.DateFormatter("%b %d")
+        formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(formatter)
         ymin, ymax = plt.ylim()
         plt.ylim((0, ymax * 1.1))
@@ -177,7 +177,8 @@ def main():
     if len(sys.argv) >= 5:
         height = int(sys.argv[4])
 
-    stats = get_stats(STATS_SERVER, 21212, 30)
+    # show all the history
+    stats = get_stats(STATS_SERVER, 21212, 1000)
 
     # Plot single node stats for all apps
     filenames = []              # (appname, latency, throughput)

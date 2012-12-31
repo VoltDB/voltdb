@@ -26,7 +26,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Track responses from each partition. This should be subsumed
@@ -99,21 +98,17 @@ public class DuplicateCounter
     {
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
-        long hash = r.getHashOfTableResults() << 32;
+        long hash = 0;
         Integer sqlHash = r.getHash();
         if (sqlHash != null) {
-            hash |= sqlHash.intValue();
+            hash = sqlHash.intValue();
         }
         return checkCommon(hash, message.isRecovering(), message);
     }
 
     int offer(FragmentResponseMessage message)
     {
-        long hash = 0;
-        for (int i = 0; i < message.getTableCount(); i++) {
-            hash ^= MiscUtils.cheesyBufferCheckSum(message.getTableAtIndex(i).getBuffer());
-        }
-        return checkCommon(hash, message.isRecovering(), message);
+        return checkCommon(0, message.isRecovering(), message);
     }
 
     VoltMessage getLastResponse()

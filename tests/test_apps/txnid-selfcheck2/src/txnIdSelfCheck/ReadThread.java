@@ -46,6 +46,7 @@ public class ReadThread extends Thread {
     final int threadCount;
     final int threadOffset;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
+    final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final Semaphore txnsOutstanding = new Semaphore(100);
 
     public ReadThread(Client client, int threadCount, int threadOffset) {
@@ -65,6 +66,7 @@ public class ReadThread extends Thread {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                 log.error("Non success in ProcCallback for ReadThread");
                 log.error(((ClientResponseImpl)clientResponse).toJSONString());
+                m_needsBlock.set(true);
                 return;
             }
             // validate the data
@@ -82,6 +84,22 @@ public class ReadThread extends Thread {
     @Override
     public void run() {
         while (m_shouldContinue.get()) {
+
+            // if a transaction callback has failed, sleep for 3 seconds
+            // if not, connected, continue to sleep
+            if (m_needsBlock.get()) {
+                do {
+                    try { Thread.sleep(3000); } catch (Exception e) {} // sleep for 3s
+                    // bail on wakeup if we're supposed to bail
+                    if (!m_shouldContinue.get()) {
+                        return;
+                    }
+                }
+                while (client.getConnectedHostList().size() > 0);
+                m_needsBlock.set(false);
+            }
+
+            // get a permit to send a transaction
             try {
                 txnsOutstanding.acquire();
             } catch (InterruptedException e) {
@@ -94,6 +112,7 @@ public class ReadThread extends Thread {
             String procName = replicated ? "ReadMP" : "ReadSP";
             byte cid = (byte) (r.nextInt(threadCount) + threadOffset);
 
+            // call a transaction
             try {
                 client.callProcedure(new ReadCallback(), procName, cid);
             }

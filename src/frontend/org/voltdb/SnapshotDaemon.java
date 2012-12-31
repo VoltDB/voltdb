@@ -614,7 +614,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
                                                                       hostId, true, truncReqId)) {
-                        SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId, hostId);
+                        SnapshotSaveAPI.increaseParticipateHost(snapshotTxnId, hostId);
                     }
 
                     try {
