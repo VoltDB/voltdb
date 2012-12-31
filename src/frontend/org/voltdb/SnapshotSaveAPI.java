@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.base.Charsets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -337,7 +338,7 @@ public class SnapshotSaveAPI
             }
 
             try {
-                JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
+                JSONObject jsonObj = new JSONObject(new String(data, Charsets.UTF_8));
                 if (jsonObj.getLong("txnId") != txnId) {
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
@@ -354,7 +355,8 @@ public class SnapshotSaveAPI
                     hosts.put(hostId);
                 }
 
-                zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
+                zk.setData(snapshotPath, jsonObj.toString(4).getBytes(Charsets.UTF_8),
+                        stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
                 continue;
             } catch (Exception e) {
@@ -398,7 +400,7 @@ public class SnapshotSaveAPI
             stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());
-            nodeBytes = jsonObj.toString(4).getBytes("UTF-8");
+            nodeBytes = jsonObj.toString(4).getBytes(Charsets.UTF_8);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error serializing snapshot completion node JSON", true, e);
         }
@@ -437,36 +439,44 @@ public class SnapshotSaveAPI
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
 
-        Stat stat = new Stat();
-        byte data[] = null;
-        try {
-            data = zk.getData(snapshotPath, false, stat);
-        } catch (KeeperException e) {
-            if (e.code() == KeeperException.Code.NONODE) {
-                // If snapshot creation failed for some reason, the node won't exist. ignore
-                return;
+        boolean success = false;
+        while (!success) {
+            Stat stat = new Stat();
+            byte data[] = null;
+            try {
+                data = zk.getData(snapshotPath, false, stat);
+            } catch (KeeperException e) {
+                if (e.code() == KeeperException.Code.NONODE) {
+                    // If snapshot creation failed for some reason, the node won't exist. ignore
+                    return;
+                }
+                VoltDB.crashLocalVoltDB("Failed to get snapshot completion node", true, e);
+            } catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB("Interrupted getting snapshot completion node", true, e);
             }
-            VoltDB.crashLocalVoltDB("Failed to get snapshot completion node", true, e);
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Interrupted getting snapshot completion node", true, e);
-        }
-        if (data == null) {
-            VoltDB.crashLocalVoltDB("Data should not be null if the node exists", false, null);
-        }
-
-        try {
-            JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
-            if (jsonObj.getLong("txnId") != txnId) {
-                VoltDB.crashLocalVoltDB("TxnId should match", false, null);
+            if (data == null) {
+                VoltDB.crashLocalVoltDB("Data should not be null if the node exists", false, null);
             }
 
-            JSONArray hosts = jsonObj.getJSONArray("hosts");
-            int hostCount = jsonObj.getInt("hostCount");
-            // +1 because hostCount was initialized to -1
-            jsonObj.put("hostCount", hostCount + hosts.length() + 1);
-            zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("This ZK call should never fail", true, e);
+            try {
+                JSONObject jsonObj = new JSONObject(new String(data, Charsets.UTF_8));
+                if (jsonObj.getLong("txnId") != txnId) {
+                    VoltDB.crashLocalVoltDB("TxnId should match", false, null);
+                }
+
+                JSONArray hosts = jsonObj.getJSONArray("hosts");
+                int hostCount = jsonObj.getInt("hostCount");
+                // +1 because hostCount was initialized to -1
+                jsonObj.put("hostCount", hostCount + hosts.length() + 1);
+                zk.setData(snapshotPath, jsonObj.toString(4).getBytes(Charsets.UTF_8),
+                        stat.getVersion());
+            } catch (KeeperException.BadVersionException e) {
+                continue;
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("This ZK call should never fail", true, e);
+            }
+
+            success = true;
         }
     }
 
