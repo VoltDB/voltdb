@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -161,14 +160,7 @@ public class SnapshotSaveAPI
 
             // Create a barrier to use with the current number of sites to wait for
             // or if the barrier is already set up check if it is broken and reset if necessary
-            if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
-                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numLocalSites);
-                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
-                        new CyclicBarrier(numLocalSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
-            } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
-                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
-                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();
-            }
+            SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
 
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
             //so that the info can be put in the digest.

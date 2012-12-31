@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CyclicBarrier;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
@@ -97,19 +96,8 @@ public class SysprocFragmentTask extends TransactionTask
          * that initializes the barrier and resets it as necessary
          */
         if (m_task.isSysProcTask() && m_task.getFragmentId(0) == SysProcFragmentId.PF_createSnapshotTargets) {
-            synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
-                // Create a barrier to use with the current number of sites to wait for
-                // or if the barrier is already set up check if it is broken and reset if necessary
-                if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
-                    final int numLocalSites = VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length;
-                    SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numLocalSites);
-                    SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
-                            new CyclicBarrier(numLocalSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
-                } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
-                    SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
-                    SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();
-                }
-            }
+            final int numLocalSites = VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length;
+            SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
             try {
                 SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
                 SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await();

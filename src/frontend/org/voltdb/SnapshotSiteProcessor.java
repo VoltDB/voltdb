@@ -89,6 +89,19 @@ public class SnapshotSiteProcessor {
     public static AtomicReference<Runnable> m_snapshotCreateSetupBarrierActualAction =
             new AtomicReference<Runnable>();
 
+    public static void readySnapshotSetupBarriers(int numSites) {
+        synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
+            if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numSites);
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
+                        new CyclicBarrier(numSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
+            } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();
+            }
+        }
+    }
+
     //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
     public static Map<Integer, Long> m_partitionLastSeenTransactionIds =
             new HashMap<Integer, Long>();
