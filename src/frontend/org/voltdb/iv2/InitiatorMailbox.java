@@ -47,7 +47,6 @@ import org.voltdb.messaging.RejoinMessage;
 public class InitiatorMailbox implements Mailbox
 {
     static boolean LOG_TX = false;
-    static boolean LOG_RX = false;
 
     VoltLogger hostLog = new VoltLogger("HOST");
     VoltLogger tmLog = new VoltLogger("TM");
@@ -363,10 +362,6 @@ public class InitiatorMailbox implements Mailbox
     private void logRxMessage(VoltMessage message)
     {
         Iv2Trace.logInitiatorRxMsg(message, m_hsId);
-        if (LOG_RX) {
-            hostLog.info("RX HSID: " + CoreUtils.hsIdToString(m_hsId) +
-                    ": " + message);
-        }
     }
 
     private void logTxMessage(VoltMessage message)
