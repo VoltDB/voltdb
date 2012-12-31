@@ -7,7 +7,7 @@
 {@id_col = "ID"}
 {@assign_col = "NUM"}
 {@assign_type = "_value[int:0,100]"}
-{@set_op = "_pick[<options=UNION,INTERSECT>]"}
+{@set_op = "_pick[<options=UNION,INTERSECT,EXCEPT>]"}
 {@optional_all = "_pick[<options=,ALL>]"}
 
 <union-template.sql>
