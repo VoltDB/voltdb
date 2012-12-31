@@ -484,6 +484,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
         }
+        else if (message instanceof FragmentTaskMessage) {
+            handleFragmentTaskMessageRepair(needsRepair, (FragmentTaskMessage)message);
+        }
+        else if (message instanceof CompleteTransactionMessage) {
+            // It should be safe to just send CompleteTransactionMessages to everyone.
+            handleCompleteTransactionMessage((CompleteTransactionMessage)message);
+        }
+        else {
+            throw new RuntimeException("SpScheduler.handleMessageRepair received unexpected message type: " +
+                    message);
+        }
     }
 
     private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
@@ -526,6 +537,51 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!needsRepair.isEmpty()) {
             Iv2InitiateTaskMessage replmsg =
                 new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(needsRepair), replmsg);
+        }
+    }
+
+    private void handleFragmentTaskMessageRepair(List<Long> needsRepair, FragmentTaskMessage message)
+    {
+        // set up duplicate counter. expect exactly the responses corresponding
+        // to needsRepair. These may, or may not, include the local site.
+
+        List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
+        DuplicateCounter counter = new DuplicateCounter(
+                message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
+                message.getTxnId(), expectedHSIds);
+        m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
+
+        // is local repair necessary?
+        if (needsRepair.contains(m_mailbox.getHSId())) {
+            // Sanity check that we really need repair.
+            if (m_outstandingTxns.get(message.getTxnId()) != null) {
+                hostLog.warn("SPI repair attempted to repair a fragment which it has already seen. " +
+                        "This shouldn't be possible.");
+                // Not sure what to do in this event.  Crash for now
+                throw new RuntimeException("Attempted to repair with a fragment we've already seen.");
+            }
+            needsRepair.remove(m_mailbox.getHSId());
+            // make a copy because handleIv2 non-repair case does?
+            FragmentTaskMessage localWork =
+                new FragmentTaskMessage(message.getInitiatorHSId(),
+                    message.getCoordinatorHSId(), message);
+            ParticipantTransactionState txn = new ParticipantTransactionState(message.getSpHandle(), localWork);
+            m_outstandingTxns.put(message.getTxnId(), txn);
+            TransactionTask task;
+            if (message.isSysProcTask()) {
+                task = new SysprocFragmentTask(m_mailbox, txn, m_pendingTasks, localWork, null);
+            }
+            else {
+                task = new FragmentTask(m_mailbox, txn, m_pendingTasks, localWork, null);
+            }
+            m_pendingTasks.offer(task);
+        }
+
+        // is remote repair necessary?
+        if (!needsRepair.isEmpty()) {
+            FragmentTaskMessage replmsg =
+                new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             m_mailbox.send(com.google.common.primitives.Longs.toArray(needsRepair), replmsg);
         }
     }

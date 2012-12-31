@@ -28,6 +28,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -351,8 +353,18 @@ public class InitiatorMailbox implements Mailbox
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
+        else if (repairWork instanceof FragmentTaskMessage) {
+            // We need to get this into the repair log in case we've never seen it before.  Adding fragment
+            // tasks to the repair log is safe; we'll never overwrite the first fragment if we've already seen it.
+            m_repairLog.deliver(repairWork);
+            m_scheduler.handleMessageRepair(needsRepair, repairWork);
+        }
         else if (repairWork instanceof CompleteTransactionMessage) {
-            send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
+            // CompleteTransactionMessages should always be safe to handle.  Either the work was done, and we'll
+            // ignore it, or we need to clean up, or we'll be restarting and it doesn't matter.  Make sure they
+            // get into the repair log and then let them run their course.
+            m_repairLog.deliver(repairWork);
+            m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
         else {
             throw new RuntimeException("Invalid repair message type: " + repairWork);
