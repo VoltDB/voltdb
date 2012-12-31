@@ -17,6 +17,7 @@
 
 #include "common/NValue.hpp"
 #include "common/executorcontext.hpp"
+#include "logging/LogManager.h"
 
 #include <cstdio>
 #include <sstream>
@@ -411,3 +412,14 @@ void NValue::createDecimalFromDouble(double& dbl) {
     getDecimal() = scaledvalue;
 }
 
+namespace voltdb {
+
+int warn_if(int condition, const char* message)
+{
+    if (condition) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, message);
+    }
+    return condition;
+}
+
+};

@@ -108,13 +108,16 @@ inline void throwCastSQLValueOutOfRangeException<int64_t>(
                        msg, internalFlags);
 }
 
+int warn_if(int condition, const char* message);
+
 inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function)
 {
-    // This is a common test for NaN, even if it fails in some configurations like "g++ -fastmath".
-    if (value == value) {
-        return;
-    }
-    if (value <= DBL_MAX && value >= -DBL_MAX) {
+    static int warned_once = warn_if(!isnan(sqrt(-1.0)),
+                                     "The C++ configuration (e.g. \"g++ --fast-math\") "
+                                     "does not support SQL standard handling of numeric function errors.");
+    // This is a standard test for NaN, even if it fails in some configurations like "g++ -ffast-math".
+    // If it's disabled, a warning has been sent to the log, so at this point, just relax the check.
+    if (warned_once || ((! isnan(value)) && value <= DBL_MAX && value >= -DBL_MAX)) {
         return;
     }
     char msg[1024];
@@ -863,10 +866,6 @@ class NValue {
             whole /= NValue::kMaxScaleFactor;
             fractional %= NValue::kMaxScaleFactor;
             retval = static_cast<double>(whole.ToInt()) + ((double)fractional.ToInt())/((double)NValue::kMaxScaleFactor);
-            //whole is with the sign.
-            /*if (whole.IsSign()) {
-               retval *= -1;
-            }*/
             return retval;
           }
           case VALUE_TYPE_VARCHAR:
