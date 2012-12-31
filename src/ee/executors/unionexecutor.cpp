@@ -232,7 +232,8 @@ void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_
     while(it_a != map_a.end()) {
         TupleMap::iterator it_b = map_b.find(it_a->first);
         if (it_b != map_b.end()) {
-            it_a->second = std::max(it_a->second - it_b->second, zero_val);
+            it_a->second = (it_a->second > it_b->second) ?
+                std::max(it_a->second - it_b->second, zero_val) : zero_val;
             if (it_a->second == zero_val) {
                 it_a = map_a.erase(it_a);
             } else {
