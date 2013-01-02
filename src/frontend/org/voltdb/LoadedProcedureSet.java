@@ -131,7 +131,7 @@ public class LoadedProcedureSet {
 
             assert(procedure != null);
             runner = m_runnerFactory.create(procedure, proc, csp);
-            builder.put(proc.getTypeName(), runner);
+            builder.put(proc.getTypeName().intern(), runner);
         }
         return builder;
     }
@@ -180,7 +180,7 @@ public class LoadedProcedureSet {
 
             runner = m_runnerFactory.create(procedure, proc, csp);
             procedure.initSysProc(m_numberOfPartitions, m_site, this, proc, catalogContext.cluster);
-            builder.put(entry.getKey(), runner);
+            builder.put(entry.getKey().intern(), runner);
         }
     }
 

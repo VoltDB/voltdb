@@ -31,6 +31,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -129,6 +130,7 @@ public class ClientThread extends Thread {
                 log.error(String.format(
                         "Client cid %d procedure %s returned %d results instead of 3",
                         m_cid, procName, results.length));
+                log.error(((ClientResponseImpl) response).toJSONString());
                 System.exit(-1);
             }
             VoltTable data = results[2];
@@ -164,7 +166,7 @@ public class ClientThread extends Thread {
                     return;
                 }
             }
-            while (m_client.getConnectedHostList().size() > 0);
+            while (m_client.getConnectedHostList().size() == 0);
 
         }
     }
@@ -174,6 +176,18 @@ public class ClientThread extends Thread {
         while (m_shouldContinue.get()) {
             try {
                 runOne();
+            }
+            catch (NoConnectionsException e) {
+                log.error("ClientThread got NoConnectionsException on proc call. Will sleep.");
+                // take a breather to avoid slamming the log (stay paused if no connections)
+                do {
+                    try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
+                    // bail on wakeup if we're supposed to bail
+                    if (!m_shouldContinue.get()) {
+                        return;
+                    }
+                }
+                while (m_client.getConnectedHostList().size() == 0);
             }
             catch (ProcCallException e) {
                 ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();

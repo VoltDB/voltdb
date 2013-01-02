@@ -114,7 +114,12 @@ public class RepairLog
     // the repairLog if the message includes a truncation hint.
     public void deliver(VoltMessage msg)
     {
-        if (msg instanceof FragmentTaskMessage) {
+        if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
+            final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
+            m_lastSpHandle = m.getSpHandle();
+            truncate(Long.MIN_VALUE, m.getTruncationHandle());
+            m_log.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+        } else if (msg instanceof FragmentTaskMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
             truncate(m.getTruncationHandle(), Long.MIN_VALUE);
             // only log the first fragment of a procedure (and handle 1st case)
@@ -137,12 +142,6 @@ public class RepairLog
                 m_lastMpHandle = Math.max(m_lastMpHandle, m.getTxnId());
                 m_lastSpHandle = m.getSpHandle();
             }
-        }
-        else if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
-            final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
-            m_lastSpHandle = m.getSpHandle();
-            truncate(Long.MIN_VALUE, m.getTruncationHandle());
-            m_log.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
         }
     }
 

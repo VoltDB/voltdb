@@ -32,6 +32,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
 public class AdHocMayhemThread extends Thread {
@@ -76,8 +77,8 @@ public class AdHocMayhemThread extends Thread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                System.err.println("Non success in ProcCallback for AdHocMayhemThread (will sleep)");
-                System.err.println(((ClientResponseImpl)clientResponse).toJSONString());
+                log.warn("Non success in ProcCallback for AdHocMayhemThread. Will sleep.");
+                log.warn(((ClientResponseImpl)clientResponse).toJSONString());
                 m_needsBlock.set(true);
             }
         }
@@ -88,8 +89,7 @@ public class AdHocMayhemThread extends Thread {
         try {
             client.callProcedure("SetupAdHocTables");
         } catch (Exception e) {
-            System.err.println("SetupAdHocTables failed in AdHocMayhemThread");
-            e.printStackTrace();
+            log.error("SetupAdHocTables failed in AdHocMayhemThread. Will exit.", e);
             System.exit(-1);
         }
 
@@ -106,7 +106,7 @@ public class AdHocMayhemThread extends Thread {
                         return;
                     }
                 }
-                while (client.getConnectedHostList().size() > 0);
+                while (client.getConnectedHostList().size() == 0);
                 m_needsBlock.set(false);
             }
 
@@ -114,8 +114,7 @@ public class AdHocMayhemThread extends Thread {
             try {
                 txnsOutstanding.acquire();
             } catch (InterruptedException e) {
-                System.err.println("AdHocMayhemThread interrupted while waiting for permit");
-                e.printStackTrace();
+                log.error("AdHocMayhemThread interrupted while waiting for permit. Will end AdHoc work.", e);
                 return;
             }
 
@@ -124,9 +123,12 @@ public class AdHocMayhemThread extends Thread {
             try {
                 client.callProcedure(new AdHocCallback(), "@AdHoc", sql);
             }
+            catch (NoConnectionsException e) {
+                log.error("AdHocMayhemThread got NoConnectionsException on proc call. Will sleep.");
+                m_needsBlock.set(true);
+            }
             catch (Exception e) {
-                System.err.println("AdHocMayhemThread failed to run an AdHoc statement");
-                e.printStackTrace();
+                log.error("AdHocMayhemThread failed to run an AdHoc statement. Exiting.", e);
                 System.exit(-1);
             }
         }

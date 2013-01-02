@@ -230,7 +230,20 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
+    public void handleMessageRepair(List<Long> needsRepair, VoltMessage message)
+    {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
+        }
+        else {
+            // MpInitiatorMailbox should throw RuntimeException for unhandled types before we could get here
+            throw new RuntimeException("MpScheduler.handleMessageRepair() received unhandled message type." +
+                    " This should be impossible");
+        }
+    }
+
+    private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
+    {
         // just reforward the Iv2InitiateTaskMessage for the txn being restarted
         // this copy may be unnecessary
         final String procedureName = message.getStoredProcedureName();
@@ -309,7 +322,7 @@ public class MpScheduler extends Scheduler
             ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
         }
         else {
-            hostLog.info("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
+            hostLog.debug("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
         }
     }
 

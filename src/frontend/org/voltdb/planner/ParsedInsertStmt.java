@@ -23,6 +23,7 @@ import java.util.Map.Entry;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -35,8 +36,13 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     public HashMap<Column, AbstractExpression> columns = new HashMap<Column, AbstractExpression>();
 
-    ParsedInsertStmt() {
-        columns = new HashMap<Column, AbstractExpression>();
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedInsertStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
     }
 
     @Override

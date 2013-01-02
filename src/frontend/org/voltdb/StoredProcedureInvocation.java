@@ -243,7 +243,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             originalUniqueId = in.readLong();
         }
 
-        procName = in.readString();
+        procName = in.readString().intern();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
         serializedParams = in.remainder();
@@ -272,7 +272,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             originalUniqueId = in.readLong();
         }
 
-        procName = in.readString();
+        procName = in.readString().intern();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
         serializedParams = in.remainder();

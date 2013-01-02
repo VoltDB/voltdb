@@ -117,7 +117,7 @@ public class BigTableLoader extends Thread {
         catch (Exception e) {
             // on exception, log and end the thread, but don't kill the process
             log.error("BigTableLoader failed a procedure call for table " + tableName +
-                    " and will now die.", e);
+                    " and the thread will now stop.", e);
             return;
         }
     }

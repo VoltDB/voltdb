@@ -131,7 +131,7 @@ public class ProcedureRunner {
         assert(m_inputCRC.getValue() == 0L);
 
         if (procedure instanceof StmtProcedure) {
-            m_procedureName = catProc.getTypeName();
+            m_procedureName = catProc.getTypeName().intern();
         }
         else {
             m_procedureName = procedure.getClass().getSimpleName();

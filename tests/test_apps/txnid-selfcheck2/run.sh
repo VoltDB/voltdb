@@ -93,6 +93,7 @@ function benchmark() {
         --fillerrowsize=10240 \
         --replfillerrowmb=32 \
         --partfillerrowmb=128 \
+        --progresstimeout=120 \
         --usecompression=false
 }
 
