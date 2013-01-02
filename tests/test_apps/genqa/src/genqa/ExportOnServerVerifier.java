@@ -37,11 +37,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -113,6 +115,36 @@ public class ExportOnServerVerifier {
 
     ExportOnServerVerifier()
     {
+    }
+
+    int splitClientTrace(String trace, long [] splat)
+    {
+        if (trace == null || splat == null || splat.length == 0) return 0;
+
+        int columnCount = 0;
+        int cursor = 0;
+        int columnPos = trace.indexOf(':', cursor);
+
+        try {
+            while (columnPos >= 0 && splat.length > columnCount+1) {
+                splat[columnCount] = Long.parseLong(trace.substring(cursor, columnPos));
+                cursor = columnPos + 1;
+                columnCount = columnCount + 1;
+                columnPos = trace.indexOf(':', cursor);
+            }
+            if (cursor < trace.length()) {
+                columnPos = columnPos < 0 ? trace.length() : columnPos;
+                splat[columnCount] = Long.parseLong(trace.substring(cursor, columnPos));
+            } else {
+                columnCount = columnCount - 1;
+            }
+        } catch (NumberFormatException nfex) {
+            return 0;
+        } catch (IndexOutOfBoundsException ioobex) {
+            return -1;
+        }
+
+        return columnCount+1;
     }
 
     void verify(String[] args) throws Exception
@@ -304,6 +336,7 @@ public class ExportOnServerVerifier {
             // no more export rows, and there are still unchecked client txnids,
             // attempt to validate as many client txnids as possible
             dcount = 0;
+            long [] rec = new long [3];
             while ((!reachedReadUpTo() || !more_rows) && more_txnids)
             {
                 String trace = txnIdReader.readLine();
@@ -321,14 +354,15 @@ public class ExportOnServerVerifier {
                         trace = txnIdReader.readLine();
                     }
                 }
-                if (trace != null && trace.length() > 17)
+                int recColumns = splitClientTrace(trace, rec);
+                if (recColumns == rec.length)
                 {
-                    // content is [row_id]:[txid] formatted as %016d:%d
-                    long rowid = Long.parseLong(trace.substring(0,16));
-                    long txid = Long.parseLong(trace.substring(17));
+                    long rowid = rec[0];
+                    long txid = rec[1];
+                    long ts = rec[2];
 
                     if (txid >= 0) {
-                        m_clientTxnIds.add(txid);
+                        m_clientTxnIds.put(txid,ts);
                         countDownReadUpTo(txid);
                     } else {
                         m_clientTxnIdOrphans.add(rowid);
@@ -398,7 +432,7 @@ public class ExportOnServerVerifier {
         System.out.println("client tx id list size is " + m_clientTxnIds.size());
         int [] txByPart    = new int [m_partitions]; Arrays.fill(txByPart, 0);
         int [] staleByPart = new int [m_partitions]; Arrays.fill(staleByPart, 0);
-        for( Long tx: m_clientTxnIds)
+        for( Long tx: m_clientTxnIds.keySet())
         {
             int partid = TxnEgo.getPartitionId(tx);
             ++txByPart[partid];
@@ -430,7 +464,25 @@ public class ExportOnServerVerifier {
         System.out.println("orphaned client row id list size is " + m_clientTxnIdOrphans.size());
         System.out.println("stale client txid id list size is " + m_staleTxnIds.size());
         System.out.println("==================================================================\n");
+    }
 
+    void printClientTxIds() {
+        SimpleDateFormat dfmt = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS");
+        TreeMap<Date, Long> sortedByDate = new TreeMap<Date,Long>();
+        for (Map.Entry<Long,Long> entry: m_clientTxnIds.entrySet()) {
+            long txid = entry.getKey();
+            Date ts = new Date(entry.getValue());
+            sortedByDate.put(ts, txid);
+        }
+        System.out.println("\n==================================================================");
+        System.out.println("List of remaining committed but unmatched client transactions:");
+        for (Map.Entry<Date,Long> entry: sortedByDate.entrySet()) {
+            String ts = dfmt.format(entry.getKey());
+            long txid = entry.getValue();
+            int partid = TxnEgo.getPartitionId(txid);
+            System.out.println(ts+ ", partition: " + partid + ", txid: " + txid);
+        }
+        System.out.println("==================================================================\n");
     }
 
     private void loadAllPrivateKeys(File file) throws Exception {
@@ -782,7 +834,7 @@ public class ExportOnServerVerifier {
         while (staleitr.hasNext())
         {
             long staletx = staleitr.next();
-            if (m_clientTxnIds.remove(staletx))
+            if (m_clientTxnIds.remove(staletx) != null)
             {
                 ++matchCount;
                 staleitr.remove();
@@ -796,7 +848,7 @@ public class ExportOnServerVerifier {
             {
                 Map.Entry<Long, Long> e = txitr.next();
 
-                if (m_clientTxnIds.remove(e.getKey()))
+                if (m_clientTxnIds.remove(e.getKey()) != null)
                 {
                     txitr.remove();
                     ++matchCount;
@@ -1021,7 +1073,7 @@ public class ExportOnServerVerifier {
 
     HashMap<Integer,Long> m_maxPartTxId = new HashMap<Integer,Long>();
 
-    TreeSet<Long> m_clientTxnIds = new TreeSet<Long>();
+    TreeMap<Long,Long> m_clientTxnIds = new TreeMap<Long,Long>();
     ArrayList<Long> m_clientTxnIdOrphans = new ArrayList<Long>();
     HashMap<Integer,AtomicLong> m_readUpTo = new HashMap<Integer, AtomicLong>();
     HashMap<Integer,Integer> m_checkedUpTo = new HashMap<Integer, Integer>();
@@ -1046,6 +1098,7 @@ public class ExportOnServerVerifier {
             if (verifier.m_clientTxnIds.size() > 0)
             {
                 System.err.println("ERROR: not all client txids were matched against exported txids");
+                verifier.printClientTxIds();
                 System.exit(1);
             }
         }

@@ -141,11 +141,12 @@ public class AsyncExportClient
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             // Track the result of the request (Success, Failure)
+            long now = System.currentTimeMillis();
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 TrackingResults.incrementAndGet(0);
                 long txid = clientResponse.getResults()[0].asScalarLong();
-                final String trace = String.format("%016d:%d\n", m_rowid, txid);
+                final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
                 try
                 {
                     m_writer.write(trace);
@@ -158,7 +159,7 @@ public class AsyncExportClient
             else
             {
                 TrackingResults.incrementAndGet(1);
-                final String trace = String.format("%016d:-1\n", m_rowid);
+                final String trace = String.format("%d:-1:%d\n", m_rowid, now);
                 try
                 {
                     m_writer.write(trace);
