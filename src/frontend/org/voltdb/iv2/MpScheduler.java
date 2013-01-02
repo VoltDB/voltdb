@@ -166,9 +166,15 @@ public class MpScheduler extends Scheduler
         long timestamp = Long.MIN_VALUE;
 
         // Update UID if it's for replay
-        if (message.isForReplay() || message.isForDR()) {
+        if (message.isForReplay()) {
             timestamp = message.getUniqueId();
             m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
+        } else if (message.isForDR()) {
+            timestamp = message.getStoredProcedureInvocation().getOriginalUniqueId();
+            // @LoadMultipartitionTable does not have a valid uid
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
+                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
+            }
         }
 
         if (message.isForReplay()) {

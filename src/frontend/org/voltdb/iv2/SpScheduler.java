@@ -374,9 +374,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 /*
                  * If this is for CL replay or DR, update the unique ID generator
                  */
-                if (message.isForReplay() || message.isForDR()) {
+                if (message.isForReplay()) {
                     uniqueId = message.getUniqueId();
                     m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                } else if (message.isForDR()) {
+                    uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
+                    // @LoadSinglepartitionTable does not have a valid uid
+                    if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
+                        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                    }
                 }
 
                 /*
