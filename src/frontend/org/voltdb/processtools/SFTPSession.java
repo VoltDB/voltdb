@@ -88,7 +88,7 @@ public class SFTPSession {
                 "specified empty or null host"
                 );
         Preconditions.checkArgument(
-                port < 1,
+                port > 1,
                 "specified invalid port"
                 );
 
@@ -196,7 +196,7 @@ public class SFTPSession {
             try {
                 m_channel.put(src, dst);
                 if (m_log.isDebugEnabled()) {
-                    m_log.debug("put " + src + " " + dst);
+                    m_log.debug("SFTP: put " + src + " " + dst);
                 }
             } catch (SftpException sfex) {
                 throw new SFTPException("put " + src + " " + dst, sfex);
@@ -243,7 +243,7 @@ public class SFTPSession {
             try {
                 m_channel.ls( d.getAbsolutePath(), selector);
                 if (m_log.isDebugEnabled()) {
-                    m_log.debug("ls " + d.getAbsolutePath());
+                    m_log.debug("SFTP: ls " + d.getAbsolutePath());
                 }
             } catch (SftpException sfex) {
                 throw new SFTPException("list directory " + d, sfex);
@@ -254,7 +254,7 @@ public class SFTPSession {
                 try {
                     m_channel.rm(artifact.getAbsolutePath());
                     if (m_log.isDebugEnabled()) {
-                        m_log.debug("rm " + artifact.getAbsolutePath());
+                        m_log.debug("SFTP: rm " + artifact.getAbsolutePath());
                     }
                 } catch (SftpException sfex) {
                     throw new SFTPException("remove artifact " + artifact, sfex);
@@ -298,7 +298,7 @@ public class SFTPSession {
                 try {
                     m_channel.mkdir(entry.getDirectory().getAbsolutePath());
                     if (m_log.isDebugEnabled()) {
-                        m_log.debug("mkdir " + entry.getDirectory().getAbsolutePath());
+                        m_log.debug("SFTP: mkdir " + entry.getDirectory().getAbsolutePath());
                     }
                 } catch (SftpException sfex) {
                     throw new SFTPException("create directory " + entry, sfex);
@@ -330,7 +330,7 @@ public class SFTPSession {
         try {
             m_channel.ls(directory.getParent(), selector);
             if (m_log.isDebugEnabled()) {
-                m_log.debug("ls " + directory.getParent());
+                m_log.debug("SFTP: ls " + directory.getParent());
             }
         } catch (SftpException sfex) {
             throw new SFTPException("list directory " + directory.getParent(), sfex);
