@@ -71,6 +71,11 @@ public class Benchmark {
     final AtomicInteger activeConnections = new AtomicInteger(0);
     final AtomicBoolean shutdown = new AtomicBoolean(false);
 
+    // for reporting and detecting progress
+    private final AtomicLong txnCount = new AtomicLong();
+    private long txnCountAtLastCheck;
+    private long lastProgressTimestamp = System.currentTimeMillis();
+
     // For retry connections
     private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
         @Override
@@ -123,6 +128,9 @@ public class Benchmark {
 
         @Option(desc = "Target data size for the partitioned filler table.")
         int partfillerrowmb = 128;
+
+        @Option(desc = "Timeout that kills the client if progress is not made.")
+        int progresstimeout = 120;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -270,10 +278,26 @@ public class Benchmark {
      * periodically during a benchmark.
      */
     private synchronized void printStatistics() {
-        log.info(String.format("Executed %d", c.get()));
+
+        long txnCountNow = txnCount.get();
+        long now = System.currentTimeMillis();
+        boolean madeProgress = txnCountNow > txnCountAtLastCheck;
+
+        if (madeProgress) {
+            lastProgressTimestamp = now;
+        }
+        txnCountAtLastCheck = txnCountNow;
+        long diffInSeconds = (now - lastProgressTimestamp) / 1000;
+
+        log.info(String.format("Executed %d%s", txnCount.get(),
+                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds)"));
+
+        if (diffInSeconds > config.progresstimeout) {
+            log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
+            System.exit(-1);
+        }
     }
 
-    private final AtomicLong c = new AtomicLong();
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -324,6 +348,8 @@ public class Benchmark {
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
+        // reset progress tracker
+        lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
 
         // Run the benchmark loop for the requested duration
@@ -345,7 +371,7 @@ public class Benchmark {
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
-            ClientThread clientThread = new ClientThread(cid, c, client, processor);
+            ClientThread clientThread = new ClientThread(cid, txnCount, client, processor);
             clientThread.start();
             clientThreads.add(clientThread);
         }
@@ -380,6 +406,9 @@ public class Benchmark {
         // block until all outstanding txns return
         client.drain();
         client.close();
+
+        log.info(HORIZONTAL_RULE);
+        log.info("Benchmark Complete");
     }
 
     /**

@@ -32,6 +32,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -116,8 +117,12 @@ public class ReadThread extends Thread {
             try {
                 client.callProcedure(new ReadCallback(), procName, cid);
             }
+            catch (NoConnectionsException e) {
+                log.error("ReadThread got NoConnectionsException on proc call. Will sleep.");
+                m_needsBlock.set(true);
+            }
             catch (Exception e) {
-                log.error("ReadThread failed to run an AdHoc statement", e);
+                log.error("ReadThread failed to run a procedure. Will exit.", e);
                 System.exit(-1);
             }
         }
