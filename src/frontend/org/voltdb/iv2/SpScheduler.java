@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -461,20 +460,33 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 uniqueId = msg.getUniqueId();
             }
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
-            final SpProcedureTask task =
-                new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
-            if (!msg.isReadOnly()) {
-                if (!m_cl.log(msg, newSpHandle, m_durabilityListener, task)) {
-                    m_pendingTasks.offer(task);
-                }
-            } else {
-                m_pendingTasks.offer(task);
-            }
+            doLocalInitiateOffer(msg);
             return;
         }
         else {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
                     "should never receive multi-partition initiations.");
+        }
+    }
+
+    /**
+     * Do the work necessary to turn the Iv2InitiateTaskMessage into a
+     * TransactionTask which can be queued to the TransactionTaskQueue.
+     * This is reused by both the normal message handling path and the repair
+     * path, and assumes that the caller has dealt with or ensured that the
+     * necessary ID, SpHandles, and replication issues are resolved.
+     */
+    private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
+    {
+        final String procedureName = msg.getStoredProcedureName();
+        final SpProcedureTask task =
+            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
+        if (!msg.isReadOnly()) {
+            if (!m_cl.log(msg, msg.getSpHandle(), m_durabilityListener, task)) {
+                m_pendingTasks.offer(task);
+            }
+        } else {
+            m_pendingTasks.offer(task);
         }
     }
 
@@ -499,7 +511,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
     {
-        final String procedureName = message.getStoredProcedureName();
         if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessageRepair " +
                     "should never receive multi-partition initiations.");
@@ -526,11 +537,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             Iv2InitiateTaskMessage localWork =
                 new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
-
-            final SpProcedureTask task = new SpProcedureTask(m_mailbox, procedureName,
-                                                             m_pendingTasks, localWork,
-                                                             m_drGateway);
-            m_pendingTasks.offer(task);
+            doLocalInitiateOffer(localWork);
         }
 
         // is remote repair necessary?
@@ -566,16 +573,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             FragmentTaskMessage localWork =
                 new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
-            ParticipantTransactionState txn = new ParticipantTransactionState(message.getSpHandle(), localWork);
-            m_outstandingTxns.put(message.getTxnId(), txn);
-            TransactionTask task;
-            if (message.isSysProcTask()) {
-                task = new SysprocFragmentTask(m_mailbox, txn, m_pendingTasks, localWork, null);
-            }
-            else {
-                task = new FragmentTask(m_mailbox, txn, m_pendingTasks, localWork, null);
-            }
-            m_pendingTasks.offer(task);
+            doLocalFragmentOffer(localWork);
         }
 
         // is remote repair necessary?
@@ -707,14 +705,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
-        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
+        doLocalFragmentOffer(msg);
+    }
+
+    /**
+     * Do the work necessary to turn the FragmentTaskMessage into a
+     * TransactionTask which can be queued to the TransactionTaskQueue.
+     * This is reused by both the normal message handling path and the repair
+     * path, and assumes that the caller has dealt with or ensured that the
+     * necessary ID, SpHandles, and replication issues are resolved.
+     */
+    private void doLocalFragmentOffer(FragmentTaskMessage msg)
+    {
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         boolean logThis = false;
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            txn = new ParticipantTransactionState(newSpHandle, msg);
+            txn = new ParticipantTransactionState(msg.getSpHandle(), msg);
             m_outstandingTxns.put(msg.getTxnId(), txn);
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't
@@ -735,7 +745,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                  m_pendingTasks, msg, null);
         }
         if (logThis) {
-            if (!m_cl.log(msg.getInitiateTask(), newSpHandle, m_durabilityListener, task)) {
+            if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
             }
         } else {
