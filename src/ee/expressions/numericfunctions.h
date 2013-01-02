@@ -155,7 +155,7 @@ template<> inline NValue NValue::callUnary<FUNC_SQRT>() const {
       and long double (128-bit) if input is long double (128-bit).*/
     double inputValue = castAsDoubleAndGetValue();
     double resultDouble = std::sqrt(inputValue);
-    throwDataExceptionIfInfiniteOrNaN(resultDouble, "SQRT");
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function SQRT");
     retval.getDouble() = resultDouble;
     return retval;
 }
@@ -171,7 +171,7 @@ template<> inline NValue NValue::callUnary<FUNC_EXP>() const {
     //and long double (128-bit) if input is long double (128-bit).
     double exponentValue = castAsDoubleAndGetValue();
     double resultDouble = std::exp(exponentValue);
-    throwDataExceptionIfInfiniteOrNaN(resultDouble, "EXP");
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function EXP");
     retval.getDouble() = resultDouble;
     return retval;
 }
@@ -194,7 +194,7 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     double baseValue = base.castAsDoubleAndGetValue();
     double exponentValue = exponent.castAsDoubleAndGetValue();
     double resultDouble = std::pow(baseValue, exponentValue);
-    throwDataExceptionIfInfiniteOrNaN(resultDouble, "POWER");
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function POWER");
     retval.getDouble() = resultDouble;
     return retval;
 }
