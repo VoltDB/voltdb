@@ -150,7 +150,7 @@ public class SFTPSession {
      * values contain their respective destinations files (not directories)
      * ensure that the directories used in the destination files exist (creating
      * them if needed), removes previously installed artifacts files that end
-     * with .so, .ajr, and .jnilib, and copy over the source files to their
+     * with .so, .jar, and .jnilib, and copy over the source files to their
      * destination.
      *
      * @param files Map where their keys contain source file, and their associated
@@ -290,8 +290,8 @@ public class SFTPSession {
            addDirectoryAncestors(f.getParentFile(), directories);
         }
         /*
-         * for each entry tests whether or not it already exists, and if it
-         * does not create it (akin to mkdir -p)
+         * for each entry it tests whether or not it already exists, and if it
+         * does not, it creates it (akin to mkdir -p)
          */
         for (DirectoryEntry entry: directories) {
             if (!directoryExists(entry.getDirectory())) {
