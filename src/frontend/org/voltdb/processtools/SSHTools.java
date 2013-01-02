@@ -68,8 +68,8 @@ public class SSHTools {
         return cmdSSH(user, key, host, stringify(command));
     }
 
-    public SFTPSession getSftpSession(String hostname) {
-        return new SFTPSession(m_username, m_keyFile, hostname);
+    public SFTPSession getSftpSession(String hostname, VoltLogger logger) {
+        return new SFTPSession(m_username, m_keyFile, hostname, logger);
     }
 
     /*
