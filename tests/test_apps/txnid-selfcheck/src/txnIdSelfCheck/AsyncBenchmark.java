@@ -487,6 +487,8 @@ public class AsyncBenchmark {
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        Long noClientGracePeriodStart = null;
+        long noClientGracePeriodMs = 15 * 1000l;
         while (benchmarkEndTime > System.currentTimeMillis()) {
             int cid;
             if (r.nextDouble() < config.multisingleratio) {
@@ -501,7 +503,19 @@ public class AsyncBenchmark {
             Client client = null;
             try {
                 if (clients.isEmpty()) {
-                    crash("No connection to any server");
+                    if (noClientGracePeriodStart == null) {
+                        noClientGracePeriodStart = System.currentTimeMillis();
+                        continue;
+                    }
+                    else if ((System.currentTimeMillis() - noClientGracePeriodStart) < noClientGracePeriodMs) {
+                        continue;
+                    }
+                    else {
+                        crash("No connection to any server");
+                    }
+                }
+                else {
+                    noClientGracePeriodStart = null;
                 }
 
                 if (cid == -1) {
