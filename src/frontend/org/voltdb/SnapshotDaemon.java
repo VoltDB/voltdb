@@ -965,7 +965,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
-                    VoltZK.snapshot_truncation_master));
+                    VoltZK.request_truncation_snapshot));
         }
     }
 
