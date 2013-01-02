@@ -314,8 +314,7 @@ public class ExportOnServerVerifier {
                 Long previous = m_rowTxnIds.get(partition).put(rowTxnId,rowId);
                 if (previous != null)
                 {
-                    System.out.println("Duplicate TXN ID in export stream: " + rowTxnId);
-                    System.exit(-1);
+                    System.out.println("WARN Duplicate TXN ID in export stream: " + rowTxnId);
                 }
                 else
                 {
