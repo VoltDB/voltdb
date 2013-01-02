@@ -38,6 +38,7 @@ import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
@@ -49,6 +50,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.SettableFuture;
 
 /**
@@ -436,6 +438,7 @@ public class RejoinProducer extends SiteTasker
         }
 
         if (m_rejoinSiteProcessor.isEOF() == false) {
+            checkSnapshotBarriers();
             m_taskQueue.offer(this);
         } else {
             REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
@@ -453,6 +456,7 @@ public class RejoinProducer extends SiteTasker
             try {
                 REJOINLOG.debug(m_whoami
                         + "waiting on snapshot completion monitor.");
+                spinOnCompletionMonitor();
                 event = m_completionMonitorAwait.get();
                 REJOINLOG.debug(m_whoami
                         + "snapshot monitor completed. "
@@ -471,6 +475,34 @@ public class RejoinProducer extends SiteTasker
                         true, e);
             }
             setRejoinComplete(siteConnection, event.exportSequenceNumbers);
+        }
+    }
+
+    private void spinOnCompletionMonitor() {
+        /*
+         * Spin waiting for the snapshot to complete. If threads are blocked
+         * on the snapshot setup barrier, join them at the barrier so they can
+         * progress on this node.
+         */
+        while(!m_completionMonitorAwait.isDone()) {
+            try {
+                checkSnapshotBarriers();
+                Thread.sleep(1);
+            } catch (Exception e) {
+                Throwables.propagate(e);
+            }
+        }
+    }
+
+    private void checkSnapshotBarriers() {
+        try {
+            if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier != null &&
+                    SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.getNumberWaiting() > 0) {
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await();
+            }
+        } catch (Exception e) {
+            Throwables.propagate(e);
         }
     }
 
@@ -514,6 +546,7 @@ public class RejoinProducer extends SiteTasker
         try {
             REJOINLOG.debug(m_whoami
                     + "waiting on snapshot completion monitor.");
+            spinOnCompletionMonitor();
             event = m_completionMonitorAwait.get();
             REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                     + "and handing off to site.");

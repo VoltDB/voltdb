@@ -95,7 +95,7 @@ public class ReadThread extends Thread {
                         return;
                     }
                 }
-                while (client.getConnectedHostList().size() > 0);
+                while (client.getConnectedHostList().size() == 0);
                 m_needsBlock.set(false);
             }
 

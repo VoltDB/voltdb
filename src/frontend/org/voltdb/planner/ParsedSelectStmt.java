@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -62,6 +63,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private long offsetParameterId = -1;
     public boolean grouped = false;
     public boolean distinct = false;
+
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedSelectStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
+    }
 
     @Override
     void parse(VoltXMLElement stmtNode) {

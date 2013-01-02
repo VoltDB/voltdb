@@ -170,11 +170,8 @@ public class TestSqlCmdInterface
         String raw = "SELECT * FROM table UNION SELECT * FROM table2";
         String expected = raw;
         ID = 7;
-        notAssertThis(raw, expected, 1, ID); // Disable this when ENG-3354 is fixed
-        //assertThis(raw, expected, 1, ID);  // Enable this when ENG-3354 is fixed
+        assertThis(raw, expected, 1, ID);
     }
-
-
 
     // 8) To test 2 select statements with --union
     //    Everything after --union should be ignored

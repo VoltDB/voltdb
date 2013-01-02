@@ -60,31 +60,47 @@ class ParameterizationInfo {
 
         VoltXMLElement parameterizedXmlSQL = xmlSQL.duplicate();
 
-        // find the parameters xml node
-        VoltXMLElement paramsNode = null;
-        for (VoltXMLElement child : parameterizedXmlSQL.children) {
-            if (child.name.equals("parameters")) {
-                paramsNode = child;
-            }
-        }
-        assert(paramsNode != null);
-
-        // don't optimize plans with params yet
-        if (paramsNode.children.size() > 0) {
-            return null;
-        }
-
         Map<String, Integer> idToParamIndexMap = new HashMap<String, Integer>();
         List<String> paramValues = new ArrayList<String>();
 
-        parameterizeRecursively(parameterizedXmlSQL, paramsNode,
-                idToParamIndexMap, paramValues);
+        parameterizeRecursively(parameterizedXmlSQL, idToParamIndexMap, paramValues);
 
-        ParameterizationInfo info = new ParameterizationInfo(
+        ParameterizationInfo info = null;
+        if(idToParamIndexMap.size() > 0) {
+            info = new ParameterizationInfo(
                 xmlSQL, parameterizedXmlSQL,
                 paramValues.toArray(new String[paramValues.size()]));
-
+        }
         return info;
+    }
+
+    public static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,
+                                    Map<String, Integer> idToParamIndexMap,
+                                    List<String> paramValues) {
+
+        if (parameterizedXmlSQL.name.equals("union")) {
+            // UNION has its parameters on the individual selects level
+            for (VoltXMLElement xmlChildSQL : parameterizedXmlSQL.children) {
+                parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
+            }
+        } else {
+            // find the parameters xml node
+            VoltXMLElement paramsNode = null;
+            for (VoltXMLElement child : parameterizedXmlSQL.children) {
+                if (child.name.equals("parameters")) {
+                    paramsNode = child;
+                }
+            }
+            assert(paramsNode != null);
+
+            // don't optimize plans with params yet
+            if (paramsNode.children.size() > 0) {
+                return;
+            }
+
+            parameterizeRecursively(parameterizedXmlSQL, paramsNode,
+                    idToParamIndexMap, paramValues);
+        }
     }
 
     static void parameterizeRecursively(VoltXMLElement node,

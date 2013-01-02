@@ -309,7 +309,7 @@ public class MpScheduler extends Scheduler
             ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
         }
         else {
-            hostLog.info("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
+            hostLog.debug("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
         }
     }
 

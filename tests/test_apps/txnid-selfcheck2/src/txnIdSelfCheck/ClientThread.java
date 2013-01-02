@@ -129,6 +129,7 @@ public class ClientThread extends Thread {
                 log.error(String.format(
                         "Client cid %d procedure %s returned %d results instead of 3",
                         m_cid, procName, results.length));
+                log.error(((ClientResponseImpl) response).toJSONString());
                 System.exit(-1);
             }
             VoltTable data = results[2];
@@ -164,7 +165,7 @@ public class ClientThread extends Thread {
                     return;
                 }
             }
-            while (m_client.getConnectedHostList().size() > 0);
+            while (m_client.getConnectedHostList().size() == 0);
 
         }
     }

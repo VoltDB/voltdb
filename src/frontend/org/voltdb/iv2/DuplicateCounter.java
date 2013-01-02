@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,7 +43,7 @@ public class DuplicateCounter
     final long m_destinationId;
     Long m_responseHash = null;
     protected VoltMessage m_lastResponse = null;
-    final Set<Long> m_expectedHSIds;
+    final List<Long> m_expectedHSIds;
     final long m_txnId;
 
     DuplicateCounter(
@@ -52,7 +53,7 @@ public class DuplicateCounter
     {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
-        m_expectedHSIds = new HashSet<Long>(expectedHSIds);
+        m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
     }
 
     long getTxnId()

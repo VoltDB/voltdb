@@ -64,7 +64,8 @@ public class SQLCommand
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     private static final String readme = "SQLCommandReadme.txt";
 
@@ -104,8 +105,12 @@ public class SQLCommand
             stringFragmentMatcher = Extract.matcher(query);
             i++;
         }
-        query = AutoSplit.matcher(query).replaceAll(";$1 ");
+
+        query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_SETOP_SELECT");
+        query = AutoSplit.matcher(query).replaceAll(";$2$4 ");
+        query = query.replaceAll("SQL_PARSER_SETOP_SELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
+
         ArrayList<String> queries = new ArrayList<String>();
         for(int j = 0;j<sqlFragments.length;j++)
         {
@@ -1130,7 +1135,6 @@ public class SQLCommand
                     }
                 }
             }
-
        }
         catch (Exception e)
         {
