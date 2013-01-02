@@ -37,15 +37,48 @@ import com.jcraft.jsch.Session;
 import com.jcraft.jsch.SftpATTRS;
 import com.jcraft.jsch.SftpException;
 
+/**
+ * Utility class that aides the copying of files to remote hosts using SFTP.
+ *
+ * @author stefano
+ *
+ */
 public class SFTPSession {
 
-    protected static final VoltLogger cmdLog = new VoltLogger("REMOTECMD");
+    /**
+     * default logger
+     */
+    protected static final VoltLogger cmdLog = new VoltLogger(SFTPSession.class.getName());
+    /*
+     * regular expression that matches file names ending in jar, so, and jnilib
+     */
     private final static Pattern ARTIFACT_REGEXP = Pattern.compile("\\.(?:jar|so|jnilib)\\Z");
-
+    /*
+     * JSch SFTP channel
+     */
     private ChannelSftp m_channel;
+    /*
+     *  remote host name
+     */
     private final String m_host;
+    /*
+     * instance logger
+     */
+    private final VoltLogger m_log;
 
-    public SFTPSession( String user, String key, String host, int port) {
+    /**
+     * Instantiate a wrapper around a JSch Sftp Channel
+     *
+     * @param user SFTP connection user name
+     * @param key SFTP connection private key
+     * @param host SFTP remote host name
+     * @param port SFTP port
+     * @param log logger
+     *
+     * @throws SFTPException when it cannot connect, and establish a SFTP
+     *   session
+     */
+    public SFTPSession( String user, String key, String host, int port, VoltLogger log) {
         Preconditions.checkArgument(
                 user != null && !user.trim().isEmpty(),
                 "specified empty or null user"
@@ -54,6 +87,13 @@ public class SFTPSession {
                 host != null && !host.trim().isEmpty(),
                 "specified empty or null host"
                 );
+        Preconditions.checkArgument(
+                port < 1,
+                "specified invalid port"
+                );
+
+        if (log == null) m_log = cmdLog;
+        else m_log = log;
 
         JSch jsch = new JSch();
 
@@ -98,9 +138,28 @@ public class SFTPSession {
     }
 
     public SFTPSession( String user, String key, String host) {
-        this(user, key, host, 22);
+        this(user, key, host, 22, null);
     }
 
+    public SFTPSession( String user, String key, String host, VoltLogger log) {
+        this(user, key, host, 22, log);
+    }
+
+    /**
+     * Given a map where their keys contain source file, and their associated
+     * values contain their respective destinations files (not directories)
+     * ensure that the directories used in the destination files exist (creating
+     * them if needed), removes previously installed artifacts files that end
+     * with .so, .ajr, and .jnilib, and copy over the source files to their
+     * destination.
+     *
+     * @param files Map where their keys contain source file, and their associated
+     * values contain their respective destinations files. NB destinations must not
+     * be directory names, but fully specified file names
+     *
+     * @throws SFTPException when an error occurs during SFTP operations performed
+     *   by this method
+     */
     public void install( Map<File, File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
@@ -111,6 +170,18 @@ public class SFTPSession {
         copyOverFiles(files);
     }
 
+    /**
+     * Given a map where their keys contain source file, and their associated
+     * values contain their respective destinations files (not directories)
+     * copy over the source files to their destination.
+     *
+     * @param files Map where their keys contain source file, and their associated
+     * values contain their respective destinations files. NB destinations must not
+     * be directory names, but fully specified file names
+     *
+     * @throws SFTPException when an error occurs during SFTP operations performed
+     *   by this method
+     */
     public void copyOverFiles( Map<File, File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
@@ -124,8 +195,8 @@ public class SFTPSession {
             String dst = entry.getValue().getAbsolutePath();
             try {
                 m_channel.put(src, dst);
-                if (cmdLog.isDebugEnabled()) {
-                    cmdLog.debug("put " + src + " " + dst);
+                if (m_log.isDebugEnabled()) {
+                    m_log.debug("put " + src + " " + dst);
                 }
             } catch (SftpException sfex) {
                 throw new SFTPException("put " + src + " " + dst, sfex);
@@ -133,6 +204,15 @@ public class SFTPSession {
         }
     }
 
+    /**
+     * if found, it deletes artifacts held in the directories that
+     * contain the given list of files
+     *
+     * @param files a collection of files
+     *
+     * @throws SFTPException when an error occurs during SFTP operations performed
+     *   by this method
+     */
     public void deletePreviouslyInstalledArtifacts( Collection<File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
@@ -141,10 +221,12 @@ public class SFTPSession {
                 m_channel != null, "stale session"
                 );
 
+        // dedup directories containing files
         TreeSet<File> directories = new TreeSet<File>();
         for (File f: files) {
             directories.add( f.getParentFile());
         }
+        // look for file artifacts that end with .so, .jar, and .jnilib
         for (File d: directories) {
             final ArrayList<String> toBeDeleted = new ArrayList<String>();
             LsEntrySelector selector = new LsEntrySelector() {
@@ -160,19 +242,19 @@ public class SFTPSession {
             };
             try {
                 m_channel.ls( d.getAbsolutePath(), selector);
-                if (cmdLog.isDebugEnabled()) {
-                    cmdLog.debug("ls " + d.getAbsolutePath());
+                if (m_log.isDebugEnabled()) {
+                    m_log.debug("ls " + d.getAbsolutePath());
                 }
             } catch (SftpException sfex) {
                 throw new SFTPException("list directory " + d, sfex);
             }
-
+            // delete found artifacts
             for (String f: toBeDeleted) {
                 File artifact = new File( d, f);
                 try {
                     m_channel.rm(artifact.getAbsolutePath());
-                    if (cmdLog.isDebugEnabled()) {
-                        cmdLog.debug("rm " + artifact.getAbsolutePath());
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug("rm " + artifact.getAbsolutePath());
                     }
                 } catch (SftpException sfex) {
                     throw new SFTPException("remove artifact " + artifact, sfex);
@@ -181,6 +263,15 @@ public class SFTPSession {
         }
     }
 
+    /**
+     * Akin to mkdir -p for all directories containing the given collection of
+     * files.
+     *
+     * @param files a collection of files
+     *
+     * @throws SFTPException when an error occurs during SFTP operations performed
+     *   by this method
+     */
     public void ensureDirectoriesExistFor( Collection<File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
@@ -189,16 +280,25 @@ public class SFTPSession {
                 m_channel != null, "stale session"
                 );
 
+        /*
+         * directory entries are sorted first by their level (/l1 < /l1/l2 < /l1/l2/l3)
+         * and then their name. This loop adds all the directories that are required
+         * to ensure that given list of destination files can be copied over successfully
+         */
         TreeSet<DirectoryEntry> directories = new TreeSet<DirectoryEntry>();
         for (File f: files) {
            addDirectoryAncestors(f.getParentFile(), directories);
         }
+        /*
+         * for each entry tests whether or not it already exists, and if it
+         * does not create it (akin to mkdir -p)
+         */
         for (DirectoryEntry entry: directories) {
             if (!directoryExists(entry.getDirectory())) {
                 try {
                     m_channel.mkdir(entry.getDirectory().getAbsolutePath());
-                    if (cmdLog.isDebugEnabled()) {
-                        cmdLog.debug("mkdir " + entry.getDirectory().getAbsolutePath());
+                    if (m_log.isDebugEnabled()) {
+                        m_log.debug("mkdir " + entry.getDirectory().getAbsolutePath());
                     }
                 } catch (SftpException sfex) {
                     throw new SFTPException("create directory " + entry, sfex);
@@ -208,6 +308,16 @@ public class SFTPSession {
         directories.clear();
     }
 
+    /**
+     * Test whether or not the given directory exists on the remote host
+     *
+     * @param directory directory name
+     *
+     * @return true if does, false if it does not
+     *
+     * @throws SFTPException when an error occurs during SFTP operations performed
+     *   by this method
+     */
     public boolean directoryExists( final File directory) {
         Preconditions.checkArgument(
                 directory != null, "null directory"
@@ -219,8 +329,8 @@ public class SFTPSession {
         DirectoryExistsSelector selector = new DirectoryExistsSelector(directory);
         try {
             m_channel.ls(directory.getParent(), selector);
-            if (cmdLog.isDebugEnabled()) {
-                cmdLog.debug("ls " + directory.getParent());
+            if (m_log.isDebugEnabled()) {
+                m_log.debug("ls " + directory.getParent());
             }
         } catch (SftpException sfex) {
             throw new SFTPException("list directory " + directory.getParent(), sfex);
@@ -228,15 +338,32 @@ public class SFTPSession {
         return selector.doesExist();
     }
 
-    private int addDirectoryAncestors( final File directory, final TreeSet<DirectoryEntry> directories) {
+    /**
+     * traverses up all the given directory ancestors, and adds them as directory
+     * entries, designated by their level, to the given set of directory entries
+     *
+     * @param directory directory name
+     * @param directories set of directory entries
+     * @return
+     */
+    private int addDirectoryAncestors(
+            final File directory,
+            final TreeSet<DirectoryEntry> directories)
+    {
+        // root folder
         if (directory == null) return 0;
+        // if not root recurse and return this directory level
         int level = addDirectoryAncestors(directory.getParentFile(), directories);
+        // add it to the set if it is not a root folder
         if( level > 0) {
             directories.add( new DirectoryEntry(level, directory));
         }
         return level + 1;
     }
 
+    /**
+     * Terminate the SFTP session associated with this instance
+     */
     public void terminate() {
         try {
             if (m_channel == null) return;
@@ -337,22 +464,22 @@ public class SFTPSession {
         private static final long serialVersionUID = 9135753444480123857L;
 
         public SFTPException() {
-            super();
+            super("(Host: " + m_host + ")");
         }
 
         public SFTPException(String message, Throwable cause) {
             super("(Host: " + m_host + ") " + message, cause);
-            cmdLog.error(this);
+            m_log.error(this);
         }
 
         public SFTPException(String message) {
             super("(Host: " + m_host + ") " + message);
-            cmdLog.error(this);
+            m_log.error(this);
         }
 
         public SFTPException(Throwable cause) {
-            super(cause);
-            cmdLog.error(this);
+            super("(Host: " + m_host + ")",cause);
+            m_log.error(this);
         }
     }
 
