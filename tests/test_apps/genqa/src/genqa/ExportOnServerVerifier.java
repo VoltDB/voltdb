@@ -909,9 +909,6 @@ public class ExportOnServerVerifier {
     }
 
     private void verifyRow(String[] row) throws ValidationErr {
-        int col = 5; // col offset is always pre-incremented.
-        Long txnid = Long.parseLong(row[++col]); // col 6
-        Long rowid = Long.parseLong(row[++col]); // col 7
 
         if (row.length < 29)
         {
@@ -921,6 +918,10 @@ public class ExportOnServerVerifier {
             }
             return;
         }
+
+        int col = 5; // col offset is always pre-incremented.
+        Long txnid = Long.parseLong(row[++col]); // col 6
+        Long rowid = Long.parseLong(row[++col]); // col 7
         // matches VoltProcedure.getSeededRandomNumberGenerator()
         Random prng = new Random(txnid);
         SampleRecord valid = new SampleRecord(rowid, prng);
