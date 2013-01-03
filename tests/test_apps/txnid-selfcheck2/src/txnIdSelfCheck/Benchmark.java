@@ -196,8 +196,8 @@ public class Benchmark {
     Benchmark(Config config) {
         this.config = config;
 
-        processor = new PayloadProcessor(config.minvaluesize, config.maxvaluesize,
-                                         config.entropy, config.usecompression);
+        processor = new PayloadProcessor(4, config.minvaluesize, config.maxvaluesize,
+                                         config.entropy, Integer.MAX_VALUE, config.usecompression);
 
         log.info(HORIZONTAL_RULE);
         log.info(" Command Line Configuration");
