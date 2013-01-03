@@ -240,7 +240,7 @@ public class ProcedureRunner {
                 } catch (Exception e) {
                     m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
-                            ": " + e.getMessage();
+                            ": " + e.toString();
                     status = ClientResponse.GRACEFUL_FAILURE;
                     return getErrorResponse(status, msg, null);
                 }
@@ -710,9 +710,15 @@ public class ProcedureRunner {
 
                 for (ProcParameter param : m_catProc.getParameters()) {
                     VoltType type = VoltType.get((byte) param.getType());
-                    if (type == VoltType.INTEGER) type = VoltType.BIGINT;
-                    if (type == VoltType.SMALLINT) type = VoltType.BIGINT;
-                    if (type == VoltType.TINYINT) type = VoltType.BIGINT;
+                    if (type == VoltType.INTEGER) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.SMALLINT) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.TINYINT) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.NUMERIC) {
+                        type = VoltType.FLOAT;
+                    }
 
                     m_paramTypes[param.getIndex()] = type.classFromType();
                     m_paramTypeIsPrimitive[param.getIndex()] = m_paramTypes[param.getIndex()].isPrimitive();
