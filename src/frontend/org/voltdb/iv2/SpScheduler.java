@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -355,7 +355,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = message.getStoredProcedureName();
         if (message.isSinglePartition()) {
             long newSpHandle;
-            long uniqueId;
+            long uniqueId = Long.MIN_VALUE;
             Iv2InitiateTaskMessage msg = message;
             if (m_isLeader || message.isReadOnly()) {
                 /*
@@ -371,14 +371,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
 
                 /*
+                 * If this is for CL replay or DR, update the unique ID generator
+                 */
+                if (message.isForReplay()) {
+                    uniqueId = message.getUniqueId();
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                } else if (message.isForDR()) {
+                    uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
+                    // @LoadSinglepartitionTable does not have a valid uid
+                    if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
+                        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                    }
+                }
+
+                /*
                  * If this is CL replay use the txnid from the CL and also
                  * update the txnid to match the one from the CL
                  */
                 if (message.isForReplay()) {
                     newSpHandle = message.getTxnId();
-                    uniqueId = message.getUniqueId();
                     setMaxSeenTxnId(newSpHandle);
-                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
                 } else if (m_isLeader) {
                     TxnEgo ego = advanceTxnEgo();
                     newSpHandle = ego.getTxnId();
