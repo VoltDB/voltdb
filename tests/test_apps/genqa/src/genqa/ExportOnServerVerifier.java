@@ -47,6 +47,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
@@ -54,6 +55,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.spearce_voltpatches.jgit.transport.OpenSshConfig;
 import org.voltcore.utils.Pair;
@@ -76,8 +79,11 @@ public class ExportOnServerVerifier {
     public static long FILE_TIMEOUT_MS = 5 * 60 * 1000; // 5 mins
 
     public static long VALIDATION_REPORT_INTERVAL = 10000;
+    public static final Locale REAL_DEFAULT_LOCALE = Locale.getDefault();
 
     private final static String TRACKER_FILENAME = "__active_tracker";
+    private final static Pattern EXPORT_FILENAME_REGEXP =
+            Pattern.compile("\\A[^-]+-(\\d+)-[^-]+-(\\d+)\\.csv\\z");
 
     private final JSch m_jsch = new JSch();
     private final List<RemoteHost> m_hosts = new ArrayList<RemoteHost>();
@@ -466,7 +472,10 @@ public class ExportOnServerVerifier {
     }
 
     void printClientTxIds() {
-        SimpleDateFormat dfmt = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS");
+        SimpleDateFormat dfmt = new SimpleDateFormat(
+                "yyyy-MM-dd'T'hh:mm:ss.SSS",
+                REAL_DEFAULT_LOCALE
+                );
         TreeMap<Date, Long> sortedByDate = new TreeMap<Date,Long>();
         for (Map.Entry<Long,Long> entry: m_clientTxnIds.entrySet()) {
             long txid = entry.getKey();
@@ -541,7 +550,14 @@ public class ExportOnServerVerifier {
 
                         if (!entry.getFilename().contains("active"))
                         {
-                            paths.add(entryFileName);
+                            Matcher mtc = EXPORT_FILENAME_REGEXP.matcher(entry.getFilename());
+                            if (mtc.matches()) {
+                                paths.add(entryFileName);
+                            } else {
+                                System.err.println(
+                                        "ERROR: " + entryFileName +
+                                        " does not match expected export file name pattern");
+                            }
                         }
                         else if (entry.getFilename().startsWith("active-"))
                         {
@@ -561,7 +577,7 @@ public class ExportOnServerVerifier {
                 rh.activeSeen = rh.activeSeen || activeInRemote;
                 if( activeInRemote) activeFound++;
 
-                Collections.sort(paths);
+                Collections.sort(paths, comparator);
                 if (!paths.isEmpty()) pathsFromAllNodes.add(Pair.of(rh.channel, paths));
             }
 
@@ -571,23 +587,31 @@ public class ExportOnServerVerifier {
                 Thread.sleep(5000);
             }
 
-            /*
-             * Take one file from the sorted list from each node at a time
-             * and add it the global list of files to process
-             */
-            boolean hadOne;
-            do {
-                hadOne = false;
-                for (Pair<ChannelSftp, List<String>> p : pathsFromAllNodes) {
-                    final ChannelSftp c = p.getFirst();
-                    final List<String> paths = p.getSecond();
-                    if (!paths.isEmpty()) {
-                        hadOne = true;
-                        final String filePath = paths.remove(0);
-                        m_exportFiles.offer(Pair.of(c, filePath));
-                    }
+            // add them to m_exportFiles as ordered by the comparator
+            TreeMap<String, Pair<ChannelSftp,String>> hadPaths =
+                    new TreeMap<String, Pair<ChannelSftp, String>>(comparator);
+
+            for (Pair<ChannelSftp, List<String>> p : pathsFromAllNodes)
+            {
+                final ChannelSftp c = p.getFirst();
+                for (String path: p.getSecond())
+                {
+                    hadPaths.put( path, Pair.of(c, path));
                 }
-            } while (hadOne);
+            }
+
+            boolean hadOne = !hadPaths.isEmpty();
+
+            Iterator<Map.Entry<String, Pair<ChannelSftp, String>>> itr =
+                    hadPaths.entrySet().iterator();
+
+            while (itr.hasNext())
+            {
+                Map.Entry<String, Pair<ChannelSftp, String>> entry = itr.next();
+                m_exportFiles.offer(entry.getValue());
+                itr.remove();
+            }
+
             long now = System.currentTimeMillis();
             if ((now - start_time) > FILE_TIMEOUT_MS)
             {
@@ -658,16 +682,27 @@ public class ExportOnServerVerifier {
             @Override
             public int compare(String f1, String f2)
             {
-                long first_ts = Long.parseLong((f1.split("-")[3]).split("\\.")[0]);
-                long second_ts = Long.parseLong((f2.split("-")[3]).split("\\.")[0]);
+                f1 = f1.substring(f1.lastIndexOf('/') + 1);
+                f2 = f2.substring(f2.lastIndexOf('/') + 1);
+
+                Matcher m1 = EXPORT_FILENAME_REGEXP.matcher(f1);
+                Matcher m2 = EXPORT_FILENAME_REGEXP.matcher(f2);
+
+                if (m1.matches() && !m2.matches()) return -1;
+                else if (m2.matches() && !m1.matches()) return 1;
+
+                long first_ts = Long.parseLong(m1.group(2));
+                long second_ts = Long.parseLong(m2.group(2));
+
                 if (first_ts != second_ts)
                 {
                     return (int)(first_ts - second_ts);
                 }
                 else
                 {
-                    long first_txnid = Long.parseLong(f1.split("-")[1]);
-                    long second_txnid = Long.parseLong(f2.split("-")[1]);
+                    long first_txnid = Long.parseLong(m1.group(1));
+                    long second_txnid = Long.parseLong(m2.group(1));
+
                     if (first_txnid < second_txnid)
                     {
                         return -1;
