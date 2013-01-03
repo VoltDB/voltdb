@@ -203,7 +203,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
     }
 
-    public ExportDataSource(Runnable onDrain,
+    public ExportDataSource(final Runnable onDrain,
             File adFile
             ) throws IOException {
 
@@ -211,7 +211,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * Certainly no more data coming if this is coming off of disk
          */
         m_endOfStream = true;
-        m_onDrain = onDrain;
+        m_onDrain = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    onDrain.run();
+                } finally {
+                    m_onDrain = null;
+                    forwardAckToOtherReplicas(Long.MIN_VALUE);
+                }
+            }
+        };
 
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
