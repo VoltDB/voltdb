@@ -20,6 +20,9 @@ package org.voltdb.iv2;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
+import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
 import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
@@ -240,5 +243,20 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             }
         }
 
+    }
+
+    private void repairReplicasWithInternal(List<Long> needsRepair, VoltMessage repairWork) {
+        assert(lockingVows());
+        if (repairWork instanceof Iv2InitiateTaskMessage) {
+            Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
+            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
+            m_scheduler.handleMessageRepair(needsRepair, work);
+        }
+        else if (repairWork instanceof CompleteTransactionMessage) {
+            send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
+        }
+        else {
+            throw new RuntimeException("During MPI repair: Invalid repair message type: " + repairWork);
+        }
     }
 }

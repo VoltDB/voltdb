@@ -128,7 +128,7 @@ public class AdHocMayhemThread extends Thread {
                 m_needsBlock.set(true);
             }
             catch (Exception e) {
-                log.error("AdHocMayhemThread failed to run an AdHoc statement. Exiting.", e);
+                log.error("AdHocMayhemThread failed to run an AdHoc statement. Will exit.", e);
                 System.exit(-1);
             }
         }
