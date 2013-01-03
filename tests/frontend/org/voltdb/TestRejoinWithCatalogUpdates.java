@@ -139,6 +139,8 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
             client.close();
 
             assertTrue(didRestore());
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
             cluster.shutDown();
             if (localServer != null) {
@@ -179,6 +181,8 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
                 assertTrue(results.length == 1);
                 client.close();
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
             cluster.shutDown();
         }
