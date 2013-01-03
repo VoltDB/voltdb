@@ -232,9 +232,6 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (m_valueType != VoltType.NUMERIC) {
             return;
         }
-        if (columnType == null || columnType == VoltType.NUMERIC) {
-            return;
-        }
         if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL)) {
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();

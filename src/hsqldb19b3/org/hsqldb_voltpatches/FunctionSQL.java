@@ -353,26 +353,31 @@ public class FunctionSQL extends Expression {
             case FUNC_EXP :
                 name      = Tokens.T_EXP;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_POWER :
                 name      = Tokens.T_POWER;
                 parseList = doubleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_SQRT :
                 name      = Tokens.T_SQRT;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_FLOOR :
                 name      = Tokens.T_FLOOR;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_CEILING :
                 name      = Tokens.T_CEILING;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_WIDTH_BUCKET :
@@ -756,10 +761,6 @@ public class FunctionSQL extends Expression {
                 }
 
                 double val = Math.exp(((Number) data[0]).doubleValue());
-                // VoltDB tweaked compliance with standard sql error handling
-                if (Double.isNaN(val) || Double.isInfinite(val)) {
-                    throw Error.error(ErrorCode.X_2201F);
-                }
 
                 return ValuePool.getDouble(Double.doubleToLongBits(val));
             }
@@ -772,10 +773,9 @@ public class FunctionSQL extends Expression {
                 double exponent = ((Number) data[1]).doubleValue();
                 double val;
 
-                //VOLTDB's HSQL_BACKEND doesn't object to negative exponents -- why should it?
-                //ORIGINAL HSQL CODE: if (exponent < 0) {
-                //ORIGINAL HSQL CODE:     throw Error.error(ErrorCode.X_2201F);
-                //ORIGINAL HSQL CODE: }
+                if (exponent < 0) {
+                    throw Error.error(ErrorCode.X_2201F);
+                }
 
                 if (base == 0) {
                     if (exponent < 0) {
@@ -787,9 +787,6 @@ public class FunctionSQL extends Expression {
                     }
                 } else {
                     val = Math.pow(base, exponent);
-                    if (Double.isNaN(val) || Double.isInfinite(val)) {
-                        throw Error.error(ErrorCode.X_2201F);
-                    }
                 }
 
                 return ValuePool.getDouble(Double.doubleToLongBits(val));
@@ -800,10 +797,6 @@ public class FunctionSQL extends Expression {
                 }
 
                 double val = Math.sqrt(((Number) data[0]).doubleValue());
-                // VoltDB tweaked compliance with standard sql error handling
-                if (Double.isNaN(val) || Double.isInfinite(val)) {
-                    throw Error.error(ErrorCode.X_2201F);
-                }
 
                 return ValuePool.getDouble(Double.doubleToLongBits(val));
             }
@@ -1248,18 +1241,11 @@ public class FunctionSQL extends Expression {
             }
             case FUNC_POWER : {
                 if (nodes[0].dataType == null) {
-                    // VoltDB swapped out this odd propagation of nulls.
-                    // ORIGINAL HSQL CODE: nodes[1].dataType = nodes[0].dataType;
-                    // VoltDB simply gives missing types the benefit of the doubt.
-                    nodes[0].dataType = Type.SQL_DOUBLE;
-                    // For VoltDB, the retest for null below is now redundant.
+                    nodes[1].dataType = nodes[0].dataType;
                 }
 
                 if (nodes[1].dataType == null) {
-                    // VoltDB swapped out this odd propagation of nulls.
-                    // ORIGINAL HSQL CODE: nodes[0].dataType = nodes[1].dataType;
-                    // VoltDB simply gives missing types the benefit of the doubt.
-                    nodes[0].dataType = Type.SQL_DOUBLE;
+                    nodes[0].dataType = nodes[1].dataType;
                 }
 
                 if (nodes[0].dataType == null) {

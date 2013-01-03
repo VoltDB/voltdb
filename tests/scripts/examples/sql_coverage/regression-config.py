@@ -78,11 +78,6 @@
                       "ddl": "strings-DDL.sql",
                       "template": "basic-strings.sql",
                       "normalizer": "normalizer.py"},
-# THESE ALL SUCCEED, USE TEMPLATE INPUT
-    "partial-covering": {"schema": "partial-covering-schema.py",
-                         "ddl": "partial-covering-DDL.sql",
-                         "template": "partial-covering.sql",
-                         "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
     "basic-ints": {"schema": "int-schema.py",
                    "ddl": "int-DDL.sql",
@@ -151,6 +146,11 @@
     "pushdown": {"schema": "pushdown-schema.py",
         "ddl": "pushdown-DDL.sql",
         "template": "pushdown.sql",
+        "normalizer": "normalizer.py"},
+# THESE ALL SUCCEED, USE TEMPLATE INPUT
+    "partial-covering": {"schema": "partial-covering-schema.py",
+        "ddl": "partial-covering-DDL.sql",
+        "template": "partial-covering.sql",
         "normalizer": "normalizer.py"},
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION
 # AND VoltDB gives VOLTDB ERROR: Type DECIMAL can't be cast as FLOAT, so keep it disabled, for now.

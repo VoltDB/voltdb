@@ -71,14 +71,6 @@ public class ParameterConverter {
             return param;
         }
 
-        // Allow anything to be passed via an untyped parameter?
-        // Null parameter type used to crash below.
-        // If instead it should be considered always a sign of error,
-        // the error should have been caught much earlier, in planning.
-        if (paramType == null) {
-            return param;
-        }
-
         Class<?> pclass = param.getClass();
 
         // hack to make strings work with input as byte[]

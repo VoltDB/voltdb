@@ -87,6 +87,26 @@ class IntValueGenerator(BaseValueGenerator):
             yield random.randint(self.__min, self.__max)
 
 
+
+class IDValueGenerator(BaseValueGenerator):
+    """This generates unique incremental integers.
+    """
+
+    counter = 0
+
+    def __init__(self):
+        BaseValueGenerator.__init__(self)
+
+    @classmethod
+    def initialize(cls, start):
+        cls.counter = start
+
+    def generate(self, count):
+        for i in xrange(count):
+            id = self.__class__.counter
+            self.__class__.counter += 1
+            yield id
+
 class ByteValueGenerator(IntValueGenerator):
     """This generates bytes.
     """
@@ -385,7 +405,8 @@ class ConstantGenerator(BaseGenerator):
     """This replaces variable with actual value.
     """
 
-    TYPES = {"int": IntValueGenerator,
+    TYPES = {"id": IDValueGenerator,
+             "int": IntValueGenerator,
              "byte": ByteValueGenerator,
              "int16": Int16ValueGenerator,
              "int32": Int32ValueGenerator,
@@ -423,27 +444,6 @@ class ConstantGenerator(BaseGenerator):
                 i = u"%.20e" % (i)
             yield unicode(i)
 
-
-class IdGenerator(BaseGenerator):
-    """This replaces _id with a counter value unique to the entire run (or until reset with the 'initialize' class method).
-    """
-
-    counter = 0
-
-    def __init__(self):
-        BaseGenerator.__init__(self, "_id")
-
-    def prepare_params(self, attribute_groups):
-        pass
-
-    def next_param(self):
-        id = self.__class__.counter
-        self.__class__.counter += 1
-        yield unicode(id)
-
-    @classmethod
-    def initialize(cls, start):
-        cls.counter = start
 
 class PickGenerator(BaseGenerator):
     """This generates statement elements picked from a specified options list, e.g.
@@ -565,7 +565,7 @@ class Statement:
         self.__generator_types = (CmpGenerator, MathGenerator, LogicGenerator,
                                   NegationGenerator, DistinctGenerator,
                                   SortOrderGenerator, AggregationGenerator, NumericAggregationGenerator,
-                                  LikeGenerator, SetGenerator, ConstantGenerator, PickGenerator, IdGenerator)
+                                  LikeGenerator, SetGenerator, ConstantGenerator, PickGenerator)
 
         # prepare table generators
         self.__statement = self.__text
@@ -741,7 +741,7 @@ class SQLGenerator:
         IS_VOLT = is_volt
 
         # Reset the counters
-        IdGenerator.initialize(0)
+        IDValueGenerator.initialize(0)
 
         if isinstance(catalog, Schema):
             self.__schema = catalog
