@@ -22,10 +22,17 @@ import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.rejoin.TaskLog;
 
 /**
@@ -75,6 +82,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
+
+    // helper class to put command log work in order
+    protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     /*
      * This lock is extremely dangerous to use without known the pattern.
@@ -150,12 +160,142 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_lock = o;
     }
 
+    /**
+     * Poll the replay sequencer and process the messages until it returns null
+     */
+    private void deliverReadyTxns() {
+        VoltMessage m = m_replaySequencer.poll();
+        while(m != null) {
+            deliver(m);
+            m = m_replaySequencer.poll();
+        }
+    }
+
+    /**
+     * Poll the replay sequencer and respond to all SPs with an IGNORED response
+     */
+    private void drainReplaySequencer()
+    {
+        VoltMessage m = m_replaySequencer.poll();
+        while (m != null) {
+            if (m instanceof Iv2InitiateTaskMessage) {
+                // Send IGNORED response for all SPs
+                Iv2InitiateTaskMessage task = (Iv2InitiateTaskMessage) m;
+                final InitiateResponseMessage response = new InitiateResponseMessage(task);
+                response.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        ClientResponseImpl.IGNORED_TRANSACTION));
+                m_mailbox.send(response.getInitiatorHSId(), response);
+            }
+            m = m_replaySequencer.poll();
+        }
+    }
+
+    /**
+     * Update last seen txnIds in the replay sequencer. This is used on MPI repair.
+     * @param message
+     */
+    public void updateLastSeenTxnIds(VoltMessage message)
+    {
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
+                (((TransactionInfoBaseMessage)message).isForReplay()));
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        boolean sentinel = message instanceof MultiPartitionParticipantMessage;
+
+        boolean replay = commandLog || sentinel || dr;
+
+        assert(!(commandLog && dr));
+
+        if (commandLog || sentinel) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+        }
+        else if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+        }
+
+        if (replay) {
+            // Update last seen and last polled txnId for replicas
+            m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+        }
+    }
+
+    /**
+     * Sequence the message for replay if it's for CL or DR.
+     *
+     * @param message
+     * @return true if the message can be delivered directly to the scheduler,
+     * false if the message is queued
+     */
+    public boolean sequenceForReplay(VoltMessage message)
+    {
+        boolean canDeliver = false;
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
+                (((TransactionInfoBaseMessage)message).isForReplay()));
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        boolean sentinel = message instanceof MultiPartitionParticipantMessage;
+
+        boolean replay = commandLog || sentinel || dr;
+        boolean sequenceForReplay = m_isLeader && replay;
+
+        assert(!(commandLog && dr));
+
+        if (commandLog || sentinel) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+        }
+        else if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+        }
+
+        if (sequenceForReplay) {
+            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            if (dupe != null) {
+                // Duplicate initiate task message, send response
+                m_mailbox.send(dupe.getInitiatorHSId(), dupe);
+            }
+            else if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage) message)) {
+                canDeliver = true;
+            }
+            else if (m_replaySequencer.isMPIEOLReached()) {
+                drainReplaySequencer();
+            }
+            else {
+                deliverReadyTxns();
+            }
+        }
+        else {
+            if (replay) {
+                // Update last seen and last polled txnId for replicas
+                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+                m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+            }
+
+            canDeliver = true;
+        }
+
+        return canDeliver;
+    }
+
     abstract public void shutdown();
 
     @Override
     abstract public void updateReplicas(List<Long> replicas);
 
-    @Override
     abstract public void deliver(VoltMessage message);
 
     abstract public void enableWritingIv2FaultLog();

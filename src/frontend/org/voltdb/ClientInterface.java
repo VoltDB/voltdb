@@ -185,12 +185,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
             new HashMap<String, List<InvocationAcceptancePolicy>>();
 
-    /**
-     * For IV2 only: this is used to track the last txnId replicated for a
-     * certain partition, so that duped DR txns can be dropped.
-     */
-    private final Map<Integer, Long> m_partitionTxnIds = new HashMap<Integer, Long>();
-
     /*
      * Allow the async compiler thread to immediately process completed planning tasks
      * without waiting for the periodic work thread to poll the mailbox.
@@ -1025,34 +1019,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             Long initiatorHSId = null;
             boolean isShortCircuitRead = false;
-
-            if (invocation.getType() == ProcedureInvocationType.REPLICATED)
-            {
-                int partitionId;
-                if (isSinglePartition) {
-                    partitionId = partitions[0];
-                } else {
-                    partitionId = MpInitiator.MP_INIT_PID;
-                }
-
-                Long lastTxnId = m_partitionTxnIds.get(partitionId);
-                if (lastTxnId != null) {
-                    /*
-                     * Ning - @LoadSinglepartTable and @LoadMultipartTable
-                     * always have the same txnId which is the txnId of the
-                     * snapshot.
-                     */
-                    if (!(invocation.getProcName().equalsIgnoreCase("@LoadSinglepartitionTable") ||
-                            invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
-                            invocation.getOriginalTxnId() <= lastTxnId)
-                    {
-                        hostLog.debug("Dropping duplicate replicated transaction " + invocation.getProcName() + ", txnid: " +
-                                invocation.getOriginalTxnId() + ", last seen: " + lastTxnId);
-                        return false;
-                    }
-                }
-                m_partitionTxnIds.put(partitionId, invocation.getOriginalTxnId());
-            }
 
             /*
              * If this is a read only single part, check if there is a local replica,

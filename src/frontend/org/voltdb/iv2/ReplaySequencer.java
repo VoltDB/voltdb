@@ -23,9 +23,14 @@ import java.util.TreeMap;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltTable;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 /**
@@ -118,6 +123,9 @@ public class ReplaySequencer
     // for released transactions do not need further sequencing.
     long m_lastPolledFragmentTxnId = Long.MIN_VALUE;
 
+    // lastSeenTxnId tracks the last seen txnId for this partition
+    long m_lastSeenTxnId = Long.MIN_VALUE;
+
     // has reached end of log for this partition, release any MP Txns for
     // replay if this is true.
     boolean m_eolReached = false;
@@ -128,6 +136,63 @@ public class ReplaySequencer
     public boolean isMPIEOLReached()
     {
         return m_mpiEOLReached;
+    }
+
+    /**
+     * Dedupe initiate task messages. Check if the initiate task message is seen before.
+     *
+     * @param inTxnId The txnId of the message
+     * @param in The initiate task message
+     * @return A client response to return if it's a duplicate, otherwise null.
+     */
+    public InitiateResponseMessage dedupe(long inTxnId, TransactionInfoBaseMessage in)
+    {
+        if (in instanceof Iv2InitiateTaskMessage) {
+            final Iv2InitiateTaskMessage init = (Iv2InitiateTaskMessage) in;
+            final StoredProcedureInvocation invocation = init.getStoredProcedureInvocation();
+            final String procName = invocation.getProcName();
+
+            /*
+             * Ning - @LoadSinglepartTable and @LoadMultipartTable always have the same txnId
+             * which is the txnId of the snapshot.
+             */
+            if (!(procName.equalsIgnoreCase("@LoadSinglepartitionTable") ||
+                    procName.equalsIgnoreCase("@LoadMultipartitionTable")) &&
+                    inTxnId <= m_lastSeenTxnId) {
+                // already sequenced
+                final InitiateResponseMessage resp = new InitiateResponseMessage(init);
+                resp.setResults(new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        ClientResponseImpl.DUPE_TRANSACTION));
+                return resp;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Update the last seen txnId for this partition if it's an initiate task message.
+     *
+     * @param inTxnId
+     * @param in
+     */
+    public void updateLastSeenTxnId(long inTxnId, TransactionInfoBaseMessage in)
+    {
+        if (in instanceof Iv2InitiateTaskMessage && inTxnId > m_lastSeenTxnId) {
+            m_lastSeenTxnId = inTxnId;
+        }
+    }
+
+    /**
+     * Update the last polled txnId for this partition if it's a fragment task message.
+     * @param inTxnId
+     * @param in
+     */
+    public void updateLastPolledTxnId(long inTxnId, TransactionInfoBaseMessage in)
+    {
+        if (in instanceof FragmentTaskMessage) {
+            m_lastPolledFragmentTxnId = inTxnId;
+        }
     }
 
     // Return the next correctly sequenced message or null if none exists.
@@ -148,9 +213,7 @@ public class ReplaySequencer
             return null;
         }
         VoltMessage m = m_replayEntries.firstEntry().getValue().poll();
-        if (m instanceof FragmentTaskMessage) {
-            m_lastPolledFragmentTxnId = m_replayEntries.firstEntry().getKey();
-        }
+        updateLastPolledTxnId(m_replayEntries.firstEntry().getKey(), (TransactionInfoBaseMessage) m);
         return m;
     }
 
@@ -254,6 +317,12 @@ public class ReplaySequencer
 
         }
         else {
+            if (dedupe(inTxnId, in) != null) {
+                // Ignore an already seen txn
+                return true;
+            }
+            updateLastSeenTxnId(inTxnId, in);
+
             if (m_replayEntries.isEmpty() || !m_replayEntries.lastEntry().getValue().hasSentinel()) {
                 // not-blocked work; rejected and not queued.
                 return false;
