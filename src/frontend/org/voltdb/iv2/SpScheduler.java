@@ -355,7 +355,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = message.getStoredProcedureName();
         if (message.isSinglePartition()) {
             long newSpHandle;
-            long uniqueId;
+            long uniqueId = Long.MIN_VALUE;
             Iv2InitiateTaskMessage msg = message;
             if (m_isLeader || message.isReadOnly()) {
                 /*
@@ -371,14 +371,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
 
                 /*
+                 * If this is for CL replay or DR, update the unique ID generator
+                 */
+                if (message.isForReplay()) {
+                    uniqueId = message.getUniqueId();
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                } else if (message.isForDR()) {
+                    uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
+                    // @LoadSinglepartitionTable does not have a valid uid
+                    if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
+                        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                    }
+                }
+
+                /*
                  * If this is CL replay use the txnid from the CL and also
                  * update the txnid to match the one from the CL
                  */
                 if (message.isForReplay()) {
                     newSpHandle = message.getTxnId();
-                    uniqueId = message.getUniqueId();
                     setMaxSeenTxnId(newSpHandle);
-                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
                 } else if (m_isLeader) {
                     TxnEgo ego = advanceTxnEgo();
                     newSpHandle = ego.getTxnId();

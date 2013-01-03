@@ -163,12 +163,23 @@ public class MpScheduler extends Scheduler
          */
         long mpTxnId;
         //Timestamp is actually a pre-IV2ish style time based transaction id
-        long timestamp;
+        long timestamp = Long.MIN_VALUE;
+
+        // Update UID if it's for replay
+        if (message.isForReplay()) {
+            timestamp = message.getUniqueId();
+            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
+        } else if (message.isForDR()) {
+            timestamp = message.getStoredProcedureInvocation().getOriginalUniqueId();
+            // @LoadMultipartitionTable does not have a valid uid
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
+                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
+            }
+        }
+
         if (message.isForReplay()) {
             mpTxnId = message.getTxnId();
-            timestamp = message.getUniqueId();
             setMaxSeenTxnId(mpTxnId);
-            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
         } else {
             TxnEgo ego = advanceTxnEgo();
             mpTxnId = ego.getTxnId();
