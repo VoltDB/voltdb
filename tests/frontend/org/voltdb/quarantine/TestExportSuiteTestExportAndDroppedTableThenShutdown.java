@@ -163,7 +163,6 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
     private boolean reconnect(ExportTestClient client) throws ExportClientException {
         for (int ii = 0; ii < 3; ii++) {
             m_tester.disconnect();
-            m_tester.reserveVerifiers();
             boolean success = client.connect();
             if (success) return true;
         }
@@ -179,7 +178,7 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
         Client client = getClient();
         for (int i=0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow( m_tester.m_generationsSeen.first(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
@@ -204,7 +203,7 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
          * way of saying make sure that the tester has created verifiers for
          */
         for (int ii = 0; m_tester.m_generationsSeen.size() < 3 ||
-                m_tester.m_verifiers.get(m_tester.m_generationsSeen.last()).size() < 6; ii++) {
+                m_tester.m_verifiers.size() < 6; ii++) {
             Thread.sleep(500);
             boolean threwException = false;
             try {
@@ -222,7 +221,7 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
 
         for (int i=10; i < 20; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_tester.addRow( m_tester.m_generationsSeen.last(), "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
+            m_tester.addRow( "NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
             final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
