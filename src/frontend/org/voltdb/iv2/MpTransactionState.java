@@ -46,7 +46,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpTransactionState extends TransactionState
 {
-    VoltLogger tmLog = new VoltLogger("TM");
+    static VoltLogger tmLog = new VoltLogger("TM");
     /**
      *  This is thrown by the TransactionState instance when something
      *  goes wrong mid-fragment, and execution needs to back all the way
