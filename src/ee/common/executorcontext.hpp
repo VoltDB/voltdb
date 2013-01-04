@@ -100,7 +100,7 @@ class ExecutorContext {
     Topend* getTopend() {
         return m_topEnd;
     }
-    
+
     /** Current or most recently sp handle */
     int64_t currentSpHandle() {
         return m_spHandle;
@@ -110,7 +110,7 @@ class ExecutorContext {
     int64_t currentUniqueId() {
         return m_uniqueId;
     }
-    
+
     /** Timestamp from unique id for this transaction */
     int64_t currentTxnTimestamp() {
         return m_currentTxnTimestamp;
