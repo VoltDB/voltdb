@@ -159,7 +159,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Execution Functions
         // -------------------------------------------------
         int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
-                         const NValueArray &params, int64_t txnId, int64_t lastCommittedTxnId, bool first, bool last);
+                         const NValueArray &params, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId, bool first, bool last);
 
         // ensure a plan fragment is loaded, given a graph
         // return the fragid and cache statistics
@@ -198,7 +198,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         */
         bool loadTable(int32_t tableId,
                        ReferenceSerializeInput &serializeIn,
-                       int64_t txnId, int64_t lastCommittedTxnId);
+                       int64_t spHandle, int64_t lastCommittedSpHandle);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         inline ReferenceSerializeOutput* getResultOutputSerializer() { return &m_resultOutput; }
@@ -234,10 +234,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
 
         /** Perform once per second, non-transactional work. */
-        void tick(int64_t timeInMillis, int64_t lastCommittedTxnId);
+        void tick(int64_t timeInMillis, int64_t lastCommittedSpHandle);
 
         /** flush active work (like EL buffers) */
-        void quiesce(int64_t lastCommittedTxnId);
+        void quiesce(int64_t lastCommittedSpHandle);
 
         // -------------------------------------------------
         // Save and Restore Table to/from disk functions

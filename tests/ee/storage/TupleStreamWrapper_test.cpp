@@ -145,7 +145,7 @@ public:
         }
         // append into the buffer
         m_wrapper->appendTuple(lastCommittedTxnId,
-                               currentTxnId, 1, 1, *m_tuple,
+                               currentTxnId, 1, 1, 1, *m_tuple,
                                TupleStreamWrapper::INSERT);
     }
 

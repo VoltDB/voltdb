@@ -269,7 +269,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final ParameterSet[] parameterSets,
-            final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException
+            final long spHandle, final long lastCommittedSpHandle,
+            long uniqueId, final long undoToken) throws EEException
     {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
@@ -305,8 +306,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     numFragmentIds,
                     planFragmentIds,
                     inputDepIds,
-                    txnId,
-                    lastCommittedTxnId,
+                    spHandle,
+                    lastCommittedSpHandle,
+                    uniqueId,
                     undoToken);
 
         try {

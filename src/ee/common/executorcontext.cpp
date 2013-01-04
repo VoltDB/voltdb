@@ -40,8 +40,8 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 std::string hostname,
                 CatalogId hostId) :
     m_topEnd(topend), m_tempStringPool(tempStringPool),
-    m_undoQuantum(undoQuantum), m_txnId(0),
-    m_lastCommittedTxnId(0),
+    m_undoQuantum(undoQuantum), m_spHandle(0),
+    m_lastCommittedSpHandle(0),
     m_siteId(siteId), m_partitionId(partitionId),
     m_hostname(hostname), m_hostId(hostId),
     m_exportEnabled(exportEnabled), m_epoch(0) // set later

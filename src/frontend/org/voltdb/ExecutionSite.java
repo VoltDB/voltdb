@@ -2466,7 +2466,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long[] planFragmentIds,
             long[] inputDepIds,
             ParameterSet[] parameterSets,
-            long txnId,
+            long spHandle,
+            long uniqueId,
             boolean readOnly) throws EEException
     {
         return ee.executePlanFragments(
@@ -2474,7 +2475,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             planFragmentIds,
             inputDepIds,
             parameterSets,
-            txnId,
+            spHandle,
+            uniqueId,
             lastCommittedTxnId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
@@ -2694,6 +2696,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             new long[] { fragmentId },
                             new long[] { inputDepId },
                             new ParameterSet[] { params },
+                            txnState.txnId,
                             txnState.txnId,
                             lastCommittedTxnId,
                             txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken())[0];

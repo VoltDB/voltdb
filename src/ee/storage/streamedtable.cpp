@@ -79,9 +79,10 @@ bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->currentTxnId(),
+        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
+                                      m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
+                                      m_executorContext->currentTxnTimestamp(),
                                       m_executorContext->currentTxnTimestamp(),
                                       source,
                                       TupleStreamWrapper::INSERT);
@@ -109,9 +110,10 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
 {
     size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->currentTxnId(),
+        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
+                                      m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
+                                      m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       tuple,
                                       TupleStreamWrapper::DELETE);
@@ -138,8 +140,8 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedTxnId,
-                                 m_executorContext->currentTxnId());
+                                 m_executorContext->m_lastCommittedSpHandle,
+                                 m_executorContext->currentSpHandle());
     }
 }
 
