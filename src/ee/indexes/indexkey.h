@@ -492,7 +492,15 @@ struct GenericPersistentKey : public GenericKey<keySize>
         const int columnCount = keySchema->columnCount();
         for (int ii = 0; ii < columnCount; ++ii) {
             AbstractExpression* ae = indexed_expressions[ii];
-            NValue indexedValue = ae->eval(tuple, NULL);
+            NValue indexedValue;
+            try {
+                indexedValue = ae->eval(tuple, NULL);
+            } catch (SQLException& ignoredDuringIndexing) {
+                // For the sake of keeping non-unique index upkeep as a non-failable operation,
+                // all exception-throwing expression evaluations get treated as NULL for index
+                // purposes.
+                indexedValue = NValue::getNullValue(ae->getValueType());
+            }
             // The NULL argument means use the persistent memory pool for the varchar
             // allocation rather than any particular COW context's pool.
             // XXX: Could this ever somehow interact badly with a COW context?
