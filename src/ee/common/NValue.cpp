@@ -17,6 +17,7 @@
 
 #include "common/NValue.hpp"
 #include "common/executorcontext.hpp"
+#include "logging/LogManager.h"
 
 #include <cstdio>
 #include <sstream>
@@ -393,3 +394,32 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     }
     return getDecimalValue(retval);
 }
+
+
+/**
+ *   set a decimal value from a double
+ */
+void NValue::createDecimalFromDouble(double& dbl) {
+    bool setSign = false;
+    if (dbl < 0) {
+        setSign = true;
+        dbl *= -1;
+    }
+    TTInt scaledvalue(static_cast<int>(dbl*kMaxScaleFactor));
+    if (setSign) {
+        scaledvalue.SetSign();
+    }
+    getDecimal() = scaledvalue;
+}
+
+namespace voltdb {
+
+int warn_if(int condition, const char* message)
+{
+    if (condition) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, message);
+    }
+    return condition;
+}
+
+};
