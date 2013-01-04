@@ -203,6 +203,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     // Yes, this is fragile having two booleans.  We could aggregate them into
     // some rejoining state enum at some point.
     volatile boolean m_rejoinDataPending = false;
+    String m_rejoinTruncationReqId = null;
 
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
@@ -2050,7 +2051,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             boolean logRecoveryCompleted = false;
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
                 try {
-                    zk.create(VoltZK.request_truncation_snapshot, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    if (m_rejoinTruncationReqId == null) {
+                        m_rejoinTruncationReqId = java.util.UUID.randomUUID().toString();
+                    }
+                    zk.create(VoltZK.request_truncation_snapshot, m_rejoinTruncationReqId.getBytes(),
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 } catch (KeeperException.NodeExistsException e) {}
             } else {
                 logRecoveryCompleted = true;
