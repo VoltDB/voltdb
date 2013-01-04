@@ -407,6 +407,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean rejoinDataPending() {
+        return false;
+    }
+
+    @Override
     public OperationMode getMode()
     {
         return m_mode;

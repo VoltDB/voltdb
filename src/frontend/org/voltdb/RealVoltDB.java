@@ -196,6 +196,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     // by the CL when the truncation snapshot completes
     // and this node is viable for replay
     volatile boolean m_rejoining = false;
+    // Need to separate the concepts of rejoin data transfer and rejoin
+    // completion.  This boolean tracks whether or not the data transfer
+    // process is done.  CL truncation snapshots will not flip the all-complete
+    // boolean until no mode data is pending.
+    // Yes, this is fragile having two booleans.  We could aggregate them into
+    // some rejoining state enum at some point.
+    volatile boolean m_rejoinDataPending = false;
+
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
 
@@ -229,6 +237,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     @Override
     public boolean rejoining() { return m_rejoining; }
+
+    @Override
+    public boolean rejoinDataPending() { return m_rejoinDataPending; }
 
     private long m_recoveryStartTime;
 
@@ -344,6 +355,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 isRejoin = true;
             }
             m_rejoining = isRejoin;
+            m_rejoinDataPending = isRejoin;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
@@ -2005,6 +2017,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_rejoinCoordinator.close();
         }
         m_rejoinCoordinator = null;
+        // Mark the data transfer as done so CL can make the right decision when a truncation snapshot completes
+        m_rejoinDataPending = false;
 
         try {
             m_testBlockRecoveryCompletion.acquire();
@@ -2182,6 +2196,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     @Override
     public synchronized void recoveryComplete() {
+        assert(m_rejoinDataPending == false);
         /*
          * IV2 always calls recovery complete on a truncation snapshot, only
          * log once.
