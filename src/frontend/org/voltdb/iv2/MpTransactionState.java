@@ -276,16 +276,6 @@ public class MpTransactionState extends TransactionState
         FragmentResponseMessage msg = pollForResponses();
         m_localWork = null;
 
-        // If the final fragment caused an error we'll need to trip rollback
-        // This is duped from handleReceivedFragResponse, consolidate later
-        if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
-            m_needsRollback = true;
-            if (msg.getException() != null) {
-                throw msg.getException();
-            } else {
-                throw new FragmentFailureException();
-            }
-        }
         // Build results from the FragmentResponseMessage
         // This is similar to dependency tracking...maybe some
         // sane way to merge it
@@ -316,6 +306,14 @@ public class MpTransactionState extends TransactionState
             // can't leave yet - the transaction is inconsistent.
             // could retry; but this is unexpected. Crash.
             throw new RuntimeException(e);
+        }
+        if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
+            m_needsRollback = true;
+            if (msg.getException() != null) {
+                throw msg.getException();
+            } else {
+                throw new FragmentFailureException();
+            }
         }
         return msg;
     }
@@ -348,14 +346,6 @@ public class MpTransactionState extends TransactionState
 
     private void handleReceivedFragResponse(FragmentResponseMessage msg)
     {
-        if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
-            m_needsRollback = true;
-            if (msg.getException() != null) {
-                throw msg.getException();
-            } else {
-                throw new FragmentFailureException();
-            }
-        }
         for (int i = 0; i < msg.getTableCount(); i++)
         {
             int this_depId = msg.getTableDependencyIdAtIndex(i);
