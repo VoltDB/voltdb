@@ -256,14 +256,8 @@ public class MpTransactionState extends TransactionState
             // which will propagate out of handleReceivedFragResponse and
             // cause ProcedureRunner to do the right thing and cause rollback.
             while (!checkDoneReceivingFragResponses()) {
-                try {
-                    FragmentResponseMessage msg = m_newDeps.take();
-                    handleReceivedFragResponse(msg);
-                } catch (InterruptedException e) {
-                    // can't leave yet - the transaction is inconsistent.
-                    // could retry; but this is unexpected. Crash.
-                    throw new RuntimeException(e);
-                }
+                FragmentResponseMessage msg = pollForResponses();
+                handleReceivedFragResponse(msg);
             }
         }
         // satisified. Clear this defensively. Procedure runner is sloppy with
@@ -279,15 +273,8 @@ public class MpTransactionState extends TransactionState
         }
         m_mbox.send(m_buddyHSId, borrowmsg);
 
-        FragmentResponseMessage msg = null;
-        try {
-            msg = m_newDeps.take();
-            m_localWork = null;
-        }
-        catch (InterruptedException e) {
-            // see above Interrupt commentary.
-            throw new RuntimeException(e);
-        }
+        FragmentResponseMessage msg = pollForResponses();
+        m_localWork = null;
 
         // If the final fragment caused an error we'll need to trip rollback
         // This is duped from handleReceivedFragResponse, consolidate later
@@ -317,6 +304,20 @@ public class MpTransactionState extends TransactionState
 
         // Need some sanity check that we got all of the expected output dependencies?
         return results;
+    }
+
+    private FragmentResponseMessage pollForResponses()
+    {
+        FragmentResponseMessage msg;
+        try {
+            msg = m_newDeps.take();
+        }
+        catch (InterruptedException e) {
+            // can't leave yet - the transaction is inconsistent.
+            // could retry; but this is unexpected. Crash.
+            throw new RuntimeException(e);
+        }
+        return msg;
     }
 
     private void trackDependency(long hsid, int depId, VoltTable table)
