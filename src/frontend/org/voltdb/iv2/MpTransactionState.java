@@ -18,15 +18,22 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -39,6 +46,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpTransactionState extends TransactionState
 {
+    VoltLogger tmLog = new VoltLogger("TM");
     /**
      *  This is thrown by the TransactionState instance when something
      *  goes wrong mid-fragment, and execution needs to back all the way
@@ -298,9 +306,25 @@ public class MpTransactionState extends TransactionState
 
     private FragmentResponseMessage pollForResponses()
     {
-        FragmentResponseMessage msg;
+        FragmentResponseMessage msg = null;
         try {
-            msg = m_newDeps.take();
+            while (msg == null) {
+                msg = m_newDeps.poll(60L, TimeUnit.SECONDS);
+                if (msg == null) {
+                    tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_task);
+                    if (m_remoteWork == null) {
+                        tmLog.warn("Waiting on local BorrowTask response from site: " +
+                                CoreUtils.hsIdToString(m_buddyHSId));
+                    }
+                    else {
+                        tmLog.warn("Waiting on remote dependencies: ");
+                        for (Entry<Integer, Set<Long>> e : m_remoteDeps.entrySet()) {
+                            tmLog.warn("Dep ID: " + e.getKey() + " waiting on: " +
+                                    CoreUtils.hsIdCollectionToString(e.getValue()));
+                        }
+                    }
+                }
+            }
         }
         catch (InterruptedException e) {
             // can't leave yet - the transaction is inconsistent.
