@@ -2195,7 +2195,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public synchronized void recoveryComplete() {
+    public synchronized void recoveryComplete(String requestId) {
         assert(m_rejoinDataPending == false);
         /*
          * IV2 always calls recovery complete on a truncation snapshot, only

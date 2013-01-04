@@ -493,7 +493,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void recoveryComplete() {
+    public void recoveryComplete(String requestId) {
         // TODO Auto-generated method stub
     }
 
