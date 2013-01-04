@@ -2202,14 +2202,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public synchronized void recoveryComplete(String requestId) {
         assert(m_rejoinDataPending == false);
-        /*
-         * IV2 always calls recovery complete on a truncation snapshot, only
-         * log once.
-         */
+
         if (m_rejoining) {
-            consoleLog.info("Node rejoin completed");
+            if (requestId.equals(m_rejoinTruncationReqId)) {
+                consoleLog.info("Node rejoin completed");
+                m_rejoinTruncationReqId = null;
+                m_rejoining = false;
+            }
+            else {
+                // If we saw some other truncation request ID, then try the same one again.  As long as we
+                // don't flip the m_rejoining state, all truncation snapshot completions will call back to here.
+                try {
+                    final ZooKeeper zk = m_messenger.getZK();
+                    if (m_rejoinTruncationReqId == null) {
+                        m_rejoinTruncationReqId = java.util.UUID.randomUUID().toString();
+                    }
+                    zk.create(VoltZK.request_truncation_snapshot, m_rejoinTruncationReqId.getBytes(),
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                }
+                catch (KeeperException.NodeExistsException e) {}
+                catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to retry post-rejoin truncation snapshot request.", true, e);
+                }
+            }
         }
-        m_rejoining = false;
     }
 
     /**
