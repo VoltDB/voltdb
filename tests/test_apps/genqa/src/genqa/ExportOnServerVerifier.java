@@ -37,6 +37,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
+import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -473,8 +474,8 @@ public class ExportOnServerVerifier {
 
     void printClientTxIds() {
         SimpleDateFormat dfmt = new SimpleDateFormat(
-                "yyyy-MM-dd'T'hh:mm:ss.SSS",
-                REAL_DEFAULT_LOCALE
+                "yyyy-MM-dd'T'hh:mm:ss.SSSZ",
+                DateFormatSymbols.getInstance(REAL_DEFAULT_LOCALE)
                 );
         TreeMap<Date, Long> sortedByDate = new TreeMap<Date,Long>();
         for (Map.Entry<Long,Long> entry: m_clientTxnIds.entrySet()) {
