@@ -72,7 +72,6 @@ struct SetOperator {
         {}
 
     bool processTuples() {
-        reset();
         return processTuplesDo();
     }
 
@@ -82,7 +81,6 @@ struct SetOperator {
 
     protected:
         virtual bool processTuplesDo() = 0;
-        virtual void reset() = 0;
 
         Table* m_output_table;
         bool m_is_all;
@@ -90,20 +88,22 @@ struct SetOperator {
 
 struct UnionSetOperator : public SetOperator {
     UnionSetOperator(std::vector<Table*>& input_tables, Table* output_table, bool is_all) :
-       SetOperator(input_tables, output_table, is_all), m_tuples()
+       SetOperator(input_tables, output_table, is_all)
        {}
 
     protected:
         bool processTuplesDo();
-        void reset();
 
     private:
-        bool needToInsert(const TableTuple& tuple);
+        bool needToInsert(const TableTuple& tuple, TupleSet& tuples);
 
-        TupleSet m_tuples;
 };
 
 bool UnionSetOperator::processTuplesDo() {
+
+    // Set to keep candidate tuples.
+    TupleSet tuples;
+
     //
     // For each input table, grab their TableIterator and then append all of its tuples
     // to our ouput table. Only distinct tuples are retained.
@@ -114,7 +114,7 @@ bool UnionSetOperator::processTuplesDo() {
         TableIterator iterator = input_table->iterator();
         TableTuple tuple(input_table->schema());
         while (iterator.next(tuple)) {
-            if (m_is_all || needToInsert(tuple)) {
+            if (m_is_all || needToInsert(tuple, tuples)) {
                 // we got tuple to insert
                 if (!m_output_table->insertTuple(tuple)) {
                     VOLT_ERROR("Failed to insert tuple from input table '%s' into"
@@ -130,15 +130,10 @@ bool UnionSetOperator::processTuplesDo() {
 }
 
 inline
-void UnionSetOperator::reset() {
-   m_tuples.clear();
-}
-
-inline
-bool UnionSetOperator::needToInsert(const TableTuple& tuple) {
-    bool result = m_tuples.find(tuple) == m_tuples.end();
+bool UnionSetOperator::needToInsert(const TableTuple& tuple, TupleSet& tuples) {
+    bool result = tuples.find(tuple) == tuples.end();
     if (result) {
-        m_tuples.insert(tuple);
+        tuples.insert(tuple);
     }
     return result;
 }
@@ -154,7 +149,6 @@ struct ExceptIntersectSetOperator : public SetOperator {
         bool is_all, bool is_except);
 
     protected:
-        void reset();
         bool processTuplesDo();
 
     private:
@@ -162,16 +156,12 @@ struct ExceptIntersectSetOperator : public SetOperator {
         void exceptTupleMaps(TupleMap& tuple_a, TupleMap& tuple_b);
         void intersectTupleMaps(TupleMap& tuple_a, TupleMap& tuple_b);
 
-        // Map to keep candidate tuples. The key is the tuple itself
-        // The value - tuple's repeat count in the final table.
-        TupleMap m_tuples;
-
         bool m_is_except;
 };
 
 ExceptIntersectSetOperator::ExceptIntersectSetOperator(
     std::vector<Table*>& input_tables, Table* output_table, bool is_all, bool is_except) :
-        SetOperator(input_tables, output_table, is_all), m_tuples(), m_is_except(is_except) {
+        SetOperator(input_tables, output_table, is_all), m_is_except(is_except) {
     if (!is_except) {
         // For intersect we want to start with the smalest table
         std::vector<Table*>::iterator minTableIt =
@@ -181,16 +171,15 @@ ExceptIntersectSetOperator::ExceptIntersectSetOperator(
 
 }
 
-inline
-void ExceptIntersectSetOperator::reset() {
-   m_tuples.clear();
-}
-
 bool ExceptIntersectSetOperator::processTuplesDo() {
+    // Map to keep candidate tuples. The key is the tuple itself
+    // The value - tuple's repeat count in the final table.
+    TupleMap tuples;
+
     // Collect all tuples from the first set
     assert(!m_input_tables.empty());
     Table* input_table = m_input_tables[0];
-    collectTuples(*input_table, m_tuples);
+    collectTuples(*input_table, tuples);
 
     //
     // For each remaining input table, collect its tuple into a separate map
@@ -203,14 +192,14 @@ bool ExceptIntersectSetOperator::processTuplesDo() {
         assert(input_table);
         collectTuples(*input_table, next_tuples);
         if (m_is_except) {
-            exceptTupleMaps(m_tuples, next_tuples);
+            exceptTupleMaps(tuples, next_tuples);
         } else {
-            intersectTupleMaps(m_tuples, next_tuples);
+            intersectTupleMaps(tuples, next_tuples);
         }
     }
 
     // Insert remaining tuples to our ouput table
-    for (TupleMap::const_iterator mapIt = m_tuples.begin(); mapIt != m_tuples.end(); ++mapIt) {
+    for (TupleMap::const_iterator mapIt = tuples.begin(); mapIt != tuples.end(); ++mapIt) {
         TableTuple tuple = mapIt->first;
         for (size_t i = 0; i < mapIt->second; ++i) {
             if (!m_output_table->insertTuple(tuple)) {
