@@ -67,7 +67,17 @@ public class TestUnion  extends TestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
         assertTrue(unionPN.getChildCount() == 3);
-    }
+
+        pn = compile("(select A from T1 UNION select B from T2) UNION select C from T3", 0, false, null);
+        unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        assertTrue(unionPN.getChildCount() == 3);
+
+        pn = compile("select A from T1 UNION (select B from T2 UNION select C from T3)", 0, false, null);
+        unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        assertTrue(unionPN.getChildCount() == 3);
+   }
 
     public void testPartitioningMixes() {
        // Sides are identically single-partitioned.
@@ -91,11 +101,19 @@ public class TestUnion  extends TestCase {
     }
 
     public void testExcept() {
-        AbstractPlanNode pn = compile("select A from T1 EXCEPT select B from T2 EXCEPT select C from T3", 0, false, null);
+        AbstractPlanNode pn = compile("select A from T1 EXCEPT select B from T2 EXCEPT select C from T3 EXCEPT select F from T6", 0, false, null);
         assertTrue(pn.getChild(0) instanceof UnionPlanNode);
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
+        assertTrue(unionPN.getChildCount() == 4);
+
+        pn = compile("select A from T1 EXCEPT (select B from T2 EXCEPT select C from T3) EXCEPT select F from T6", 0, false, null);
+        unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
         assertTrue(unionPN.getChildCount() == 3);
+        UnionPlanNode childPN = (UnionPlanNode) unionPN.getChild(1);
+        assertTrue(childPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT);
+        assertTrue(childPN.getChildCount() == 2);
     }
 
     public void testExceptAll() {
@@ -104,12 +122,32 @@ public class TestUnion  extends TestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT_ALL);
         assertTrue(unionPN.getChildCount() == 2);
+
+        pn = compile("select A from T1 EXCEPT ALL (select B from T2 EXCEPT ALL select C from T3) EXCEPT ALL select F from T6", 0, false, null);
+        unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT_ALL);
+        assertTrue(unionPN.getChildCount() == 3);
+        UnionPlanNode childPN = (UnionPlanNode) unionPN.getChild(1);
+        assertTrue(childPN.getUnionType() == ParsedUnionStmt.UnionType.EXCEPT_ALL);
+        assertTrue(childPN.getChildCount() == 2);
     }
 
     public void testIntersect() {
         AbstractPlanNode pn = compile("select A from T1 INTERSECT select B from T2 INTERSECT select C from T3", 0, false, null);
         assertTrue(pn.getChild(0) instanceof UnionPlanNode);
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT);
+        assertTrue(unionPN.getChildCount() == 3);
+
+        pn = compile("(select A from T1 INTERSECT select B from T2) INTERSECT select C from T3", 0, false, null);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT);
+        assertTrue(unionPN.getChildCount() == 3);
+
+        pn = compile("select A from T1 INTERSECT (select B from T2 INTERSECT select C from T3)", 0, false, null);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.INTERSECT);
         assertTrue(unionPN.getChildCount() == 3);
     }

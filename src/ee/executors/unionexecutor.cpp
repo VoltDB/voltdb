@@ -72,6 +72,7 @@ struct SetOperator {
         {}
 
     bool processTuples() {
+        reset();
         return processTuplesDo();
     }
 
@@ -81,6 +82,7 @@ struct SetOperator {
 
     protected:
         virtual bool processTuplesDo() = 0;
+        virtual void reset() = 0;
 
         Table* m_output_table;
         bool m_is_all;
@@ -93,6 +95,7 @@ struct UnionSetOperator : public SetOperator {
 
     protected:
         bool processTuplesDo();
+        void reset();
 
     private:
         bool needToInsert(const TableTuple& tuple);
@@ -127,6 +130,11 @@ bool UnionSetOperator::processTuplesDo() {
 }
 
 inline
+void UnionSetOperator::reset() {
+   m_tuples.clear();
+}
+
+inline
 bool UnionSetOperator::needToInsert(const TableTuple& tuple) {
     bool result = m_tuples.find(tuple) == m_tuples.end();
     if (result) {
@@ -146,6 +154,7 @@ struct ExceptIntersectSetOperator : public SetOperator {
         bool is_all, bool is_except);
 
     protected:
+        void reset();
         bool processTuplesDo();
 
     private:
@@ -170,6 +179,11 @@ ExceptIntersectSetOperator::ExceptIntersectSetOperator(
         std::swap( m_input_tables[0], *minTableIt);
     }
 
+}
+
+inline
+void ExceptIntersectSetOperator::reset() {
+   m_tuples.clear();
 }
 
 bool ExceptIntersectSetOperator::processTuplesDo() {
