@@ -127,7 +127,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         };
         m_database = db;
         m_tableName = tableName;
-        m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + generation + " sig " + signature, 1);
+        m_es =
+                CoreUtils.getListeningExecutorService(
+                        "ExportDataSource gen " + m_generation
+                        + " table " + m_tableName + " partition " + partitionId, 1);
 
         String nonce = signature + "_" + HSId + "_" + partitionId;
 
@@ -257,7 +260,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // compute the number of bytes necessary to hold one bit per
         // schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
-        m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " sig " + m_signature, 1);
+        m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
     public void updateAckMailboxes( final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {

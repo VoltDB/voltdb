@@ -82,7 +82,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
         mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
                                       m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
-                                      m_executorContext->currentTxnTimestamp(),
+                                      m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       source,
                                       TupleStreamWrapper::INSERT);

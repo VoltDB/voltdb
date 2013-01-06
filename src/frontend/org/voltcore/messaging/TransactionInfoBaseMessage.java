@@ -63,7 +63,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_initiatorHSId = initiatorHSId;
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = txnId;
-        m_spHandle = Long.MIN_VALUE;
+        m_spHandle = Long.MIN_VALUE;//IV2 replaces this value using setSpHanlde
+                                    //Pre IV2 constructs transactions with only the transactionid
         m_uniqueId = uniqueId;
         m_isReadOnly = isReadOnly;
         m_subject = Subject.DEFAULT.getId();
