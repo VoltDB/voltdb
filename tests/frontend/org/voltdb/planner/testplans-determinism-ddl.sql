@@ -32,3 +32,10 @@ create table tpk (
   z bigint not null
 );
 
+CREATE TABLE eng4155 (
+  id bigint NOT NULL,
+  ts bigint NOT NULL,
+  foo bigint NOT NULL,
+  CONSTRAINT PK_id_eng4155 PRIMARY KEY (id)
+);
+CREATE INDEX TSINDEX ON eng4155 (ts DESC);

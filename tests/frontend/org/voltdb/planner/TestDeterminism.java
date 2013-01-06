@@ -199,4 +199,8 @@ public class TestDeterminism extends TestCase {
         assertPlanDeterminism("update tunique set z = 5 where a < 2;", ORDERED, CONSISTENT);
         assertPlanDeterminism("update tpk set z = 5 where a < 2;", ORDERED, CONSISTENT);
     }
+
+    public void testOrderByWithoutIndex() {
+        assertPlanDeterminism("SELECT * FROM eng4155 ORDER BY ts DESC, id;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+    }
 }
