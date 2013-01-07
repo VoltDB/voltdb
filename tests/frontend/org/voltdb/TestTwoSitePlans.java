@@ -160,6 +160,7 @@ public class TestTwoSitePlans extends TestCase {
                 new ParameterSet[] { params },
                 1,
                 0,
+                42,
                 Long.MAX_VALUE);
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
@@ -174,6 +175,7 @@ public class TestTwoSitePlans extends TestCase {
                 new ParameterSet[] { params },
                 2,
                 1,
+                42,
                 Long.MAX_VALUE);
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
@@ -189,7 +191,7 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, Long.MAX_VALUE)[0];
+                3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
@@ -203,7 +205,7 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, Long.MAX_VALUE)[0];
+                3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
@@ -220,7 +222,7 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
                 new long[] { outDepId },
                 new ParameterSet[] { params },
-                3, 2, Long.MAX_VALUE)[0];
+                3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println("Final Result");
             System.out.println(dependency1.toString());
