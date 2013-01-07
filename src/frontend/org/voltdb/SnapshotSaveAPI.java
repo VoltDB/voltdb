@@ -122,7 +122,7 @@ public class SnapshotSaveAPI
                     Map<Integer, Long>  partitionTransactionIds = new HashMap<Integer, Long>();
                     if (VoltDB.instance().isIV2Enabled()) {
                         partitionTransactionIds = SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
-                        System.out.println("Last seen partition transaction ids " + partitionTransactionIds);
+                        HOST_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
                         SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
                         partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
 
@@ -167,7 +167,8 @@ public class SnapshotSaveAPI
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
             if (VoltDB.instance().isIV2Enabled()) {
-                System.out.println("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId));
+                HOST_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
+                        TxnEgo.getPartitionId(partitionTxnId));
                 SnapshotSiteProcessor.m_partitionLastSeenTransactionIds.put(
                         TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
             }
