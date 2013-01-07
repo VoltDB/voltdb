@@ -41,20 +41,21 @@ public class ClientThread extends Thread {
     static VoltLogger log = new VoltLogger("HOST");
 
     static enum Type {
-        PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID;
+        PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID, ADHOC_MP;
 
         /**
          * Use modulo so the same CID will run the same code
          * across client process lifetimes.
          */
         static Type typeFromId(int id) {
-            if (id % 10 == 0) return PARTITIONED_MP; // 20%
+            if (id % 10 == 0) return PARTITIONED_MP;               // 20%
             if (id % 10 == 1) return PARTITIONED_MP;
-            if (id % 10 == 2) return REPLICATED;     // 20%
+            if (id % 10 == 2) return REPLICATED;                   // 20%
             if (id % 10 == 3) return REPLICATED;
-            if (id % 10 == 4) return HYBRID;         // 20%
+            if (id % 10 == 4) return HYBRID;                       // 20%
             if (id % 10 == 5) return HYBRID;
-            return PARTITIONED_SP;                   // 40%
+            if ((id % 10 == 6) && (id % 20 != 6)) return ADHOC_MP; // 5%
+            return PARTITIONED_SP;                                 // 35%
         }
     }
 
@@ -107,6 +108,9 @@ public class ClientThread extends Thread {
                 break;
             case HYBRID:
                 procName = "UpdateBothMP";
+                break;
+            case ADHOC_MP:
+                procName = "UpdateReplicatedMPInProcAdHoc";
                 break;
             }
 
