@@ -37,7 +37,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -48,7 +47,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
@@ -80,7 +78,6 @@ public class ExportOnServerVerifier {
     public static long FILE_TIMEOUT_MS = 5 * 60 * 1000; // 5 mins
 
     public static long VALIDATION_REPORT_INTERVAL = 10000;
-    public static final Locale REAL_DEFAULT_LOCALE = Locale.getDefault();
 
     private final static String TRACKER_FILENAME = "__active_tracker";
     private final static Pattern EXPORT_FILENAME_REGEXP =
@@ -473,20 +470,20 @@ public class ExportOnServerVerifier {
     }
 
     void printClientTxIds() {
-        SimpleDateFormat dfmt = new SimpleDateFormat(
-                "yyyy-MM-dd'T'hh:mm:ss.SSSZ",
-                DateFormatSymbols.getInstance(REAL_DEFAULT_LOCALE)
-                );
-        TreeMap<Date, Long> sortedByDate = new TreeMap<Date,Long>();
-        for (Map.Entry<Long,Long> entry: m_clientTxnIds.entrySet()) {
-            long txid = entry.getKey();
-            Date ts = new Date(entry.getValue());
-            sortedByDate.put(ts, txid);
+        SimpleDateFormat dfmt = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSSZ");
+
+        TreeMap<Long, Long> sortedByDate = new TreeMap<Long,Long>();
+        Iterator<Map.Entry<Long, Long>> itr = m_clientTxnIds.entrySet().iterator();
+        while (itr.hasNext()) {
+            Map.Entry<Long, Long> entry = itr.next();
+            sortedByDate.put(entry.getValue(), entry.getKey());
+            itr.remove();
         }
+
         System.out.println("\n==================================================================");
         System.out.println("List of remaining committed but unmatched client transactions:");
-        for (Map.Entry<Date,Long> entry: sortedByDate.entrySet()) {
-            String ts = dfmt.format(entry.getKey());
+        for (Map.Entry<Long,Long> entry: sortedByDate.entrySet()) {
+            String ts = dfmt.format(new Date(entry.getKey()));
             long txid = entry.getValue();
             int partid = TxnEgo.getPartitionId(txid);
             System.out.println(ts+ ", partition: " + partid + ", txid: " + txid);
