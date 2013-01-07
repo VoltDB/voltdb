@@ -418,7 +418,18 @@ public class ExportGeneration {
         messenger.createMailbox(null, m_mbox);
 
         for (Integer partition : localPartitions) {
-            ZKUtil.asyncMkdirs(m_zk, m_mailboxesZKPath + "/" + partition + "/" + m_mbox.getHSId());
+
+            final String partitionDN =  m_mailboxesZKPath + "/" + partition;
+            ZKUtil.asyncMkdirs(m_zk, partitionDN);
+
+            ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
+            m_zk.create(
+                    partitionDN + "/" + m_mbox.getHSId(),
+                    null,
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.EPHEMERAL,
+                    cb,
+                    null);
         }
 
         ListenableFuture<?> fut = m_childUpdatingThread.submit(new Runnable() {
