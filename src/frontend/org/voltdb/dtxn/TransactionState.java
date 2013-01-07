@@ -90,7 +90,7 @@ public abstract class TransactionState extends OrderableTransaction  {
                                ExecutionSite site,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getSpHandle(),
+        super(notice.getTxnId(), notice.getTxnId(),
                 notice.getTxnId(),
                 notice.getInitiatorHSId());
         m_mbox = mbox;

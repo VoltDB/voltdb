@@ -85,13 +85,14 @@ public:
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
-                       int64_t lastComittedTxnId,
-                       int64_t currentTxnId);
+                       int64_t lastComittedSpHandle,
+                       int64_t currentSpHandle);
 
     /** write a tuple to the stream */
-    size_t appendTuple(int64_t lastCommittedTxnId,
-                       int64_t txnId,
+    size_t appendTuple(int64_t lastCommittedSpHandle,
+                       int64_t spHandle,
                        int64_t seqNo,
+                       int64_t uniqueId,
                        int64_t timestamp,
                        TableTuple &tuple,
                        TupleStreamWrapper::Type type);
@@ -101,7 +102,7 @@ public:
     void discardBlock(StreamBlock *sb);
 
     /** Send committed data to the top end */
-    void commit(int64_t lastCommittedTxnId, int64_t txnId, bool sync = false);
+    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, bool sync = false);
 
     // cached catalog values
     const CatalogId m_partitionId;
@@ -123,13 +124,13 @@ public:
     std::deque<StreamBlock*> m_pendingBlocks;
 
     /** transaction id of the current (possibly uncommitted) transaction */
-    int64_t m_openTransactionId;
+    int64_t m_openSpHandle;
 
     /** Universal stream offset when current transaction was opened */
     size_t m_openTransactionUso;
 
     /** last committed transaction id */
-    int64_t m_committedTransactionId;
+    int64_t m_committedSpHandle;
 
     /** current committed uso */
     size_t m_committedUso;
