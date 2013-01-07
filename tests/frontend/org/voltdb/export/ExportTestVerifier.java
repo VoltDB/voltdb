@@ -175,7 +175,7 @@ public class ExportTestVerifier extends ExportDecoderBase
 
     boolean done()
     {
-        return (m_ackRepeats > 3); // arbitrary value
+        return empty();
     }
 
     boolean empty()

@@ -54,8 +54,9 @@ public class MockExecutionEngine extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final ParameterSet[] parameterSets,
-            final long txnId,
-            final long lastCommittedTxnId,
+            final long spHandle,
+            final long lastCommittedSpHandle,
+            final long uniqueId,
             final long undoToken) throws EEException
     {
         if (numFragmentIds != 1) {

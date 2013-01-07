@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.List;
 import java.util.Map;
 
@@ -26,18 +25,16 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
-
-import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltType;
 
 public class FragmentTask extends TransactionTask
 {
@@ -186,7 +183,8 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        m_txn.txnId,
+                        m_txn.spHandle,
+                        m_txn.uniqueId,
                         m_txn.isReadOnly())[0];
 
                 if (hostLog.isTraceEnabled()) {
