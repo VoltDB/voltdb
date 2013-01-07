@@ -88,7 +88,7 @@ public class AsyncBenchmark {
     // Statistics manager objects from the client
 //    final ClientStatsContext periodicStatsContext;
 //    final ClientStatsContext fullStatsContext;
-    final PayloadProcessor processor;
+    final TxnIdPayloadProcessor processor;
     // For retry connections
     final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
         @Override
@@ -215,7 +215,7 @@ public class AsyncBenchmark {
     public AsyncBenchmark(Config config) {
         this.config = config;
 
-        processor = new PayloadProcessor(config.minvaluesize, config.maxvaluesize,
+        processor = new TxnIdPayloadProcessor(config.minvaluesize, config.maxvaluesize,
                                          config.entropy, config.usecompression);
 
         System.out.print(HORIZONTAL_RULE);

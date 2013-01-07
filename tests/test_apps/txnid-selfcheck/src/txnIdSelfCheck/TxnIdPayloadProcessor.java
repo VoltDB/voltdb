@@ -20,26 +20,24 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 package txnIdSelfCheck;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-public class PayloadProcessor
+import java.nio.ByteBuffer;
+
+public class TxnIdPayloadProcessor
 {
     public static class Pair
     {
-        public final String Key;
         private final byte[] RawValue;
         private final byte[] StoreValue;
-        protected Pair(String key, byte[] rawValue, byte[] storeValue)
+        protected Pair(byte[] rawValue, byte[] storeValue)
         {
-            this.Key = key;
             this.RawValue = rawValue;
             this.StoreValue = storeValue;
         }
@@ -65,82 +63,56 @@ public class PayloadProcessor
         }
     }
 
-    private final int KeySize;
     private final int MinValueSize;
     private final int MaxValueSize;
-    private final int PoolSize;
     private final boolean UseCompression;
-    public final String KeyFormat;
     private final int Entropy;
     private final Random Rand = new Random(0);
 
     /*
      * Volt deals with 2 megs at the most so 4 megabytes of entropy is plenty
      */
-    private final ByteBuffer entropyBytesGlobal = ByteBuffer.allocate (1024 * 1024 * 4);
+    private final ByteBuffer entropyBytes = ByteBuffer.allocate (1024 * 1024 * 4);
 
-    /*
-     * Create a thread local copy of the buffer because multiple threads will be manipulating the position pointers.
-     * Give each thread it's own wrapper around the global byte buffer.
-     */
-    private final ThreadLocal<ByteBuffer> entropyBytes =
-        new ThreadLocal <ByteBuffer> () {
-            @Override protected ByteBuffer initialValue() {
-                return entropyBytesGlobal.duplicate();
-        }
-    };
-
-    public PayloadProcessor(
-            int keySize,
+    public TxnIdPayloadProcessor(
             int minValueSize,
             int maxValueSize,
             int entropy,
-            int poolSize,
             boolean useCompression)
     {
-        this.KeySize = keySize;
         this.MinValueSize = minValueSize;
         this.MaxValueSize = maxValueSize;
-        this.PoolSize = poolSize;
         this.UseCompression = useCompression;
         this.Entropy = entropy;
         if (entropy < 1 || entropy > 127) {
             throw new IllegalArgumentException("Entropy must be a number between 1 and 127");
         }
-        while (entropyBytes.get().hasRemaining()) {
-            entropyBytes.get().put((byte)(Rand.nextInt(127) % Entropy));
+        while (entropyBytes.hasRemaining()) {
+            entropyBytes.put((byte)(Rand.nextInt(127) % Entropy));
         }
-        // Get the base key format string used to generate keys
-        this.KeyFormat = "K%1$" + String.valueOf(this.KeySize-1) + "s";
     }
 
     public Pair generateForStore()
     {
-        final String key = String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
         final byte[] rawValue = new byte[this.MinValueSize+this.Rand.nextInt(this.MaxValueSize-this.MinValueSize+1)];
-        if (entropyBytes.get().remaining() > rawValue.length){
-            entropyBytes.get().get(rawValue);
+        if (entropyBytes.remaining() > rawValue.length){
+            entropyBytes.get(rawValue);
         } else {
-            entropyBytes.get().position(0);
-            entropyBytes.get().get(rawValue);
+            entropyBytes.position(0);
+            entropyBytes.get(rawValue);
         }
         if (this.UseCompression)
-            return new Pair(key, rawValue, gzip(rawValue));
+            return new Pair(rawValue, gzip(rawValue));
         else
-            return new Pair(key, rawValue, null);
+            return new Pair(rawValue, null);
     }
 
-    public String generateRandomKeyForRetrieval()
-    {
-        return String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
-    }
-
-    public Pair retrieveFromStore(String key, byte[] storeValue)
+    public Pair retrieveFromStore(byte[] storeValue)
     {
         if (this.UseCompression)
-            return new Pair(key, gunzip(storeValue), storeValue);
+            return new Pair(gunzip(storeValue), storeValue);
         else
-            return new Pair(key, storeValue, null);
+            return new Pair(storeValue, null);
     }
 
     private static byte[] gzip(byte[] bytes)
