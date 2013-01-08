@@ -435,29 +435,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 if (isIV2Enabled()) {
                     ClusterConfig iv2config = new ClusterConfig(topo);
                     m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
+                    List<Integer> partitions = null;
                     if (isRejoin) {
-                        List<Integer> partitionsToReplace = m_cartographer.getIv2PartitionsToReplace(topo);
-                        if (partitionsToReplace.size() == 0) {
+                        partitions = m_cartographer.getIv2PartitionsToReplace(topo);
+                        if (partitions.size() == 0) {
                             VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                     "the requested k-safety factor of " +
                                     iv2config.getReplicationFactor() + ".\n" +
                                     "No more nodes can join.", false, null);
                         }
-                        for (int ii = 0; ii < partitionsToReplace.size(); ii++) {
-                            Integer partition = partitionsToReplace.get(ii);
-                            m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
-                        }
-                        m_iv2Initiators = createIv2Initiators(partitionsToReplace, true);
                     }
                     else {
-                        List<Integer> partitions =
-                            ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                        for (int ii = 0; ii < partitions.size(); ii++) {
-                            Integer partition = partitions.get(ii);
-                            m_iv2InitiatorStartingTxnIds.put(partition, TxnEgo.makeZero(partitions.get(ii)).getTxnId());
-                        }
-                        m_iv2Initiators = createIv2Initiators(partitions, false);
+                        partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                     }
+                    for (int ii = 0; ii < partitions.size(); ii++) {
+                        Integer partition = partitions.get(ii);
+                        m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
+                    }
+                    m_iv2Initiators = createIv2Initiators(partitions, isRejoin);
                     m_iv2InitiatorStartingTxnIds.put(
                             MpInitiator.MP_INIT_PID,
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
