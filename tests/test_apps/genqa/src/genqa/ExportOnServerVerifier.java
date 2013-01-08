@@ -31,10 +31,13 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
@@ -56,6 +59,7 @@ import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPOutputStream;
 
 import org.spearce_voltpatches.jgit.transport.OpenSshConfig;
 import org.voltcore.utils.Pair;
@@ -151,7 +155,48 @@ public class ExportOnServerVerifier {
         return columnCount+1;
     }
 
-    void verify(String[] args) throws Exception
+    private long unquoteLong(String quoted)
+    {
+        StringBuilder sb = new StringBuilder(quoted);
+        int i = 0;
+        while (i < sb.length()) {
+            if (sb.charAt(i) == '"') sb.deleteCharAt(i);
+            else ++i;
+        }
+        return Long.parseLong(sb.toString().trim());
+    }
+
+    int splitCSV(String csv, long [] splat)
+    {
+        if (csv == null || splat == null || splat.length == 0) return 0;
+
+        int columnCount = 0;
+        int cursor = 0;
+        int columnPos = csv.indexOf(',', cursor);
+
+        try {
+            while (columnPos >= 0 && splat.length > columnCount+1) {
+                splat[columnCount] = unquoteLong(csv.substring(cursor, columnPos));
+                cursor = columnPos + 1;
+                columnCount = columnCount + 1;
+                columnPos = csv.indexOf(',', cursor);
+            }
+            if (cursor < csv.length()) {
+                columnPos = columnPos < 0 ? csv.length() : columnPos;
+                splat[columnCount] = unquoteLong(csv.substring(cursor, columnPos));
+            } else {
+                columnCount = columnCount - 1;
+            }
+        } catch (NumberFormatException nfex) {
+            return 0;
+        } catch (IndexOutOfBoundsException ioobex) {
+            return -1;
+        }
+
+        return columnCount+1;
+    }
+
+    boolean verifySetup( String [] args) throws Exception
     {
         String remoteHosts[] = args[0].split(",");
         final String homeDir = System.getProperty("user.home");
@@ -229,7 +274,14 @@ public class ExportOnServerVerifier {
             m_readUpTo.put(i, new AtomicLong(0));
         }
 
-        long ttlVerified = 0;
+        m_clientPath = new File(args[2]);
+        if (!m_clientPath.exists() || !m_clientPath.isDirectory())
+        {
+            if (!m_clientPath.mkdir()) {
+                throw new IOException("Issue with transaction ID path");
+            }
+        }
+
         for (RemoteHost rh : m_hosts) {
             boolean existsOrIsDir = true;
             try {
@@ -241,7 +293,7 @@ public class ExportOnServerVerifier {
                 if (e.id == ChannelSftp.SSH_FX_NO_SUCH_FILE) {
                     existsOrIsDir = false;
                 } else {
-                Throwables.propagate(e);
+                    Throwables.propagate(e);
                 }
             }
             if (!existsOrIsDir) {
@@ -249,17 +301,22 @@ public class ExportOnServerVerifier {
             }
         }
 
+        boolean skinny = false;
+        if (args.length > 3 && args[3] != null && !args[3].trim().isEmpty()) {
+            skinny = Boolean.parseBoolean(args[3].trim().toLowerCase());
+        }
+
+        return skinny;
+    }
+
+    void verifyFat() throws Exception
+    {
+
+        long ttlVerified = 0;
+
         //checkForMoreExportFiles();
         Pair<CSVReader, Runnable> csvPair = openNextExportFile();
         CSVReader csv = csvPair.getFirst();
-
-        m_clientPath = new File(args[2]);
-        if (!m_clientPath.exists() || !m_clientPath.isDirectory())
-        {
-            if (!m_clientPath.mkdir()) {
-                throw new IOException("Issue with transaction ID path");
-            }
-        }
 
         //checkForMoreClientFiles();
         BufferedReader txnIdReader = openNextClientFile();
@@ -380,7 +437,7 @@ public class ExportOnServerVerifier {
 
             System.out.println("!_!_! DEBUG !_!_! read " + dcount + " client txid records");
 
-            if (matchClientTxnIds())
+            if (matchClientTxnIds(null))
             {
                 emptyRemovalCycles = 0;
             }
@@ -420,6 +477,235 @@ public class ExportOnServerVerifier {
             {
                 System.out.println("THIS IS A REAL ERROR?!");
             }
+        }
+    }
+
+    void verifySkinny() throws Exception
+    {
+
+        long ttlVerified = 0;
+
+        //checkForMoreExportFiles();
+        Pair<BufferedReader, Runnable> csvPair = openNextSkinnyExportFile();
+        BufferedReader csv = csvPair.getFirst();
+
+        //checkForMoreClientFiles();
+        BufferedReader txnIdReader = openNextClientFile();
+        String row;
+        long [] rowValues = new long [8]; // [6] txnId [7] rowId
+        boolean quit = false;
+        boolean more_rows = true;
+        boolean more_txnids = true;
+        boolean expect_export_eof = false;
+        int emptyRemovalCycles = 0;
+
+        File transactionsReadFH = new File("read-exported-transactions.gz");
+        if (   transactionsReadFH.exists()
+            && transactionsReadFH.isFile()
+            && transactionsReadFH.canRead()
+            && transactionsReadFH.canWrite()
+            )
+        {
+            transactionsReadFH.delete();
+        }
+        File verifiedTransactionsdFH = new File("verified-exported-transactions.gz");
+        if (   verifiedTransactionsdFH.exists()
+                && verifiedTransactionsdFH.isFile()
+                && verifiedTransactionsdFH.canRead()
+                && verifiedTransactionsdFH.canWrite()
+                )
+        {
+            verifiedTransactionsdFH.delete();
+        }
+
+        PrintWriter txout =
+                new PrintWriter(
+                        new OutputStreamWriter(
+                                new GZIPOutputStream(
+                                        new FileOutputStream(transactionsReadFH), 16384)));
+        PrintWriter vfout =
+                new PrintWriter(
+                        new OutputStreamWriter(
+                                new GZIPOutputStream(
+                                        new FileOutputStream(verifiedTransactionsdFH), 16384)));
+
+        while (!quit)
+        {
+            markCheckedUpTo();
+            int dcount = 0;
+            while ((dcount < 10000 || !more_txnids) && more_rows)
+            {
+                row = csv.readLine();
+                if (row == null)
+                {
+                    expect_export_eof = false;
+                    csvPair.getSecond().run();
+                    csvPair = openNextSkinnyExportFile();
+                    if (csvPair == null)
+                    {
+                        System.out.println("No more export rows");
+                        try
+                        {
+                            txout.close();
+                        }
+                        catch (Exception ex)
+                        {
+                            System.err.println("ERROR: closing read transaction id files");
+                            ex.printStackTrace();
+                        }
+                        more_rows = false;
+                        break;
+                    }
+                    else
+                    {
+                        csv = csvPair.getFirst();
+                        row = csv.readLine();
+                    }
+                }
+                else if (expect_export_eof)
+                {
+                    throw new ValidationErr("previously logged row had unexpected number of columns");
+                }
+
+                int columnCount = splitCSV(row, rowValues);
+                expect_export_eof = columnCount < rowValues.length;
+                dcount++;
+
+                if (expect_export_eof) {
+                    System.err.println(
+                            "ERROR: Unexpected number of columns for the following row:\n\t" +
+                             row
+                             );
+                    continue;
+                }
+                /*
+                 * client dude has only confirmed tx id, on asynch writer exceptions we
+                 * writer row id for which we don't have confirmed commit, and thus use
+                 * rows' own tx id for verification
+                 */
+                if (++ttlVerified % VALIDATION_REPORT_INTERVAL == 0) {
+                    System.out.println("Verified " + ttlVerified + " rows.");
+                }
+
+                int partition =  Integer.MAX_VALUE;
+                if (rowValues[3] < Integer.MAX_VALUE)
+                {
+                    partition = (int)rowValues[3];
+                }
+                long rowTxnId = rowValues[6];
+                long rowId = rowValues[7];
+
+                if (TxnEgo.getPartitionId(rowTxnId) != partition) {
+                    System.err.println("ERROR: mismatched exported partition for txid " + rowTxnId +
+                            ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
+                            ", while export record says " + partition);
+                }
+
+                txout.printf("%d:%d\n", rowValues[0], rowValues[1]);
+
+                if (! m_rowTxnIds.containsKey(partition)) {
+                    System.err.println("ERROR: unknow partition " + partition + " in txnid " + rowTxnId);
+                    continue;
+                }
+
+                Long previous = m_rowTxnIds.get(partition).put(rowTxnId,rowId);
+                if (previous != null)
+                {
+                    System.out.println("WARN Duplicate TXN ID in export stream: " + rowTxnId);
+                }
+                else
+                {
+                    //System.out.println("Added txnId: " + rowTxnId + " to outstanding export");
+                }
+            }
+
+            System.out.println("\n!_!_! DEBUG !_!_! read " + dcount + " exported records");
+
+            determineReadUpToCounters();
+            dcount = m_clientOverFlow.size();
+            processClientIdOverFlow();
+
+            System.out.println("!_!_! DEBUG !_!_! processed " + (dcount - m_clientOverFlow.size()) + " client overflow txid records");
+            System.out.println("!_!_! DEBUG !_!_! overflow size is now " + m_clientOverFlow.size());
+
+            // If we've pulled in rows for every partition, or there are
+            // no more export rows, and there are still unchecked client txnids,
+            // attempt to validate as many client txnids as possible
+            dcount = 0;
+            long [] rec = new long [3];
+            while ((!reachedReadUpTo() || !more_rows) && more_txnids)
+            {
+                String trace = txnIdReader.readLine();
+                if (trace == null)
+                {
+                    txnIdReader = openNextClientFile();
+
+                    if (txnIdReader == null)
+                    {
+                        System.out.println("No more client txn IDs");
+                        more_txnids = false;
+                    }
+                    else
+                    {
+                        trace = txnIdReader.readLine();
+                    }
+                }
+                int recColumns = splitClientTrace(trace, rec);
+                if (recColumns == rec.length)
+                {
+                    long rowid = rec[0];
+                    long txid = rec[1];
+                    long ts = rec[2];
+
+                    if (txid >= 0) {
+                        m_clientTxnIds.put(txid,ts);
+                        countDownReadUpTo(txid);
+                    } else {
+                        m_clientTxnIdOrphans.add(rowid);
+                    }
+                    dcount++;
+                }
+                else if (trace != null)
+                {
+                    System.out.println("WARN read malformed trace " + trace);
+                }
+            }
+
+            System.out.println("!_!_! DEBUG !_!_! read " + dcount + " client txid records");
+
+            if (matchClientTxnIds(vfout))
+            {
+                emptyRemovalCycles = 0;
+            }
+            else if (++emptyRemovalCycles >= 10)
+            {
+                System.err.println("ERROR: 10 check cycles failed to match client tx ids with exported tx id -- bailing out");
+                System.exit(1);
+            }
+
+            printTxCountByPartition();
+
+            if (!more_rows || !more_txnids)
+            {
+                if (more_rows && ! m_clientTxnIds.isEmpty())
+                {
+                    quit = false;
+                }
+                else
+                {
+                    quit = true;
+                }
+            }
+        }
+
+        try
+        {
+            vfout.close();
+        }
+        catch (Exception ioex)
+        {
+            System.err.println("ERROR: closing verified transactions file");
+            ioex.printStackTrace();
         }
     }
 
@@ -778,6 +1064,40 @@ public class ExportOnServerVerifier {
         return Pair.of( exportreader, r);
     }
 
+    Pair<BufferedReader,Runnable> openNextSkinnyExportFile() throws Exception
+    {
+        if (m_exportFiles.isEmpty())
+        {
+            checkForMoreExportFiles();
+        }
+        Pair<ChannelSftp, String> remotePair = m_exportFiles.poll();
+        if (remotePair == null) return null;
+        final ChannelSftp channel = remotePair.getFirst();
+        final String path = remotePair.getSecond();
+        System.out.println(
+                "Opening export file: " + channel.getSession().getHost() + "@" + path);
+        final BufferedReader reader = new BufferedReader(
+                new InputStreamReader(channel.get(path)), 4096 * 32
+                );
+        Runnable r = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    reader.close();
+                    channel.rm(path);
+                } catch (Exception e)
+                {
+                    Throwables.propagate(e);
+                }
+            }
+        };
+
+        return Pair.of(reader,r);
+    }
+
     private BufferedReader openNextClientFile() throws FileNotFoundException, ValidationErr
     {
         BufferedReader clientreader = null;
@@ -854,7 +1174,7 @@ public class ExportOnServerVerifier {
         return allCountedDown;
     }
 
-    private boolean matchClientTxnIds()
+    private boolean matchClientTxnIds(PrintWriter writer)
     {
         Collections.sort(m_clientTxnIdOrphans);
 
@@ -870,6 +1190,9 @@ public class ExportOnServerVerifier {
             {
                 ++matchCount;
                 staleitr.remove();
+
+                if (writer != null) writer.println(staletx);
+
                 System.out.println(" *** Resurfaced stale tx " + staletx + " found in the client tx list");
             }
         }
@@ -884,6 +1207,9 @@ public class ExportOnServerVerifier {
                 {
                     txitr.remove();
                     ++matchCount;
+
+                    if (writer != null) writer.println(e.getKey());
+
                     m_clientOverFlow.remove(e.getKey());
                     if (e.getKey() > m_maxPartTxId.get(i))
                     {
@@ -909,6 +1235,8 @@ public class ExportOnServerVerifier {
                     if( bsidx >= 0)
                     {
                         System.out.println(" *** Found unrecorded txid " + e.getKey() + " for rowId " + e.getValue());
+
+                        if (writer != null) writer.println(e.getKey());
 
                         txitr.remove();
                         m_clientTxnIdOrphans.remove(bsidx);
@@ -1127,7 +1455,11 @@ public class ExportOnServerVerifier {
         ExportOnServerVerifier verifier = new ExportOnServerVerifier();
         try
         {
-            verifier.verify(args);
+            boolean skinny = verifier.verifySetup(args);
+
+            if (skinny) verifier.verifySkinny();
+            else verifier.verifyFat();
+
             if (verifier.m_clientTxnIds.size() > 0)
             {
                 System.err.println("ERROR: not all client txids were matched against exported txids");
