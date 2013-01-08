@@ -740,6 +740,13 @@ public abstract class VoltTableRow {
 
     /** Reads a string from a buffer with a specific encoding. */
     final String readString(int position, String encoding) {
+        // Sanity check the request.
+        if (position + 4 > m_buffer.capacity()) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::readString: Can't read 4 byte integer for size " +
+                    "at position %d from buffer with capacity %d",
+                    position, m_buffer.capacity()));
+        }
         final int len = m_buffer.getInt(position);
         //System.out.println(len);
 

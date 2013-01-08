@@ -319,12 +319,12 @@ public abstract class ExpressionUtil {
                     try {
                         TimestampType ts = new TimestampType(cve.m_value);
                         cve.m_value = String.valueOf(ts.getTime());
-                        cve.setValueType(neededType);
-                        cve.setValueSize(neededSize);
-                        checkConstantValueTypeSafety(cve);
                     }
                     // ignore errors if it's not the right format
                     catch (IllegalArgumentException e) {}
+                    cve.setValueType(neededType);
+                    cve.setValueSize(neededSize);
+                    checkConstantValueTypeSafety(cve);
                     return;
                 }
             }
