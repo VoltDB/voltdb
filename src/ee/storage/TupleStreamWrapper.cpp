@@ -390,7 +390,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedSpHandle,
                              m_currBlock->remaining() - rowHeaderSz);
 
     // write metadata columns
-    io.writeLong(uniqueId);
+    io.writeLong(spHandle);
     io.writeLong(timestamp);
     io.writeLong(seqNo);
     io.writeLong(m_partitionId);
