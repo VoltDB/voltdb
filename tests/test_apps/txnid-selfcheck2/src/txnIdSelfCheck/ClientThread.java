@@ -68,6 +68,8 @@ public class ClientThread extends Thread {
     final AtomicLong m_txnsRun;
 
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor) throws Exception {
+        setName("ClientThread(CID=" + String.valueOf(cid) + ")");
+
         m_type = Type.typeFromId(cid);
         m_cid = cid;
         m_client = client;
@@ -135,6 +137,7 @@ public class ClientThread extends Thread {
                         "Client cid %d procedure %s returned %d results instead of 3",
                         m_cid, procName, results.length));
                 log.error(((ClientResponseImpl) response).toJSONString());
+                Benchmark.printJStack();
                 System.exit(-1);
             }
             VoltTable data = results[2];
@@ -155,6 +158,7 @@ public class ClientThread extends Thread {
                 (cri.getStatus() == ClientResponse.USER_ABORT)) {
             log.error("ClientThread had a proc-call exception that indicated bad data", e);
             log.error(cri.toJSONString(), e);
+            Benchmark.printJStack();
             System.exit(-1);
         }
         else {
@@ -203,6 +207,7 @@ public class ClientThread extends Thread {
             }
             catch (Exception e) {
                 log.error("ClientThread had a non proc-call exception", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }

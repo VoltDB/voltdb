@@ -25,7 +25,10 @@ package txnIdSelfCheck;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -156,6 +159,49 @@ public class Benchmark {
 
             // parse servers
             parsedServers = servers.split(",");
+        }
+    }
+
+    /**
+     * Fake an internal jstack to the log
+     */
+    static public void printJStack() {
+        log.info(new Date().toString() + " Full thread dump");
+
+        Map<String, List<String>> deduped = new HashMap<String, List<String>>();
+
+        // collect all the output, but dedup the identical stack traces
+        for (Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+            Thread t = e.getKey();
+            String header = String.format("\"%s\" %sprio=%d tid=%d %s",
+                    t.getName(),
+                    t.isDaemon() ? "daemon " : "",
+                    t.getPriority(),
+                    t.getId(),
+                    t.getState().toString());
+
+            String stack = "";
+            for (StackTraceElement ste : e.getValue()) {
+                stack += "    at " + ste.toString() + "\n";
+            }
+
+            if (deduped.containsKey(stack)) {
+                deduped.get(stack).add(header);
+            }
+            else {
+                ArrayList<String> headers = new ArrayList<String>();
+                headers.add(header);
+                deduped.put(stack, headers);
+            }
+        }
+
+        for (Entry<String, List<String>> e : deduped.entrySet()) {
+            String logline = "";
+            for (String header : e.getValue()) {
+                logline += header + "\n";
+            }
+            logline += e.getKey();
+            log.info(logline);
         }
     }
 
@@ -294,6 +340,7 @@ public class Benchmark {
 
         if (diffInSeconds > config.progresstimeout) {
             log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
+            printJStack();
             System.exit(-1);
         }
     }
@@ -324,6 +371,7 @@ public class Benchmark {
             if (cr.getStatus() != ClientResponse.SUCCESS) {
                 log.error("Failed to call Summarize proc at startup. Exiting.");
                 log.error(((ClientResponseImpl) cr).toJSONString());
+                printJStack();
                 System.exit(-1);
             }
 
@@ -339,6 +387,7 @@ public class Benchmark {
         catch (ProcCallException e) {
             log.error("Failed to call Summarize proc at startup. Exiting.", e);
             log.error(((ClientResponseImpl) e.getClientResponse()).toJSONString());
+            printJStack();
             System.exit(-1);
         }
 

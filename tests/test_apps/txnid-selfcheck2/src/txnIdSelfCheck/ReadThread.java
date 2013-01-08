@@ -51,6 +51,8 @@ public class ReadThread extends Thread {
     final Semaphore txnsOutstanding = new Semaphore(100);
 
     public ReadThread(Client client, int threadCount, int threadOffset) {
+        setName("ReadThread");
+
         this.client = client;
         this.threadCount = threadCount;
         this.threadOffset = threadOffset;
@@ -77,6 +79,7 @@ public class ReadThread extends Thread {
             }
             catch (Exception e) {
                 log.error("ReadThread got a bad response", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }
@@ -127,6 +130,7 @@ public class ReadThread extends Thread {
             }
             catch (Exception e) {
                 log.error("ReadThread failed to run a procedure. Will exit.", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }
