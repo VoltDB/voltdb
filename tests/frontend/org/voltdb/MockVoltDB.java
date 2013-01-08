@@ -407,6 +407,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean rejoinDataPending() {
+        return false;
+    }
+
+    @Override
     public OperationMode getMode()
     {
         return m_mode;
@@ -488,7 +493,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void recoveryComplete() {
+    public void recoveryComplete(String requestId) {
         // TODO Auto-generated method stub
     }
 

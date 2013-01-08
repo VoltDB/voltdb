@@ -62,23 +62,26 @@ class ExecutorContext {
 
     // helper to configure the context for a new jni call
     void setupForPlanFragments(UndoQuantum *undoQuantum,
-                               int64_t txnId,
-                               int64_t lastCommittedTxnId)
+                               int64_t spHandle,
+                               int64_t lastCommittedSpHandle,
+                               int64_t uniqueId)
     {
         m_undoQuantum = undoQuantum;
-        m_txnId = txnId;
-        m_lastCommittedTxnId = lastCommittedTxnId;
+        m_spHandle = spHandle;
+        m_lastCommittedSpHandle = lastCommittedSpHandle;
+        m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
+        m_uniqueId = uniqueId;
     }
 
     // data available via tick()
-    void setupForTick(int64_t lastCommittedTxnId)
+    void setupForTick(int64_t lastCommittedSpHandle)
     {
-        m_lastCommittedTxnId = lastCommittedTxnId;
+        m_lastCommittedSpHandle = lastCommittedSpHandle;
     }
 
     // data available via quiesce()
-    void setupForQuiesce(int64_t lastCommittedTxnId) {
-        m_lastCommittedTxnId = lastCommittedTxnId;
+    void setupForQuiesce(int64_t lastCommittedSpHandle) {
+        m_lastCommittedSpHandle = lastCommittedSpHandle;
     }
 
     // for test (VoltDBEngine::getExecutorContext())
@@ -98,19 +101,24 @@ class ExecutorContext {
         return m_topEnd;
     }
 
-    /** Current or most recently executed transaction id. */
-    int64_t currentTxnId() {
-        return m_txnId;
+    /** Current or most recently sp handle */
+    int64_t currentSpHandle() {
+        return m_spHandle;
     }
 
-    /** Current or most recently executed transaction id. */
+    /** Timestamp from unique id for this transaction */
+    int64_t currentUniqueId() {
+        return m_uniqueId;
+    }
+
+    /** Timestamp from unique id for this transaction */
     int64_t currentTxnTimestamp() {
-        return (m_txnId >> 23) + m_epoch;
+        return m_currentTxnTimestamp;
     }
 
     /** Last committed transaction known to this EE */
-    int64_t lastCommittedTxnId() {
-        return m_lastCommittedTxnId;
+    int64_t lastCommittedSpHandle() {
+        return m_lastCommittedSpHandle;
     }
 
     static ExecutorContext* getExecutorContext();
@@ -126,10 +134,11 @@ class ExecutorContext {
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
-    int64_t m_txnId;
-
+    int64_t m_spHandle;
+    int64_t m_uniqueId;
+    int64_t m_currentTxnTimestamp;
   public:
-    int64_t m_lastCommittedTxnId;
+    int64_t m_lastCommittedSpHandle;
     int64_t m_siteId;
     CatalogId m_partitionId;
     std::string m_hostname;

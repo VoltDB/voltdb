@@ -30,7 +30,7 @@ import java.util.Random;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-public class PayloadProcessor
+public class TxnIdPayloadProcessor
 {
     public static class Pair
     {
@@ -90,7 +90,7 @@ public class PayloadProcessor
         }
     };
 
-    public PayloadProcessor(
+    public TxnIdPayloadProcessor(
             int keySize,
             int minValueSize,
             int maxValueSize,
