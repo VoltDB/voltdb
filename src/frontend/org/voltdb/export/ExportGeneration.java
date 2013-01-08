@@ -140,6 +140,7 @@ public class ExportGeneration {
     private Mailbox m_mbox;
 
     private ZooKeeper m_zk;
+    private volatile boolean shutdown = false;
 
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
@@ -511,6 +512,7 @@ public class ExportGeneration {
                     @Override
                     public void run() {
                         try {
+                            if (shutdown) return;
                             KeeperException.Code code = KeeperException.Code.get(rc);
                             if (code != KeeperException.Code.OK) {
                                 throw KeeperException.create(code);
@@ -686,6 +688,7 @@ public class ExportGeneration {
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
         }
+        shutdown = true;
         VoltFile.recursivelyDelete(m_directory);
 
     }
@@ -742,6 +745,7 @@ public class ExportGeneration {
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
         }
+        shutdown = true;
     }
 
     /**
