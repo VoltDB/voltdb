@@ -109,8 +109,12 @@ public class ReadThread extends Thread {
             }
 
             // 1/5 of all reads are MP
-            boolean replicated = (counter++ % 5) == 0;
+            boolean replicated = (counter % 5) == 0;
+            // 1/23th of all SP reads are in-proc adhoc
+            boolean inprocAdhoc = (counter % 23) == 0;
+            counter++;
             String procName = replicated ? "ReadMP" : "ReadSP";
+            if (inprocAdhoc) procName += "InProcAdHoc";
             byte cid = (byte) (r.nextInt(threadCount) + threadOffset);
 
             // call a transaction

@@ -23,15 +23,7 @@
 
 package org.voltdb.planner;
 
-//import java.util.List;
-
 import junit.framework.TestCase;
-
-//import org.voltdb.catalog.CatalogMap;
-//import org.voltdb.catalog.Cluster;
-//import org.voltdb.catalog.Table;
-//import org.voltdb.plannodes.AbstractPlanNode;
-//import org.voltdb.plannodes.IndexScanPlanNode;
 
 public class TestDeterminism extends TestCase {
 
@@ -198,5 +190,11 @@ public class TestDeterminism extends TestCase {
         assertPlanDeterminism("update ttree set z = 5 where a < 2;", ORDERED, CONSISTENT);
         assertPlanDeterminism("update tunique set z = 5 where a < 2;", ORDERED, CONSISTENT);
         assertPlanDeterminism("update tpk set z = 5 where a < 2;", ORDERED, CONSISTENT);
+    }
+
+    public void testOrderByWithoutIndex() {
+        assertPlanDeterminism("SELECT * FROM eng4155 ORDER BY ts DESC, id;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        assertPlanDeterminism("SELECT * FROM eng4155 ORDER BY ts DESC;", UNORDERED, CONSISTENT);
+        assertPlanDeterminism("SELECT ts FROM eng4155 ORDER BY ts DESC;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
     }
 }

@@ -929,10 +929,8 @@ public class PlanAssembler {
         orderByNode.addAndLinkChild(root);
         orderByNode.generateOutputSchema(m_catalogDb);
 
-        // The method for determining that the ordering is on a unique value or unique combination of values is a little weak, here.
         // In theory, for a single-table query, there just needs to exist a uniqueness constraint (primary key or other unique index)
         // on some of the ORDER BY values regardless of whether the associated index is used in the selected plan.
-        // For now, we only recognize such an index if it is currently used in the plan.
         // Strictly speaking, if it was used at the top of the plan, this function would have already returned without adding an orderByNode.
         // The interesting case here, addressing issue ENG-3335, is when the index scan is in the distributed part of the plan.
         // Then, the orderByNode is required to re-order the results at the coordinator.
@@ -941,16 +939,34 @@ public class PlanAssembler {
         // TODO: In theory, it is possible to analyze the join criteria and/or projected columns
         // to determine whether the particular join preserves the uniqueness of its index-scanned input.
         if (m_parsedSelect.tableList.size() == 1) {
-            List<AbstractPlanNode> indexScans = root.findAllNodesOfType(PlanNodeType.INDEXSCAN);
-            if (indexScans.size() == 1) {
-                IndexScanPlanNode ixnode = (IndexScanPlanNode) (indexScans.get(0));
-                // The index must be associated with the expected ordering.
-                if (ixnode.getSortDirection() != SortDirectionType.INVALID) {
-                    Index index = ixnode.getCatalogIndex();
-                    // Index must guarantee uniqueness
-                    if (index.getUnique()) {
-                        orderByNode.setOrderingByUniqueColumns();
-                    }
+
+            Table table = m_parsedSelect.tableList.get(0);
+
+            // get all of the columns in the sort
+            ArrayList<String> orderColNames = new ArrayList<String>();
+            for (AbstractExpression e : orderByNode.getSortExpressions()) {
+                if (e instanceof TupleValueExpression) {
+                    TupleValueExpression tve = (TupleValueExpression) e;
+                    orderColNames.add(tve.getColumnName());
+                }
+            }
+
+            // search indexes for one that makes the order by deterministic
+            for (Index index : table.getIndexes()) {
+                // skip unique indexes
+                if (!index.getUnique()) {
+                    continue;
+                }
+
+                // get the list of columns in this unique index
+                ArrayList<String> indexColNames = new ArrayList<String>();
+                for (ColumnRef cref : index.getColumns()) {
+                    indexColNames.add(cref.getColumn().getTypeName());
+                }
+
+                // if the sort covers the index, then it's a unique sort
+                if (orderColNames.containsAll(indexColNames)) {
+                    orderByNode.setOrderingByUniqueColumns();
                 }
             }
         }
