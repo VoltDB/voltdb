@@ -46,7 +46,6 @@ import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google.common.base.Charsets;
@@ -104,17 +103,21 @@ public class RawProcessor implements ExportDataProcessor {
     private final Runnable m_runLoop = new Runnable() {
         @Override
         public void run() {
-            Runnable r;
-            while (m_shouldContinue.get() == true) {
-                try {
-                    r = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);
-                    if (r != null) {
-                        r.run();
+            try {
+                Runnable r;
+                while (m_shouldContinue.get() == true) {
+                    try {
+                        r = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);
+                        if (r != null) {
+                            r.run();
+                        }
+                    }
+                    catch (InterruptedException e) {
+                        // acceptable. just re-loop.
                     }
                 }
-                catch (InterruptedException e) {
-                    // acceptable. just re-loop.
-                }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error in RawProcessor run loop", false, e);
             }
         }
     };

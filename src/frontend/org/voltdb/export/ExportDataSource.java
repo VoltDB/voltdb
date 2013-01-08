@@ -555,6 +555,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_onDrain != null) {
                     m_onDrain.run();
                 }
+            } else {
+                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId);
             }
             return;
         }
