@@ -154,6 +154,10 @@ public class OrderByPlanNode extends AbstractPlanNode {
         return m_sortExpressions.size();
     }
 
+    public List<AbstractExpression> getSortExpressions() {
+        return m_sortExpressions;
+    }
+
     @Override
     public void resolveColumnIndexes()
     {
