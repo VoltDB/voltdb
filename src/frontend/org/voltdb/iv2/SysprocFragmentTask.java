@@ -27,7 +27,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.SnapshotSiteProcessor;
+
+import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
@@ -35,10 +36,7 @@ import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.LogKeys;
-
-import com.google.common.base.Throwables;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -71,6 +69,17 @@ public class SysprocFragmentTask extends TransactionTask
             }
         }
 
+        if (m_task.isSysProcTask() &&
+            SysProcFragmentId.isSnapshotSaveFragment(m_task.getFragmentId(0)) &&
+            VoltDB.instance().rejoinDataPending()) {
+            final FragmentResponseMessage response =
+                new FragmentResponseMessage(m_task, m_initiator.getHSId());
+            response.setRecovering(true);
+            response.setStatus(FragmentResponseMessage.SUCCESS, null);
+            m_initiator.deliver(response);
+            return;
+        }
+
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
@@ -84,27 +93,6 @@ public class SysprocFragmentTask extends TransactionTask
     throws IOException
     {
         taskLog.logTask(m_task);
-
-        /*
-         * During rejoin all sites on the host must arrive at the barrier
-         * for any snapshots that occur. Some will arrive at the barrier here
-         *
-         * This code has to be inlined here for this fragment since the handling of the
-         * fragment during rejoin is different since the site is not recovered
-         *
-         * There is similar code used at fully functioning sites in SnasphotSaveAPI
-         * that initializes the barrier and resets it as necessary
-         */
-        if (m_task.isSysProcTask() && m_task.getFragmentId(0) == SysProcFragmentId.PF_createSnapshotTargets) {
-            final int numLocalSites = VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length;
-            SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
-            try {
-                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
-                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await();
-            } catch (Exception e) {
-                Throwables.propagate(e);
-            }
-        }
 
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_task, m_initiator.getHSId());
