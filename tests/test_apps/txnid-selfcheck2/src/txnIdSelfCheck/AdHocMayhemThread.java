@@ -47,6 +47,8 @@ public class AdHocMayhemThread extends Thread {
     final Semaphore txnsOutstanding = new Semaphore(100);
 
     public AdHocMayhemThread(Client client) {
+        setName("AdHocMayhemThread");
+
         this.client = client;
     }
 
@@ -130,6 +132,7 @@ public class AdHocMayhemThread extends Thread {
             client.callProcedure("SetupAdHocTables");
         } catch (Exception e) {
             log.error("SetupAdHocTables failed in AdHocMayhemThread. Will exit.", e);
+            Benchmark.printJStack();
             System.exit(-1);
         }
 
@@ -168,6 +171,7 @@ public class AdHocMayhemThread extends Thread {
             }
             catch (Exception e) {
                 log.error("AdHocMayhemThread failed to run an AdHoc statement. Will exit.", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }

@@ -435,29 +435,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 if (isIV2Enabled()) {
                     ClusterConfig iv2config = new ClusterConfig(topo);
                     m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
+                    List<Integer> partitions = null;
                     if (isRejoin) {
-                        List<Integer> partitionsToReplace = m_cartographer.getIv2PartitionsToReplace(topo);
-                        if (partitionsToReplace.size() == 0) {
+                        partitions = m_cartographer.getIv2PartitionsToReplace(topo);
+                        if (partitions.size() == 0) {
                             VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                     "the requested k-safety factor of " +
                                     iv2config.getReplicationFactor() + ".\n" +
                                     "No more nodes can join.", false, null);
                         }
-                        for (int ii = 0; ii < partitionsToReplace.size(); ii++) {
-                            Integer partition = partitionsToReplace.get(ii);
-                            m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
-                        }
-                        m_iv2Initiators = createIv2Initiators(partitionsToReplace, true);
                     }
                     else {
-                        List<Integer> partitions =
-                            ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                        for (int ii = 0; ii < partitions.size(); ii++) {
-                            Integer partition = partitions.get(ii);
-                            m_iv2InitiatorStartingTxnIds.put(partition, TxnEgo.makeZero(partitions.get(ii)).getTxnId());
-                        }
-                        m_iv2Initiators = createIv2Initiators(partitions, false);
+                        partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                     }
+                    for (int ii = 0; ii < partitions.size(); ii++) {
+                        Integer partition = partitions.get(ii);
+                        m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
+                    }
+                    m_iv2Initiators = createIv2Initiators(partitions, isRejoin);
                     m_iv2InitiatorStartingTxnIds.put(
                             MpInitiator.MP_INIT_PID,
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
@@ -632,6 +627,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     0, m_memoryStats);
             if (isIV2Enabled()) {
                 m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+            }
+
+            /*
+             * Initialize the command log on rejoin before configuring the IV2
+             * initiators.  This will prevent them from receiving transactions
+             * which need logging before the internal file writers are
+             * initialized.  Root cause of ENG-4136.
+             */
+            if (m_commandLog != null && isRejoin) {
+                //On rejoin the starting IDs are all 0 so technically it will load any snapshot
+                //but the newest snapshot will always be the truncation snapshot taken after rejoin
+                //completes at which point the node will mark itself as actually recovered.
+                m_commandLog.initForRejoin(
+                        m_catalogContext,
+                        Long.MIN_VALUE,
+                        m_iv2InitiatorStartingTxnIds,
+                        true,
+                        m_config.m_commandLogBinding);
             }
 
             /*
@@ -844,17 +857,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 VoltDB.crashLocalVoltDB("Error initializing snapshot completion monitor", true, e);
             }
 
-            if (m_commandLog != null && isRejoin) {
-                //On rejoin the starting IDs are all 0 so technically it will load any snapshot
-                //but the newest snapshot will always be the truncation snapshot taken after rejoin
-                //completes at which point the node will mark itself as actually recovered.
-                m_commandLog.initForRejoin(
-                        m_catalogContext,
-                        Long.MIN_VALUE,
-                        m_iv2InitiatorStartingTxnIds,
-                        true,
-                        m_config.m_commandLogBinding);
-            }
 
             /*
              * Make sure the build string successfully validated

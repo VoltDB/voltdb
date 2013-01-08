@@ -50,6 +50,8 @@ public class BigTableLoader extends Thread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
 
     BigTableLoader(Client client, String tableName, int targetCount, int rowSize) {
+        setName("BigTableLoader");
+
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
