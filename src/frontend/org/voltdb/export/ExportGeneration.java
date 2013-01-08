@@ -756,7 +756,7 @@ public class ExportGeneration {
     public void acceptMastershipTask( int partitionId) {
         HashMap<String, ExportDataSource> partitionDataSourceMap =
                 m_dataSourcesByPartition.get(partitionId);
-
+        exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             eds.acceptMastership();
         }
