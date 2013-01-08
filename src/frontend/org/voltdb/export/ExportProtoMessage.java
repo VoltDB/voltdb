@@ -363,7 +363,7 @@ public class ExportProtoMessage
             s = s + " payloadBytes(" + m_data.remaining() +")";
         }
         else {
-            s = s + " no payoad.";
+            s = s + " no payload.";
         }
         return s;
     }

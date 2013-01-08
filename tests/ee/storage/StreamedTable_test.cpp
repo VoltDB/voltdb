@@ -172,7 +172,7 @@ TEST_F(StreamedTableTest, BaseCase) {
           new (m_pool->allocate(sizeof(UndoQuantum)))
           UndoQuantum(i + tokenOffset, m_pool);
         // quant, currTxnId, committedTxnId
-        m_context->setupForPlanFragments(m_quantum, i, i - 1);
+        m_context->setupForPlanFragments(m_quantum, i, i - 1, 0);
 
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {

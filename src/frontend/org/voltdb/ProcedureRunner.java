@@ -1306,7 +1306,8 @@ public class ProcedureRunner {
                        fragmentIds,
                        null,
                        params,
-                       m_txnState.txnId,
+                       m_txnState.spHandle,
+                       m_txnState.uniqueId,
                        m_catProc.getReadonly());
                }
 
@@ -1325,7 +1326,8 @@ public class ProcedureRunner {
                            new long[] { fragId },
                            new long[] { AGG_DEPID },
                            new ParameterSet[] {queuedSQL.params},
-                           m_txnState.txnId,
+                           m_txnState.spHandle,
+                           m_txnState.uniqueId,
                            m_catProc.getReadonly())[0];
                    }
                    return results;

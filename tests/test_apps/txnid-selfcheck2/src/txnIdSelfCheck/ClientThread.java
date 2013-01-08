@@ -63,11 +63,11 @@ public class ClientThread extends Thread {
     final byte m_cid;
     long m_nextRid;
     final Type m_type;
-    final PayloadProcessor m_processor;
+    final TxnId2PayloadProcessor m_processor;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicLong m_txnsRun;
 
-    ClientThread(byte cid, AtomicLong txnsRun, Client client, PayloadProcessor processor) throws Exception {
+    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor) throws Exception {
         m_type = Type.typeFromId(cid);
         m_cid = cid;
         m_client = client;

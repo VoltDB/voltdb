@@ -33,12 +33,14 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 public interface VoltDBInterface
 {
     public boolean rejoining();
+    public boolean rejoinDataPending();
 
-    /*
+    /**
      * Invoked from the command log once this node is marked unfaulted.
-     * Allows its command log to be used for recovery
+     * Allows its command log to be used for recovery.
+     * @param requestId The id, if any, associated with the truncation request.
      */
-    public void recoveryComplete();
+    public void recoveryComplete(String requestId);
 
     public void readBuildInfo(String editionTag);
 

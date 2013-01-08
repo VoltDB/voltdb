@@ -66,7 +66,7 @@ public class Benchmark {
     // Benchmark start time
     long benchmarkStartTS;
 
-    final PayloadProcessor processor;
+    final TxnId2PayloadProcessor processor;
 
     final AtomicInteger activeConnections = new AtomicInteger(0);
     final AtomicBoolean shutdown = new AtomicBoolean(false);
@@ -196,7 +196,7 @@ public class Benchmark {
     Benchmark(Config config) {
         this.config = config;
 
-        processor = new PayloadProcessor(4, config.minvaluesize, config.maxvaluesize,
+        processor = new TxnId2PayloadProcessor(4, config.minvaluesize, config.maxvaluesize,
                                          config.entropy, Integer.MAX_VALUE, config.usecompression);
 
         log.info(HORIZONTAL_RULE);
