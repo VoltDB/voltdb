@@ -1093,7 +1093,7 @@ public class ExportToFileClient extends ExportClientBase2 {
         boolean batched = Boolean.parseBoolean(conf.getProperty("batched", "false"));
         boolean withSchema = Boolean.parseBoolean(conf.getProperty("with-schema", "false"));
 
-        String fullDelimiters = conf.getProperty("delimeters");
+        String fullDelimiters = conf.getProperty("delimiters");
         if (fullDelimiters != null) {
             fullDelimiters = fullDelimiters.trim();
             String charsAsStr = StringEscapeUtils.unescapeJava(fullDelimiters.trim());
