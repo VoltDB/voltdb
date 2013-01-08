@@ -119,39 +119,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     private boolean orderingByUniqueColumns() {
-        if (m_orderingByUniqueColumns) {
-            return true;
-        }
-
-        // assume order by has one child node
-        assert(m_children.size() == 1);
-
-        AbstractPlanNode child = m_children.get(0);
-        // skip plans that are joins or have fanciness
-        if ((child instanceof AbstractScanPlanNode) == false) {
-            return false;
-        }
-
-        AbstractScanPlanNode scanNode = (AbstractScanPlanNode) child;
-
-        String tableName = scanNode.getTargetTableName();
-
-
-
-        // find all tables underneath
-        for (AbstractExpression e : m_sortExpressions) {
-            if (e instanceof TupleValueExpression) {
-
-            }
-        }
-
-        // for each table
-            // for each index
-                // find all expressions
-
-        return false;
-
-
+        return m_orderingByUniqueColumns;
     }
 
     public void setOrderingByUniqueColumns() {
@@ -184,6 +152,10 @@ public class OrderByPlanNode extends AbstractPlanNode {
 
     public int countOfSortExpressions() {
         return m_sortExpressions.size();
+    }
+
+    public List<AbstractExpression> getSortExpressions() {
+        return m_sortExpressions;
     }
 
     @Override
