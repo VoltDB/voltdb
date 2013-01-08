@@ -38,7 +38,7 @@ public class DuplicateCounter
     static final int DONE = 1;
     static final int WAITING = 2;
 
-    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     final long m_destinationId;
     Long m_responseHash = null;
@@ -79,9 +79,12 @@ public class DuplicateCounter
                 m_responseHash = Long.valueOf(hash);
             }
             else if (!m_responseHash.equals(hash)) {
-                System.out.printf("COMPARING: %d to %d\n", hash, m_responseHash);
-                System.out.println("PREV MESSAGE: " + m_lastResponse.toString());
-                System.out.println("CURR MESSAGE: " + message.toString());
+                String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n" +
+                        "PREV MESSAGE: %s\n" +
+                        "CURR MESSAGE: %s\n",
+                        hash, m_responseHash,
+                        m_lastResponse.toString(), message.toString());
+                tmLog.error(msg);
                 return MISMATCH;
             }
             m_lastResponse = message;
