@@ -52,3 +52,23 @@ CREATE TABLE export_mirror_partitioned_table2
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 , PRIMARY KEY (rowid)
 );
+
+CREATE TABLE export_skinny_partitioned_table2
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+PARTITION TABLE export_skinny_partitioned_table2 ON COLUMN rowid
+;
+
+CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleSkinnyExportSinglePartition
+;
+
+PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
+  ON TABLE export_skinny_partitioned_table2 COLUMN rowid
+;
+
+EXPORT TABLE export_skinny_partitioned_table2
+;
+

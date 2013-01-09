@@ -140,6 +140,7 @@ public class ExportGeneration {
     private Mailbox m_mbox;
 
     private ZooKeeper m_zk;
+    private volatile boolean shutdown = false;
 
     private static final ListeningExecutorService m_childUpdatingThread =
             CoreUtils.getListeningExecutorService("Export ZK Watcher", 1);
@@ -418,7 +419,18 @@ public class ExportGeneration {
         messenger.createMailbox(null, m_mbox);
 
         for (Integer partition : localPartitions) {
-            ZKUtil.asyncMkdirs(m_zk, m_mailboxesZKPath + "/" + partition + "/" + m_mbox.getHSId());
+
+            final String partitionDN =  m_mailboxesZKPath + "/" + partition;
+            ZKUtil.asyncMkdirs(m_zk, partitionDN);
+
+            ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
+            m_zk.create(
+                    partitionDN + "/" + m_mbox.getHSId(),
+                    null,
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.EPHEMERAL,
+                    cb,
+                    null);
         }
 
         ListenableFuture<?> fut = m_childUpdatingThread.submit(new Runnable() {
@@ -500,6 +512,7 @@ public class ExportGeneration {
                     @Override
                     public void run() {
                         try {
+                            if (shutdown) return;
                             KeeperException.Code code = KeeperException.Code.get(rc);
                             if (code != KeeperException.Code.OK) {
                                 throw KeeperException.create(code);
@@ -675,6 +688,7 @@ public class ExportGeneration {
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
         }
+        shutdown = true;
         VoltFile.recursivelyDelete(m_directory);
 
     }
@@ -731,6 +745,7 @@ public class ExportGeneration {
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
         }
+        shutdown = true;
     }
 
     /**
@@ -741,7 +756,7 @@ public class ExportGeneration {
     public void acceptMastershipTask( int partitionId) {
         HashMap<String, ExportDataSource> partitionDataSourceMap =
                 m_dataSourcesByPartition.get(partitionId);
-
+        exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             eds.acceptMastership();
         }

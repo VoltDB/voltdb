@@ -224,6 +224,7 @@ public class ExportManager
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
                 );
+        exportLog.info("ExportManager accepting mastership for partition " + partitionId);
         /*
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.

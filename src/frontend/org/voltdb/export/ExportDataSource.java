@@ -47,7 +47,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -183,7 +182,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         exportLog.info("Creating ad for " + nonce);
         assert(!adFile.exists());
         byte jsonBytes[] = null;
-        FastSerializer fs = new FastSerializer();
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
@@ -274,7 +272,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void releaseExportBytes(long releaseOffset, ArrayList<StreamBlock> blocksToDelete) throws IOException {
+    private void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
         if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso())
         {
@@ -287,8 +285,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseOffset >= sb.uso() + sb.totalUso()) {
                 m_committedBuffers.pop();
-                blocksToDelete.add(sb);
-                lastUso = sb.uso() + sb.totalUso();
+                try {
+                    lastUso = sb.uso() + sb.totalUso();
+                } finally {
+                    sb.deleteContent();
+                }
             } else if (releaseOffset >= sb.uso()) {
                 sb.releaseUso(releaseOffset);
                 lastUso = releaseOffset;
@@ -316,7 +317,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //Process the ack if any and add blocks to the delete list or move the released USO pointer
             if (message.isAck() && message.getAckOffset() > 0) {
                 try {
-                    releaseExportBytes(message.getAckOffset(), blocksToDelete);
+                    releaseExportBytes(message.getAckOffset());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                     return;
@@ -555,6 +556,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_onDrain != null) {
                     m_onDrain.run();
                 }
+            } else {
+                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId);
             }
             return;
         }
@@ -822,29 +825,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void ackImpl(long uso) {
-        //Assemble a list of blocks to delete so that they can be deleted
-        //outside of the m_committedBuffers critical section
-        ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
 
         if (uso == Long.MIN_VALUE && m_onDrain != null) {
             m_onDrain.run();
             return;
         }
 
-        try {
-            //Process the ack if any and add blocks to the delete list or move the released USO pointer
-            if (uso > 0) {
-                try {
-                    releaseExportBytes(uso, blocksToDelete);
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
-                    return;
-                }
-            }
-        } finally {
-            //Try hard not to leak memory
-            for (StreamBlock sb : blocksToDelete) {
-                sb.deleteContent();
+        //Process the ack if any and add blocks to the delete list or move the released USO pointer
+        if (uso > 0) {
+            try {
+                releaseExportBytes(uso);
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
+                return;
             }
         }
     }
