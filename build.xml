@@ -714,7 +714,7 @@ CLEANING
 
 <target name='clean'
 	description="Remove all compiled and generated files."
-	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package, clean_bindoc">
+	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package, clean_bindoc, clean_other_gen">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -1996,6 +1996,12 @@ PROJECT FILE SCHEMA CODE GENERATION
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${project.parsergen.dir}'" />
     </exec>
+</target>
+
+<target name="clean_other_gen"
+        description="Remove other generated source files.">
+    <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
+    <delete file="${src.ee.dir}/org_voltcore_utils_DBBPool.h" />
 </target>
 
 <!--
