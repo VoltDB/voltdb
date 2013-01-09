@@ -29,6 +29,7 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -244,6 +245,8 @@ public class InitiatorMailbox implements Mailbox
     protected void deliverInternal(VoltMessage message) {
         assert(lockingVows());
         logRxMessage(message);
+        if (message instanceof DumpMessage) {
+        }
         if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
             return;

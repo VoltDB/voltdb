@@ -24,6 +24,8 @@ import java.util.Map;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
+
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
@@ -147,5 +149,16 @@ public class SysprocFragmentTask extends TransactionTask
             }
         }
         return currentFragResponse;
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SysprocFragmentTask:");
+        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+        sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
+        sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        return sb.toString();
     }
 }

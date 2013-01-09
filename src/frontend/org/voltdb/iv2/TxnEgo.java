@@ -17,7 +17,11 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Encapsulates an Iv2 transaction id, timestamp and random number seed.
@@ -165,5 +169,27 @@ final public class TxnEgo {
     {
         return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +
             TxnEgo.getPartitionId(txnId) + ")";
+    }
+
+    public static String txnIdCollectionToString(Collection<Long> ids) {
+        List<String> idstrings = new ArrayList<String>();
+        for (Long id : ids) {
+            idstrings.add(txnIdToString(id));
+        }
+        // Easy hack, sort txn IDs lexically.
+        Collections.sort(idstrings);
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        boolean first = false;
+        for (String id : idstrings) {
+            if (!first) {
+                first = true;
+            } else {
+                sb.append(", ");
+            }
+            sb.append(id);
+        }
+        sb.append("]");
+        return sb.toString();
     }
 }
