@@ -1133,6 +1133,7 @@ public class SQLCommand
             KeyMap keyMap = lineInputReader.getKeys();
             keyMap.bind(new Character(KeyMap.CTRL_D).toString(), "exit\r");
 
+            /*
             // Disable Ctrl-C in interactive mode to prevent accidental exit.
             sun.misc.Signal.handle(new Signal("INT"), new SignalHandler() {
                 @Override
@@ -1146,7 +1147,7 @@ public class SQLCommand
                     }
                     catch (IOException e) {}
                 }
-            });
+            });*/
 
             boolean interactive = true;
             if (queries != null && !queries.isEmpty())
