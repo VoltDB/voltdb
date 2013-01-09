@@ -486,6 +486,10 @@ public class AsyncBenchmark {
             try {
                 if (cid == -1) {
                     client = clients.get(0);
+                    // skip this work if the client is not connected
+                    if (client.getConnectedHostList().size() == 0) {
+                        continue;
+                    }
 
                     // update the replicated table
                     try {
@@ -494,12 +498,17 @@ public class AsyncBenchmark {
                                              rid);
                     }
                     catch (NoConnectionsException e) {
-                        log.error("ClientThread got NoConnectionsException on updateReplicated proc call. Will sleep.");
-                        sleepUntilConnected(client, benchmarkEndTime);
+                        log.error("ClientThread got NoConnectionsException on updateReplicated proc call.");
                     }
                 }
                 else {
                     client = clients.get(cid % clients.size());
+
+                    // skip this work if the client is not connected
+                    if (client.getConnectedHostList().size() == 0) {
+                        continue;
+                    }
+
                     // asynchronously call the "doTxn" procedure
                     try {
                         client.callProcedure(new doTxnCallback(),
@@ -510,8 +519,7 @@ public class AsyncBenchmark {
                                              processor.generateForStore().getStoreValue());
                     }
                     catch (NoConnectionsException e) {
-                        log.error("ClientThread got NoConnectionsException on doTxn proc call. Will sleep.");
-                        sleepUntilConnected(client, benchmarkEndTime);
+                        log.error("ClientThread got NoConnectionsException on doTxn proc call.");
                     }
                 }
             }
