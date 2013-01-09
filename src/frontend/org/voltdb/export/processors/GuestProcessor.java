@@ -93,6 +93,9 @@ public class GuestProcessor implements ExportDataProcessor {
 
                     @Override
                     public void run() {
+                        m_logger.info(
+                                "Beginning export processing for export source " + source.getTableName()
+                                + " partition " + source.getPartitionId() + " generation " + source.getGeneration());
                         ArrayList<VoltType> types = new ArrayList<VoltType>();
                         for (int type : source.m_columnTypes) {
                             types.add(VoltType.get((byte)type));
