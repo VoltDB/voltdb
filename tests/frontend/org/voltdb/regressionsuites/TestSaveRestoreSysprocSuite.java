@@ -488,16 +488,18 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 saveTablesWithDefaultOptions(client);
 
                 boolean skipFirst = true;
+                int deletedFiles = 0;
                 for (File f : lc.listFiles(new File(TMPDIR))) {
                     if (f.getName().startsWith(TESTNONCE + "-REPLICATED")) {
                         if (skipFirst) {
                             skipFirst = false;
                             continue;
                         }
-                        f.delete();
-                        break;
+                        assertTrue(f.delete());
+                        deletedFiles++;
                     }
                 }
+                assertEquals(deletedFiles, 2);
             } finally {
                 client.close();
             }
