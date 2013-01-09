@@ -73,6 +73,36 @@ public class ExportVerifier {
     {
     }
 
+    int splitClientTrace(String trace, long [] splat)
+    {
+        if (trace == null || splat == null || splat.length == 0) return 0;
+
+        int columnCount = 0;
+        int cursor = 0;
+        int columnPos = trace.indexOf(':', cursor);
+
+        try {
+            while (columnPos >= 0 && splat.length > columnCount+1) {
+                splat[columnCount] = Long.parseLong(trace.substring(cursor, columnPos));
+                cursor = columnPos + 1;
+                columnCount = columnCount + 1;
+                columnPos = trace.indexOf(':', cursor);
+            }
+            if (cursor < trace.length()) {
+                columnPos = columnPos < 0 ? trace.length() : columnPos;
+                splat[columnCount] = Long.parseLong(trace.substring(cursor, columnPos));
+            } else {
+                columnCount = columnCount - 1;
+            }
+        } catch (NumberFormatException nfex) {
+            return 0;
+        } catch (IndexOutOfBoundsException ioobex) {
+            return -1;
+        }
+
+        return columnCount+1;
+    }
+
     void verify(String[] args) throws IOException, ValidationErr
     {
         m_partitions = Integer.parseInt(args[0]);
@@ -152,6 +182,7 @@ public class ExportVerifier {
             // no more export rows, and there are still unchecked client txnids,
             // attempt to validate as many client txnids as possible
             more_txnids = true;
+            long [] rec = new long [3];
             while ((canCheckClient() || !more_rows) && more_txnids)
             {
                 String trace = txnIdReader.readLine();
@@ -168,10 +199,10 @@ public class ExportVerifier {
                         trace = txnIdReader.readLine();
                     }
                 }
-                if (trace != null && trace.length() > 17)
+                int recColumns = splitClientTrace(trace, rec);
+                if (recColumns == rec.length)
                 {
-                    // content is [row_id]:[txid] formatted as %016d:%d
-                    long txid = Long.parseLong(trace.substring(17));
+                    long txid = rec[1];
 
                     if (txid >= 0)
                     {

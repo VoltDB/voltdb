@@ -168,3 +168,22 @@ CREATE TABLE export_replicated_table
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
+
+CREATE TABLE export_skinny_partitioned_table
+(
+  txnid                     BIGINT        NOT NULL
+, rowid                     BIGINT        NOT NULL
+);
+
+PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid
+;
+
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition
+;
+
+PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
+  ON TABLE export_skinny_partitioned_table COLUMN rowid
+;
+
+EXPORT TABLE export_skinny_partitioned_table
+;
