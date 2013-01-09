@@ -31,6 +31,7 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
+import org.voltdb.VoltDB;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -38,7 +39,7 @@ public class ForeignHost {
     private Connection m_connection;
     final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
-    final int m_hostId;
+    final Integer m_hostId;
     final InetSocketAddress m_listeningAddress;
 
     private final String m_remoteHostname = "UNKNOWN_HOSTNAME";
@@ -233,21 +234,30 @@ public class ForeignHost {
 
     /** Deliver a deserialized message from the network to a local mailbox */
     private void deliverMessage(long destinationHSId, VoltMessage message) {
+        if (!m_hostMessenger.validateForeignHostId(m_hostId)) {
+            hostLog.warn(String.format("Message (%s) sent to site id: %s @ (%s) at " +
+                    m_hostMessenger.getHostId() + " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                    " which is a known failed host. The message will be dropped\n",
+                    message.getClass().getSimpleName(),
+                    CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString()));
+            return;
+        }
+
         Mailbox mailbox = m_hostMessenger.getMailbox(destinationHSId);
         /*
          * At this point we are OK with messages going to sites that don't exist
          * because we are saying that things can come and go
          */
         if (mailbox == null) {
-            System.err.printf("Message (%s) sent to unknown site id: %s @ (%s) at " +
+            hostLog.warn(String.format("Message (%s) sent to unknown site id: %s @ (%s) at " +
                     m_hostMessenger.getHostId() + " from " + CoreUtils.hsIdToString(message.m_sourceHSId) + "\n",
                     message.getClass().getSimpleName(),
-                    CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString());
+                    CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString()));
             /*
              * If it is for the wrong host, that definitely isn't cool
              */
             if (m_hostMessenger.getHostId() != (int)destinationHSId) {
-                assert(false);
+                VoltDB.crashLocalVoltDB("Received a message at wrong host", false, null);
             }
             return;
         }
