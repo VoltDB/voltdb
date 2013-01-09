@@ -48,13 +48,24 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
         stats.incrementStatistic(0, StatsField.TUPLES_READ, tableEstimates.maxTuples);
+        // This maxTuples value estimates the number of tuples fetched from the sequential scan.
+        // It's a vague measure of the cost of the scan.
+        // Its accuracy depends a lot on what kind of post-filtering or projection needs to happen, if any.
+        // The tuplesRead value is also used to estimate the number of RESULT rows, regardless of
+        // how effective post-filtering might be -- as if all rows passed the filters.
+        // This is at least semi-consistent with the ignoring of post-filter effects in IndexScanPlanNode.
+        // In effect, though, it gives index scans an "unfair" advantage when they reduce the estimated result size
+        // by taking into account the indexed filters -- follow-on plan steps, sorts (etc.), are costed lower
+        // as if they are operating on fewer rows than would have come out of the seqscan,
+        // though that's nonsense.
+        // In any case, it's important to keep an eye on any changes (discounts) to SeqScanPlanNode's costing
+        // here to make sure that SeqScanPlanNode never gains an unfair advantage over IndexScanPlanNode.
         m_estimatedOutputTupleCount = tableEstimates.maxTuples;
-        return true;
     }
 
     @Override
