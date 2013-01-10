@@ -25,8 +25,6 @@ import com.sun.jna.LastErrorException;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Platform;
-import com.sun.jna.PointerType;
-import com.sun.jna.ptr.LongByReference;
 
 
 /**
@@ -56,11 +54,11 @@ public enum PosixJNAAffinity {
 
         public int sched_setaffinity(final int pid,
                                      final int cpusetsize,
-                                     final PointerType cpuset) throws LastErrorException;
+                                     final long[] cpuset) throws LastErrorException;
 
         public int sched_getaffinity(final int pid,
                                      final int cpusetsize,
-                                     final PointerType cpuset) throws LastErrorException;
+                                     final long[] cpuset) throws LastErrorException;
     }
 
     static {
@@ -77,12 +75,12 @@ public enum PosixJNAAffinity {
     public long getAffinity() {
         final CLibrary lib = CLibrary.INSTANCE;
         // TODO where are systems with 64+ cores...
-        final LongByReference cpuset = new LongByReference(0L);
+        final long cpuset[] = new long[16];
         try {
-            final int ret = lib.sched_getaffinity(0, Long.SIZE / 8, cpuset);
+            final int ret = lib.sched_getaffinity(0, 16 * (Long.SIZE / 8), cpuset);
             if (ret < 0)
                 throw new IllegalStateException("sched_getaffinity((" + Long.SIZE / 8 + ") , &(" + cpuset + ") ) return " + ret);
-            return cpuset.getValue();
+            return cpuset[0];
         } catch (LastErrorException e) {
             throw new IllegalStateException("sched_getaffinity((" + Long.SIZE / 8 + ") , &(" + cpuset + ") ) errorNo=" + e.getErrorCode(), e);
         }
@@ -140,7 +138,9 @@ public enum PosixJNAAffinity {
         final CLibrary lib = CLibrary.INSTANCE;
         try {
             //fixme: where are systems with more then 64 cores...
-            final int ret = lib.sched_setaffinity(0, Long.SIZE / 8, new LongByReference(affinity));
+            long affinityMask[] = new long[16];
+            affinityMask[0] = affinity;
+            final int ret = lib.sched_setaffinity(0, 16 * (Long.SIZE / 8), affinityMask);
             if (ret < 0) {
                 throw new IllegalStateException("sched_setaffinity((" + Long.SIZE / 8 + ") , &(" + affinity + ") ) return " + ret);
             }
