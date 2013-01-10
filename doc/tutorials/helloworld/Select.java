@@ -1,10 +1,5 @@
 import org.voltdb.*;
 
-@ProcInfo(
-    partitionInfo = "HELLOWORLD.DIALECT: 0",
-    singlePartition = true
-)
-
 public class Select extends VoltProcedure {
 
   public final SQLStmt sql = new SQLStmt(

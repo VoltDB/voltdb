@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,9 +39,8 @@ public class NonDeterministicSPProc extends VoltProcedure {
 
     static final int NO_PROBLEM = 0;
     static final int MISMATCH_VALUES = 1;
-    static final int MISMATCH_LENGTH = 2;
-    static final int MISMATCH_INSERTION = 3;
-    static final int MISMATCH_WHITESPACE_IN_SQL = 4;
+    static final int MISMATCH_INSERTION = 2;
+    static final int MISMATCH_WHITESPACE_IN_SQL = 3;
 
     public static final SQLStmt sql = new SQLStmt("insert into kv values ?, ?");
     public static final SQLStmt sql2 = new SQLStmt("insert into  kv values ?, ?");
@@ -61,13 +60,8 @@ public class NonDeterministicSPProc extends VoltProcedure {
 
         VoltTable retval = new VoltTable(new ColumnInfo("", VoltType.BIGINT));
 
-        // non deterministic length if desired
-        if (failType == MISMATCH_LENGTH) {
-            for (int i = 0; i < id; i++)
-                retval.addRow(0);
-        }
         // non deterministic by value
-        else if (failType == MISMATCH_VALUES) {
+        if (failType == MISMATCH_VALUES) {
             retval.addRow(id);
         }
 

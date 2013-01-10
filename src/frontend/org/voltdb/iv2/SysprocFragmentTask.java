@@ -1,24 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,15 +26,19 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.rejoin.TaskLog;
+import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.LogKeys;
+
+import com.google.common.base.Throwables;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -81,6 +84,28 @@ public class SysprocFragmentTask extends TransactionTask
     throws IOException
     {
         taskLog.logTask(m_task);
+
+        /*
+         * During rejoin all sites on the host must arrive at the barrier
+         * for any snapshots that occur. Some will arrive at the barrier here
+         *
+         * This code has to be inlined here for this fragment since the handling of the
+         * fragment during rejoin is different since the site is not recovered
+         *
+         * There is similar code used at fully functioning sites in SnasphotSaveAPI
+         * that initializes the barrier and resets it as necessary
+         */
+        if (m_task.isSysProcTask() && m_task.getFragmentId(0) == SysProcFragmentId.PF_createSnapshotTargets) {
+            final int numLocalSites = VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length;
+            SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
+            try {
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await();
+            } catch (Exception e) {
+                Throwables.propagate(e);
+            }
+        }
+
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_task, m_initiator.getHSId());
         response.setRecovering(true);

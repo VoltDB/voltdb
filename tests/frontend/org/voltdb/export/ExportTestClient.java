@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,8 +26,6 @@ package org.voltdb.export;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.voltcore.logging.VoltLogger;
@@ -43,10 +41,8 @@ public class ExportTestClient extends ExportClientBase
 {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
     // hash table name + partition to verifier
-    public final TreeMap<Long, HashMap<String, ExportTestVerifier>> m_verifiers =
-        new TreeMap<Long, HashMap<String, ExportTestVerifier>>();
-
-    private HashMap<Long, HashMap<String, ExportTestVerifier>> m_verifiersToReserve = new HashMap<Long, HashMap<String, ExportTestVerifier>>();
+    public final HashMap<String, ExportTestVerifier> m_verifiers =
+        new HashMap<String, ExportTestVerifier>();
 
     public TreeSet<Long> m_generationsSeen = new TreeSet<Long>();
 
@@ -55,27 +51,13 @@ public class ExportTestClient extends ExportClientBase
         super.addServerInfo(new InetSocketAddress("localhost", port));
     }
 
-    /*
-     * The export client base is going to reconnect. Reserve it the old verifiers
-     * that have the test data.
-     */
-    public void reserveVerifiers() {
-        m_verifiersToReserve = new HashMap<Long, HashMap<String, ExportTestVerifier>>();
-        for (Map.Entry<Long, HashMap<String, ExportTestVerifier>> entry : m_verifiers.entrySet()) {
-            m_verifiersToReserve.put( entry.getKey(), new HashMap<String, ExportTestVerifier>(entry.getValue()));
-        }
-    }
-
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
     {
         m_generationsSeen.add(source.m_generation);
         String key = source.tableName + source.partitionId;
-        if (m_verifiersToReserve.containsKey(source.m_generation)) {
-            HashMap<String, ExportTestVerifier> verifiers = m_verifiersToReserve.get(source.m_generation);
-            if (verifiers.containsKey(key)) {
-                return verifiers.remove(key);
-            }
+        if (m_verifiers.containsKey(key)) {
+            return m_verifiers.get(key);
         }
 
         // create a verifier with the 'schema'
@@ -83,30 +65,16 @@ public class ExportTestClient extends ExportClientBase
         // hash it by table name + partition ID
         m_logger.info("Creating verifier for table: " + source.tableName +
                 ", part ID: " + source.partitionId);
-        HashMap<String, ExportTestVerifier> verifiers = m_verifiers.get(source.m_generation);
-        if (verifiers == null) {
-            verifiers = new HashMap<String, ExportTestVerifier>();
-            m_verifiers.put(source.m_generation, verifiers);
-        }
-
-        if (!verifiers.containsKey(key))
-        {
-            verifiers.put(key,
+        m_verifiers.put(key,
                     verifier);
-        }
         return verifier;
     }
 
-    public void addRow(Long generation, String tableName, Object partitionHash, Object[] data)
+    public void addRow(String tableName, Object partitionHash, Object[] data)
     {
         int partition = TheHashinator.hashToPartition(partitionHash);
-        HashMap<String, ExportTestVerifier> verifiers = m_verifiers.get(generation);
-        if (verifiers == null) {
-            verifiers = new HashMap<String, ExportTestVerifier>();
-            m_verifiers.put( generation, verifiers);
-        }
 
-        ExportTestVerifier verifier = verifiers.get(tableName + partition);
+        ExportTestVerifier verifier = m_verifiers.get(tableName + partition);
         if (verifier == null)
         {
             // something horribly wrong, bail
@@ -119,13 +87,11 @@ public class ExportTestClient extends ExportClientBase
     private boolean done()
     {
         boolean retval = true;
-        for (Map.Entry<Long, HashMap<String, ExportTestVerifier>> entry : m_verifiers.entrySet()) {
-            for (ExportTestVerifier verifier : entry.getValue().values()) {
+        for (ExportTestVerifier verifier : m_verifiers.values()) {
+            {
+                if (!verifier.done())
                 {
-                    if (!verifier.done())
-                    {
-                        retval = false;
-                    }
+                    retval = false;
                 }
             }
         }
@@ -135,13 +101,11 @@ public class ExportTestClient extends ExportClientBase
     public boolean allRowsVerified()
     {
         boolean retval = true;
-        for (HashMap<String, ExportTestVerifier> verifiers : m_verifiers.values()) {
-            for (ExportTestVerifier verifier : verifiers.values())
+        for (ExportTestVerifier verifier : m_verifiers.values())
+        {
+            if (!verifier.allRowsVerified())
             {
-                if (!verifier.allRowsVerified())
-                {
-                    retval = false;
-                }
+                retval = false;
             }
         }
         return retval;

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,7 +22,6 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,6 +53,8 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.common.primitives.Longs;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -805,8 +806,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         ForeignHost host = presend(destinationHSId, message);
         if (host != null) {
-            Long dests[] = {destinationHSId};
-            host.send(Arrays.asList(dests), message);
+            host.send(new long [] { destinationHSId }, message);
         }
     }
 
@@ -830,9 +830,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (foreignHosts.size() == 0) return;
 
         for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
-            e.getKey().send(e.getValue(), message);
+            e.getKey().send(Longs.toArray(e.getValue()), message);
         }
-        foreignHosts.clear();
     }
 
     /**

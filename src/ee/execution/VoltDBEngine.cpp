@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -306,7 +306,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int32_t outputDependencyId,
                                int32_t inputDependencyId,
                                const NValueArray &params,
-                               int64_t txnId, int64_t lastCommittedTxnId,
+                               int64_t spHandle, int64_t lastCommittedSpHandle,
+                               int64_t uniqueId,
                                bool first, bool last)
 {
     assert(planfragmentId != 0);
@@ -341,8 +342,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
 
     // configure the execution context.
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
-                                             txnId,
-                                             lastCommittedTxnId);
+                                             spHandle,
+                                             lastCommittedSpHandle,
+                                             uniqueId);
 
     // count the number of plan fragments executed
     ++m_pfCount;
@@ -823,11 +825,16 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
-                        int64_t txnId, int64_t lastCommittedTxnId)
+                        int64_t spHandle, int64_t lastCommittedSpHandle)
 {
+    //Not going to thread the unique id through.
+    //The spHandle and lastCommittedSpHandle aren't really used in load table
+    //since their only purpose as of writing this (1/2013) they are only used
+    //for export data and we don't technically support loading into an export table
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
-                                             txnId,
-                                             lastCommittedTxnId);
+                                             spHandle,
+                                             -1,
+                                             lastCommittedSpHandle);
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {
@@ -1144,8 +1151,8 @@ bool VoltDBEngine::isLocalSite(const NValue& value)
 }
 
 /** Perform once per second, non-transactional work. */
-void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
-    m_executorContext->setupForTick(lastCommittedTxnId);
+void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
+    m_executorContext->setupForTick(lastCommittedSpHandle);
     typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
@@ -1153,8 +1160,8 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
-void VoltDBEngine::quiesce(int64_t lastCommittedTxnId) {
-    m_executorContext->setupForQuiesce(lastCommittedTxnId);
+void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
+    m_executorContext->setupForQuiesce(lastCommittedSpHandle);
     typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);

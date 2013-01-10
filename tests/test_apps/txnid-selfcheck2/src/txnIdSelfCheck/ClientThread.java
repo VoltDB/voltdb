@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,6 +31,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -40,20 +41,21 @@ public class ClientThread extends Thread {
     static VoltLogger log = new VoltLogger("HOST");
 
     static enum Type {
-        PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID;
+        PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID, ADHOC_MP;
 
         /**
          * Use modulo so the same CID will run the same code
          * across client process lifetimes.
          */
         static Type typeFromId(int id) {
-            if (id % 10 == 0) return PARTITIONED_MP; // 20%
+            if (id % 10 == 0) return PARTITIONED_MP;               // 20%
             if (id % 10 == 1) return PARTITIONED_MP;
-            if (id % 10 == 2) return REPLICATED;     // 20%
+            if (id % 10 == 2) return REPLICATED;                   // 20%
             if (id % 10 == 3) return REPLICATED;
-            if (id % 10 == 4) return HYBRID;         // 20%
+            if (id % 10 == 4) return HYBRID;                       // 20%
             if (id % 10 == 5) return HYBRID;
-            return PARTITIONED_SP;                   // 40%
+            if ((id % 10 == 6) && (id % 20 != 6)) return ADHOC_MP; // 5%
+            return PARTITIONED_SP;                                 // 35%
         }
     }
 
@@ -61,11 +63,13 @@ public class ClientThread extends Thread {
     final byte m_cid;
     long m_nextRid;
     final Type m_type;
-    final PayloadProcessor m_processor;
+    final TxnId2PayloadProcessor m_processor;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicLong m_txnsRun;
 
-    ClientThread(byte cid, AtomicLong txnsRun, Client client, PayloadProcessor processor) throws Exception {
+    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor) throws Exception {
+        setName("ClientThread(CID=" + String.valueOf(cid) + ")");
+
         m_type = Type.typeFromId(cid);
         m_cid = cid;
         m_client = client;
@@ -82,40 +86,97 @@ public class ClientThread extends Thread {
         m_nextRid = pNextRid > rNextRid ? pNextRid : rNextRid; // max
     }
 
-    void runOne() throws Exception {
-        String procName = null;
-        switch (m_type) {
-        case PARTITIONED_SP:
-            procName = "UpdatePartitionedSP";
-            break;
-        case PARTITIONED_MP:
-            procName = "UpdatePartitionedMP";
-            break;
-        case REPLICATED:
-            procName = "UpdateReplicatedMP";
-            break;
-        case HYBRID:
-            procName = "UpdateBothMP";
-            break;
+    class UserProcCallException extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        public ClientResponseImpl cri = null;
+        UserProcCallException(ClientResponse cr) {
+            cri = (ClientResponseImpl) cr;
         }
+    }
 
-        byte[] payload = m_processor.generateForStore().getStoreValue();
+    void runOne() throws Exception {
+        try {
+            String procName = null;
+            switch (m_type) {
+            case PARTITIONED_SP:
+                procName = "UpdatePartitionedSP";
+                break;
+            case PARTITIONED_MP:
+                procName = "UpdatePartitionedMP";
+                break;
+            case REPLICATED:
+                procName = "UpdateReplicatedMP";
+                break;
+            case HYBRID:
+                procName = "UpdateBothMP";
+                break;
+            case ADHOC_MP:
+                procName = "UpdateReplicatedMPInProcAdHoc";
+                break;
+            }
 
-        VoltTable[] results = m_client.callProcedure(procName,
-                m_cid,
-                m_nextRid,
-                payload).getResults();
-        m_txnsRun.incrementAndGet();
+            byte[] payload = m_processor.generateForStore().getStoreValue();
 
-        assert(results.length == 3);
-        VoltTable data = results[2];
-        UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+            ClientResponse response = m_client.callProcedure(procName,
+                    m_cid,
+                    m_nextRid,
+                    payload);
 
-        m_nextRid++;
+            // fake a proc call exception if we think one should be thrown
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                throw new UserProcCallException(response);
+            }
+
+            VoltTable[] results = response.getResults();
+
+            m_txnsRun.incrementAndGet();
+
+            if (results.length != 3) {
+                log.error(String.format(
+                        "Client cid %d procedure %s returned %d results instead of 3",
+                        m_cid, procName, results.length));
+                log.error(((ClientResponseImpl) response).toJSONString());
+                Benchmark.printJStack();
+                System.exit(-1);
+            }
+            VoltTable data = results[2];
+            UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+        }
+        finally {
+            // ensure rid is incremented no matter what
+            m_nextRid++;
+        }
     }
 
     void shutdown() {
         m_shouldContinue.set(false);
+    }
+
+    void handleException(ClientResponseImpl cri, Exception e) {
+        if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
+                (cri.getStatus() == ClientResponse.USER_ABORT)) {
+            log.error("ClientThread had a proc-call exception that indicated bad data", e);
+            log.error(cri.toJSONString(), e);
+            Benchmark.printJStack();
+            System.exit(-1);
+        }
+        else {
+            // other proc call exceptions are logged, but don't stop the thread
+            log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
+            log.warn(cri.toJSONString());
+
+            // take a breather to avoid slamming the log (stay paused if no connections)
+            do {
+                try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
+                // bail on wakeup if we're supposed to bail
+                if (!m_shouldContinue.get()) {
+                    return;
+                }
+            }
+            while (m_client.getConnectedHostList().size() == 0);
+
+        }
     }
 
     @Override
@@ -124,24 +185,29 @@ public class ClientThread extends Thread {
             try {
                 runOne();
             }
+            catch (NoConnectionsException e) {
+                log.error("ClientThread got NoConnectionsException on proc call. Will sleep.");
+                // take a breather to avoid slamming the log (stay paused if no connections)
+                do {
+                    try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
+                    // bail on wakeup if we're supposed to bail
+                    if (!m_shouldContinue.get()) {
+                        return;
+                    }
+                }
+                while (m_client.getConnectedHostList().size() == 0);
+            }
             catch (ProcCallException e) {
                 ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
-                if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
-                        (cri.getStatus() == ClientResponse.USER_ABORT)) {
-                    log.error("ClientThread had a proc-call exception that indicated bad data", e);
-                    log.error(cri.toJSONString(), e);
-                    System.exit(-1);
-                }
-                else {
-                    // other proc call exceptions are logged, but don't stop the thread
-                    log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
-                    log.warn(cri.toJSONString());
-                    // take a breather to avoid slamming the log
-                    try { Thread.sleep(3000); } catch (InterruptedException e1) {}
-                }
+                handleException(cri, e);
+            }
+            catch (UserProcCallException e) {
+                ClientResponseImpl cri = e.cri;
+                handleException(cri, e);
             }
             catch (Exception e) {
                 log.error("ClientThread had a non proc-call exception", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }

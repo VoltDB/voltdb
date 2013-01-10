@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -50,6 +50,8 @@ public class BigTableLoader extends Thread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
 
     BigTableLoader(Client client, String tableName, int targetCount, int rowSize) {
+        setName("BigTableLoader");
+
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
@@ -117,7 +119,7 @@ public class BigTableLoader extends Thread {
         catch (Exception e) {
             // on exception, log and end the thread, but don't kill the process
             log.error("BigTableLoader failed a procedure call for table " + tableName +
-                    " and will now die.", e);
+                    " and the thread will now stop.", e);
             return;
         }
     }

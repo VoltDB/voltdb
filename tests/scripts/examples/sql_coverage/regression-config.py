@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2013 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -62,6 +62,11 @@
     "basic": {"schema": "schema.py",
               "ddl": "DDL.sql",
               "template": "basic.sql",
+              "normalizer": "normalizer.py"},
+# THESE ALL SUCCEED, USE THE TEMPLATE INPUT
+    "basic-unions": {"schema": "union-schema.py",
+              "ddl": "union-DDL.sql",
+              "template": "basic-unions.sql",
               "normalizer": "normalizer.py"},
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-index": {"schema": "schema.py",

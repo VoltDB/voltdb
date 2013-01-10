@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,6 +19,9 @@ package org.voltdb.iv2;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+
+import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import jsr166y.LinkedTransferQueue;
 
@@ -240,5 +243,20 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             }
         }
 
+    }
+
+    private void repairReplicasWithInternal(List<Long> needsRepair, VoltMessage repairWork) {
+        assert(lockingVows());
+        if (repairWork instanceof Iv2InitiateTaskMessage) {
+            Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
+            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
+            m_scheduler.handleMessageRepair(needsRepair, work);
+        }
+        else if (repairWork instanceof CompleteTransactionMessage) {
+            send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
+        }
+        else {
+            throw new RuntimeException("During MPI repair: Invalid repair message type: " + repairWork);
+        }
     }
 }

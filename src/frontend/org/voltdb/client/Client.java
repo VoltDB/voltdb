@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -20,7 +20,9 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 
 /**
  *  <p>
@@ -263,6 +265,17 @@ public interface Client {
      * max outstanding txns.
      */
     public int[] getThroughputAndOutstandingTxnLimits();
+
+    /**
+     * Get the list of VoltDB server hosts that this client has open TCP connections
+     * to. Note that this doesn't guarantee that those nodes are actually alive at
+     * the precise moment this method is called. There is also a race condition
+     * between calling this method and acting on the results. It is true that the list
+     * won't grow unless createConnection is called, and the list will never contain
+     * hosts that weren't explicitly connected to.
+     * @return An array of InetSocketAddresses representing the connected hosts.
+     */
+    public List<InetSocketAddress> getConnectedHostList();
 
     /**
      * Write a single line of comma separated values to the file specified.

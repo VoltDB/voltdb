@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,6 +22,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
@@ -31,6 +34,10 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 
 /**
@@ -55,7 +62,7 @@ public class AuthSystem {
         /**
          * Set of users that are a member of this group
          */
-        private final HashSet<AuthUser> m_users = new HashSet<AuthUser>();
+        private Set<AuthUser> m_users = new HashSet<AuthUser>();
 
         /**
          * Whether membership in this group grants permission to invoke system procedures
@@ -80,10 +87,14 @@ public class AuthSystem {
          * @param adhoc Whether membership in this group grants permission to invoke adhoc queries
          */
         private AuthGroup(String name, boolean sysproc, boolean defaultproc, boolean adhoc) {
-            m_name = name;
+            m_name = name.intern();
             m_sysproc = sysproc;
             m_defaultproc = defaultproc;
             m_adhoc = adhoc;
+        }
+
+        private void finish() {
+            m_users = ImmutableSet.copyOf(m_users);
         }
     }
 
@@ -126,19 +137,19 @@ public class AuthSystem {
         /**
          * Fast iterable list of groups this user is a member of.
          */
-        private final ArrayList<AuthGroup> m_groups = new ArrayList<AuthGroup>();
+        private List<AuthGroup> m_groups = new ArrayList<AuthGroup>();
 
         /**
          * Fast membership check set of stored procedures this user has permission to invoke.
          * This is generated when the catalog is parsed and it includes procedures the user has permission
          * to invoke by virtue of group membership. The catalog entry for the stored procedure is used here.
          */
-        private final HashSet<Procedure> m_authorizedProcedures = new HashSet<Procedure>();
+        private Set<Procedure> m_authorizedProcedures = new HashSet<Procedure>();
 
         /**
          * Set of export connectors this user is authorized to access.
          */
-        private final HashSet<Connector> m_authorizedConnectors = new HashSet<Connector>();
+        private Set<Connector> m_authorizedConnectors = new HashSet<Connector>();
 
         /**
          * The constructor accepts the password as either sha1 or bcrypt. In practice
@@ -155,7 +166,11 @@ public class AuthSystem {
                          boolean sysproc, boolean defaultproc, boolean adhoc) {
             m_sha1ShadowPassword = sha1ShadowPassword;
             m_bcryptShadowPassword = bcryptShadowPassword;
-            m_name = name;
+            if (name != null) {
+                m_name = name.intern();
+            } else {
+                m_name = null;
+            }
             m_sysproc = sysproc;
             m_defaultproc = defaultproc;
             m_adhoc = adhoc;
@@ -255,17 +270,23 @@ public class AuthSystem {
             }
             return false;
         }
+
+        private void finish() {
+            m_groups = ImmutableList.copyOf(m_groups);
+            m_authorizedProcedures = ImmutableSet.copyOf(m_authorizedProcedures);
+            m_authorizedConnectors = ImmutableSet.copyOf(m_authorizedConnectors);
+        }
     }
 
     /**
      * Storage for user permissions keyed on the username
      */
-    private final HashMap<String, AuthUser> m_users = new HashMap<String, AuthUser>( 16, (float).5);
+    private Map<String, AuthUser> m_users = new HashMap<String, AuthUser>();
 
     /**
      * Storage for group permissions keyed on group name.
      */
-    private final HashMap<String, AuthGroup> m_groups = new HashMap<String, AuthGroup>( 16, (float).5);
+    private Map<String, AuthGroup> m_groups = new HashMap<String, AuthGroup>();
 
     /**
      * Indicates whether security is enabled. If security is disabled all authentications will succede and all returned
@@ -301,7 +322,7 @@ public class AuthSystem {
             final AuthUser user = new AuthUser( sha1ShadowPassword, shadowPassword,
                     catalogUser.getTypeName(), catalogUser.getSysproc(),
                     catalogUser.getDefaultproc(), catalogUser.getAdhoc());
-            m_users.put(user.m_name.intern(), user);
+            m_users.put(user.m_name, user);
             for (org.voltdb.catalog.GroupRef catalogGroupRef : catalogUser.getGroups()) {
                 final org.voltdb.catalog.Group  catalogGroup = catalogGroupRef.getGroup();
                 AuthGroup group = null;
@@ -384,6 +405,14 @@ public class AuthSystem {
                     }
                 }
             }
+        }
+        m_users = ImmutableMap.copyOf(m_users);
+        m_groups = ImmutableMap.copyOf(m_groups);
+        for (AuthUser user : m_users.values()) {
+            user.finish();
+        }
+        for (AuthGroup group : m_groups.values()) {
+            group.finish();
         }
     }
 
