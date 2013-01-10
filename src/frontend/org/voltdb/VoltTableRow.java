@@ -74,6 +74,7 @@ public abstract class VoltTableRow {
     static final int ROW_HEADER_SIZE = Integer.SIZE/8;
     static final int ROW_COUNT_SIZE = Integer.SIZE/8;
     static final int STRING_LEN_SIZE = Integer.SIZE/8;
+    static final int VARBINARY_LEN_SIZE = Integer.SIZE/8;
     static final int INVALID_ROW_INDEX = -1;
 
     /** Stores the row data (and possibly much more) */
@@ -487,6 +488,14 @@ public abstract class VoltTableRow {
     public final byte[] getVarbinary(int columnIndex) {
         validateColumnType(columnIndex, VoltType.VARBINARY);
         int pos = m_buffer.position();
+        // Sanity check the varbinary size int position. Note that the eventual
+        // m_buffer.get() does check for underflow, getInt() does not.
+        if (pos + VARBINARY_LEN_SIZE > m_buffer.capacity()) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::readString: Can't read %d byte integer for varbinary size " +
+                    "at position %d from buffer with capacity %d",
+                    VARBINARY_LEN_SIZE, pos, m_buffer.capacity()));
+        }
         m_buffer.position(getOffset(columnIndex));
         int len = m_buffer.getInt();
         if (len == VoltTable.NULL_STRING_INDICATOR) {
@@ -663,7 +672,8 @@ public abstract class VoltTableRow {
     void putJSONRep(int columnIndex, JSONStringer js) throws JSONException {
         long value; double dvalue;
 
-        switch (getColumnType(columnIndex)) {
+        VoltType columnType = getColumnType(columnIndex);
+        switch (columnType) {
         case TINYINT:
             value = getLong(columnIndex);
             if (value == VoltType.NULL_TINYINT)
@@ -720,6 +730,16 @@ public abstract class VoltTableRow {
             else
                 js.value(dec.toString());
             break;
+        case DECIMAL_STRING:
+            break;
+        case INVALID:
+            break;
+        case NULL:
+            break;
+        case NUMERIC:
+            break;
+        case VOLTTABLE:
+            break;
         }
     }
 
@@ -740,12 +760,13 @@ public abstract class VoltTableRow {
 
     /** Reads a string from a buffer with a specific encoding. */
     final String readString(int position, String encoding) {
-        // Sanity check the request.
-        if (position + 4 > m_buffer.capacity()) {
+        // Sanity check the string size int position. Note that the eventual
+        // m_buffer.get() does check for underflow, getInt() does not.
+        if (position + STRING_LEN_SIZE > m_buffer.capacity()) {
             throw new RuntimeException(String.format(
-                    "VoltTableRow::readString: Can't read 4 byte integer for size " +
+                    "VoltTableRow::readString: Can't read %d byte integer for size " +
                     "at position %d from buffer with capacity %d",
-                    position, m_buffer.capacity()));
+                    STRING_LEN_SIZE, position, m_buffer.capacity()));
         }
         final int len = m_buffer.getInt(position);
         //System.out.println(len);

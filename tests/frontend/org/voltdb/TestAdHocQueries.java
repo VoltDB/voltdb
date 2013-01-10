@@ -41,7 +41,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.exceptions.SQLException;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
@@ -620,9 +619,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // bad timestamp should result in a clean compiler error.
             try {
                 String sql = "INSERT INTO TS_CONSTRAINT_EXCEPTION VALUES ('aaa','{}');";
-                VoltTable modCount = env.m_client.callProcedure("@AdHoc", sql).getResults()[0];
-                assertEquals(1, modCount.getRowCount());
-                assertEquals(1, modCount.asScalarLong());
+                env.m_client.callProcedure("@AdHoc", sql).getResults();
+                fail("Compilation should have failed.");
             }
             catch(ProcCallException e) {
                 assertTrue(e.getMessage().contains("Error compiling"));
