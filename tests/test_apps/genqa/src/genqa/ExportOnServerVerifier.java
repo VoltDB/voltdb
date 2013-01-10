@@ -310,12 +310,9 @@ public class ExportOnServerVerifier {
 
         long ttlVerified = 0;
 
-        //checkForMoreExportFiles();
-        //checkForMoreExportFiles();
         Pair<BufferedReader, Runnable> csvPair = openNextExportFile();
         BufferedReader csv = csvPair.getFirst();
 
-        //checkForMoreClientFiles();
         BufferedReader txnIdReader = openNextClientFile();
         String exportLine;
         String[] row;
@@ -361,6 +358,9 @@ public class ExportOnServerVerifier {
 
                 verifyRow(row);
                 expect_export_eof = row.length < 29;
+
+                if (row.length < 8) continue; // row[6] txnId row[7] rowId
+
                 dcount++;
                 /*
                  * client dude has only confirmed tx id, on asynch writer exceptions we
@@ -381,10 +381,6 @@ public class ExportOnServerVerifier {
                 if (previous != null)
                 {
                     System.out.println("WARN Duplicate TXN ID in export stream: " + rowTxnId);
-                }
-                else
-                {
-                    //System.out.println("Added txnId: " + rowTxnId + " to outstanding export");
                 }
             }
 
@@ -1237,9 +1233,6 @@ public class ExportOnServerVerifier {
         if (row.length < 29)
         {
             System.err.println("ERROR: Unexpected number of columns for the following row:\n\t" + Arrays.toString(row));
-            if (row.length < 8) {
-                error("row column count", row.length, 29);
-            }
             return;
         }
 
