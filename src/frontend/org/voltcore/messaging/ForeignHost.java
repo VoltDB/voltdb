@@ -39,7 +39,7 @@ public class ForeignHost {
     private Connection m_connection;
     final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
-    final Integer m_hostId;
+    private final Integer m_hostId;
     final InetSocketAddress m_listeningAddress;
 
     private final String m_remoteHostname = "UNKNOWN_HOSTNAME";
