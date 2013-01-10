@@ -18,7 +18,7 @@
 
 HOUR=`date +%H`
 if [ $USER = "test" ] && ( [ $HOUR -ge 22 ] || [ $HOUR -le 7 ] ); then
-   for H in volt{3{a,b,c,d,e,f,l},7{b,c,d},5{b,c,d},12{b,c,d,e,f}}
+   for H in volt{3{a,b,c,d,e,f},7{b,c,d},5{b,c,d},12{b,c,d,e,f}}
    do
       if [ $HOSTNAME = $H ]; then
         SUDO=sudo
@@ -26,4 +26,6 @@ if [ $USER = "test" ] && ( [ $HOUR -ge 22 ] || [ $HOUR -le 7 ] ); then
       fi
    done
 fi
-jps -l | grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}' | xargs -r $SUDO kill -9
+Z=`$SUDO jps -l | grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}' | xargs`
+[ -n "$Z" ] && $SUDO kill -9 $Z
+exit 0
