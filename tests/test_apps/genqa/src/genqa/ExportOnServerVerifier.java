@@ -24,7 +24,6 @@ package genqa;
 
 import genqa.procedures.SampleRecord;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -34,7 +33,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -66,8 +64,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.types.TimestampType;
-
-import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 import com.google.common.base.Throwables;
 import com.jcraft.jsch.ChannelSftp;
@@ -315,11 +311,13 @@ public class ExportOnServerVerifier {
         long ttlVerified = 0;
 
         //checkForMoreExportFiles();
-        Pair<CSVReader, Runnable> csvPair = openNextExportFile();
-        CSVReader csv = csvPair.getFirst();
+        //checkForMoreExportFiles();
+        Pair<BufferedReader, Runnable> csvPair = openNextExportFile();
+        BufferedReader csv = csvPair.getFirst();
 
         //checkForMoreClientFiles();
         BufferedReader txnIdReader = openNextClientFile();
+        String exportLine;
         String[] row;
         boolean quit = false;
         boolean more_rows = true;
@@ -327,14 +325,17 @@ public class ExportOnServerVerifier {
         boolean expect_export_eof = false;
         int emptyRemovalCycles = 0;
 
+        PrintWriter txout = gzipWriterTo("read-exported-transactions.gz");
+        PrintWriter vfout = gzipWriterTo("verified-exported-transactions.gz");
+
         while (!quit)
         {
             markCheckedUpTo();
             int dcount = 0;
             while ((dcount < 10000 || !more_txnids) && more_rows)
             {
-                row = csv.readNext();
-                if (row == null)
+                exportLine = csv.readLine();
+                if (exportLine == null)
                 {
                     expect_export_eof = false;
                     csvPair.getSecond().run();
@@ -348,13 +349,15 @@ public class ExportOnServerVerifier {
                     else
                     {
                         csv = csvPair.getFirst();
-                        row = csv.readNext();
+                        exportLine = csv.readLine();
                     }
                 }
                 else if (expect_export_eof)
                 {
                     throw new ValidationErr("previously logged row had unexpected number of columns");
                 }
+
+                row = RoughCSVTokenizer.tokenize(exportLine);
 
                 verifyRow(row);
                 expect_export_eof = row.length < 29;
@@ -368,9 +371,11 @@ public class ExportOnServerVerifier {
                     System.out.println("Verified " + ttlVerified + " rows.");
                 }
 
-                Integer partition = Integer.parseInt(row[3]);
-                Long rowTxnId = Long.parseLong(row[6]);
-                Long rowId = Long.parseLong(row[7]);
+                Integer partition = Integer.parseInt(row[3].trim());
+                Long rowTxnId = Long.parseLong(row[6].trim());
+                Long rowId = Long.parseLong(row[7].trim());
+
+                txout.printf("%d:%d\n", rowTxnId, rowId);
 
                 Long previous = m_rowTxnIds.get(partition).put(rowTxnId,rowId);
                 if (previous != null)
@@ -437,7 +442,7 @@ public class ExportOnServerVerifier {
 
             System.out.println("!_!_! DEBUG !_!_! read " + dcount + " client txid records");
 
-            if (matchClientTxnIds(null))
+            if (matchClientTxnIds(vfout))
             {
                 emptyRemovalCycles = 0;
             }
@@ -480,13 +485,28 @@ public class ExportOnServerVerifier {
         }
     }
 
+    private PrintWriter gzipWriterTo( String fileName) throws IOException
+    {
+        File fh = new File(fileName);
+        if (fh.exists() && fh.isFile() && fh.canRead() && fh.canWrite())
+        {
+            fh.delete();
+        }
+        PrintWriter out =
+                new PrintWriter(
+                        new OutputStreamWriter(
+                                new GZIPOutputStream(
+                                        new FileOutputStream(fh), 16384)));
+        return out;
+    }
+
     void verifySkinny() throws Exception
     {
 
         long ttlVerified = 0;
 
         //checkForMoreExportFiles();
-        Pair<BufferedReader, Runnable> csvPair = openNextSkinnyExportFile();
+        Pair<BufferedReader, Runnable> csvPair = openNextExportFile();
         BufferedReader csv = csvPair.getFirst();
 
         //checkForMoreClientFiles();
@@ -499,35 +519,8 @@ public class ExportOnServerVerifier {
         boolean expect_export_eof = false;
         int emptyRemovalCycles = 0;
 
-        File transactionsReadFH = new File("read-exported-transactions.gz");
-        if (   transactionsReadFH.exists()
-            && transactionsReadFH.isFile()
-            && transactionsReadFH.canRead()
-            && transactionsReadFH.canWrite()
-            )
-        {
-            transactionsReadFH.delete();
-        }
-        File verifiedTransactionsdFH = new File("verified-exported-transactions.gz");
-        if (   verifiedTransactionsdFH.exists()
-                && verifiedTransactionsdFH.isFile()
-                && verifiedTransactionsdFH.canRead()
-                && verifiedTransactionsdFH.canWrite()
-                )
-        {
-            verifiedTransactionsdFH.delete();
-        }
-
-        PrintWriter txout =
-                new PrintWriter(
-                        new OutputStreamWriter(
-                                new GZIPOutputStream(
-                                        new FileOutputStream(transactionsReadFH), 16384)));
-        PrintWriter vfout =
-                new PrintWriter(
-                        new OutputStreamWriter(
-                                new GZIPOutputStream(
-                                        new FileOutputStream(verifiedTransactionsdFH), 16384)));
+        PrintWriter txout = gzipWriterTo("read-exported-transactions.gz");
+        PrintWriter vfout = gzipWriterTo("verified-exported-transactions.gz");
 
         while (!quit)
         {
@@ -540,7 +533,7 @@ public class ExportOnServerVerifier {
                 {
                     expect_export_eof = false;
                     csvPair.getSecond().run();
-                    csvPair = openNextSkinnyExportFile();
+                    csvPair = openNextExportFile();
                     if (csvPair == null)
                     {
                         System.out.println("No more export rows");
@@ -601,7 +594,7 @@ public class ExportOnServerVerifier {
                             ", while export record says " + partition);
                 }
 
-                txout.printf("%d:%d\n", rowValues[0], rowValues[1]);
+                txout.printf("%d:%d\n", rowTxnId, rowId);
 
                 if (! m_rowTxnIds.containsKey(partition)) {
                     System.err.println("ERROR: unknow partition " + partition + " in txnid " + rowTxnId);
@@ -1034,37 +1027,7 @@ public class ExportOnServerVerifier {
         m_clientFiles = checkForMoreFiles(m_clientPath, m_clientFiles, acceptor, comparator);
     }
 
-    private Pair<CSVReader, Runnable> openNextExportFile() throws Exception
-    {
-        if (m_exportFiles.isEmpty())
-        {
-            checkForMoreExportFiles();
-        }
-        Pair<ChannelSftp, String> remotePair = m_exportFiles.poll();
-        if (remotePair == null) return null;
-        final ChannelSftp channel = remotePair.getFirst();
-        final String path = remotePair.getSecond();
-        System.out.println(
-                "Opening export file: " + channel.getSession().getHost() + "@" + path);
-        InputStream dataIs = channel.get(path);
-        BufferedInputStream bis = new BufferedInputStream(dataIs, 4096 * 32);
-        Reader reader = new InputStreamReader(bis);
-        final CSVReader exportreader = new CSVReader(reader);
-        Runnable r = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    exportreader.close();
-                    channel.rm(path);
-                } catch (Exception e) {
-                    Throwables.propagate(e);
-                }
-            }
-        };
-        return Pair.of( exportreader, r);
-    }
-
-    Pair<BufferedReader,Runnable> openNextSkinnyExportFile() throws Exception
+    Pair<BufferedReader,Runnable> openNextExportFile() throws Exception
     {
         if (m_exportFiles.isEmpty())
         {
@@ -1476,5 +1439,73 @@ public class ExportOnServerVerifier {
             System.exit(-1);
         }
         System.exit(0);
+    }
+
+    public static class RoughCSVTokenizer {
+
+        private RoughCSVTokenizer() {
+        }
+
+        private static void moveToBuffer(List<String> resultBuffer, StringBuilder buf) {
+            resultBuffer.add(buf.toString());
+            buf.delete(0, buf.length());
+        }
+
+        public static String[] tokenize(String csv) {
+            List<String> resultBuffer = new java.util.ArrayList<String>();
+
+            if (csv != null) {
+                int z = csv.length();
+                Character openingQuote = null;
+                boolean trimSpace = false;
+                StringBuilder buf = new StringBuilder();
+
+                for (int i = 0; i < z; ++i) {
+                    char c = csv.charAt(i);
+                    trimSpace = trimSpace && Character.isWhitespace(c);
+                    if (c == '"' || c == '\'') {
+                        if (openingQuote == null) {
+                            openingQuote = c;
+                            int bi = 0;
+                            while (bi < buf.length()) {
+                                if (Character.isWhitespace(buf.charAt(bi))) {
+                                    buf.deleteCharAt(bi);
+                                } else {
+                                    bi++;
+                                }
+                            }
+                        }
+                        else if (openingQuote == c ) {
+                            openingQuote = null;
+                            trimSpace = true;
+                        }
+                    }
+                    else if (c == '\\') {
+                        if ((z > i + 1)
+                            && ((csv.charAt(i + 1) == '"')
+                                || (csv.charAt(i + 1) == '\\'))) {
+                            buf.append(csv.charAt(i + 1));
+                            ++i;
+                        } else {
+                            buf.append("\\");
+                        }
+                    } else {
+                        if (openingQuote != null) {
+                            buf.append(c);
+                        } else {
+                            if (c == ',') {
+                                moveToBuffer(resultBuffer, buf);
+                            } else {
+                                if (!trimSpace) buf.append(c);
+                            }
+                        }
+                    }
+                }
+                moveToBuffer(resultBuffer, buf);
+            }
+
+            String[] result = new String[resultBuffer.size()];
+            return resultBuffer.toArray(result);
+        }
     }
 }
