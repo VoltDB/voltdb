@@ -6,9 +6,9 @@ public class Insert extends VoltProcedure {
       "INSERT INTO HELLOWORLD VALUES (?, ?, ?);"
   );
 
-  public VoltTable[] run( String hello,
-                          String world,
-                          String language)
+  public VoltTable[] run( String language,
+                          String hello,
+                          String world)
       throws VoltAbortException {
           voltQueueSQL( sql, hello, world, language );
           voltExecuteSQL();
