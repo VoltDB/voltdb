@@ -71,6 +71,14 @@ public class SysprocFragmentTask extends TransactionTask
             }
         }
 
+        // HACK HACK HACK
+        // We take the coward's way out to prevent rejoining sites from doing
+        // snapshot work by finding every snapshot fragment and responding with the
+        // recovering status instead of running the fragment.
+        // rejoinDataPending() is VoltDB state which will be flipped to false by
+        // the rejoin code once all of the site data is synchronized.  This will then
+        // allow truncation snapshots necessary to make the node officially rejoined
+        // to take place.
         if (m_task.isSysProcTask() &&
             SysProcFragmentId.isSnapshotSaveFragment(m_task.getFragmentId(0)) &&
             VoltDB.instance().rejoinDataPending()) {
