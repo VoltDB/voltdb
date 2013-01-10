@@ -24,6 +24,8 @@ import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
+
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -118,5 +120,12 @@ public class DuplicateCounter
     VoltMessage getLastResponse()
     {
         return m_lastResponse;
+    }
+
+    public String toString()
+    {
+        String msg = String.format("DuplicateCounter: txnId: %s, outstanding HSIds: %s\n", m_txnId,
+               CoreUtils.hsIdCollectionToString(m_expectedHSIds));
+        return msg;
     }
 }
