@@ -22,14 +22,12 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,6 +44,7 @@ import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.COWMap;
+import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.PortGenerator;
@@ -180,7 +179,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * All failed hosts that have ever been seen.
      * Used to dedupe failures so that they are only processed once.
      */
-    private final Set<Integer> m_knownFailedHosts = Collections.synchronizedSet(new HashSet<Integer>());
+    private final COWNavigableSet<Integer> m_knownFailedHosts = new COWNavigableSet<Integer>();
 
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
@@ -931,5 +930,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 fh.sendPoisonPill(err);
             }
         }
+    }
+
+    public boolean validateForeignHostId(Integer hostId) {
+        return !m_knownFailedHosts.contains(hostId);
     }
 }
