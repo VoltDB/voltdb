@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.NavigableSet;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ForwardingNavigableSet;
 import com.google.common.collect.ImmutableSortedSet;
 
@@ -30,6 +31,15 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
 
     public COWNavigableSet() {
         m_set = new AtomicReference<ImmutableSortedSet<E>>(ImmutableSortedSet.<E>of());
+    }
+
+    public COWNavigableSet(Collection<E> c) {
+        Preconditions.checkNotNull(c);
+        ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
+        for (E e : c) {
+            builder.add(e);
+        }
+        m_set = new AtomicReference<ImmutableSortedSet<E>>(builder.build());
     }
 
     @Override

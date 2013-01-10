@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ForwardingNavigableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.ImmutableSortedMap.Builder;
@@ -58,16 +59,19 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
 
     @Override
     public boolean containsKey(Object key) {
+        Preconditions.checkNotNull(key);
         return m_map.get().containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value) {
+        Preconditions.checkNotNull(value);
         return m_map.get().containsValue(value);
     }
 
     @Override
     public V get(Object key) {
+        Preconditions.checkNotNull(key);
         return m_map.get().get(key);
     }
 
@@ -99,6 +103,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
 
     @Override
     public V remove(Object key) {
+        Preconditions.checkNotNull(key);
         while (true) {
             ImmutableSortedMap<K, V> original = m_map.get();
             Builder<K, V> builder = ImmutableSortedMap.<K, V>naturalOrder();
@@ -163,15 +168,15 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
         while (true) {
             ImmutableSortedMap<K, V> original = m_map.get();
             Builder<K, V> builder = ImmutableSortedMap.<K, V>naturalOrder();
-            final Map.Entry<K, V> firstEntry = original.firstEntry();
+            final Map.Entry<K, V> lastEntry = original.lastEntry();
             for (Map.Entry<K, V> entry : original.entrySet()) {
-                if (!entry.equals(firstEntry)) {
+                if (!entry.equals(lastEntry)) {
                     builder.put(entry);
                 }
             }
             ImmutableSortedMap<K, V> copy = builder.build();
             if (m_map.compareAndSet(original,copy)) {
-                return firstEntry;
+                return lastEntry;
             }
         }
     }

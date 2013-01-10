@@ -780,7 +780,8 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
 jsr166y - LinkedTransferQueue, ThreadLocalRandom, ConcurrentLinkedDeque, TransferQueue
-
+JSR166TestCase, ConcurrentHashMapTest, ConcurrentSkipListMapTest,
+ConcurrentSkipListSetTest
 /*
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -792,6 +793,14 @@ jsr166y - LinkedTransferQueue, ThreadLocalRandom, ConcurrentLinkedDeque, Transfe
  * JCP JSR-166 Expert Group and released to the public domain, as explained
  * at http://creativecommons.org/publicdomain/zero/1.0/
  */
+/*
+ * Written by Doug Lea with assistance from members of JCP JSR-166
+ * Expert Group and released to the public domain, as explained at
+ * http://creativecommons.org/publicdomain/zero/1.0/
+ * Other contributors include Andrew Wright, Jeffrey Hayes,
+ * Pat Fisher, Mike Judd.
+ */
+
 ================================================================================
 Java thread affinity by Peter Lawrey
 /*
