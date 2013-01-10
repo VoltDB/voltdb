@@ -1416,6 +1416,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
+
+        // Semi-hacky check to see if we're attempting to rejoin to ourselves.
+        // The leader node gets assigned host ID 0, always, so if we're the
+        // leader and we're rejoining, this is clearly bad.
+        if (m_myHostId == 0 && isRejoin) {
+            VoltDB.crashLocalVoltDB("Unable to rejoin a node to itself.  " +
+                    "Please check your command line and start action and try again.", false, null);
+        }
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
