@@ -246,6 +246,7 @@ public class InitiatorMailbox implements Mailbox
         assert(lockingVows());
         logRxMessage(message);
         if (message instanceof DumpMessage) {
+            hostLog.warn("Received DumpMessage at " + m_hsId);
         }
         if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);

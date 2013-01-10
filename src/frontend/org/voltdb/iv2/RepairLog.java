@@ -144,8 +144,6 @@ public class RepairLog
                 m_lastSpHandle = m.getSpHandle();
             }
         }
-        if (msg instanceof DumpMessage) {
-        }
     }
 
     // trim unnecessary log messages.

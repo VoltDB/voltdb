@@ -848,7 +848,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_duplicateCounters.size() > 0) {
             hostLog.warn("" + who + ": duplicate counters: ");
             for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
-                hostLog.warn("\t" + e.getKey().toString() + ": " + e.getValue().toString());
+                hostLog.warn("\t" + who + ": " + e.getKey().toString() + ": " + e.getValue().toString());
             }
         }
     }
