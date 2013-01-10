@@ -1133,21 +1133,8 @@ public class SQLCommand
             KeyMap keyMap = lineInputReader.getKeys();
             keyMap.bind(new Character(KeyMap.CTRL_D).toString(), "exit\r");
 
-            /*
-            // Disable Ctrl-C in interactive mode to prevent accidental exit.
-            sun.misc.Signal.handle(new Signal("INT"), new SignalHandler() {
-                @Override
-                public void handle(Signal arg0) {
-                    try {
-                        if (lineInputReader != null) {
-                            // Clear the line so that it does something useful.
-                            lineInputReader.setCursorPosition(0);
-                            lineInputReader.killLine();
-                        }
-                    }
-                    catch (IOException e) {}
-                }
-            });*/
+            // Removed code to prevent Ctrl-C from exiting. The original code is visible
+            // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
 
             boolean interactive = true;
             if (queries != null && !queries.isEmpty())
