@@ -209,34 +209,30 @@ public class StatementQuery extends StatementDMQL {
                     queryExpr.getLeftQueryExpression(), session);
             VoltXMLElement rightExpr = voltGetXMLExpression(
                     queryExpr.getRightQueryExpression(), session);
-            unionExpr = voltTransformUnionXMLExpression(unionExpr, leftExpr);
-            unionExpr = voltTransformUnionXMLExpression(unionExpr, rightExpr);
+            /**
+             * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
+             * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
+             * associativity - (Select 1 EXCEPT Select2) EXCEPT Select3 vs. Select 1 EXCEPT (Select2 EXCEPT Select3) 
+             */
+            if ("union".equalsIgnoreCase(leftExpr.name) &&
+                    queryExpr.operatorName().equalsIgnoreCase(leftExpr.attributes.get("uniontype"))) {
+                unionExpr.children.addAll(leftExpr.children);
+            } else {
+                unionExpr.children.add(leftExpr);
+            }
+            if (exprType != QueryExpression.EXCEPT && exprType != QueryExpression.EXCEPT_ALL &&
+                "union".equalsIgnoreCase(rightExpr.name) &&
+                queryExpr.operatorName().equalsIgnoreCase(rightExpr.attributes.get("uniontype"))) {
+                unionExpr.children.addAll(rightExpr.children);
+            } else {
+                unionExpr.children.add(rightExpr);
+            }
             return unionExpr;
         } else {
             throw new HSQLParseException(queryExpression.operatorName() + "  tuple set operator is not supported.");
         }
     }
-    
-    /**
-     * VoltDB added method to transform VoltXMLElement representing tuple set expression.
-     * So far the only transformation is to merge parent and the child union nodes with identical set operation 
-     * @param unionExpr The parent UNION element
-     * @param childExpr The child expression
-     * @return VoltXMLElement transformed UNION expression.
-     * @throws HSQLParseException
-     */
-    VoltXMLElement voltTransformUnionXMLExpression(VoltXMLElement parentExpr, VoltXMLElement childExpr)
-    throws HSQLParseException
-    {
-        if ("union".equalsIgnoreCase(childExpr.name) &&
-            parentExpr.attributes.get("uniontype").equalsIgnoreCase(childExpr.attributes.get("uniontype"))) {
-            parentExpr.children.addAll(childExpr.children);
-        } else {
-            parentExpr.children.add(childExpr);
-        }
-        return parentExpr;
-    }
-    
+
     VoltXMLElement voltGetXMLSpecification(QuerySpecification select, Session session)
     throws HSQLParseException {
 

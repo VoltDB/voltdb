@@ -155,7 +155,7 @@ public interface SiteProcedureConnection {
     public void quiesce();
 
     public void exportAction(boolean syncAction,
-                             int ackOffset,
+                             long ackOffset,
                              Long sequenceNumber,
                              Integer partitionId,
                              String tableSignature);

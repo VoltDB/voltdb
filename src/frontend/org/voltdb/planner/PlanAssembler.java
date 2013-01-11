@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -943,29 +944,47 @@ public class PlanAssembler {
             Table table = m_parsedSelect.tableList.get(0);
 
             // get all of the columns in the sort
-            ArrayList<String> orderColNames = new ArrayList<String>();
-            for (AbstractExpression e : orderByNode.getSortExpressions()) {
-                if (e instanceof TupleValueExpression) {
-                    TupleValueExpression tve = (TupleValueExpression) e;
-                    orderColNames.add(tve.getColumnName());
-                }
-            }
+            List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
 
             // search indexes for one that makes the order by deterministic
             for (Index index : table.getIndexes()) {
-                // skip unique indexes
+                // skip non-unique indexes
                 if (!index.getUnique()) {
                     continue;
                 }
 
-                // get the list of columns in this unique index
-                ArrayList<String> indexColNames = new ArrayList<String>();
-                for (ColumnRef cref : index.getColumns()) {
-                    indexColNames.add(cref.getColumn().getTypeName());
+                // get the list of expressions for the index
+                List<AbstractExpression> indexExpressions = new ArrayList<AbstractExpression>();
+
+                String jsonExpr = index.getExpressionsjson();
+                // if this is a pure-column index...
+                if (jsonExpr.isEmpty()) {
+                    for (ColumnRef cref : index.getColumns()) {
+                        Column col = cref.getColumn();
+                        TupleValueExpression tve = new TupleValueExpression();
+                        tve.setColumnIndex(col.getIndex());
+                        tve.setColumnName(col.getName());
+                        tve.setExpressionType(ExpressionType.VALUE_TUPLE);
+                        tve.setHasAggregate(false);
+                        tve.setTableName(table.getTypeName());
+                        tve.setValueSize(col.getSize());
+                        tve.setValueType(VoltType.get((byte) col.getType()));
+                        indexExpressions.add(tve);
+                    }
+                }
+                // if this is a fancy expression-based index...
+                else {
+                    try {
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                    } catch (JSONException e) {
+                        e.printStackTrace(); // danger will robinson
+                        assert(false);
+                        return null;
+                    }
                 }
 
                 // if the sort covers the index, then it's a unique sort
-                if (orderColNames.containsAll(indexColNames)) {
+                if (orderExpressions.containsAll(indexExpressions)) {
                     orderByNode.setOrderingByUniqueColumns();
                 }
             }

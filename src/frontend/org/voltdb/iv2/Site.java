@@ -911,7 +911,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void exportAction(boolean syncAction,
-                             int ackOffset,
+                             long ackOffset,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
@@ -963,7 +963,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             exportAction(
                     true,
-                    sequenceNumbers.getFirst().intValue(),
+                    sequenceNumbers.getFirst().longValue(),
                     sequenceNumbers.getSecond(),
                     m_partitionId,
                     catalogTable.getSignature());

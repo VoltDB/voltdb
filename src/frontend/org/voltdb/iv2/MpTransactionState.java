@@ -34,6 +34,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -323,6 +325,7 @@ public class MpTransactionState extends TransactionState
                                     CoreUtils.hsIdCollectionToString(e.getValue()));
                         }
                     }
+                    m_mbox.send(com.google.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                 }
             }
         }
