@@ -222,6 +222,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         removeForeignHost(hostId);
         m_agreementSite.reportFault(initiatorSiteId);
+        logger.warn(String.format("Host %d failed", hostId));
     }
 
     /**
