@@ -26,4 +26,6 @@ if [ $USER = "test" ] && ( [ $HOUR -ge 22 ] || [ $HOUR -le 7 ] ); then
       fi
    done
 fi
-$SUDO jps -l | grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}' | xargs -r $SUDO kill -9
+Z=`$SUDO jps -l | grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}' | xargs`
+[ -n "$Z" ] && $SUDO kill -9 $Z
+exit 0
