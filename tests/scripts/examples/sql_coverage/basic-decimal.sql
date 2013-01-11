@@ -1,6 +1,6 @@
 -- Run the basic-template against DDL with decimal
 
-{@insert_vals = "_value[id], _value[decimal], _value[decimal], _value[float]"}
+{@insert_vals = "_id, _value[decimal], _value[decimal], _value[float]"}
 {@from_tables = "_table"}
 {@col_type = "decimal"}
 {@cmp_type = "_value[decimal]"}
