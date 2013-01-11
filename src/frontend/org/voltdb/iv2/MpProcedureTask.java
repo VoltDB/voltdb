@@ -19,6 +19,8 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.ArrayList;
+
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.List;
 
 import org.voltcore.logging.Level;
@@ -47,7 +49,7 @@ public class MpProcedureTask extends ProcedureTask
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters
     // when we requeue this Task to for restart
-    final List<Long> m_restartMasters = new ArrayList<Long>();
+    final private AtomicReference<List<Long>> m_restartMasters = new AtomicReference<List<Long>>();
     boolean m_isRestart = false;
     final Iv2InitiateTaskMessage m_msg;
 
@@ -62,6 +64,7 @@ public class MpProcedureTask extends ProcedureTask
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);
+        m_restartMasters.set(new ArrayList<Long>());
     }
 
     /**
@@ -84,8 +87,8 @@ public class MpProcedureTask extends ProcedureTask
      */
     public void doRestart(List<Long> masters)
     {
-        m_restartMasters.clear();
-        m_restartMasters.addAll(masters);
+        List<Long> copy = new ArrayList<Long>(masters);
+        m_restartMasters.set(copy);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -179,7 +182,7 @@ public class MpProcedureTask extends ProcedureTask
         // which will send the necessary CompleteTransactionMessage to restart.
         ((MpTransactionState)m_txn).restart();
         // Update the masters list with the list provided when restart was triggered
-        updateMasters(m_restartMasters);
+        updateMasters(m_restartMasters.get());
         m_isRestart = true;
         m_queue.restart();
     }
