@@ -61,6 +61,7 @@ class UnionPlanNode : public AbstractPlanNode {
         UnionPlanNode() : AbstractPlanNode(), m_unionType(UNION_TYPE_NOUNION) {
             // Do nothing
         }
+        ~UnionPlanNode();
 
         PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UNION); }
 
