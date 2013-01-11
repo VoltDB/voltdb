@@ -319,7 +319,7 @@ public class ExportOnServerVerifier {
         boolean quit = false;
         boolean more_rows = true;
         boolean more_txnids = true;
-        boolean expect_export_eof = false;
+        ValidationErr expect_export_eof = null;
         int emptyRemovalCycles = 0;
 
         PrintWriter txout = gzipWriterTo("read-exported-transactions.gz");
@@ -334,7 +334,7 @@ public class ExportOnServerVerifier {
                 exportLine = csv.readLine();
                 if (exportLine == null)
                 {
-                    expect_export_eof = false;
+                    expect_export_eof = null;
                     csvPair.getSecond().run();
                     csvPair = openNextExportFile();
                     if (csvPair == null)
@@ -349,15 +349,14 @@ public class ExportOnServerVerifier {
                         exportLine = csv.readLine();
                     }
                 }
-                else if (expect_export_eof)
+                else if (expect_export_eof != null)
                 {
-                    throw new ValidationErr("previously logged row had unexpected number of columns");
+                    throw expect_export_eof;
                 }
 
                 row = RoughCSVTokenizer.tokenize(exportLine);
 
-                verifyRow(row);
-                expect_export_eof = row.length < 29;
+                expect_export_eof = verifyRow(row);
 
                 if (row.length < 8) continue; // row[6] txnId row[7] rowId
 
@@ -1228,12 +1227,12 @@ public class ExportOnServerVerifier {
         }
     }
 
-    private void verifyRow(String[] row) throws ValidationErr {
-
+    ValidationErr verifyRow(String[] row) throws ValidationErr
+    {
         if (row.length < 29)
         {
             System.err.println("ERROR: Unexpected number of columns for the following row:\n\t" + Arrays.toString(row));
-            return;
+            return new ValidationErr("number of columns", row.length, 29);
         }
 
         int col = 5; // col offset is always pre-incremented.
@@ -1246,51 +1245,51 @@ public class ExportOnServerVerifier {
         // col 8
         Byte rowid_group = Byte.parseByte(row[++col]);
         if (rowid_group != valid.rowid_group)
-            error("rowid_group invalid", rowid_group, valid.rowid_group);
+            return error("rowid_group invalid", rowid_group, valid.rowid_group);
 
         // col 9
         Byte type_null_tinyint = row[++col].equals("NULL") ? null : Byte.valueOf(row[col]);
         if ( (!(type_null_tinyint == null && valid.type_null_tinyint == null)) &&
              (!type_null_tinyint.equals(valid.type_null_tinyint)) )
-            error("type_not_null_tinyint", type_null_tinyint, valid.type_null_tinyint);
+            return error("type_not_null_tinyint", type_null_tinyint, valid.type_null_tinyint);
 
         // col 10
         Byte type_not_null_tinyint = Byte.valueOf(row[++col]);
         if (!type_not_null_tinyint.equals(valid.type_not_null_tinyint))
-            error("type_not_null_tinyint", type_not_null_tinyint, valid.type_not_null_tinyint);
+            return error("type_not_null_tinyint", type_not_null_tinyint, valid.type_not_null_tinyint);
 
         // col 11
         Short type_null_smallint = row[++col].equals("NULL") ? null : Short.valueOf(row[col]);
         if ( (!(type_null_smallint == null && valid.type_null_smallint == null)) &&
              (!type_null_smallint.equals(valid.type_null_smallint)) )
-            error("type_null_smallint", type_null_smallint, valid.type_null_smallint);
+            return error("type_null_smallint", type_null_smallint, valid.type_null_smallint);
 
         // col 12
         Short type_not_null_smallint = Short.valueOf(row[++col]);
         if (!type_not_null_smallint.equals(valid.type_not_null_smallint))
-            error("type_null_smallint", type_not_null_smallint, valid.type_not_null_smallint);
+            return error("type_null_smallint", type_not_null_smallint, valid.type_not_null_smallint);
 
         // col 13
         Integer type_null_integer = row[++col].equals("NULL") ? null : Integer.valueOf(row[col]);
         if ( (!(type_null_integer == null && valid.type_null_integer == null)) &&
              (!type_null_integer.equals(valid.type_null_integer)) )
-            error("type_null_integer", type_null_integer, valid.type_null_integer);
+            return error("type_null_integer", type_null_integer, valid.type_null_integer);
 
         // col 14
         Integer type_not_null_integer = Integer.valueOf(row[++col]);
         if (!type_not_null_integer.equals(valid.type_not_null_integer))
-            error("type_not_null_integer", type_not_null_integer, valid.type_not_null_integer);
+            return error("type_not_null_integer", type_not_null_integer, valid.type_not_null_integer);
 
         // col 15
         Long type_null_bigint = row[++col].equals("NULL") ? null : Long.valueOf(row[col]);
         if ( (!(type_null_bigint == null && valid.type_null_bigint == null)) &&
              (!type_null_bigint.equals(valid.type_null_bigint)) )
-            error("type_null_bigint", type_null_bigint, valid.type_null_bigint);
+            return error("type_null_bigint", type_null_bigint, valid.type_null_bigint);
 
         // col 16
         Long type_not_null_bigint = Long.valueOf(row[++col]);
         if (!type_not_null_bigint.equals(valid.type_not_null_bigint))
-            error("type_not_null_bigint", type_not_null_bigint, valid.type_not_null_bigint);
+            return error("type_not_null_bigint", type_not_null_bigint, valid.type_not_null_bigint);
 
         // The ExportToFileClient truncates microseconds. Construct a TimestampType here
         // that also truncates microseconds.
@@ -1308,24 +1307,24 @@ public class ExportOnServerVerifier {
             System.out.println("CSV value: " + row[col]);
             System.out.println("EXP value: " + valid.type_null_timestamp.toString());
             System.out.println("ACT value: " + type_null_timestamp.toString());
-            error("type_null_timestamp", type_null_timestamp, valid.type_null_timestamp);
+            return error("type_null_timestamp", type_null_timestamp, valid.type_null_timestamp);
         }
 
         // col 18
         TimestampType type_not_null_timestamp = new TimestampType(row[++col]);
         if (!type_not_null_timestamp.equals(valid.type_not_null_timestamp))
-            error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
+            return error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
 
         // col 19
         BigDecimal type_null_decimal = row[++col].equals("NULL") ? null : new BigDecimal(row[col]);
         if ( (!(type_null_decimal == null && valid.type_null_decimal == null)) &&
              (!type_null_decimal.equals(valid.type_null_decimal)) )
-            error("type_null_decimal", type_null_decimal, valid.type_null_decimal);
+            return error("type_null_decimal", type_null_decimal, valid.type_null_decimal);
 
         // col 20
         BigDecimal type_not_null_decimal = new BigDecimal(row[++col]);
         if (!type_not_null_decimal.equals(valid.type_not_null_decimal))
-            error("type_not_null_decimal", type_not_null_decimal, valid.type_not_null_decimal);
+            return error("type_not_null_decimal", type_not_null_decimal, valid.type_not_null_decimal);
 
         // col 21
         Double type_null_float = row[++col].equals("NULL") ? null : Double.valueOf(row[col]);
@@ -1337,51 +1336,53 @@ public class ExportOnServerVerifier {
             System.out.println("ACT value: " + type_null_float);
             System.out.println("valueOf():" + Double.valueOf("-2155882919525625344.000000000000"));
             System.out.flush();
-            error("type_null_float", type_null_float, valid.type_null_float);
+            return error("type_null_float", type_null_float, valid.type_null_float);
         }
 
         // col 22
         Double type_not_null_float = Double.valueOf(row[++col]);
         if (!type_not_null_float.equals(valid.type_not_null_float))
-            error("type_not_null_float", type_not_null_float, valid.type_not_null_float);
+            return error("type_not_null_float", type_not_null_float, valid.type_not_null_float);
 
         // col 23
         String type_null_varchar25 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar25 == valid.type_null_varchar25 ||
               type_null_varchar25.equals(valid.type_null_varchar25)))
-            error("type_null_varchar25", type_null_varchar25, valid.type_null_varchar25);
+            return error("type_null_varchar25", type_null_varchar25, valid.type_null_varchar25);
 
         // col 24
         String type_not_null_varchar25 = row[++col];
         if (!type_not_null_varchar25.equals(valid.type_not_null_varchar25))
-            error("type_not_null_varchar25", type_not_null_varchar25, valid.type_not_null_varchar25);
+            return error("type_not_null_varchar25", type_not_null_varchar25, valid.type_not_null_varchar25);
 
         // col 25
         String type_null_varchar128 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar128 == valid.type_null_varchar128 ||
               type_null_varchar128.equals(valid.type_null_varchar128)))
-            error("type_null_varchar128", type_null_varchar128, valid.type_null_varchar128);
+            return error("type_null_varchar128", type_null_varchar128, valid.type_null_varchar128);
 
         // col 26
         String type_not_null_varchar128 = row[++col];
         if (!type_not_null_varchar128.equals(valid.type_not_null_varchar128))
-            error("type_not_null_varchar128", type_not_null_varchar128, valid.type_not_null_varchar128);
+            return error("type_not_null_varchar128", type_not_null_varchar128, valid.type_not_null_varchar128);
 
         // col 27
         String type_null_varchar1024 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar1024 == valid.type_null_varchar1024 ||
               type_null_varchar1024.equals(valid.type_null_varchar1024)))
-            error("type_null_varchar1024", type_null_varchar1024, valid.type_null_varchar1024);
+            return error("type_null_varchar1024", type_null_varchar1024, valid.type_null_varchar1024);
 
         // col 28
         String type_not_null_varchar1024 = row[++col];
         if (!type_not_null_varchar1024.equals(valid.type_not_null_varchar1024))
-            error("type_not_null_varchar1024", type_not_null_varchar1024, valid.type_not_null_varchar1024);
+            return error("type_not_null_varchar1024", type_not_null_varchar1024, valid.type_not_null_varchar1024);
+
+        return null;
     }
 
-    private void error(String msg, Object val, Object exp) throws ValidationErr {
+    private ValidationErr error(String msg, Object val, Object exp) throws ValidationErr {
         System.err.println("ERROR: " + msg + " " + val + " " + exp);
-        throw new ValidationErr(msg, val, exp);
+        return new ValidationErr(msg, val, exp);
     }
 
     int m_partitions = 0;
