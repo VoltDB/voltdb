@@ -37,6 +37,7 @@ import java.math.BigInteger;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.OpTypes;
+import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.Types;
@@ -58,6 +59,9 @@ public final class NumberType extends Type {
     static final int bigintPrecision              = 8;
     static final int doublePrecision              = 8;
     static final int defaultNumericPrecision      = 26;
+    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    public static final int defaultNumericScale          = 32;
+    // END Cherry-picked code change from hsqldb-2.2.8
     static final int bigintSquareNumericPrecision = 40;
 
     //
@@ -816,6 +820,9 @@ public final class NumberType extends Type {
             } else if (a instanceof Double) {
                 otherType = Type.SQL_DOUBLE;
             } else if (a instanceof BigDecimal) {
+                // BEGIN Cherry-picked code change from hsqldb-2.2.8
+                otherType = Type.SQL_DECIMAL_DEFAULT;
+/*
                 if (typeCode == Types.SQL_DECIMAL
                         || typeCode == Types.SQL_NUMERIC) {
                     return convertToTypeLimits(session, a);
@@ -825,9 +832,44 @@ public final class NumberType extends Type {
 
                 otherType = getNumberType(Types.SQL_DECIMAL,
                                           JavaSystem.precision(val), scale);
+*/
+                // END Cherry-picked code change from hsqldb-2.2.8
             } else {
                 throw Error.error(ErrorCode.X_42561);
             }
+
+            // BEGIN Cherry-picked code change from hsqldb-2.2.8
+            switch (typeCode) {
+
+                case Types.TINYINT :
+                case Types.SQL_SMALLINT :
+                case Types.SQL_INTEGER :
+                    return convertToInt(session, a, Types.INTEGER);
+
+                case Types.SQL_BIGINT :
+                    return convertToLong(session, a);
+
+                case Types.SQL_REAL :
+                case Types.SQL_FLOAT :
+                case Types.SQL_DOUBLE :
+                    return convertToDouble(a);
+
+                case Types.SQL_NUMERIC :
+                case Types.SQL_DECIMAL : {
+                    a = convertToDecimal(a);
+
+                    BigDecimal dec = (BigDecimal) a;
+
+                    if (scale != dec.scale()) {
+                        dec = dec.setScale(scale, BigDecimal.ROUND_HALF_DOWN);
+                    }
+
+                    return dec;
+                }
+                default :
+                    throw Error.error(ErrorCode.X_42561);
+            }
+            // END Cherry-picked code change from hsqldb-2.2.8
         } else if (a instanceof String) {
             otherType = Type.SQL_VARCHAR;
         } else {
@@ -932,6 +974,116 @@ public final class NumberType extends Type {
             throw Error.error(ErrorCode.X_42561);
         }
     }
+
+    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    /**
+     * Type narrowing from DOUBLE/DECIMAL/NUMERIC to BIGINT / INT / SMALLINT / TINYINT
+     * following SQL rules. When conversion is from a non-integral type,
+     * digits to the right of the decimal point are lost.
+     */
+
+    /**
+     * Converter from a numeric object to Integer. Input is checked to be
+     * within range represented by the given number type.
+     */
+    static Integer convertToInt(SessionInterface session, Object a, int type) {
+
+        int value;
+
+        if (a instanceof Integer) {
+            if (type == Types.SQL_INTEGER) {
+                return (Integer) a;
+            }
+
+            value = ((Integer) a).intValue();
+        } else if (a instanceof Long) {
+            long temp = ((Long) a).longValue();
+
+            if (Integer.MAX_VALUE < temp || temp < Integer.MIN_VALUE) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            value = (int) temp;
+        } else if (a instanceof BigDecimal) {
+            BigDecimal bd = ((BigDecimal) a);
+
+            if (bd.compareTo(MAX_INT) > 0 || bd.compareTo(MIN_INT) < 0) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            value = bd.intValue();
+        } else if (a instanceof Double || a instanceof Float) {
+            double d = ((Number) a).doubleValue();
+
+            if (session instanceof Session) {
+                if (!((Session) session).database.sqlConvertTruncate) {
+                    d = java.lang.Math.rint(d);
+                }
+            }
+
+            if (Double.isInfinite(d) || Double.isNaN(d)
+                    || d >= (double) Integer.MAX_VALUE + 1
+                    || d <= (double) Integer.MIN_VALUE - 1) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            value = (int) d;
+        } else {
+            throw Error.error(ErrorCode.X_42561);
+        }
+
+        if (type == Types.TINYINT) {
+            if (Byte.MAX_VALUE < value || value < Byte.MIN_VALUE) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+        } else if (type == Types.SQL_SMALLINT) {
+            if (Short.MAX_VALUE < value || value < Short.MIN_VALUE) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+        }
+
+        return Integer.valueOf(value);
+    }
+
+    /**
+     * Converter from a numeric object to Long. Input is checked to be
+     * within range represented by Long.
+     */
+    static Long convertToLong(SessionInterface session, Object a) {
+
+        if (a instanceof Integer) {
+            return ValuePool.getLong(((Integer) a).intValue());
+        } else if (a instanceof Long) {
+            return (Long) a;
+        } else if (a instanceof BigDecimal) {
+            BigDecimal bd = (BigDecimal) a;
+
+            if (bd.compareTo(MAX_LONG) > 0 || bd.compareTo(MIN_LONG) < 0) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            return ValuePool.getLong(bd.longValue());
+        } else if (a instanceof Double || a instanceof Float) {
+            double d = ((Number) a).doubleValue();
+
+            if (session instanceof Session) {
+                if (!((Session) session).database.sqlConvertTruncate) {
+                    d = java.lang.Math.rint(d);
+                }
+            }
+
+            if (Double.isInfinite(d) || Double.isNaN(d)
+                    || d >= (double) Long.MAX_VALUE + 1
+                    || d <= (double) Long.MIN_VALUE - 1) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            return ValuePool.getLong((long) d);
+        } else {
+            throw Error.error(ErrorCode.X_42561);
+        }
+    }
+    // END Cherry-picked code change from hsqldb-2.2.8
 
     /**
      * Converter from a numeric object to Double. Input is checked to be
@@ -1591,9 +1743,7 @@ public final class NumberType extends Type {
                 BigDecimal value = ((BigDecimal) a).setScale(0,
                     BigDecimal.ROUND_CEILING);
 
-                if (JavaSystem.precision(value) > precision) {
-                    throw Error.error(ErrorCode.X_22003);
-                }
+                return value;
             }
 
             // fall through
@@ -1626,9 +1776,7 @@ public final class NumberType extends Type {
                 BigDecimal value = ((BigDecimal) a).setScale(0,
                     BigDecimal.ROUND_FLOOR);
 
-                if (JavaSystem.precision(value) > precision) {
-                    throw Error.error(ErrorCode.X_22003);
-                }
+                return value;
             }
 
             // fall through
