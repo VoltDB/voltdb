@@ -114,6 +114,25 @@ public class MpProcedureTask extends ProcedureTask
             hostLog.debug("SYSPROCFAIL: " + this);
             return;
         }
+
+        // Let's ensure that we flush any previous attempts of this transaction
+        // at the masters we're going to try to use this time around.
+        if (m_isRestart) {
+            CompleteTransactionMessage restart = new CompleteTransactionMessage(
+                    m_initiator.getHSId(), // who is the "initiator" now??
+                    m_initiator.getHSId(),
+                    m_txn.txnId,
+                    m_txn.isReadOnly(),
+                    0,
+                    true,
+                    false,  // really don't want to have ack the ack.
+                    !m_txn.isReadOnly(),
+                    m_msg.isForReplay());
+
+            restart.setTruncationHandle(m_msg.getTruncationHandle());
+            restart.setOriginalTxnId(m_msg.getOriginalTxnId());
+            m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
+        }
         final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
         // 1) We're not writing the Iv2InitiateTaskMessage to the first
