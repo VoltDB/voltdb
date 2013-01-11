@@ -30,8 +30,8 @@ Valid commands are:
 
     {SQL statement}
     EXEC[UTE] {procedure-name} [parameters]
-    EXPLAIN
-    EXPLAINPROC
+    EXPLAIN {sql statement}
+    EXPLAINPROC {procedure-name}
     FILE {file-name}
 
 Command and SQL keywords (such as SELECT) are case insensitive.
@@ -77,6 +77,10 @@ Executing SQL Statements -------------------------------------------------------
   is not required.)
 
 + You may enter more than one statement before requesting execution.
+
++ You can press the Tab key at the start of a command to complete the command name. 
+  Note that sqlcmd does not complete terms and database objects in the body of the 
+  command.
 
 + To request execution, enter a semi-colon at the end of a statement, or enter the
   interactive command GO.
@@ -197,7 +201,8 @@ Recalling commands -------------------------------------------------------------
 Quitting the application -------------------------------------------------------
 
 + While in interactive mode, type the commands EXIT or QUIT to return to the
-  shell prompt.
+  shell prompt.  You can also press Control-D on an empty line to return to
+  the shell prompt.
 
 + In general, sqlcmd follows the bash shell emacs-style keyboard interface.
 
