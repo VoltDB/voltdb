@@ -17,6 +17,8 @@
 
 package org.voltdb.utils;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -42,6 +44,8 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jline.Terminal;
+import jline.console.CursorBuffer;
 import jline.console.KeyMap;
 import jline.console.completer.Completer;
 import jline.console.history.FileHistory;
@@ -1134,9 +1138,24 @@ public class SQLCommand
             historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
             lineInputReader.setHistory(historyFile);
 
-            // Make Ctrl-D (EOF) exit.
+            // Make Ctrl-D (EOF) exit if on an empty line, otherwise delete the next character.
             KeyMap keyMap = lineInputReader.getKeys();
-            keyMap.bind(new Character(KeyMap.CTRL_D).toString(), "exit\r");
+            keyMap.bind(new Character(KeyMap.CTRL_D).toString(), new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e)
+                {
+                    CursorBuffer cursorBuffer = lineInputReader.getCursorBuffer();
+                    if (cursorBuffer.length() == 0) {
+                        System.exit(0);
+                    }
+                    else {
+                        try {
+                            lineInputReader.delete();
+                        }
+                        catch (IOException e1) {}
+                    }
+                }
+            });
 
             // Removed code to prevent Ctrl-C from exiting. The original code is visible
             // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
