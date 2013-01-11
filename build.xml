@@ -264,6 +264,9 @@ PRIMARY ENTRY POINTS
     <!-- add tools and support files -->
     <dist_tools_macro distlabel="-tools" />
 
+    <!-- add README.voltadmin -->
+    <copy todir="${dist.dir}-tools" file="${base.dir}/README.voltadmin"/>
+
     <!-- LICENSE isn't handled by dist_tools_macro -->
     <copy todir="${dist.dir}-tools" file="${dist.dir}/LICENSE"/>
 
@@ -672,9 +675,6 @@ DISTRIBUTION
         <copy todir="${dist.dir}@{distlabel}">
             <fileset dir="${base.dir}">
                 <include name="version.txt" />
-            </fileset>
-            <fileset dir="${base.dir}">
-                <include name="README.voltadmin" />
             </fileset>
         </copy>
         <copy todir="${dist.dir}@{distlabel}/bin">
