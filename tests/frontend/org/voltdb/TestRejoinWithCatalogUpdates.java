@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -139,6 +139,8 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
             client.close();
 
             assertTrue(didRestore());
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
             cluster.shutDown();
             if (localServer != null) {
@@ -179,6 +181,8 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
                 assertTrue(results.length == 1);
                 client.close();
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
             cluster.shutDown();
         }

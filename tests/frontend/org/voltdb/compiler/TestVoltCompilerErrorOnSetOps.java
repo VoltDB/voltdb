@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,19 +28,5 @@ public class TestVoltCompilerErrorOnSetOps extends VoltCompilerErrorTest {
 
     public void testNoErrorOnParens() throws Exception {
         statementNonErrorTest("PARENS", "(select ival from blah);");
-    }
-    public void testErrorOnUnion() throws Exception {
-        statementErrorTest("UNION", "(select ival from blah) union (select ival from indexed_blah);");
-        statementErrorTest("UNION", "select ival from blah union select ival from indexed_blah;");
-    }
-
-    public void testErrorOnIntersect() throws Exception {
-        statementErrorTest("INTERSECT", "(select ival from blah) intersect (select ival from indexed_blah);");
-        statementErrorTest("INTERSECT", "select ival from blah intersect select ival from indexed_blah;");
-    }
-
-    public void testErrorOnExcept() throws Exception {
-        statementErrorTest("EXCEPT", "(select ival from blah) except (select ival from indexed_blah);");
-        statementErrorTest("EXCEPT", "select ival from blah except select ival from indexed_blah;");
     }
 }

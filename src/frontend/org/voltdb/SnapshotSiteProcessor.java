@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -20,20 +20,23 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
@@ -65,19 +68,43 @@ public class SnapshotSiteProcessor {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /** Global count of execution sites on this node performing snapshot */
-    public static final AtomicInteger ExecutionSitesCurrentlySnapshotting =
-        new AtomicInteger(-1);
-
+    public static final Set<Object> ExecutionSitesCurrentlySnapshotting =
+            Collections.synchronizedSet(new HashSet<Object>());
     /**
      * Ensure only one thread running the setup fragment does the creation
      * of the targets and the distribution of the work.
      */
     public static final Object m_snapshotCreateLock = new Object();
-    public static Semaphore m_snapshotCreateSetupPermit = null;
+    public static CyclicBarrier m_snapshotCreateSetupBarrier = null;
+    public static CyclicBarrier m_snapshotCreateFinishBarrier = null;
+    public static final Runnable m_snapshotCreateSetupBarrierAction = new Runnable() {
+        @Override
+        public void run() {
+            Runnable r = SnapshotSiteProcessor.m_snapshotCreateSetupBarrierActualAction.getAndSet(null);
+            if (r != null) {
+                r.run();
+            }
+        }
+    };
+    public static AtomicReference<Runnable> m_snapshotCreateSetupBarrierActualAction =
+            new AtomicReference<Runnable>();
+
+    public static void readySnapshotSetupBarriers(int numSites) {
+        synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
+            if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numSites);
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
+                        new CyclicBarrier(numSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
+            } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();
+            }
+        }
+    }
 
     //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
-    public static ArrayList<Long> m_partitionLastSeenTransactionIds =
-            new ArrayList<Long>();
+    public static Map<Integer, Long> m_partitionLastSeenTransactionIds =
+            new HashMap<Integer, Long>();
 
     /**
      * Only proceed once permits are available after setup completes
@@ -248,7 +275,8 @@ public class SnapshotSiteProcessor {
         }
         m_snapshotBufferOrigins.clear();
         m_availableSnapshotBuffers.clear();
-        m_snapshotCreateSetupPermit = null;
+        m_snapshotCreateSetupBarrier = null;
+        m_snapshotCreateFinishBarrier = null;
         if (m_snapshotTargetTerminators != null) {
             for (Thread t : m_snapshotTargetTerminators) {
                 t.join();
@@ -344,6 +372,7 @@ public class SnapshotSiteProcessor {
             long txnId,
             int numHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+        ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
         m_lastSnapshotSucceded = true;
@@ -510,14 +539,24 @@ public class SnapshotSiteProcessor {
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
             m_snapshotTargets = null;
             m_snapshotTableTasks = null;
-            final int result = ExecutionSitesCurrentlySnapshotting.decrementAndGet();
+            boolean IamLast = false;
+            synchronized (ExecutionSitesCurrentlySnapshotting) {
+                if (!ExecutionSitesCurrentlySnapshotting.contains(this)) {
+                    VoltDB.crashLocalVoltDB(
+                            "Currently snapshotting site didn't find itself in set of snapshotting sites", true, null);
+                }
+                IamLast = ExecutionSitesCurrentlySnapshotting.size() == 1;
+                if (!IamLast) {
+                    ExecutionSitesCurrentlySnapshotting.remove(this);
+                }
+            }
 
             /**
              * If this is the last one then this EE must close all the SnapshotDataTargets.
              * Done in a separate thread so the EE can go and do other work. It will
              * sync every file descriptor and that may block for a while.
              */
-            if (result == 0) {
+            if (IamLast) {
                 final long txnId = m_lastSnapshotTxnId;
                 final int numHosts = m_lastSnapshotNumHosts;
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
@@ -571,11 +610,13 @@ public class SnapshotSiteProcessor {
                                         exportSequenceNumbers);
                             } finally {
                                 /**
-                                 * Set it to -1 indicating the system is ready to perform another snapshot.
-                                 * Changed to wait until all the previous snapshot work has finished so
-                                 * that snapshot initiation doesn't wait on the file system
+                                 * Remove this last site from the set here after the terminator has run
+                                 * so that new snapshots won't start until
+                                 * everything is on disk for the previous snapshot. This prevents a really long
+                                 * snapshot initiation procedure from occurring because it has to contend for
+                                 * filesystem resources
                                  */
-                                ExecutionSitesCurrentlySnapshotting.decrementAndGet();
+                                ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
                         }
                     }

@@ -1,23 +1,27 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Encapsulates an Iv2 transaction id, timestamp and random number seed.
@@ -165,5 +169,27 @@ final public class TxnEgo {
     {
         return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +
             TxnEgo.getPartitionId(txnId) + ")";
+    }
+
+    public static String txnIdCollectionToString(Collection<Long> ids) {
+        List<String> idstrings = new ArrayList<String>();
+        for (Long id : ids) {
+            idstrings.add(txnIdToString(id));
+        }
+        // Easy hack, sort txn IDs lexically.
+        Collections.sort(idstrings);
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        boolean first = false;
+        for (String id : idstrings) {
+            if (!first) {
+                first = true;
+            } else {
+                sb.append(", ");
+            }
+            sb.append(id);
+        }
+        sb.append("]");
+        return sb.toString();
     }
 }

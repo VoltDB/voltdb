@@ -1,25 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -34,7 +32,6 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -42,11 +39,9 @@ import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.primitives.Longs;
 
 public class SnapshotCompletionMonitor {
-    @SuppressWarnings("unused")
-    private static final VoltLogger LOG = new VoltLogger("LOGGING");
+    private static final VoltLogger LOG = new VoltLogger("HOST");
     final CopyOnWriteArrayList<SnapshotCompletionInterest> m_interests =
             new CopyOnWriteArrayList<SnapshotCompletionInterest>();
     private ZooKeeper m_zk;
@@ -78,9 +73,11 @@ public class SnapshotCompletionMonitor {
      * and when the snapshot completes the completion monitor will grab the list of partition specific
      * txnids to pass to those who are interestewd
      */
-    private final HashMap<Long, List<Long>> m_snapshotTxnIdsToPartitionTxnIds = new HashMap<Long, List<Long>>();
+    private final HashMap<Long, Map<Integer, Long>> m_snapshotTxnIdsToPartitionTxnIds =
+            new HashMap<Long, Map<Integer, Long>>();
 
-    public void registerPartitionTxnIdsForSnapshot(long snapshotTxnId, List<Long> partitionTxnIds) {
+    public void registerPartitionTxnIdsForSnapshot(long snapshotTxnId, Map<Integer, Long> partitionTxnIds) {
+        LOG.debug("Registering per partition txnids " + partitionTxnIds);
         synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
             assert(!m_snapshotTxnIdsToPartitionTxnIds.containsKey(snapshotTxnId));
             m_snapshotTxnIdsToPartitionTxnIds.put(snapshotTxnId, partitionTxnIds);
@@ -196,15 +193,14 @@ public class SnapshotCompletionMonitor {
             }
             exportSequenceNumbers = builder.build();
 
-            long partitionTxnIds[] = null;
+            Map<Integer, Long> partitionTxnIdsMap = ImmutableMap.of();
             synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
-                List<Long> partitionTxnIdsList = m_snapshotTxnIdsToPartitionTxnIds.get(txnId);
+                Map<Integer, Long> partitionTxnIdsList = m_snapshotTxnIdsToPartitionTxnIds.get(txnId);
                 if (partitionTxnIdsList != null) {
-                    partitionTxnIds = Longs.toArray(partitionTxnIdsList);
-                } else {
-                    partitionTxnIds = new long[0];
+                    partitionTxnIdsMap = ImmutableMap.copyOf(partitionTxnIdsList);
                 }
             }
+
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
@@ -212,8 +208,7 @@ public class SnapshotCompletionMonitor {
                         new SnapshotCompletionEvent(
                             nonce,
                             txnId,
-                            Arrays.copyOf(partitionTxnIds,
-                                               partitionTxnIds.length),
+                            partitionTxnIdsMap,
                             truncation,
                             truncReqId,
                             exportSequenceNumbers));

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,6 +43,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ReplicaProcCaller;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.VoltFile;
 
 public class TestReplicatedInvocation {
@@ -123,14 +125,15 @@ public class TestReplicatedInvocation {
         client.createConnection("localhost");
         ReplicaProcCaller pc = client;
         SyncCallback callback = new SyncCallback();
-        pc.callProcedure(3, 4, callback, "ReplicatedProcedure", 1, "haha");
+        long uid = UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(), 4, MpInitiator.MP_INIT_PID);
+        pc.callProcedure(3, uid, callback, "ReplicatedProcedure", 1, "haha");
         callback.waitForResponse();
         ClientResponse response = callback.getResponse();
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         VoltTable result = VoltTable.fromJSONString(response.getAppStatusString());
         result.advanceRow();
         assertEquals(3, result.getLong("txnId"));
-        assertEquals(4, result.getLong("timestamp"));
+        assertEquals(uid, result.getLong("timestamp"));
         client.close();
     }
 

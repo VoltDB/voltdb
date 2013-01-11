@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,7 +25,10 @@ package txnIdSelfCheck;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -66,10 +69,15 @@ public class Benchmark {
     // Benchmark start time
     long benchmarkStartTS;
 
-    final PayloadProcessor processor;
+    final TxnId2PayloadProcessor processor;
 
     final AtomicInteger activeConnections = new AtomicInteger(0);
     final AtomicBoolean shutdown = new AtomicBoolean(false);
+
+    // for reporting and detecting progress
+    private final AtomicLong txnCount = new AtomicLong();
+    private long txnCountAtLastCheck;
+    private long lastProgressTimestamp = System.currentTimeMillis();
 
     // For retry connections
     private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
@@ -124,6 +132,9 @@ public class Benchmark {
         @Option(desc = "Target data size for the partitioned filler table.")
         int partfillerrowmb = 128;
 
+        @Option(desc = "Timeout that kills the client if progress is not made.")
+        int progresstimeout = 120;
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -148,6 +159,49 @@ public class Benchmark {
 
             // parse servers
             parsedServers = servers.split(",");
+        }
+    }
+
+    /**
+     * Fake an internal jstack to the log
+     */
+    static public void printJStack() {
+        log.info(new Date().toString() + " Full thread dump");
+
+        Map<String, List<String>> deduped = new HashMap<String, List<String>>();
+
+        // collect all the output, but dedup the identical stack traces
+        for (Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+            Thread t = e.getKey();
+            String header = String.format("\"%s\" %sprio=%d tid=%d %s",
+                    t.getName(),
+                    t.isDaemon() ? "daemon " : "",
+                    t.getPriority(),
+                    t.getId(),
+                    t.getState().toString());
+
+            String stack = "";
+            for (StackTraceElement ste : e.getValue()) {
+                stack += "    at " + ste.toString() + "\n";
+            }
+
+            if (deduped.containsKey(stack)) {
+                deduped.get(stack).add(header);
+            }
+            else {
+                ArrayList<String> headers = new ArrayList<String>();
+                headers.add(header);
+                deduped.put(stack, headers);
+            }
+        }
+
+        for (Entry<String, List<String>> e : deduped.entrySet()) {
+            String logline = "";
+            for (String header : e.getValue()) {
+                logline += header + "\n";
+            }
+            logline += e.getKey();
+            log.info(logline);
         }
     }
 
@@ -188,8 +242,8 @@ public class Benchmark {
     Benchmark(Config config) {
         this.config = config;
 
-        processor = new PayloadProcessor(config.minvaluesize, config.maxvaluesize,
-                                         config.entropy, config.usecompression);
+        processor = new TxnId2PayloadProcessor(4, config.minvaluesize, config.maxvaluesize,
+                                         config.entropy, Integer.MAX_VALUE, config.usecompression);
 
         log.info(HORIZONTAL_RULE);
         log.info(" Command Line Configuration");
@@ -270,10 +324,27 @@ public class Benchmark {
      * periodically during a benchmark.
      */
     private synchronized void printStatistics() {
-        log.info(String.format("Executed %d", c.get()));
+
+        long txnCountNow = txnCount.get();
+        long now = System.currentTimeMillis();
+        boolean madeProgress = txnCountNow > txnCountAtLastCheck;
+
+        if (madeProgress) {
+            lastProgressTimestamp = now;
+        }
+        txnCountAtLastCheck = txnCountNow;
+        long diffInSeconds = (now - lastProgressTimestamp) / 1000;
+
+        log.info(String.format("Executed %d%s", txnCount.get(),
+                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds)"));
+
+        if (diffInSeconds > config.progresstimeout) {
+            log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
+            printJStack();
+            System.exit(-1);
+        }
     }
 
-    private final AtomicLong c = new AtomicLong();
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -300,6 +371,7 @@ public class Benchmark {
             if (cr.getStatus() != ClientResponse.SUCCESS) {
                 log.error("Failed to call Summarize proc at startup. Exiting.");
                 log.error(((ClientResponseImpl) cr).toJSONString());
+                printJStack();
                 System.exit(-1);
             }
 
@@ -315,6 +387,7 @@ public class Benchmark {
         catch (ProcCallException e) {
             log.error("Failed to call Summarize proc at startup. Exiting.", e);
             log.error(((ClientResponseImpl) e.getClientResponse()).toJSONString());
+            printJStack();
             System.exit(-1);
         }
 
@@ -324,6 +397,8 @@ public class Benchmark {
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
+        // reset progress tracker
+        lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
 
         // Run the benchmark loop for the requested duration
@@ -345,7 +420,7 @@ public class Benchmark {
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
-            ClientThread clientThread = new ClientThread(cid, c, client, processor);
+            ClientThread clientThread = new ClientThread(cid, txnCount, client, processor);
             clientThread.start();
             clientThreads.add(clientThread);
         }
@@ -380,6 +455,9 @@ public class Benchmark {
         // block until all outstanding txns return
         client.drain();
         client.close();
+
+        log.info(HORIZONTAL_RULE);
+        log.info("Benchmark Complete");
     }
 
     /**

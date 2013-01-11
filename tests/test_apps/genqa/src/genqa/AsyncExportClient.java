@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -55,6 +55,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -141,11 +142,12 @@ public class AsyncExportClient
         @Override
         public void clientCallback(ClientResponse clientResponse) {
             // Track the result of the request (Success, Failure)
+            long now = System.currentTimeMillis();
             if (clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 TrackingResults.incrementAndGet(0);
                 long txid = clientResponse.getResults()[0].asScalarLong();
-                final String trace = String.format("%016d:%d\n", m_rowid, txid);
+                final String trace = String.format("%d:%d:%d\n", m_rowid, txid, now);
                 try
                 {
                     m_writer.write(trace);
@@ -158,7 +160,7 @@ public class AsyncExportClient
             else
             {
                 TrackingResults.incrementAndGet(1);
-                final String trace = String.format("%016d:-1\n", m_rowid);
+                final String trace = String.format("%d:-1:%d\n", m_rowid, now);
                 try
                 {
                     m_writer.write(trace);
@@ -229,6 +231,10 @@ public class AsyncExportClient
     // Statistics manager objects from the client
     private static ClientStatsContext periodicStatsContext;
     private static ClientStatsContext fullStatsContext;
+
+    static {
+        VoltDB.setDefaultTimezone();
+    }
 
     // Application entry point
     public static void main(String[] args)

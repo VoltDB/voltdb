@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -69,8 +69,9 @@ struct ipc_command {
  */
 typedef struct {
     struct ipc_command cmd;
-    int64_t txnId;
-    int64_t lastCommittedTxnId;
+    int64_t spHandle;
+    int64_t lastCommittedSpHandle;
+    int64_t uniqueId;
     int64_t undoToken;
     int32_t numFragmentIds;
     char data[0];
@@ -88,8 +89,8 @@ typedef struct {
 typedef struct {
     struct ipc_command cmd;
     int32_t tableId;
-    int64_t txnId;
-    int64_t lastCommittedTxnId;
+    int64_t spHandle;
+    int64_t lastCommittedSpHandle;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -503,7 +504,7 @@ int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
     struct tick {
         struct ipc_command cmd;
         int64_t time;
-        int64_t lastTxnId;
+        int64_t lastSpHandle;
     }__attribute__((packed));
 
     struct tick * cs = (struct tick*) cmd;
@@ -511,7 +512,7 @@ int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
 
     try {
         // no return code. can't fail!
-        m_engine->tick(ntohll(cs->time), ntohll(cs->lastTxnId));
+        m_engine->tick(ntohll(cs->time), ntohll(cs->lastSpHandle));
     } catch (FatalException e) {
         crashVoltDB(e);
     }
@@ -522,13 +523,13 @@ int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
 int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
     struct quiesce {
         struct ipc_command cmd;
-        int64_t lastTxnId;
+        int64_t lastSpHandle;
     }__attribute__((packed));
 
     struct quiesce *cs = (struct quiesce*)cmd;
 
     try {
-        m_engine->quiesce(ntohll(cs->lastTxnId));
+        m_engine->quiesce(ntohll(cs->lastSpHandle));
     } catch (FatalException e) {
         crashVoltDB(e);
     }
@@ -545,9 +546,9 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     int32_t numFrags = ntohl(queryCommand->numFragmentIds);
 
     if (0)
-        std::cout << "querypfs:" << " txnId=" << ntohll(queryCommand->txnId)
-                  << " txnId=" << ntohll(queryCommand->txnId)
-                  << " lastCommitted=" << ntohll(queryCommand->lastCommittedTxnId)
+        std::cout << "querypfs:"
+                  << " spHandle=" << ntohll(queryCommand->spHandle)
+                  << " lastCommittedSphandle=" << ntohll(queryCommand->lastCommittedSpHandle)
                   << " undoToken=" << ntohll(queryCommand->undoToken)
                   << " numFragIds=" << numFrags << std::endl;
 
@@ -575,8 +576,9 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                                        1,
                                        (int32_t)(ntohll(inputDepId[i])), // Java sends int64 but EE wants int32
                                        params,
-                                       ntohll(queryCommand->txnId),
-                                       ntohll(queryCommand->lastCommittedTxnId),
+                                       ntohll(queryCommand->spHandle),
+                                       ntohll(queryCommand->lastCommittedSpHandle),
+                                       ntohll(queryCommand->uniqueId),
                                        i == 0 ? true : false, //first
                                        i == numFrags - 1 ? true : false)) { //last
                 ++errors;
@@ -661,20 +663,20 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
 
     if (0) {
         std::cout << "loadTable:" << " tableId=" << ntohl(loadTableCommand->tableId)
-                  << " txnId=" << ntohll(loadTableCommand->txnId) << " lastCommitted="
-                  << ntohll(loadTableCommand->lastCommittedTxnId) << std::endl;
+                  << " spHandle=" << ntohll(loadTableCommand->spHandle) << " lastCommittedSpHandle="
+                  << ntohll(loadTableCommand->lastCommittedSpHandle) << std::endl;
     }
 
     const int32_t tableId = ntohl(loadTableCommand->tableId);
-    const int64_t txnId = ntohll(loadTableCommand->txnId);
-    const int64_t lastCommittedTxnId = ntohll(loadTableCommand->lastCommittedTxnId);
+    const int64_t spHandle = ntohll(loadTableCommand->spHandle);
+    const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
     try {
         ReferenceSerializeInput serialize_in(offset, sz);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, txnId, lastCommittedTxnId);
+        bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle);
         if (success) {
             return kErrorCode_Success;
         } else {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -574,5 +574,73 @@ public class TestCatalogUtil extends TestCase {
 
         // current version should work
         assertTrue(CatalogUtil.isCatalogCompatible(VoltDB.instance().getVersionString()));
+    }
+
+    // I'm not testing the legacy behavior here, just IV2
+    public void testIv2PartitionDetectionSettings() throws Exception
+    {
+        if (!VoltDB.checkTestEnvForIv2()) {
+            return;
+        }
+        final String noElement =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "</deployment>";
+
+        final String ppdEnabledDefaultPrefix =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <partition-detection enabled='true'>" +
+            "   </partition-detection>" +
+            "</deployment>";
+
+        final String ppdEnabledWithPrefix =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <partition-detection enabled='true'>" +
+            "      <snapshot prefix='testPrefix'/>" +
+            "   </partition-detection>" +
+            "</deployment>";
+
+        final String ppdDisabledNoPrefix =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <partition-detection enabled='false'>" +
+            "   </partition-detection>" +
+            "</deployment>";
+
+        final File tmpNoElement = VoltProjectBuilder.writeStringToTempFile(noElement);
+        long crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpNoElement.getPath(), true);
+        assertTrue("Deployment file failed to parse", crc != -1);
+        Cluster cluster = catalog.getClusters().get("cluster");
+        assertTrue(cluster.getNetworkpartition());
+        assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
+
+        setUp();
+        final File tmpEnabledDefault = VoltProjectBuilder.writeStringToTempFile(ppdEnabledDefaultPrefix);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpEnabledDefault.getPath(), true);
+        assertTrue("Deployment file failed to parse", crc != -1);
+        cluster = catalog.getClusters().get("cluster");
+        assertTrue(cluster.getNetworkpartition());
+        assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
+
+        setUp();
+        final File tmpEnabledPrefix = VoltProjectBuilder.writeStringToTempFile(ppdEnabledWithPrefix);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpEnabledPrefix.getPath(), true);
+        assertTrue("Deployment file failed to parse", crc != -1);
+        cluster = catalog.getClusters().get("cluster");
+        assertTrue(cluster.getNetworkpartition());
+        assertEquals("testPrefix", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
+
+        setUp();
+        final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(ppdDisabledNoPrefix);
+        crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDisabled.getPath(), true);
+        assertTrue("Deployment file failed to parse", crc != -1);
+        cluster = catalog.getClusters().get("cluster");
+        assertFalse(cluster.getNetworkpartition());
     }
 }

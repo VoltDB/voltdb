@@ -1,28 +1,31 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
+
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -37,12 +40,12 @@ public class DuplicateCounter
     static final int DONE = 1;
     static final int WAITING = 2;
 
-    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     final long m_destinationId;
     Long m_responseHash = null;
     protected VoltMessage m_lastResponse = null;
-    final Set<Long> m_expectedHSIds;
+    final List<Long> m_expectedHSIds;
     final long m_txnId;
 
     DuplicateCounter(
@@ -52,7 +55,7 @@ public class DuplicateCounter
     {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
-        m_expectedHSIds = new HashSet<Long>(expectedHSIds);
+        m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
     }
 
     long getTxnId()
@@ -78,9 +81,12 @@ public class DuplicateCounter
                 m_responseHash = Long.valueOf(hash);
             }
             else if (!m_responseHash.equals(hash)) {
-                System.out.printf("COMPARING: %d to %d\n", hash, m_responseHash);
-                System.out.println("PREV MESSAGE: " + m_lastResponse.toString());
-                System.out.println("CURR MESSAGE: " + message.toString());
+                String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n" +
+                        "PREV MESSAGE: %s\n" +
+                        "CURR MESSAGE: %s\n",
+                        hash, m_responseHash,
+                        m_lastResponse.toString(), message.toString());
+                tmLog.error(msg);
                 return MISMATCH;
             }
             m_lastResponse = message;
@@ -114,5 +120,12 @@ public class DuplicateCounter
     VoltMessage getLastResponse()
     {
         return m_lastResponse;
+    }
+
+    public String toString()
+    {
+        String msg = String.format("DuplicateCounter: txnId: %s, outstanding HSIds: %s\n", m_txnId,
+               CoreUtils.hsIdCollectionToString(m_expectedHSIds));
+        return msg;
     }
 }

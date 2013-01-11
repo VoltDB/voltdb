@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,6 +32,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -50,6 +51,8 @@ public class ReadThread extends Thread {
     final Semaphore txnsOutstanding = new Semaphore(100);
 
     public ReadThread(Client client, int threadCount, int threadOffset) {
+        setName("ReadThread");
+
         this.client = client;
         this.threadCount = threadCount;
         this.threadOffset = threadOffset;
@@ -76,6 +79,7 @@ public class ReadThread extends Thread {
             }
             catch (Exception e) {
                 log.error("ReadThread got a bad response", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }
@@ -95,7 +99,7 @@ public class ReadThread extends Thread {
                         return;
                     }
                 }
-                while (client.getConnectedHostList().size() > 0);
+                while (client.getConnectedHostList().size() == 0);
                 m_needsBlock.set(false);
             }
 
@@ -108,16 +112,25 @@ public class ReadThread extends Thread {
             }
 
             // 1/5 of all reads are MP
-            boolean replicated = (counter++ % 5) == 0;
+            boolean replicated = (counter % 5) == 0;
+            // 1/23th of all SP reads are in-proc adhoc
+            boolean inprocAdhoc = (counter % 23) == 0;
+            counter++;
             String procName = replicated ? "ReadMP" : "ReadSP";
+            if (inprocAdhoc) procName += "InProcAdHoc";
             byte cid = (byte) (r.nextInt(threadCount) + threadOffset);
 
             // call a transaction
             try {
                 client.callProcedure(new ReadCallback(), procName, cid);
             }
+            catch (NoConnectionsException e) {
+                log.error("ReadThread got NoConnectionsException on proc call. Will sleep.");
+                m_needsBlock.set(true);
+            }
             catch (Exception e) {
-                log.error("ReadThread failed to run an AdHoc statement", e);
+                log.error("ReadThread failed to run a procedure. Will exit.", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }

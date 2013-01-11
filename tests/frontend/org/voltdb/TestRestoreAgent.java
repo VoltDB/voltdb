@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -36,6 +36,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -123,7 +124,13 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                             new LinkedList<SnapshotCompletionInterest>(m_interests);
                                     for (SnapshotCompletionInterest i : interests) {
                                         i.snapshotCompleted(
-                                                new SnapshotCompletionEvent("", 0, new long[0], true, "", null));
+                                                new SnapshotCompletionEvent(
+                                                        "",
+                                                        0,
+                                                        Collections.<Integer, Long>emptyMap(),
+                                                        true,
+                                                        "",
+                                                        null));
                                     }
                                     break;
                                 }
@@ -824,7 +831,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     @Override
-    public void onRestoreCompletion(long txnId, long perPartitionTxnIds[]) {
+    public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds) {
         if (snapshotTxnId != null) {
             assertEquals(snapshotTxnId.longValue(), txnId);
         }

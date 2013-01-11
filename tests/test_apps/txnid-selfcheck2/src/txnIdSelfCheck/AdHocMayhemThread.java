@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,6 +32,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
 public class AdHocMayhemThread extends Thread {
@@ -46,13 +47,44 @@ public class AdHocMayhemThread extends Thread {
     final Semaphore txnsOutstanding = new Semaphore(100);
 
     public AdHocMayhemThread(Client client) {
+        setName("AdHocMayhemThread");
+
         this.client = client;
     }
 
     private String nextAdHoc() {
-        // 1/5 of all adhocs are MP
-        boolean replicated = (counter++ % 5) == 0;
 
+        // 1/5 of all adhocs are MP
+        boolean replicated = (counter % 5) == 0;
+        boolean batched = (counter % 11) == 0;
+
+        // batched statements can go rw, wr or ww
+        long rwMix = counter % 3;
+
+        String sql = "";
+
+        if (batched) {
+            if (rwMix == 0) {
+                sql += nextWriteAdHocStmt(replicated);
+            }
+            if (rwMix == 1) {
+                sql += nextReadAdHocStmt(replicated);
+            }
+        }
+
+        sql += nextWriteAdHocStmt(replicated);
+
+        if (batched) {
+            if (rwMix == 2) {
+                sql += nextReadAdHocStmt(replicated);
+            }
+        }
+        counter++;
+
+        return sql;
+    }
+
+    private String nextWriteAdHocStmt(boolean replicated) {
         String sql = "update";
         sql += replicated ? " adhocr " : " adhocp";
         sql += " set";
@@ -67,6 +99,17 @@ public class AdHocMayhemThread extends Thread {
         return sql;
     }
 
+    private String nextReadAdHocStmt(boolean replicated) {
+        String sql = "select * from";
+        sql += replicated ? " adhocr " : " adhocp";
+        if (!replicated) {
+            sql += " where id = " + r.nextInt(10);
+        }
+        sql += " order by id limit 1;";
+
+        return sql;
+    }
+
     void shutdown() {
         m_shouldContinue.set(false);
     }
@@ -76,8 +119,8 @@ public class AdHocMayhemThread extends Thread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                System.err.println("Non success in ProcCallback for AdHocMayhemThread (will sleep)");
-                System.err.println(((ClientResponseImpl)clientResponse).toJSONString());
+                log.warn("Non success in ProcCallback for AdHocMayhemThread. Will sleep.");
+                log.warn(((ClientResponseImpl)clientResponse).toJSONString());
                 m_needsBlock.set(true);
             }
         }
@@ -88,11 +131,10 @@ public class AdHocMayhemThread extends Thread {
         try {
             client.callProcedure("SetupAdHocTables");
         } catch (Exception e) {
-            System.err.println("SetupAdHocTables failed in AdHocMayhemThread");
-            e.printStackTrace();
+            log.error("SetupAdHocTables failed in AdHocMayhemThread. Will exit.", e);
+            Benchmark.printJStack();
             System.exit(-1);
         }
-
 
         while (m_shouldContinue.get()) {
 
@@ -106,7 +148,7 @@ public class AdHocMayhemThread extends Thread {
                         return;
                     }
                 }
-                while (client.getConnectedHostList().size() > 0);
+                while (client.getConnectedHostList().size() == 0);
                 m_needsBlock.set(false);
             }
 
@@ -114,8 +156,7 @@ public class AdHocMayhemThread extends Thread {
             try {
                 txnsOutstanding.acquire();
             } catch (InterruptedException e) {
-                System.err.println("AdHocMayhemThread interrupted while waiting for permit");
-                e.printStackTrace();
+                log.error("AdHocMayhemThread interrupted while waiting for permit. Will end AdHoc work.", e);
                 return;
             }
 
@@ -124,9 +165,13 @@ public class AdHocMayhemThread extends Thread {
             try {
                 client.callProcedure(new AdHocCallback(), "@AdHoc", sql);
             }
+            catch (NoConnectionsException e) {
+                log.error("AdHocMayhemThread got NoConnectionsException on proc call. Will sleep.");
+                m_needsBlock.set(true);
+            }
             catch (Exception e) {
-                System.err.println("AdHocMayhemThread failed to run an AdHoc statement");
-                e.printStackTrace();
+                log.error("AdHocMayhemThread failed to run an AdHoc statement. Will exit.", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }

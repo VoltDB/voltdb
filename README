@@ -1,9 +1,9 @@
 Thank you for your interest in VoltDB!
 
 This program is free software distributed under the terms of the 
-GNU General Public License Version 3. See the accompanying LICENSE
-file for details on your rights and responsibilities with regards to
-the use and redistribution of VoltDB software.
+GNU Affero General Public License Version 3. See the accompanying 
+LICENSE file for details on your rights and responsibilities with 
+regards to the use and redistribution of VoltDB software.
 
 What is VoltDB?
 ====================
@@ -28,16 +28,18 @@ voltdb   - the VoltDB software itself
 
 The easiest way to get started using VoltDB is to try building and 
 running one or more of the sample programs. Read examples/README for 
-instructions. There is also a more complete tutorial describing the 
-Hello World program in _Getting Started with VoltDB_ which is 
-available online:
+instructions.
 
-    http://community.voltdb.com/docs/GettingStarted/index
+There is also a tutorial online, as well as a _Getting Started with 
+VoltDB_ document available:
+
+    http://voltdb.com/docs/tutorial/
+    http://voltdb.com/docs/GettingStarted/
 
 Additional documentation on using VoltDB to build high performance
 applications is available from the VoltDB community site:
 
-    http://voltdb.com/community/documentation.php 
+    http://voltdb.com/docs/
 
 
 Feedback
