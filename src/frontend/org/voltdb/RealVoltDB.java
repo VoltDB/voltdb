@@ -290,10 +290,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 System.exit(-1);
             }
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-            if (config.m_enableIV2) {
-                consoleLog.warn("Running 3.0 preview (iv2 mode). NOT SUPPORTED IN PRODUCTION.");
-            } else {
-                consoleLog.warn("Running 3.0 preview (legacy mode). NOT SUPPORTED IN PRODUCTION.");
+            if (!config.m_enableIV2) {
+                consoleLog.warn("Running 3.0 preview (legacy mode).  THIS MODE IS DEPRECATED.");
             }
 
             // If there's no deployment provide a default and put it under voltdbroot.
