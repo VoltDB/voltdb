@@ -811,6 +811,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // now, fix that later.
         if (txn != null)
         {
+            Iv2Trace.logCompleteTransactionMessage(message, m_mailbox.getHSId());
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
             m_pendingTasks.offer(task);
