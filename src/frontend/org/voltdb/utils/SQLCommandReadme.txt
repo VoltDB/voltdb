@@ -1,16 +1,15 @@
 --------------------------------------------------------------------------------
-VoltDB SQLCommand
+VoltDB sqlcmd
 --------------------------------------------------------------------------------
 
-VoltDB SQLCommand is a command line tool for connecting to a VoltDB database
-and invoking SQL statements and stored procedures interactively. SQLCommand
+VoltDB sqlcmd is a command line tool for connecting to a VoltDB database
+and invoking SQL statements and stored procedures interactively. sqlcmd
 can be run interactively from the system command line (or shell) or as part
 of a script.
 
-The command line for running the SQLCommand utility is the following:
+The command line for running the sqlcmd utility is the following:
 
-    (linux)               $ ./sqlcmd  [options]  [command]
-    (Microsoft Windows)   > sqlcmd.cmd  [options]  [command]
+    $ ./sqlcmd  [options]  [command]
 
 The options let you specify what database to connect to and how the output is
 formatted. The allowable options are:
@@ -20,8 +19,8 @@ formatted. The allowable options are:
     --port=port_number
     --user=user
     --password=password
-    --output-format=(fixed|csv|tab)
-     --output-skip-metadata
+    --output-format={fixed|csv|tab}
+    --output-skip-metadata
 
 
 If you specify a command when you invoke the utility, that command is executed
@@ -31,6 +30,8 @@ Valid commands are:
 
     {SQL statement}
     EXEC[UTE] {procedure-name} [parameters]
+    EXPLAIN {sql statement}
+    EXPLAINPROC {procedure-name}
     FILE {file-name}
 
 Command and SQL keywords (such as SELECT) are case insensitive.
@@ -46,24 +47,14 @@ commands are:
 
     GO
     LIST PROC[EDURES]
+    LIST TABLES
     RECALL [command-number]
     QUIT or EXIT
 
-The following sections provide more detail on how to use the SQLCommand utility.
-
-
---------------------------------------------------------------------------------
-System Requirements
---------------------------------------------------------------------------------
-VoltDB SQLCommand is a Java application that requires a Java runtime
-environment such as OpenJDK.
-
-As installed, the command script assumes that the VoltDB client library is
-located in the relative path: ../../voltdb/*.jar  If you move the script or if
-your deployment be different, you must update the command script.
+The following sections provide more detail on how to use the sqlcmd utility.
 
 --------------------------------------------------------------------------------
-Using VoltDB SQLCommand
+Using VoltDB sqlcmd
 --------------------------------------------------------------------------------
 
 
@@ -87,16 +78,23 @@ Executing SQL Statements -------------------------------------------------------
 
 + You may enter more than one statement before requesting execution.
 
++ You can press the Tab key at the start of a command to complete the command name. 
+  Note that sqlcmd does not complete terms and database objects in the body of the 
+  command.
+
 + To request execution, enter a semi-colon at the end of a statement, or enter the
   interactive command GO.
 
 
-Executing Stored Procedures ------------------------------------------------------
+Executing Stored Procedures ----------------------------------------------------
 
 + You can run any stored procedures that are discovered, as well as the
   following system procedures:
 
+  + @Explain varchar
+  + @ExplainProc varchar
   + @Pause
+  + @Promote
   + @Quiesce
   + @Resume
   + @Shutdown
@@ -105,12 +103,12 @@ Executing Stored Procedures ----------------------------------------------------
   + @SnapshotSave varchar, varchar, bit
   + @SnapshotSave varchar
   + @SnapshotScan varchar
+  + @SnapshotStatus
   + @Statistics StatisticsComponent, bit
   + @SystemInformation
   + @SystemCatalog CatalogComponent
   + @UpdateApplicationCatalog varchar, varchar
   + @UpdateLogging varchar
-  + @Promote
 
 + 'bit' values may be provided as either {true|yes|1} or {false|no|0}.
 
@@ -123,6 +121,7 @@ Executing Stored Procedures ----------------------------------------------------
   + MANAGEMENT
   + MEMORY
   + PARTITIONCOUNT
+  + PLANNER
   + PROCEDURE
   + TABLE
 
@@ -136,13 +135,27 @@ Executing Stored Procedures ----------------------------------------------------
   + exec Results;
   + exec Vote 5055555555, 2, 10;
 
+Explaining SQL Queries and VoltDB Stored Procedures -----------------------------
+
++ You can use the EXPLAIN command to display the execution plan for a
+  given SQL statement.  The execution plan describes how VoltDB expects to execute
+  the query at runtime, including what indexes are used, the order the tables are
+  joined, and so on.  For example:
+  
+      explain select * from votes;
+  
++ You can use the EXPLAINPROC command to return the execution plans for 
+  all of the SQL queries within the specified stored procedure. For example:
+  
+      explainproc Vote;
+  
 
 Listing Stored Procedures -------------------------------------------------------
 
 + You can list available stored procedures, including both system procedures
   as well as any procedure you defined, using the following interactive command:
 
-  list proc(edures)
+      list proc[edures]
 
 + List operations are considered as interactive mode commands only, thus they
   do not require a terminating semi-colon and will execute immediately (even if
@@ -174,16 +187,27 @@ Recalling commands -------------------------------------------------------------
   do not require a terminating semi-colon: the requested command is merely
   recalled and can be edited before submission to the tool.
 
++ You can also search and find matching entries in the history list by typing
+  Control-R. This will search backward in the history for the next entry
+  matching the search string typed so far. Hitting Enter will terminate the 
+  search and accept the line, thereby executing the command from the history list.  
+  Note that the last incremental search string is remembered. If two Control-R's 
+  are typed without any intervening characters defining a new search string, the 
+  remembered search string is used.
+
 + Recall commands are ignored in script files.
 
 
 Quitting the application -------------------------------------------------------
 
 + While in interactive mode, type the commands EXIT or QUIT to return to the
-  shell prompt.
+  shell prompt.  You can also press Control-D on an empty line to return to
+  the shell prompt.
+
++ In general, sqlcmd follows the bash shell emacs-style keyboard interface.
 
 
-Running SQLCommand in non-interactive mode ------------------------------------------------
+Running sqlcmd in non-interactive mode -----------------------------------------
 
 + You can run the command utility in non-interactive mode by piping in sql
   commands directly to the utility. For example:
@@ -242,26 +266,24 @@ Controlling output format ------------------------------------------------------
     --output-skip-metadata
 
 
-Important note on standard output messages ------------------------------------------------
+Important note on standard output messages -------------------------------------
 
 + The VoltDB client library connection writes informational messages to
   standard output.  If you want to remove these extraneous messages from your
-  SQLCommand output, you can use grep to filter the output when saving
+  sqlcmd output, you can use grep to filter the output when saving
   data to a file.  The following command shows how you can filter the output:
 
-  + echo "exec Results" | ./sqlcmd --output-format=csv \
++ echo "exec Results" | ./sqlcmd --output-format=csv \
     --output-skip-metadata | grep -v "\[Volt Network\]" > VoterResults.csv
 
 
 --------------------------------------------------------------------------------
 Known Issues / Limitations
 --------------------------------------------------------------------------------
-+ SQLCommand executes SQL statements as ad-hoc queries using the @AdHoc system
-  procedure. Ad hoc queries are always executed as multi-partition procedures
-  and constrain how much data can be selected, aggregated, sorted, and returned.
-  If any of these constraints are violated, the query will fail and produce
-  error text in the output.
-
++ sqlcmd executes SQL statements as ad-hoc queries using the @AdHoc system
+  procedure. Ad hoc query execution will be slower than stored procedure execution
+  and should not be used for any performance measurement or comparison.
+  
 + For consistency with similar applications on different database engines,
   string output data is NOT quoted.  However, unquoted text can cause parsing
   issues when re-reading the data output in CSV or TAB format.
