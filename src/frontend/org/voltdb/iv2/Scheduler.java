@@ -275,6 +275,17 @@ abstract public class Scheduler implements InitiatorMessageHandler
             else {
                 deliverReadyTxns();
             }
+
+            // If it's a DR sentinel, send an acknowledgement
+            if (sentinel && !commandLog) {
+                MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage) message;
+                final InitiateResponseMessage response = new InitiateResponseMessage(mppm);
+                ClientResponseImpl clientResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0], ClientResponseImpl.DUPE_TRANSACTION);
+                response.setResults(clientResponse);
+                m_mailbox.send(response.getInitiatorHSId(), response);
+            }
         }
         else {
             if (replay) {
