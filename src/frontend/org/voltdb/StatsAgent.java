@@ -177,6 +177,15 @@ public class StatsAgent {
         sendStatsResponse(request);
     }
 
+    /**
+     * Need to release references to catalog related stats sources
+     * to avoid hoarding references to the catalog.
+     */
+    public synchronized void notifyOfCatalogUpdate() {
+        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(SysProcSelector.PROCEDURE);
+        catalogIdToStatsSources.clear();
+    }
+
     public void collectStats(final Connection c, final long clientHandle, final String selector) throws Exception {
         m_es.submit(new Runnable() {
             @Override
