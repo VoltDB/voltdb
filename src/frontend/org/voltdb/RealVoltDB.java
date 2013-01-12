@@ -1916,12 +1916,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_adminListener.notifyOfCatalogUpdate();
             }
 
-            // 4. If running IV2, we need to update the MPI's catalog.  The MPI doesn't
-            // run an every-site copy of the UpdateApplicationCatalog sysproc, so for now
-            // we do the update along with the rest of the global state here.
+            // 4. Flush StatisticsAgent old catalog statistics.
+            // Otherwise, the stats agent will hold all old catalogs
+            // in memory.
+            m_statsAgent.notifyOfCatalogUpdate();
+
+            // 5. MPIs don't run fragments. Update them here. Do
+            // this after flushing the stats -- this will re-register
+            // the MPI statistics.
             if (m_MPI != null) {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
+
 
             return Pair.of(m_catalogContext, csp);
         }
