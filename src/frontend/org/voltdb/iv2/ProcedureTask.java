@@ -81,8 +81,21 @@ abstract public class ProcedureTask extends TransactionTask
             }
             if (callerParams != null) {
                 ClientResponseImpl cr = null;
-
                 ProcedureRunner runner = siteConnection.getProcedureRunner(m_procName);
+                if (runner == null) {
+                    String error =
+                        "Procedure " + m_procName + " is not present in the catalog. "  +
+                        "This can happen if a catalog update removing the procedure occurred " +
+                        "after the procedure was submitted " +
+                        "but before the procedure was executed.";
+                    hostLog.debug(error);
+                    response.setResults(
+                            new ClientResponseImpl(
+                                ClientResponse.UNEXPECTED_FAILURE,
+                                new VoltTable[]{},
+                                error));
+                    return response;
+                }
                 runner.setupTransaction(m_txn);
                 cr = runner.call(task.getParameters());
 

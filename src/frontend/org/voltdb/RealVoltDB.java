@@ -1872,6 +1872,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 return Pair.of( contextTracker.m_context, contextTracker.m_csp);
             }
             else if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
+                hostLog.fatal("Failed catalog update." +
+                        " expectedCatalogVersion: " + expectedCatalogVersion +
+                        " currentTxnId: " + currentTxnId +
+                        " currentTxnUniqueId: " + currentTxnUniqueId +
+                        " m_catalogContext.catalogVersion " + m_catalogContext.catalogVersion);
+
                 throw new RuntimeException("Trying to update main catalog context with diff " +
                         "commands generated for an out-of date catalog. Expected catalog version: " +
                         expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
