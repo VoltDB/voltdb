@@ -304,7 +304,7 @@ public class ReplaySequencer
             if (inTxnId <= m_lastPolledFragmentTxnId) {
                 return false;
             }
-            if (found != null) {
+            if (found != null && found.m_firstFragment != null) {
                 found.addBlockedMessage(in);
             }
             else {

@@ -632,5 +632,26 @@ public class TestReplaySequencer extends TestCase
         assertFalse(dut.offer(2L, init2));
         assertNull(dut.poll());
     }
+
+    @Test
+    public void testCompleteWithoutFirstFrag()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sntl = makeSentinel(1L);
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage cmpl = makeCompleteTxn(1L);
+
+        assertTrue(dut.offer(1L, sntl));
+        // a restart complete arrives before the first fragment
+        assertFalse(dut.offer(1L, cmpl));
+        assertTrue(dut.offer(1L, frag));
+        // this one should be queued
+        assertTrue(dut.offer(1L, cmpl));
+
+        assertEquals(frag, dut.poll());
+        assertEquals(cmpl, dut.poll());
+        assertNull(dut.poll());
+    }
 }
 
