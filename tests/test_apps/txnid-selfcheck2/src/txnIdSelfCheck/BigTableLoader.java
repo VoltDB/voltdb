@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -50,6 +50,8 @@ public class BigTableLoader extends Thread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
 
     BigTableLoader(Client client, String tableName, int targetCount, int rowSize) {
+        setName("BigTableLoader");
+
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
@@ -79,11 +81,18 @@ public class BigTableLoader extends Thread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             byte status = clientResponse.getStatus();
-            if ((status != ClientResponse.SUCCESS) && (status != ClientResponse.GRACEFUL_FAILURE)) {
+            if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
-                log.error("BigTableLoader failed to insert into table " + tableName);
+                log.error("BigTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the world
+                System.exit(-1);
+            }
+            if (status != ClientResponse.SUCCESS) {
+                // log what happened
+                log.error("BigTableLoader ungracefully failed to insert into table " + tableName);
+                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // stop the loader
                 m_shouldContinue.set(false);
             }
             latch.countDown();
@@ -101,8 +110,8 @@ public class BigTableLoader extends Thread {
                 CountDownLatch latch = new CountDownLatch(25);
                 // try to insert 5 random rows
                 for (int i = 0; i < 25; i++) {
-                    long id = Math.abs(r.nextLong());
-                    client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + ".insert", id, data);
+                    long p = Math.abs(r.nextLong());
+                    client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                 }
                 latch.await(10, TimeUnit.SECONDS);
                 long nextRowCount = getRowCount();

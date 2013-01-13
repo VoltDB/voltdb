@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -163,7 +163,14 @@ public class TestCtrlC extends TestCase {
     int startClientProcess() throws IOException, Exception {
         String classpath = System.getProperty("java.class.path");
         System.out.println(classpath);
-        ProcessBuilder pb = new ProcessBuilder("java", "-cp", classpath, "org.voltdb.exportclient.ExportToSocketClient");
+        ProcessBuilder pb =
+                new ProcessBuilder(
+                "java", "-agentlib:jdwp=transport=dt_socket,address=8000,server=y,suspend=n",
+                "-Dlog4j.configuration=file:///home/aweisberg/hz_src/tests/log4j-allconsole.xml",
+                "-cp",
+                classpath,
+                "org.voltdb.exportclient.ExportToSocketClient",
+                Integer.toString(VoltDBFickleCluster.getPort(0)));
         m_clientProcess = pb.redirectErrorStream(true).start();
         assert(m_clientProcess != null);
 

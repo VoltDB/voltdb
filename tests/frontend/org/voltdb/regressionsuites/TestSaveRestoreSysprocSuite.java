@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -467,7 +467,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
 
-        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 2, 0, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 3, 0, BackendTarget.NATIVE_EE_JNI);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project =
             new SaveRestoreTestProjectBuilder();
@@ -488,16 +488,18 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 saveTablesWithDefaultOptions(client);
 
                 boolean skipFirst = true;
-                for (File f : lc.listFiles(new File("/tmp"))) {
+                int deletedFiles = 0;
+                for (File f : lc.listFiles(new File(TMPDIR))) {
                     if (f.getName().startsWith(TESTNONCE + "-REPLICATED")) {
                         if (skipFirst) {
                             skipFirst = false;
                             continue;
                         }
-                        f.delete();
-                        break;
+                        assertTrue(f.delete());
+                        deletedFiles++;
                     }
                 }
+                assertEquals(deletedFiles, 2);
             } finally {
                 client.close();
             }

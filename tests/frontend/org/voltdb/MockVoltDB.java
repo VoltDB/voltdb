@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -407,6 +407,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean rejoinDataPending() {
+        return false;
+    }
+
+    @Override
     public OperationMode getMode()
     {
         return m_mode;
@@ -488,7 +493,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void recoveryComplete() {
+    public void recoveryComplete(String requestId) {
         // TODO Auto-generated method stub
     }
 

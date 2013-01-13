@@ -27,6 +27,7 @@ CLASSPATH=$({ \
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
@@ -76,7 +77,7 @@ function async-benchmark-help() {
 
 function async-benchmark() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.AsyncBenchmark \
         --displayinterval=1 \
         --duration=120 \

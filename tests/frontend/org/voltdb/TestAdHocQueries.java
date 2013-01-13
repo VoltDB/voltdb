@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,6 +42,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 
 @RunWith(value = Parameterized.class)
@@ -606,6 +607,44 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
+    // ENG-4151 a bad string timestamp insert causes various errors when a constraint
+    // violation occurs because the bad timestamp column is serialized as a string
+    // instead of a timestamp. It was mis-handling the timestamp datatype during planning.
+    // Testing with ad hoc because that's how it was discovered.
+    public void testTimestampInsert() throws Exception {
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 1, 1, 0, m_useIv2);
+        try {
+            env.setUp();
+            // bad timestamp should result in a clean compiler error.
+            try {
+                String sql = "INSERT INTO TS_CONSTRAINT_EXCEPTION VALUES ('aaa','{}');";
+                env.m_client.callProcedure("@AdHoc", sql).getResults();
+                fail("Compilation should have failed.");
+            }
+            catch(ProcCallException e) {
+                assertTrue(e.getMessage().contains("Error compiling"));
+            }
+            // double insert should cause a clean constraint violation, not a crash
+            try {
+                String sql = String.format("INSERT INTO TS_CONSTRAINT_EXCEPTION VALUES ('%s','{}');",
+                                           new TimestampType().toString());
+                VoltTable modCount = env.m_client.callProcedure("@AdHoc", sql).getResults()[0];
+                assertEquals(1, modCount.getRowCount());
+                assertEquals(1, modCount.asScalarLong());
+                modCount = env.m_client.callProcedure("@AdHoc", sql).getResults()[0];
+                assertEquals(1, modCount.getRowCount());
+                assertEquals(1, modCount.asScalarLong());
+            }
+            catch(ProcCallException e) {
+                assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
+            }
+        }
+        finally {
+            env.tearDown();
+        }
+    }
+
     /**
      * Builds and validates query batch runs.
      */
@@ -755,6 +794,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                            "CREATE PROCEDURE Insert AS INSERT into BLAH values (?, ?, ?);\n" +
                                            "CREATE PROCEDURE InsertWithDate AS \n" +
                                            "  INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);\n" +
+                                           "\n" +
+                                           "CREATE TABLE TS_CONSTRAINT_EXCEPTION\n" +
+                                           "  (TS TIMESTAMP UNIQUE NOT NULL,\n" +
+                                           "   COL1 VARCHAR(2048)); \n" +
                                            "");
 
                 // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -163,12 +163,23 @@ public class MpScheduler extends Scheduler
          */
         long mpTxnId;
         //Timestamp is actually a pre-IV2ish style time based transaction id
-        long timestamp;
+        long timestamp = Long.MIN_VALUE;
+
+        // Update UID if it's for replay
+        if (message.isForReplay()) {
+            timestamp = message.getUniqueId();
+            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
+        } else if (message.isForDR()) {
+            timestamp = message.getStoredProcedureInvocation().getOriginalUniqueId();
+            // @LoadMultipartitionTable does not have a valid uid
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
+                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
+            }
+        }
+
         if (message.isForReplay()) {
             mpTxnId = message.getTxnId();
-            timestamp = message.getUniqueId();
             setMaxSeenTxnId(mpTxnId);
-            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
         } else {
             TxnEgo ego = advanceTxnEgo();
             mpTxnId = ego.getTxnId();
@@ -230,7 +241,20 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
+    public void handleMessageRepair(List<Long> needsRepair, VoltMessage message)
+    {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
+        }
+        else {
+            // MpInitiatorMailbox should throw RuntimeException for unhandled types before we could get here
+            throw new RuntimeException("MpScheduler.handleMessageRepair() received unhandled message type." +
+                    " This should be impossible");
+        }
+    }
+
+    private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
+    {
         // just reforward the Iv2InitiateTaskMessage for the txn being restarted
         // this copy may be unnecessary
         final String procedureName = message.getStoredProcedureName();

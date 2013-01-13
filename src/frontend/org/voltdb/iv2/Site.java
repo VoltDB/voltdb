@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -725,11 +725,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void loadTable(long txnId, int tableId, VoltTable data)
+    public void loadTable(long spHandle, int tableId, VoltTable data)
     {
         m_ee.loadTable(tableId, data,
-                txnId,
-                m_lastCommittedTxnId);
+                spHandle,
+                m_lastCommittedSpHandle);
     }
 
     @Override
@@ -818,7 +818,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         long time = System.currentTimeMillis();
 
-        m_ee.tick(time, m_lastCommittedTxnId);
+        m_ee.tick(time, m_lastCommittedSpHandle);
         statsTick(time);
     }
 
@@ -906,12 +906,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void quiesce()
     {
-        m_ee.quiesce(m_lastCommittedTxnId);
+        m_ee.quiesce(m_lastCommittedSpHandle);
     }
 
     @Override
     public void exportAction(boolean syncAction,
-                             int ackOffset,
+                             long ackOffset,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
@@ -963,7 +963,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             exportAction(
                     true,
-                    sequenceNumbers.getFirst().intValue(),
+                    sequenceNumbers.getFirst().longValue(),
                     sequenceNumbers.getSecond(),
                     m_partitionId,
                     catalogTable.getSignature());
@@ -992,15 +992,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
-            ParameterSet[] parameterSets, long txnId, boolean readOnly)
+            ParameterSet[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
             throws EEException {
         return m_ee.executePlanFragments(
                 numFragmentIds,
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
-                txnId,
-                m_lastCommittedTxnId,
+                spHandle,
+                m_lastCommittedSpHandle,
+                uniqueId,
                 readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 

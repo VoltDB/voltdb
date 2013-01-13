@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -45,7 +45,6 @@
 #include "common/value_defs.h"
 #include "utf8.h"
 
-#define CHECK_FPE( x ) ( std::isinf(x) || std::isnan(x) )
 namespace voltdb {
 
 /*
@@ -108,6 +107,29 @@ inline void throwCastSQLValueOutOfRangeException<int64_t>(
                        msg, internalFlags);
 }
 
+int warn_if(int condition, const char* message);
+
+// This has been demonstrated to be more reliable than std::isinf
+// -- less sensitive on LINUX to the "g++ -ffast-math" option.
+inline int non_std_isinf( double x ) { return (x > DBL_MAX) || (x < -DBL_MAX); }
+
+inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function)
+{
+    static int warned_once_no_nan = warn_if( ! std::isnan(sqrt(-1.0)),
+                                            "The C++ configuration (e.g. \"g++ --fast-math\") "
+                                            "does not support SQL standard handling of NaN errors.");
+    static int warned_once_no_inf = warn_if( ! non_std_isinf(std::pow(0.0, -1.0)),
+                                            "The C++ configuration (e.g. \"g++ --fast-math\") "
+                                            "does not support SQL standard handling of numeric infinity errors.");
+    // This uses a standard test for NaN, even though that fails in some configurations like LINUX "g++ -ffast-math".
+    // If it is known to fail in the current config, a warning has been sent to the log, so at this point, just relax the check.
+    if ((warned_once_no_nan || ! std::isnan(value)) && (warned_once_no_inf || ! non_std_isinf(value))) {
+        return;
+    }
+    char msg[1024];
+    snprintf(msg, 1024, "Invalid result value (%f) from floating point %s", value, function);
+    throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg);
+}
 
 /**
  * A class to wrap all scalar values regardless of type and
@@ -405,6 +427,7 @@ class NValue {
 
     // Function declarations for NValue.cpp definitions.
     void createDecimalFromString(const std::string &txt);
+    void createDecimalFromDouble(double& dbl);
     std::string createStringFromDecimal() const;
     NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
     NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
@@ -840,9 +863,19 @@ class NValue {
             return static_cast<double>(getTimestamp());
           case VALUE_TYPE_DOUBLE:
             return getDouble();
+          case VALUE_TYPE_DECIMAL:
+          {
+            double retval;
+            TTInt scaledValue = getDecimal();
+            TTInt whole(scaledValue);
+            TTInt fractional(scaledValue);
+            whole /= NValue::kMaxScaleFactor;
+            fractional %= NValue::kMaxScaleFactor;
+            retval = static_cast<double>(whole.ToInt()) + ((double)fractional.ToInt())/((double)NValue::kMaxScaleFactor);
+            return retval;
+          }
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
-          case VALUE_TYPE_DECIMAL:
           default:
             throwCastSQLException(type, VALUE_TYPE_DOUBLE);
             return 0; // NOT REACHED
@@ -1523,14 +1556,7 @@ class NValue {
             return getDoubleValue(DOUBLE_MIN);
 
         const double result = lhs + rhs;
-
-        if (CHECK_FPE(result)) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to add %f with %f caused overflow/underflow or some other error. Result was %f",
-                    lhs, rhs, result);
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
+        throwDataExceptionIfInfiniteOrNaN(result, "'+' operator");
         return getDoubleValue(result);
     }
 
@@ -1539,14 +1565,7 @@ class NValue {
             return getDoubleValue(DOUBLE_MIN);
 
         const double result = lhs - rhs;
-
-        if (CHECK_FPE(result)) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to subtract %f by %f caused overflow/underflow or some other error. Result was %f",
-                    lhs, rhs, result);
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
+        throwDataExceptionIfInfiniteOrNaN(result, "'-' operator");
         return getDoubleValue(result);
     }
 
@@ -1555,14 +1574,7 @@ class NValue {
             return getDoubleValue(DOUBLE_MIN);
 
         const double result = lhs * rhs;
-
-        if (CHECK_FPE(result)) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %f by %f caused overflow/underflow or some other error. Result was %f",
-                    lhs, rhs, result);
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
+        throwDataExceptionIfInfiniteOrNaN(result, "'*' operator");
         return getDoubleValue(result);
     }
 
@@ -1570,16 +1582,8 @@ class NValue {
         if (lhs <= DOUBLE_NULL || rhs <= DOUBLE_NULL)
             return getDoubleValue(DOUBLE_MIN);
 
-
         const double result = lhs / rhs;
-
-        if (CHECK_FPE(result)) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to divide %f by %f caused overflow/underflow or some other error. Result was %f",
-                    lhs, rhs, result);
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
+        throwDataExceptionIfInfiniteOrNaN(result, "'/' operator");
         return getDoubleValue(result);
     }
 

@@ -500,6 +500,11 @@ public abstract class Type implements SchemaObject, Cloneable {
     public static final NumberType SQL_DECIMAL =
         new NumberType(Types.SQL_DECIMAL, NumberType.defaultNumericPrecision,
                        7);
+    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    public static final NumberType SQL_DECIMAL_DEFAULT =
+            new NumberType(Types.SQL_DECIMAL, NumberType.defaultNumericPrecision,
+                           NumberType.defaultNumericScale);
+    // END Cherry-picked code change from hsqldb-2.2.8
     public static final NumberType SQL_DECIMAL_BIGINT_SQR =
         new NumberType(Types.SQL_DECIMAL,
                        NumberType.bigintSquareNumericPrecision, 0);

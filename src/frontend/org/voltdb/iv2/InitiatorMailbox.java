@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -28,6 +28,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -47,13 +50,12 @@ import org.voltdb.messaging.RejoinMessage;
 public class InitiatorMailbox implements Mailbox
 {
     static boolean LOG_TX = false;
-    static boolean LOG_RX = false;
 
     VoltLogger hostLog = new VoltLogger("HOST");
     VoltLogger tmLog = new VoltLogger("TM");
 
     private final int m_partitionId;
-    private final Scheduler m_scheduler;
+    protected final Scheduler m_scheduler;
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
     private final RejoinProducer m_rejoinProducer;
@@ -243,6 +245,9 @@ public class InitiatorMailbox implements Mailbox
     protected void deliverInternal(VoltMessage message) {
         assert(lockingVows());
         logRxMessage(message);
+        if (message instanceof DumpMessage) {
+            hostLog.warn("Received DumpMessage at " + m_hsId);
+        }
         if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
             return;
@@ -345,15 +350,25 @@ public class InitiatorMailbox implements Mailbox
         repairReplicasWithInternal(needsRepair, repairWork);
     }
 
-    protected  void repairReplicasWithInternal(List<Long> needsRepair, VoltMessage repairWork) {
+    private void repairReplicasWithInternal(List<Long> needsRepair, VoltMessage repairWork) {
         assert(lockingVows());
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
-            m_scheduler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
+            m_scheduler.handleMessageRepair(needsRepair, work);
+        }
+        else if (repairWork instanceof FragmentTaskMessage) {
+            // We need to get this into the repair log in case we've never seen it before.  Adding fragment
+            // tasks to the repair log is safe; we'll never overwrite the first fragment if we've already seen it.
+            m_repairLog.deliver(repairWork);
+            m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
-            send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
+            // CompleteTransactionMessages should always be safe to handle.  Either the work was done, and we'll
+            // ignore it, or we need to clean up, or we'll be restarting and it doesn't matter.  Make sure they
+            // get into the repair log and then let them run their course.
+            m_repairLog.deliver(repairWork);
+            m_scheduler.handleMessageRepair(needsRepair, repairWork);
         }
         else {
             throw new RuntimeException("Invalid repair message type: " + repairWork);
@@ -363,10 +378,6 @@ public class InitiatorMailbox implements Mailbox
     private void logRxMessage(VoltMessage message)
     {
         Iv2Trace.logInitiatorRxMsg(message, m_hsId);
-        if (LOG_RX) {
-            hostLog.info("RX HSID: " + CoreUtils.hsIdToString(m_hsId) +
-                    ": " + message);
-        }
     }
 
     private void logTxMessage(VoltMessage message)

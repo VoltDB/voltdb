@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -85,13 +85,14 @@ public:
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
-                       int64_t lastComittedTxnId,
-                       int64_t currentTxnId);
+                       int64_t lastComittedSpHandle,
+                       int64_t currentSpHandle);
 
     /** write a tuple to the stream */
-    size_t appendTuple(int64_t lastCommittedTxnId,
-                       int64_t txnId,
+    size_t appendTuple(int64_t lastCommittedSpHandle,
+                       int64_t spHandle,
                        int64_t seqNo,
+                       int64_t uniqueId,
                        int64_t timestamp,
                        TableTuple &tuple,
                        TupleStreamWrapper::Type type);
@@ -101,7 +102,7 @@ public:
     void discardBlock(StreamBlock *sb);
 
     /** Send committed data to the top end */
-    void commit(int64_t lastCommittedTxnId, int64_t txnId, bool sync = false);
+    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, bool sync = false);
 
     // cached catalog values
     const CatalogId m_partitionId;
@@ -123,13 +124,13 @@ public:
     std::deque<StreamBlock*> m_pendingBlocks;
 
     /** transaction id of the current (possibly uncommitted) transaction */
-    int64_t m_openTransactionId;
+    int64_t m_openSpHandle;
 
     /** Universal stream offset when current transaction was opened */
     size_t m_openTransactionUso;
 
     /** last committed transaction id */
-    int64_t m_committedTransactionId;
+    int64_t m_committedSpHandle;
 
     /** current committed uso */
     size_t m_committedUso;

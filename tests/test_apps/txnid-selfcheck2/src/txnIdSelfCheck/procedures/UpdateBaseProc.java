@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -51,7 +51,7 @@ public class UpdateBaseProc extends VoltProcedure {
     }
 
     protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt getAdHocData,
-                                 byte cid, long rid, byte[] value)
+                                 byte cid, long rid, byte[] value, byte shouldRollback)
     {
         voltQueueSQL(getCIDData, cid);
         voltQueueSQL(getAdHocData);
@@ -95,7 +95,66 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
-        return voltExecuteSQL();
+        VoltTable[] retval = voltExecuteSQL();
+
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+
+        return retval;
+    }
+
+    @SuppressWarnings("deprecation")
+    protected VoltTable[] doWorkInProcAdHoc(byte cid, long rid, byte[] value, byte shouldRollback) {
+        voltQueueSQLExperimental("SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;", cid);
+        voltQueueSQLExperimental("SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
+        VoltTable[] results = voltExecuteSQL();
+        VoltTable data = results[0];
+        VoltTable adhoc = results[1];
+
+        final long txnid = getUniqueId();
+        final long ts = getTransactionTime().getTime();
+        long prevtxnid = 0;
+        long prevrid = 0;
+        long cnt = 0;
+
+        // read data modified by AdHocMayhemThread for later insertion
+        final long adhocInc = adhoc.fetchRow(0).getLong("inc");
+        final long adhocJmp = adhoc.fetchRow(0).getLong("jmp");
+
+        // compute the cheesy checksum of all of the table's contents based on
+        // this cid to subsequently store in the new row
+        final long cidallhash = MiscUtils.cheesyBufferCheckSum(data.getBuffer());
+
+        // get the most recent row's data
+        int rowCount = data.getRowCount();
+        if (rowCount != 0) {
+            VoltTableRow row = data.fetchRow(0);
+            cnt = row.getLong("cnt") + 1;
+            prevtxnid = row.getLong("prevtxnid");
+            prevrid = row.getLong("rid");
+        }
+
+        validateCIDData(data, getClass().getName());
+
+        // check the rids monotonically increase
+        if (prevrid >= rid) {
+            throw new VoltAbortException(getClass().getName() +
+                    " previous rid " + prevrid +
+                    " >= than current rid " + rid +
+                    " for cid " + cid);
+        }
+
+        voltQueueSQLExperimental("INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
+        voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
+        voltQueueSQLExperimental("SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;", cid);
+        VoltTable[] retval = voltExecuteSQL();
+
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+
+        return retval;
     }
 
     public static void validateCIDData(VoltTable data, String callerId) {

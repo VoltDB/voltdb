@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -240,7 +240,7 @@ public class ProcedureRunner {
                 } catch (Exception e) {
                     m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
-                            ": " + e.getMessage();
+                            ": " + e.toString();
                     status = ClientResponse.GRACEFUL_FAILURE;
                     return getErrorResponse(status, msg, null);
                 }
@@ -710,9 +710,15 @@ public class ProcedureRunner {
 
                 for (ProcParameter param : m_catProc.getParameters()) {
                     VoltType type = VoltType.get((byte) param.getType());
-                    if (type == VoltType.INTEGER) type = VoltType.BIGINT;
-                    if (type == VoltType.SMALLINT) type = VoltType.BIGINT;
-                    if (type == VoltType.TINYINT) type = VoltType.BIGINT;
+                    if (type == VoltType.INTEGER) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.SMALLINT) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.TINYINT) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.NUMERIC) {
+                        type = VoltType.FLOAT;
+                    }
 
                     m_paramTypes[param.getIndex()] = type.classFromType();
                     m_paramTypeIsPrimitive[param.getIndex()] = m_paramTypes[param.getIndex()].isPrimitive();
@@ -1306,7 +1312,8 @@ public class ProcedureRunner {
                        fragmentIds,
                        null,
                        params,
-                       m_txnState.txnId,
+                       m_txnState.spHandle,
+                       m_txnState.uniqueId,
                        m_catProc.getReadonly());
                }
 
@@ -1325,7 +1332,8 @@ public class ProcedureRunner {
                            new long[] { fragId },
                            new long[] { AGG_DEPID },
                            new ParameterSet[] {queuedSQL.params},
-                           m_txnState.txnId,
+                           m_txnState.spHandle,
+                           m_txnState.uniqueId,
                            m_catProc.getReadonly())[0];
                    }
                    return results;

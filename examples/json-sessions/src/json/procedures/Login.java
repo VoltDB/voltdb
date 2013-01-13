@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,16 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-//
-// Accepts a vote, enforcing business logic: make sure the vote is for a valid
-// contestant and that the voter (phone number of the caller) is not above the
-// number of allowed votes.
-//
-
 package json.procedures;
-
-import java.util.UUID;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
@@ -68,8 +59,8 @@ public class Login extends VoltProcedure {
             // Update the last time this account was accessed (for timeout purposes)
             voltQueueSQL(updateUserStmt, this.getTransactionTime(), username);
         } else {
-            // Do the login, create an entry in the session table.
-            voltQueueSQL(insertUserStmt, username, password, UUID.randomUUID().toString(), this.getTransactionTime(), json);
+            // Do the login, create an entry in the session table.  Use VoltDB's getUniqueID() api to create a deterministic unique ID for the login.
+            voltQueueSQL(insertUserStmt, username, password, Long.toString(getUniqueId()), this.getTransactionTime(), json);
         }
 
         voltExecuteSQL();

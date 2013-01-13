@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@
 
 package txnIdSelfCheck;
 
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -41,20 +42,21 @@ public class ClientThread extends Thread {
     static VoltLogger log = new VoltLogger("HOST");
 
     static enum Type {
-        PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID;
+        PARTITIONED_SP, PARTITIONED_MP, REPLICATED, HYBRID, ADHOC_MP;
 
         /**
          * Use modulo so the same CID will run the same code
          * across client process lifetimes.
          */
         static Type typeFromId(int id) {
-            if (id % 10 == 0) return PARTITIONED_MP; // 20%
+            if (id % 10 == 0) return PARTITIONED_MP;               // 20%
             if (id % 10 == 1) return PARTITIONED_MP;
-            if (id % 10 == 2) return REPLICATED;     // 20%
+            if (id % 10 == 2) return REPLICATED;                   // 20%
             if (id % 10 == 3) return REPLICATED;
-            if (id % 10 == 4) return HYBRID;         // 20%
+            if (id % 10 == 4) return HYBRID;                       // 20%
             if (id % 10 == 5) return HYBRID;
-            return PARTITIONED_SP;                   // 40%
+            if ((id % 10 == 6) && (id % 20 != 6)) return ADHOC_MP; // 5%
+            return PARTITIONED_SP;                                 // 35%
         }
     }
 
@@ -62,11 +64,14 @@ public class ClientThread extends Thread {
     final byte m_cid;
     long m_nextRid;
     final Type m_type;
-    final PayloadProcessor m_processor;
+    final TxnId2PayloadProcessor m_processor;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicLong m_txnsRun;
+    final Random m_random = new Random();
 
-    ClientThread(byte cid, AtomicLong txnsRun, Client client, PayloadProcessor processor) throws Exception {
+    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor) throws Exception {
+        setName("ClientThread(CID=" + String.valueOf(cid) + ")");
+
         m_type = Type.typeFromId(cid);
         m_cid = cid;
         m_client = client;
@@ -93,6 +98,9 @@ public class ClientThread extends Thread {
     }
 
     void runOne() throws Exception {
+        // 1/10th of txns roll back
+        byte shouldRollback = (byte) (m_random.nextInt(10) == 0 ? 1 : 0);
+
         try {
             String procName = null;
             switch (m_type) {
@@ -108,6 +116,9 @@ public class ClientThread extends Thread {
             case HYBRID:
                 procName = "UpdateBothMP";
                 break;
+            case ADHOC_MP:
+                procName = "UpdateReplicatedMPInProcAdHoc";
+                break;
             }
 
             byte[] payload = m_processor.generateForStore().getStoreValue();
@@ -115,7 +126,8 @@ public class ClientThread extends Thread {
             ClientResponse response = m_client.callProcedure(procName,
                     m_cid,
                     m_nextRid,
-                    payload);
+                    payload,
+                    shouldRollback);
 
             // fake a proc call exception if we think one should be thrown
             if (response.getStatus() != ClientResponse.SUCCESS) {
@@ -131,14 +143,17 @@ public class ClientThread extends Thread {
                         "Client cid %d procedure %s returned %d results instead of 3",
                         m_cid, procName, results.length));
                 log.error(((ClientResponseImpl) response).toJSONString());
+                Benchmark.printJStack();
                 System.exit(-1);
             }
             VoltTable data = results[2];
             UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
         }
         finally {
-            // ensure rid is incremented no matter what
-            m_nextRid++;
+            // ensure rid is incremented (if not rolled back intentionally)
+            if (shouldRollback == 0) {
+                m_nextRid++;
+            }
         }
     }
 
@@ -147,14 +162,21 @@ public class ClientThread extends Thread {
     }
 
     void handleException(ClientResponseImpl cri, Exception e) {
+        // this is not an error
+        if ((cri.getStatus() == ClientResponse.USER_ABORT) &&
+                cri.getStatusString().contains("EXPECTED ROLLBACK")) {
+            return;
+        }
+        // this implies bad data and is fatal
         if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                 (cri.getStatus() == ClientResponse.USER_ABORT)) {
             log.error("ClientThread had a proc-call exception that indicated bad data", e);
             log.error(cri.toJSONString(), e);
+            Benchmark.printJStack();
             System.exit(-1);
         }
+        // other proc call exceptions are logged, but don't stop the thread
         else {
-            // other proc call exceptions are logged, but don't stop the thread
             log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
             log.warn(cri.toJSONString());
 
@@ -199,6 +221,7 @@ public class ClientThread extends Thread {
             }
             catch (Exception e) {
                 log.error("ClientThread had a non proc-call exception", e);
+                Benchmark.printJStack();
                 System.exit(-1);
             }
         }
