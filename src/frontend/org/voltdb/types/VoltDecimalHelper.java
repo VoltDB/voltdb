@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -89,18 +90,9 @@ public class VoltDecimalHelper {
         out.write(NULL_INDICATOR);
     }
 
-    /**
-     * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
-     * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
-     * @param out {@link org.voltdb.messaging.FastSerializer FastSerializer} to serialize the <code>BigDecimal</code> to
-     * @throws IOException Thrown if the precision or scale is out of range
-     */
-    static public void serializeBigDecimal(BigDecimal bd, FastSerializer out)
-        throws IOException
-    {
+    static public byte[] getUnscaledBytes(BigDecimal bd) throws IOException {
         if (bd == null) {
-            serializeNull(out);
-            return;
+            return Arrays.copyOf(NULL_INDICATOR, NULL_INDICATOR.length);
         }
         final int scale = bd.scale();
         final int precision = bd.precision();
@@ -122,7 +114,19 @@ public class VoltDecimalHelper {
         if (unscaledValue.length > 16) {
             throw new IOException("Precision of " + bd + " is >38 digits");
         }
-        out.write(expandToLength16(unscaledValue, isNegative));
+        return expandToLength16(unscaledValue, isNegative);
+    }
+
+    /**
+     * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
+     * @param bd {@link java.math.BigDecimal BigDecimal} to serialize
+     * @param out {@link org.voltdb.messaging.FastSerializer FastSerializer} to serialize the <code>BigDecimal</code> to
+     * @throws IOException Thrown if the precision or scale is out of range
+     */
+    static public void serializeBigDecimal(BigDecimal bd, FastSerializer out)
+        throws IOException
+    {
+        out.write(getUnscaledBytes(bd));
     }
 
     /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,23 +21,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.dtxn;
+package txnIdSelfCheck.procedures;
 
-import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    singlePartition = false
-)
-public class Deterministic_RO_MP extends VoltProcedure {
+public class UpdatePartitionedSP extends UpdateBaseProc {
 
-    public static final SQLStmt sql = new SQLStmt("select nondetval from kv order by nondetval");
-
-    public VoltTable run() {
-        voltQueueSQL(sql);
-        return voltExecuteSQL()[0];
+    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
+        return doWork(p_getCIDData, p_cleanUp, p_insert, p_getAdhocData,
+                cid, rid, value, rollback);
     }
-
 }

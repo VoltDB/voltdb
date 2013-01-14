@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -56,7 +56,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     buddyHSId,
                     new SiteTaskerQueue()),
                 "MP",
-                agent);
+                agent,
+                false /* never for rejoin */);
     }
 
     @Override
@@ -68,7 +69,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway drGateway)
+                          NodeDRGateway drGateway,
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
@@ -77,7 +79,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions, startAction, null, null, cl);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -112,8 +114,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                         m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
                     }
                     tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                             + "finished leader promotion. Took "
+                             + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
@@ -127,9 +129,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     // CrashVoltDB here means one node failure causing another.
                     // Don't create a cascading failure - just try again.
                     tmLog.info(m_whoami
-                            + "interrupted during leader promotion after "
-                            + (System.currentTimeMillis() - startTime) + " ms. of "
-                            + "trying. Retrying.");
+                             + "interrupted during leader promotion after "
+                             + (System.currentTimeMillis() - startTime) + " ms. of "
+                             + "trying. Retrying.");
                 }
             }
             super.acceptPromotion();

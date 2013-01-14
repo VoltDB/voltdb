@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -38,13 +38,6 @@ public class TransactionTaskQueue
      * Multi-part transactions create a backlog of tasks behind them. A queue is
      * created for each multi-part task to maintain the backlog until the next
      * multi-part task.
-     *
-     * DR uses m_drMPSentinelBacklog to queue additional sentinels than the one
-     * currently in progress because DR uses GENERIC_MP_SENTINEL value for all
-     * sentinels. When a DR multipart completes, another sentinel will be polled
-     * from m_drMPSentinelBacklog and put in this map. It is impossible to have
-     * an empty m_backlog while m_drMPSentinelBacklog has more
-     * sentinels queued.
      */
     Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
@@ -225,7 +218,9 @@ public class TransactionTaskQueue
         StringBuilder sb = new StringBuilder();
         sb.append("TransactionTaskQueue:").append("\n");
         sb.append("\tSIZE: ").append(size());
-        sb.append("\tHEAD: ").append(m_backlog.getFirst());
+        if (!m_backlog.isEmpty()) {
+            sb.append("\tHEAD: ").append(m_backlog.getFirst());
+        }
         return sb.toString();
     }
 }

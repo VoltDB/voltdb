@@ -3,7 +3,7 @@
     <info>
         <name>GenQA Example</name>
         <version>1.0</version>
-        <description>Provides general QA benchmarkign support.</description>
+        <description>Provides general QA benchmarking support.</description>
     </info>
     <database name='database'>
         <schemas>

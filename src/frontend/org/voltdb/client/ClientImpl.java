@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -20,8 +20,10 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -187,7 +189,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public ClientResponse callProcedure(
             long originalTxnId,
-            long originalTimestamp,
+            long originalUniqueId,
             String procName,
             Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException
@@ -195,7 +197,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalTimestamp,
+            new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
         return callProcedure(cb, invocation);
@@ -263,7 +265,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(
             long originalTxnId,
-            long originalTimestamp,
+            long originalUniqueId,
             ProcedureCallback callback,
             String procName,
             Object... parameters)
@@ -272,7 +274,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             ((ProcedureArgumentCacher)callback).setArgs(parameters);
         }
         ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalTimestamp,
+            new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
         return private_callProcedure(callback, 0, invocation);
@@ -528,6 +530,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                     "with a client that wasn't constructed with a username and password specified");
         }
         createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
+    }
+
+    @Override
+    public List<InetSocketAddress> getConnectedHostList() {
+        return m_distributer.getConnectedHostList();
     }
 
     @Override

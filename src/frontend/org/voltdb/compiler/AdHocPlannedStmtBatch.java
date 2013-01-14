@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -40,7 +40,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     // for DR
     public final ProcedureInvocationType type;
     public final long originalTxnId;
-    public final long originalTs;
+    public final long originalUniqueId;
 
     // May be reassigned if the planner infers single partition work.
     // Also not persisted across serializations
@@ -82,7 +82,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             boolean adminConnection,
             ProcedureInvocationType type,
             long originalTxnId,
-            long originalTs,
+            long originalUniqueId,
             Object clientData) {
         this.sqlBatchText = sqlBatchText;
         this.partitionParam = partitionParam;
@@ -93,7 +93,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         this.clientData = clientData;
         this.type = type;
         this.originalTxnId = originalTxnId;
-        this.originalTs = originalTs;
+        this.originalUniqueId = originalUniqueId;
     }
 
     @Override

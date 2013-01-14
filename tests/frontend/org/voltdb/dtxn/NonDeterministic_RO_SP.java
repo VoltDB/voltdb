@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +25,8 @@ package org.voltdb.dtxn;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
 @ProcInfo (
     partitionInfo = "kv.key: 0",
@@ -36,9 +36,8 @@ public class NonDeterministic_RO_SP extends VoltProcedure {
 
     public static final SQLStmt sql = new SQLStmt("select * from kv where key = ?");
 
-    public VoltTable run(long key) {
-        voltQueueSQL(sql, key);
-        return voltExecuteSQL()[0];
+    public long run(long key) {
+        return VoltDB.instance().getHostMessenger().getHostId();
     }
 
 }

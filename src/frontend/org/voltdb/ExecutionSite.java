@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -684,9 +684,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                 // rollup the table memory stats for this site
                 while (stats.advanceRow()) {
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     tupleCount += stats.getLong(7);
+                    assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     tupleAllocatedMem += (int) stats.getLong(8);
+                    assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
                     tupleDataMem += (int) stats.getLong(9);
+                    assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
                     stringMem += (int) stats.getLong(10);
                 }
                 stats.resetRowPosition();
@@ -704,7 +709,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                 // rollup the index memory stats for this site
                 while (stats.advanceRow()) {
-                    indexMem += stats.getLong(10);
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
+                    indexMem += stats.getLong(11);
                 }
                 stats.resetRowPosition();
 
@@ -878,7 +885,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             voltdb.getBackendTargetType(),
                             serializedCatalog,
                             txnId,
-                            m_context.m_timestamp,
+                            m_context.m_uniqueId,
                             configuredNumberOfPartitions);
         }
 
@@ -1013,7 +1020,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         ee.quiesce(lastCommittedTxnId);
-        ee.updateCatalog( context.m_timestamp, catalogDiffCommands);
+        ee.updateCatalog( context.m_uniqueId, catalogDiffCommands);
 
         return true;
     }
@@ -1499,6 +1506,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 if (!txnState.needsRollback()) {
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
                                                                    ts,
+                                                                   txnState.getHash(),
                                                                    invocation,
                                                                    txnState.getResults());
                 }
@@ -1791,7 +1799,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress());
-            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
+            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty() &&
                 snapshotMsg.crash) {
                 String msg = "Partition detection snapshot completed. Shutting down. " +
                         "Result: " + startSnapshotting.toString();
@@ -2458,7 +2466,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long[] planFragmentIds,
             long[] inputDepIds,
             ParameterSet[] parameterSets,
-            long txnId,
+            long txnId,//txnid is both sphandle and uniqueid pre-iv2
+            long txnIdAsUniqueId,
             boolean readOnly) throws EEException
     {
         return ee.executePlanFragments(
@@ -2468,6 +2477,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             parameterSets,
             txnId,
             lastCommittedTxnId,
+            txnIdAsUniqueId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
@@ -2688,6 +2698,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             new ParameterSet[] { params },
                             txnState.txnId,
                             lastCommittedTxnId,
+                            txnState.txnId,
                             txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken())[0];
 
                     sendDependency(currentFragResponse, outputDepId, dependency);
@@ -2749,6 +2760,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     // call the proc
                     runner.setupTransaction(txnState);
                     cr = runner.call(itask.getParameters());
+                    txnState.setHash(cr.getHash());
                     response.setResults(cr);
 
                     // record the results of write transactions to the transaction state
@@ -2902,7 +2914,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public void exportAction(boolean syncAction,
-                             int ackOffset,
+                             long ackOffset,
                              Long sequenceNumber,
                              Integer partitionId,
                              String tableSignature)

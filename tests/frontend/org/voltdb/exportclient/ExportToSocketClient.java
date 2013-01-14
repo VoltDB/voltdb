@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,7 +28,6 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
-import org.voltdb.VoltDB;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 
 /**
@@ -58,14 +57,13 @@ public class ExportToSocketClient extends ExportClientBase
         }
     }
 
-    public ExportToSocketClient() throws IOException {
+    public ExportToSocketClient(int port) throws IOException {
         m_socket = new Socket();
         m_socket.connect(new InetSocketAddress("localhost", 9999));
         assert(m_socket.isConnected());
         m_debugOut = m_socket.getOutputStream();
         System.out.println("Connected to socket");
-
-        super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+        super.addServerInfo(new InetSocketAddress("localhost", port));
     }
 
     @Override
@@ -110,7 +108,7 @@ public class ExportToSocketClient extends ExportClientBase
     }
 
     public static void main(String[] args) throws IOException {
-        ExportToSocketClient client = new ExportToSocketClient();
+        ExportToSocketClient client = new ExportToSocketClient(Integer.valueOf(args[0]));
 
         // main loop
         try {

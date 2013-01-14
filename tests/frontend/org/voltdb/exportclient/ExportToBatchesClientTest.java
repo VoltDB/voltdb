@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -90,7 +90,8 @@ public class ExportToBatchesClientTest {
         File dir = new File(System.getProperty("user.dir") + File.separator + "00_exportout");
         System.out.printf("Working dir is %s\n", dir.getPath());
         ExportToFileClient exportClient = new ExportToFileClient(
-                ',', "testy", dir, 1, "yyyyMMddHHmmss", null, 0, false, true, true, 0);
+                ',', "testy", dir, 1, "yyyyMMddHHmmss", null, 0,
+                false, true, true, 0, ExportToFileClient.BinaryEncoding.HEX);
         //ExportToFileClient exportClient = new ExportToFileClient(',', "testy", dir, 1, "yyyyMMddHHmmss", 0, false);
         //DiscardingExportClient exportClient = new DiscardingExportClient(false);
         exportClient.addServerInfo("localhost", false);

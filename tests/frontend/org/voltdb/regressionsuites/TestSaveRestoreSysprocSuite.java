@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,6 +44,7 @@ import java.util.zip.GZIPInputStream;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.VoltDB;
@@ -76,6 +77,7 @@ import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectB
  * Test the SnapshotSave and SnapshotRestore system procedures
  */
 public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
+    private final static VoltLogger LOG = new VoltLogger("CONSOLE");
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
@@ -397,7 +399,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         saveTablesWithDefaultOptions(client);
 
-        JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"));
+        JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"), LOG);
         JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
         System.out.println("TRANSACTION IDS: " + transactionIds.toString());
         assertEquals( 4, transactionIds.length());
@@ -428,7 +430,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
             saveTables(client, TMPDIR, TESTNONCE + 2, true, false);
 
-            digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"));
+            digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"), LOG);
             JSONObject newTransactionIds = digest.getJSONObject("partitionTransactionIds");
             assertEquals(transactionIds.length(), newTransactionIds.length());
 
@@ -465,7 +467,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         int num_replicated_items = 1000;
         int num_partitioned_items = 126;
 
-        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 2, 0, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster lc = new LocalCluster( JAR_NAME, 2, 3, 0, BackendTarget.NATIVE_EE_JNI);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project =
             new SaveRestoreTestProjectBuilder();
@@ -486,16 +488,18 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 saveTablesWithDefaultOptions(client);
 
                 boolean skipFirst = true;
-                for (File f : lc.listFiles(new File("/tmp"))) {
+                int deletedFiles = 0;
+                for (File f : lc.listFiles(new File(TMPDIR))) {
                     if (f.getName().startsWith(TESTNONCE + "-REPLICATED")) {
                         if (skipFirst) {
                             skipFirst = false;
                             continue;
                         }
-                        f.delete();
-                        break;
+                        assertTrue(f.delete());
+                        deletedFiles++;
                     }
                 }
+                assertEquals(deletedFiles, 2);
             } finally {
                 client.close();
             }
@@ -682,6 +686,51 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         InputStream is =
             org.voltdb_testprocs.regressionsuites.saverestore.MatView.class.
             getResource("voltdb_1.2_snapshot.tar.gz").openConnection().getInputStream();
+        GZIPInputStream gis = new GZIPInputStream(is);
+        int totalRead = 0;
+        int readLastTime = 0;
+        while (readLastTime != -1 && totalRead != snapshotTarBytes.length) {
+            readLastTime = gis.read(snapshotTarBytes, totalRead, snapshotTarBytes.length - totalRead);
+            if (readLastTime == -1) {
+                break;
+            }
+            totalRead += readLastTime;
+        }
+        assertTrue(totalRead > 0);
+        assertFalse(totalRead == snapshotTarBytes.length);
+
+        ProcessBuilder pb = new ProcessBuilder(new String[]{ "tar", "--directory", TMPDIR, "-x"});
+        Process proc = pb.start();
+        OutputStream os = proc.getOutputStream();
+        os.write(snapshotTarBytes, 0, totalRead);
+        os.close();
+        assertEquals(0, proc.waitFor());
+        validateSnapshot(true);
+
+        byte firstStringBytes[] = new byte[1048576];
+        java.util.Arrays.fill(firstStringBytes, (byte)'c');
+        byte secondStringBytes[] = new byte[1048564];
+        java.util.Arrays.fill(secondStringBytes, (byte)'a');
+
+        client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+
+        VoltTable results[] = client.callProcedure("JumboSelect", 0).getResults();
+        assertEquals(results.length, 1);
+        assertTrue(results[0].advanceRow());
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(1), firstStringBytes));
+        assertTrue(java.util.Arrays.equals( results[0].getStringAsBytes(2), secondStringBytes));
+    }
+
+    public void testRestore2dot8dot4dot1Snapshot()
+    throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        Client client = getClient();
+        byte snapshotTarBytes[] = new byte[1024 * 1024 * 3];
+        InputStream is =
+            org.voltdb_testprocs.regressionsuites.saverestore.MatView.class.
+            getResource("voltdb_2.8.4.1_snapshot.tar.gz").openConnection().getInputStream();
         GZIPInputStream gis = new GZIPInputStream(is);
         int totalRead = 0;
         int readLastTime = 0;

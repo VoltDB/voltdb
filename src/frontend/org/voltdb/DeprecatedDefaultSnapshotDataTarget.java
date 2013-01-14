@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,7 +25,6 @@ import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
@@ -33,13 +32,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotTableTask;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.util.concurrent.Callables;
@@ -188,7 +186,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
         schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length
 
-        final CRC32 crc = new CRC32();
+        final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaContainer.b.remaining());
         aggregateBuffer.put(container.b);
         aggregateBuffer.put(schemaContainer.b);

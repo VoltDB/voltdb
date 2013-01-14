@@ -19,10 +19,15 @@ else
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+CLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
@@ -44,7 +49,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -72,7 +77,7 @@ function async-benchmark-help() {
 
 function async-benchmark() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.AsyncBenchmark \
         --displayinterval=1 \
         --duration=120 \

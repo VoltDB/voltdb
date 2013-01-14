@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -23,11 +23,11 @@ import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -39,11 +39,11 @@ import org.voltdb.utils.LogKeys;
 public class EveryPartitionTask extends TransactionTask
 {
     final long[] m_initiatorHSIds;
-    final Iv2InitiateTaskMessage m_msg;
+    final TransactionInfoBaseMessage m_msg;
     final Mailbox m_mailbox;
 
     EveryPartitionTask(Mailbox mailbox, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg, List<Long> pInitiators)
+                  TransactionInfoBaseMessage msg, List<Long> pInitiators)
     {
         super(new SpTransactionState(msg), queue);
         m_msg = msg;

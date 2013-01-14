@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,14 +22,12 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
+import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,6 +44,7 @@ import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.COWMap;
+import org.voltcore.utils.COWNavigableSet;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.PortGenerator;
@@ -53,6 +52,8 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.common.primitives.Longs;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -81,6 +82,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
+        public Queue<String> coreBindIds;;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -177,7 +179,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * All failed hosts that have ever been seen.
      * Used to dedupe failures so that they are only processed once.
      */
-    private final Set<Integer> m_knownFailedHosts = Collections.synchronizedSet(new HashSet<Integer>());
+    private final COWNavigableSet<Integer> m_knownFailedHosts = new COWNavigableSet<Integer>();
 
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
@@ -199,7 +201,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             Config config)
     {
         m_config = config;
-        m_network = new VoltNetworkPool( m_config.networkThreads);
+        m_network = new VoltNetworkPool( m_config.networkThreads, m_config.coreBindIds);
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
@@ -220,6 +222,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         removeForeignHost(hostId);
         m_agreementSite.reportFault(initiatorSiteId);
+        logger.warn(String.format("Host %d failed", hostId));
     }
 
     /**
@@ -702,7 +705,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 mbox.deliver(message);
                 return null;
             } else {
-                hostLog.warn("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
+                hostLog.info("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
                 return null;
             }
         }
@@ -803,8 +806,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         ForeignHost host = presend(destinationHSId, message);
         if (host != null) {
-            Long dests[] = {destinationHSId};
-            host.send(Arrays.asList(dests), message);
+            host.send(new long [] { destinationHSId }, message);
         }
     }
 
@@ -828,9 +830,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (foreignHosts.size() == 0) return;
 
         for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
-            e.getKey().send(e.getValue(), message);
+            e.getKey().send(Longs.toArray(e.getValue()), message);
         }
-        foreignHosts.clear();
     }
 
     /**
@@ -930,5 +931,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 fh.sendPoisonPill(err);
             }
         }
+    }
+
+    public boolean validateForeignHostId(Integer hostId) {
+        return !m_knownFailedHosts.contains(hostId);
     }
 }

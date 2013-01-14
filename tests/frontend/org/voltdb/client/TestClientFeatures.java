@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,9 @@
 package org.voltdb.client;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
@@ -34,7 +37,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
-public class TestClientTimeouts extends TestCase {
+public class TestClientFeatures extends TestCase {
 
     static final String SCHEMA =
             "create table kv (" +
@@ -129,5 +132,23 @@ public class TestClientTimeouts extends TestCase {
 
         client.callProcedure("ArbitraryDurationProc", 3000);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
+
+    public void testGetAddressList() throws UnknownHostException, IOException, InterruptedException {
+        CSL csl = new CSL();
+
+        ClientConfig config = new ClientConfig(null, null, csl);
+        config.setProcedureCallTimeout(0);
+        Client client = ClientFactory.createClient(config);
+
+        List<InetSocketAddress> addrs = client.getConnectedHostList();
+        assertEquals(0, addrs.size());
+        client.createConnection("localhost");
+        addrs = client.getConnectedHostList();
+        assertEquals(1, addrs.size());
+        assertEquals(VoltDB.DEFAULT_PORT, addrs.get(0).getPort());
+        client.close();
+        addrs = client.getConnectedHostList();
+        assertEquals(0, addrs.size());
     }
 }

@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -55,7 +55,6 @@
 #include "storage/tablefactory.h"
 
 #include <set>
-#include <vector>
 #include <cassert>
 
 using namespace voltdb;
@@ -82,23 +81,6 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
                                               limits));
     }
     return (true);
-}
-
-namespace detail {
-    struct ltTuples {
-        bool operator () (const std::vector<NValue>& v1, const std::vector<NValue>& v2) const {
-            assert(v1.size() == v2.size());
-            std::vector<NValue>::const_iterator it1 = v1.begin();
-            std::vector<NValue>::const_iterator it2 = v2.begin();
-            for (; it1 != v1.end(); ++it1, ++it2) {
-                int comp = it1->compare(*it2);
-                if (comp != 0) {
-                    return comp < 0;
-                }
-            }
-            return false;
-        } 
-    };
 }
 
 bool DistinctExecutor::p_execute(const NValueArray &params) {
@@ -132,7 +114,6 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
                 return false;
             }
         }
-    else
     }
 
     return true;

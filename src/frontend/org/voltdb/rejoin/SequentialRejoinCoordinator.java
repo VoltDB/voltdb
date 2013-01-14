@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -34,15 +34,22 @@ import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.utils.VoltFile;
 
 /**
- * Sequentially rejoins each site. This rejoin coordinator is accessed by sites
- * sequentially, so no need to synchronize.
+ * Sequentially rejoins each site.
+ *
+ * Thread Safety: this is a reentrant class. All mutable datastructures
+ * must be thread-safe. They use m_lock to do this. DO NOT hold m_lock
+ * when leaving this class.
  */
 public class SequentialRejoinCoordinator extends RejoinCoordinator {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
+    // This lock synchronizes all data structure access. Do not hold this
+    // across blocking external calls.
+    private final Object m_lock = new Object();
+
     // triggers specific test code for TestMidRejoinDeath
-    private static boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtestonrejoinside");
-    private static boolean m_rejoinDeathTestCancel = System.getProperties().containsKey("rejoindeathtestcancel");
+    private static final boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtestonrejoinside");
+    private static final boolean m_rejoinDeathTestCancel = System.getProperties().containsKey("rejoindeathtestcancel");
 
     private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
@@ -58,20 +65,22 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
                                        String voltroot,
                                        boolean liveRejoin) {
         super(messenger);
-        m_liveRejoin = liveRejoin;
-        m_pendingSites = new LinkedList<Long>(sites);
-        if (m_pendingSites.isEmpty()) {
-            VoltDB.crashLocalVoltDB("No execution sites to rejoin", false, null);
-        }
-
-        // clear overflow dir in case there are files left from previous runs
-        try {
-            File overflowDir = new File(voltroot, "rejoin_overflow");
-            if (overflowDir.exists()) {
-                VoltFile.recursivelyDelete(overflowDir);
+        synchronized (m_lock) {
+            m_liveRejoin = liveRejoin;
+            m_pendingSites = new LinkedList<Long>(sites);
+            if (m_pendingSites.isEmpty()) {
+                VoltDB.crashLocalVoltDB("No execution sites to rejoin", false, null);
             }
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Fail to clear rejoin overflow directory", false, e);
+
+            // clear overflow dir in case there are files left from previous runs
+            try {
+                File overflowDir = new File(voltroot, "rejoin_overflow");
+                if (overflowDir.exists()) {
+                    VoltFile.recursivelyDelete(overflowDir);
+                }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Fail to clear rejoin overflow directory", false, e);
+            }
         }
     }
 
@@ -80,63 +89,76 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
      * @param HSId
      */
     private void initiateRejoinOnSite(long HSId) {
+        // Must not hold m_lock across the send() call to manage lock
+        // acquisition ordering with other in-process mailboxes.
         RejoinMessage msg = new RejoinMessage(getHSId(),
                 m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                RejoinMessage.Type.INITIATION_COMMUNITY);
         send(HSId, msg);
 
-        // exit here if one property is set and not the other
-        // awkward, but useful for testing
+        // For testing, exit if only one property is set...
         if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel &&
                 (m_sitesRejoinedCount.incrementAndGet() == 2)) {
-            // die a painful death
             System.exit(0);
         }
     }
 
     @Override
     public void startRejoin() {
-        long firstSite = m_pendingSites.poll();
-        m_rejoiningSites.add(firstSite);
+        long firstSite;
+        synchronized (m_lock) {
+            firstSite = m_pendingSites.poll();
+            m_rejoiningSites.add(firstSite);
+        }
         String HSIdString = CoreUtils.hsIdToString(firstSite);
         rejoinLog.info("Initiating snapshot stream to first site: " + HSIdString);
         initiateRejoinOnSite(firstSite);
     }
 
     private void onSnapshotStreamFinished(long HSId) {
-        if (!m_pendingSites.isEmpty()) {
-            long nextSite = m_pendingSites.poll();
-            m_rejoiningSites.add(nextSite);
-            rejoinLog.info("Finished streaming snapshot to site: " +
-                    CoreUtils.hsIdToString(HSId) +
-                    " and initiating snapshot stream to next site: " +
-                    CoreUtils.hsIdToString(nextSite));
-            initiateRejoinOnSite(nextSite);
+        // make all the decisions under lock.
+        Long nextSite = null;
+        synchronized (m_lock) {
+            if (!m_pendingSites.isEmpty()) {
+                nextSite = m_pendingSites.poll();
+                m_rejoiningSites.add(nextSite);
+                rejoinLog.info("Finished streaming snapshot to site: " +
+                        CoreUtils.hsIdToString(HSId) +
+                        " and initiating snapshot stream to next site: " +
+                        CoreUtils.hsIdToString(nextSite));
+            }
+            else {
+                rejoinLog.info("Finished streaming snapshot to site: " +
+                        CoreUtils.hsIdToString(HSId));
+            }
         }
-        else {
-            rejoinLog.info("Finished streaming snapshot to site: " +
-                    CoreUtils.hsIdToString(HSId));
+        if (nextSite != null) {
+            initiateRejoinOnSite(nextSite);
         }
     }
 
     private void onReplayFinished(long HSId) {
-        if (!m_rejoiningSites.remove(HSId)) {
-            VoltDB.crashLocalVoltDB("Unknown site " + CoreUtils.hsIdToString(HSId) +
-                                    " finished rejoin", false, null);
-        }
-        String msg = "Finished rejoining site " + CoreUtils.hsIdToString(HSId);
-        ArrayList<Long> remainingSites = new ArrayList<Long>(m_pendingSites);
-        remainingSites.addAll(m_rejoiningSites);
-        if (!remainingSites.isEmpty()) {
-            msg += ". Remaining sites to rejoin: " +
+        boolean allDone = false;
+        synchronized (m_lock) {
+            if (!m_rejoiningSites.remove(HSId)) {
+                VoltDB.crashLocalVoltDB("Unknown site " + CoreUtils.hsIdToString(HSId) +
+                        " finished rejoin", false, null);
+            }
+            String msg = "Finished rejoining site " + CoreUtils.hsIdToString(HSId);
+            ArrayList<Long> remainingSites = new ArrayList<Long>(m_pendingSites);
+            remainingSites.addAll(m_rejoiningSites);
+            if (!remainingSites.isEmpty()) {
+                msg += ". Remaining sites to rejoin: " +
                     CoreUtils.hsIdCollectionToString(remainingSites);
+            }
+            else {
+                msg += ". All sites completed rejoin.";
+            }
+            rejoinLog.info(msg);
+            allDone = m_rejoiningSites.isEmpty();
         }
-        else {
-            msg += ". All sites completed rejoin.";
-        }
-        rejoinLog.info(msg);
 
-        if (m_rejoiningSites.isEmpty()) {
+        if (allDone) {
             // no more sites to rejoin, we're done
             VoltDB.instance().onExecutionSiteRejoinCompletion(0l);
         }

@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -447,7 +447,7 @@ struct GenericKey
                 keyTuple.setNValue(ii, ae->eval(tuple, NULL));
             }
             return;
-        } // else take advantage og columns-only optimization
+        } // else take advantage of columns-only optimization
         for (int ii = 0; ii < columnCount; ++ii) {
             keyTuple.setNValue(ii, tuple->getNValue(indices[ii]));
         }
@@ -455,6 +455,128 @@ struct GenericKey
 
     // actual location of data, extends past the end.
     char data[keySize];
+};
+
+/**
+ * Key object for indexes of mixed types that need to persist their own backing storage for general string expressions.
+ * Plain vanilla GenericKey is the better (simpler) choice for indexes of:
+ *   numeric (inlined) values (columns or expressions)
+ *   string-valued COLUMNS (also varbinary or any other non-inline types we may eventually support)
+ *
+ * It's only the edge case of non-inline-typed non-column expressions that need this class for
+ * its ability to persist the indexed expression values using pooled storage.
+ */
+template <std::size_t keySize>
+struct GenericPersistentKey : public GenericKey<keySize>
+{
+    // These keys Compare and Hash as GenericKeys
+    GenericPersistentKey() : m_keySchema(NULL) {}
+
+    GenericPersistentKey(const TableTuple *tuple) : GenericKey<keySize>(tuple)
+        , m_keySchema(NULL) // This is just an ephemeral search key -- it doesn't need to persist.
+    { }
+
+    GenericPersistentKey(const TableTuple *tuple, const std::vector<int> &notUsedIndices,
+                         const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema)
+        // Not bothering to delegate to the full-blown GenericKey constructor,
+        // since in some ways the special case processing here is simpler.
+        : GenericKey<keySize>()
+        , m_keySchema(keySchema)
+    {
+        assert(tuple);
+        // Assume that there are indexed expressions.
+        // Columns-only indexes don't use GenericPersistentKey
+        assert(indexed_expressions.size() > 0);
+        TableTuple keyTuple(keySchema);
+        keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
+        const int columnCount = keySchema->columnCount();
+        for (int ii = 0; ii < columnCount; ++ii) {
+            AbstractExpression* ae = indexed_expressions[ii];
+            NValue indexedValue;
+            try {
+                indexedValue = ae->eval(tuple, NULL);
+            } catch (SQLException& ignoredDuringIndexing) {
+                // For the sake of keeping non-unique index upkeep as a non-failable operation,
+                // all exception-throwing expression evaluations get treated as NULL for index
+                // purposes.
+                indexedValue = NValue::getNullValue(ae->getValueType());
+            }
+            // The NULL argument means use the persistent memory pool for the varchar
+            // allocation rather than any particular COW context's pool.
+            // XXX: Could this ever somehow interact badly with a COW context?
+            keyTuple.setNValueAllocateForObjectCopies(ii, indexedValue, NULL);
+        }
+    }
+
+    // Both copy constructor and assignment operator are apparently required by CompactingMap.
+    // It is now VERY IMPORTANT to only extract keys OUT of a map by const reference AND avoid
+    // using these constructor/assignment functions in scenarios like that
+    // -- with a local variable as the lhs and an in-map key as the rhs.
+    // That would effectively corrupt the map entry when the local variable goes out of scope
+    // and/or prevent the in-map key from properly freeing its referenced objects when it got
+    // deleted from the map.
+    GenericPersistentKey( const GenericPersistentKey& other )
+        : GenericKey<keySize>() // Copying the inherited member explicitly.
+        , m_keySchema(other.m_keySchema)
+    {
+        ::memcpy(this->data, other.data, keySize);
+        // Only one key, this, can own the tuple and its objects.
+        const_cast<GenericPersistentKey&>(other).m_keySchema = NULL;
+    }
+
+    const GenericPersistentKey& operator=( const GenericPersistentKey& other )
+    {
+        // To avoid leaking data, "*this" and "other" -- typically a temp -- actually SWAP state
+        // so that data memory management becomes a simple matter of running the expected
+        // destructors.  If overwriting a full-blown actively-in-use persistent key,
+        // its previous value (presumably obsolete) will go out of scope with other!
+        // This data memory management is only a concern for "full-blown" keys
+        // that have m_keySchema -- not a problem for ephemeral search keys that just "borrow" memory.
+        const TupleSchema *keptKeySchema = this->m_keySchema;
+        this->m_keySchema = other.m_keySchema;
+
+        // Exactly one full-blown key must own each tuple and its objects.
+        // So either use other as a lifeboat for the prior value of *this.
+        // It's destructor will deal with the old value of "this", probably VERY SOON.
+        // Or mark it as ephemeral if that's what *this was.
+        GenericPersistentKey& writableOther = const_cast<GenericPersistentKey&>(other);
+
+        if (keptKeySchema) {
+            writableOther.m_keySchema = keptKeySchema;
+            // Other needs to lifeboat the original value of *this.
+            char keptData[keySize];
+            ::memcpy(keptData, this->data, keySize);
+
+            ::memcpy(this->data, other.data, keySize);
+
+            ::memcpy(writableOther.data, keptData, keySize);
+        } else {
+            // *this was ephemeral, so other must become ephemeral.
+            // The state of its data on exit does not matter.
+            writableOther.m_keySchema = NULL;
+
+            ::memcpy(this->data, other.data, keySize);
+        }
+        return *this;
+    }
+
+    ~GenericPersistentKey()
+    {
+        if (m_keySchema == NULL) {
+            return;
+        }
+        TableTuple keyTuple(m_keySchema);
+        keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
+        keyTuple.freeObjectColumns();
+    }
+
+private:
+    // The keySchema is only retained for object memory reclaim purposes.
+    // If NULL, this was either constructed as an ephemeral search key,
+    // or it has been "demoted" in the process of shuffling keys around
+    // in the map, passing its memory management responsibilities
+    // to another key, so no reclaim is required.
+    const TupleSchema *m_keySchema;
 };
 
 /**

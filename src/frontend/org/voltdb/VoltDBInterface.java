@@ -1,29 +1,28 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
@@ -34,12 +33,14 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 public interface VoltDBInterface
 {
     public boolean rejoining();
+    public boolean rejoinDataPending();
 
-    /*
+    /**
      * Invoked from the command log once this node is marked unfaulted.
-     * Allows its command log to be used for recovery
+     * Allows its command log to be used for recovery.
+     * @param requestId The id, if any, associated with the truncation request.
      */
-    public void recoveryComplete();
+    public void recoveryComplete(String requestId);
 
     public void readBuildInfo(String editionTag);
 
@@ -152,6 +153,12 @@ public interface VoltDBInterface
 
     /**
      * Schedule a work to be performed once or periodically.
+     * No blocking or resource intensive work should be done
+     * from this thread. High priority tasks,
+     * that are known not to do anything risky can use
+     * schedulePriorityWork if they actually have fine grained requirements.
+     * All others should use schedule work
+     * and be aware that they may stomp on each other.
      *
      * @param work
      *            The work to be scheduled
@@ -165,6 +172,26 @@ public interface VoltDBInterface
      *            Time unit
      */
     public ScheduledFuture<?> scheduleWork(Runnable work, long initialDelay, long delay,
+                             TimeUnit unit);
+
+    /**
+     * Schedule a work to be performed once or periodically.
+     * This is for high priority work with fine grained scheduling requirements.
+     * Tasks submitted here must absolutely not do any work in the scheduler thread.
+     * Submit the work to be done to a different thread unless it is absolutely trivial.
+     *
+     * @param work
+     *            The work to be scheduled
+     * @param initialDelay
+     *            The initial delay before the first execution of the work
+     * @param delay
+     *            The delay between each subsequent execution of the work. If
+     *            this is negative, the work will only be executed once after
+     *            the initial delay.
+     * @param unit
+     *            Time unit
+     */
+    public ScheduledFuture<?> schedulePriorityWork(Runnable work, long initialDelay, long delay,
                              TimeUnit unit);
 
     /**

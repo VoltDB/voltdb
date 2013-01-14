@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,12 +31,14 @@ import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
@@ -295,6 +297,25 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertEquals(1, results.length);
         System.out.println("Test iostats table: " + results[0].toString());
+
+        //
+        // TOPO
+        //
+        if (VoltDB.checkTestEnvForIv2()) {
+            results = client.callProcedure("@Statistics", "TOPO", 0).getResults();
+            // one aggregate table returned
+            assertEquals(1, results.length);
+            System.out.println("Test TOPO table: " + results[0].toString());
+            VoltTable topo = results[0];
+            // Make sure we can find the MPI, at least
+            boolean found = false;
+            while (topo.advanceRow()) {
+                if ((int)topo.getLong("Partition") == TxnEgo.MP_PARTITIONID) {
+                    found = true;
+                }
+            }
+            assertTrue(found);
+        }
     }
 
     //
@@ -400,7 +421,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTable() throws IOException {
+    public void testLoadMultipartitionTableAndIndexStats() throws IOException {
         Client client = getClient();
 
         // try the failure case first
@@ -477,6 +498,38 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 }
             }
             assertEquals(6, foundItem);
+
+            VoltTable indexStats =
+                    client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            System.out.println(indexStats);
+            long memorySum = 0;
+            while (indexStats.advanceRow()) {
+                memorySum += indexStats.getLong("MEMORY_ESTIMATE");
+            }
+
+            /*
+             * It takes about a minute to spin through this 1000 times.
+             * Should definitely give a 1 second tick time to fire
+             */
+            long indexMemorySum = 0;
+            for (int ii = 0; ii < 1000; ii++) {
+                indexMemorySum = 0;
+                indexStats = client.callProcedure("@Statistics", "MEMORY", 0).getResults()[0];
+                System.out.println(indexStats);
+                while (indexStats.advanceRow()) {
+                    indexMemorySum += indexStats.getLong("INDEXMEMORY");
+                }
+                boolean success = indexMemorySum != 120;//That is a row count, not memory usage
+                if (success) {
+                    success = memorySum == indexMemorySum;
+                    if (success) {
+                        return;
+                    }
+                }
+                Thread.sleep(1);
+            }
+            assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
+            assertEquals(memorySum, indexMemorySum);
         }
         catch (Exception e) {
             e.printStackTrace();

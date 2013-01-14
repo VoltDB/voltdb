@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,6 +49,8 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.ParamSetArrays;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Select;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.UpdateDecimal;
+
+import com.google.common.base.Charsets;
 
 public class TestSQLTypesSuite extends RegressionSuite {
 
@@ -269,7 +271,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                    new String("ABCDEFABCDEF0123"),
                    new byte[] { 0 },
                    new byte[] { 'a', 'b', 'c' },
-                   new String("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").getBytes()),
+                   new String("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").getBytes(Charsets.UTF_8)),
         new Column("A_POOL_B", VoltType.VARBINARY, false,
                    VoltType.NULL_STRING_OR_VARBINARY,
                    new String("ABCDEFABCDEF0123456789"),

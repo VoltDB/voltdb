@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -75,6 +75,25 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
+
+    /*
+     * This lock is extremely dangerous to use without known the pattern.
+     * It is the intrinsic lock on the InitiatorMailbox. For an SpInitiator
+     * this is a real thing, but for the MpInitiator the intrinsic lock isn't used
+     * because it uses MpInitiatorMailbox (as subclass of InitiatorMailbox)
+     * which uses a dedicated thread instead of locking.
+     *
+     * In the MpInitiator case locking on this will not provide any isolation because
+     * the InitiatorMailbox thread doesn't use the lock.
+     *
+     * Right now this lock happens to only be used to gain isolation for
+     * command logging while submitting durable tasks. Only SpInitiators log
+     * so this is fine.
+     *
+     * Think twice and ask around before using it for anything else.
+     * You should probably be going through InitiatorMailbox.deliver which automatically
+     * handles the transition between locking vs. submitting to the MpInitiatorMailbox task queue.
+     */
     protected Object m_lock;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)

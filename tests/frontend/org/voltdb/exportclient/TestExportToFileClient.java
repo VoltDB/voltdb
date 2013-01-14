@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,7 +56,8 @@ public class TestExportToFileClient extends TestCase {
                 false,
                 false,
                 false,
-                0);
+                0,
+                ExportToFileClient.BinaryEncoding.HEX);
         AdvertisedDataSource source0 = TestExportDecoderBase.constructTestSource(0);
         AdvertisedDataSource source1 = TestExportDecoderBase.constructTestSource(1);
         ExportToFileDecoder decoder0 = exportClient.constructExportDecoder(source0);
@@ -117,7 +118,8 @@ public class TestExportToFileClient extends TestCase {
                     false,
                     0,
                     false,
-                    TimeZone.getDefault());
+                    TimeZone.getDefault(),
+                    ExportToFileClient.BinaryEncoding.HEX);
         final ExportToFileClient exportClient2 =
                 new ExportToFileClient(
                     ',',
@@ -132,7 +134,8 @@ public class TestExportToFileClient extends TestCase {
                     false,
                     0,
                     false,
-                    TimeZone.getDefault());
+                    TimeZone.getDefault(),
+                    ExportToFileClient.BinaryEncoding.HEX);
 
         InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", cluster.port(0));
         InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", cluster.port(1));

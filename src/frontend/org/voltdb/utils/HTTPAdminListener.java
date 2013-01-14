@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -34,7 +34,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.eclipse.jetty.server.AsyncContinuation;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
@@ -43,13 +42,13 @@ import org.eclipse.jetty.server.bio.SocketConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.zk.CoreZK;
 
 public class HTTPAdminListener {
 
@@ -348,6 +347,15 @@ public class HTTPAdminListener {
             });
 
             m_server.setHandler(handlers);
+
+            /*
+             * Don't force us to look at a huge pile of threads
+             */
+            final QueuedThreadPool qtp = new QueuedThreadPool();
+            qtp.setMaxIdleTimeMs(15000);
+            qtp.setMinThreads(1);
+            m_server.setThreadPool(qtp);
+
             m_server.start();
             m_jsonEnabled = jsonEnabled;
         }
@@ -355,7 +363,7 @@ public class HTTPAdminListener {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
             try { m_server.destroy(); } catch (Exception e2) {}
-            throw e;
+            throw new Exception(e);
         }
     }
 

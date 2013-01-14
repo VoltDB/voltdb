@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -24,6 +24,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientInterfaceHandleManager;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -188,6 +189,18 @@ public class Iv2Trace
                         txnIdToString(ftask.getTxnId()),
                         txnIdToString(spHandle),
                         txnIdToString(ftask.getTruncationHandle())));
+        }
+    }
+
+    public static void logCompleteTransactionMessage(CompleteTransactionMessage ctask, long localHSId)
+    {
+        if (iv2log.isTraceEnabled()) {
+            String logmsg = "rxCompMsg %s from %s txnId %s %s %s";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                        CoreUtils.hsIdToString(ctask.m_sourceHSId),
+                        txnIdToString(ctask.getTxnId()),
+                        ctask.isRollback() ? "ROLLBACK" : "COMMIT",
+                        ctask.isRestart() ? "RESTART" : ""));
         }
     }
 

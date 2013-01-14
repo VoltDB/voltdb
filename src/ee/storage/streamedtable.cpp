@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -79,9 +79,10 @@ bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->currentTxnId(),
+        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
+                                      m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
+                                      m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       source,
                                       TupleStreamWrapper::INSERT);
@@ -109,9 +110,10 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
 {
     size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->currentTxnId(),
+        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
+                                      m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
+                                      m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       tuple,
                                       TupleStreamWrapper::DELETE);
@@ -138,8 +140,8 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedTxnId,
-                                 m_executorContext->currentTxnId());
+                                 m_executorContext->m_lastCommittedSpHandle,
+                                 m_executorContext->currentSpHandle());
     }
 }
 

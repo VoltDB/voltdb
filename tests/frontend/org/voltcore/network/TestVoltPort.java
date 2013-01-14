@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,7 +26,7 @@ package org.voltcore.network;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 
-import junit.framework.*;
+import junit.framework.TestCase;
 
 /*
  * Not a lot of functionality in VoltPort. The only tricky bit
@@ -39,7 +39,7 @@ public class TestVoltPort extends TestCase {
     private static class MockVoltNetwork extends VoltNetwork {
 
         public MockVoltNetwork() {
-            super(0);
+            super(0, null);
         }
     }
 

@@ -1,23 +1,25 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb;
 
 import java.util.ArrayDeque;
+import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -31,7 +33,11 @@ public interface CommandLog {
      *            The txnId of the truncation snapshot at the end of restore, or
      *            Long.MIN if there was none.
      */
-    public abstract void init(CatalogContext context, long txnId, long perPartitionTxnId[]);
+    public abstract void init(
+            CatalogContext context,
+            long txnId,
+            Map<Integer, Long> perPartitionTxnId,
+            String coreBinding);
 
     /**
     *
@@ -39,7 +45,12 @@ public interface CommandLog {
     *            The txnId of the truncation snapshot at the end of restore, or
     *            Long.MIN if there was none.
     */
-    public abstract void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin);
+    public abstract void initForRejoin(
+            CatalogContext context,
+            long txnId,
+            Map<Integer, Long> perPartitionTxnId,
+            boolean isRejoin,
+            String coreBinding);
 
     public abstract boolean needsInitialization();
 
@@ -77,6 +88,6 @@ public interface CommandLog {
     public abstract long getFaultSequenceNumber();
 
     public interface DurabilityListener {
-        public void onDurability(ArrayDeque<Object> durableThings);
+        public void onDurability(ArrayList<Object> durableThings);
     }
 }
