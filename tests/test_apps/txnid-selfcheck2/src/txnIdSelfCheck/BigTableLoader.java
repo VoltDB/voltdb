@@ -81,11 +81,18 @@ public class BigTableLoader extends Thread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             byte status = clientResponse.getStatus();
-            if ((status != ClientResponse.SUCCESS) && (status != ClientResponse.GRACEFUL_FAILURE)) {
+            if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // log what happened
-                log.error("BigTableLoader failed to insert into table " + tableName);
+                log.error("BigTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the world
+                System.exit(-1);
+            }
+            if (status != ClientResponse.SUCCESS) {
+                // log what happened
+                log.error("BigTableLoader ungracefully failed to insert into table " + tableName);
+                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // stop the loader
                 m_shouldContinue.set(false);
             }
             latch.countDown();
@@ -103,8 +110,8 @@ public class BigTableLoader extends Thread {
                 CountDownLatch latch = new CountDownLatch(25);
                 // try to insert 5 random rows
                 for (int i = 0; i < 25; i++) {
-                    long id = Math.abs(r.nextLong());
-                    client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + ".insert", id, data);
+                    long p = Math.abs(r.nextLong());
+                    client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                 }
                 latch.await(10, TimeUnit.SECONDS);
                 long nextRowCount = getRowCount();

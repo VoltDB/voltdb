@@ -24,6 +24,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientInterfaceHandleManager;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -188,6 +189,18 @@ public class Iv2Trace
                         txnIdToString(ftask.getTxnId()),
                         txnIdToString(spHandle),
                         txnIdToString(ftask.getTruncationHandle())));
+        }
+    }
+
+    public static void logCompleteTransactionMessage(CompleteTransactionMessage ctask, long localHSId)
+    {
+        if (iv2log.isTraceEnabled()) {
+            String logmsg = "rxCompMsg %s from %s txnId %s %s %s";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                        CoreUtils.hsIdToString(ctask.m_sourceHSId),
+                        txnIdToString(ctask.getTxnId()),
+                        ctask.isRollback() ? "ROLLBACK" : "COMMIT",
+                        ctask.isRestart() ? "RESTART" : ""));
         }
     }
 

@@ -222,6 +222,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         removeForeignHost(hostId);
         m_agreementSite.reportFault(initiatorSiteId);
+        logger.warn(String.format("Host %d failed", hostId));
     }
 
     /**
@@ -704,7 +705,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 mbox.deliver(message);
                 return null;
             } else {
-                hostLog.warn("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
+                hostLog.info("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
                 return null;
             }
         }

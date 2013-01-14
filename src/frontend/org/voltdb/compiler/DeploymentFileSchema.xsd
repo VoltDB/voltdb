@@ -137,7 +137,7 @@
   <!-- <partition-detection>/<snapshot> -->
   <xs:complexType name="partitionDetectionType">
       <xs:all>
-          <xs:element name="snapshot" minOccurs="1" maxOccurs="1">
+          <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
              <xs:complexType>
                  <xs:attribute name="prefix" type="xs:string" use="required"/>
              </xs:complexType>

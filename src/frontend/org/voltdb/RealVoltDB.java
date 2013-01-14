@@ -290,10 +290,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 System.exit(-1);
             }
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-            if (config.m_enableIV2) {
-                consoleLog.warn("Running 3.0 preview (iv2 mode). NOT SUPPORTED IN PRODUCTION.");
-            } else {
-                consoleLog.warn("Running 3.0 preview (legacy mode). NOT SUPPORTED IN PRODUCTION.");
+            if (!config.m_enableIV2) {
+                consoleLog.warn("Running 3.0 preview (legacy mode).  THIS MODE IS DEPRECATED.");
             }
 
             // If there's no deployment provide a default and put it under voltdbroot.
@@ -1416,6 +1414,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
+
+        // Semi-hacky check to see if we're attempting to rejoin to ourselves.
+        // The leader node gets assigned host ID 0, always, so if we're the
+        // leader and we're rejoining, this is clearly bad.
+        if (m_myHostId == 0 && isRejoin) {
+            VoltDB.crashLocalVoltDB("Unable to rejoin a node to itself.  " +
+                    "Please check your command line and start action and try again.", false, null);
+        }
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -1866,6 +1872,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 return Pair.of( contextTracker.m_context, contextTracker.m_csp);
             }
             else if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
+                hostLog.fatal("Failed catalog update." +
+                        " expectedCatalogVersion: " + expectedCatalogVersion +
+                        " currentTxnId: " + currentTxnId +
+                        " currentTxnUniqueId: " + currentTxnUniqueId +
+                        " m_catalogContext.catalogVersion " + m_catalogContext.catalogVersion);
+
                 throw new RuntimeException("Trying to update main catalog context with diff " +
                         "commands generated for an out-of date catalog. Expected catalog version: " +
                         expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
@@ -1904,12 +1916,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_adminListener.notifyOfCatalogUpdate();
             }
 
-            // 4. If running IV2, we need to update the MPI's catalog.  The MPI doesn't
-            // run an every-site copy of the UpdateApplicationCatalog sysproc, so for now
-            // we do the update along with the rest of the global state here.
+            // 4. Flush StatisticsAgent old catalog statistics.
+            // Otherwise, the stats agent will hold all old catalogs
+            // in memory.
+            m_statsAgent.notifyOfCatalogUpdate();
+
+            // 5. MPIs don't run fragments. Update them here. Do
+            // this after flushing the stats -- this will re-register
+            // the MPI statistics.
             if (m_MPI != null) {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
+
 
             return Pair.of(m_catalogContext, csp);
         }

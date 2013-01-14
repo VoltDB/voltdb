@@ -67,19 +67,21 @@ CREATE INDEX P_TSINDEX ON adhocp (ts DESC);
 -- replicated table
 CREATE TABLE bigr
 (
-  id         bigint             NOT NULL
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id_br PRIMARY KEY (id)
+, CONSTRAINT PK_id_br PRIMARY KEY (p,id)
 );
 
 -- partitioned table
 CREATE TABLE bigp
 (
-  id         bigint             NOT NULL
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id_bp PRIMARY KEY (id)
+, CONSTRAINT PK_id_bp PRIMARY KEY (p,id)
 );
-PARTITION TABLE bigp ON COLUMN id;
+PARTITION TABLE bigp ON COLUMN p;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -100,3 +102,6 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSPInProcAdHoc;
 PARTITION PROCEDURE ReadSPInProcAdHoc ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPInProcAdHoc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
+PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;

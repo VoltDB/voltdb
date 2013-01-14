@@ -34,6 +34,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -309,7 +311,7 @@ public class MpTransactionState extends TransactionState
         FragmentResponseMessage msg = null;
         try {
             while (msg == null) {
-                msg = m_newDeps.poll(60L, TimeUnit.SECONDS);
+                msg = m_newDeps.poll(60L * 5, TimeUnit.SECONDS);
                 if (msg == null) {
                     tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_task);
                     if (m_remoteWork == null) {
@@ -323,6 +325,7 @@ public class MpTransactionState extends TransactionState
                                     CoreUtils.hsIdCollectionToString(e.getValue()));
                         }
                     }
+                    m_mbox.send(com.google.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                 }
             }
         }

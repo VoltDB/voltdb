@@ -80,6 +80,12 @@ public class SysProcFragmentId
      */
     public static final long PF_snapshotSaveQuiesceResults = 45;
 
+    public static boolean isSnapshotSaveFragment(long fragId)
+    {
+        return (fragId == PF_saveTest || fragId == PF_createSnapshotTargets ||
+                fragId == PF_snapshotSaveQuiesce);
+    }
+
     // @LoadMultipartitionTable
     public static final long PF_distribute = 50;
     public static final long PF_aggregate = 51;

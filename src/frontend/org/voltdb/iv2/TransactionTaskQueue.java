@@ -218,7 +218,9 @@ public class TransactionTaskQueue
         StringBuilder sb = new StringBuilder();
         sb.append("TransactionTaskQueue:").append("\n");
         sb.append("\tSIZE: ").append(size());
-        sb.append("\tHEAD: ").append(m_backlog.getFirst());
+        if (!m_backlog.isEmpty()) {
+            sb.append("\tHEAD: ").append(m_backlog.getFirst());
+        }
         return sb.toString();
     }
 }

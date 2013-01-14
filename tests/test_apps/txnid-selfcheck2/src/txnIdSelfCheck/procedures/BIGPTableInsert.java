@@ -23,12 +23,15 @@
 
 package txnIdSelfCheck.procedures;
 
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class UpdatePartitionedSP extends UpdateBaseProc {
+public class BIGPTableInsert extends VoltProcedure {
+    final SQLStmt insert = new SQLStmt("insert into bigp values (?,?,?);");
 
-    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        return doWork(p_getCIDData, p_cleanUp, p_insert, p_getAdhocData,
-                cid, rid, value, rollback);
+    public VoltTable[] run(long p, byte[] data) {
+        voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), p, getUniqueId(), data);
+        return voltExecuteSQL(true);
     }
 }
