@@ -117,9 +117,13 @@ public class RepairLog
     {
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
-            m_lastSpHandle = m.getSpHandle();
-            truncate(Long.MIN_VALUE, m.getTruncationHandle());
-            m_log.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+            // We can't repair read-only SP transactions due to their short-circuited nature.
+            // Just don't log them to the repair log.
+            if (!m.isReadOnly()) {
+                m_lastSpHandle = m.getSpHandle();
+                truncate(Long.MIN_VALUE, m.getTruncationHandle());
+                m_log.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+            }
         } else if (msg instanceof FragmentTaskMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
             truncate(m.getTruncationHandle(), Long.MIN_VALUE);
