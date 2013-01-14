@@ -131,7 +131,7 @@ public class UpdateBaseProc extends VoltProcedure {
         if (rowCount != 0) {
             VoltTableRow row = data.fetchRow(0);
             cnt = row.getLong("cnt") + 1;
-            prevtxnid = row.getLong("prevtxnid");
+            prevtxnid = row.getLong("txnid");
             prevrid = row.getLong("rid");
         }
 

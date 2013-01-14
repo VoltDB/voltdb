@@ -154,6 +154,7 @@ public class ClientThread extends Thread {
             catch (VoltAbortException vae) {
                 log.error("validateCIDData failed on: " + procName + ", shouldRollback: " +
                         shouldRollback + " data: " + data);
+                throw vae;
             }
         }
         finally {
