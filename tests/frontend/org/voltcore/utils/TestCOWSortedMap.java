@@ -42,14 +42,12 @@ import java.util.Set;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
-import org.voltcore.utils.COWSortedMap;
-
-public class COWSortedMapTest extends JSR166TestCase {
+public class TestCOWSortedMap extends JSR166TestCase {
     public static void main(String[] args) {
         junit.textui.TestRunner.run(suite());
     }
     public static Test suite() {
-        return new TestSuite(COWSortedMapTest.class);
+        return new TestSuite(TestCOWSortedMap.class);
     }
 
     /**

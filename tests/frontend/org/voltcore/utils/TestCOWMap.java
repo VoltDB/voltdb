@@ -40,12 +40,12 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 
-public class COWMapTest extends JSR166TestCase {
+public class TestCOWMap extends JSR166TestCase {
     public static void main(String[] args) {
         junit.textui.TestRunner.run(suite());
     }
     public static Test suite() {
-        return new TestSuite(COWMapTest.class);
+        return new TestSuite(TestCOWMap.class);
     }
 
     /**

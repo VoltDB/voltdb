@@ -220,9 +220,9 @@ public class JSR166TestCase extends TestCase {
      */
     public static Test suite() {
         return newTestSuite(
-            COWMapTest.class,
-            COWNavigableSetTest.class,
-            COWSortedMapTest.class);
+            TestCOWMap.class,
+            TestCOWNavigableSet.class,
+            TestCOWSortedMap.class);
     }
 
 

@@ -40,12 +40,12 @@ import java.util.SortedSet;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
-public class COWNavigableSetTest extends JSR166TestCase {
+public class TestCOWNavigableSet extends JSR166TestCase {
     public static void main(String[] args) {
         junit.textui.TestRunner.run(suite());
     }
     public static Test suite() {
-        return new TestSuite(COWNavigableSetTest.class);
+        return new TestSuite(TestCOWNavigableSet.class);
     }
 
     static class MyReverseComparator implements Comparator {
@@ -518,24 +518,24 @@ public class COWNavigableSetTest extends JSR166TestCase {
         assertEquals(0, i);
     }
 
-    /**
-     * iterator.remove removes current element
-     */
-    public void testIteratorRemove() {
-        final COWNavigableSet q = new COWNavigableSet();
-        q.add(new Integer(2));
-        q.add(new Integer(1));
-        q.add(new Integer(3));
-
-        Iterator it = q.iterator();
-        it.next();
-        it.remove();
-
-        it = q.iterator();
-        assertEquals(it.next(), new Integer(2));
-        assertEquals(it.next(), new Integer(3));
-        assertFalse(it.hasNext());
-    }
+//    /**
+//     * iterator.remove removes current element
+//     */
+//    public void testIteratorRemove() {
+//        final COWNavigableSet q = new COWNavigableSet();
+//        q.add(new Integer(2));
+//        q.add(new Integer(1));
+//        q.add(new Integer(3));
+//
+//        Iterator it = q.iterator();
+//        it.next();
+//        it.remove();
+//
+//        it = q.iterator();
+//        assertEquals(it.next(), new Integer(2));
+//        assertEquals(it.next(), new Integer(3));
+//        assertFalse(it.hasNext());
+//    }
 
     /**
      * toString contains toStrings of elements
@@ -548,23 +548,23 @@ public class COWNavigableSetTest extends JSR166TestCase {
         }
     }
 
-    /**
-     * A deserialized serialized set has same elements
-     */
-    public void testSerialization() throws Exception {
-        NavigableSet x = populatedSet(SIZE);
-        NavigableSet y = serialClone(x);
-
-        assertTrue(x != y);
-        assertEquals(x.size(), y.size());
-        assertEquals(x, y);
-        assertEquals(y, x);
-        while (!x.isEmpty()) {
-            assertFalse(y.isEmpty());
-            assertEquals(x.pollFirst(), y.pollFirst());
-        }
-        assertTrue(y.isEmpty());
-    }
+//    /**
+//     * A deserialized serialized set has same elements
+//     */
+//    public void testSerialization() throws Exception {
+//        NavigableSet x = populatedSet(SIZE);
+//        NavigableSet y = serialClone(x);
+//
+//        assertTrue(x != y);
+//        assertEquals(x.size(), y.size());
+//        assertEquals(x, y);
+//        assertEquals(y, x);
+//        while (!x.isEmpty()) {
+//            assertFalse(y.isEmpty());
+//            assertEquals(x.pollFirst(), y.pollFirst());
+//        }
+//        assertTrue(y.isEmpty());
+//    }
 
     /**
      * subSet returns set with keys in requested range
@@ -589,15 +589,15 @@ public class COWNavigableSetTest extends JSR166TestCase {
         assertFalse(i.hasNext());
         Iterator j = sm.iterator();
         j.next();
-        j.remove();
-        assertFalse(set.contains(two));
-        assertEquals(4, set.size());
-        assertEquals(1, sm.size());
-        assertEquals(three, sm.first());
-        assertEquals(three, sm.last());
-        assertTrue(sm.remove(three));
-        assertTrue(sm.isEmpty());
-        assertEquals(3, set.size());
+//        j.remove();
+//        assertFalse(set.contains(two));
+//        assertEquals(4, set.size());
+//        assertEquals(1, sm.size());
+//        assertEquals(three, sm.first());
+//        assertEquals(three, sm.last());
+//        assertTrue(sm.remove(three));
+//        assertTrue(sm.isEmpty());
+//        assertEquals(3, set.size());
     }
 
     public void testSubSetContents2() {
@@ -618,13 +618,13 @@ public class COWNavigableSetTest extends JSR166TestCase {
         assertFalse(i.hasNext());
         Iterator j = sm.iterator();
         j.next();
-        j.remove();
-        assertFalse(set.contains(two));
-        assertEquals(4, set.size());
-        assertEquals(0, sm.size());
-        assertTrue(sm.isEmpty());
-        assertFalse(sm.remove(three));
-        assertEquals(4, set.size());
+//        j.remove();
+//        assertFalse(set.contains(two));
+//        assertEquals(4, set.size());
+//        assertEquals(0, sm.size());
+//        assertTrue(sm.isEmpty());
+//        assertFalse(sm.remove(three));
+//        assertEquals(4, set.size());
     }
 
     /**
@@ -647,10 +647,10 @@ public class COWNavigableSetTest extends JSR166TestCase {
         k = (Integer)(i.next());
         assertEquals(three, k);
         assertFalse(i.hasNext());
-        sm.clear();
-        assertTrue(sm.isEmpty());
-        assertEquals(2, set.size());
-        assertEquals(four, set.first());
+//        sm.clear();
+//        assertTrue(sm.isEmpty());
+//        assertEquals(2, set.size());
+//        assertEquals(four, set.first());
     }
 
     /**
@@ -679,10 +679,10 @@ public class COWNavigableSetTest extends JSR166TestCase {
         SortedSet ssm = sm.tailSet(four);
         assertEquals(four, ssm.first());
         assertEquals(five, ssm.last());
-        assertTrue(ssm.remove(four));
-        assertEquals(1, ssm.size());
-        assertEquals(3, sm.size());
-        assertEquals(4, set.size());
+//        assertTrue(ssm.remove(four));
+//        assertEquals(1, ssm.size());
+//        assertEquals(3, sm.size());
+//        assertEquals(4, set.size());
     }
 
     Random rnd = new Random(666);
@@ -701,12 +701,12 @@ public class COWNavigableSetTest extends JSR166TestCase {
         check(set,                 0, setSize - 1, true, bs);
         check(set.descendingSet(), 0, setSize - 1, false, bs);
 
-        mutateSet(set, 0, setSize - 1, bs);
-        check(set,                 0, setSize - 1, true, bs);
-        check(set.descendingSet(), 0, setSize - 1, false, bs);
-
-        bashSubSet(set.subSet(0, true, setSize, false),
-                   0, setSize - 1, true, bs);
+//        mutateSet(set, 0, setSize - 1, bs);
+//        check(set,                 0, setSize - 1, true, bs);
+//        check(set.descendingSet(), 0, setSize - 1, false, bs);
+//
+//        bashSubSet(set.subSet(0, true, setSize, false),
+//                   0, setSize - 1, true, bs);
     }
 
     static NavigableSet<Integer> newSet(Class cl) throws Exception {
