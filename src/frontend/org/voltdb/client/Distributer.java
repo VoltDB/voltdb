@@ -173,7 +173,9 @@ class Distributer {
                                     e1.printStackTrace();
                                 }
                                 iter.remove();
-                                c.m_callbacksToInvoke.decrementAndGet();
+                                m_rateLimiter.transactionResponseReceived(now, -1);
+                                int callbacksToInvoke = c.m_callbacksToInvoke.decrementAndGet();
+                                assert(callbacksToInvoke >= 0);
                             }
                         }
                     }
@@ -186,6 +188,7 @@ class Distributer {
 
     class CallbackBookeeping {
         public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name) {
+            assert(callback != null);
             this.timestamp = timestamp;
             this.callback = callback;
             this.name = name;
@@ -296,6 +299,7 @@ class Distributer {
             ProcedureCallback cb = null;
             long callTime = 0;
             int delta = 0;
+            long handle = response.getClientHandle();
             synchronized (this) {
                 // track the timestamp of the most recent read on this connection
                 m_lastResponseTime = now;
@@ -308,7 +312,8 @@ class Distributer {
 
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
                 // presumably (hopefully) this is a response for a timed-out message
-                if (stuff == null) {
+                // (also ignore topology and procedure internal calls)
+                if ((stuff == null) && (handle != TOPOLOGY_HANDLE) && (handle != PROCEDURE_HANDLE)) {
                     for (ClientStatusListenerExt listener : m_listeners) {
                         listener.lateProcedureResponse(response, m_hostname, m_port);
                     }
@@ -333,8 +338,7 @@ class Distributer {
             }
 
             try {
-                if (response.getClientHandle() == TOPOLOGY_HANDLE) {
-                    m_callbacksToInvoke.decrementAndGet();
+                if (handle == TOPOLOGY_HANDLE) {
                     synchronized (Distributer.this) {
                         VoltTable results[] = response.getResults();
                         if (results != null && results.length == 1) {
@@ -342,8 +346,7 @@ class Distributer {
                             updateAffinityTopology(vt);
                         }
                     }
-                } else if (response.getClientHandle() == PROCEDURE_HANDLE) {
-                    m_callbacksToInvoke.decrementAndGet();
+                } else if (handle == PROCEDURE_HANDLE) {
                     synchronized (Distributer.this) {
                         VoltTable results[] = response.getResults();
                         if (results != null && results.length == 1) {
@@ -356,16 +359,15 @@ class Distributer {
                 e.printStackTrace();
             }
 
-            if (cb != null) {
-                response.setClientRoundtrip(delta);
-                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
-                try {
-                    cb.clientCallback(response);
-                } catch (Exception e) {
-                    uncaughtException(cb, response, e);
-                }
-                m_callbacksToInvoke.decrementAndGet();
+            response.setClientRoundtrip(delta);
+            assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
+            try {
+                cb.clientCallback(response);
+            } catch (Exception e) {
+                uncaughtException(cb, response, e);
             }
+            int callbacksToInvoke = m_callbacksToInvoke.decrementAndGet();
+            assert(callbacksToInvoke >= 0);
         }
 
         @Override
@@ -592,11 +594,11 @@ class Distributer {
             if (m_useClientAffinity) {
                 ProcedureInvocation spi = new ProcedureInvocation( TOPOLOGY_HANDLE, "@Statistics", "TOPO", 0);
                 //The handle is specific to topology updates and has special cased handling
-                queue(spi, null, true);
+                queue(spi, new NullCallback(), true);
 
                 spi = new ProcedureInvocation( PROCEDURE_HANDLE, "@SystemCatalog", "PROCEDURES");
                 //The handle is specific to procedure updates and has special cased handling
-                queue(spi, null, true);
+                queue(spi, new NullCallback(), true);
                 m_hostIdToConnection.put(hostId, cxn);
             }
         }
@@ -618,6 +620,9 @@ class Distributer {
             ProcedureCallback cb,
             final boolean ignoreBackpressure)
     throws NoConnectionsException {
+        assert(invocation != null);
+        assert(cb != null);
+
         NodeConnection cxn = null;
         boolean backpressure = true;
 
