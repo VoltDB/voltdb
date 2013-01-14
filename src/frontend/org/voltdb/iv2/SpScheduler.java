@@ -604,6 +604,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // Pass a response through the duplicate counters.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
+        // All single-partition reads are short-circuit reads and will have no duplicate counter.
+        // SpScheduler will only see InitiateResponseMessages for SP transactions, so if it's
+        // read-only here, it's short-circuited.  Avoid all the lookup below.  Also, don't update
+        // the truncation handle, since it won't have meaning for anyone.
+        if (message.isReadOnly()) {
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            m_mailbox.send(message.getInitiatorHSId(), message);
+            return;
+        }
+
         final long spHandle = message.getSpHandle();
         final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
         DuplicateCounter counter = m_duplicateCounters.get(dcKey);
