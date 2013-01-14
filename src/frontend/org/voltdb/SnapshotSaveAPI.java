@@ -887,8 +887,8 @@ public class SnapshotSaveAPI
                                              table.getIsreplicated(),
                                              partitionsForHost,
                                              CatalogUtil.getVoltTable(table),
-                                             timestamp,
-                                             txnId);
+                                             txnId,
+                                             timestamp);
     }
 
 }
