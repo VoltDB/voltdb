@@ -78,7 +78,7 @@ public class UpdateBaseProc extends VoltProcedure {
         if (rowCount != 0) {
             VoltTableRow row = data.fetchRow(0);
             cnt = row.getLong("cnt") + 1;
-            prevtxnid = row.getLong("prevtxnid");
+            prevtxnid = row.getLong("txnid");
             prevrid = row.getLong("rid");
         }
 
@@ -171,7 +171,8 @@ public class UpdateBaseProc extends VoltProcedure {
             if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
                 throw new VoltAbortException(callerId +
                         " cnt values are not consecutive" +
-                        " for cid " + cid);
+                        " for cid " + cid + ". Got " + cntValue +
+                        ", prev was: " + prevCnt);
             }
             prevCnt = cntValue;
         }
