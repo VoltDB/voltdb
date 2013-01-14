@@ -17,9 +17,15 @@
 
 package org.voltdb.processtools;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -27,7 +33,9 @@ import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
+import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.ChannelSftp.LsEntry;
 import com.jcraft.jsch.ChannelSftp.LsEntrySelector;
@@ -75,7 +83,7 @@ public class SFTPSession {
      * @param port SFTP port
      * @param log logger
      *
-     * @throws SFTPException when it cannot connect, and establish a SFTP
+     * @throws {@link SFTPException} when it cannot connect, and establish a SFTP
      *   session
      */
     public SFTPSession( String user, String key, String host, int port, VoltLogger log) {
@@ -92,6 +100,7 @@ public class SFTPSession {
                 "specified invalid port"
                 );
 
+        m_host = host;
         if (log == null) m_log = cmdLog;
         else m_log = log;
 
@@ -133,7 +142,6 @@ public class SFTPSession {
         } catch (JSchException jsex) {
             throw new SFTPException("open an SFTP channel", jsex);
         }
-        m_host = host;
         m_channel = channel;
     }
 
@@ -157,8 +165,8 @@ public class SFTPSession {
      * values contain their respective destinations files. NB destinations must not
      * be directory names, but fully specified file names
      *
-     * @throws SFTPException when an error occurs during SFTP operations performed
-     *   by this method
+     * @throws {@link SFTPException} when an error occurs during SFTP operations
+     *   performed by this method
      */
     public void install( Map<File, File> files) {
         Preconditions.checkArgument(
@@ -179,8 +187,8 @@ public class SFTPSession {
      * values contain their respective destinations files. NB destinations must not
      * be directory names, but fully specified file names
      *
-     * @throws SFTPException when an error occurs during SFTP operations performed
-     *   by this method
+     * @throws {@link SFTPException} when an error occurs during SFTP operations
+     *   performed by this method
      */
     public void copyOverFiles( Map<File, File> files) {
         Preconditions.checkArgument(
@@ -269,8 +277,8 @@ public class SFTPSession {
      *
      * @param files a collection of files
      *
-     * @throws SFTPException when an error occurs during SFTP operations performed
-     *   by this method
+     * @throws {@link SFTPException} when an error occurs during SFTP operations
+     *   performed by this method
      */
     public void ensureDirectoriesExistFor( Collection<File> files) {
         Preconditions.checkArgument(
@@ -315,8 +323,8 @@ public class SFTPSession {
      *
      * @return true if does, false if it does not
      *
-     * @throws SFTPException when an error occurs during SFTP operations performed
-     *   by this method
+     * @throws {@link SFTPException} when an error occurs during SFTP operations
+     *   performed by this method
      */
     public boolean directoryExists( final File directory) {
         Preconditions.checkArgument(
@@ -336,6 +344,120 @@ public class SFTPSession {
             throw new SFTPException("list directory " + directory.getParent(), sfex);
         }
         return selector.doesExist();
+    }
+
+    /**
+     * Executes the given command with the given list as its input
+     *
+     * @param list input
+     * @param command command to execute on remote host
+     * @return the output of the command as a list
+     * @throws {@link SSHException} when an error occurs during SSH
+     *   command performed by this method
+     */
+    public List<String> pipeListToShellCommand(Collection<String> list, String command) {
+
+        Preconditions.checkArgument(
+                command != null && !command.trim().isEmpty(),
+                "specified empty or null command string"
+                );
+        Preconditions.checkState(
+                m_channel != null, "stale session"
+                );
+
+        ChannelExec e = null;
+        BufferedReader sherr = null;
+        BufferedReader shout = null;
+
+        List<String> shellout = new ArrayList<String>();
+
+        try {
+            try {
+                e = (ChannelExec)m_channel.getSession().openChannel("exec");
+            } catch (JSchException jex) {
+                throw new SSHException("opening ssh exec channel", jex);
+            }
+            try {
+                shout = new BufferedReader(
+                        new InputStreamReader(
+                                e.getInputStream(), Charsets.UTF_8));
+            } catch (IOException ioex) {
+                throw new SSHException("geting exec channel input stream", ioex);
+            }
+            try {
+                sherr = new BufferedReader(
+                        new InputStreamReader(
+                                e.getErrStream(), Charsets.UTF_8));
+            } catch (IOException ioex) {
+                throw new SSHException("getting exec channel error stream", ioex);
+            }
+            if (list != null && !list.isEmpty()) {
+                e.setInputStream( listAsInputStream(list));
+            }
+            e.setCommand(command);
+
+            try {
+                e.connect(5000);
+                int retries = 50;
+                while (!e.isClosed() && retries-- > 0) {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ignoreIt) {}
+                }
+            } catch (JSchException jex) {
+                throw new SSHException("executing " + command, jex);
+            }
+
+            try {
+                String outputLine = shout.readLine();
+                while (outputLine != null) {
+                    shellout.add(outputLine);
+                    outputLine = shout.readLine();
+                }
+            } catch (IOException ioex) {
+                throw new SSHException("capturing " + command + " output", ioex);
+            }
+            if (e.getExitStatus() != 0) {
+                try {
+                    String errorLine = sherr.readLine();
+                    while (errorLine != null) {
+                        shellout.add(errorLine);
+                        errorLine = sherr.readLine();
+                    }
+                } catch (IOException ioex) {
+                    throw new SSHException("capturing " + command + " error", ioex);
+                }
+                throw new SSHException(
+                        "error output from '" +
+                        command + "':\n\t" + join(shellout,"\n\t")
+                        );
+            }
+        } finally {
+            if (sherr != null) try { sherr.close(); } catch (Exception ignoreIt) {}
+            if (shout != null) try { shout.close(); } catch (Exception ignoreIt) {}
+        }
+
+        return shellout;
+    }
+
+    /**
+     * Joins the given list of string using the given join string
+     *
+     * @param list of strings
+     * @param joinWith string to join the list with
+     * @return items of the given list joined with the given join string
+     */
+    protected final static String join(Collection<String> list, String joinWith) {
+        Preconditions.checkArgument(list != null, "specified null list");
+        Preconditions.checkArgument(joinWith != null, "specified null joinWith string");
+
+        int cnt = 0;
+        StringBuilder sb = new StringBuilder();
+        for (String item: list) {
+            if (cnt++ > 0) sb.append(joinWith);
+            sb.append(item);
+        }
+        return sb.toString();
     }
 
     /**
@@ -375,6 +497,23 @@ public class SFTPSession {
         } finally {
             m_channel = null;
         }
+    }
+
+    /**
+     * Return an {@link InputStream} that encompasses the the content
+     * of the given list separated by the new line character
+     *
+     * @param list of strings
+     * @return an {@link InputStream} that encompasses the the content
+     *   of the given list separated by the new line character
+     */
+    protected final static InputStream listAsInputStream(Collection<String> list) {
+        Preconditions.checkArgument(list != null, "specified null list");
+        StringBuilder sb = new StringBuilder();
+        for (String item: list) {
+            sb.append(item).append("\n");
+        }
+        return new ByteArrayInputStream(sb.toString().getBytes(Charsets.UTF_8));
     }
 
     private final static class DirectoryExistsSelector implements LsEntrySelector {
@@ -469,18 +608,35 @@ public class SFTPSession {
 
         public SFTPException(String message, Throwable cause) {
             super("(Host: " + m_host + ") " + message, cause);
-            m_log.error(this);
         }
 
         public SFTPException(String message) {
             super("(Host: " + m_host + ") " + message);
-            m_log.error(this);
         }
 
         public SFTPException(Throwable cause) {
             super("(Host: " + m_host + ")",cause);
-            m_log.error(this);
         }
     }
 
+    public class SSHException extends RuntimeException {
+
+        private static final long serialVersionUID = 9135753444480123857L;
+
+        public SSHException() {
+            super("(Host: " + m_host + ")");
+        }
+
+        public SSHException(String message, Throwable cause) {
+            super("(Host: " + m_host + ") " + message, cause);
+        }
+
+        public SSHException(String message) {
+            super("(Host: " + m_host + ") " + message);
+        }
+
+        public SSHException(Throwable cause) {
+            super("(Host: " + m_host + ")",cause);
+        }
+    }
 }
