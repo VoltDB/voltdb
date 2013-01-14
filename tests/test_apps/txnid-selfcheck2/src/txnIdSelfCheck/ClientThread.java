@@ -34,6 +34,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.VoltProcedure.VoltAbortException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
@@ -147,7 +148,14 @@ public class ClientThread extends Thread {
                 System.exit(-1);
             }
             VoltTable data = results[2];
-            UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+            try {
+                UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+            }
+            catch (VoltAbortException vae) {
+                log.error("validateCIDData failed on: " + procName + ", shouldRollback: " +
+                        shouldRollback + " data: " + data);
+                throw vae;
+            }
         }
         finally {
             // ensure rid is incremented (if not rolled back intentionally)
