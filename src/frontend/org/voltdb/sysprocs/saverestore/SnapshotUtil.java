@@ -30,6 +30,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -91,7 +92,8 @@ public class SnapshotUtil {
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
-        InstanceId instanceId)
+        InstanceId instanceId,
+        long timestamp)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -109,6 +111,8 @@ public class SnapshotUtil {
                 stringer.object();
                 stringer.key("version").value(1);
                 stringer.key("txnId").value(txnId);
+                stringer.key("timestamp").value(timestamp);
+                stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -1162,5 +1166,11 @@ public class SnapshotUtil {
         ThreadFactory factory = CoreUtils.getThreadFactory("Snapshot Request - " + nonce);
         Thread workThread = factory.newThread(work);
         workThread.start();
+    }
+
+    public static String formatHumanReadableDate(long timestamp) {
+        SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING + "z");
+        sdf.setTimeZone(VoltDB.VOLT_TIMEZONE);
+        return sdf.format(new Date(timestamp));
     }
 }
