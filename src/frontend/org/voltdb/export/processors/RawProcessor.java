@@ -117,7 +117,7 @@ public class RawProcessor implements ExportDataProcessor {
                     }
                 }
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error in RawProcessor run loop", false, e);
+                VoltDB.crashLocalVoltDB("Error in RawProcessor run loop", true, e);
             }
         }
     };
