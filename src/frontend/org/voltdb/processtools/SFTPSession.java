@@ -273,7 +273,7 @@ public class SFTPSession {
 
     /**
      * Akin to mkdir -p for all directories containing the given collection of
-     * files.
+     * remote files.
      *
      * @param files a collection of files
      *
@@ -311,6 +311,42 @@ public class SFTPSession {
                 } catch (SftpException sfex) {
                     throw new SFTPException("create directory " + entry, sfex);
                 }
+            }
+        }
+        directories.clear();
+    }
+
+    /**
+     * Akin to mkdir -p for all directories containing the given collection of
+     * of local files.
+     *
+     * @param files a collection of files
+     *
+     * @throws {@link RuntimeException} when an error occurs during local file
+     *   operations performed by this method
+     */
+    public void ensureLocalDirectoriesExistFor( Collection<File> files) {
+        Preconditions.checkArgument(
+                files != null, "null file collection"
+                );
+        Preconditions.checkState(
+                m_channel != null, "stale session"
+                );
+
+        // dedup directories containing files
+        TreeSet<File> directories = new TreeSet<File>();
+        for (File f: files) {
+            directories.add( f.getParentFile());
+        }
+        for (File dir: directories) {
+            dir.mkdirs();
+            if (   !dir.exists()
+                || !dir.isDirectory()
+                || !dir.canRead()
+                || !dir.canWrite()
+                || !dir.canExecute()
+            ) {
+                throw new RuntimeException(dir + " is not write accessible");
             }
         }
         directories.clear();
@@ -404,8 +440,11 @@ public class SFTPSession {
                         Thread.sleep(100);
                     } catch (InterruptedException ignoreIt) {}
                 }
+                if (retries < 0) {
+                    throw new SSHException("'" + command + "' timed out");
+                }
             } catch (JSchException jex) {
-                throw new SSHException("executing " + command, jex);
+                throw new SSHException("executing '" + command + "'", jex);
             }
 
             try {
@@ -415,7 +454,7 @@ public class SFTPSession {
                     outputLine = shout.readLine();
                 }
             } catch (IOException ioex) {
-                throw new SSHException("capturing " + command + " output", ioex);
+                throw new SSHException("capturing '" + command + "' output", ioex);
             }
             if (e.getExitStatus() != 0) {
                 try {
@@ -425,12 +464,15 @@ public class SFTPSession {
                         errorLine = sherr.readLine();
                     }
                 } catch (IOException ioex) {
-                    throw new SSHException("capturing " + command + " error", ioex);
+                    throw new SSHException("capturing '" + command + "' error", ioex);
                 }
                 throw new SSHException(
                         "error output from '" +
                         command + "':\n\t" + join(shellout,"\n\t")
                         );
+            }
+            if (m_log.isDebugEnabled()) {
+                m_log.debug("SSH: " + command);
             }
         } finally {
             if (sherr != null) try { sherr.close(); } catch (Exception ignoreIt) {}
@@ -468,7 +510,7 @@ public class SFTPSession {
      * @param directories set of directory entries
      * @return
      */
-    private int addDirectoryAncestors(
+    protected int addDirectoryAncestors(
             final File directory,
             final TreeSet<DirectoryEntry> directories)
     {
@@ -516,7 +558,7 @@ public class SFTPSession {
         return new ByteArrayInputStream(sb.toString().getBytes(Charsets.UTF_8));
     }
 
-    private final static class DirectoryExistsSelector implements LsEntrySelector {
+    protected final static class DirectoryExistsSelector implements LsEntrySelector {
         boolean m_exists = false;
         final File m_directory;
 
@@ -537,7 +579,7 @@ public class SFTPSession {
         }
     }
 
-    private final static class DirectoryEntry implements Comparable<DirectoryEntry> {
+    protected final static class DirectoryEntry implements Comparable<DirectoryEntry> {
         final int m_level;
         final File m_directory;
 
@@ -546,7 +588,6 @@ public class SFTPSession {
             this.m_directory = directory;
         }
 
-        @SuppressWarnings("unused")
         int getLevel() {
             return m_level;
         }
@@ -619,24 +660,24 @@ public class SFTPSession {
         }
     }
 
-    public class SSHException extends RuntimeException {
+    public class SSHException extends SFTPException {
 
-        private static final long serialVersionUID = 9135753444480123857L;
+        private static final long serialVersionUID = 8494735481584692337L;
 
         public SSHException() {
-            super("(Host: " + m_host + ")");
+            super();
         }
 
         public SSHException(String message, Throwable cause) {
-            super("(Host: " + m_host + ") " + message, cause);
+            super(message, cause);
         }
 
         public SSHException(String message) {
-            super("(Host: " + m_host + ") " + message);
+            super(message);
         }
 
         public SSHException(Throwable cause) {
-            super("(Host: " + m_host + ")",cause);
+            super(cause);
         }
     }
 }
