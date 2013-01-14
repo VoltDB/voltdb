@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google.common.base.Charsets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -62,6 +61,7 @@ import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
 
+import com.google.common.base.Charsets;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
@@ -104,7 +104,8 @@ public class SnapshotSaveAPI
     public VoltTable startSnapshotting(
             final String file_path, final String file_nonce, final SnapshotFormat format, final byte block,
             final long multiPartTxnId, final long partitionTxnId, final long legacyPerPartitionTxnIds[],
-            final String data, final SystemProcedureExecutionContext context, final String hostname)
+            final String data, final SystemProcedureExecutionContext context, final String hostname,
+            final long timestamp)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
@@ -155,7 +156,8 @@ public class SnapshotSaveAPI
                             hostname,
                             result,
                             exportSequenceNumbers,
-                            st);
+                            st,
+                            timestamp);
                 }
             });
 
@@ -498,7 +500,7 @@ public class SnapshotSaveAPI
             String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker) {
+            SiteTracker tracker, long timestamp) {
         {
             final int numLocalSites =
                     (tracker.getLocalSites().length - recoveringSiteCount.get());
@@ -581,7 +583,8 @@ public class SnapshotSaveAPI
                                                   context.getHostId(),
                                                   exportSequenceNumbers,
                                                   partitionTransactionIds,
-                                                  VoltDB.instance().getHostMessenger().getInstanceId());
+                                                  VoltDB.instance().getHostMessenger().getInstanceId(),
+                                                  timestamp);
                     if (completionTask != null) {
                         SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
                     }
@@ -669,6 +672,7 @@ public class SnapshotSaveAPI
                                         context.getHostId(),
                                         tracker.m_numberOfPartitions,
                                         txnId,
+                                        timestamp,
                                         tracker.getPartitionsForHost(context.getHostId()));
                         }
 
@@ -870,6 +874,7 @@ public class SnapshotSaveAPI
             int hostId,
             int numPartitions,
             long txnId,
+            long timestamp,
             List<Integer> partitionsForHost)
     throws IOException
     {
@@ -882,6 +887,7 @@ public class SnapshotSaveAPI
                                              table.getIsreplicated(),
                                              partitionsForHost,
                                              CatalogUtil.getVoltTable(table),
+                                             timestamp,
                                              txnId);
     }
 
