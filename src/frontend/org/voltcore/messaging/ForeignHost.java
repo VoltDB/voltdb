@@ -248,7 +248,7 @@ public class ForeignHost {
          * because we are saying that things can come and go
          */
         if (mailbox == null) {
-            hostLog.warn(String.format("Message (%s) sent to unknown site id: %s @ (%s) at " +
+            hostLog.info(String.format("Message (%s) sent to unknown site id: %s @ (%s) at " +
                     m_hostMessenger.getHostId() + " from " + CoreUtils.hsIdToString(message.m_sourceHSId) + "\n",
                     message.getClass().getSimpleName(),
                     CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString()));
