@@ -221,6 +221,7 @@ class Distributer {
 
         public void createWork(long handle, String name, ByteBuffer c,
                 ProcedureCallback callback, boolean ignoreBackpressure) {
+            assert(callback != null);
             long now = System.currentTimeMillis();
             now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
                     now, ignoreBackpressure);
@@ -326,6 +327,7 @@ class Distributer {
                     callTime = stuff.timestamp;
                     delta = (int)(now - callTime);
                     cb = stuff.callback;
+                    assert(cb != null);
                     final byte status = response.getStatus();
                     boolean abort = false;
                     boolean error = false;
@@ -362,15 +364,18 @@ class Distributer {
                 e.printStackTrace();
             }
 
-            response.setClientRoundtrip(delta);
-            assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
-            try {
-                cb.clientCallback(response);
-            } catch (Exception e) {
-                uncaughtException(cb, response, e);
+            // cb might be null on late response
+            if (cb != null) {
+                response.setClientRoundtrip(delta);
+                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
+                try {
+                    cb.clientCallback(response);
+                } catch (Exception e) {
+                    uncaughtException(cb, response, e);
+                }
+                int callbacksToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(callbacksToInvoke >= 0);
             }
-            int callbacksToInvoke = m_callbacksToInvoke.decrementAndGet();
-            assert(callbacksToInvoke >= 0);
         }
 
         @Override
