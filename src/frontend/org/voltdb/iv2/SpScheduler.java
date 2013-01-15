@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
@@ -35,8 +36,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-
-import org.voltdb.messaging.DumpMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -47,6 +46,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -890,9 +890,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     void writeIv2ViableReplayEntryInternal(long spHandle)
     {
-        if (m_replayComplete) {
-            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
-                    spHandle);
+        Semaphore writeComplete = new Semaphore(0);
+        try {
+            if (m_replayComplete) {
+                m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
+                        spHandle, writeComplete);
+                writeComplete.acquire();
+            }
+        } catch (InterruptedException ie) {
+            VoltDB.crashLocalVoltDB("Interrupted while writing fault log entry.", true, ie);
         }
     }
 

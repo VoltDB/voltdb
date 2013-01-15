@@ -81,7 +81,7 @@ public interface CommandLog {
      * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
      */
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
-            int partitionId, long spHandle);
+            int partitionId, long spHandle, Semaphore writeComplete);
 
     public abstract void logHeartbeat(final long txnId);
 
