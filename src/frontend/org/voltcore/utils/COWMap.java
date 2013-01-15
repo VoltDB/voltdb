@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ForwardingMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -70,6 +71,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
 
     @Override
     public V remove(Object key) {
+        Preconditions.checkNotNull(key);
         while (true) {
             ImmutableMap<K, V> original = m_map.get();
             Builder<K, V> builder = new Builder<K, V>();
@@ -141,7 +143,27 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
     }
 
     @Override
+    public V get(Object key) {
+        Preconditions.checkNotNull(key);
+        return delegate().get(key);
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+        Preconditions.checkNotNull(key);
+        return delegate().containsKey(key);
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+        Preconditions.checkNotNull(value);
+        return delegate().containsValue(value);
+    }
+
+    @Override
     public boolean remove(Object key, Object value) {
+        Preconditions.checkNotNull(key);
+        if (value == null) return false;
         while (true) {
             ImmutableMap<K, V> original = m_map.get();
             V existingValue = original.get(key);
@@ -166,6 +188,9 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
 
     @Override
     public boolean replace(K key, V oldValue, V newValue) {
+        Preconditions.checkNotNull(key);
+        Preconditions.checkNotNull(oldValue);
+        Preconditions.checkNotNull(newValue);
         while (true) {
             ImmutableMap<K, V> original = m_map.get();
             V existingValue = original.get(key);
@@ -191,6 +216,8 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
 
     @Override
     public V replace(K key, V value) {
+        Preconditions.checkNotNull(key);
+        Preconditions.checkNotNull(value);
         while (true) {
             ImmutableMap<K, V> original = m_map.get();
             V existingValue = original.get(key);
