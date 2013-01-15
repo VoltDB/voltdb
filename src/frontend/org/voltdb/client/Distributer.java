@@ -309,10 +309,13 @@ class Distributer {
 
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
                 // presumably (hopefully) this is a response for a timed-out message
-                // (also ignore topology and procedure internal calls)
-                if ((stuff == null) && (handle != TOPOLOGY_HANDLE) && (handle != PROCEDURE_HANDLE)) {
-                    for (ClientStatusListenerExt listener : m_listeners) {
-                        listener.lateProcedureResponse(response, m_hostname, m_port);
+                if (stuff == null) {
+                    // also ignore topology and procedure internal calls
+                    if ((handle != TOPOLOGY_HANDLE) && (handle != PROCEDURE_HANDLE)) {
+                        // notify any listeners of the late response
+                        for (ClientStatusListenerExt listener : m_listeners) {
+                            listener.lateProcedureResponse(response, m_hostname, m_port);
+                        }
                     }
                 }
                 // handle a proper callback
