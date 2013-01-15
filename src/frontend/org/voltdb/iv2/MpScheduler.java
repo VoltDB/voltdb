@@ -58,6 +58,10 @@ public class MpScheduler extends Scheduler
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+    // We need to lag the current MP execution point by at least two committed TXN ids
+    // since that's the first point we can be sure is safely agreed on by all nodes.
+    // Let the one we can't be sure about linger here.  See ENG-4211 for more.
+    long m_repairLogAwaitingCommit = Long.MIN_VALUE;
 
     MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
     {
@@ -292,7 +296,11 @@ public class MpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
-                m_repairLogTruncationHandle = message.getTxnId();
+                // Only advance the truncation point on committed transactions.  See ENG-4211
+                if (message.shouldCommit()) {
+                    m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                    m_repairLogAwaitingCommit = message.getTxnId();
+                }
                 m_outstandingTxns.remove(message.getTxnId());
 
                 m_mailbox.send(counter.m_destinationId, message);
@@ -303,9 +311,13 @@ public class MpScheduler extends Scheduler
             // doing duplicate suppresion: all done.
         }
         else {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            m_repairLogTruncationHandle = message.getTxnId();
+            // Only advance the truncation point on committed transactions.
+            if (message.shouldCommit()) {
+                m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                m_repairLogAwaitingCommit = message.getTxnId();
+            }
             m_outstandingTxns.remove(message.getTxnId());
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }
