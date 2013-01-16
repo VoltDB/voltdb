@@ -58,8 +58,11 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+
+import static org.mockito.Mockito.doReturn;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
 public class MockVoltClient implements Client, ReplicaProcCaller{
@@ -303,7 +306,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     @Override
     public ClientStatsContext createStatsContext() {
-        return null;
+        ClientStatsContext mock = Mockito.mock(ClientStatsContext.class);
+        doReturn(mock).when(mock).fetchAndResetBaseline();
+        doReturn(Mockito.mock(ClientStats.class)).when(mock).getStats();
+        return mock;
     }
 
     @Override
