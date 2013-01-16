@@ -67,9 +67,6 @@ public class DummyCommandLog implements CommandLog {
 
     @Override
     public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
-            int partitionId, long spHandle, Semaphore writeComplete) {
-        if (writeComplete != null) {
-            writeComplete.release(1);
-        }
+            int partitionId, long spHandle) {
     }
 }
