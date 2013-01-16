@@ -858,6 +858,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 hostLog.warn("Running without redundancy (k=0) is not recommended for production use.");
             }
 
+            // warn if cluster is partitionable, but partition detection is off
+            if ((m_catalogContext.cluster.getNetworkpartition() == false) &&
+                    (clusterConfig.getReplicationFactor() > 0)) {
+                hostLog.warn("Running a redundant (k-safe) cluster with network partition detection disabled is not recommended for production use.");
+                hostLog.warn("With partition detection disabled, data may be lost or corrupted by certain classes of network failures.");
+            }
+
             assert(m_clientInterfaces.size() > 0);
             ClientInterface ci = m_clientInterfaces.get(0);
             ci.initializeSnapshotDaemon(m_messenger.getZK(), m_globalServiceElector);
