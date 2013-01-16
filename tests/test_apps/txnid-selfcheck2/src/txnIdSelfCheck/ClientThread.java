@@ -124,11 +124,21 @@ public class ClientThread extends Thread {
 
             byte[] payload = m_processor.generateForStore().getStoreValue();
 
-            ClientResponse response = m_client.callProcedure(procName,
-                    m_cid,
-                    m_nextRid,
-                    payload,
-                    shouldRollback);
+            ClientResponse response;
+            try {
+                response = m_client.callProcedure(procName,
+                        m_cid,
+                        m_nextRid,
+                        payload,
+                        shouldRollback);
+            } catch (Exception e) {
+                log.warn("ClientThread threw after " + m_txnsRun.get() +
+                        " calls while calling procedure: " + procName +
+                        " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
+                        ", payload: " + payload +
+                        ", shouldRollback: " + shouldRollback);
+                throw e;
+            }
 
             // fake a proc call exception if we think one should be thrown
             if (response.getStatus() != ClientResponse.SUCCESS) {

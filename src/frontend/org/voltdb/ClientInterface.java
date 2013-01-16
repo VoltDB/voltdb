@@ -1186,8 +1186,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         public ByteBuffer[] serialize()
                                                 throws IOException {
                                             ClientResponseImpl clientResponse = response.getClientResponseData();
-                                            ClientInterfaceHandleManager.Iv2InFlight clientData =
-                                                    cihm.findHandle(response.getClientInterfaceHandle());
+                                            // HACK-O-RIFFIC
+                                            // For now, figure out if this is a transaction that was ignored
+                                            // by the ReplaySequencer and just remove the handle from the CIHM
+                                            // without removing any handles before it which we haven't seen yet.
+                                            ClientInterfaceHandleManager.Iv2InFlight clientData;
+                                            if (clientResponse.getStatusString() != null &&
+                                                clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
+                                                clientData = cihm.removeHandle(response.getClientInterfaceHandle());
+                                            }
+                                            else {
+                                                clientData = cihm.findHandle(response.getClientInterfaceHandle());
+                                            }
                                             if (clientData == null) {
                                                 return new ByteBuffer[] {};
                                             }
