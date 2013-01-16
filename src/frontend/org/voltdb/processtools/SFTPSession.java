@@ -213,6 +213,67 @@ public class SFTPSession {
     }
 
     /**
+     * Given a map where their keys contain source file, and their associated
+     * values contain their respective destinations files (not directories)
+     * copy over the source files to their destination.
+     *
+     * @param files Map where their keys contain source file, and their associated
+     * values contain their respective destinations files. NB destinations must not
+     * be directory names, but fully specified file names
+     *
+     * @throws {@link SFTPException} when an error occurs during SFTP operations
+     *   performed by this method
+     */
+    public void copyInFiles( Map <File,File> files) {
+        Preconditions.checkArgument(
+                files != null, "null file collection"
+                );
+        Preconditions.checkState(
+                m_channel != null, "stale session"
+                );
+
+        for (Map.Entry<File, File> entry: files.entrySet()) {
+            String src = entry.getKey().getAbsolutePath();
+            String dst = entry.getValue().getAbsolutePath();
+            try {
+                m_channel.get(src, dst);
+                if (m_log.isDebugEnabled()) {
+                    m_log.debug("SFTP: get " + src + " " + dst);
+                }
+            } catch (SftpException sfex) {
+                throw new SFTPException("get " + src + " " + dst, sfex);
+            }
+        }
+    }
+
+    /**
+     * Delete the given list of files
+     *
+     * @param files a collection of files
+     * @throws SFTPException when an error occurs during SFTP operations performed
+     *   by this method
+     */
+    public void deleteFiles(Collection<File> files) {
+        Preconditions.checkArgument(
+                files != null, "null file collection"
+                );
+        Preconditions.checkState(
+                m_channel != null, "stale session"
+                );
+
+        for (File f: files) {
+            try {
+                m_channel.rm(f.getAbsolutePath());
+                if (m_log.isDebugEnabled()) {
+                    m_log.debug("SFTP: rm " + f);
+                }
+            } catch (SftpException sfex) {
+                throw new SFTPException("rm " + f, sfex);
+            }
+        }
+    }
+
+    /**
      * if found, it deletes artifacts held in the directories that
      * contain the given list of files
      *
