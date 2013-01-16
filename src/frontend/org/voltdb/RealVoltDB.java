@@ -861,8 +861,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // warn if cluster is partitionable, but partition detection is off
             if ((m_catalogContext.cluster.getNetworkpartition() == false) &&
                     (clusterConfig.getReplicationFactor() > 0)) {
-                hostLog.warn("Running a redundant (k-safe) cluster with network partition detection disabled is not recommended for production use.");
-                hostLog.warn("With partition detection disabled, data may be lost or corrupted by certain classes of network failures.");
+                hostLog.warn("Running a redundant (k-safe) cluster with network " +
+                		"partition detection disabled is not recommended for production use.");
+                // we decided not to include the stronger language below for the 3.0 version (ENG-4215)
+                //hostLog.warn("With partition detection disabled, data may be lost or " +
+                //		"corrupted by certain classes of network failures.");
             }
 
             assert(m_clientInterfaces.size() > 0);
