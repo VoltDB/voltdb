@@ -132,11 +132,13 @@ public class ClientThread extends Thread {
                         payload,
                         shouldRollback);
             } catch (Exception e) {
-                log.warn("ClientThread threw after " + m_txnsRun.get() +
-                        " calls while calling procedure: " + procName +
-                        " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
-                        ", payload: " + payload +
-                        ", shouldRollback: " + shouldRollback);
+                if (shouldRollback == 0) {
+                    log.warn("ClientThread threw after " + m_txnsRun.get() +
+                            " calls while calling procedure: " + procName +
+                            " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
+                            ", payload: " + payload +
+                            ", shouldRollback: " + shouldRollback);
+                }
                 throw e;
             }
 
