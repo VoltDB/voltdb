@@ -86,7 +86,9 @@ public class SFTPSession {
      * @throws {@link SFTPException} when it cannot connect, and establish a SFTP
      *   session
      */
-    public SFTPSession( String user, String key, String host, int port, VoltLogger log) {
+    public SFTPSession(
+            final String user, final String key, final String host,
+            int port, final VoltLogger log) {
         Preconditions.checkArgument(
                 user != null && !user.trim().isEmpty(),
                 "specified empty or null user"
@@ -145,11 +147,12 @@ public class SFTPSession {
         m_channel = channel;
     }
 
-    public SFTPSession( String user, String key, String host) {
+    public SFTPSession( final String user, final String key, final String host) {
         this(user, key, host, 22, null);
     }
 
-    public SFTPSession( String user, String key, String host, VoltLogger log) {
+    public SFTPSession( final String user, final String key,
+            final String host, final VoltLogger log) {
         this(user, key, host, 22, log);
     }
 
@@ -168,7 +171,7 @@ public class SFTPSession {
      * @throws {@link SFTPException} when an error occurs during SFTP operations
      *   performed by this method
      */
-    public void install( Map<File, File> files) {
+    public void install( final Map<File, File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
                 );
@@ -190,7 +193,7 @@ public class SFTPSession {
      * @throws {@link SFTPException} when an error occurs during SFTP operations
      *   performed by this method
      */
-    public void copyOverFiles( Map<File, File> files) {
+    public void copyOverFiles( final Map<File, File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
                 );
@@ -224,7 +227,7 @@ public class SFTPSession {
      * @throws {@link SFTPException} when an error occurs during SFTP operations
      *   performed by this method
      */
-    public void copyInFiles( Map <File,File> files) {
+    public void copyInFiles( final Map <File,File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
                 );
@@ -253,7 +256,7 @@ public class SFTPSession {
      * @throws SFTPException when an error occurs during SFTP operations performed
      *   by this method
      */
-    public void deleteFiles(Collection<File> files) {
+    public void deleteFiles(final Collection<File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
                 );
@@ -282,7 +285,7 @@ public class SFTPSession {
      * @throws SFTPException when an error occurs during SFTP operations performed
      *   by this method
      */
-    public void deletePreviouslyInstalledArtifacts( Collection<File> files) {
+    public void deletePreviouslyInstalledArtifacts( final Collection<File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
                 );
@@ -341,7 +344,7 @@ public class SFTPSession {
      * @throws {@link SFTPException} when an error occurs during SFTP operations
      *   performed by this method
      */
-    public void ensureDirectoriesExistFor( Collection<File> files) {
+    public void ensureDirectoriesExistFor( final Collection<File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
                 );
@@ -386,7 +389,7 @@ public class SFTPSession {
      * @throws {@link RuntimeException} when an error occurs during local file
      *   operations performed by this method
      */
-    public void ensureLocalDirectoriesExistFor( Collection<File> files) {
+    public void ensureLocalDirectoriesExistFor(final Collection<File> files) {
         Preconditions.checkArgument(
                 files != null, "null file collection"
                 );
@@ -423,7 +426,7 @@ public class SFTPSession {
      * @throws {@link SFTPException} when an error occurs during SFTP operations
      *   performed by this method
      */
-    public boolean directoryExists( final File directory) {
+    public boolean directoryExists(final File directory) {
         Preconditions.checkArgument(
                 directory != null, "null directory"
                 );
@@ -452,7 +455,8 @@ public class SFTPSession {
      * @throws {@link SSHException} when an error occurs during SSH
      *   command performed by this method
      */
-    public List<String> pipeListToShellCommand(Collection<String> list, String command) {
+    public List<String> pipeListToShellCommand(
+            final Collection<String> list, final String command) {
 
         Preconditions.checkArgument(
                 command != null && !command.trim().isEmpty(),
@@ -550,7 +554,8 @@ public class SFTPSession {
      * @param joinWith string to join the list with
      * @return items of the given list joined with the given join string
      */
-    protected final static String join(Collection<String> list, String joinWith) {
+    protected final static String join(
+            final Collection<String> list, final String joinWith) {
         Preconditions.checkArgument(list != null, "specified null list");
         Preconditions.checkArgument(joinWith != null, "specified null joinWith string");
 
@@ -610,7 +615,8 @@ public class SFTPSession {
      * @return an {@link InputStream} that encompasses the the content
      *   of the given list separated by the new line character
      */
-    protected final static InputStream listAsInputStream(Collection<String> list) {
+    protected final static InputStream listAsInputStream(
+            final Collection<String> list) {
         Preconditions.checkArgument(list != null, "specified null list");
         StringBuilder sb = new StringBuilder();
         for (String item: list) {
@@ -630,7 +636,7 @@ public class SFTPSession {
         @Override
         public int select(LsEntry entry) {
             m_exists = m_directory.getName().equals(entry.getFilename())
-                    && entry.getAttrs().isDir();
+                    && (entry.getAttrs().isDir() || entry.getAttrs().isLink());
             if (m_exists) return BREAK;
             else return CONTINUE;
         }
