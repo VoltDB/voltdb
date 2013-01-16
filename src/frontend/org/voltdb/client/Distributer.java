@@ -285,6 +285,7 @@ class Distributer {
                     return;
                 }
 
+                assert(m_callbacks.containsKey(handle) == false);
                 m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
                 m_callbacksToInvoke.incrementAndGet();
             }
