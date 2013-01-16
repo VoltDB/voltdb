@@ -38,7 +38,8 @@ import org.voltdb.utils.CatalogUtil;
  */
 public final class ClientImpl implements Client, ReplicaProcCaller {
 
-    private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
+    // call initiated by the user use positive handles
+    private final AtomicLong m_handle = new AtomicLong(0);
 
     /*
      * Username and password as set by createConnection. Used
