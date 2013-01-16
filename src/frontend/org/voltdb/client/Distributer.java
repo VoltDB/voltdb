@@ -35,6 +35,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -61,8 +62,9 @@ import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 class Distributer {
 
     static final long PING_HANDLE = Long.MAX_VALUE;
-    static final long TOPOLOGY_HANDLE = Long.MAX_VALUE - 1;
-    static final long PROCEDURE_HANDLE = Long.MAX_VALUE - 2;
+
+    // handles used internally are negative and decrement for each call
+    public final AtomicLong m_sysHandle = new AtomicLong(-1);
 
     // collection of connections to the cluster
     private final CopyOnWriteArrayList<NodeConnection> m_connections =
@@ -113,6 +115,50 @@ class Distributer {
     private Object m_clusterInstanceId[];
 
     private String m_buildString;
+
+    /**
+     * Handles topology updates for client affinity
+     */
+    class TopoUpdateCallback implements ProcedureCallback {
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            try {
+                synchronized (Distributer.this) {
+                    VoltTable results[] = clientResponse.getResults();
+                    if (results != null && results.length == 1) {
+                        VoltTable vt = results[0];
+                        updateAffinityTopology(vt);
+                    }
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Handles procedure updates for client affinity
+     */
+    class ProcUpdateCallback implements ProcedureCallback {
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            try {
+                synchronized (Distributer.this) {
+                    VoltTable results[] = clientResponse.getResults();
+                    if (results != null && results.length == 1) {
+                        VoltTable vt = results[0];
+                        updateProcedurePartitioning(vt);
+                    }
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     class CallExpiration implements Runnable {
         @Override
@@ -311,8 +357,8 @@ class Distributer {
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
                 // presumably (hopefully) this is a response for a timed-out message
                 if (stuff == null) {
-                    // also ignore topology and procedure internal calls
-                    if ((handle != TOPOLOGY_HANDLE) && (handle != PROCEDURE_HANDLE)) {
+                    // also ignore internal (topology and procedure) calls
+                    if (handle >= 0) {
                         // notify any listeners of the late response
                         for (ClientStatusListenerExt listener : m_listeners) {
                             listener.lateProcedureResponse(response, m_hostname, m_port);
@@ -337,28 +383,6 @@ class Distributer {
                     m_rateLimiter.transactionResponseReceived(now, clusterRoundTrip);
                     updateStats(stuff.name, delta, clusterRoundTrip, abort, error);
                 }
-            }
-
-            try {
-                if (handle == TOPOLOGY_HANDLE) {
-                    synchronized (Distributer.this) {
-                        VoltTable results[] = response.getResults();
-                        if (results != null && results.length == 1) {
-                            VoltTable vt = results[0];
-                            updateAffinityTopology(vt);
-                        }
-                    }
-                } else if (handle == PROCEDURE_HANDLE) {
-                    synchronized (Distributer.this) {
-                        VoltTable results[] = response.getResults();
-                        if (results != null && results.length == 1) {
-                            VoltTable vt = results[0];
-                            updateProcedurePartitioning(vt);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
 
             // cb might be null on late response
@@ -450,12 +474,9 @@ class Distributer {
                     ") was lost before a response was received");
                 for (final CallbackBookeeping callBk : m_callbacks.values()) {
                     try {
-                        //Client affinity doesn't register callbacks so you can have an entry
-                        //with a null callback
-                        if (callBk.callback != null) {
-                            callBk.callback.clientCallback(r);
-                        }
-                    } catch (Exception e) {
+                        callBk.callback.clientCallback(r);
+                    }
+                    catch (Exception e) {
                         uncaughtException(callBk.callback, r, e);
                     }
                     m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
@@ -593,19 +614,17 @@ class Distributer {
 
         synchronized (this) {
             if (m_useClientAffinity) {
-                ProcedureInvocation spi = new ProcedureInvocation( TOPOLOGY_HANDLE, "@Statistics", "TOPO", 0);
+                ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
                 //The handle is specific to topology updates and has special cased handling
-                queue(spi, new NullCallback(), true);
+                queue(spi, new TopoUpdateCallback(), true);
 
-                spi = new ProcedureInvocation( PROCEDURE_HANDLE, "@SystemCatalog", "PROCEDURES");
+                spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
                 //The handle is specific to procedure updates and has special cased handling
-                queue(spi, new NullCallback(), true);
+                queue(spi, new ProcUpdateCallback(), true);
                 m_hostIdToConnection.put(hostId, cxn);
             }
         }
     }
-
-    //    private HashMap<String, Long> reportedSizes = new HashMap<String, Long>();
 
     /**
      * Queue invocation on first node connection without backpressure. If there is none with without backpressure
