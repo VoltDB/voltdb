@@ -761,4 +761,9 @@ public class ExportGeneration {
             eds.acceptMastership();
         }
     }
+
+    @Override
+    public String toString() {
+        return "Export Generation - " + m_timestamp.toString();
+    }
 }
