@@ -202,10 +202,16 @@ public class SFTPSession {
                 );
 
         for (Map.Entry<File, File> entry: files.entrySet()) {
+            File srcFile = entry.getKey();
             String src = entry.getKey().getAbsolutePath();
             String dst = entry.getValue().getAbsolutePath();
             try {
                 m_channel.put(src, dst);
+
+                SftpATTRS dstAttr = m_channel.stat(dst);
+                new BasicAttributes(srcFile).setFor(dstAttr);
+                m_channel.setStat(dst,dstAttr);
+
                 if (m_log.isDebugEnabled()) {
                     m_log.debug("SFTP: put " + src + " " + dst);
                 }
@@ -238,8 +244,10 @@ public class SFTPSession {
         for (Map.Entry<File, File> entry: files.entrySet()) {
             String src = entry.getKey().getAbsolutePath();
             String dst = entry.getValue().getAbsolutePath();
+            File destFile = entry.getValue();
             try {
                 m_channel.get(src, dst);
+                new BasicAttributes(m_channel.stat(src)).setFor(destFile);
                 if (m_log.isDebugEnabled()) {
                     m_log.debug("SFTP: get " + src + " " + dst);
                 }
@@ -745,6 +753,42 @@ public class SFTPSession {
 
         public SSHException(Throwable cause) {
             super(cause);
+        }
+    }
+
+    public static class BasicAttributes {
+        private final int m_modifyTime;
+        private final boolean m_isExecutable;
+
+        public BasicAttributes(final SftpATTRS attr) {
+            Preconditions.checkArgument(attr != null, "specified null sftp attributes");
+            m_modifyTime = attr.getMTime();
+            m_isExecutable = (attr.getPermissions() & 0100) != 0;
+        }
+
+        public BasicAttributes(final File file) {
+            Preconditions.checkArgument(
+                    file != null && file.exists() && file.canRead(),
+                    "specified file is null or inaccessible"
+                    );
+            m_modifyTime = (int)(file.lastModified() / 1000);
+            m_isExecutable = file.canExecute();
+        }
+
+        public void setFor(SftpATTRS attr) {
+            if (attr == null) return;
+            attr.setACMODTIME(m_modifyTime, m_modifyTime);
+            if (m_isExecutable) {
+                attr.setPERMISSIONS(attr.getPermissions() | 0100);
+            }
+        }
+
+        public void setFor(File file) {
+            if (file == null || !file.exists() || !file.canWrite()) return;
+            file.setLastModified(m_modifyTime * 1000);
+            if (m_isExecutable) {
+                file.setExecutable(true);
+            }
         }
     }
 }
