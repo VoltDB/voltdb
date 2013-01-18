@@ -265,7 +265,7 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private static AbstractExpression parseValueExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
-        String type = exprNode.attributes.get("type");
+        String type = exprNode.attributes.get("valuetype");
         String isParam = exprNode.attributes.get("isparam");
         String isPlannerGenerated = exprNode.attributes.get("isplannergenerated");
 
@@ -357,7 +357,7 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private static AbstractExpression parseOperationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
-        String type = exprNode.attributes.get("type");
+        String type = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(type);
         AbstractExpression expr = null;
 
@@ -433,7 +433,7 @@ public abstract class AbstractParsedStmt {
         if (disabled != null) {
             throw new PlanningErrorException("Function '" + name + "' is not supported in VoltDB: " + disabled);
         }
-        String value_type_name = exprNode.attributes.get("type");
+        String value_type_name = exprNode.attributes.get("valuetype");
         VoltType value_type = VoltType.typeFromString(value_type_name);
         String id = exprNode.attributes.get("id");
         assert(id != null);
@@ -544,7 +544,7 @@ public abstract class AbstractParsedStmt {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
                 int index = Integer.parseInt(node.attributes.get("index"));
-                String typeName = node.attributes.get("type");
+                String typeName = node.attributes.get("valuetype");
                 VoltType type = VoltType.typeFromString(typeName);
                 m_paramsById.put(id, index);
                 paramList[index] = type;

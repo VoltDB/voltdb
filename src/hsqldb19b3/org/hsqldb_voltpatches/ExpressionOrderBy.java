@@ -156,7 +156,7 @@ public class ExpressionOrderBy extends Expression {
         VoltXMLElement exp = new VoltXMLElement("operation");
         // We want to keep track of which expressions are the same in the XML output
         exp.attributes.put("id", getUniqueId(session));
-        exp.attributes.put("type", "orderby");
+        exp.attributes.put("optype", "orderby");
         if ((this.alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
         }

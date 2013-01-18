@@ -1969,7 +1969,7 @@ public class FunctionSQL extends Expression {
 
         VoltXMLElement exp = new VoltXMLElement("function");
         exp.attributes.put("name", name);
-        exp.attributes.put("type", dataType.getNameString());
+        exp.attributes.put("valuetype", dataType.getNameString());
         if (parameterArg != -1) {
             exp.attributes.put("parameter", String.valueOf(parameterArg));
         }

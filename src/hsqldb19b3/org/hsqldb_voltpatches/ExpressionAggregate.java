@@ -324,7 +324,7 @@ public class ExpressionAggregate extends Expression {
         VoltXMLElement exp = new VoltXMLElement("operation");
 
         exp.attributes.put("id", getUniqueId(session));
-        exp.attributes.put("type", element);
+        exp.attributes.put("optype", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
         }

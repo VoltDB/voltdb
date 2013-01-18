@@ -181,7 +181,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     void parseOrderColumn(VoltXMLElement orderByNode) {
         // make sure everything is kosher
         assert(orderByNode.name.equalsIgnoreCase("operation"));
-        String operationType = orderByNode.attributes.get("type");
+        String operationType = orderByNode.attributes.get("optype");
         assert(operationType != null);
         assert(operationType.equalsIgnoreCase("orderby"));
 
