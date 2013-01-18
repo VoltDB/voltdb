@@ -3,7 +3,7 @@
 Testrun is a simple tool that builds on the run.sh files in example folders.
 It helps make certain common types of repetitive manual testing easier. Some
 aspects of it are geared toward the internal VoltDB testing environment. Other
-aspects should be useful to anyone anywhere.
+aspects should be useful to almost any VoltDB user anywhere.
 
 This has been tested by only one person in one environment. There will be
 hiccups until it gets more mileage.
@@ -40,6 +40,8 @@ It does not use the local deployment.xml.
 * Run testrun with no arguments to see the available commands.
 * Change EXTSCRIPTS if you want to add an extension script.
 * Add additional tests to the extension script as TEST_... functions.
+
+Here is a sample session:
 
     $ cd examples/voter
     $ testrun
