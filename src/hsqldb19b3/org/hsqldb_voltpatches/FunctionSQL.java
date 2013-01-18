@@ -2070,7 +2070,7 @@ public class FunctionSQL extends Expression {
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
-            exp.attributes.put("id", String.valueOf(keywordConstant + SQL_EXTRACT_VOLT_FUNC_OFFSET));
+            exp.attributes.put("function_id", String.valueOf(keywordConstant + SQL_EXTRACT_VOLT_FUNC_OFFSET));
             exp.attributes.put("volt_alias", volt_alias);
             VoltXMLElement vxmle = nodes[1].voltGetXML(session);
             exp.children.add(vxmle);
@@ -2083,7 +2083,7 @@ public class FunctionSQL extends Expression {
             break;
         }
 
-        exp.attributes.put("id", String.valueOf(volt_funcType));
+        exp.attributes.put("function_id", String.valueOf(volt_funcType));
 
         switch (funcType) {
         case FUNC_SUBSTRING_CHAR :

@@ -435,7 +435,7 @@ public abstract class AbstractParsedStmt {
         }
         String value_type_name = exprNode.attributes.get("valuetype");
         VoltType value_type = VoltType.typeFromString(value_type_name);
-        String id = exprNode.attributes.get("id");
+        String id = exprNode.attributes.get("function_id");
         assert(id != null);
         int idArg = 0;
         try {
