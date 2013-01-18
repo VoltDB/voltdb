@@ -310,8 +310,8 @@ public class ReplaySequencer
             else {
                 // Always expect to see the fragment first, but there are places in the protocol
                 // where CompleteTransactionMessages may arrive for transactions that this site hasn't
-                // done/won't do, so just tell the caller that we can't do anything with it and hope
-                // the right thing happens.
+                // done/won't do, e.g. txn restart, so just tell the caller that we can't do
+                // anything with it and hope the right thing happens.
                 return false;
             }
 
