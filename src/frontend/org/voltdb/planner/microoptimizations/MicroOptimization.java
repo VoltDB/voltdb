@@ -18,10 +18,12 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.List;
+
+import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
 
 public interface MicroOptimization {
 
-    public List<CompiledPlan> apply(CompiledPlan plan);
+    public List<CompiledPlan> apply(CompiledPlan plan, Database db);
 
 }

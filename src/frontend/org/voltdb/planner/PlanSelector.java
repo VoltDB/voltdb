@@ -103,6 +103,7 @@ public class PlanSelector implements Cloneable{
      * Clone itself.
      * @return deep copy of self
      */
+    @Override
     public Object clone() {
         return new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName, m_procName, m_sql,
                 m_costModel, m_paramHints, m_quietPlanner, m_fullDebug);
@@ -139,10 +140,10 @@ public class PlanSelector implements Cloneable{
     /** Picks the best cost plan for a given raw plan
      * @param rawplan
      */
-   public void considerCandidatePlan(CompiledPlan rawplan) {
+   public void considerCandidatePlan(CompiledPlan rawplan, Database db) {
 
         // run the set of microptimizations, which may return many plans (or not)
-        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan);
+        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, db);
 
         // iterate through the subset of plans
         for (CompiledPlan plan : optimizedPlans) {
