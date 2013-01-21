@@ -40,6 +40,7 @@ public class RejoinMessage extends VoltMessage {
 
     private Type m_type;
     private long m_snapshotTxnId = -1; // snapshot txnId
+    private String m_snapshotNonce = null;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -58,12 +59,27 @@ public class RejoinMessage extends VoltMessage {
         m_type = type;
     }
 
+    /**
+     * INITIATION and INITIATION_COMMUNITY pass the nonce used by the
+     * SequentialRejoinCoordinator to the site.
+     */
+    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce)
+    {
+        this(sourceHSId, type);
+        assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
+        m_snapshotNonce = snapshotNonce;
+    }
+
     public Type getType() {
         return m_type;
     }
 
     public long getSnapshotTxnId() {
         return m_snapshotTxnId;
+    }
+
+    public String getSnapshotNonce() {
+        return m_snapshotNonce;
     }
 
     @Override
