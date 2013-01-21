@@ -302,7 +302,13 @@ public class ExpressionAggregate extends Expression {
         switch (opType) {
         // Last minute simple column substitutions can blast a new opType into Expressions of any class
         // as an optimization for duplicated expressions, so just go with it.
-        case OpTypes.SIMPLE_COLUMN:     element = "simplecolumn"; break;
+        case OpTypes.SIMPLE_COLUMN:
+            VoltXMLElement simplecolumn = new VoltXMLElement("simplecolumn");
+            simplecolumn.attributes.put("id", getUniqueId(session));
+            if ((this.alias != null) && (getAlias().length() > 0)) {
+                simplecolumn.attributes.put("alias", getAlias());
+            }
+            return simplecolumn;
 
         case OpTypes.COUNT:             element = "count"; break;
         case OpTypes.SUM:               element = "sum"; break;
@@ -321,7 +327,7 @@ public class ExpressionAggregate extends Expression {
                                          String.valueOf(opType));
         }
 
-        VoltXMLElement exp = new VoltXMLElement("operation");
+        VoltXMLElement exp = new VoltXMLElement("aggregation");
 
         exp.attributes.put("id", getUniqueId(session));
         exp.attributes.put("optype", element);
