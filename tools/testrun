@@ -54,6 +54,7 @@ expand_config_template()
         \ls -1 "$VOLTDB_DIST/lib"/*.jar; \
         \ls -1 "$VOLTDB_DIST/lib"/extension/*.jar; \
     } 2> /dev/null | paste -sd ':' - )
+    # Expand the template by substituting environment variables for ${...}.
     awk '
     {
         while(match($0,"[$]{[^}]*}"))
@@ -82,7 +83,7 @@ export CLASSPATH VOLT_ENABLEIV2
 TEST_clean()
 {
     echo "Cleaning compilation output and database files..."
-    \rm -rf "$OBJDIR" debugoutput $COMPILEJAR voltdbroot voltdbroot log server* replica
+    \rm -rf "$OBJDIR" debugoutput $COMPILEJAR voltdbroot log server* replica
 }
 
 TEST_compile()
@@ -94,13 +95,13 @@ TEST_server()
 {
     buildcatalog
     initserver "$@"
-    $VOLTDB create catalog $CREATEJAR deployment $DEPFILE license $LICENSE host $LEADERHOST | tee output.txt 2>&1
+    $VOLTDB create catalog $CREATEJAR deployment $DEPFILE license $LICENSE host $LEADERHOST 2>&1 | tee output.txt
 }
 
 TEST_replica()
 {
     initdir replica
-    $VOLTDB replica catalog $REPLICAJAR deployment $DEPFILE license $LICENSE host $REPLICAHOST | tee output.txt 2>&1
+    $VOLTDB replica catalog $REPLICAJAR deployment $DEPFILE license $LICENSE host $REPLICAHOST 2>&1 | tee output.txt
 }
 
 TEST_client()
@@ -112,13 +113,15 @@ TEST_client()
 TEST_dragent()
 {
     usedir replica
-    $DRAGENT master $DBMASTER replica localhost | tee dragent.txt 2>&1
+    $DRAGENT master $DBMASTER replica localhost 2>&1 | tee dragent.txt
 }
 
 TEST_down()
 {
     local iface=$GATEIFACE1
-    test "$1" = "2" ] && iface=$GATEIFACE2
+    if [ "$1" = "2" ]; then
+        iface=$GATEIFACE2
+    fi
     ssh $GATEHOST sudo /sbin/ifdown $iface
     gateway_ifconfig
 }
@@ -181,8 +184,6 @@ showstatus()
     if [ -n "$STATUSQUERY" ]; then
         echo "Querying database status..."
         $VOLT sql "$STATUSQUERY"
-    else
-        echo "* STATUSQUERY is not defined in testrun.cfg *"
     fi
 }
 
@@ -199,27 +200,22 @@ buildcatalog()
 
 initserver()
 {
-    local name=$(serverdir "$@")
-    cd $name
-}
-
-useserver()
-{
-    local name=$(serverdir "$@")
+    if [ -z "$1" ]; then
+        echo "* Specify host # 1-n *"
+        exit 1
+    fi
+    local name="server$1"
     initdir $name
 }
 
-serverdir()
+useserver()
 {
     if [ -z "$1" ]; then
         echo "* Specify host # 1-n *"
         exit 1
     fi
-    if [ -z "$1" ]; then
-        echo server1
-    else
-        echo server$1
-    fi
+    local name="server$1"
+    cd $name
 }
 
 initdir()
@@ -261,7 +257,7 @@ usage()
 {
     echo "Usage: $PROG TEST [ ARG ... ]"
     echo "   Where TEST is one of the following:"
-    set | sort | awk '/\s*TEST_([a-zA-Z0-9_]+)\ +\(\)/ {printf("      %s\n",substr($1,9));}'
+    set | sort | awk '/\s*TEST_([a-zA-Z0-9_]+)\ +\(\)/ {printf("      %s\n",substr($1,6));}'
 }
 
 if [ $# -lt 1 ]; then
