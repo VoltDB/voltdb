@@ -66,8 +66,8 @@ class FastSerializer:
     VOLTTYPE_FLOAT = 8    # float64
     VOLTTYPE_STRING = 9
     VOLTTYPE_TIMESTAMP = 11 # 8 byte long
-    VOLTTYPE_DECIMAL = 22  # 16 byte long
-    VOLTTYPE_DECIMAL_STRING = 23  # 9 byte long
+    VOLTTYPE_DECIMAL = 22  # fixed precision decimal
+    VOLTTYPE_DECIMAL_STRING = 23  # NOT USED?
     VOLTTYPE_MONEY = 20     # 8 byte long
     VOLTTYPE_VOLTTABLE = 21
     VOLTTYPE_VARBINARY = 25

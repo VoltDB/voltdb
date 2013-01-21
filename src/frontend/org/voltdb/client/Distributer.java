@@ -831,8 +831,15 @@ class Distributer {
         return retval;
     }
 
-    public Object[] getInstanceId() {
+    public synchronized Object[] getInstanceId() {
         return m_clusterInstanceId;
+    }
+
+    /**
+     * Not exposed to users for the moment.
+     */
+    public synchronized void resetInstanceId() {
+        m_clusterInstanceId = null;
     }
 
     public String getBuildString() {

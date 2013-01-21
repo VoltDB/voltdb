@@ -479,6 +479,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         return m_distributer.getInstanceId();
     }
 
+    /**
+     * Not exposed to users for the moment.
+     */
+    public void resetInstanceId() {
+        m_distributer.resetInstanceId();
+    }
+
     @Override
     public String getBuildString() {
         return m_distributer.getBuildString();
