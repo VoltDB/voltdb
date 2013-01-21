@@ -78,21 +78,11 @@ public class RejoinMessage extends VoltMessage {
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
-        m_sourceHSId = buf.getLong();
-        m_type = Type.values()[buf.get()];
-        m_snapshotTxnId = buf.getLong();
-
-        assert(buf.capacity() == buf.position());
+        throw new RuntimeException("RejoinMessage: Attempted to deserialize a message which should never need it.");
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(VoltDbMessageFactory.REJOIN_RESPONSE_ID);
-        buf.putLong(m_sourceHSId);
-        buf.put((byte) m_type.ordinal());
-        buf.putLong(m_snapshotTxnId);
-
-        assert(buf.capacity() == buf.position());
-        buf.limit(buf.position());
+        throw new RuntimeException("RejoinMessage: Attempted to serialize a message which should never need it.");
     }
 }
