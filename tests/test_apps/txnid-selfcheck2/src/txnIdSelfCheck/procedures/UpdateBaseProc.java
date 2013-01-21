@@ -98,7 +98,7 @@ public class UpdateBaseProc extends VoltProcedure {
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occuring.
-        data = retval[0];
+        data = retval[2];
         validateCIDData(data, getClass().getName());
 
         if (shouldRollback != 0) {
@@ -155,7 +155,7 @@ public class UpdateBaseProc extends VoltProcedure {
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occuring.
-        data = retval[0];
+        data = retval[2];
         validateCIDData(data, getClass().getName());
 
         if (shouldRollback != 0) {
