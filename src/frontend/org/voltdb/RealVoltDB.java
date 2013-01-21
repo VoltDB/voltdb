@@ -72,6 +72,8 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+
+import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -504,7 +506,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
                     hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
 
-                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, hsidsToRejoin,
+                    m_rejoinCoordinator = new Iv2RejoinCoordinator(m_messenger, hsidsToRejoin,
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == START_ACTION.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
