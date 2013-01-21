@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.DeterminismMode;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.SQLStmt;
@@ -254,7 +255,8 @@ public abstract class ProcedureCompiler {
             }
             PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
             StatementCompiler.compile(compiler, hsql, catalog, db,
-                    estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(), partitioning);
+                    estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
+                    stmt.getDeterminismMode(), partitioning);
 
             if (partitioning.wasSpecifiedAsSingle()) {
                 procWantsCommonPartitioning = false; // Don't try to infer what's already been asserted.
@@ -519,7 +521,6 @@ public abstract class ProcedureCompiler {
             shortName = parts[parts.length - 1];
         }
 
-
         // add an entry to the catalog (using the full className)
         final Procedure procedure = db.getProcedures().add(shortName);
         for (String groupName : procedureDescriptor.m_authGroups) {
@@ -565,7 +566,7 @@ public abstract class ProcedureCompiler {
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
         StatementCompiler.compile(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
-                procedureDescriptor.m_joinOrder, partitioning);
+                procedureDescriptor.m_joinOrder, DeterminismMode.UNSAFE, partitioning);
 
         // if the single stmt is not read only, then the proc is not read only
         boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);

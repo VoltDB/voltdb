@@ -18,6 +18,7 @@
 package org.voltdb.compiler;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltdb.DeterminismMode;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -54,7 +55,8 @@ public abstract class StatementCompiler {
 
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
-            Statement catalogStmt, String stmt, String joinOrder, PartitioningForStatement partitioning)
+            Statement catalogStmt, String stmt, String joinOrder,
+            DeterminismMode detMode, PartitioningForStatement partitioning)
     throws VoltCompiler.VoltCompilerException {
 
         // Cleanup whitespace newlines for catalog compatibility
@@ -120,7 +122,7 @@ public abstract class StatementCompiler {
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
                 partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
-                costModel, null, joinOrder);
+                costModel, null, joinOrder, detMode);
 
         CompiledPlan plan = null;
         try {

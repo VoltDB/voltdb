@@ -32,11 +32,15 @@ import org.voltdb.catalog.Statement;
  * @see VoltProcedure
  */
 public class SQLStmt {
+
     // Used for uncompiled SQL.
     byte[] sqlText;
     String joinOrder;
     // hash of the sql string for determinism checks
     byte[] sqlCRC;
+
+    // null implies the default mode
+    DeterminismMode detMode = null;
 
     // Used for compiled SQL
     SQLStmtPlan plan = null;
@@ -48,7 +52,7 @@ public class SQLStmt {
      * place holders.
      */
     public SQLStmt(String sqlText) {
-        this(sqlText, null);
+        this(sqlText, null, null);
     }
 
     /**
@@ -59,15 +63,24 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this(sqlText.getBytes(VoltDB.UTF8ENCODING), joinOrder);
+        this(sqlText.getBytes(VoltDB.UTF8ENCODING), joinOrder, null);
+    }
+
+    public SQLStmt(String sqlText, DeterminismMode determinismMode) {
+        this(sqlText.getBytes(VoltDB.UTF8ENCODING), null, determinismMode);
+    }
+
+    public SQLStmt(String sqlText, String joinOrder, DeterminismMode determinismMode) {
+        this(sqlText.getBytes(VoltDB.UTF8ENCODING), joinOrder, determinismMode);
     }
 
     /**
      * Construct a SQLStmt instance from a byte array for internal use.
      */
-    private SQLStmt(byte[] sqlText, String joinOrder) {
+    private SQLStmt(byte[] sqlText, String joinOrder, DeterminismMode determinismMode) {
         this.sqlText = sqlText;
         this.joinOrder = joinOrder;
+        this.detMode = determinismMode;
 
         // create a hash for determinism purposes
         PureJavaCrc32C crc = new PureJavaCrc32C();
@@ -92,7 +105,7 @@ public class SQLStmt {
                                   boolean isReplicatedTableDML,
                                   boolean isReadOnly,
                                   VoltType[] params) {
-        SQLStmt stmt = new SQLStmt(sqlText, null);
+        SQLStmt stmt = new SQLStmt(sqlText, null, null);
 
         /*
          * Fill out the parameter types
@@ -134,6 +147,15 @@ public class SQLStmt {
      */
     public String getJoinOrder() {
         return joinOrder;
+    }
+
+    /**
+     * Get the join order hint supplied in the constructor.
+     *
+     * @return String containing the join order hint.
+     */
+    public DeterminismMode getDeterminismMode() {
+        return detMode;
     }
 
     /**
