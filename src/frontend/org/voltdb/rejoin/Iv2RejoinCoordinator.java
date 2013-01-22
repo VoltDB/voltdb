@@ -19,19 +19,33 @@ package org.voltdb.rejoin;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.json_voltpatches.JSONStringer;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.client.ClientResponse;
+
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.SnapshotFormat;
+
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.utils.VoltFile;
+
+import org.voltdb.VoltTable;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -39,7 +53,7 @@ import org.voltdb.utils.VoltFile;
  * when leaving this class.
  */
 public class Iv2RejoinCoordinator extends RejoinCoordinator {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+    private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     // This lock synchronizes all data structure access. Do not hold this
     // across blocking external calls.
@@ -57,6 +71,8 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
     private final Queue<Long> m_rejoiningSites = new LinkedList<Long>();
     // true if performing live rejoin
     private final boolean m_liveRejoin;
+    // Need to remember the nonces we're using here (for now)
+    private final Map<Long, String> m_nonces = new HashMap<Long, String>();
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
                                        List<Long> sites,
@@ -89,9 +105,14 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
     private void initiateRejoinOnSite(long HSId) {
         // Must not hold m_lock across the send() call to manage lock
         // acquisition ordering with other in-process mailboxes.
+        String nonce = makeSnapshotNonce(HSId);
+        synchronized(m_lock) {
+            m_nonces.put(HSId, nonce);
+        }
         RejoinMessage msg = new RejoinMessage(getHSId(),
                 m_liveRejoin ? RejoinMessage.Type.INITIATION :
-                               RejoinMessage.Type.INITIATION_COMMUNITY);
+                               RejoinMessage.Type.INITIATION_COMMUNITY,
+                               nonce);
         send(HSId, msg);
 
         // For testing, exit if only one property is set...
@@ -99,6 +120,27 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
                 (m_sitesRejoinedCount.incrementAndGet() == 2)) {
             System.exit(0);
         }
+    }
+
+    private String makeSnapshotNonce(long HSId)
+    {
+        return "Rejoin_" + HSId + "_" + System.currentTimeMillis();
+    }
+
+    private String makeSnapshotRequest(long HSId, long sourceSite)
+    {
+        try {
+            JSONStringer jsStringer = new JSONStringer();
+            jsStringer.object();
+            jsStringer.key("hsId").value(HSId);
+            jsStringer.key("target_hsid").value(sourceSite);
+            jsStringer.endObject();
+            return jsStringer.toString();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
+        }
+        // unreachable;
+        return null;
     }
 
     @Override
@@ -109,7 +151,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             m_rejoiningSites.add(firstSite);
         }
         String HSIdString = CoreUtils.hsIdToString(firstSite);
-        rejoinLog.info("Initiating snapshot stream to first site: " + HSIdString);
+        REJOINLOG.info("Initiating snapshot stream to first site: " + HSIdString);
         initiateRejoinOnSite(firstSite);
     }
 
@@ -120,13 +162,13 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             if (!m_pendingSites.isEmpty()) {
                 nextSite = m_pendingSites.poll();
                 m_rejoiningSites.add(nextSite);
-                rejoinLog.info("Finished streaming snapshot to site: " +
+                REJOINLOG.info("Finished streaming snapshot to site: " +
                         CoreUtils.hsIdToString(HSId) +
                         " and initiating snapshot stream to next site: " +
                         CoreUtils.hsIdToString(nextSite));
             }
             else {
-                rejoinLog.info("Finished streaming snapshot to site: " +
+                REJOINLOG.info("Finished streaming snapshot to site: " +
                         CoreUtils.hsIdToString(HSId));
             }
         }
@@ -152,7 +194,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             else {
                 msg += ". All sites completed rejoin.";
             }
-            rejoinLog.info(msg);
+            REJOINLOG.info(msg);
             allDone = m_rejoiningSites.isEmpty();
         }
 
@@ -160,6 +202,56 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             // no more sites to rejoin, we're done
             VoltDB.instance().onExecutionSiteRejoinCompletion(0l);
         }
+    }
+
+    /*
+     * m_handler is called when a SnapshotUtil.requestSnapshot response occurs.
+     * This callback runs on the snapshot daemon thread.
+     */
+    SnapshotResponseHandler m_handler = new SnapshotResponseHandler() {
+        @Override
+        public void handleResponse(ClientResponse resp)
+        {
+            if (resp == null) {
+                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
+                        false, null);
+            } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: "
+                        + resp.getStatusString(), false, null);
+            }
+
+            VoltTable[] results = resp.getResults();
+            if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                String appStatus = resp.getAppStatusString();
+                if (appStatus == null) {
+                    VoltDB.crashLocalVoltDB("Rejoin snapshot request failed: "
+                            + resp.getStatusString(), false, null);
+                }
+                else {
+                    // success is buried down here...
+                    return;
+                }
+            } else {
+                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
+                        false, null);
+            }
+        }
+    };
+
+    private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId)
+    {
+        String data = makeSnapshotRequest(dataSinkHSId, masterHSId);
+        String nonce = null;
+        synchronized(m_lock) {
+            nonce = m_nonces.get(HSId);
+        }
+        if (nonce == null) {
+            // uh-oh, shouldn't be possible
+            throw new RuntimeException("Received an INITIATION_RESPONSE for an HSID for which no nonce exists: " +
+                    CoreUtils.hsIdToString(HSId));
+        }
+        SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
+                m_handler, true);
     }
 
     @Override
@@ -176,6 +268,8 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             onSnapshotStreamFinished(rm.m_sourceHSId);
         } else if (type == RejoinMessage.Type.REPLAY_FINISHED) {
             onReplayFinished(rm.m_sourceHSId);
+        } else if (type == RejoinMessage.Type.INITIATION_RESPONSE) {
+            onSiteInitialized(rm.m_sourceHSId, rm.getMasterHSId(), rm.getSnapshotSinkHSId());
         } else {
             VoltDB.crashLocalVoltDB("Wrong rejoin message of type " + type +
                                     " sent to the rejoin coordinator", false, null);
