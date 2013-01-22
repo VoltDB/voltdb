@@ -36,6 +36,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -62,8 +63,9 @@ import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 class Distributer {
 
     static final long PING_HANDLE = Long.MAX_VALUE;
-    static final long TOPOLOGY_HANDLE = Long.MAX_VALUE - 1;
-    static final long PROCEDURE_HANDLE = Long.MAX_VALUE - 2;
+
+    // handles used internally are negative and decrement for each call
+    public final AtomicLong m_sysHandle = new AtomicLong(-1);
 
     // collection of connections to the cluster
     private final CopyOnWriteArrayList<NodeConnection> m_connections =
@@ -114,6 +116,50 @@ class Distributer {
     private Object m_clusterInstanceId[];
 
     private String m_buildString;
+
+    /**
+     * Handles topology updates for client affinity
+     */
+    class TopoUpdateCallback implements ProcedureCallback {
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            try {
+                synchronized (Distributer.this) {
+                    VoltTable results[] = clientResponse.getResults();
+                    if (results != null && results.length == 1) {
+                        VoltTable vt = results[0];
+                        updateAffinityTopology(vt);
+                    }
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Handles procedure updates for client affinity
+     */
+    class ProcUpdateCallback implements ProcedureCallback {
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            try {
+                synchronized (Distributer.this) {
+                    VoltTable results[] = clientResponse.getResults();
+                    if (results != null && results.length == 1) {
+                        VoltTable vt = results[0];
+                        updateProcedurePartitioning(vt);
+                    }
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     class CallExpiration implements Runnable {
         @Override
@@ -173,7 +219,9 @@ class Distributer {
                                     e1.printStackTrace();
                                 }
                                 iter.remove();
-                                c.m_callbacksToInvoke.decrementAndGet();
+                                m_rateLimiter.transactionResponseReceived(now, -1);
+                                int callbacksToInvoke = c.m_callbacksToInvoke.decrementAndGet();
+                                assert(callbacksToInvoke >= 0);
                             }
                         }
                     }
@@ -186,6 +234,7 @@ class Distributer {
 
     class CallbackBookeeping {
         public CallbackBookeeping(long timestamp, ProcedureCallback callback, String name) {
+            assert(callback != null);
             this.timestamp = timestamp;
             this.callback = callback;
             this.name = name;
@@ -218,6 +267,7 @@ class Distributer {
 
         public void createWork(long handle, String name, ByteBuffer c,
                 ProcedureCallback callback, boolean ignoreBackpressure) {
+            assert(callback != null);
             long now = System.currentTimeMillis();
             now = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
                     now, ignoreBackpressure);
@@ -235,6 +285,7 @@ class Distributer {
                     return;
                 }
 
+                assert(m_callbacks.containsKey(handle) == false);
                 m_callbacks.put(handle, new CallbackBookeeping(now, callback, name));
                 m_callbacksToInvoke.incrementAndGet();
             }
@@ -296,6 +347,7 @@ class Distributer {
             ProcedureCallback cb = null;
             long callTime = 0;
             int delta = 0;
+            long handle = response.getClientHandle();
             synchronized (this) {
                 // track the timestamp of the most recent read on this connection
                 m_lastResponseTime = now;
@@ -309,8 +361,12 @@ class Distributer {
                 CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
                 // presumably (hopefully) this is a response for a timed-out message
                 if (stuff == null) {
-                    for (ClientStatusListenerExt listener : m_listeners) {
-                        listener.lateProcedureResponse(response, m_hostname, m_port);
+                    // also ignore internal (topology and procedure) calls
+                    if (handle >= 0) {
+                        // notify any listeners of the late response
+                        for (ClientStatusListenerExt listener : m_listeners) {
+                            listener.lateProcedureResponse(response, m_hostname, m_port);
+                        }
                     }
                 }
                 // handle a proper callback
@@ -318,6 +374,7 @@ class Distributer {
                     callTime = stuff.timestamp;
                     delta = (int)(now - callTime);
                     cb = stuff.callback;
+                    assert(cb != null);
                     final byte status = response.getStatus();
                     boolean abort = false;
                     boolean error = false;
@@ -332,30 +389,7 @@ class Distributer {
                 }
             }
 
-            try {
-                if (response.getClientHandle() == TOPOLOGY_HANDLE) {
-                    m_callbacksToInvoke.decrementAndGet();
-                    synchronized (Distributer.this) {
-                        VoltTable results[] = response.getResults();
-                        if (results != null && results.length == 1) {
-                            VoltTable vt = results[0];
-                            updateAffinityTopology(vt);
-                        }
-                    }
-                } else if (response.getClientHandle() == PROCEDURE_HANDLE) {
-                    m_callbacksToInvoke.decrementAndGet();
-                    synchronized (Distributer.this) {
-                        VoltTable results[] = response.getResults();
-                        if (results != null && results.length == 1) {
-                            VoltTable vt = results[0];
-                            updateProcedurePartitioning(vt);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
+            // cb might be null on late response
             if (cb != null) {
                 response.setClientRoundtrip(delta);
                 assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
@@ -364,7 +398,8 @@ class Distributer {
                 } catch (Exception e) {
                     uncaughtException(cb, response, e);
                 }
-                m_callbacksToInvoke.decrementAndGet();
+                int callbacksToInvoke = m_callbacksToInvoke.decrementAndGet();
+                assert(callbacksToInvoke >= 0);
             }
         }
 
@@ -443,12 +478,9 @@ class Distributer {
                     ") was lost before a response was received");
                 for (final CallbackBookeeping callBk : m_callbacks.values()) {
                     try {
-                        //Client affinity doesn't register callbacks so you can have an entry
-                        //with a null callback
-                        if (callBk.callback != null) {
-                            callBk.callback.clientCallback(r);
-                        }
-                    } catch (Exception e) {
+                        callBk.callback.clientCallback(r);
+                    }
+                    catch (Exception e) {
                         uncaughtException(callBk.callback, r, e);
                     }
                     m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
@@ -590,19 +622,17 @@ class Distributer {
 
         synchronized (this) {
             if (m_useClientAffinity) {
-                ProcedureInvocation spi = new ProcedureInvocation( TOPOLOGY_HANDLE, "@Statistics", "TOPO", 0);
+                ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
                 //The handle is specific to topology updates and has special cased handling
-                queue(spi, null, true);
+                queue(spi, new TopoUpdateCallback(), true);
 
-                spi = new ProcedureInvocation( PROCEDURE_HANDLE, "@SystemCatalog", "PROCEDURES");
+                spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
                 //The handle is specific to procedure updates and has special cased handling
-                queue(spi, null, true);
+                queue(spi, new ProcUpdateCallback(), true);
                 m_hostIdToConnection.put(hostId, cxn);
             }
         }
     }
-
-    //    private HashMap<String, Long> reportedSizes = new HashMap<String, Long>();
 
     /**
      * Queue invocation on first node connection without backpressure. If there is none with without backpressure
@@ -618,6 +648,9 @@ class Distributer {
             ProcedureCallback cb,
             final boolean ignoreBackpressure)
     throws NoConnectionsException {
+        assert(invocation != null);
+        assert(cb != null);
+
         NodeConnection cxn = null;
         boolean backpressure = true;
 
@@ -798,8 +831,15 @@ class Distributer {
         return retval;
     }
 
-    public Object[] getInstanceId() {
+    public synchronized Object[] getInstanceId() {
         return m_clusterInstanceId;
+    }
+
+    /**
+     * Not exposed to users for the moment.
+     */
+    public synchronized void resetInstanceId() {
+        m_clusterInstanceId = null;
     }
 
     public String getBuildString() {

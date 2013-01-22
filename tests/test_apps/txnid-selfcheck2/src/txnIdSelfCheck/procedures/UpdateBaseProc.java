@@ -78,7 +78,7 @@ public class UpdateBaseProc extends VoltProcedure {
         if (rowCount != 0) {
             VoltTableRow row = data.fetchRow(0);
             cnt = row.getLong("cnt") + 1;
-            prevtxnid = row.getLong("prevtxnid");
+            prevtxnid = row.getLong("txnid");
             prevrid = row.getLong("rid");
         }
 
@@ -96,6 +96,10 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
         VoltTable[] retval = voltExecuteSQL();
+        // Verify that our update happened.  The client is reporting data errors on this validation
+        // not seen by the server, hopefully this will bisect where they're occuring.
+        data = retval[2];
+        validateCIDData(data, getClass().getName());
 
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
@@ -131,7 +135,7 @@ public class UpdateBaseProc extends VoltProcedure {
         if (rowCount != 0) {
             VoltTableRow row = data.fetchRow(0);
             cnt = row.getLong("cnt") + 1;
-            prevtxnid = row.getLong("prevtxnid");
+            prevtxnid = row.getLong("txnid");
             prevrid = row.getLong("rid");
         }
 
@@ -149,6 +153,10 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
         voltQueueSQLExperimental("SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;", cid);
         VoltTable[] retval = voltExecuteSQL();
+        // Verify that our update happened.  The client is reporting data errors on this validation
+        // not seen by the server, hopefully this will bisect where they're occuring.
+        data = retval[2];
+        validateCIDData(data, getClass().getName());
 
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
@@ -171,7 +179,8 @@ public class UpdateBaseProc extends VoltProcedure {
             if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
                 throw new VoltAbortException(callerId +
                         " cnt values are not consecutive" +
-                        " for cid " + cid);
+                        " for cid " + cid + ". Got " + cntValue +
+                        ", prev was: " + prevCnt);
             }
             prevCnt = cntValue;
         }

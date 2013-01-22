@@ -34,6 +34,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.VoltProcedure.VoltAbortException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
@@ -123,11 +124,23 @@ public class ClientThread extends Thread {
 
             byte[] payload = m_processor.generateForStore().getStoreValue();
 
-            ClientResponse response = m_client.callProcedure(procName,
-                    m_cid,
-                    m_nextRid,
-                    payload,
-                    shouldRollback);
+            ClientResponse response;
+            try {
+                response = m_client.callProcedure(procName,
+                        m_cid,
+                        m_nextRid,
+                        payload,
+                        shouldRollback);
+            } catch (Exception e) {
+                if (shouldRollback == 0) {
+                    log.warn("ClientThread threw after " + m_txnsRun.get() +
+                            " calls while calling procedure: " + procName +
+                            " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
+                            ", payload: " + payload +
+                            ", shouldRollback: " + shouldRollback);
+                }
+                throw e;
+            }
 
             // fake a proc call exception if we think one should be thrown
             if (response.getStatus() != ClientResponse.SUCCESS) {
@@ -147,7 +160,14 @@ public class ClientThread extends Thread {
                 System.exit(-1);
             }
             VoltTable data = results[2];
-            UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+            try {
+                UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+            }
+            catch (VoltAbortException vae) {
+                log.error("validateCIDData failed on: " + procName + ", shouldRollback: " +
+                        shouldRollback + " data: " + data);
+                throw vae;
+            }
         }
         finally {
             // ensure rid is incremented (if not rolled back intentionally)

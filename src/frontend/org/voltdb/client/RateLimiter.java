@@ -149,6 +149,7 @@ class RateLimiter {
     synchronized void transactionResponseReceived(long timestamp, int internalLatency) {
         ensureCurrentBlockIsKosher(timestamp);
         --m_outstandingTxns;
+        assert(m_outstandingTxns >= 0);
         if (internalLatency != -1) {
             ++m_currentBlockRecvSuccessCount;
             m_currentBlockTotalInternalLatency += internalLatency;

@@ -129,17 +129,17 @@ public class ExportManager
                 @Override
                 public void run() {
 
-                    ExportGeneration generation = m_generations.firstEntry().getValue();
+                    ExportGeneration oldGeneration = m_generations.firstEntry().getValue();
                     ExportDataProcessor newProcessor = null;
-
+                    ExportDataProcessor oldProcessor = null;
                     synchronized (ExportManager.this) {
 
                         m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
-                        exportLog.info("Finished draining generation " + generation.m_timestamp);
+                        exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
 
-                        exportLog.info("Creating connector " + m_loaderClass);
                         try {
-                            if (m_loaderClass != null) {
+                            if (m_loaderClass != null && !m_generations.isEmpty()) {
+                                exportLog.info("Creating connector " + m_loaderClass);
                                 final Class<?> loaderClass = Class.forName(m_loaderClass);
                                 //Make it so
                                 ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
@@ -177,11 +177,16 @@ public class ExportManager
                         } catch (IllegalAccessException e) {
                             exportLog.error(e);
                         }
+                        oldProcessor = m_processor.getAndSet(newProcessor);
                     }
 
-                    m_processor.getAndSet(newProcessor).shutdown();
+                    /*
+                     * The old processor should not be null since this shutdown task
+                     * is running for this processor
+                     */
+                    oldProcessor.shutdown();
                     try {
-                        generation.closeAndDelete();
+                        oldGeneration.closeAndDelete();
                     } catch (IOException e) {
                         e.printStackTrace();
                         exportLog.error(e);
@@ -448,7 +453,7 @@ public class ExportManager
         m_processorConfig = newConfig;
     }
 
-    public void updateCatalog(CatalogContext catalogContext)
+    public synchronized void updateCatalog(CatalogContext catalogContext)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");

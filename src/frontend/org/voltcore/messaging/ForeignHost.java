@@ -42,7 +42,6 @@ public class ForeignHost {
     private final Integer m_hostId;
     final InetSocketAddress m_listeningAddress;
 
-    private final String m_remoteHostname = "UNKNOWN_HOSTNAME";
     private boolean m_closing;
     boolean m_isUp;
 
@@ -218,7 +217,7 @@ public class ForeignHost {
         if ((!m_closing && m_isUp) &&
             (current_delta > m_deadHostTimeout))
         {
-            hostLog.error("DEAD HOST DETECTED, hostname: " + m_remoteHostname);
+            hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
             hostLog.info("\tcurrent time: " + current_time);
             hostLog.info("\tlast message: " + m_lastMessageMillis);
             hostLog.info("\tdelta (millis): " + current_delta);
@@ -229,7 +228,7 @@ public class ForeignHost {
 
 
     String hostname() {
-        return m_remoteHostname;
+        return m_connection.getHostnameOrIP();
     }
 
     /** Deliver a deserialized message from the network to a local mailbox */
@@ -249,7 +248,7 @@ public class ForeignHost {
          * because we are saying that things can come and go
          */
         if (mailbox == null) {
-            hostLog.warn(String.format("Message (%s) sent to unknown site id: %s @ (%s) at " +
+            hostLog.info(String.format("Message (%s) sent to unknown site id: %s @ (%s) at " +
                     m_hostMessenger.getHostId() + " from " + CoreUtils.hsIdToString(message.m_sourceHSId) + "\n",
                     message.getClass().getSimpleName(),
                     CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString()));

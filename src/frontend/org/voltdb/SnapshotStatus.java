@@ -99,7 +99,7 @@ public class SnapshotStatus extends StatsSource {
         Table t = p.getSecond();
         double duration = 0;
         double throughput = 0;
-        long timeStarted = org.voltdb.TransactionIdManager.getTimestampFromTransactionId(s.txnId);
+        long timeStarted = s.timeStarted;
         if (s.timeFinished != 0) {
             duration =
                 (s.timeFinished - timeStarted) / 1000.0;

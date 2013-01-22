@@ -44,6 +44,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
 
 import com.google.common.util.concurrent.Callables;
@@ -113,7 +114,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final boolean isReplicated,
             final List<Integer> partitionIds,
             final VoltTable schemaTable,
-            final long txnId) throws IOException {
+            final long txnId,
+            final long timestamp) throws IOException {
         this(
                 file,
                 hostId,
@@ -125,6 +127,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 partitionIds,
                 schemaTable,
                 txnId,
+                timestamp,
                 new int[] { 0, 0, 0, 2 });
     }
 
@@ -139,6 +142,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final List<Integer> partitionIds,
             final VoltTable schemaTable,
             final long txnId,
+            final long timestamp,
             int version[]
             ) throws IOException {
         String hostname = CoreUtils.getHostnameOrAddress();
@@ -166,6 +170,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             stringer.key("isReplicated").value(isReplicated);
             stringer.key("isCompressed").value(true);
             stringer.key("checksumType").value("CRC32C");
+            stringer.key("timestamp").value(timestamp);
+            /*
+             * The timestamp string is for human consumption, automated stuff should use
+             * the actual timestamp
+             */
+            stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
             if (!isReplicated) {
                 stringer.key("partitionIds").array();
                 for (int partitionId : partitionIds) {
