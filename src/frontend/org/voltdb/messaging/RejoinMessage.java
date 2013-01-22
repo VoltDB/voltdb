@@ -43,6 +43,7 @@ public class RejoinMessage extends VoltMessage {
     private Type m_type;
     private long m_snapshotTxnId = -1; // snapshot txnId
     private long m_snapshotSinkHSId = -1;
+    private long m_masterHSId = -1;
     private String m_snapshotNonce = null;
 
     /** Empty constructor for de-serialization */
@@ -77,9 +78,10 @@ public class RejoinMessage extends VoltMessage {
      * For IV2, INITIATION_RESPONSE is used by the local site to inform the
      * Iv2RejoinCoordinator of the HSId of the SnapshotDataSink is has created
      */
-    public RejoinMessage(long sourceHSId, long sinkHSId)
+    public RejoinMessage(long sourceHSId, long masterHSId, long sinkHSId)
     {
         this(sourceHSId, Type.INITIATION_RESPONSE);
+        m_masterHSId = masterHSId;
         m_snapshotSinkHSId = sinkHSId;
     }
 
@@ -93,6 +95,10 @@ public class RejoinMessage extends VoltMessage {
 
     public String getSnapshotNonce() {
         return m_snapshotNonce;
+    }
+
+    public long getMasterHSId() {
+        return m_masterHSId;
     }
 
     public long getSnapshotSinkHSId() {
