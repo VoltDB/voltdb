@@ -148,7 +148,7 @@ TEST_gateway()
 TEST_recover()
 {
     initserver "$@"
-    $VOLT recover -H $LEADERHOST -d $DEPFILE -l $LICENSE $RECOVERJAR
+    $VOLTDB recover deployment $DEPFILE license $LICENSE host $LEADERHOST
 }
 
 TEST_recover_replica()
