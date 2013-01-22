@@ -1,0 +1,90 @@
+# Application name
+APPNAME=${APPNAME}
+
+# The object directory that gets automatically added to the CLASSPATH
+OBJDIR=obj
+
+# Options
+HOSTCOUNT=1
+SITESPERHOST=2
+KFACTOR=0
+COMMANDLOG=true
+VOLT_ENABLEIV2=true
+
+# Files to copy to the test subdirectory
+OTHERFILES=""
+
+# Extension scripts (sourced for additional commands)
+EXTSCRIPTS=""
+
+# Catalogs (all the same for the normal case)
+COMPILEJAR=${APPNAME}.jar
+CREATEJAR=${APPNAME}.jar
+REPLICAJAR=${APPNAME}.jar
+REJOINJAR=${APPNAME}.jar
+UPDATEJAR=${APPNAME}.jar
+
+# Hosts
+LEADERHOST=localhost
+REPLICAHOST=localhost
+CLIENTHOSTS=localhost
+
+# Master host for replication
+# FIXME: generated for volt7d Frankencluster interface
+DBMASTER=192.168.11.10
+
+# Frankencluster info
+GATEHOST=volt5a
+GATEIP0=volt5a
+GATEIP1=192.168.10.1
+GATEIP2=192.168.11.1
+GATEIFACE1=eth1
+GATEIFACE2=eth2
+
+# Base paths
+VOLTDB_DIST="${VOLTDB_DIST}"
+
+# Tools
+VOLTDB="$VOLTDB_DIST/bin/voltdb"
+VOLTCOMPILER="$VOLTDB_DIST/bin/voltcompiler"
+DRAGENT="$VOLTDB_DIST/bin/dragent"
+VOLTADMIN="$VOLTDB_DIST/bin/voltadmin"
+VOLT="$VOLTDB_DIST/tools/volt"
+
+# Files
+LOG4J="$VOLTDB_DIST/voltdb/log4j.xml"
+LICENSE="$VOLTDB_DIST/voltdb/license.xml"
+
+# Client java source
+CLIENTJAVA="src/$APPNAME/*.java src/$APPNAME/procedures/*.java"
+
+# Client class
+CLIENTCLS=$APPNAME.AsyncBenchmark
+
+# Client options
+# FIXME: generated specifically for voter*
+CLIENTOPTS="\
+--displayinterval=5 \
+--warmup=5 \
+--duration=120 \
+--servers=localhost:21212 \
+--contestants=6 \
+--maxvotes=2 \
+--ratelimit=100000 \
+--autotune=true \
+--latencytarget=6"
+
+# Deployment
+DEPFILE=deployment.xml
+
+# Java heap size in MB
+VOLTDB_HEAPSIZE=4096
+
+# Classpath
+CLASSPATH_BASE="${CLASSPATH_BASE}"
+CLASSPATH="$CLASSPATH_BASE"
+
+# Query to run after populating the database
+STATUSQUERY=""
+
+# vim: syntax=sh
