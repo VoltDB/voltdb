@@ -98,8 +98,10 @@ implements SnapshotDataTarget {
     private Exception m_lastAckReceiverException = null;
     private Exception m_lastSenderException = null;
 
-    public StreamSnapshotDataTarget(long hsId, Map<Integer, byte[]> schemas) throws IOException {
+    public StreamSnapshotDataTarget(Map<Integer, Long> streamMap, Map<Integer, byte[]> schemas) throws IOException
+    {
         super();
+        long hsId = streamMap.values().iterator().next();
         m_schemas = schemas;
         m_destHSId = hsId;
         m_mb = VoltDB.instance().getHostMessenger().createMailbox();

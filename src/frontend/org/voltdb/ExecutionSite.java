@@ -1355,11 +1355,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-            jsStringer.key("hsId").value(hsId);
+            jsStringer.key("streamPairs");
+            jsStringer.object();
+            jsStringer.key(Long.toString(sourceSite)).value(Long.toString(hsId));
+            jsStringer.endObject();
             // make this snapshot only contain data from this site
             m_rejoinLog.info("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
                                " is " + CoreUtils.hsIdToString(sourceSite));
-            jsStringer.key("target_hsid").value(sourceSite);
             jsStringer.endObject();
             data = jsStringer.toString();
         } catch (Exception e) {

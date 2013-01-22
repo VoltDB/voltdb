@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
@@ -614,26 +615,31 @@ public class SnapshotSaveAPI
                     }
 
                     if (format == SnapshotFormat.STREAM && jsData != null) {
-                        long hsId = jsData.getLong("hsId");
-
-                        // if a target_hsid exists, set it for filtering a snapshot for a specific site
                         try {
-                            targetHSid = jsData.getLong("target_hsid");
-                        }
-                        catch (JSONException e) {} // leave value as null on exception
-
-                        // if this snapshot targets a specific site...
-                        if (targetHSid != null) {
-                            // get the list of sites on this node
-                            List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
-                            // if the target site is local to this node...
-                            if (localHSids.contains(targetHSid)) {
-                                sdt = new StreamSnapshotDataTarget(hsId, schemas);
+                            Map<Integer, Long> streamPairs = new HashMap<Integer, Long>();
+                            JSONObject sp = jsData.getJSONObject("streamPairs");
+                            @SuppressWarnings("unchecked")
+                            Iterator<String> it = sp.keys();
+                            while (it.hasNext()) {
+                                String key = it.next();
+                                long sourceHSId = Long.valueOf(key);
+                                // See whether this source HSID is a local site, if so, we need
+                                // the partition ID
+                                List<Long> localHSIds = tracker.getSitesForHost(context.getHostId());
+                                if (localHSIds.contains(sourceHSId)) {
+                                    int partitionId = tracker.getPartitionForSite(sourceHSId);
+                                    Long destHSId = Long.valueOf(sp.getString(key));
+                                    streamPairs.put(partitionId, destHSId);
+                                }
+                            }
+                            if (streamPairs.size() > 0) {
+                                sdt = new StreamSnapshotDataTarget(streamPairs, schemas);
                             }
                             else {
                                 sdt = new DevNullSnapshotTarget();
                             }
                         }
+                        catch (JSONException e) {} // Leave sdt as null for later error path
                     }
                 }
 

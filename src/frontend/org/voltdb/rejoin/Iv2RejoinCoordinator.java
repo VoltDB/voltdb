@@ -132,8 +132,10 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-            jsStringer.key("hsId").value(HSId);
-            jsStringer.key("target_hsid").value(sourceSite);
+            jsStringer.key("streamPairs");
+            jsStringer.object();
+            jsStringer.key(Long.toString(sourceSite)).value(Long.toString(HSId));
+            jsStringer.endObject();
             jsStringer.endObject();
             return jsStringer.toString();
         } catch (Exception e) {
