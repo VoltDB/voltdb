@@ -52,6 +52,10 @@ class TableCatalogDelegate : public CatalogDelegate {
              catalog::Database &catalogDatabase,
              catalog::Table &catalogTable);
 
+    int processSchemaChanges(ExecutorContext *executorContext,
+                             catalog::Database &catalogDatabase,
+                             catalog::Table &catalogTable);
+
     static TupleSchema *createTupleSchema(catalog::Table &catalogTable);
 
     static bool getIndexScheme(catalog::Table &catalogTable,
@@ -80,6 +84,10 @@ class TableCatalogDelegate : public CatalogDelegate {
     }
 
   private:
+    static Table *constructTableFromCatalog(ExecutorContext *executorContext,
+                                            catalog::Database &catalogDatabase,
+                                            catalog::Table &catalogTable);
+
     voltdb::Table *m_table;
     bool m_exportEnabled;
     std::string m_signature;

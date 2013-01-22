@@ -98,6 +98,28 @@ public:
         return NValue::getAddressValue(address);
     }
 
+    static inline NValue convertToOutOfLine(NValue &inlineValue) {
+        if (inlineValue.getValueType() == VALUE_TYPE_VARCHAR) {
+            if (inlineValue.isNull()) {
+                return ValueFactory::getNullStringValue();
+            }
+            return ValueFactory::getStringValue((const char*)inlineValue.getObjectValue());
+        }
+        else if (inlineValue.getValueType() == VALUE_TYPE_VARBINARY) {
+            if (inlineValue.isNull()) {
+                return ValueFactory::getNullBinaryValue();
+            }
+            return ValueFactory::getBinaryValue((const unsigned char* )inlineValue.getObjectValue(),
+                                                inlineValue.getObjectLength());
+        }
+        else {
+            assert(false); // only two types can be out of line
+        }
+        // should never get here
+        return NValue(VALUE_TYPE_INVALID);
+
+    }
+
     // What follows exists for test only!
 
     static inline NValue castAsBigInt(NValue value) {
@@ -126,6 +148,48 @@ public:
 
     static inline NValue castAsString(NValue value) {
         return value.castAsString();
+    }
+
+    static NValue nvalueFromSQLDefaultType(const ValueType type, std::string &value) {
+        switch (type) {
+            case VALUE_TYPE_NULL:
+            {
+                return getNullValue();
+            }
+            case VALUE_TYPE_TINYINT:
+            case VALUE_TYPE_SMALLINT:
+            case VALUE_TYPE_INTEGER:
+            case VALUE_TYPE_BIGINT:
+            case VALUE_TYPE_TIMESTAMP:
+            {
+                NValue retval(VALUE_TYPE_BIGINT);
+                int64_t ival = atol(value.c_str());
+                retval = getBigIntValue(ival);
+                return retval.castAs(type);
+            }
+            case VALUE_TYPE_DECIMAL:
+            {
+                return getDecimalValueFromString(value);
+            }
+            case VALUE_TYPE_DOUBLE:
+            {
+                double dval = atof(value.c_str());
+                return getDoubleValue(dval);
+            }
+            case VALUE_TYPE_VARCHAR:
+            {
+                return NValue::getTempStringValue(value.c_str(), value.length());
+            }
+            case VALUE_TYPE_VARBINARY:
+            {
+                return getBinaryValue(value);
+            }
+            default:
+            {
+                // skip to throw
+            }
+        }
+        throwDynamicSQLException("Default value parsing error.");
     }
 };
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='schemachange-ddl.sql' />
+            <schema path='schemachange-index-ddl.sql' />
+        </schemas>
+        <partitions>
+            <partition table='BIG_TABLE' column='id' />
+        </partitions>
+    </database>
+</project>

@@ -594,6 +594,45 @@ VoltDBEngine::processCatalogDeletes(int64_t txnId)
     return true;
 }
 
+bool
+VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
+    // covers column count
+    if (t1->columns().size() != t2->columnCount()) {
+        return false;
+    }
+
+    // make sure widths are the same
+    map<string, catalog::Column*>::const_iterator outerIter;
+    for (outerIter = t1->columns().begin();
+         outerIter != t1->columns().end();
+         outerIter++)
+    {
+        int index = outerIter->second->index();
+        int size = outerIter->second->size();
+        int32_t type = outerIter->second->type();
+        std::string name = outerIter->second->name();
+        bool nullable = outerIter->second->nullable();
+
+        if (t2->columnName(index).compare(name)) {
+            return false;
+        }
+
+        if (t2->schema()->columnLength(index) != size) {
+            return false;
+        }
+
+        if (t2->schema()->columnAllowNull(index) != nullable) {
+            return false;
+        }
+
+        if (t2->schema()->columnType(index) != type) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
 /*
  * Create catalog delegates for new catalog tables.
  * Create the tables themselves when new tables are needed.
@@ -670,11 +709,25 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                 table->setSignatureAndGeneration(catalogTable->signature(), txnId);
             }
 
-            vector<TableIndex*> currentIndexes = table->allIndexes();
+            //////////////////////////////////////////
+            // if the table schema has changed, build a new
+            // table and migrate tuples over to it, repopulating
+            // indexes as we go
+            //////////////////////////////////////////
+
+            if (!hasSameSchema(catalogTable, table)) {
+                tcd->processSchemaChanges(m_executorContext, *m_database, *catalogTable);
+
+                // don't continue on to modify/add/remove indexes, because the
+                // call above should rebuild them all anyway
+                continue;
+            }
 
             //////////////////////////////////////////
             // find all of the indexes to add
             //////////////////////////////////////////
+
+            vector<TableIndex*> currentIndexes = table->allIndexes();
 
             // iterate over indexes for this table in the catalog
             map<string, catalog::Index*>::const_iterator indexIter;

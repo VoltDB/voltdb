@@ -31,6 +31,7 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/CatalogUtil.h"
 #include "common/types.h"
+#include "common/ValueFactory.hpp"
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
@@ -234,10 +235,10 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
                              columnIndexes);
 }
 
-int
-TableCatalogDelegate::init(ExecutorContext *executorContext,
-                           catalog::Database &catalogDatabase,
-                           catalog::Table &catalogTable)
+Table*
+TableCatalogDelegate::constructTableFromCatalog(ExecutorContext *executorContext,
+                                                catalog::Database &catalogDatabase,
+                                                catalog::Table &catalogTable)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -363,40 +364,188 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
         partitionColumnIndex = partitionColumn->index();
     }
 
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
+    bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
 
     int32_t databaseId = catalogDatabase.relativeIndex();
-    m_table = TableFactory::getPersistentTable(databaseId, executorContext,
+    Table *table = TableFactory::getPersistentTable(databaseId, executorContext,
                                                catalogTable.name(), schema, columnNames.get(),
-                                               partitionColumnIndex, m_exportEnabled,
+                                               partitionColumnIndex, exportEnabled,
                                                isTableExportOnly(catalogDatabase, table_id));
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(pkey_index_scheme);
         assert(pkeyIndex);
-        m_table->addIndex(pkeyIndex);
-        m_table->setPrimaryKeyIndex(pkeyIndex);
+        table->addIndex(pkeyIndex);
+        table->setPrimaryKeyIndex(pkeyIndex);
     }
 
     // add other indexes
     BOOST_FOREACH(TableIndexScheme scheme, indexes) {
         TableIndex *index = TableIndexFactory::getInstance(scheme);
         assert(index);
-        m_table->addIndex(index);
+        table->addIndex(index);
     }
+
+    return table;
+}
+
+int
+TableCatalogDelegate::init(ExecutorContext *executorContext,
+                           catalog::Database &catalogDatabase,
+                           catalog::Table &catalogTable)
+{
+    m_table = constructTableFromCatalog(executorContext,
+                                        catalogDatabase,
+                                        catalogTable);
+    if (!m_table) {
+        return false; // mixing ints and booleans here :(
+    }
+
 
     // configure for stats tables
     m_table->configureIndexStats(executorContext->m_hostId,
                                  executorContext->m_hostname,
                                  executorContext->m_siteId,
                                  executorContext->m_partitionId,
-                                 databaseId);
+                                 catalogDatabase.relativeIndex());
 
     m_table->incrementRefcount();
     return 0;
 }
 
+int
+TableCatalogDelegate::processSchemaChanges(ExecutorContext *executorContext,
+                                           catalog::Database &catalogDatabase,
+                                           catalog::Table &catalogTable)
+{
+    ///////////////////////////////////////////////
+    // Create a new table so two tables exist
+    ///////////////////////////////////////////////
+
+    PersistentTable *newTable = dynamic_cast<PersistentTable*>(constructTableFromCatalog(executorContext,
+                                                                                         catalogDatabase,
+                                                                                         catalogTable));
+
+    ///////////////////////////////////////////////
+    // Move tuples from one table to the other
+    ///////////////////////////////////////////////
+
+    PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
+
+    // figure out what goes in each columns of the new table
+
+    // set default values once in the temp tuple
+    int columnCount = newTable->columnCount();
+
+    // default values
+    boost::scoped_array<NValue> defaults_array(new NValue[columnCount]);
+    NValue *defaults = defaults_array.get();
+
+    // map from existing table
+    boost::scoped_array<int> columnSourceMap_array(new int[columnCount]);
+    int *columnSourceMap = columnSourceMap_array.get();
+
+    vector<std::string> oldColumnNames = existingTable->getColumnNames();    
+
+    int i = 0;
+    catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
+    for (colIter = catalogTable.columns().begin();
+         colIter != catalogTable.columns().end();
+         colIter++)
+    {
+        std::string colName = colIter->first;
+        catalog::Column *column = colIter->second;
+        int index = column->index();
+
+        // assign a default value, if one exists
+        ValueType defaultColType = static_cast<ValueType>(column->defaulttype());
+        if (defaultColType == VALUE_TYPE_INVALID) {
+            defaults[index] = ValueFactory::getNullValue();
+        }
+        else {
+            std::string defaultValue = column->defaultvalue();
+            defaults[index] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue);
+        }
+        
+        // find a source column in the existing table, if one exists
+        columnSourceMap[i] = -1; // -1 is code for not found, use defaults
+        for (int j = 0; j < oldColumnNames.size(); j++) {
+            if (oldColumnNames[j].compare(colName) == 0) {
+                columnSourceMap[index] = j;
+            }
+        }
+    }
+
+    TableIterator &iterator = m_table->iterator();
+    TableTuple &tupleToInsert = newTable->tempTuple();
+    TableTuple scannedTuple(m_table->schema());
+
+    std::vector<NValue> requiresFree;
+
+    while (iterator.next(scannedTuple)) {
+        // set the values from the old table or from defaults
+        for (int i = 0; i < columnCount; i++) {
+            if (columnSourceMap[i] >= 0) {
+                NValue value = scannedTuple.getNValue(columnSourceMap[i]);
+                printf("value: %s\n", value.debug().c_str());
+
+                // check if the column is widening so it was inline and now is out of line
+                if (scannedTuple.getSchema()->columnIsInlined(columnSourceMap[i])) {
+                    if (!tupleToInsert.getSchema()->columnIsInlined(i)) {
+                        value = ValueFactory::convertToOutOfLine(value);
+                        if (!value.isNull()) {
+                            requiresFree.push_back(value);
+                        }
+                    }
+                }
+
+                tupleToInsert.setNValue(i, value);
+            }
+            else {
+                tupleToInsert.setNValue(i, defaults[i]);
+            }
+        }
+        // insert into the new table
+        newTable->insertTuple(tupleToInsert, false);
+        // delete from the old table
+        existingTable->deleteTupleForSchemaChange(scannedTuple);
+
+        while (requiresFree.size()) {
+            requiresFree.back().free();
+            requiresFree.pop_back();
+        }
+    }
+
+    // release any memory held by the default values --
+    // normally you'd want this in a finally block, but since this code failing
+    // implies serious problems, we'll not worry our pretty little heads
+    for (int i = 0; i < columnCount; i++) {
+        defaults[i].free();
+    }
+
+    ///////////////////////////////////////////////
+    // Drop the old table
+    ///////////////////////////////////////////////
+
+    deleteCommand();
+
+    ///////////////////////////////////////////////
+    // Patch up the new table as a replacement
+    ///////////////////////////////////////////////
+
+    m_table = newTable;
+
+    // configure for stats tables
+    m_table->configureIndexStats(executorContext->m_hostId,
+                                 executorContext->m_hostname,
+                                 executorContext->m_siteId,
+                                 executorContext->m_partitionId,
+                                 catalogDatabase.relativeIndex());
+
+    m_table->incrementRefcount();
+    return 0;
+}
 
 void TableCatalogDelegate::deleteCommand()
 {

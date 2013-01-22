@@ -356,6 +356,9 @@ class NValue {
         const char * const m_end;
     };
 
+    bool getSourceInlined() {
+        return m_sourceInlined;
+    }
 
     /* For boost hashing */
     void hashCombine(std::size_t &seed) const;
