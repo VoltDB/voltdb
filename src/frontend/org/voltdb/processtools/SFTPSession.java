@@ -56,7 +56,7 @@ public class SFTPSession {
     /**
      * default logger
      */
-    protected static final VoltLogger cmdLog = new VoltLogger(SFTPSession.class.getName());
+    protected static final VoltLogger sftpLog = new VoltLogger(SFTPSession.class.getName());
     /*
      * regular expression that matches file names ending in jar, so, and jnilib
      */
@@ -103,7 +103,7 @@ public class SFTPSession {
                 );
 
         m_host = host;
-        if (log == null) m_log = cmdLog;
+        if (log == null) m_log = sftpLog;
         else m_log = log;
 
         JSch jsch = new JSch();
@@ -157,15 +157,15 @@ public class SFTPSession {
     }
 
     /**
-     * Given a map where their keys contain source file, and their associated
-     * values contain their respective destinations files (not directories)
+     * Given a map where their keys contain absolute source file, and their associated
+     * values contain their respective absolute destinations files (not directories)
      * ensure that the directories used in the destination files exist (creating
      * them if needed), removes previously installed artifacts files that end
      * with .so, .jar, and .jnilib, and copy over the source files to their
      * destination.
      *
-     * @param files Map where their keys contain source file, and their associated
-     * values contain their respective destinations files. NB destinations must not
+     * @param files Map where their keys contain absolute source file, and their associated
+     * values contain their respective absolute destinations files. NB destinations must not
      * be directory names, but fully specified file names
      *
      * @throws {@link SFTPException} when an error occurs during SFTP operations
@@ -182,12 +182,12 @@ public class SFTPSession {
     }
 
     /**
-     * Given a map where their keys contain source file, and their associated
-     * values contain their respective destinations files (not directories)
+     * Given a map where their keys contain absolute source file, and their associated
+     * values contain their respective absolute destinations files (not directories)
      * copy over the source files to their destination.
      *
-     * @param files Map where their keys contain source file, and their associated
-     * values contain their respective destinations files. NB destinations must not
+     * @param files Map where their keys contain absolute source file, and their associated
+     * values contain their respective absolute destinations files. NB destinations must not
      * be directory names, but fully specified file names
      *
      * @throws {@link SFTPException} when an error occurs during SFTP operations
@@ -200,11 +200,12 @@ public class SFTPSession {
         Preconditions.checkState(
                 m_channel != null, "stale session"
                 );
+        verifyAllAreAbsolutePaths(files);
 
         for (Map.Entry<File, File> entry: files.entrySet()) {
             File srcFile = entry.getKey();
-            String src = entry.getKey().getAbsolutePath();
-            String dst = entry.getValue().getAbsolutePath();
+            String src = entry.getKey().getPath();
+            String dst = entry.getValue().getPath();
             try {
                 m_channel.put(src, dst);
 
@@ -222,12 +223,12 @@ public class SFTPSession {
     }
 
     /**
-     * Given a map where their keys contain source file, and their associated
-     * values contain their respective destinations files (not directories)
+     * Given a map where their keys contain absolute source file, and their associated
+     * values contain their respective absolute destinations files (not directories)
      * copy over the source files to their destination.
      *
-     * @param files Map where their keys contain source file, and their associated
-     * values contain their respective destinations files. NB destinations must not
+     * @param files Map where their keys contain absolute source file, and their associated
+     * values contain their respective absolute destinations files. NB destinations must not
      * be directory names, but fully specified file names
      *
      * @throws {@link SFTPException} when an error occurs during SFTP operations
@@ -240,10 +241,11 @@ public class SFTPSession {
         Preconditions.checkState(
                 m_channel != null, "stale session"
                 );
+        verifyAllAreAbsolutePaths(files);
 
         for (Map.Entry<File, File> entry: files.entrySet()) {
-            String src = entry.getKey().getAbsolutePath();
-            String dst = entry.getValue().getAbsolutePath();
+            String src = entry.getKey().getPath();
+            String dst = entry.getValue().getPath();
             File destFile = entry.getValue();
             try {
                 m_channel.get(src, dst);
@@ -258,9 +260,9 @@ public class SFTPSession {
     }
 
     /**
-     * Delete the given list of files
+     * Delete the given list of absolute files paths
      *
-     * @param files a collection of files
+     * @param files a collection of files specified as absolute paths
      * @throws SFTPException when an error occurs during SFTP operations performed
      *   by this method
      */
@@ -271,10 +273,11 @@ public class SFTPSession {
         Preconditions.checkState(
                 m_channel != null, "stale session"
                 );
+        verifyAllAreAbsolutePaths(files);
 
         for (File f: files) {
             try {
-                m_channel.rm(f.getAbsolutePath());
+                m_channel.rm(f.getPath());
                 if (m_log.isDebugEnabled()) {
                     m_log.debug("SFTP: rm " + f);
                 }
@@ -286,9 +289,9 @@ public class SFTPSession {
 
     /**
      * if found, it deletes artifacts held in the directories that
-     * contain the given list of files
+     * contain the given list of absolute file paths
      *
-     * @param files a collection of files
+     * @param files a collection of files specified as absolute paths
      *
      * @throws SFTPException when an error occurs during SFTP operations performed
      *   by this method
@@ -300,6 +303,7 @@ public class SFTPSession {
         Preconditions.checkState(
                 m_channel != null, "stale session"
                 );
+        verifyAllAreAbsolutePaths(files);
 
         // dedup directories containing files
         TreeSet<File> directories = new TreeSet<File>();
@@ -321,9 +325,9 @@ public class SFTPSession {
                 }
             };
             try {
-                m_channel.ls( d.getAbsolutePath(), selector);
+                m_channel.ls( d.getPath(), selector);
                 if (m_log.isDebugEnabled()) {
-                    m_log.debug("SFTP: ls " + d.getAbsolutePath());
+                    m_log.debug("SFTP: ls " + d.getPath());
                 }
             } catch (SftpException sfex) {
                 throw new SFTPException("list directory " + d, sfex);
@@ -332,9 +336,9 @@ public class SFTPSession {
             for (String f: toBeDeleted) {
                 File artifact = new File( d, f);
                 try {
-                    m_channel.rm(artifact.getAbsolutePath());
+                    m_channel.rm(artifact.getPath());
                     if (m_log.isDebugEnabled()) {
-                        m_log.debug("SFTP: rm " + artifact.getAbsolutePath());
+                        m_log.debug("SFTP: rm " + artifact.getPath());
                     }
                 } catch (SftpException sfex) {
                     throw new SFTPException("remove artifact " + artifact, sfex);
@@ -347,7 +351,7 @@ public class SFTPSession {
      * Akin to mkdir -p for all directories containing the given collection of
      * remote files.
      *
-     * @param files a collection of files
+     * @param files a collection of files specified as absolute paths
      *
      * @throws {@link SFTPException} when an error occurs during SFTP operations
      *   performed by this method
@@ -359,6 +363,7 @@ public class SFTPSession {
         Preconditions.checkState(
                 m_channel != null, "stale session"
                 );
+        verifyAllAreAbsolutePaths(files);
 
         /*
          * directory entries are sorted first by their level (/l1 < /l1/l2 < /l1/l2/l3)
@@ -376,9 +381,9 @@ public class SFTPSession {
         for (DirectoryEntry entry: directories) {
             if (!directoryExists(entry.getDirectory())) {
                 try {
-                    m_channel.mkdir(entry.getDirectory().getAbsolutePath());
+                    m_channel.mkdir(entry.getDirectory().getPath());
                     if (m_log.isDebugEnabled()) {
-                        m_log.debug("SFTP: mkdir " + entry.getDirectory().getAbsolutePath());
+                        m_log.debug("SFTP: mkdir " + entry.getDirectory().getPath());
                     }
                 } catch (SftpException sfex) {
                     throw new SFTPException("create directory " + entry, sfex);
@@ -392,7 +397,7 @@ public class SFTPSession {
      * Akin to mkdir -p for all directories containing the given collection of
      * of local files.
      *
-     * @param files a collection of files
+     * @param files a collection of files specified as absolute paths
      *
      * @throws {@link RuntimeException} when an error occurs during local file
      *   operations performed by this method
@@ -404,6 +409,7 @@ public class SFTPSession {
         Preconditions.checkState(
                 m_channel != null, "stale session"
                 );
+        verifyAllAreAbsolutePaths(files);
 
         // dedup directories containing files
         TreeSet<File> directories = new TreeSet<File>();
@@ -418,7 +424,7 @@ public class SFTPSession {
                 || !dir.canWrite()
                 || !dir.canExecute()
             ) {
-                throw new RuntimeException(dir + " is not write accessible");
+                throw new SFTPException(dir + " is not write accessible");
             }
         }
         directories.clear();
@@ -556,6 +562,47 @@ public class SFTPSession {
     }
 
     /**
+     * Creates hard links of the given list of absolute paths by appending
+     * the given extension to them
+     *
+     * @param files a collection of files specified as absolute paths
+     * @param linkExtension
+     *
+     * @throws {@link SFTPException} when an error occurs during SFTP operations
+     *   performed by this method
+     */
+    public void createLinks(final Collection<File> files, final String linkExtension) {
+        Preconditions.checkArgument(
+                files != null, "null file collection"
+                );
+        Preconditions.checkArgument(
+                linkExtension != null && !linkExtension.trim().isEmpty(),
+                "specified null or empty linkEtension"
+                );
+        Preconditions.checkState(
+                m_channel != null, "stale session"
+                );
+        verifyAllAreAbsolutePaths(files);
+
+        ArrayList<String> fileNames = new ArrayList<String>();
+        for (File f: files) {
+            fileNames.add(f.getPath());
+        }
+
+        pipeListToShellCommand(
+                fileNames, "xargs -I {} ln -f {} {}" + linkExtension);
+
+        if (m_log.isDebugEnabled()) {
+            for (String fileName: fileNames) {
+                m_log.debug("CMD: 'ln " +
+                        fileName + " " +
+                        fileName+linkExtension + "'"
+                        );
+            }
+        }
+    }
+
+    /**
      * Joins the given list of string using the given join string
      *
      * @param list of strings
@@ -631,6 +678,37 @@ public class SFTPSession {
             sb.append(item).append("\n");
         }
         return new ByteArrayInputStream(sb.toString().getBytes(Charsets.UTF_8));
+    }
+
+    /**
+     * Verifies that given collection of files contain only files specified
+     * as absolute paths
+     * @param files a collection of files
+     * @throws IllegalArgumentException when a file is not specified as an absolute path
+     */
+    protected void verifyAllAreAbsolutePaths( final Collection<File> files) {
+        for (final File f: files) {
+            Preconditions.checkArgument(f.isAbsolute(), f + " is not an absolute path");
+        }
+    }
+
+    /**
+     * Verifies that given map of files contain only files specified
+     * as absolute paths
+     * @param files a collection of files
+     * @throws IllegalArgumentException when a file is not specified as an absolute path
+     */
+    protected void verifyAllAreAbsolutePaths( final Map<File,File> files) {
+        for (final Map.Entry<File, File> e: files.entrySet()) {
+            Preconditions.checkArgument(
+                    e.getKey().isAbsolute(),
+                    "source file "+e.getKey()+" is not an absolute path"
+                    );
+            Preconditions.checkArgument(
+                    e.getValue().isAbsolute(),
+                    "destination file "+e.getValue()+" is not an absolute path"
+                    );
+        }
     }
 
     protected final static class DirectoryExistsSelector implements LsEntrySelector {
@@ -756,6 +834,11 @@ public class SFTPSession {
         }
     }
 
+    /**
+     * Convenient file attribute translation helper class
+     * @author ssantoro
+     *
+     */
     public static class BasicAttributes {
         private final int m_modifyTime;
         private final boolean m_isExecutable;
