@@ -2404,7 +2404,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         if (m_localReplicasBuilder != null) {
             m_localReplicasBuilder.join(10000);
-            hostLog.error("Local replica map builder took more than ten seconds, probably hung");
+            if (m_localReplicasBuilder.isAlive()) {
+                hostLog.error("Local replica map builder took more than ten seconds, probably hung");
+            }
             m_localReplicasBuilder.join();
         }
     }
