@@ -180,10 +180,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     void parseOrderColumn(VoltXMLElement orderByNode) {
         // make sure everything is kosher
-        assert(orderByNode.name.equalsIgnoreCase("operation"));
-        String operationType = orderByNode.attributes.get("type");
-        assert(operationType != null);
-        assert(operationType.equalsIgnoreCase("orderby"));
+        assert(orderByNode.name.equalsIgnoreCase("orderby"));
 
         // get desc/asc
         String desc = orderByNode.attributes.get("desc");
@@ -203,34 +200,28 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // inner child could be columnref, in which case it's just a normal
         // column.  Just make a ParsedColInfo object for it and the planner
         // will do the right thing later
-        if (child.name.equals("columnref"))
-        {
-            order_col.columnName = child.attributes.get("column");
-            order_col.tableName = child.attributes.get("table");
-            String alias = child.attributes.get("alias");
-            order_col.alias = alias;
-
+        if (child.name.equals("columnref")) {
             // The ORDER BY column MAY be identical to a simple display column, in which case,
             // tagging the actual display column as being also an order by column
             // helps later when trying to determine ORDER BY coverage (for determinism).
-            if (order_exp instanceof TupleValueExpression)
-            {
-                ParsedColInfo orig_col = null;
-                for (ParsedColInfo col : displayColumns)
-                {
-                    if (col.expression.equals(order_exp)) {
-                        orig_col = col;
-                        break;
-                    }
-                }
-                if (orig_col != null) {
-                    orig_col.orderBy = true;
-                    orig_col.ascending = order_col.ascending;
+            assert(order_exp instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) order_exp;
+            order_col.columnName = tve.getColumnName();
+            order_col.tableName = tve.getTableName();
+            order_col.alias = tve.getColumnAlias();
+            ParsedColInfo orig_col = null;
+            for (ParsedColInfo col : displayColumns) {
+                if (col.expression.equals(order_exp)) {
+                    orig_col = col;
+                    break;
                 }
             }
+            if (orig_col != null) {
+                orig_col.orderBy = true;
+                orig_col.ascending = order_col.ascending;
+            }
         }
-        else if (child.name.equals("operation"))
-        {
+        else if (child.name.equals("simplecolumn")) {
             order_col.columnName = "";
             // I'm not sure anyone actually cares about this table name
             order_col.tableName = "VOLT_TEMP_TABLE";
@@ -243,56 +234,51 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // This case seems to be the result of cross-referencing a display column
             // by its position, as in "ORDER BY 2, 3". Otherwise the ORDER BY column
             // is a columnref as handled in the prior code block.
-            if (order_exp instanceof TupleValueExpression) {
-                String alias = child.attributes.get("alias");
-                order_col.alias = alias;
-                ParsedColInfo orig_col = null;
-                for (ParsedColInfo col : displayColumns)
-                {
-                    if (col.alias.equals(alias))
-                    {
-                        orig_col = col;
-                        break;
-                    }
-                }
-                // We need the original column expression so we can extract
-                // the value size and type for our TVE that refers back to it.
-                // XXX: This check runs into problems for some cases where a display column expression gets re-used in the ORDER BY.
-                // I THINK one problem case was "select x, max(y) from t group by x order by max(y);" --paul
-                if (orig_col == null)
-                {
-                    throw new PlanningErrorException("Unable to find source " +
-                                                     "column for simplecolumn: " +
-                                                     alias);
-                }
-
-                // Tagging the actual display column as being also an order by column
-                // helps later when trying to determine ORDER BY coverage (for determinism).
-                orig_col.orderBy = true;
-                orig_col.ascending = order_col.ascending;
-
-                assert(orig_col.tableName.equals("VOLT_TEMP_TABLE"));
-                // Construct our fake TVE that will point back at the input
-                // column.
-                TupleValueExpression tve = (TupleValueExpression) order_exp;
-                tve.setColumnAlias(alias);
-                tve.setColumnName("");
-                tve.setColumnIndex(-1);
-                tve.setTableName("VOLT_TEMP_TABLE");
-                tve.setValueSize(orig_col.expression.getValueSize());
-                tve.setValueType(orig_col.expression.getValueType());
-                if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    tve.setHasAggregate(true);
+            assert(order_exp instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) order_exp;
+            String alias = tve.getColumnAlias();
+            order_col.alias = alias;
+            ParsedColInfo orig_col = null;
+            for (ParsedColInfo col : displayColumns) {
+                if (col.alias.equals(alias)) {
+                    orig_col = col;
+                    break;
                 }
             }
+
+            // We need the original column expression so we can extract
+            // the value size and type for our TVE that refers back to it.
+            // XXX: This check runs into problems for some cases where a display column expression gets re-used in the ORDER BY.
+            // I THINK one problem case was "select x, max(y) from t group by x order by max(y);" --paul
+            if (orig_col == null) {
+                throw new PlanningErrorException("Unable to find source " +
+                                                 "column for simplecolumn: " +
+                                                 alias);
+            }
+
+            // Tagging the actual display column as being also an order by column
+            // helps later when trying to determine ORDER BY coverage (for determinism).
+            orig_col.orderBy = true;
+            orig_col.ascending = order_col.ascending;
+
+            assert(orig_col.tableName.equals("VOLT_TEMP_TABLE"));
+            // Fill in our fake TVE that will point back at the input column.
+            tve.setColumnName("");
+            tve.setColumnIndex(-1);
+            tve.setTableName("VOLT_TEMP_TABLE");
+            tve.setValueSize(orig_col.expression.getValueSize());
+            tve.setValueType(orig_col.expression.getValueType());
+            if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                tve.setHasAggregate(true);
+            }
         }
-        else if (child.name.equals("function") == false)
-        {
+        else if ((child.name.equals("operation") == false) &&
+                 (child.name.equals("aggregation") == false) &&
+                 (child.name.equals("function") == false)) {
             throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
         }
-        if (order_exp instanceof ConstantValueExpression) {
-            assert(order_exp.getValueType() != VoltType.NUMERIC);
-        }
+        assert( ! (order_exp instanceof ConstantValueExpression));
+        assert( ! (order_exp instanceof ParameterValueExpression));
         ExpressionUtil.finalizeValueTypes(order_exp);
         order_col.expression = order_exp;
         orderColumns.add(order_col);
