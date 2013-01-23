@@ -125,11 +125,11 @@ public class ExpressionValue extends Expression {
             exp.name = "value";
 
             if (dataType == null) {
-                exp.attributes.put("type", "NULL");
+                exp.attributes.put("valuetype", "NULL");
                 exp.attributes.put("value", "NULL");
             }
             else {
-                exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
+                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
 
                 if (isParam) {
                     exp.attributes.put("isparam", "true");

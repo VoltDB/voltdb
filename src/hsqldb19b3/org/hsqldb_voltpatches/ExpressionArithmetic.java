@@ -466,7 +466,7 @@ public class ExpressionArithmetic extends Expression {
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
             exp.name = "value";
-            exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
+            exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
 
             if (isParam) {
                 exp.attributes.put("isparam", "true");
@@ -507,9 +507,9 @@ public class ExpressionArithmetic extends Expression {
         case OpTypes.NOT:               element = "not"; break;
         case OpTypes.CONCAT:   
             VoltXMLElement expConcat = new VoltXMLElement("function");
-            expConcat.attributes.put("id", String.valueOf(FunctionCustom.FUNC_CONCAT));
+            expConcat.attributes.put("function_id", String.valueOf(FunctionCustom.FUNC_CONCAT));
             expConcat.attributes.put("name", Tokens.T_CONCAT_WORD);
-            expConcat.attributes.put("type", Type.SQL_VARCHAR.getNameString());
+            expConcat.attributes.put("valuetype", Type.SQL_VARCHAR.getNameString());
             
             for (Expression expr : nodes) {
                 if (expr != null) {
@@ -525,7 +525,7 @@ public class ExpressionArithmetic extends Expression {
         }
 
         exp.name = "operation";
-        exp.attributes.put("type", element);
+        exp.attributes.put("optype", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
         }

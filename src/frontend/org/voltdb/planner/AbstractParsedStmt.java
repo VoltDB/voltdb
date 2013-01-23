@@ -240,11 +240,14 @@ public abstract class AbstractParsedStmt {
         else if (elementName.equals("columnref")) {
             retval = parseColumnRefExpression(root);
         }
-        else if (elementName.equals("bool")) {
-            retval = parseBooleanExpression(root);
-        }
         else if (elementName.equals("operation")) {
             retval = parseOperationExpression(paramsById, root);
+        }
+        else if (elementName.equals("aggregation")) {
+            retval = parseAggregationExpression(paramsById, root);
+        }
+        else if (elementName.equals("simplecolumn")) {
+            retval = parseSimpleColumnExpression(root);
         }
         else if (elementName.equals("function")) {
             retval = parseFunctionExpression(paramsById, root);
@@ -265,7 +268,7 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private static AbstractExpression parseValueExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
-        String type = exprNode.attributes.get("type");
+        String type = exprNode.attributes.get("valuetype");
         String isParam = exprNode.attributes.get("isparam");
         String isPlannerGenerated = exprNode.attributes.get("isplannergenerated");
 
@@ -333,31 +336,13 @@ public abstract class AbstractParsedStmt {
 
     /**
      *
-     * @param exprNode
-     * @param attrs
-     * @return
-     */
-    private static AbstractExpression parseBooleanExpression(VoltXMLElement exprNode) {
-        ConstantValueExpression expr = new ConstantValueExpression();
-
-        expr.setValueType(VoltType.BIGINT);
-        expr.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        if (exprNode.attributes.get("attrs").equalsIgnoreCase("true"))
-            expr.setValue("1");
-        else
-            expr.setValue("0");
-        return expr;
-    }
-
-    /**
-     *
      * @param paramsById
      * @param exprNode
      * @param attrs
      * @return
      */
     private static AbstractExpression parseOperationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
-        String type = exprNode.attributes.get("type");
+        String type = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(type);
         AbstractExpression expr = null;
 
@@ -372,41 +357,25 @@ public abstract class AbstractParsedStmt {
         }
         expr.setExpressionType(exprType);
 
-        // If the operation type was 'simplecolumn' then it's going to turn
-        // into a TVE and we need to bail out before we try parsing the
-        // left and right subtrees
-        if (expr instanceof TupleValueExpression)
-        {
-            return expr;
-        }
-
         // Allow expressions to read expression-specific data from exprNode.
-        // Looks like the design fully abstracts other volt classes from
-        // the XML serialization?  Putting this here instead of in derived
-        // Expression implementations.
-
-        if (expr instanceof AggregateExpression) {
-            String node;
-            if ((node = exprNode.attributes.get("distinct")) != null) {
-                AggregateExpression ae = (AggregateExpression)expr;
-                ae.m_distinct = Boolean.parseBoolean(node);
-            }
-        }
+        // The design fully abstracts other volt classes from the XML serialization,
+        // putting this here instead of in derived Expression implementations.
 
         // get the first (left) node that is an element
         VoltXMLElement leftExprNode = exprNode.children.get(0);
         assert(leftExprNode != null);
-
-        // get the second (right) node that is an element (might be null)
-        VoltXMLElement rightExprNode = null;
-        if (exprNode.children.size() > 1)
-            rightExprNode = exprNode.children.get(1);
 
         // recursively parse the left subtree (could be another operator or
         // a constant/tuple/param value operand).
         AbstractExpression leftExpr = parseExpressionTree(paramsById, leftExprNode);
         assert((leftExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
         expr.setLeft(leftExpr);
+
+        // get the second (right) node that is an element (might be null)
+        VoltXMLElement rightExprNode = null;
+        if (exprNode.children.size() > 1) {
+            rightExprNode = exprNode.children.get(1);
+        }
 
         if (expr.needsRightExpression()) {
             assert(rightExprNode != null);
@@ -415,8 +384,65 @@ public abstract class AbstractParsedStmt {
             AbstractExpression rightExpr = parseExpressionTree(paramsById, rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
+        } else {
+            assert(rightExprNode == null);
         }
 
+        return expr;
+    }
+
+
+    /**
+     *
+     * @param exprNode
+     * @return
+     */
+    private static AbstractExpression parseSimpleColumnExpression(VoltXMLElement exprNode)
+    {
+        // This object is a place holder that gets filled in later based on the display column it aliases.
+        String alias = exprNode.attributes.get("alias");
+        TupleValueExpression expr = new TupleValueExpression();
+        expr.setColumnAlias(alias);
+        return expr;
+    }
+
+
+    /**
+     *
+     * @param paramsById
+     * @param exprNode
+     * @return
+     */
+    private static AbstractExpression parseAggregationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode)
+    {
+        String type = exprNode.attributes.get("optype");
+        ExpressionType exprType = ExpressionType.get(type);
+
+        if (exprType == ExpressionType.INVALID) {
+            throw new PlanningErrorException("Unsupported aggregation type '" + type + "'");
+        }
+        AggregateExpression expr = new AggregateExpression(exprType);
+
+        // Allow expressions to read expression-specific data from exprNode.
+        // The design fully abstracts other volt classes from the XML serialization.
+        // So, this goes here instead of in derived Expression implementations.
+
+        String node;
+        if ((node = exprNode.attributes.get("distinct")) != null) {
+            expr.m_distinct = Boolean.parseBoolean(node);
+        }
+
+        assert (exprNode.children.size() == 1);
+
+        // get the single required child node
+        VoltXMLElement childExprNode = exprNode.children.get(0);
+        assert(childExprNode != null);
+
+        // recursively parse the child subtree -- could (in theory) be an operator or
+        // a constant, column, or param value operand or null in the specific case of "COUNT(*)".
+        AbstractExpression childExpr = parseExpressionTree(paramsById, childExprNode);
+        assert((childExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
+        expr.setLeft(childExpr);
         return expr;
     }
 
@@ -433,9 +459,9 @@ public abstract class AbstractParsedStmt {
         if (disabled != null) {
             throw new PlanningErrorException("Function '" + name + "' is not supported in VoltDB: " + disabled);
         }
-        String value_type_name = exprNode.attributes.get("type");
+        String value_type_name = exprNode.attributes.get("valuetype");
         VoltType value_type = VoltType.typeFromString(value_type_name);
-        String id = exprNode.attributes.get("id");
+        String id = exprNode.attributes.get("function_id");
         assert(id != null);
         int idArg = 0;
         try {
@@ -544,7 +570,7 @@ public abstract class AbstractParsedStmt {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
                 int index = Integer.parseInt(node.attributes.get("index"));
-                String typeName = node.attributes.get("type");
+                String typeName = node.attributes.get("valuetype");
                 VoltType type = VoltType.typeFromString(typeName);
                 m_paramsById.put(id, index);
                 paramList[index] = type;
