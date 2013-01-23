@@ -349,7 +349,11 @@ public class ExportGeneration {
         if (m_partitionLeaderZKName.get(partition).equals(leader)) {
             if (m_partitionsIKnowIAmTheLeader.add(partition)) {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
-                    eds.acceptMastership();
+                    try {
+                        eds.acceptMastership();
+                    } catch (Exception e) {
+                        exportLog.error("Unable to start exporting", e);
+                    }
                 }
             }
         }
@@ -758,7 +762,11 @@ public class ExportGeneration {
                 m_dataSourcesByPartition.get(partitionId);
         exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
-            eds.acceptMastership();
+            try {
+                eds.acceptMastership();
+            } catch (Exception e) {
+                exportLog.error("Unable to start exporting", e);
+            }
         }
     }
 
