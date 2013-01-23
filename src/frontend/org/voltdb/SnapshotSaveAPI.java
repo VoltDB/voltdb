@@ -506,9 +506,9 @@ public class SnapshotSaveAPI
             final int numLocalSites =
                     (tracker.getLocalSites().length - recoveringSiteCount.get());
 
-            // non-null if targeting only one site (used for rejoin)
+            // not empty if targeting only one site (used for rejoin)
             // set later from the "data" JSON string
-            Long targetHSid = null;
+            Map<Integer, Long> streamPairs = new HashMap<Integer, Long>();
 
             JSONObject jsData = null;
             if (data != null && !data.isEmpty()) {
@@ -616,7 +616,7 @@ public class SnapshotSaveAPI
 
                     if (format == SnapshotFormat.STREAM && jsData != null) {
                         try {
-                            Map<Integer, Long> streamPairs = new HashMap<Integer, Long>();
+                            List<Long> localHSIds = tracker.getSitesForHost(context.getHostId());
                             JSONObject sp = jsData.getJSONObject("streamPairs");
                             @SuppressWarnings("unchecked")
                             Iterator<String> it = sp.keys();
@@ -625,7 +625,6 @@ public class SnapshotSaveAPI
                                 long sourceHSId = Long.valueOf(key);
                                 // See whether this source HSID is a local site, if so, we need
                                 // the partition ID
-                                List<Long> localHSIds = tracker.getSitesForHost(context.getHostId());
                                 if (localHSIds.contains(sourceHSId)) {
                                     int partitionId = tracker.getPartitionForSite(sourceHSId);
                                     Long destHSId = Long.valueOf(sp.getString(key));
@@ -733,23 +732,16 @@ public class SnapshotSaveAPI
                             filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
                         }
 
-                        // if this snapshot targets a specific site...
-                        if (targetHSid != null) {
-                            // get the list of sites on this node
-                            List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
-                            // if the target site is local to this node...
-                            if (localHSids.contains(targetHSid)) {
-                                // ...get its partition id...
-                                int partitionId = tracker.getPartitionForSite(targetHSid);
-                                // ...and build a filter to only get that partition
-                                filters.add(new PartitionProjectionSnapshotFilter(
-                                        new int[] { partitionId }, sdt.getHeaderSize()));
-                            }
-                            else {
-                                // filter EVERYTHING because the site we want isn't local
-                                filters.add(new PartitionProjectionSnapshotFilter(
+                        // if this snapshot targets sites on this node
+                        if (streamPairs.size() > 0) {
+                            filters.add(new PartitionProjectionSnapshotFilter(
+                                        com.google.common.primitives.Ints.toArray(streamPairs.keySet()),
+                                        sdt.getHeaderSize()));
+                        }
+                        else {
+                            // filter EVERYTHING because the site we want isn't local
+                            filters.add(new PartitionProjectionSnapshotFilter(
                                         new int[0], sdt.getHeaderSize()));
-                            }
                         }
 
                         final SnapshotTableTask task =
