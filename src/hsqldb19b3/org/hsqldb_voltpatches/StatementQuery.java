@@ -42,7 +42,6 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
-import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of Statement for query expressions.<p>
@@ -179,12 +178,12 @@ public class StatementQuery extends StatementDMQL {
      * @throws HSQLParseException
      */
     @Override
-    VoltXMLElement voltGetXML(Session session)
+    VoltXMLElement voltGetStatementXML(Session session)
     throws HSQLParseException
     {
         return voltGetXMLExpression(queryExpression, session);
     }
-    
+
     VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, Session session)
     throws HSQLParseException
     {
@@ -212,7 +211,7 @@ public class StatementQuery extends StatementDMQL {
             /**
              * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
              * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
-             * associativity - (Select 1 EXCEPT Select2) EXCEPT Select3 vs. Select 1 EXCEPT (Select2 EXCEPT Select3) 
+             * associativity - (Select 1 EXCEPT Select2) EXCEPT Select3 vs. Select 1 EXCEPT (Select2 EXCEPT Select3)
              */
             if ("union".equalsIgnoreCase(leftExpr.name) &&
                     queryExpr.operatorName().equalsIgnoreCase(leftExpr.attributes.get("uniontype"))) {
@@ -240,10 +239,6 @@ public class StatementQuery extends StatementDMQL {
         VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
             query.attributes.put("distinct", "true");
-        if (select.isGrouped)
-            query.attributes.put("grouped", "true");
-        if (select.isAggregated)
-            query.attributes.put("aggregated", "true");
 
         // limit
         if ((select.sortAndSlice != null) && (select.sortAndSlice.limitCondition != null)) {
@@ -340,7 +335,6 @@ public class StatementQuery extends StatementDMQL {
         // columns
         VoltXMLElement cols = new VoltXMLElement("columns");
         query.children.add(cols);
-        assert(cols != null);
 
         ArrayList<Expression> orderByCols = new ArrayList<Expression>();
         ArrayList<Expression> groupByCols = new ArrayList<Expression>();
@@ -401,16 +395,13 @@ public class StatementQuery extends StatementDMQL {
                 groupByCols.add(expr);
             } else if (expr.opType == OpTypes.ORDER_BY) {
                 orderByCols.add(expr);
-            } else if (expr.opType == OpTypes.SIMPLE_COLUMN && expr.isAggregate && expr.alias != null) {
+            } else if ((expr.opType != OpTypes.SIMPLE_COLUMN) || (expr.isAggregate && expr.alias != null)) {
                 // Add aggregate aliases to the display columns to maintain
                 // the output schema column ordering.
                 displayCols.add(expr);
-            } else if (expr.opType == OpTypes.SIMPLE_COLUMN) {
-                // Other simple columns are ignored. If others exist, maybe
-                // volt infers a display column from another column collection?
-            } else {
-                displayCols.add(expr);
             }
+            // else, other simple columns are ignored. If others exist, maybe
+            // volt infers a display column from another column collection?
         }
 
         for (Pair<Integer, SimpleName> alias : aliases) {
@@ -471,23 +462,7 @@ public class StatementQuery extends StatementDMQL {
         }
 
         // parameters
-        VoltXMLElement params = new VoltXMLElement("parameters");
-        query.children.add(params);
-        assert(params != null);
-
-        for (int i = 0; i < parameters.length; i++) {
-            VoltXMLElement parameter = new VoltXMLElement("parameter");
-            params.children.add(parameter);
-            assert(parameter != null);
-
-            parameter.attributes.put("index", String.valueOf(i));
-            ExpressionColumn param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId(session));
-            Type paramType = param.getDataType();
-            if (paramType != null) {
-                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
-            }
-        }
+        voltAppendParameters(session, query);
 
         // scans
         VoltXMLElement scans = new VoltXMLElement("tablescans");

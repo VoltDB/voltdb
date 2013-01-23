@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
@@ -165,6 +166,25 @@ public abstract class AbstractParsedStmt {
      * @param db
      */
     abstract void parse(VoltXMLElement stmtElement);
+
+    void parseTargetColumns(VoltXMLElement columnsNode, Table table, HashMap<Column, AbstractExpression> columns)
+    {
+        for (VoltXMLElement child : columnsNode.children) {
+            assert(child.name.equals("column"));
+
+            String name = child.attributes.get("name");
+            assert(name != null);
+            Column col = table.getColumns().getIgnoreCase(name.trim());
+
+            assert(child.children.size() == 1);
+            VoltXMLElement subChild = child.children.get(0);
+            AbstractExpression expr = parseExpressionTree(subChild);
+            assert(expr != null);
+            expr.refineValueType(VoltType.get((byte)col.getType()));
+            ExpressionUtil.finalizeValueTypes(expr);
+            columns.put(col, expr);
+        }
+    }
 
     /**Parse tables and parameters
      * .
@@ -317,7 +337,6 @@ public abstract class AbstractParsedStmt {
     /**
      *
      * @param exprNode
-     * @param attrs
      * @return
      */
     private static AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
@@ -338,7 +357,6 @@ public abstract class AbstractParsedStmt {
      *
      * @param paramsById
      * @param exprNode
-     * @param attrs
      * @return
      */
     private static AbstractExpression parseOperationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
@@ -610,7 +628,7 @@ public abstract class AbstractParsedStmt {
 
     /**
      */
-void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
+    void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
         // This next bit of code identifies which tables get classified how
         HashSet<Table> tableSet = new HashSet<Table>();
         for (AbstractExpression expr : whereList) {
