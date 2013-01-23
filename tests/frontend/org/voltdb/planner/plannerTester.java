@@ -259,10 +259,11 @@ public class plannerTester {
 
     }
 
-    public static void setUp( String config ) throws IOException {
+    public static boolean setUp( String config ) throws IOException {
         m_partitionColumns.clear();
         m_baselinePath = (m_fixedBaselinePath != null) ? m_fixedBaselinePath : (config + "/baseline/");
         m_ddlFilePath = null;
+        m_stmts.clear();
         BufferedReader reader = new BufferedReader( new FileReader(config + "/config") );
         String line = null;
         while( ( line = reader.readLine() ) != null ) {
@@ -270,20 +271,34 @@ public class plannerTester {
                 continue;
             }
             else if( line.equalsIgnoreCase("DDL:")) {
-                line = reader.readLine();
+                if ( ( line = reader.readLine() ) == null ) {
+                    break;
+                }
                 m_ddlFilePath = new File( line ).getCanonicalPath();
             }
             else if( line.equalsIgnoreCase("SQL:")) {
-                m_stmts.clear();
-                while( (line = reader.readLine()).length() > 6 ) {
+                boolean atEof = false;
+                while (true) {
+                    if ( ( line = reader.readLine() ) == null ) {
+                        atEof = true;
+                        break;
+                    }
                     if( line.startsWith("#") ) {
                         continue;
                     }
+                    if (line.length() <= 6 ) {
+                        break;
+                    }
                     m_stmts.add( line );
+                }
+                if (atEof) {
+                    break;
                 }
             }
             else if( line.equalsIgnoreCase("Partition Columns:") ) {
-                line = reader.readLine();
+                if ( ( line = reader.readLine() ) == null ) {
+                    break;
+                }
                 String [] cols = line.split(",");
                 for( String col : cols ) {
                     int index = col.indexOf(".");
@@ -297,11 +312,24 @@ public class plannerTester {
                 System.err.println("Config file syntax error : ignoring line: " + line);
             }
         }
+        boolean success = true;
+        if (m_ddlFilePath == null ) {
+            System.err.println("ERROR: syntax error : config file '" + config + "/config' has no 'DDL:' section");
+            success = false;
+        }
+        if (m_stmts.isEmpty()) {
+            System.err.println("ERROR: syntax error : config file '" + config + "/config' has no 'SQL:' section or SQL statements");
+            success = false;
+        }
         try {
-            setUpSchema(config);
+            if (success) {
+                setUpSchema(config);
+            }
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
+        return success;
     }
 
     public static void setUpForTest( String pathDDL, String config, String table, String column ) {
@@ -397,7 +425,9 @@ public class plannerTester {
     }
 
     public static void configCompileSave(String config, boolean isSave) throws Exception {
-        setUp( config );
+        if ( ! setUp( config )) {
+            return;
+        }
         int size = m_stmts.size();
         for( int i = 0; i < size; i++ ) {
             List<AbstractPlanNode> pnList = compile(m_stmts.get(i));
@@ -421,7 +451,9 @@ public class plannerTester {
     //parameters : path to baseline and the new plans
     //size : number of total files in the baseline directory
     public static void configDiff(String config) throws IOException {
-        setUp(config);
+        if ( ! setUp( config )) {
+            return;
+        }
         m_reportWriter.write( "===================================================================Begin "+config+"\n" );
         PlanNodeTree pnt1 = null;
         PlanNodeTree pnt2 = null;
