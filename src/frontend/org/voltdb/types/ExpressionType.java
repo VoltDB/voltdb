@@ -28,7 +28,6 @@ import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.InComparisonExpression;
-import org.voltdb.expressions.NullValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleAddressExpression;
@@ -95,7 +94,6 @@ public enum ExpressionType {
     VALUE_PARAMETER          (ParameterValueExpression.class, 31),
     VALUE_TUPLE                  (TupleValueExpression.class, 32),
     VALUE_TUPLE_ADDRESS        (TupleAddressExpression.class, 33),
-    VALUE_NULL                    (NullValueExpression.class, 34),
 
     // ----------------------------
     // Aggregate

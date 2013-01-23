@@ -1345,6 +1345,8 @@ public class DDLCompiler {
             return;
         }
         else if (type == ConstraintType.FOREIGN_KEY) {
+            // TODO: We need to be able to use indexes for foreign keys. I am purposely
+            //       leaving those out right now because HSQLDB just makes too many of them.
             String msg = "VoltDB does not enforce foreign key references and constraints. ";
             msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
             m_compiler.addWarn(msg);
@@ -1367,9 +1369,7 @@ public class DDLCompiler {
         }
 
         // The constraint is backed by an index, therefore we need to create it
-        // TODO: We need to be able to use indexes for foreign keys. I am purposely
-        //       leaving those out right now because HSQLDB just makes too many of them.
-        Constraint catalog_const = null;
+        Constraint catalog_const = table.getConstraints().add(name);
         if (node.attributes.get("index") != null) {
             String indexName = node.attributes.get("index");
 
@@ -1380,30 +1380,19 @@ public class DDLCompiler {
 
             Index catalog_index = indexMap.get(indexName);
 
-            // if the constraint name contains index type hints, exercise them (giant hack)
             if (catalog_index != null) {
+                // if the constraint name contains index type hints, exercise them (giant hack)
                 String constraintNameNoCase = name.toLowerCase();
                 if (constraintNameNoCase.contains("tree"))
                     catalog_index.setType(IndexType.BALANCED_TREE.getValue());
                 if (constraintNameNoCase.contains("hash"))
                     catalog_index.setType(IndexType.HASH_TABLE.getValue());
-            }
 
-            catalog_const = table.getConstraints().add(name);
-            if (catalog_index != null) {
-                catalog_const.setIndex(catalog_index);
                 catalog_index.setUnique(type == ConstraintType.UNIQUE || type == ConstraintType.PRIMARY_KEY);
+                catalog_const.setIndex(catalog_index);
             }
-        } else {
-            catalog_const = table.getConstraints().add(name);
         }
         catalog_const.setType(type.getValue());
-
-        // NO ADDITIONAL WORK
-        // since we only really support unique constraints, setting up a
-        // unique index above is all we need to do to make that work
-
-        return;
     }
 
     /**

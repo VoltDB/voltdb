@@ -63,6 +63,9 @@ import org.hsqldb_voltpatches.types.Type;
 // support for MERGE statement by Justin Spadea (jzs9783@users dot sourceforge.net)
 public class StatementDML extends StatementDMQL {
 
+    /**
+     * Instantiate this as an INSERT statement
+     */
     StatementDML(int type, int group, HsqlName schemaName) {
         super(type, group, schemaName);
     }
@@ -1251,57 +1254,22 @@ public class StatementDML extends StatementDMQL {
 
     /*************** VOLTDB *********************/
 
-    private void voltAppendInsertColumns(Session session, VoltXMLElement xml)
+    private void voltAppendTargetColumns(Session session, int[] columnMap, Expression[] expressions, VoltXMLElement xml)
     throws HSQLParseException
     {
         VoltXMLElement columns = new VoltXMLElement("columns");
         xml.children.add(columns);
-        assert(columns != null);
 
-        for (int i = 0; i < insertColumnMap.length; i++)
+        for (int i = 0; i < columnMap.length; i++)
         {
             VoltXMLElement column = new VoltXMLElement("column");
             columns.children.add(column);
-            column.attributes.put("table", targetTable.tableName.name);
-            column.attributes.put("name", targetTable.getColumn(insertColumnMap[i]).getName().name);
-            column.children.add(insertExpression.nodes[0].nodes[i].voltGetXML(session));
+            column.attributes.put("name", targetTable.getColumn(columnMap[i]).getName().name);
+            column.children.add(expressions[i].voltGetXML(session));
         }
     }
 
-    private void voltAppendUpdateColumns(Session session, VoltXMLElement xml)
-    throws HSQLParseException
-    {
-        VoltXMLElement columns = new VoltXMLElement("columns");
-        xml.children.add(columns);
-        assert(columns != null);
-
-        for (int i = 0; i < updateColumnMap.length; i++)
-        {
-            VoltXMLElement column = new VoltXMLElement("column");
-            columns.children.add(column);
-            column.attributes.put("table", targetTable.tableName.name);
-            column.attributes.put("name", targetTable.getColumn(updateColumnMap[i]).getName().name);
-            column.children.add(updateExpressions[i].voltGetXML(session));
-        }
-    }
-
-    private void voltAppendParameters(Session session, VoltXMLElement xml) {
-
-        VoltXMLElement parameterXML = new VoltXMLElement("parameters");
-        xml.children.add(parameterXML);
-        assert(parameterXML != null);
-
-        for (int i = 0; i < parameters.length; i++) {
-            VoltXMLElement parameter = new VoltXMLElement("parameter");
-            parameterXML.children.add(parameter);
-            parameter.attributes.put("index", String.valueOf(i));
-            Expression param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId(session));
-            parameter.attributes.put("valuetype", Types.getTypeName(param.getDataType().typeCode));
-        }
-    }
-
-    private void voltAppendUpdateCondition(Session session, VoltXMLElement xml)
+    private void voltAppendCondition(Session session, VoltXMLElement xml)
     throws HSQLParseException
     {
         assert(targetRangeVariables.length > 0);
@@ -1312,40 +1280,30 @@ public class StatementDML extends StatementDMQL {
         assert(condition != null);
 
         // AND together all of the WHERE conditions that HSQL spits out
-        // The parser will currently redo all of the index start/end
-        // smarts that HSQL tried to do
-        Expression cond = rv.indexCondition;
-        if (rv.indexEndCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond,
-                                             rv.indexEndCondition);
-            }
-            else {
-                cond = rv.indexEndCondition;
-            }
-        }
-        if (rv.nonIndexJoinCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond,
-                                             rv.nonIndexJoinCondition);
-            }
-            else {
-                cond = rv.nonIndexJoinCondition;
-            }
-        }
-        if (rv.nonIndexWhereCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond,
-                                             rv.nonIndexWhereCondition);
-            }
-            else {
-                cond = rv.nonIndexWhereCondition;
-            }
-        }
-
+        // The planner will redo all of the index start/end
+        // smarts that HSQL tried to do.
+        Expression cond = voltAndTogether(rv.indexCondition,
+                                      rv.indexEndCondition,
+                                      rv.nonIndexJoinCondition,
+                                      rv.nonIndexWhereCondition);
         if (cond != null) {
             condition.children.add(cond.voltGetXML(session));
         }
+    }
+
+    private static Expression voltAndTogether(Expression... conditions)
+    {
+        Expression result = null;
+        for(Expression child : conditions) {
+            if (child != null) {
+                if (result == null) {
+                    result = child;
+                    continue;
+                }
+                result = new ExpressionLogical(OpTypes.AND, result, child);
+            }
+        }
+        return result;
     }
 
     /**
@@ -1357,42 +1315,44 @@ public class StatementDML extends StatementDMQL {
      * @throws HSQLParseException
      */
      @Override
-    VoltXMLElement voltGetXML(Session session)
-     throws HSQLParseException
-     {
-        VoltXMLElement xml = new VoltXMLElement("unknown");
-        xml.attributes.put("table", targetTable.getName().name);
+    VoltXMLElement voltGetStatementXML(Session session)
+    throws HSQLParseException
+    {
+        VoltXMLElement xml;
         VoltXMLElement child;
 
         switch (type) {
 
-            case StatementTypes.INSERT :
-                xml.name = "insert";
-                voltAppendInsertColumns(session, xml);
-                voltAppendParameters(session, xml);
-                break;
+        case StatementTypes.INSERT :
+            xml = new VoltXMLElement("insert");
+            voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
+            break;
 
-            case StatementTypes.UPDATE_CURSOR :
-            case StatementTypes.UPDATE_WHERE :
-                xml.name = "update";
-                voltAppendUpdateColumns(session, xml);
-                voltAppendParameters(session, xml);
-                child = targetRangeVariables[0].voltGetXML(session);
-                xml.children.add(child);
-                assert(child != null);
-                voltAppendUpdateCondition(session, xml);
-                break;
+        case StatementTypes.UPDATE_CURSOR :
+        case StatementTypes.UPDATE_WHERE :
+            xml = new VoltXMLElement("update");
+            voltAppendTargetColumns(session, updateColumnMap, updateExpressions, xml);
+            child = targetRangeVariables[0].voltGetXML(session);
+            assert(child != null);
+            xml.children.add(child);
+            voltAppendCondition(session, xml);
+            break;
 
-            case StatementTypes.DELETE_CURSOR :
-            case StatementTypes.DELETE_WHERE :
-                xml.name = "delete";
-                voltAppendParameters(session, xml);
-                child = targetRangeVariables[0].voltGetXML(session);
-                xml.children.add(child);
-                assert(child != null);
-                voltAppendUpdateCondition(session, xml);
-                break;
+        case StatementTypes.DELETE_CURSOR :
+        case StatementTypes.DELETE_WHERE :
+            xml = new VoltXMLElement("delete");
+            child = targetRangeVariables[0].voltGetXML(session);
+            assert(child != null);
+            xml.children.add(child);
+            voltAppendCondition(session, xml);
+            break;
+
+        default:
+            throw new HSQLParseException("VoltDB does not support DML statements of type " + type);
         }
+
+        voltAppendParameters(session, xml);
+        xml.attributes.put("table", targetTable.getName().name);
         return xml;
     }
 }

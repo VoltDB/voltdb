@@ -1056,48 +1056,22 @@ public final class Constraint implements SchemaObject {
      * some names.
      * @return XML, correctly indented, representing this object.
      */
-    VoltXMLElement voltGetXML(Session session)
-    throws HSQLParseException
+    VoltXMLElement voltGetConstraintXML()
     {
-        VoltXMLElement constraint = null;
-
         // Skip "MAIN" constraints, as they are the parent of foreign key references
-        if (this.constType != MAIN) {
-            constraint = new VoltXMLElement("constraint");
+        if (constType == MAIN) {
+            return null;
+        }
 
-            constraint.attributes.put("name", getName().name);
-            constraint.attributes.put("constrainttype", getTypeName());
+        VoltXMLElement constraint = new VoltXMLElement("constraint");
 
-            // Foreign Keys
-            if (this.constType == FOREIGN_KEY) {
-                Table our_table = this.getRef();
-                int our_cols[] = this.getRefColumns();
+        constraint.attributes.put("name", getName().name);
+        constraint.attributes.put("constrainttype", getTypeName());
 
-                Table fkey_table = this.getMain();
-                int fkey_cols[] = this.getMainColumns();
-
-                constraint.attributes.put("foreignkeytable", fkey_table.getName().statementName);
-
-                // XXX Can bad SQL get us here or does HSQL barf before that?
-                assert(our_cols.length == fkey_cols.length);
-                for (int i = 0; i < our_cols.length; i++) {
-                    String our_colname = our_table.getColumn(our_cols[i]).getName().statementName;
-                    String fkey_colname = fkey_table.getColumn(fkey_cols[i]).getName().statementName;
-
-                    VoltXMLElement ref = new VoltXMLElement("constraint");
-                    constraint.children.add(ref);
-                    assert(ref != null);
-                    ref.attributes.put("from", our_colname);
-                    ref.attributes.put("to", fkey_colname);
-                }
-            }
-            // All other constraints...
-            else {
-                if (core.mainIndex != null)
-                    constraint.attributes.put("index", core.mainIndex.getName().name);
-                else
-                    constraint.attributes.put("index", "");
-            }
+        // Constraints that don't just give "unimplemented" warnings, are typically implemented with a named index...
+        if (constType != FOREIGN_KEY && constType != CHECK // unimplemented
+            && core.mainIndex != null) {
+            constraint.attributes.put("index", core.mainIndex.getName().name);
         }
 
         return constraint;
