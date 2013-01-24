@@ -1161,12 +1161,6 @@ final class RangeVariable {
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        // output metadata
-        if (isSeqScan)
-            scan.attributes.put("type", "sequential");
-        else
-            scan.attributes.put("type", "index");
-
         scan.attributes.put("table", rangeTable.getName().name);
 
         if ((index != null) && (isSeqScan == false)) {
