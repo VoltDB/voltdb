@@ -23,32 +23,20 @@
 
 package org.voltdb.planner;
 
-import junit.framework.TestCase;
 
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
-
-public class TestFunctions extends TestCase {
-
-    private PlannerTestAideDeCamp aide;
+public class TestFunctions extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestFunctions.class.getResource("testplans-functions-ddl.sql"), "testfunctions");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(true);
-        }
+        final boolean planForSinglePartitionFalse = false;
+        setupSchema(TestFunctions.class.getResource("testplans-functions-ddl.sql"), "testfunctions",
+                                                    planForSinglePartitionFalse);
+        forceReplication();
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     /**
@@ -56,11 +44,7 @@ public class TestFunctions extends TestCase {
      * was not a column name and is a reserved word.
      */
     public void testENG913_userfunction() {
-        try {
-            aide.compile("update ENG913 set name = 'tim' where user = ?;", 0);
-            fail();
-        }
-        catch (PlanningErrorException ex) {}
+        failToCompile("update ENG913 set name = 'tim' where user = ?;", "'user'", "not supported");
     }
 
 }

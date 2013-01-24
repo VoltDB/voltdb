@@ -23,32 +23,17 @@
 
 package org.voltdb.planner;
 
-import junit.framework.TestCase;
-
-public class TestDeterminism extends TestCase {
-
-    private PlannerTestAideDeCamp aide;
+public class TestDeterminism extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestDeterminism.class.getResource("testplans-determinism-ddl.sql"),
-                                         "testdeterminism");
-
-/* It makes little sense to force tables to be non-replicated but specify no partitioning column.
- * It breaks join planning, anyway.
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
- */
+        final boolean planForSinglePartitionFalse = false;
+        setupSchema(TestDeterminism.class.getResource("testplans-determinism-ddl.sql"), "testdeterminism", planForSinglePartitionFalse);
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     /**
@@ -59,20 +44,7 @@ public class TestDeterminism extends TestCase {
      */
     private void assertPlanDeterminism(String sql, boolean order, boolean content)
     {
-        CompiledPlan cp = null;
-        try {
-            cp = aide.compileAdHocPlan(sql);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(cp != null);
+        CompiledPlan cp = compileAdHocPlan(sql);
         assertTrue(order == cp.isOrderDeterministic());
         assertTrue(content == cp.isContentDeterministic());
         assertTrue(cp.isContentDeterministic() || ! cp.isOrderDeterministic());
