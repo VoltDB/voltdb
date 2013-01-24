@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -186,6 +186,18 @@ public class ReplaySequencer
         }
 
         if (in instanceof MultiPartitionParticipantMessage) {
+            /*
+             * DR sends multiple @LoadMultipartitionTable proc calls with the
+             * same txnId, which is the snapshot txnId. For each partition,
+             * there is a sentinel paired with the @LoadMultipartitionTable
+             * call. Dedupe the sentinels the same way as we dedupe fragments,
+             * so that there won't be sentinels end up in the sequencer where
+             * matching fragments are deduped.
+             */
+            if (inTxnId <= m_lastPolledFragmentTxnId) {
+                return true;
+            }
+
             // Incoming sentinel.
             // MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage)in;
             if (m_mpiEOLReached) {

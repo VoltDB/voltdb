@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -60,31 +60,47 @@ class ParameterizationInfo {
 
         VoltXMLElement parameterizedXmlSQL = xmlSQL.duplicate();
 
-        // find the parameters xml node
-        VoltXMLElement paramsNode = null;
-        for (VoltXMLElement child : parameterizedXmlSQL.children) {
-            if (child.name.equals("parameters")) {
-                paramsNode = child;
-            }
-        }
-        assert(paramsNode != null);
-
-        // don't optimize plans with params yet
-        if (paramsNode.children.size() > 0) {
-            return null;
-        }
-
         Map<String, Integer> idToParamIndexMap = new HashMap<String, Integer>();
         List<String> paramValues = new ArrayList<String>();
 
-        parameterizeRecursively(parameterizedXmlSQL, paramsNode,
-                idToParamIndexMap, paramValues);
+        parameterizeRecursively(parameterizedXmlSQL, idToParamIndexMap, paramValues);
 
-        ParameterizationInfo info = new ParameterizationInfo(
+        ParameterizationInfo info = null;
+        if(idToParamIndexMap.size() > 0) {
+            info = new ParameterizationInfo(
                 xmlSQL, parameterizedXmlSQL,
                 paramValues.toArray(new String[paramValues.size()]));
-
+        }
         return info;
+    }
+
+    public static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,
+                                    Map<String, Integer> idToParamIndexMap,
+                                    List<String> paramValues) {
+
+        if (parameterizedXmlSQL.name.equals("union")) {
+            // UNION has its parameters on the individual selects level
+            for (VoltXMLElement xmlChildSQL : parameterizedXmlSQL.children) {
+                parameterizeRecursively(xmlChildSQL, idToParamIndexMap, paramValues);
+            }
+        } else {
+            // find the parameters xml node
+            VoltXMLElement paramsNode = null;
+            for (VoltXMLElement child : parameterizedXmlSQL.children) {
+                if (child.name.equals("parameters")) {
+                    paramsNode = child;
+                }
+            }
+            assert(paramsNode != null);
+
+            // don't optimize plans with params yet
+            if (paramsNode.children.size() > 0) {
+                return;
+            }
+
+            parameterizeRecursively(parameterizedXmlSQL, paramsNode,
+                    idToParamIndexMap, paramValues);
+        }
     }
 
     static void parameterizeRecursively(VoltXMLElement node,
@@ -109,8 +125,8 @@ class ParameterizationInfo {
 
                 VoltXMLElement paramIndexNode = new VoltXMLElement("parameter");
                 paramIndexNode.attributes.put("index", String.valueOf(paramIndex));
-                String typeStr = node.attributes.get("type");
-                paramIndexNode.attributes.put("type", typeStr);
+                String typeStr = node.attributes.get("valuetype");
+                paramIndexNode.attributes.put("valuetype", typeStr);
                 paramIndexNode.attributes.put("id", idStr);
                 paramsNode.children.add(paramIndexNode);
 

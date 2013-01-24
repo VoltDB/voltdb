@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -54,11 +54,11 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Date;
-import java.util.zip.CRC32;
 
 import junit.framework.TestCase;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
@@ -185,7 +185,7 @@ public class TestParameterSet extends TestCase {
 
     public void testGetCRCWithoutCrash() throws IOException {
         ParameterSet pset;
-        CRC32 crc;
+        PureJavaCrc32C crc;
 
         Object[] psetObjs = new Object[] {
                 null, VoltType.INTEGER.getNullValue(), VoltType.DECIMAL.getNullValue(), // null values
@@ -198,7 +198,7 @@ public class TestParameterSet extends TestCase {
 
         pset = new ParameterSet();
         pset.setParameters(psetObjs);
-        crc = new CRC32();
+        crc = new PureJavaCrc32C();
         pset.addToCRC(crc);
         long crc1 = crc.getValue();
 
@@ -206,19 +206,19 @@ public class TestParameterSet extends TestCase {
 
         pset = new ParameterSet();
         pset.setParameters(psetObjs);
-        crc = new CRC32();
+        crc = new PureJavaCrc32C();
         pset.addToCRC(crc);
         long crc2 = crc.getValue();
 
         pset = new ParameterSet();
         pset.setParameters(new Object[0]);
-        crc = new CRC32();
+        crc = new PureJavaCrc32C();
         pset.addToCRC(crc);
         long crc3 = crc.getValue();
 
         pset = new ParameterSet();
         pset.setParameters(new Object[] { 1 });
-        crc = new CRC32();
+        crc = new PureJavaCrc32C();
         pset.addToCRC(crc);
         long crc4 = crc.getValue();
 

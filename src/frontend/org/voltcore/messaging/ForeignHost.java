@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -23,15 +23,15 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -39,10 +39,9 @@ public class ForeignHost {
     private Connection m_connection;
     final FHInputHandler m_handler;
     private final HostMessenger m_hostMessenger;
-    final int m_hostId;
+    private final Integer m_hostId;
     final InetSocketAddress m_listeningAddress;
 
-    private final String m_remoteHostname = "UNKNOWN_HOSTNAME";
     private boolean m_closing;
     boolean m_isUp;
 
@@ -174,10 +173,10 @@ public class ForeignHost {
 
     /** Send a message to the network. This public method is re-entrant. */
     void send(
-            final List<Long> destinations,
+            final long destinations[],
             final VoltMessage message)
     {
-        if (destinations.isEmpty()) {
+        if (destinations.length == 0) {
             return;
         }
 
@@ -188,14 +187,14 @@ public class ForeignHost {
                     int len = 4            /* length prefix */
                             + 8            /* source hsid */
                             + 4            /* destinationCount */
-                            + 8 * destinations.size()  /* destination list */
+                            + 8 * destinations.length  /* destination list */
                             + message.getSerializedSize();
                     ByteBuffer buf = ByteBuffer.allocate(len);
                     buf.putInt(len - 4);
                     buf.putLong(message.m_sourceHSId);
-                    buf.putInt(destinations.size());
-                    for (int ii = 0; ii < destinations.size(); ii++) {
-                        buf.putLong(destinations.get(ii));
+                    buf.putInt(destinations.length);
+                    for (int ii = 0; ii < destinations.length; ii++) {
+                        buf.putLong(destinations[ii]);
                     }
                     message.flattenToBuffer(buf);
                     buf.flip();
@@ -218,7 +217,7 @@ public class ForeignHost {
         if ((!m_closing && m_isUp) &&
             (current_delta > m_deadHostTimeout))
         {
-            hostLog.error("DEAD HOST DETECTED, hostname: " + m_remoteHostname);
+            hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
             hostLog.info("\tcurrent time: " + current_time);
             hostLog.info("\tlast message: " + m_lastMessageMillis);
             hostLog.info("\tdelta (millis): " + current_delta);
@@ -229,26 +228,35 @@ public class ForeignHost {
 
 
     String hostname() {
-        return m_remoteHostname;
+        return m_connection.getHostnameOrIP();
     }
 
     /** Deliver a deserialized message from the network to a local mailbox */
     private void deliverMessage(long destinationHSId, VoltMessage message) {
+        if (!m_hostMessenger.validateForeignHostId(m_hostId)) {
+            hostLog.warn(String.format("Message (%s) sent to site id: %s @ (%s) at " +
+                    m_hostMessenger.getHostId() + " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                    " which is a known failed host. The message will be dropped\n",
+                    message.getClass().getSimpleName(),
+                    CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString()));
+            return;
+        }
+
         Mailbox mailbox = m_hostMessenger.getMailbox(destinationHSId);
         /*
          * At this point we are OK with messages going to sites that don't exist
          * because we are saying that things can come and go
          */
         if (mailbox == null) {
-            System.err.printf("Message (%s) sent to unknown site id: %s @ (%s) at " +
+            hostLog.info(String.format("Message (%s) sent to unknown site id: %s @ (%s) at " +
                     m_hostMessenger.getHostId() + " from " + CoreUtils.hsIdToString(message.m_sourceHSId) + "\n",
                     message.getClass().getSimpleName(),
-                    CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString());
+                    CoreUtils.hsIdToString(destinationHSId), m_socket.getRemoteSocketAddress().toString()));
             /*
              * If it is for the wrong host, that definitely isn't cool
              */
             if (m_hostMessenger.getHostId() != (int)destinationHSId) {
-                assert(false);
+                VoltDB.crashLocalVoltDB("Received a message at wrong host", false, null);
             }
             return;
         }

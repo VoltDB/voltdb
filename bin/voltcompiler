@@ -2,7 +2,7 @@
 
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2011 VoltDB Inc.
+# Copyright (C) 2008-2013 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -133,7 +133,7 @@ for f in $VOLTDB_LIB/*.jar; do
 done
 
 # if present include user supplied jars
-if \ls -1 $VOLTDB_LIB/extension | egrep -q '\.jar$'; then
+if \ls -1 $VOLTDB_LIB/extension 2> /dev/null | egrep -q '\.jar$'; then
   for f in $VOLTDB_LIB/extension/*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done

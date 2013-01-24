@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -510,6 +510,35 @@ public class TestReplaySequencer extends TestCase
         assertEquals(init4, dut.poll());
         assertEquals(init5, dut.poll());
         assertNull(dut.poll());
+    }
+
+    /**
+     * This tests multiple @LoadMultipartitionTable transactions with the same
+     * txnId as DR does.
+     */
+    @Test
+    public void testSentinelsAndFragsWithSameTxnId()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sntl = makeSentinel(1L);
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage frag2 = makeFragment(1L);
+
+        assertTrue(dut.offer(1L, sntl));
+        assertTrue(dut.offer(1L, frag));
+        assertEquals(frag, dut.poll());
+        assertEquals(null, dut.poll());
+
+        // subsequent fragments won't block the queue.
+        assertFalse(dut.offer(1L, frag2));
+        assertEquals(null, dut.poll());
+
+        // Dupe sentinels and fragments
+        assertTrue(dut.offer(1L, sntl));
+        assertFalse(dut.offer(1L, frag));
+        assertFalse(dut.offer(1L, frag2));
+        assertEquals(null, dut.poll());
     }
 }
 

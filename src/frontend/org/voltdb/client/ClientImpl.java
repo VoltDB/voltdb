@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -20,8 +20,10 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -36,7 +38,8 @@ import org.voltdb.utils.CatalogUtil;
  */
 public final class ClientImpl implements Client, ReplicaProcCaller {
 
-    private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
+    // call initiated by the user use positive handles
+    private final AtomicLong m_handle = new AtomicLong(0);
 
     /*
      * Username and password as set by createConnection. Used
@@ -476,6 +479,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         return m_distributer.getInstanceId();
     }
 
+    /**
+     * Not exposed to users for the moment.
+     */
+    public void resetInstanceId() {
+        m_distributer.resetInstanceId();
+    }
+
     @Override
     public String getBuildString() {
         return m_distributer.getBuildString();
@@ -528,6 +538,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                     "with a client that wasn't constructed with a username and password specified");
         }
         createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
+    }
+
+    @Override
+    public List<InetSocketAddress> getConnectedHostList() {
+        return m_distributer.getConnectedHostList();
     }
 
     @Override

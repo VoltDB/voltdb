@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -46,6 +46,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -128,44 +129,46 @@ public class ExportManager
                 @Override
                 public void run() {
 
-                    ExportGeneration generation = m_generations.firstEntry().getValue();
+                    ExportGeneration oldGeneration = m_generations.firstEntry().getValue();
                     ExportDataProcessor newProcessor = null;
-
+                    ExportDataProcessor oldProcessor = null;
                     synchronized (ExportManager.this) {
 
                         m_generationGhosts.add(m_generations.remove(m_generations.firstEntry().getKey()).m_timestamp);
-                        exportLog.info("Finished draining generation " + generation.m_timestamp);
+                        exportLog.info("Finished draining generation " + oldGeneration.m_timestamp);
 
-                        exportLog.info("Creating connector " + m_loaderClass);
                         try {
-                            final Class<?> loaderClass = Class.forName(m_loaderClass);
-                            //Make it so
-                            ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-                            newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-                            newProcessor.addLogger(exportLog);
-                            newProcessor.setExportGeneration(nextGeneration);
-                            newProcessor.setProcessorConfig(m_processorConfig);
-                            newProcessor.readyForData();
+                            if (m_loaderClass != null && !m_generations.isEmpty()) {
+                                exportLog.info("Creating connector " + m_loaderClass);
+                                final Class<?> loaderClass = Class.forName(m_loaderClass);
+                                //Make it so
+                                ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
+                                newProcessor = (ExportDataProcessor)loaderClass.newInstance();
+                                newProcessor.addLogger(exportLog);
+                                newProcessor.setExportGeneration(nextGeneration);
+                                newProcessor.setProcessorConfig(m_processorConfig);
+                                newProcessor.readyForData();
 
-                            if (!m_loaderClass.equals(RawProcessor.class.getName())) {
-                                if (nextGeneration.isDiskBased()) {
-                                    /*
-                                     * Changes in partition count can make the load balancing strategy not capture
-                                     * all partitions for data that was from a previously larger cluster.
-                                     * For those use a naive leader election strategy that is implemented
-                                     * by export generation.
-                                     */
-                                    nextGeneration.kickOffLeaderElection();
-                                } else {
-                                    /*
-                                     * This strategy is the one that piggy backs on
-                                     * regular partition mastership distribution to determine
-                                     * who will process export data for different partitions.
-                                     * We stashed away all the ones we have mastership of
-                                     * in m_masterOfPartitions
-                                     */
-                                    for( Integer partitionId: m_masterOfPartitions) {
-                                        nextGeneration.acceptMastershipTask(partitionId);
+                                if (!m_loaderClass.equals(RawProcessor.class.getName())) {
+                                    if (nextGeneration.isDiskBased()) {
+                                        /*
+                                         * Changes in partition count can make the load balancing strategy not capture
+                                         * all partitions for data that was from a previously larger cluster.
+                                         * For those use a naive leader election strategy that is implemented
+                                         * by export generation.
+                                         */
+                                        nextGeneration.kickOffLeaderElection();
+                                    } else {
+                                        /*
+                                         * This strategy is the one that piggy backs on
+                                         * regular partition mastership distribution to determine
+                                         * who will process export data for different partitions.
+                                         * We stashed away all the ones we have mastership of
+                                         * in m_masterOfPartitions
+                                         */
+                                        for( Integer partitionId: m_masterOfPartitions) {
+                                            nextGeneration.acceptMastershipTask(partitionId);
+                                        }
                                     }
                                 }
                             }
@@ -174,12 +177,16 @@ public class ExportManager
                         } catch (IllegalAccessException e) {
                             exportLog.error(e);
                         }
-
+                        oldProcessor = m_processor.getAndSet(newProcessor);
                     }
 
-                    m_processor.getAndSet(newProcessor).shutdown();
+                    /*
+                     * The old processor should not be null since this shutdown task
+                     * is running for this processor
+                     */
+                    oldProcessor.shutdown();
                     try {
-                        generation.closeAndDelete();
+                        oldGeneration.closeAndDelete();
                     } catch (IOException e) {
                         e.printStackTrace();
                         exportLog.error(e);
@@ -224,6 +231,7 @@ public class ExportManager
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
                 );
+        exportLog.info("ExportManager accepting mastership for partition " + partitionId);
         /*
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.
@@ -297,6 +305,13 @@ public class ExportManager
 
         m_loaderClass = conn.getLoaderclass();
 
+        createInitialExportProcessor(catalogContext, conn, true);
+    }
+
+    private void createInitialExportProcessor(
+            CatalogContext catalogContext,
+            final Connector conn,
+            boolean startup) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = null;
@@ -305,30 +320,82 @@ public class ExportManager
             m_processor.set(newProcessor);
             newProcessor.addLogger(exportLog);
             File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
-            initializePersistedGenerations(
-                    exportOverflowDirectory,
-                    catalogContext, conn);
-            ExportGeneration currentGeneration =
-                new ExportGeneration(
-                        catalogContext.m_timestamp,
-                        m_onGenerationDrained,
-                        exportOverflowDirectory);
-            currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, messenger);
-            m_generations.put( catalogContext.m_timestamp, currentGeneration);
-            newProcessor.setExportGeneration(m_generations.firstEntry().getValue());
+
+            /*
+             * If this is a catalog update providing an existing generation,
+             * the persisted stuff has already been initialized
+             */
+            if (startup) {
+                initializePersistedGenerations(
+                        exportOverflowDirectory,
+                        catalogContext, conn);
+            }
+
+            /*
+             * If this is startup there is no existing generation created for new export data
+             * So construct one here, otherwise use the one provided
+             */
+            if (startup) {
+                final ExportGeneration currentGeneration = new ExportGeneration(
+                            catalogContext.m_uniqueId,
+                            m_onGenerationDrained,
+                            exportOverflowDirectory);
+                currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger);
+                m_generations.put( catalogContext.m_uniqueId, currentGeneration);
+            }
+            final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
+            /*
+             * For the newly constructed processor, provide it the oldest known generation
+             */
+            newProcessor.setExportGeneration(nextGeneration);
             newProcessor.setProcessorConfig(m_processorConfig);
             newProcessor.readyForData();
-            if (m_generations.firstEntry().getValue().isDiskBased() &&
-                    !m_loaderClass.equals(RawProcessor.class.getName())) {
-                m_generations.firstEntry().getValue().kickOffLeaderElection();
+
+            if (startup) {
+                /*
+                 * If the oldest known generation was disk based,
+                 * and we are using server side export we need to kick off a leader election
+                 * to choose which server is going to export each partition
+                 */
+                if (nextGeneration.isDiskBased() &&
+                        !m_loaderClass.equals(RawProcessor.class.getName())) {
+                    nextGeneration.kickOffLeaderElection();
+                }
+            } else {
+                /*
+                 * When it isn't startup, it is necessary to kick things off with the mastership
+                 * settings that already exist
+                 */
+                if (!m_loaderClass.equals(RawProcessor.class.getName())) {
+                    if (nextGeneration.isDiskBased()) {
+                        /*
+                         * Changes in partition count can make the load balancing strategy not capture
+                         * all partitions for data that was from a previously larger cluster.
+                         * For those use a naive leader election strategy that is implemented
+                         * by export generation.
+                         */
+                        nextGeneration.kickOffLeaderElection();
+                    } else {
+                        /*
+                         * This strategy is the one that piggy backs on
+                         * regular partition mastership distribution to determine
+                         * who will process export data for different partitions.
+                         * We stashed away all the ones we have mastership of
+                         * in m_masterOfPartitions
+                         */
+                        for( Integer partitionId: m_masterOfPartitions) {
+                            nextGeneration.acceptMastershipTask(partitionId);
+                        }
+                    }
+                }
             }
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
-            throw new ExportManager.SetupException(e);
+            Throwables.propagate(e);
         }
         catch (final Exception e) {
-            throw new ExportManager.SetupException(e);
+            Throwables.propagate(e);
         }
     }
 
@@ -386,12 +453,12 @@ public class ExportManager
         m_processorConfig = newConfig;
     }
 
-    public void updateCatalog(CatalogContext catalogContext)
+    public synchronized void updateCatalog(CatalogContext catalogContext)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final Connector conn= db.getConnectors().get("0");
-        if (conn == null) {
+        if (conn == null || !conn.getEnabled()) {
             m_loaderClass = null;
             return;
         }
@@ -404,7 +471,7 @@ public class ExportManager
         ExportGeneration newGeneration = null;
         try {
             newGeneration = new ExportGeneration(
-                    catalogContext.m_timestamp,
+                    catalogContext.m_uniqueId,
                     m_onGenerationDrained,
                     exportOverflowDirectory);
         } catch (IOException e1) {
@@ -412,7 +479,15 @@ public class ExportManager
         }
         newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger);
 
-        m_generations.put(catalogContext.m_timestamp, newGeneration);
+        m_generations.put(catalogContext.m_uniqueId, newGeneration);
+
+        /*
+         * If there is no existing export processor, create an initial one.
+         * This occurs when export is turned on/off at runtime.
+         */
+        if (m_processor.get() == null) {
+            createInitialExportProcessor(catalogContext, conn, false);
+        }
     }
 
     public void shutdown() {

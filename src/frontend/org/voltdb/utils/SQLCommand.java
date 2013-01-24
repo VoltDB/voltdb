@@ -1,22 +1,24 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.utils;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -26,13 +28,11 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.Writer;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -44,8 +44,11 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.ConsoleReader;
-import jline.SimpleCompletor;
+import jline.Terminal;
+import jline.console.CursorBuffer;
+import jline.console.KeyMap;
+import jline.console.completer.Completer;
+import jline.console.history.FileHistory;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -56,6 +59,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
+
 import com.google.common.collect.ImmutableMap;
 
 public class SQLCommand
@@ -64,7 +70,8 @@ public class SQLCommand
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     private static final String readme = "SQLCommandReadme.txt";
 
@@ -104,8 +111,12 @@ public class SQLCommand
             stringFragmentMatcher = Extract.matcher(query);
             i++;
         }
-        query = AutoSplit.matcher(query).replaceAll(";$1 ");
+
+        query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_SETOP_SELECT");
+        query = AutoSplit.matcher(query).replaceAll(";$2$4 ");
+        query = query.replaceAll("SQL_PARSER_SETOP_SELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
+
         ArrayList<String> queries = new ArrayList<String>();
         for(int j = 0;j<sqlFragments.length;j++)
         {
@@ -122,6 +133,7 @@ public class SQLCommand
         }
         return queries;
     }
+
     public static List<String> parseQueryProcedureCallParameters(String query)
     {
         if (query == null)
@@ -159,21 +171,46 @@ public class SQLCommand
     }
 
     // Command line interaction
-    private static ConsoleReader Input = null;
+    private static SQLConsoleReader lineInputReader = null;
+    private static FileHistory historyFile = null;
+
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListToken = Pattern.compile("^\\s*(list proc|list procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*(list proc|list procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ListTablesToken = Pattern.compile("^\\s*(list tables);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
     private static int LineIndex = 1;
     private static List<String> Lines = new ArrayList<String>();
+
+    /**
+     * The list of recognized basic tab-complete-able SQL command prefixes.
+     * Comparisons are done in uppercase.
+     */
+    static final String[] m_commandPrefixes = new String[] {
+        "DELETE",
+        "EXEC",
+        "EXIT",
+        "EXPLAIN",
+        "EXPLAINPROC",
+        "FILE",
+        "GO",
+        "INSERT",
+        "LIST PROCEDURES",
+        "LIST TABLES",
+        "QUIT",
+        "RECALL",
+        "SELECT",
+        "UPDATE",
+    };
+
     private static List<String> getQuery(boolean interactive) throws Exception
     {
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
         String line = null;
+
         do
         {
             if (interactive)
@@ -181,14 +218,14 @@ public class SQLCommand
                 if (isRecall)
                 {
                     isRecall = false;
-                    line = Input.readLine("");
+                    line = lineInputReader.readLine("");
 
                 }
                 else
-                    line = Input.readLine((LineIndex++) + "> ");
+                    line = lineInputReader.readLine((LineIndex++) + "> ");
             }
             else
-                line = Input.readLine();
+                line = lineInputReader.readLine();
 
             if (line == null)
             {
@@ -209,8 +246,8 @@ public class SQLCommand
                         if (recall > -1 && recall < Lines.size())
                         {
                             line = Lines.get(recall);
-                            Input.putString(line);
-                            out.flush();
+                            lineInputReader.putString(line);
+                            lineInputReader.flush();
                             isRecall = true;
                             continue;
                         }
@@ -235,8 +272,8 @@ public class SQLCommand
                 if (interactive)
                     return null;
             }
-            // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
-            else if (ListToken.matcher(line).matches())
+            // LIST PROCEDURES command
+            else if (ListProceduresToken.matcher(line).matches())
             {
                 if (interactive)
                 {
@@ -282,26 +319,15 @@ public class SQLCommand
                     System.out.print("\n");
                 }
             }
-            // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
+            // LIST TABLES command
             else if (ListTablesToken.matcher(line).matches())
             {
                 if (interactive)
                 {
-                    Object[] lists = GetTableList();
-                    for(int i=0;i<3;i++)
-                    {
-                        if (i == 0)
-                            System.out.println("\n--- User Tables --------------------------------------------");
-                        else if (i == 1)
-                            System.out.println("\n--- User Views ---------------------------------------------");
-                        else
-                            System.out.println("\n--- User Export Streams ------------------------------------");
-                        @SuppressWarnings("unchecked")
-                        Iterator<String> list = ((TreeSet<String>)lists[i]).iterator();
-                        while(list.hasNext())
-                            System.out.println(list.next());
-                        System.out.print("\n");
-                    }
+                    Tables tables = getTables();
+                    printTables("User Tables", tables.tables);
+                    printTables("User Views", tables.views);
+                    printTables("User Export Streams", tables.exports);
                     System.out.print("\n");
                 }
             }
@@ -344,6 +370,7 @@ public class SQLCommand
                         return null;
                 }
             }
+            // Regular SQL query - collect until the next semi-colon.
             else
             {
                 query.append(line);
@@ -354,6 +381,15 @@ public class SQLCommand
             line = null;
         }
         while(true);
+    }
+
+    private static void printTables(final String name, final Collection<String> tables)
+    {
+        System.out.printf("\n--- %s --------------------------------------------\n", name);
+        Iterator<String> list = tables.iterator();
+        while(list.hasNext())
+            System.out.println(list.next());
+        System.out.print("\n");
     }
 
     public static String readScriptFile(String filePath)
@@ -677,27 +713,7 @@ public class SQLCommand
     // Output generation
     private static String OutputFormat = "fixed";
     private static boolean OutputShowMetadata = true;
-    public static String paddingString(String s, int n, char c, boolean paddingLeft)
-    {
-        if (s == null)
-            return s;
 
-        int add = n - s.length();
-
-        if(add <= 0)
-            return s;
-
-        StringBuffer str = new StringBuffer(s);
-        char[] ch = new char[add];
-        Arrays.fill(ch, c);
-        if(paddingLeft)
-            str.insert(0, ch);
-        else
-            str.append(ch);
-
-
-       return str.toString();
-    }
     private static boolean isUpdateResult(VoltTable table)
     {
         return ((table.getColumnName(0).length() == 0 || table.getColumnName(0).equals("modified_tuples"))&& table.getRowCount() == 1 && table.getColumnCount() == 1 && table.getColumnType(0) == VoltType.BIGINT);
@@ -716,75 +732,10 @@ public class SQLCommand
                         System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
                     continue;
                 }
-                int columnCount = t.getColumnCount();
-                int[] padding = new int[columnCount];
-                String[] fmt = new String[columnCount];
-                for (int i = 0; i < columnCount; i++)
-                    padding[i] = OutputShowMetadata ? t.getColumnName(i).length() : 0;
-                t.resetRowPosition();
-                while(t.advanceRow())
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull())
-                            v = "NULL";
-                        int l = 0;  // length
-                        if (t.getColumnType(i) == VoltType.VARBINARY && !t.wasNull()) {
-                            l = ((byte[])v).length*2;
-                        }
-                        else {
-                            l= v.toString().length();
-                        }
 
-                        if (padding[i] < l)
-                            padding[i] = l;
-                    }
-                }
-                for (int i = 0; i < columnCount; i++)
-                {
-                    padding[i] += 1;
-                    fmt[i] = "%1$" +
-                        ((t.getColumnType(i) == VoltType.STRING ||
-                          t.getColumnType(i) == VoltType.TIMESTAMP ||
-                          t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                        + padding[i] + "s";
-                }
-                if (OutputShowMetadata)
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        System.out.printf("%1$-" + padding[i] + "s", t.getColumnName(i));
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        System.out.print(paddingString("", padding[i], '-', false));
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                }
-                t.resetRowPosition();
-                while(t.advanceRow())
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull())
-                            v = "NULL";
-                        else if (t.getColumnType(i) == VoltType.VARBINARY)
-                            v = byteArrayToHexString((byte[])v);
-                        else
-                            v = v.toString();
-                        System.out.printf(fmt[i], v);
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                }
+                // Use the VoltTable pretty printer to display formatted output.
+                System.out.println(t.toFormattedString());
+
                 if (OutputShowMetadata)
                     System.out.printf("\n\n(%d row(s) affected)\n", t.getRowCount());
             }
@@ -974,30 +925,35 @@ public class SQLCommand
         }
     }
 
-    private static Object[] GetTableList() throws Exception
+    private static class Tables
     {
-        VoltTable tableData = VoltDB.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
         TreeSet<String> tables = new TreeSet<String>();
         TreeSet<String> exports = new TreeSet<String>();
         TreeSet<String> views = new TreeSet<String>();
+    }
+
+    private static Tables getTables() throws Exception
+    {
+        Tables tables = new Tables();
+        VoltTable tableData = VoltDB.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
         for(int i = 0; i < tableData.getRowCount(); i++)
         {
             String tableName = tableData.fetchRow(i).getString("TABLE_NAME");
             String tableType = tableData.fetchRow(i).getString("TABLE_TYPE");
             if (tableType.equalsIgnoreCase("EXPORT"))
             {
-                exports.add(tableName);
+                tables.exports.add(tableName);
             }
             else if (tableType.equalsIgnoreCase("VIEW"))
             {
-                views.add(tableName);
+                tables.views.add(tableName);
             }
             else
             {
-                tables.add(tableName);
+                tables.tables.add(tableName);
             }
         }
-        return new Object[] {tables, views, exports};
+        return tables;
     }
 
     private static void loadStoredProcedures(Map<String,Map<Integer, List<String>>> procedures)
@@ -1087,7 +1043,7 @@ public class SQLCommand
     }
 
     private static InputStream in = null;
-    private static Writer out = null;
+    private static OutputStream out = null;
     // Application entry point
     public static void main(String args[])
     {
@@ -1169,11 +1125,40 @@ public class SQLCommand
             loadStoredProcedures(Procedures);
 
             in = new FileInputStream(FileDescriptor.in);
-            out = new PrintWriter(new OutputStreamWriter(System.out, System.getProperty("jline.WindowsTerminal.output.encoding", System.getProperty("file.encoding"))));
-            Input = new ConsoleReader(in, out);
+            out = System.out;
+            lineInputReader = new SQLConsoleReader(in, out);
 
-            Input.setBellEnabled(false);
-            Input.addCompletor(new SimpleCompletor(new String[] {"select", "update", "insert", "delete", "exec", "file", "recall", "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" }));
+            lineInputReader.setBellEnabled(false);
+
+            // Provide a custom completer.
+            Completer completer = new SQLCompleter(m_commandPrefixes);
+            lineInputReader.addCompleter(completer);
+
+            // Maintain persistent history in ~/.sqlcmd_history.
+            historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
+            lineInputReader.setHistory(historyFile);
+
+            // Make Ctrl-D (EOF) exit if on an empty line, otherwise delete the next character.
+            KeyMap keyMap = lineInputReader.getKeys();
+            keyMap.bind(new Character(KeyMap.CTRL_D).toString(), new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e)
+                {
+                    CursorBuffer cursorBuffer = lineInputReader.getCursorBuffer();
+                    if (cursorBuffer.length() == 0) {
+                        System.exit(0);
+                    }
+                    else {
+                        try {
+                            lineInputReader.delete();
+                        }
+                        catch (IOException e1) {}
+                    }
+                }
+            });
+
+            // Removed code to prevent Ctrl-C from exiting. The original code is visible
+            // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
 
             boolean interactive = true;
             if (queries != null && !queries.isEmpty())
@@ -1215,7 +1200,6 @@ public class SQLCommand
                     }
                 }
             }
-
        }
         catch (Exception e)
         {
@@ -1226,6 +1210,21 @@ public class SQLCommand
         finally
         {
             try { VoltDB.close(); } catch(Exception _) {}
+            // Flush input history to a file.
+            if (historyFile != null) {
+                try {
+                    historyFile.flush();
+                }
+                catch (IOException e) {
+                    System.err.printf("* Unable to write history to \"%s\" *\n",
+                                      historyFile.getFile().getPath());
+                    e.printStackTrace();
+                }
+            }
+            // Clean up jline2 resources.
+            if (lineInputReader != null) {
+                lineInputReader.shutdown();
+            }
         }
     }
 

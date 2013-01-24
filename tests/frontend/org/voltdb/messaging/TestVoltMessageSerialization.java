@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -126,6 +126,30 @@ public class TestVoltMessageSerialization extends TestCase {
         InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
 
         assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
+    }
+
+    public void testInitiateResponseForIv2() throws IOException {
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setClientHandle(25);
+        spi.setProcName("elmerfudd");
+        spi.setParams(57, "wrascallywabbit");
+
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
+
+        VoltTable table = new VoltTable(
+                new VoltTable.ColumnInfo("foobar", VoltType.STRING)
+        );
+        table.addRow("howmanylicksdoesittaketogettothecenterofatootsiepop");
+
+        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
+        iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                new VoltTable[] { table, table }, "knockknockbananna", new EEException(1)));
+        iresponse.setClientHandle(99);
+
+        InitiateResponseMessage iresponse2 = (InitiateResponseMessage) checkVoltMessage(iresponse);
+
+        assertEquals(iresponse.getTxnId(), iresponse2.getTxnId());
+        assertTrue(iresponse2.isReadOnly());
     }
 
     public void testFragmentTask() throws IOException {

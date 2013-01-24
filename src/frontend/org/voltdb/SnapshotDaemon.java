@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -91,7 +91,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
     private final ScheduledThreadPoolExecutor m_esBase =
             new ScheduledThreadPoolExecutor(1,
-                    CoreUtils.getThreadFactory(null, "SnapshotDaemon", CoreUtils.SMALL_STACK_SIZE, false),
+                    CoreUtils.getThreadFactory(null, "SnapshotDaemon", CoreUtils.SMALL_STACK_SIZE, false, null),
                                             new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
     private final ListeningScheduledExecutorService m_es = MoreExecutors.listeningDecorator(m_esBase);
 
@@ -614,7 +614,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
                                                                       hostId, true, truncReqId)) {
-                        SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId, hostId);
+                        SnapshotSaveAPI.increaseParticipateHost(snapshotTxnId, hostId);
                     }
 
                     try {
@@ -965,7 +965,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
-                    VoltZK.snapshot_truncation_master));
+                    VoltZK.request_truncation_snapshot));
         }
     }
 
@@ -1121,7 +1121,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (m_snapshots.size() > m_retain) {
             //Quick hack to make sure we don't delete while the snapshot is running.
             //Deletes work really badly during a snapshot because the FS is occupied
-            if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0) {
+            if (!SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty()) {
                 m_lastSysprocInvocation = System.currentTimeMillis() + 3000;
                 return;
             }

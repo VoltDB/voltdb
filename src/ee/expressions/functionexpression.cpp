@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -217,75 +217,118 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     size_t nArgs = arguments->size();
     switch(nArgs) {
     case 0:
-        // ret = new ConstantFunctionExpression<???>();
-        if (ret) {
-            delete arguments;
-        }
-        break;
+        //Uncomment this to support the first constant function, e.g. PI().
+        //switch(functionId) {
+        //case FUNC_???:
+        //    ret = new ConstantFunctionExpression<FUNC_???>();
+        //    break;
+        //default:
+            return NULL;
+        //}
+        //delete arguments;
+        //break;
     case 1:
-        // TODO: consider converting this else-if series to a switch statement
-        // Please keep these blocks sorted alphabetically for ease of reference and to avoid merge
-        // conflicts that occur when appending new blocks at the same line.
-        if (functionId == FUNC_ABS) {
+        switch(functionId) {
+        case FUNC_ABS:
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
-        } else if (functionId == FUNC_CHAR_LENGTH) {
+            break;
+        case FUNC_CEILING:
+            ret = new UnaryFunctionExpression<FUNC_CEILING>((*arguments)[0]);
+            break;
+        case FUNC_CHAR_LENGTH:
             ret = new UnaryFunctionExpression<FUNC_CHAR_LENGTH>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_DAY) {
+            break;
+        case FUNC_EXP:
+            ret = new UnaryFunctionExpression<FUNC_EXP>((*arguments)[0]);
+            break;
+        case FUNC_EXTRACT_DAY:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_DAY_OF_WEEK) {
+            break;
+        case FUNC_EXTRACT_DAY_OF_WEEK:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_WEEK>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_DAY_OF_YEAR) {
+            break;
+        case FUNC_EXTRACT_DAY_OF_YEAR:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_YEAR>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_HOUR) {
+            break;
+        case FUNC_EXTRACT_HOUR:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_HOUR>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_MINUTE) {
+            break;
+        case FUNC_EXTRACT_MINUTE:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_MINUTE>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_MONTH) {
+            break;
+        case FUNC_EXTRACT_MONTH:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_MONTH>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_QUARTER) {
+            break;
+        case FUNC_EXTRACT_QUARTER:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_QUARTER>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_SECOND) {
+            break;
+        case FUNC_EXTRACT_SECOND:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_SECOND>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_WEEK_OF_YEAR) {
+            break;
+        case FUNC_EXTRACT_WEEK_OF_YEAR:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_WEEK_OF_YEAR>((*arguments)[0]);
-        } else if (functionId == FUNC_EXTRACT_YEAR) {
+            break;
+        case FUNC_EXTRACT_YEAR:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_YEAR>((*arguments)[0]);
-        } else if (functionId == FUNC_OCTET_LENGTH) {
+            break;
+        case FUNC_FLOOR:
+            ret = new UnaryFunctionExpression<FUNC_FLOOR>((*arguments)[0]);
+            break;
+        case FUNC_OCTET_LENGTH:
             ret = new UnaryFunctionExpression<FUNC_OCTET_LENGTH>((*arguments)[0]);
-        } else if (functionId == FUNC_SPACE) {
+            break;
+        case FUNC_SPACE:
             ret = new UnaryFunctionExpression<FUNC_SPACE>((*arguments)[0]);
-        } else if (functionId == FUNC_VOLT_SQL_ERROR) {
+            break;
+        case FUNC_SQRT:
+            ret = new UnaryFunctionExpression<FUNC_SQRT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
+            break;
+        default:
+            return NULL;
         }
-        if (ret) {
-            delete arguments;
-        }
+        delete arguments;
         break;
     default:
         // GeneralFunctions defer deleting the arguments container until through with it.
-        // TODO: consider converting this else-if series to a switch statement
-        // Please keep these blocks sorted alphabetically for ease of reference and to avoid merge
-        // conflicts that occur when appending new blocks at the same line.
-        if (functionId == FUNC_CONCAT) {
+        switch(functionId) {
+        case FUNC_CONCAT:
             ret = new GeneralFunctionExpression<FUNC_CONCAT>(*arguments);
-        } else if (functionId == FUNC_DECODE) {
+            break;
+        case FUNC_DECODE:
             ret = new GeneralFunctionExpression<FUNC_DECODE>(*arguments);
-        } else if (functionId == FUNC_LEFT) {
+            break;
+        case FUNC_LEFT:
             ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
-        } else if (functionId == FUNC_POSITION_CHAR) {
+            break;
+        case FUNC_POSITION_CHAR:
             ret = new GeneralFunctionExpression<FUNC_POSITION_CHAR>(*arguments);
-        } else if (functionId == FUNC_REPEAT) {
+            break;
+        case FUNC_POWER:
+            ret = new GeneralFunctionExpression<FUNC_POWER>(*arguments);
+            break;
+        case FUNC_REPEAT:
             ret = new GeneralFunctionExpression<FUNC_REPEAT>(*arguments);
-        } else if (functionId == FUNC_RIGHT) {
+            break;
+        case FUNC_RIGHT:
             ret = new GeneralFunctionExpression<FUNC_RIGHT>(*arguments);
-        } else if (functionId == FUNC_SUBSTRING_CHAR) {
+            break;
+        case FUNC_SUBSTRING_CHAR:
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
-        } else if (functionId == FUNC_VOLT_SUBSTRING_CHAR_FROM) {
-            ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
-        } else if (functionId == FUNC_VOLT_SQL_ERROR) {
-            ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
-        } else if (functionId == FUNC_VOLT_FIELD) {
+            break;
+        case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
+            break;
+        case FUNC_VOLT_SQL_ERROR:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
+            break;
+        case FUNC_VOLT_SUBSTRING_CHAR_FROM:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
+            break;
+        default:
+            return NULL;
         }
     }
     // May return null, leaving it to the caller (with more context) to generate an exception.

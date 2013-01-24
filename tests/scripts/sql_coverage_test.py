@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2013 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -110,6 +110,7 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
             break
 
         try:
+            ### print "VERBOSELY SPOUTING SENDING adhoc %s" % statement["SQL"]
             client.onecmd("adhoc " + statement["SQL"])
         except:
             print >> sys.stderr, "Error occurred while executing '%s': %s" % \
@@ -135,6 +136,8 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
             break
         if client.response.tables != None:
             tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
+        # else:
+        #     print "DEBUG: but I got no table(s) from ?", statement["SQL"] ,"?"
         cPickle.dump({"Status": client.response.status,
                       "Info": client.response.statusString,
                       "Result": tables,
@@ -173,8 +176,10 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     global normalize
     if "normalizer" in config:
         normalize = imp.load_source("normalizer", config["normalizer"]).normalize
+        # print "DEBUG: using normalizer ", config["normalizer"], " for ", template
     else:
         normalize = lambda x, y: x
+        # print "DEBUG: using no normalizer for ", template
 
     command = " ".join(args[2:])
     command += " schema=" + os.path.basename(config['ddl'])

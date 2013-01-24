@@ -1,10 +1,5 @@
 import org.voltdb.*;
 
-@ProcInfo(
-    partitionInfo = "USERACCOUNT.EMAIL: 0",
-    singlePartition = true
-)
-
 public class SignIn extends VoltProcedure {
 
   public final SQLStmt getuser = new SQLStmt(

@@ -1,31 +1,29 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -58,6 +56,11 @@ import org.voltdb.types.VoltDecimalHelper;
     private byte[][][] m_encodedStringArrays = null;
     // memoized serialized size (start assuming valid size for empty ParameterSet)
     private int m_serializedSize = 2;
+
+    // we serialize to compute a crc
+    // save the serialization for needed later
+    private byte[] m_serializedParams = null;
+    private boolean m_hasSerialization = false;
 
     public ParameterSet() {
     }
@@ -127,6 +130,11 @@ import org.voltdb.types.VoltDecimalHelper;
 
     @Override
     public void writeExternal(FastSerializer out) throws IOException {
+        if (m_hasSerialization) {
+            out.write(m_serializedParams);
+            return;
+        }
+
         out.writeShort(m_params.length);
 
         for (Object obj : m_params) {
@@ -630,6 +638,11 @@ import org.voltdb.types.VoltDecimalHelper;
 
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
 
+        if (m_hasSerialization) {
+            buf.put(m_serializedParams);
+            return;
+        }
+
         buf.putShort((short)m_params.length);
 
         for (int i = 0; i < m_params.length; i++) {
@@ -787,113 +800,12 @@ import org.voltdb.types.VoltDecimalHelper;
      * @param crc
      * @throws IOException
      */
-    void addToCRC(CRC32 crc) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(8);
-        DataOutputStream dos = new DataOutputStream(bos);
-        byte[] b;
-
-        for (int i = 0; i < m_params.length; i++) {
-            Object obj = m_params[i];
-
-            if ((obj == null) || (obj == JSONObject.NULL)) {
-                crc.update(new byte[] { 0 });
-                continue;
-            }
-
-            Class<?> cls = obj.getClass();
-
-            // Handle NULL mappings not encoded by type.min_value convention
-            if (obj == VoltType.NULL_TIMESTAMP) {
-                crc.update(new byte[] { 0 });
-                continue;
-            }
-            else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
-                crc.update(new byte[] { 0 });
-                continue;
-            }
-            else if (obj == VoltType.NULL_DECIMAL) {
-                crc.update(new byte[] { 0 });
-                continue;
-            }
-
-            bos.reset();
-
-            VoltType type = VoltType.typeFromClass(cls);
-            switch (type) {
-                case TINYINT:
-                    dos.writeLong((Byte) obj);
-                    b = bos.toByteArray();
-                    crc.update(b);
-                    break;
-                case SMALLINT:
-                    dos.writeLong((Short) obj);
-                    b = bos.toByteArray();
-                    crc.update(b);
-                    break;
-                case INTEGER:
-                    dos.writeLong((Integer) obj);
-                    b = bos.toByteArray();
-                    crc.update(b);
-                    break;
-                case BIGINT:
-                    dos.writeLong((Long) obj);
-                    b = bos.toByteArray();
-                    crc.update(b);
-                    break;
-                case FLOAT:
-                    if (cls == Float.class) {
-                        dos.writeInt(0);
-                        dos.writeFloat((Float) obj);
-                    }
-                    else if (cls == Double.class) {
-                        dos.writeDouble((Double) obj);
-                    }
-                    else {
-                        throw new RuntimeException("Can't cast parameter type to Double");
-                    }
-                    b = bos.toByteArray();
-                    crc.update(b);
-                    break;
-                case STRING:
-                    if (m_encodedStrings[i] == null) {
-                        // should not happen
-                        throw new IOException("String not encoded: " + (String) obj);
-                    }
-                    crc.update(m_encodedStrings[i]);
-                    break;
-                case VARBINARY:
-                    if (m_params[i] instanceof byte[]) {
-                        crc.update((byte[]) m_params[i]);
-                    }
-                    else if (m_params[i] instanceof byte[]) {
-                        for (Byte B : (Byte[]) m_params[i]) {
-                            if (B != null) {
-                                crc.update(B.byteValue());
-                            }
-                            else {
-                                crc.update(0);
-                            }
-                        }
-                    }
-                    else if (m_encodedStrings[i] != null) {
-                        crc.update(m_encodedStrings[i]);
-                    }
-                    else {
-                        throw new IOException("Failed to computer CRC of VARBINARY value: " + (String) obj);
-                    }
-                case TIMESTAMP:
-                    long micros = timestampToMicroseconds(obj);
-                    dos.writeLong(micros);
-                    b = bos.toByteArray();
-                    crc.update(b);
-                    break;
-                case DECIMAL:
-                    crc.update(VoltDecimalHelper.getUnscaledBytes((BigDecimal) obj));
-                    break;
-                default:
-                    throw new RuntimeException("FIXME: Unsupported type " + type);
-            }
-        }
+    void addToCRC(PureJavaCrc32C crc) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(m_serializedSize);
+        flattenToBuffer(buf);
+        m_serializedParams = buf.array();
+        m_hasSerialization = true;
+        crc.update(m_serializedParams);
     }
 
     static long timestampToMicroseconds(Object obj) {

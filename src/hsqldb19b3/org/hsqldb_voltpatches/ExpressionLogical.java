@@ -1753,7 +1753,7 @@ public class ExpressionLogical extends Expression {
         // We want to keep track of which expressions are the same in the XML output
         exp.attributes.put("id", getUniqueId(session));
 
-        exp.attributes.put("type", element);
+        exp.attributes.put("optype", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
         }

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -70,11 +70,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     };
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
-            SnapshotCompletionMonitor snapMonitor)
+            SnapshotCompletionMonitor snapMonitor, boolean forRejoin)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
-                "SP", agent);
+                "SP", agent, forRejoin);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }
@@ -88,7 +88,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway nodeDRGateway)
+                          NodeDRGateway nodeDRGateway,
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -99,7 +100,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
                 startAction,
-                agent, memStats, cl);
+                agent, memStats, cl, coreBindIds);
 
         m_tickProducer.start();
 
@@ -119,6 +120,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void acceptPromotion()
     {
         try {
+
             long startTime = System.currentTimeMillis();
             Boolean success = false;
             m_term = createTerm(m_messenger.getZK(),
@@ -130,6 +132,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 repair = createPromoteAlgo(m_term.getInterestingHSIds(),
                         m_initiatorMailbox, m_whoami);
 
+                // if rejoining, a promotion can not be accepted. If the rejoin is
+                // in-progress, the loss of the master will terminate the rejoin
+                // anyway. If the rejoin has transferred data but not left the rejoining
+                // state, it will respond REJOINING to new work which will break
+                // the MPI and/or be unexpected to external clients.
+                if (!m_initiatorMailbox.acceptPromotion()) {
+                    tmLog.error(m_whoami
+                            + "rejoining site can not be promoted to leader. Terminating.");
+                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
+                    return;
+                }
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
                 Pair<Boolean, Long> result = repair.start().get();
@@ -137,8 +150,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 if (success) {
                     m_initiatorMailbox.setLeaderState(result.getSecond());
                     tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                             + "finished leader promotion. Took "
+                             + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.

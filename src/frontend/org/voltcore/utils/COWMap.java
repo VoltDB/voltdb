@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltcore.utils;
@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ForwardingMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -70,6 +71,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
 
     @Override
     public V remove(Object key) {
+        Preconditions.checkNotNull(key);
         while (true) {
             ImmutableMap<K, V> original = m_map.get();
             Builder<K, V> builder = new Builder<K, V>();
@@ -141,7 +143,27 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
     }
 
     @Override
+    public V get(Object key) {
+        Preconditions.checkNotNull(key);
+        return delegate().get(key);
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+        Preconditions.checkNotNull(key);
+        return delegate().containsKey(key);
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+        Preconditions.checkNotNull(value);
+        return delegate().containsValue(value);
+    }
+
+    @Override
     public boolean remove(Object key, Object value) {
+        Preconditions.checkNotNull(key);
+        if (value == null) return false;
         while (true) {
             ImmutableMap<K, V> original = m_map.get();
             V existingValue = original.get(key);
@@ -166,6 +188,9 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
 
     @Override
     public boolean replace(K key, V oldValue, V newValue) {
+        Preconditions.checkNotNull(key);
+        Preconditions.checkNotNull(oldValue);
+        Preconditions.checkNotNull(newValue);
         while (true) {
             ImmutableMap<K, V> original = m_map.get();
             V existingValue = original.get(key);
@@ -191,6 +216,8 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
 
     @Override
     public V replace(K key, V value) {
+        Preconditions.checkNotNull(key);
+        Preconditions.checkNotNull(value);
         while (true) {
             ImmutableMap<K, V> original = m_map.get();
             V existingValue = original.get(key);

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -21,12 +21,14 @@ import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
@@ -78,7 +80,7 @@ public class VoltDB {
     public static final String ANON_STMT_NAME = "sql";
 
     public enum START_ACTION {
-        CREATE, RECOVER, START, REJOIN, LIVE_REJOIN
+        CREATE, RECOVER, REJOIN, LIVE_REJOIN
     }
 
     public static boolean createForRejoin(VoltDB.START_ACTION startAction)
@@ -169,7 +171,7 @@ public class VoltDB {
         public int m_deadHostTimeoutMS = 10000;
 
         /** start up action */
-        public START_ACTION m_startAction = START_ACTION.START;
+        public START_ACTION m_startAction = null;
 
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
@@ -205,8 +207,16 @@ public class VoltDB {
         /** set to true to run with iv2 initiation. Good Luck! */
         public boolean m_enableIV2 = true;
 
+        public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
+        public String m_commandLogBinding = null;
+
         public Configuration() {
             m_enableIV2 = VoltDB.checkTestEnvForIv2();
+            // Set start action create.  The cmd line validates that an action is specified, however,
+            // defaulting it to create for local cluster test scripts
+            m_startAction = VoltDB.START_ACTION.CREATE;
         }
 
         /** Behavior-less arg used to differentiate command lines from "ps" */
@@ -224,6 +234,9 @@ public class VoltDB {
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
             m_zkInterface = "127.0.0.1:" + ports.next();
+            // Set start action create.  The cmd line validates that an action is specified, however,
+            // defaulting it to create for local cluster test scripts
+            m_startAction = VoltDB.START_ACTION.CREATE;
         }
 
         public Configuration(String args[]) {
@@ -305,6 +318,30 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
+                } else if (arg.startsWith("networkbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_networkCoreBindings.offer(core);
+                    }
+                    System.out.println("Network bindings are " + m_networkCoreBindings);
+                }
+                else if (arg.startsWith("computationbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_computationCoreBindings.offer(core);
+                    }
+                    System.out.println("Computation bindings are " + m_computationCoreBindings);
+                }
+                else if (arg.startsWith("executionbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_executionCoreBindings.offer(core);
+                    }
+                    System.out.println("Execution bindings are " + m_executionCoreBindings);
+                } else if (arg.startsWith("commandlogbinding")) {
+                    String binding = args[++i];
+                    if (binding.split(",").length > 1) {
+                        throw new RuntimeException("Command log only supports a single set of bindings");
+                    }
+                    m_commandLogBinding = binding;
+                    System.out.println("Commanglog binding is " + m_commandLogBinding);
                 }
                 else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();
@@ -327,8 +364,6 @@ public class VoltDB {
                     m_startAction = START_ACTION.CREATE;
                 } else if (arg.equals("recover")) {
                     m_startAction = START_ACTION.RECOVER;
-                } else if (arg.equals("start")) {
-                    m_startAction = START_ACTION.START;
                 } else if (arg.equals("rejoin")) {
                     m_startAction = START_ACTION.REJOIN;
                 } else if (arg.startsWith("live rejoin")) {
@@ -338,6 +373,8 @@ public class VoltDB {
                 }
 
                 else if (arg.equals("replica")) {
+                    // We're starting a replica, so we must create a new database.
+                    m_startAction = START_ACTION.CREATE;
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -386,6 +423,18 @@ public class VoltDB {
                 }
             }
 
+            // If no action is specified, issue an error.
+            if (null == m_startAction) {
+                if (org.voltdb.utils.MiscUtils.isPro()) {
+                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, or compile.");
+                } else
+                {
+                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, or compile.");
+                }
+                usage();
+                System.exit(-1);
+            }
+
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
             // acts as 'recover' and other times as 'create'.
@@ -413,6 +462,11 @@ public class VoltDB {
          */
         public boolean validate() {
             boolean isValid = true;
+
+            if (m_startAction == null) {
+                    isValid = false;
+                    hostLog.fatal("The startup action is missing (either create, recover, replica or rejoin).");
+                }
 
             if (m_startAction == START_ACTION.CREATE &&
                 m_pathToCatalog == null) {
@@ -474,20 +528,20 @@ public class VoltDB {
             // GettingStarted.pdf).
             String message = "";
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
+                message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
+                        + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb replica [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
                         + "       voltdb [live] rejoin host <hostname>\n";
             } else {
-                message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>\n"
+                message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
                         + "       voltdb rejoin host <hostname>\n";
             }
+            message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
             hostLog.info(message);
             // Don't bother logging these for log4j, only dump them to the designated stream.
-            os.println("If action is not specified the default is to 'recover' the database if a snapshot is present otherwise 'create'.");
             os.println("If no deployment is specified, a default 1 node cluster deployment will be configured.");
         }
 

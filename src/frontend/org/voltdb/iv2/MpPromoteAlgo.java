@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -45,7 +45,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
-    private List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
+    private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -135,8 +135,8 @@ public class MpPromoteAlgo implements RepairAlgo
         }
 
         tmLog.info(m_whoami + "found " + m_survivors.size()
-                + " surviving leaders to repair. "
-                + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
+                 + " surviving leaders to repair. "
+                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
@@ -148,9 +148,9 @@ public class MpPromoteAlgo implements RepairAlgo
         if (message instanceof Iv2RepairLogResponseMessage) {
             Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
             if (response.getRequestId() != m_requestId) {
-                tmLog.info(m_whoami + "rejecting stale repair response."
-                        + " Current request id is: " + m_requestId
-                        + " Received response for request id: " + response.getRequestId());
+                tmLog.debug(m_whoami + "rejecting stale repair response."
+                          + " Current request id is: " + m_requestId
+                          + " Received response for request id: " + response.getRequestId());
                 return;
             }
 
@@ -165,15 +165,15 @@ public class MpPromoteAlgo implements RepairAlgo
             // Step 3: update the corresponding replica repair struct.
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
             if (rrs.m_expectedResponses < 0) {
-                tmLog.info(m_whoami + "collecting " + response.getOfTotal()
-                        + " repair log entries from "
-                        + CoreUtils.hsIdToString(response.m_sourceHSId));
+                tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
+                          + " repair log entries from "
+                          + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
 
             if (rrs.update(response)) {
-                tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
-                        + " responses for " + rrs.m_expectedResponses +
-                        " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
+                tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
+                          + " responses for " + rrs.m_expectedResponses
+                          + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
                 if (areRepairLogsComplete()) {
                     repairSurvivors();
                 }
@@ -209,7 +209,7 @@ public class MpPromoteAlgo implements RepairAlgo
             return;
         }
 
-        tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             // send the repair log union to all the survivors. SPIs will ignore
             // CompleteTransactionMessages for transactions which have already

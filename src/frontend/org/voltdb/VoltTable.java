@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -1087,6 +1088,99 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
 
         assert(verifyTableInvariants());
         return buffer.toString();
+    }
+
+    /**
+     * Return a "pretty print" representation of this table.  Output will be formatted
+     * in a tabular textual format suitable for display.
+     * @return A string containing a pretty-print formatted representation of this table.
+     */
+    public String toFormattedString() {
+        StringBuffer sb = new StringBuffer();
+
+        int columnCount = this.getColumnCount();
+        int[] padding = new int[columnCount];
+        String[] fmt = new String[columnCount];
+        for (int i = 0; i < columnCount; i++) {
+            padding[i] = this.getColumnName(i).length();
+        }
+        this.resetRowPosition();
+
+        // Compute the padding needed for each column of the table (note must
+        // visit every row)
+        while (this.advanceRow()) {
+            for (int i = 0; i < columnCount; i++) {
+                Object v = this.get(i, this.getColumnType(i));
+                if (this.wasNull()) {
+                    v = "NULL";
+                }
+                int len = 0; // length
+                if (this.getColumnType(i) == VoltType.VARBINARY
+                        && !this.wasNull()) {
+                    len = ((byte[]) v).length * 2;
+                } else {
+                    len = v.toString().length();
+                }
+
+                if (padding[i] < len) {
+                    padding[i] = len;
+                }
+            }
+        }
+
+        // Determine the formatting string for each column
+        for (int i = 0; i < columnCount; i++) {
+            padding[i] += 1;
+            fmt[i] = "%1$"
+                    + ((this.getColumnType(i) == VoltType.STRING
+                            || this.getColumnType(i) == VoltType.TIMESTAMP || this
+                            .getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
+                    + padding[i] + "s";
+        }
+
+        // Create the column headers
+        for (int i = 0; i < columnCount; i++) {
+            sb.append(String.format("%1$-" + padding[i] + "s",
+                    this.getColumnName(i)));
+            if (i < columnCount - 1) {
+                sb.append(" ");
+            }
+        }
+        sb.append("\n");
+
+        // Create the separator between the column headers and the rows of data
+        for (int i = 0; i < columnCount; i++) {
+            char[] underline_array = new char[padding[i]];
+            Arrays.fill(underline_array, '-');
+            sb.append(new String(underline_array));
+            if (i < columnCount - 1) {
+                sb.append(" ");
+            }
+        }
+        sb.append("\n");
+
+        // Now display each row of data.
+        this.resetRowPosition();
+        while (this.advanceRow()) {
+            for (int i = 0; i < columnCount; i++) {
+                Object value = this.get(i, this.getColumnType(i));
+                if (this.wasNull()) {
+                    value = "NULL";
+                }
+                else if (this.getColumnType(i) == VoltType.VARBINARY) {
+                    value = Encoder.hexEncode((byte[]) value);
+                }
+                else {
+                    value = value.toString();
+                }
+                sb.append(String.format(fmt[i], value));
+                if (i < columnCount - 1) {
+                    sb.append(" ");
+                }
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 
     /**

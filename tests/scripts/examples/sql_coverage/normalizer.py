@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2013 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -22,9 +22,18 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import sys
+# For spot testing, add the path to SQLCoverageReport, just based on knowing
+# where we are now
+sys.path.append('../../')
+sys.path.append('../../../../lib/python')
+
 import decimal
 import re
 import math
+
+from voltdbclient import FastSerializer
+
 from SQLCoverageReport import generate_html_reports
 
 # lame, but it matches at least up to 6 ORDER BY columns
@@ -35,22 +44,13 @@ __EXPR = re.compile(r"ORDER BY\s(\w+\.(?P<column_1>\w+)(\s+\w+)?)"
                     r"(,\s+\w+\.(?P<column_5>\w+)(\s+\w+)?)?"
                     r"(,\s+\w+\.(?P<column_6>\w+)(\s+\w+)?)?")
 
-VOLTTYPE_NULL = 1
-VOLTTYPE_TINYINT = 3  # int8
-VOLTTYPE_SMALLINT = 4 # int16
-VOLTTYPE_INTEGER = 5  # int32
-VOLTTYPE_BIGINT = 6   # int64
-VOLTTYPE_FLOAT = 8    # float64
-VOLTTYPE_STRING = 9
-VOLTTYPE_TIMESTAMP = 11 # 8 byte long
-VOLTTYPE_MONEY = 20     # 8 byte long
-VOLTTYPE_DECIMAL = 22  # 9 byte long
-
-__NULL = {VOLTTYPE_TINYINT: -128,
-          VOLTTYPE_SMALLINT: -32768,
-          VOLTTYPE_INTEGER: -2147483648,
-          VOLTTYPE_BIGINT: -9223372036854775808,
-          VOLTTYPE_FLOAT: -1.7E+308}
+# This appears to be a weak knock-off of FastSerializer.NullCheck
+# TODO: There's probably a way to use the actual FastSerializer.NullCheck
+__NULL = {FastSerializer.VOLTTYPE_TINYINT: FastSerializer.NULL_TINYINT_INDICATOR,
+          FastSerializer.VOLTTYPE_SMALLINT: FastSerializer.NULL_SMALLINT_INDICATOR,
+          FastSerializer.VOLTTYPE_INTEGER: FastSerializer.NULL_INTEGER_INDICATOR,
+          FastSerializer.VOLTTYPE_BIGINT: FastSerializer.NULL_BIGINT_INDICATOR,
+          FastSerializer.VOLTTYPE_FLOAT: FastSerializer.NULL_FLOAT_INDICATOR}
 
 SIGNIFICANT_DIGITS = 13
 
@@ -58,17 +58,20 @@ def normalize_value(v, vtype):
     global __NULL
     if vtype in __NULL and v == __NULL[vtype]:
         return None
-    elif vtype == VOLTTYPE_FLOAT:
+    elif vtype == FastSerializer.VOLTTYPE_FLOAT:
         # round to the desired number of decimal places -- accounting for significant digits before the decimal
         decimal_places = SIGNIFICANT_DIGITS
         abs_v = abs(float(v))
         if abs_v >= 1.0:
             # round to the total number of significant digits, including the integer part
             decimal_places = SIGNIFICANT_DIGITS - 1 - int(math.floor(math.log10(abs_v)))
+        # print "DEBUG normalized float:(", round(v, decimal_places), ")"
         return round(v, decimal_places)
-    elif vtype == VOLTTYPE_DECIMAL:
+    elif vtype == FastSerializer.VOLTTYPE_DECIMAL:
+        # print "DEBUG normalized_to:(", decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN"), ")"
         return decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN")
     else:
+        # print "DEBUG normalized pass-through:(", v, ")"
         return v
 
 def normalize_values(tuples, columns):

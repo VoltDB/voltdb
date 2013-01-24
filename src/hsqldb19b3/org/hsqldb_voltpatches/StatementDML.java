@@ -1297,7 +1297,7 @@ public class StatementDML extends StatementDMQL {
             parameter.attributes.put("index", String.valueOf(i));
             Expression param = parameters[i];
             parameter.attributes.put("id", param.getUniqueId(session));
-            parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
+            parameter.attributes.put("valuetype", Types.getTypeName(param.getDataType().typeCode));
         }
     }
 

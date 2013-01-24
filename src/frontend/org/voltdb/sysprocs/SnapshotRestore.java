@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -371,7 +371,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     TRACE_LOG.trace("Checking saved table digest state for restore of: "
                             + m_filePath + ", " + m_fileNonce);
                     List<JSONObject> digests =
-                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce);
+                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce, HOST_LOG);
 
                     for (JSONObject obj : digests) {
                         result.addRow(obj.toString(), "SUCCESS", null);
@@ -1113,7 +1113,7 @@ public class SnapshotRestore extends VoltSystemProcedure
          * we do want a truncation snapshot if CL is enabled.
          */
         final boolean isStartWithNoAutomatedRestore =
-            startAction == VoltDB.START_ACTION.START && mode != org.voltdb.OperationMode.INITIALIZING;
+            startAction == VoltDB.START_ACTION.CREATE && mode != org.voltdb.OperationMode.INITIALIZING;
 
         final boolean isCLEnabled =
             VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl");

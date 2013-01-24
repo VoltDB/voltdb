@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,7 +24,11 @@
 package txnIdSelfCheck;
 
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -35,19 +39,27 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.utils.MiscUtils;
 
 public class Benchmark {
 
+    static VoltLogger log = new VoltLogger("HOST");
+
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
-            "----------" + "----------" + "----------" + "----------" + "\n";
+            "----------" + "----------" + "----------" + "----------";
 
     // validated command line configuration
     final Config config;
@@ -58,10 +70,15 @@ public class Benchmark {
     // Benchmark start time
     long benchmarkStartTS;
 
-    final PayloadProcessor processor;
+    final TxnId2PayloadProcessor processor;
 
     final AtomicInteger activeConnections = new AtomicInteger(0);
     final AtomicBoolean shutdown = new AtomicBoolean(false);
+
+    // for reporting and detecting progress
+    private final AtomicLong txnCount = new AtomicLong();
+    private long txnCountAtLastCheck;
+    private long lastProgressTimestamp = System.currentTimeMillis();
 
     // For retry connections
     private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
@@ -107,6 +124,18 @@ public class Benchmark {
         @Option(desc = "Compress values on the client side.")
         boolean usecompression = false;
 
+        @Option(desc = "Filler table blob size.")
+        int fillerrowsize = 5128;
+
+        @Option(desc = "Target data size for the filler replicated table (at each site).")
+        int replfillerrowmb = 32;
+
+        @Option(desc = "Target data size for the partitioned filler table.")
+        int partfillerrowmb = 128;
+
+        @Option(desc = "Timeout that kills the client if progress is not made.")
+        int progresstimeout = 120;
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -135,6 +164,49 @@ public class Benchmark {
     }
 
     /**
+     * Fake an internal jstack to the log
+     */
+    static public void printJStack() {
+        log.info(new Date().toString() + " Full thread dump");
+
+        Map<String, List<String>> deduped = new HashMap<String, List<String>>();
+
+        // collect all the output, but dedup the identical stack traces
+        for (Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+            Thread t = e.getKey();
+            String header = String.format("\"%s\" %sprio=%d tid=%d %s",
+                    t.getName(),
+                    t.isDaemon() ? "daemon " : "",
+                    t.getPriority(),
+                    t.getId(),
+                    t.getState().toString());
+
+            String stack = "";
+            for (StackTraceElement ste : e.getValue()) {
+                stack += "    at " + ste.toString() + "\n";
+            }
+
+            if (deduped.containsKey(stack)) {
+                deduped.get(stack).add(header);
+            }
+            else {
+                ArrayList<String> headers = new ArrayList<String>();
+                headers.add(header);
+                deduped.put(stack, headers);
+            }
+        }
+
+        for (Entry<String, List<String>> e : deduped.entrySet()) {
+            String logline = "";
+            for (String header : e.getValue()) {
+                logline += header + "\n";
+            }
+            logline += e.getKey();
+            log.info(logline);
+        }
+    }
+
+    /**
      * Remove the client from the list if connection is broken.
      */
     private class StatusListener extends ClientStatusListenerExt {
@@ -146,9 +218,15 @@ public class Benchmark {
 
             activeConnections.decrementAndGet();
 
+            // reset the connection id so the client will connect to a recovered cluster
+            // this is a bit of a hack
+            if (connectionsLeft == 0) {
+                ((ClientImpl) client).resetInstanceId();
+            }
+
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+                log.warn(String.format("Connection to %s:%d was lost.", hostname, port));
             }
 
             // setup for retry
@@ -171,13 +249,13 @@ public class Benchmark {
     Benchmark(Config config) {
         this.config = config;
 
-        processor = new PayloadProcessor(config.minvaluesize, config.maxvaluesize,
-                                         config.entropy, config.usecompression);
+        processor = new TxnId2PayloadProcessor(4, config.minvaluesize, config.maxvaluesize,
+                                         config.entropy, Integer.MAX_VALUE, config.usecompression);
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
+        log.info(HORIZONTAL_RULE);
+        log.info(" Command Line Configuration");
+        log.info(HORIZONTAL_RULE);
+        log.info(config.getConfigDumpString());
 
         StatusListener statusListener = new StatusListener();
         ClientConfig clientConfig = new ClientConfig("", "", statusListener);
@@ -197,11 +275,11 @@ public class Benchmark {
             try {
                 client.createConnection(server);
                 activeConnections.incrementAndGet();
-                System.out.printf("Connected to VoltDB node at: %s.\n", server);
+                log.info(String.format("Connected to VoltDB node at: %s.", server));
                 break;
             }
             catch (Exception e) {
-                System.err.printf("Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
+                log.warn(String.format("Connection to " + server + " failed - retrying in %d second(s).", sleep / 1000));
                 try { Thread.sleep(sleep); } catch (Exception interruted) {}
                 if (sleep < 8000) sleep += sleep;
             }
@@ -215,7 +293,7 @@ public class Benchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     private void connect() throws InterruptedException {
-        System.out.println("Connecting to VoltDB...");
+        log.info("Connecting to VoltDB...");
 
         final CountDownLatch connections = new CountDownLatch(config.parsedServers.length);
 
@@ -253,10 +331,27 @@ public class Benchmark {
      * periodically during a benchmark.
      */
     private synchronized void printStatistics() {
-        System.out.printf("Executed %d\n", c.get());
+
+        long txnCountNow = txnCount.get();
+        long now = System.currentTimeMillis();
+        boolean madeProgress = txnCountNow > txnCountAtLastCheck;
+
+        if (madeProgress) {
+            lastProgressTimestamp = now;
+        }
+        txnCountAtLastCheck = txnCountNow;
+        long diffInSeconds = (now - lastProgressTimestamp) / 1000;
+
+        log.info(String.format("Executed %d%s", txnCount.get(),
+                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds)"));
+
+        if (diffInSeconds > config.progresstimeout) {
+            log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
+            printJStack();
+            System.exit(-1);
+        }
     }
 
-    private final AtomicLong c = new AtomicLong();
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -264,9 +359,9 @@ public class Benchmark {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Setup & Initialization");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info(" Setup & Initialization");
+        log.info(HORIZONTAL_RULE);
 
         final int cidCount = 128;
         final long[] lastRid = new long[cidCount];
@@ -277,24 +372,62 @@ public class Benchmark {
         // connect to one or more servers, loop until success
         connect();
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println("Starting Benchmark");
-        System.out.println(HORIZONTAL_RULE);
+        // get stats
+        try {
+            ClientResponse cr = client.callProcedure("Summarize");
+            if (cr.getStatus() != ClientResponse.SUCCESS) {
+                log.error("Failed to call Summarize proc at startup. Exiting.");
+                log.error(((ClientResponseImpl) cr).toJSONString());
+                printJStack();
+                System.exit(-1);
+            }
+
+            // successfully called summarize
+            VoltTable t = cr.getResults()[0];
+            long ts = t.fetchRow(0).getLong("ts");
+            String tsStr = ts == 0 ? "NO TIMESTAMPS" : String.valueOf(ts) + " / " + new Date(ts).toString();
+            long count = t.fetchRow(0).getLong("count");
+
+            log.info("STARTUP TIMESTAMP OF LAST UPDATE (GMT): " + tsStr);
+            log.info("UPDATES RUN AGAINST THIS DB TO DATE: " + count);
+        }
+        catch (ProcCallException e) {
+            log.error("Failed to call Summarize proc at startup. Exiting.", e);
+            log.error(((ClientResponseImpl) e.getClientResponse()).toJSONString());
+            printJStack();
+            System.exit(-1);
+        }
+
+        log.info(HORIZONTAL_RULE);
+        log.info("Starting Benchmark");
+        log.info(HORIZONTAL_RULE);
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
+        // reset progress tracker
+        lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
-        System.out.println("\nRunning benchmark...");
+        log.info("Running benchmark...");
+
+        BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
+                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+        partitionedLoader.start();
+        BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
+                (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
+        replicatedLoader.start();
+
+        ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset);
+        readThread.start();
 
         AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client);
         adHocMayhemThread.start();
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
-            ClientThread clientThread = new ClientThread(cid, c, client, processor);
+            ClientThread clientThread = new ClientThread(cid, txnCount, client, processor);
             clientThread.start();
             clientThreads.add(clientThread);
         }
@@ -305,10 +438,16 @@ public class Benchmark {
             Thread.yield();
         }
 
+        replicatedLoader.shutdown();
+        partitionedLoader.shutdown();
+        readThread.shutdown();
         adHocMayhemThread.shutdown();
         for (ClientThread clientThread : clientThreads) {
             clientThread.shutdown();
         }
+        replicatedLoader.join();
+        partitionedLoader.join();
+        readThread.join();
         adHocMayhemThread.join();
         for (ClientThread clientThread : clientThreads) {
             clientThread.join();
@@ -323,6 +462,9 @@ public class Benchmark {
         // block until all outstanding txns return
         client.drain();
         client.close();
+
+        log.info(HORIZONTAL_RULE);
+        log.info("Benchmark Complete");
     }
 
     /**

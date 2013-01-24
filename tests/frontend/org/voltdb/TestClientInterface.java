@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -399,8 +399,8 @@ public class TestClientInterface {
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
         assertFalse(boolValues.get(1)); // readonly
-        assertTrue(boolValues.get(2)); // single-part
-        assertTrue(boolValues.get(3)); // every site
+        assertFalse(boolValues.get(2)); // single-part
+        assertFalse(boolValues.get(3)); // every site
         assertEquals("@UpdateApplicationCatalog", invocationCaptor.getValue().getProcName());
         assertEquals("diff", invocationCaptor.getValue().getParameterAtIndex(0));
         assertTrue(Arrays.equals("blah".getBytes(), (byte[]) invocationCaptor.getValue().getParameterAtIndex(1)));

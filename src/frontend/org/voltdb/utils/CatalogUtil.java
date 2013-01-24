@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -46,12 +47,17 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
@@ -107,7 +113,7 @@ public abstract class CatalogUtil {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {2, 0};
+    public static final int[] minCompatibleVersion = {3, 0};
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
@@ -658,8 +664,9 @@ public abstract class CatalogUtil {
         if (pdt != null) {
             sb.append(pdt.isEnabled()).append(",");
             PartitionDetectionType.Snapshot st = pdt.getSnapshot();
-            assert(st != null);
-            sb.append(st.getPrefix()).append(",");
+            if (st != null) {
+                sb.append(st.getPrefix()).append(",");
+            }
         }
 
         sb.append(" SECURITY ");
@@ -933,12 +940,18 @@ public abstract class CatalogUtil {
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
             // copy partition detection configuration from xml to catalog
+            String defaultPPDPrefix = "partition_detection";
             if (deployment.getPartitionDetection() != null) {
                 if (deployment.getPartitionDetection().isEnabled()) {
                     catCluster.setNetworkpartition(true);
                     CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                     SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
+                    if (deployment.getPartitionDetection().getSnapshot() != null) {
+                        sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
+                    }
+                    else {
+                        sched.setPrefix(defaultPPDPrefix);
+                    }
                     if (printLog) {
                         hostLog.info("Detection of network partitions in the cluster is enabled.");
                     }
@@ -956,7 +969,7 @@ public abstract class CatalogUtil {
                     catCluster.setNetworkpartition(true);
                     CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                     SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix("partition_detection");
+                    sched.setPrefix(defaultPPDPrefix);
                     if (printLog) {
                         hostLog.info("Detection of network partitions in the cluster is enabled.");
                     }
@@ -1435,6 +1448,56 @@ public abstract class CatalogUtil {
         }
         final byte passwordHash[] = md.digest(password.getBytes());
         return Encoder.hexEncode(passwordHash);
+    }
+
+    public static void
+        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+                throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        versionAndBytes.putInt(catalogVersion);
+        versionAndBytes.putLong(txnId);
+        versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogBytes);
+        zk.create(VoltZK.catalogbytes,
+                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    }
+
+    public static void
+        setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+            throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        versionAndBytes.putInt(catalogVersion);
+        versionAndBytes.putLong(txnId);
+        versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogBytes);
+        zk.setData(VoltZK.catalogbytes,
+                versionAndBytes.array(), -1);
+    }
+
+    public static class CatalogAndIds {
+        public final long txnId;
+        public final long uniqueId;
+        public final int version;
+        public final byte bytes[];
+
+        public CatalogAndIds(long txnId, long uniqueId, int catalogVersion, byte catalogBytes[]) {
+            this.txnId = txnId;
+            this.uniqueId = uniqueId;
+            this.version = catalogVersion;
+            this.bytes = catalogBytes;
+        }
+    }
+
+    public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes =
+                ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
+        int version = versionAndBytes.getInt();
+        long catalogTxnId = versionAndBytes.getLong();
+        long catalogUniqueId = versionAndBytes.getLong();
+        byte catalogBytes[] = new byte[versionAndBytes.remaining()];
+        versionAndBytes.get(catalogBytes);
+        versionAndBytes = null;
+        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogBytes);
     }
 
 }

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -44,6 +44,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
 
 import com.google.common.util.concurrent.Callables;
@@ -113,7 +114,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final boolean isReplicated,
             final List<Integer> partitionIds,
             final VoltTable schemaTable,
-            final long txnId) throws IOException {
+            final long txnId,
+            final long timestamp) throws IOException {
         this(
                 file,
                 hostId,
@@ -125,6 +127,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 partitionIds,
                 schemaTable,
                 txnId,
+                timestamp,
                 new int[] { 0, 0, 0, 2 });
     }
 
@@ -139,6 +142,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final List<Integer> partitionIds,
             final VoltTable schemaTable,
             final long txnId,
+            final long timestamp,
             int version[]
             ) throws IOException {
         String hostname = CoreUtils.getHostnameOrAddress();
@@ -166,6 +170,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             stringer.key("isReplicated").value(isReplicated);
             stringer.key("isCompressed").value(true);
             stringer.key("checksumType").value("CRC32C");
+            stringer.key("timestamp").value(timestamp);
+            /*
+             * The timestamp string is for human consumption, automated stuff should use
+             * the actual timestamp
+             */
+            stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
             if (!isReplicated) {
                 stringer.key("partitionIds").array();
                 for (int partitionId : partitionIds) {

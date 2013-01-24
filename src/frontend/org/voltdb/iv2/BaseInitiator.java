@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -63,14 +63,15 @@ public abstract class BaseInitiator implements Initiator
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, boolean forRejoin)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        RejoinProducer rejoinProducer =
-            new RejoinProducer(m_partitionId, scheduler.m_tasks);
+        RejoinProducer rejoinProducer = forRejoin ?
+            new RejoinProducer(m_partitionId, scheduler.m_tasks) :
+            null;
         if (m_partitionId == MpInitiator.MP_INIT_PID) {
             m_initiatorMailbox = new MpInitiatorMailbox(
                     m_partitionId,
@@ -89,7 +90,9 @@ public abstract class BaseInitiator implements Initiator
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
-        rejoinProducer.setMailbox(m_initiatorMailbox);
+        if (rejoinProducer != null) {
+            rejoinProducer.setMailbox(m_initiatorMailbox);
+        }
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
@@ -113,7 +116,8 @@ public abstract class BaseInitiator implements Initiator
                           VoltDB.START_ACTION startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
-                          CommandLog cl)
+                          CommandLog cl,
+                          String coreBindIds)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -138,7 +142,8 @@ public abstract class BaseInitiator implements Initiator
                                        snapshotPriority,
                                        m_initiatorMailbox,
                                        agent,
-                                       memStats);
+                                       memStats,
+                                       coreBindIds);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 

@@ -1,22 +1,25 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb;
 
+import java.nio.ByteBuffer;
+
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltdb.catalog.Statement;
 
 /**
@@ -32,6 +35,8 @@ public class SQLStmt {
     // Used for uncompiled SQL.
     byte[] sqlText;
     String joinOrder;
+    // hash of the sql string for determinism checks
+    byte[] sqlCRC;
 
     // Used for compiled SQL
     SQLStmtPlan plan = null;
@@ -47,13 +52,6 @@ public class SQLStmt {
     }
 
     /**
-     * Construct a SQLStmt instance from a byte array for internal use.
-     */
-    private SQLStmt(byte[] sqlText) {
-        this.sqlText = sqlText;
-    }
-
-    /**
      * Construct a SQLStmt instance from a SQL statement.
      *
      * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
@@ -61,8 +59,21 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this.sqlText = sqlText.getBytes(VoltDB.UTF8ENCODING);
+        this(sqlText.getBytes(VoltDB.UTF8ENCODING), joinOrder);
+    }
+
+    /**
+     * Construct a SQLStmt instance from a byte array for internal use.
+     */
+    private SQLStmt(byte[] sqlText, String joinOrder) {
+        this.sqlText = sqlText;
         this.joinOrder = joinOrder;
+
+        // create a hash for determinism purposes
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        crc.update(sqlText);
+        // ugly hack to get bytes from an int
+        this.sqlCRC = ByteBuffer.allocate(4).putInt((int) crc.getValue()).array();
     }
 
     /**
@@ -81,7 +92,7 @@ public class SQLStmt {
                                   boolean isReplicatedTableDML,
                                   boolean isReadOnly,
                                   VoltType[] params) {
-        SQLStmt stmt = new SQLStmt(sqlText);
+        SQLStmt stmt = new SQLStmt(sqlText, null);
 
         /*
          * Fill out the parameter types

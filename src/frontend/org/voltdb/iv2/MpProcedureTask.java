@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,6 +19,8 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.ArrayList;
+
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.List;
 
 import org.voltcore.logging.Level;
@@ -47,7 +49,7 @@ public class MpProcedureTask extends ProcedureTask
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters
     // when we requeue this Task to for restart
-    final List<Long> m_restartMasters = new ArrayList<Long>();
+    final private AtomicReference<List<Long>> m_restartMasters = new AtomicReference<List<Long>>();
     boolean m_isRestart = false;
     final Iv2InitiateTaskMessage m_msg;
 
@@ -62,6 +64,7 @@ public class MpProcedureTask extends ProcedureTask
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);
+        m_restartMasters.set(new ArrayList<Long>());
     }
 
     /**
@@ -84,8 +87,8 @@ public class MpProcedureTask extends ProcedureTask
      */
     public void doRestart(List<Long> masters)
     {
-        m_restartMasters.clear();
-        m_restartMasters.addAll(masters);
+        List<Long> copy = new ArrayList<Long>(masters);
+        m_restartMasters.set(copy);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -110,6 +113,25 @@ public class MpProcedureTask extends ProcedureTask
             m_initiator.deliver(errorResp);
             hostLog.debug("SYSPROCFAIL: " + this);
             return;
+        }
+
+        // Let's ensure that we flush any previous attempts of this transaction
+        // at the masters we're going to try to use this time around.
+        if (m_isRestart) {
+            CompleteTransactionMessage restart = new CompleteTransactionMessage(
+                    m_initiator.getHSId(), // who is the "initiator" now??
+                    m_initiator.getHSId(),
+                    m_txn.txnId,
+                    m_txn.isReadOnly(),
+                    0,
+                    true,
+                    false,  // really don't want to have ack the ack.
+                    !m_txn.isReadOnly(),
+                    m_msg.isForReplay());
+
+            restart.setTruncationHandle(m_msg.getTruncationHandle());
+            restart.setOriginalTxnId(m_msg.getOriginalTxnId());
+            m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
@@ -179,7 +201,7 @@ public class MpProcedureTask extends ProcedureTask
         // which will send the necessary CompleteTransactionMessage to restart.
         ((MpTransactionState)m_txn).restart();
         // Update the masters list with the list provided when restart was triggered
-        updateMasters(m_restartMasters);
+        updateMasters(m_restartMasters.get());
         m_isRestart = true;
         m_queue.restart();
     }

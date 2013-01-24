@@ -22,6 +22,7 @@ fi
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
@@ -43,7 +44,15 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
+
+    # primary catalog
     $VOLTDB compile --classpath obj -o $APPNAME.jar src/txnIdSelfCheck/ddl.sql
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit; fi
+
+    # alternate catalog that adds an index
+    $VOLTDB compile --classpath obj -o $APPNAME-alt.jar \
+        src/txnIdSelfCheck/ddl.sql src/txnIdSelfCheck/ddl-annex.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -71,16 +80,20 @@ function benchmark-help() {
 
 function benchmark() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=120 \
         --servers=localhost \
-        --threads=100 \
+        --threads=20 \
         --threadoffset=0 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --entropy=127 \
+        --fillerrowsize=10240 \
+        --replfillerrowmb=32 \
+        --partfillerrowmb=128 \
+        --progresstimeout=120 \
         --usecompression=false
 }
 

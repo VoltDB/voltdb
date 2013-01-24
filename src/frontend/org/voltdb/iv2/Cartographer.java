@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,24 +25,18 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.CoreUtils;
-
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
-
-import org.voltdb.compiler.ClusterConfig;
-
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
@@ -50,6 +44,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
+import org.voltdb.compiler.ClusterConfig;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
@@ -189,6 +184,41 @@ public class Cartographer extends StatsSource
     }
 
     /**
+     * Given a set of partition IDs, return a map of partition to a list of HSIDs of all the sites with copies of each partition
+     */
+    public Map<Integer, List<Long>> getReplicasForPartitions(Set<Integer> partitions) {
+        Map<Integer, List<Long>> retval = new HashMap<Integer, List<Long>>();
+        List<Pair<Integer,ZKUtil.ChildrenCallback>> callbacks = new ArrayList<Pair<Integer, ZKUtil.ChildrenCallback>>();
+
+        for (Integer partition : partitions) {
+            String zkpath = LeaderElector.electionDirForPartition(partition);
+            ZKUtil.ChildrenCallback cb = new ZKUtil.ChildrenCallback();
+            callbacks.add(Pair.of(partition, cb));
+            m_zk.getChildren(zkpath, false, cb, null);
+        }
+
+        for (Pair<Integer, ZKUtil.ChildrenCallback> p : callbacks ) {
+            final Integer partition = p.getFirst();
+            try {
+                List<String> children = p.getSecond().getChildren();
+                List<Long> sites = new ArrayList<Long>();
+                for (String child : children) {
+                    sites.add(Long.valueOf(child.split("_")[0]));
+                }
+                retval.put(partition, sites);
+            } catch (KeeperException ke) {
+                org.voltdb.VoltDB.crashLocalVoltDB("KeeperException getting replicas for partition: " + partition,
+                        true, ke);
+            }
+            catch (InterruptedException ie) {
+                org.voltdb.VoltDB.crashLocalVoltDB("InterruptedException getting replicas for partition: " +
+                        partition, true, ie);
+            }
+        }
+        return retval;
+    }
+
+    /**
      * Convenience method to return the immediate count of replicas for the given partition
      */
     public int getReplicaCountForPartition(int partition) {
@@ -202,6 +232,7 @@ public class Cartographer extends StatsSource
     {
         List<Entry<Integer, Integer>> entries = new ArrayList<Entry<Integer, Integer>>(map.entrySet());
         Collections.sort(entries, new Comparator<Entry<Integer, Integer>>() {
+            @Override
             public int compare(Entry<Integer, Integer> o1, Entry<Integer, Integer> o2) {
                 if (!o1.getValue().equals(o2.getValue())) {
                     return (o1.getValue()).compareTo(o2.getValue());
@@ -254,8 +285,11 @@ public class Cartographer extends StatsSource
     private List<MailboxNodeContent> getMailboxNodeContentList()
     {
         List<MailboxNodeContent> sitesList = new ArrayList<MailboxNodeContent>();
-        for (Integer partId : m_iv2Masters.pointInTimeCache().keySet()) {
-            List<Long> hsidsForPart = getReplicasForPartition(partId);
+        final Set<Integer> iv2MastersKeySet = m_iv2Masters.pointInTimeCache().keySet();
+        Map<Integer, List<Long>> hsidsForPartMap = getReplicasForPartitions(iv2MastersKeySet);
+        for (Map.Entry<Integer, List<Long>> entry : hsidsForPartMap.entrySet()) {
+            Integer partId = entry.getKey();
+            List<Long> hsidsForPart = entry.getValue();
             for (long hsid : hsidsForPart) {
                 MailboxNodeContent mnc = new MailboxNodeContent(hsid, partId);
                 sitesList.add(mnc);

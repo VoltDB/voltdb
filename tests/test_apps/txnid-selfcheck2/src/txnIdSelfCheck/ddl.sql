@@ -41,6 +41,17 @@ CREATE TABLE replicated
 );
 CREATE INDEX R_CIDINDEX ON replicated (cid);
 
+-- replicated table
+CREATE TABLE adhocr
+(
+  id         bigint             NOT NULL
+, ts         bigint             NOT NULL
+, inc        bigint             NOT NULL
+, jmp        bigint             NOT NULL
+, CONSTRAINT PK_id_ar PRIMARY KEY (id)
+);
+CREATE INDEX R_TSINDEX ON adhocr (ts DESC);
+
 -- partitioned table
 CREATE TABLE adhocp
 (
@@ -54,16 +65,23 @@ PARTITION TABLE adhocp ON COLUMN id;
 CREATE INDEX P_TSINDEX ON adhocp (ts DESC);
 
 -- replicated table
-CREATE TABLE adhocr
+CREATE TABLE bigr
 (
-  id         bigint             NOT NULL
-, ts         bigint             NOT NULL
-, inc        bigint             NOT NULL
-, jmp        bigint             NOT NULL
-, CONSTRAINT PK_id_ar PRIMARY KEY (id)
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_br PRIMARY KEY (p,id)
 );
-CREATE INDEX R_TSINDEX ON adhocr (ts DESC);
 
+-- partitioned table
+CREATE TABLE bigp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_bp PRIMARY KEY (p,id)
+);
+PARTITION TABLE bigp ON COLUMN p;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -76,3 +94,14 @@ PARTITION PROCEDURE UpdatePartitionedSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateReplicatedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBothMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateReplicatedMPInProcAdHoc;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSP;
+PARTITION PROCEDURE ReadSP ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSPInProcAdHoc;
+PARTITION PROCEDURE ReadSPInProcAdHoc ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPInProcAdHoc;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
+PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;

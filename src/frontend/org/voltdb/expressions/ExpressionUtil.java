@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -296,7 +296,7 @@ public abstract class ExpressionUtil {
             }
 
             // handle the types that can be converted to decimal
-            if (neededType == VoltType.DECIMAL) {
+            else if (neededType == VoltType.DECIMAL) {
                 if ((cve.getValueType().isExactNumeric()) || (cve.getValueType() == VoltType.FLOAT)) {
                     cve.setValueType(neededType);
                     cve.setValueSize(neededSize);
@@ -305,7 +305,7 @@ public abstract class ExpressionUtil {
                 }
             }
 
-            if (neededType == VoltType.VARBINARY) {
+            else if (neededType == VoltType.VARBINARY) {
                 if ((cve.getValueType() == VoltType.STRING) && (Encoder.isHexEncodedString(cve.getValue()))) {
                     cve.setValueType(neededType);
                     cve.setValueSize(neededSize);
@@ -314,22 +314,23 @@ public abstract class ExpressionUtil {
                 }
             }
 
-            if (neededType == VoltType.TIMESTAMP) {
+            else if (neededType == VoltType.TIMESTAMP) {
                 if (cve.getValueType() == VoltType.STRING) {
                     try {
                         TimestampType ts = new TimestampType(cve.m_value);
                         cve.m_value = String.valueOf(ts.getTime());
                         cve.setValueType(neededType);
                         cve.setValueSize(neededSize);
-                        checkConstantValueTypeSafety(cve);
+                        return;
                     }
-                    // ignore errors if it's not the right format
+                    // It couldn't be converted to timestamp, fall through and throw Exception.
                     catch (IllegalArgumentException e) {}
-                    return;
                 }
             }
 
-            throw new Exception("Constant value cannot be converted to column type.");
+            throw new Exception(
+                    String.format("Constant value cannot be converted to %s column type.",
+                                  neededType.name()));
         }
         else {
             input.setValueType(neededType);

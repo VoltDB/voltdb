@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -26,6 +26,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
@@ -114,7 +115,16 @@ public class RepairLog
     // the repairLog if the message includes a truncation hint.
     public void deliver(VoltMessage msg)
     {
-        if (msg instanceof FragmentTaskMessage) {
+        if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
+            final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
+            // We can't repair read-only SP transactions due to their short-circuited nature.
+            // Just don't log them to the repair log.
+            if (!m.isReadOnly()) {
+                m_lastSpHandle = m.getSpHandle();
+                truncate(Long.MIN_VALUE, m.getTruncationHandle());
+                m_log.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+            }
+        } else if (msg instanceof FragmentTaskMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
             truncate(m.getTruncationHandle(), Long.MIN_VALUE);
             // only log the first fragment of a procedure (and handle 1st case)
@@ -137,12 +147,6 @@ public class RepairLog
                 m_lastMpHandle = Math.max(m_lastMpHandle, m.getTxnId());
                 m_lastSpHandle = m.getSpHandle();
             }
-        }
-        else if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
-            final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
-            m_lastSpHandle = m.getSpHandle();
-            truncate(Long.MIN_VALUE, m.getTruncationHandle());
-            m_log.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
         }
     }
 
@@ -185,7 +189,7 @@ public class RepairLog
         }
 
         int ofTotal = items.size() + 1;
-        tmLog.info("Responding with " + ofTotal + " repair log parts.");
+        tmLog.debug("Responding with " + ofTotal + " repair log parts.");
         List<Iv2RepairLogResponseMessage> responses =
             new LinkedList<Iv2RepairLogResponseMessage>();
 

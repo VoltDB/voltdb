@@ -780,7 +780,8 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
 jsr166y - LinkedTransferQueue, ThreadLocalRandom, ConcurrentLinkedDeque, TransferQueue
-
+JSR166TestCase, ConcurrentHashMapTest, ConcurrentSkipListMapTest,
+ConcurrentSkipListSetTest
 /*
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -792,7 +793,31 @@ jsr166y - LinkedTransferQueue, ThreadLocalRandom, ConcurrentLinkedDeque, Transfe
  * JCP JSR-166 Expert Group and released to the public domain, as explained
  * at http://creativecommons.org/publicdomain/zero/1.0/
  */
+/*
+ * Written by Doug Lea with assistance from members of JCP JSR-166
+ * Expert Group and released to the public domain, as explained at
+ * http://creativecommons.org/publicdomain/zero/1.0/
+ * Other contributors include Andrew Wright, Jeffrey Hayes,
+ * Pat Fisher, Mike Judd.
+ */
 
+================================================================================
+Java thread affinity by Peter Lawrey
+/*
+ * Copyright 2011 Peter Lawrey
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 ================================================================================
 CRC32c implementation by Evan Jones, Intel, and others
 Copyright (c) 2008,2009,2010 Massachusetts Institute of Technology.
@@ -909,6 +934,27 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Twitter4J includes software from JSON.org to parse JSON response from the Twitter API.
 See the JSON license included in this document.
+
+================================================================================
+google-gson (used by the VoltDB JSON example)
+
+/*
+ * Copyright (C) 2008 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+See Apache 2.0 license below.
 
 ================================================================================
 Build and Test System Only (VoltDB includes these jars or binaries in our git repository)
@@ -1174,10 +1220,10 @@ Linked with or Included in VoltDB tools
 ================================================================================
 VoltDB sqlcmd uses the following third party component:
 
-JLine version 1.0
+JLine version 2.10
 http://jline.sourceforge.net/
 
-Copyright (c) 2002-2006, Marc Prud'hommeaux <mwp1@cornell.edu>
+Copyright (c) 2002-2012, Marc Prud'hommeaux <mwp1@cornell.edu>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or

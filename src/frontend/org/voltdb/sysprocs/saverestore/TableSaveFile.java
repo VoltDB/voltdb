@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -35,6 +35,7 @@ import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.TransactionIdManager;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.EELibraryLoader;
@@ -224,6 +225,7 @@ public class TableSaveFile
              */
             if (m_versionNum[3] == 0) {
                 m_txnId = fd.readLong();
+                m_timestamp = TransactionIdManager.getTimestampFromTransactionId(m_txnId);
                 m_hostId = fd.readInt();
                 m_hostname = fd.readString();
                 m_clusterName = fd.readString();
@@ -262,6 +264,13 @@ public class TableSaveFile
                 JSONObject obj = new JSONObject(jsonString);
 
                 m_txnId = obj.getLong("txnId");
+                //Timestamp field added for 3.0, might not be there
+                if (obj.has("timestamp")) {
+                    m_timestamp = obj.getLong("timestamp");
+                } else {
+                    //Pre 3.0/IV2 the timestamp was in the transactionid
+                    m_timestamp = TransactionIdManager.getTimestampFromTransactionId(m_txnId);
+                }
                 m_hostId = obj.getInt("hostId");
                 m_hostname = obj.getString("hostname");
                 m_clusterName = obj.getString("clusterName");
@@ -361,6 +370,10 @@ public class TableSaveFile
         return m_txnId;
     }
 
+    public long getTimestamp() {
+        return m_timestamp;
+    }
+
     public void close() throws IOException {
         if (m_chunkReaderThread != null) {
             m_chunkReaderThread.interrupt();
@@ -452,6 +465,7 @@ public class TableSaveFile
     private final int m_partitionIds[];
     private final int m_totalPartitions;
     private final long m_txnId;
+    private final long m_timestamp;
     private boolean m_hasMoreChunks = true;
     private ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
     private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();

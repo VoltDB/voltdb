@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -102,26 +102,6 @@ public class TestNonDetermisticSeppuku extends TestCase {
         }
         catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Connection to database"));
-            // success!
-        }
-    }
-
-    /**
-     * Call a single-partition proc that returns a different number
-     * of identical rows from two different replicas.
-     */
-    public void testDifferentResultLengthDeath() throws Exception {
-        try {
-            client.callProcedure(
-                    "NonDeterministicSPProc",
-                    0,
-                    0,
-                    NonDeterministicSPProc.MISMATCH_LENGTH);
-            fail("R/W length mismatch didn't fail?!");
-        }
-        catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("Connection to database") ||
-                    e.getMessage().contains("Transaction dropped"));
             // success!
         }
     }

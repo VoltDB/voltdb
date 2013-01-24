@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,6 +30,7 @@ import java.util.ArrayList;
 
 import junit.framework.TestCase;
 
+import org.voltcore.TransactionIdManager;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -57,6 +58,7 @@ public class TestTableSaveFile extends TestCase {
     private static String DATABASE_NAME = "TEST_DATABASE";
     private static String TABLE_NAME = "TEST_TABLE";
     private static int TOTAL_PARTITIONS = 13;
+    private static long TIMESTAMP = System.currentTimeMillis();
 
     static {
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
@@ -101,7 +103,7 @@ public class TestTableSaveFile extends TestCase {
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
                 TOTAL_PARTITIONS, false, partIds, table,
-                TXN_ID, VERSION2);
+                TXN_ID, TIMESTAMP, VERSION2);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
                 columnInfo.length);
@@ -136,7 +138,7 @@ public class TestTableSaveFile extends TestCase {
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
                 TOTAL_PARTITIONS, false, partIds, vt,
-                TXN_ID, VERSION1);
+                TXN_ID, TIMESTAMP, VERSION1);
         dsdt.close();
 
         FileInputStream fis = new FileInputStream(f);
@@ -169,6 +171,7 @@ public class TestTableSaveFile extends TestCase {
         assertEquals(CLUSTER_NAME, savefile.getClusterName());
         assertEquals(DATABASE_NAME, savefile.getDatabaseName());
         assertEquals(TABLE_NAME, savefile.getTableName());
+        assertEquals(TIMESTAMP, savefile.getTimestamp());
         assertFalse(savefile.isReplicated());
         int partitionIds[] = savefile.getPartitionIds();
         for (int ii = 0; ii < 5; ii++) {
@@ -219,6 +222,7 @@ public class TestTableSaveFile extends TestCase {
         assertEquals(CLUSTER_NAME, savefile.getClusterName());
         assertEquals(DATABASE_NAME, savefile.getDatabaseName());
         assertEquals(TABLE_NAME, savefile.getTableName());
+        assertEquals(TransactionIdManager.getTimestampFromTransactionId(TXN_ID), savefile.getTimestamp());
         assertFalse(savefile.isReplicated());
         int partitionIds[] = savefile.getPartitionIds();
         for (int ii = 0; ii < 5; ii++) {

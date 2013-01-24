@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -139,6 +139,7 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[4] != null);
             assert(params.toArray()[5] != null);
             assert(params.toArray()[6] != null);
+            assert(params.toArray()[7] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
@@ -162,12 +163,13 @@ public class SnapshotSave extends VoltSystemProcedure
             }
 
             String data = (String) params.toArray()[6];
+            final long timestamp = (Long)params.toArray()[7];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
                                                          context.getLastCommittedSpHandle(),
                                                          Longs.toArray(perPartitionTransactionIdsToKeep),
-                                                         data, context, hostname);
+                                                         data, context, hostname, timestamp);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -235,10 +237,10 @@ public class SnapshotSave extends VoltSystemProcedure
             {
                 TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
                                 + file_path + ", " + file_nonce);
-
-                if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
+                final int numSitesSnapshotting = SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.size();
+                if (numSitesSnapshotting > 0) {
                     HOST_LOG.debug("Snapshot in progress, " +
-                            SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() +
+                            numSitesSnapshotting +
                             " sites are still snapshotting");
                     result.addRow(
                                   context.getHostId(),
@@ -406,6 +408,8 @@ public class SnapshotSave extends VoltSystemProcedure
 
         results = performSnapshotCreationWork(path, nonce, ctx.getCurrentTxnId(), perPartitionTxnIds,
                                               (byte)(block ? 1 : 0), format, data);
+        SnapshotSaveAPI.logParticipatingHostCount(ctx.getCurrentTxnId());
+
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
@@ -471,7 +475,8 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data);
+        params.setParameters(
+                filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data, System.currentTimeMillis());
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files

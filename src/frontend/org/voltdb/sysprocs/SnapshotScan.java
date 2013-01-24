@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -29,12 +29,13 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -230,7 +231,9 @@ public class SnapshotScan extends VoltSystemProcedure {
                         if (f.canRead()) {
                             try {
                                 HashSet<String> tableNames = new HashSet<String>();
-                                JSONArray tables = SnapshotUtil.CRCCheck(f).getJSONArray("tables");
+                                JSONObject digest = SnapshotUtil.CRCCheck(f, HOST_LOG);
+                                if (digest == null) continue;
+                                JSONArray tables = digest.getJSONArray("tables");
                                 for (int ii = 0; ii < tables.length(); ii++) {
                                     tableNames.add(tables.getString(ii));
                                 }

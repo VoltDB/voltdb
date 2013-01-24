@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,10 +40,8 @@
 
 package txnIdSelfCheck;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +54,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -64,7 +64,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
 
@@ -72,10 +71,12 @@ import txnIdSelfCheck.procedures.updateReplicated;
 
 public class AsyncBenchmark {
 
+    static VoltLogger log = new VoltLogger("HOST");
+
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
-            "----------" + "----------" + "----------" + "----------" + "\n";
+            "----------" + "----------" + "----------" + "----------";
 
     // validated command line configuration
     final Config config;
@@ -85,10 +86,8 @@ public class AsyncBenchmark {
     Timer timer;
     // Benchmark start time
     long benchmarkStartTS;
-    // Statistics manager objects from the client
-//    final ClientStatsContext periodicStatsContext;
-//    final ClientStatsContext fullStatsContext;
-    final PayloadProcessor processor;
+
+    final TxnIdPayloadProcessor processor;
     // For retry connections
     final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
         @Override
@@ -101,6 +100,11 @@ public class AsyncBenchmark {
 
     final AtomicLong previousReplicated = new AtomicLong(0);
     final AtomicBoolean shutdown = new AtomicBoolean(false);
+
+    // for reporting and detecting progress
+    private final AtomicLong txnCount = new AtomicLong();
+    private long txnCountAtLastCheck;
+    private long lastProgressTimestamp = System.currentTimeMillis();
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -144,6 +148,9 @@ public class AsyncBenchmark {
 
         @Option(desc = "Compress values on the client side.")
         boolean usecompression= false;
+
+        @Option(desc = "Timeout that kills the client if progress is not made.")
+        int progresstimeout = 120;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -191,9 +198,8 @@ public class AsyncBenchmark {
 
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf(new Date() + " Connection to %s:%d was lost.\n", hostname, port);
+                log.warn(String.format("Connection to %s:%d was lost.", hostname, port));
             }
-            clients.remove(this.client);
 
             // setup for retry
             final String server = MiscUtils.getHostnameColonPortString(hostname, port);
@@ -215,13 +221,13 @@ public class AsyncBenchmark {
     public AsyncBenchmark(Config config) {
         this.config = config;
 
-        processor = new PayloadProcessor(config.minvaluesize, config.maxvaluesize,
-                                         config.entropy, config.usecompression);
+        processor = new TxnIdPayloadProcessor(4, config.minvaluesize, config.maxvaluesize,
+                                         config.entropy, Integer.MAX_VALUE, config.usecompression);
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
+        log.info(HORIZONTAL_RULE);
+        log.info(" Command Line Configuration");
+        log.info(HORIZONTAL_RULE);
+        log.info(config.getConfigDumpString());
     }
 
     Client createClient(int serverCount) {
@@ -237,8 +243,6 @@ public class AsyncBenchmark {
         Client client = ClientFactory.createClient(clientConfig);
         statusListener.setClient(client);
 
-//        periodicStatsContext = client.createStatsContext();
-//        fullStatsContext = client.createStatsContext();
         return client;
     }
 
@@ -256,11 +260,11 @@ public class AsyncBenchmark {
             try {
                 client.createConnection(server);
                 clients.add(client);
-                System.out.printf(new Date() + " Connected to VoltDB node at: %s.\n", server);
+                log.info(String.format("Connected to VoltDB node at: %s.", server));
                 break;
             }
             catch (Exception e) {
-                System.err.printf(new Date() + " Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
+                log.warn(String.format("Connection to " + server + " failed - retrying in %d second(s).", sleep / 1000));
                 try { Thread.sleep(sleep); } catch (Exception interruted) {}
                 if (sleep < 1000) sleep += sleep;
             }
@@ -274,7 +278,7 @@ public class AsyncBenchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     void connect() throws InterruptedException {
-        System.out.println("Connecting to VoltDB...");
+        log.info("Connecting to VoltDB...");
 
         final CountDownLatch connections = new CountDownLatch(config.parsedServers.length);
 
@@ -313,60 +317,27 @@ public class AsyncBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-//        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-//        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
-//
-//        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-//        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
-//        System.out.printf("Aborts/Failures %d/%d, ",
-//                stats.getInvocationAborts(), stats.getInvocationErrors());
-//        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-//                stats.kPercentileLatency(0.95));
-        System.out.printf("Executed %d\n", c.get());
-    }
+        long txnCountNow = txnCount.get();
+        long now = System.currentTimeMillis();
+        boolean madeProgress = txnCountNow > txnCountAtLastCheck;
 
-    /**
-     * Prints the results of the voting simulation and statistics
-     * about performance.
-     *
-     * @throws Exception if anything unexpected happens.
-     */
-    public synchronized void printResults() throws Exception {
-        //ClientStats stats = fullStatsContext.fetch().getStats();
-
-        // 1. Voting Board statistics, Voting results and performance statistics
-        String display = "\n" +
-                         HORIZONTAL_RULE +
-                         " Voting Results\n" +
-                         HORIZONTAL_RULE +
-                         "\nA total of %d votes were received...\n\n";
-        //System.out.printf(display, stats.getInvocationsCompleted());
-
-        // 3. Performance statistics
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Client Workload Statistics");
-        System.out.println(HORIZONTAL_RULE);
-
-//        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-//        System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-//        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-//        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
-
-        System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" System Server Statistics");
-        System.out.println(HORIZONTAL_RULE);
-
-        if (config.autotune) {
-            System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
+        if (madeProgress) {
+            lastProgressTimestamp = now;
         }
-        //System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
+        txnCountAtLastCheck = txnCountNow;
+        long diffInSeconds = (now - lastProgressTimestamp) / 1000;
 
-        // 4. Write stats to file if requested
-        //client.writeSummaryCSV(stats, config.statsfile);
+        log.info(String.format("Executed %d%s", txnCount.get(),
+                madeProgress ? "" : " (no progress made in " + diffInSeconds + " seconds)"));
+
+        if (diffInSeconds > config.progresstimeout) {
+            log.error("No progress was made in over " + diffInSeconds + " seconds while connected to a cluster. Exiting.");
+            System.exit(-1);
+        }
     }
 
     private static void crash(String msg) {
-        System.err.println(msg);
+        log.error(msg);
         System.exit(-1);
     }
 
@@ -378,19 +349,25 @@ public class AsyncBenchmark {
     class updateReplicatedCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            c.incrementAndGet();
-
             if (response.getStatus() == ClientResponse.SUCCESS) {
-                // pass
-            } else if (response.getStatus() == ClientResponse.USER_ABORT) {
+                txnCount.incrementAndGet();
+                return; // pass
+            }
+
+            if (response.getStatus() == ClientResponse.USER_ABORT) {
                 if (response.getAppStatus() != updateReplicated.AbortStatus.NORMAL.ordinal()) {
+                    log.warn("Non-success in updateReplicatedCallback");
+                    log.warn(((ClientResponseImpl) response).toJSONString());
                     crash(response.getStatusString());
                 }
-            } else if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
+                return; // this might happen and it's ok
+            }
+
+            log.warn("Non-success in updateReplicatedCallback");
+            log.warn(((ClientResponseImpl) response).toJSONString());
+
+            if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
                 crash(response.getStatusString());
-            } else {
-                // Could be server connection lost
-                //System.err.println("updateReplicated failed: " + response.getStatusString());
             }
         }
     }
@@ -403,7 +380,13 @@ public class AsyncBenchmark {
     class doTxnCallback implements ProcedureCallback {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            c.incrementAndGet();
+            if (response.getStatus() == ClientResponse.SUCCESS) {
+                txnCount.incrementAndGet();
+                return; // pass
+            }
+
+            log.warn("Non-success in doTxnCallback");
+            log.warn(((ClientResponseImpl) response).toJSONString());
 
             if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
                 crash(response.getStatusString());
@@ -411,7 +394,14 @@ public class AsyncBenchmark {
         }
     }
 
-    private final AtomicLong c = new AtomicLong();
+    public void sleepUntilConnected(Client client, long benchmarkEndTime) {
+        // take a breather to avoid slamming the log (stay paused if no connections)
+        do {
+            try { Thread.sleep(1000); } catch (Exception e) {} // sleep for 1s
+        }
+        while ((client.getConnectedHostList().size() == 0) && (benchmarkEndTime > System.currentTimeMillis()));
+    }
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -419,9 +409,9 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Setup & Initialization");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info(" Setup & Initialization");
+        log.info(HORIZONTAL_RULE);
 
         // connect to one or more servers, loop until success
         connect();
@@ -431,24 +421,23 @@ public class AsyncBenchmark {
         boolean succeeded = false;
         // If server fails during initialization, try again
         while (!succeeded) {
+            Client initClient = clients.get(0);
+
             try {
                 // initialize using synchronous call
-                Client initClient = clients.get(0);
                 initClient.callProcedure("Initialize");
                 ClientResponse rowResp = initClient.callProcedure("getLastRow");
                 rowResults = rowResp.getResults();
                 assert (rowResp.getStatus() == ClientResponse.SUCCESS);
-                System.err.println("start");
-                Thread.sleep(3000);
-                System.err.println("end");
+
                 ClientResponse replicatedRowResp = initClient.callProcedure("getLastReplicatedRow");
                 replicatedResults = replicatedRowResp.getResults();
                 assert (replicatedRowResp.getStatus() == ClientResponse.SUCCESS);
                 succeeded = true;
-            } catch (ProcCallException e) {
-                System.err.println(e.getMessage());
-            } catch (NoConnectionsException e) {
-                System.err.println("Failed to initialize, will retry: " + e.getMessage());
+            }
+            catch (Exception e) {
+                log.error("Exception on init. Will sleep.", e);
+                sleepUntilConnected(initClient, System.currentTimeMillis() + config.duration * 1000);
             }
         }
 
@@ -469,15 +458,11 @@ public class AsyncBenchmark {
         }
         rids.put(-1, replicatedResults[0].asScalarLong() + 1);
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println("Starting Benchmark");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info("Starting Benchmark");
+        log.info(HORIZONTAL_RULE);
 
         java.util.Random r = new java.util.Random(2);
-
-        // reset the stats after warmup
-//        fullStatsContext.fetchAndResetBaseline();
-//        periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
@@ -485,7 +470,6 @@ public class AsyncBenchmark {
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
-        System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         while (benchmarkEndTime > System.currentTimeMillis()) {
             int cid;
@@ -500,32 +484,48 @@ public class AsyncBenchmark {
             // txns for the same cid go to the same client
             Client client = null;
             try {
-                if (clients.isEmpty()) {
-                    crash("No connection to any server");
-                }
-
                 if (cid == -1) {
                     client = clients.get(0);
+                    // skip this work if the client is not connected
+                    if (client.getConnectedHostList().size() == 0) {
+                        continue;
+                    }
+
                     // update the replicated table
-                    client.callProcedure(new updateReplicatedCallback(),
-                                         "updateReplicated",
-                                         rid);
-                } else {
-                    client = clients.get(cid % clients.size());
-                    // asynchronously call the "doTxn" procedure
-                    client.callProcedure(new doTxnCallback(),
-                                         "doTxn",
-                                         cid,
-                                         rid,
-                                         rid > windowPerCid ? rid - windowPerCid : 0,
-                                         processor.generateForStore().getStoreValue());
+                    try {
+                        client.callProcedure(new updateReplicatedCallback(),
+                                             "updateReplicated",
+                                             rid);
+                    }
+                    catch (NoConnectionsException e) {
+                        log.error("ClientThread got NoConnectionsException on updateReplicated proc call.");
+                    }
                 }
-            } catch (IndexOutOfBoundsException e) {
-                Thread.sleep(1000);
-                continue;
-            } catch (IOException e) {
-                Thread.sleep(1000);
-                continue;
+                else {
+                    client = clients.get(cid % clients.size());
+
+                    // skip this work if the client is not connected
+                    if (client.getConnectedHostList().size() == 0) {
+                        continue;
+                    }
+
+                    // asynchronously call the "doTxn" procedure
+                    try {
+                        client.callProcedure(new doTxnCallback(),
+                                             "doTxn",
+                                             cid,
+                                             rid,
+                                             rid > windowPerCid ? rid - windowPerCid : 0,
+                                             processor.generateForStore().getStoreValue());
+                    }
+                    catch (NoConnectionsException e) {
+                        log.error("ClientThread got NoConnectionsException on doTxn proc call.");
+                    }
+                }
+            }
+            catch (Exception e) {
+                log.error("Benchark had a unexpected exception", e);
+                System.exit(-1);
             }
 
             rids.put(cid, rid + 1);
@@ -542,10 +542,9 @@ public class AsyncBenchmark {
             client.drain();
             client.close();
         }
-        clients.clear();
 
-        // print the summary results
-        printResults();
+        log.info(HORIZONTAL_RULE);
+        log.info("Benchmark Complete");
     }
 
     /**
