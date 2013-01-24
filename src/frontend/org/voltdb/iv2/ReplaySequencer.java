@@ -55,6 +55,18 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  * ReplayEntry.m_firstFragment in the case of DR fragment tasks. The
  * ReplaySequencer MUST do all txnId comparisons on the value passed to offer
  * (which becomes a key in m_replayEntries tree map).
+ *
+ * Drainable: When poll() should make no more progress, we need to switch to drain().
+ * These conditions are only applicable to command log replay and not DR.
+ * - If we're blocked on a sentinel with no matching fragment and we've seen the MP EOL condition,
+ *   then we know that we're never going to be able to order anything later than that position in
+ *   the log, and we need to drain any outstanding invocations so we can respond IGNORING for them
+ *   to complete command log replay.
+ * - If we're blocked on a fragment with no matching sentinel and we've seen the SP EOL condition,
+ *   then we know that we're never going to be able to order anything later than that position in
+ *   the log.  This is currently defect ENG-4218.  We will need to do drain, plus we'll
+ *   probably want to respond to any outstanding FragmentTasks with an error response of some kind to abort
+ *   those transactions.
  */
 public class ReplaySequencer
 {
@@ -69,15 +81,11 @@ public class ReplaySequencer
 
         boolean isReady()
         {
-            if (m_mpiEOLReached) {
-                // no more MP fragments will arrive
-                return true;
-            } else if (m_eolReached) {
-                // End of log, no more sentinels, release first fragment
+            // ENG-4218 fix makes this condition go away
+            if (m_eolReached) {
                 return m_firstFragment != null;
-            } else {
-                return m_sentinalTxnId != null && m_firstFragment != null;
             }
+            return m_sentinalTxnId != null && m_firstFragment != null;
         }
 
         boolean hasSentinel()
@@ -106,6 +114,17 @@ public class ReplaySequencer
             }
         }
 
+        VoltMessage drain()
+        {
+            if(!m_servedFragment && m_firstFragment != null) {
+                m_servedFragment = true;
+                return m_firstFragment;
+            }
+            else {
+                return m_blockedMessages.poll();
+            }
+        }
+
         boolean isEmpty() {
             return isReady() && m_servedFragment && m_blockedMessages.isEmpty();
         }
@@ -124,34 +143,74 @@ public class ReplaySequencer
     // has reached end of log for the MPI, no more MP fragments will come,
     // release all txns.
     boolean m_mpiEOLReached = false;
-
-    public boolean isMPIEOLReached()
-    {
-        return m_mpiEOLReached;
-    }
+    // some combination of conditions has occurred which will result in no
+    // further sequence-able transactions.  All remaining invocations in the
+    // sequencer must be removed using drain()
+    boolean m_mustDrain = false;
 
     // Return the next correctly sequenced message or null if none exists.
     public VoltMessage poll()
     {
-        if (m_replayEntries.isEmpty()) {
+        if (m_mustDrain || m_replayEntries.isEmpty()) {
             return null;
         }
-        /*
-         * If the MPI has sent EOL message to this partition, leave the
-         * unfinished MP entry there so that future SPs will be offered to the
-         * backlog and they will not get executed.
-         */
-        if (!m_mpiEOLReached && m_replayEntries.firstEntry().getValue().isEmpty()) {
+        if (m_replayEntries.firstEntry().getValue().isEmpty()) {
             m_replayEntries.pollFirstEntry();
         }
-        if (m_replayEntries.isEmpty()) {
+        // All the drain conditions depend on being blocked, which
+        // we will only really know for sure when we try to poll().
+        checkDrainCondition();
+        if (m_mustDrain || m_replayEntries.isEmpty()) {
             return null;
         }
+
         VoltMessage m = m_replayEntries.firstEntry().getValue().poll();
         if (m instanceof FragmentTaskMessage) {
             m_lastPolledFragmentTxnId = m_replayEntries.firstEntry().getKey();
         }
         return m;
+    }
+
+    // Pull the next message that needs an IGNORING response.  Once this
+    // starts returning messages, poll() will always return null
+    public VoltMessage drain()
+    {
+        if (!m_mustDrain || m_replayEntries.isEmpty()) {
+            return null;
+        }
+        VoltMessage head = m_replayEntries.firstEntry().getValue().drain();
+        if (head == null) {
+            m_replayEntries.pollFirstEntry();
+            if (!m_replayEntries.isEmpty()) {
+                head = m_replayEntries.firstEntry().getValue().drain();
+            }
+        }
+        return head;
+    }
+
+    private void checkDrainCondition()
+    {
+        // Don't ever go backwards once the drain decision is made.
+        if (m_mustDrain) {
+            return;
+        }
+        // if we've got things to sequence, check to if we're blocked
+        if (!m_replayEntries.isEmpty()) {
+            ReplayEntry head = m_replayEntries.firstEntry().getValue();
+            if (!head.isReady()) {
+                // if we're blocked, see if we have a sentinel or a fragment.
+                // we know we have one or the other but not both.  Neither
+                // means we wouldn't exist, and both would make us ready.
+                // if it's the sentinel, see if the MPI's command log is done
+                if (head.hasSentinel() && m_mpiEOLReached) {
+                    m_mustDrain = true;
+                }
+                else if (!head.hasSentinel() && m_eolReached) {
+                    // We have a fragment and will never get the sentinel
+                    // ENG-4218 will fill this in at some point
+                }
+            }
+        }
     }
 
     // Offer a new message. Return false if the offered message can be run immediately.
@@ -180,6 +239,9 @@ public class ReplaySequencer
          * If the txn is not found, then there will be no matching sentinel to
          * come later, and there will be no SP txns after this MP, so release
          * the first fragment immediately.
+         *
+         * ENG-4218 will want to change this to queue an MP fragment which we
+         * can't sequence properly so that we can drain() it appropriately later
          */
         if (m_eolReached && found == null) {
             return false;
@@ -198,15 +260,7 @@ public class ReplaySequencer
                 return true;
             }
 
-            // Incoming sentinel.
-            // MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage)in;
-            if (m_mpiEOLReached) {
-                /*
-                 * MPI sent end of log. No more fragments or complete transaction
-                 * messages will arrive. Ignore all sentinels.
-                 */
-            }
-            else if (found == null) {
+            if (found == null) {
                 ReplayEntry newEntry = new ReplayEntry();
                 newEntry.m_sentinalTxnId = inTxnId;
                 m_replayEntries.put(inTxnId, newEntry);

@@ -248,19 +248,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      * Poll the replay sequencer and process the messages until it returns null
      */
     private void deliverReadyTxns() {
+        // First, pull all the sequenced messages, if any.
         VoltMessage m = m_replaySequencer.poll();
         while(m != null) {
             deliver2(m);
             m = m_replaySequencer.poll();
         }
-    }
-
-    /**
-     * Poll the replay sequencer and respond to all SPs with an IGNORED response
-     */
-    private void drainReplaySequencer()
-    {
-        VoltMessage m = m_replaySequencer.poll();
+        // Then, try to pull all the drainable messages, if any.
+        m = m_replaySequencer.drain();
         while (m != null) {
             if (m instanceof Iv2InitiateTaskMessage) {
                 // Send IGNORED response for all SPs
@@ -271,7 +266,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                                            ClientResponseImpl.IGNORED_TRANSACTION));
                 m_mailbox.send(response.getInitiatorHSId(), response);
             }
-            m = m_replaySequencer.poll();
+            m = m_replaySequencer.drain();
         }
     }
 
@@ -309,9 +304,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (sequenceForReplay) {
             if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage)message)) {
                 deliver2(message);
-            }
-            else if (m_replaySequencer.isMPIEOLReached()) {
-                drainReplaySequencer();
             }
             else {
                 deliverReadyTxns();
