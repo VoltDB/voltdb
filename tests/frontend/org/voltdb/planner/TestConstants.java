@@ -23,82 +23,48 @@
 
 package org.voltdb.planner;
 
-import java.util.List;
 
-import junit.framework.TestCase;
-
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
-import org.voltdb.plannodes.AbstractPlanNode;
-
-public class TestConstants extends TestCase {
-    private PlannerTestAideDeCamp aide;
-
-    private AbstractPlanNode compile(String sql, int paramCount) {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn =  aide.compile(sql, paramCount);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
-    }
+public class TestConstants extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestFunctions.class.getResource("testplans-const-ddl.sql"), "testconstants");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(true);
-        }
+        final boolean planForSinglePartitionFalse = false;
+        setupSchema(TestFunctions.class.getResource("testplans-const-ddl.sql"),
+                    "testconstants", planForSinglePartitionFalse);
+        forceReplication();
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     /**
      * Before fixing ENG-257, the SQL wouldn't  compile.
      */
     public void testSelectConstTable() {
-        compile("select INT1, 5, 'test' from T1 where T1_PK=1", 0);
-  }
+        compile("select INT1, 5, 'test' from T1 where T1_PK=1");
+    }
 
     /**
      * Testing select constant with aggregate function.
      */
-   public void testSelectConstAggrTable() {
-        compile("select max(INT1), 5, 'test' from T1", 0);
-  }
+    public void testSelectConstAggrTable() {
+        compile("select max(INT1), 5, 'test' from T1");
+    }
 
-   /**
-    * Testing select constant from view.
-    */
-  public void testSelectConstView() {
-       compile("select V1, 5, 'test' from V_T1", 0);
- }
+    /**
+     * Testing select constant from view.
+     */
+    public void testSelectConstView() {
+        compile("select V1, 5, 'test' from V_T1");
+    }
 
-  /**
-   * Testing select constant from join.
-   */
- public void testSelectConstJoin() {
-      compile("select a.CHAR1, 5, 'test' from T2 a, V_T1 b where a.T2_PK = b.V1 group by a.CHAR1 order by a.CHAR1", 0);
-}
+    /**
+     * Testing select constant from join.
+     */
+    public void testSelectConstJoin() {
+        compile("select a.CHAR1, 5, 'test' from T2 a, V_T1 b where a.T2_PK = b.V1 group by a.CHAR1 order by a.CHAR1");
+    }
 
 }

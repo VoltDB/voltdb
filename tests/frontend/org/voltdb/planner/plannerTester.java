@@ -33,7 +33,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,30 +54,27 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class plannerTester {
-    private static PlannerTestAideDeCamp aide;
-    private static String m_currentConfig;
-    private static String m_testName;
-    private static String m_pathRefPlan;
-    private static String m_baseName;
-    private static String m_pathDDL;
-    private static ArrayList<String> m_savePlanPaths = new ArrayList<String>();
-    private static String m_savePlanPath;
-    private static boolean m_isSavePathFromCML = false;
+    private static PlannerTestAideDeCamp m_aide;
+    private static String m_workPath = "/tmp/plannertester/";
+    private static String m_baselinePath;
+    private static String m_fixedBaselinePath = null;
+    private static String m_ddlFilePath;
     private static Map<String,String> m_partitionColumns = new HashMap<String, String>();
     private static ArrayList<String> m_stmts = new ArrayList<String>();
     private static int m_treeSizeDiff;
     private static boolean m_changedSQL;
 
-    private static boolean m_isCompileSave = false;
+    private static boolean m_isCompile = false;
+    private static boolean m_isSave = false;
     private static boolean m_isDiff = false;
-    private static boolean m_showExpainedPlan = false;
-    private static boolean m_showSQLStatement = false;
+    private static boolean m_reportExplainedPlan = false;
+    private static boolean m_reportSQLStatement = false;
     private static ArrayList<String> m_config = new ArrayList<String>();
 
     private static int m_numPass;
     private static int m_numFail;
     public static ArrayList<String> m_diffMessages = new ArrayList<String>();
-    private static String m_reportDir = "/tmp/";
+    private static String m_reportPath = "/tmp/";
     private static BufferedWriter m_reportWriter;
     private static ArrayList<String>  m_filters = new ArrayList<String> ();
 
@@ -118,35 +114,8 @@ public class plannerTester {
         }
     }
 
-    //TODO maybe a more robust parser? Need to figure out how to handle config file array if using the CLIConfig below
-//    private static class PlannerTesterConfig extends CLIConfig {
-//        @Option(shortOpt = "d", desc = "Do the diff")
-//        boolean isDiff = false;
-//        @Option(shortOpt = "cs", desc = "Compile queris and save according to the config file")
-//        boolean isCompileSave = false;
-//        @Option(shortOpt = "C", desc = "Specify the path to the config file")
-//        ArrayList<String> configFiles = new ArrayList<String> ();
-//
-//        @Override
-//        public void validate() {
-//            if (maxerrors < 0)
-//                exitWithMessageAndUsage("abortfailurecount must be >=0");
-//        }
-//
-//        @Override
-//        public void printUsage() {
-//            System.out
-//                .println("Usage: csvloader [args] tablename");
-//            System.out
-//                .println("       csvloader [args] -p procedurename");
-//            super.printUsage();
-//        }
-//    }
-
     public static void main( String[] args ) {
-        int size = args.length;
-        for( int i=0; i<size; i++ ) {
-            String str = args[i];
+        for(String str : args) {
             if( str.startsWith("-C=")) {
                 String subStr = str.split("=")[1];
                 String [] configs = subStr.split(",");
@@ -154,42 +123,52 @@ public class plannerTester {
                     m_config.add( config.trim() );
                 }
             }
-            if( str.startsWith("-sp=")) {
-                m_isSavePathFromCML = true;
-                String subStr = str.split("=")[1];
-                String [] savePaths = subStr.split(",");
-                for( String savePath : savePaths ) {
-                    savePath = savePath.trim();
-                    if( !savePath.endsWith("/") ){
-                        savePath += "/";
-                    }
-                    m_savePlanPaths.add( savePath );
+            else if( str.startsWith("-sp=")) {
+                m_workPath = str.split("=")[1];
+                m_workPath = m_workPath.trim();
+                if( ! m_workPath.endsWith("/") ) {
+                    m_workPath += "/";
                 }
             }
-            else if( str.startsWith("-cd") ) {
-                m_isCompileSave = true;
-                m_isDiff = true;
-                m_showExpainedPlan = true;
-                m_showSQLStatement = true;
-            }
-            else if( str.startsWith("-cs") ) {
-                m_isCompileSave = true;
-            }
-            else if( str.startsWith("-d") ) {
-                m_isDiff = true;
-            }
-            else if( str.startsWith("-r") ){
-                m_reportDir = str.split("=")[1];
-                m_reportDir = m_reportDir.trim();
-                if( !m_reportDir.endsWith("/") ) {
-                    m_reportDir += "/";
+            else if( str.startsWith("-b=")) {
+                m_fixedBaselinePath = str.split("=")[1];
+                m_fixedBaselinePath = m_fixedBaselinePath.trim();
+                if( !m_fixedBaselinePath.endsWith("/") ) {
+                    m_fixedBaselinePath += "/";
                 }
             }
-            else if( str.startsWith("-e") ){
-                m_showExpainedPlan = true;
+            else if( str.equals("-s") ) {
+                m_isCompile = true;
+                m_isSave = true;
             }
-            else if( str.startsWith("-s") ){
-                m_showSQLStatement = true;
+            else if( str.equals("-sv") ) {
+                m_isCompile = true;
+                m_isSave = true;
+                m_reportExplainedPlan = true;
+                m_reportSQLStatement = true;
+            }
+            else if( str.equals("-d") ) {
+                m_isCompile = true;
+                m_isDiff = true;
+            }
+            else if( str.equals("-dv") ) {
+                m_isCompile = true;
+                m_isDiff = true;
+                m_reportExplainedPlan = true;
+                m_reportSQLStatement = true;
+            }
+            else if( str.startsWith("-r=") ){
+                m_reportPath = str.split("=")[1];
+                m_reportPath = m_reportPath.trim();
+                if( !m_reportPath.endsWith("/") ) {
+                    m_reportPath += "/";
+                }
+            }
+            else if( str.equals("-re") ){
+                m_reportExplainedPlan = true;
+            }
+            else if( str.equals("-rs") ){
+                m_reportSQLStatement = true;
             }
             else if( str.startsWith("-i=") ) {
                 m_filters.add(str.split("=")[1] );
@@ -198,58 +177,54 @@ public class plannerTester {
                 printUsage();
                 System.exit(0);
             }
+            else {
+                System.out.println("Illegal command line argument: " + str);
+                printUsage();
+                System.exit(0);
+            }
         }
-        size = m_config.size();
-        if( m_isCompileSave ) {
-            Iterator<String> it = m_savePlanPaths.iterator();
+
+        if( !new File(m_workPath).exists() ) {
+            new File(m_workPath).mkdirs();
+        }
+
+        if( m_isCompile ) {
             for( String config : m_config ) {
                 try {
-                    setUp( config );
-                    if( m_isSavePathFromCML && it.hasNext() ) {
-                        m_savePlanPath = it.next();
-                    }
-                    batchCompileSave();
+                    configCompileSave(config, m_isSave);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }
         if( m_isDiff ) {
-            if( !new File(m_reportDir).exists() ) {
-                new File(m_reportDir).mkdirs();
+            if( !new File(m_reportPath).exists() ) {
+                new File(m_reportPath).mkdirs();
             }
             try {
-                m_reportWriter = new BufferedWriter(new FileWriter( m_reportDir+"plannerTester.report" ));
+                m_reportWriter = new BufferedWriter(new FileWriter( m_reportPath+"plannerTester.report" ));
             } catch (IOException e1) {
                 System.out.println(e1.getMessage());
                 System.exit(-1);
             }
-            Iterator<String> it = m_savePlanPaths.iterator();
             for( String config : m_config ) {
                 try {
-                    setUp( config );
-                    if( m_isSavePathFromCML && it.hasNext() ) {
-                        m_savePlanPath = it.next();
-                    }
-                    startDiff();
+                    configDiff(config);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
             int numTest = m_numPass + m_numFail;
-            System.out.println("Test: "+numTest);
-            System.out.println("Pass: "+m_numPass);
-            System.out.println("Fail: "+m_numFail);
+            String summary = "\nTest: "+numTest+"\nPass: "+m_numPass+"\nFail: "+m_numFail+"\n";
+            System.out.print(summary);
             try {
-                m_reportWriter.write( "\nTest: "+numTest+"\n"
-                        +"Pass: "+m_numPass+"\n"
-                        +"Fail: "+m_numFail+"\n");
+                m_reportWriter.write(summary);
                 m_reportWriter.flush();
                 m_reportWriter.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            System.out.println("Report file created at "+m_reportDir+"plannerTester.report");
+            System.out.println("Report file created at "+m_reportPath+"plannerTester.report");
         }
         if( m_numFail == 0 ) {
             System.exit(0);
@@ -259,100 +234,120 @@ public class plannerTester {
     }
 
     public static void printUsage() {
-        System.out.println("-C='configFile1, configFile2, ...'" +
-                        "\nSpecify the path to a config file.\n");
-        System.out.println("-sp='savePath1, savePath2, ...'" +
-                        "\nspecify save paths for newly generated plan files, should be in the same order of the config files.\n");
-        System.out.println("-r=reportFileDir " +
-                        "\nSpecify report file path, default will be tmp/, report file name is plannerTester.report.\n");
+        System.out.println("-C=configDir1[,configDir2,...]" +
+                        "\nSpecify the path to each config file.\n");
+        System.out.println("-sp=savePath" +
+                        "\nspecify path for newly generated plan files.\n");
+        System.out.println("-b=baselinePath" +
+                        "\nspecify path for ALL baseline reference plan files. Omit for separate <configDir>/baseline dirs\n");
+        System.out.println("-r=reportFilePath " +
+                        "\nSpecify report file path, default will be ./reports, report file name is plannerTester.report.\n");
         System.out.println("-i=ignorePattern" +
                         "\nSpecify a pattern to ignore, the pattern will not be recorded in the report file.\n");
-        System.out.println("-cd" +
-                        "\nSame as putting -cs -d -e -s.\n");
-        System.out.println("-cs" +
-                        "\nCompile queries and save the plans according to the config files.\n");
+        System.out.println("-s" +
+                        "\nSave compiled queries in the baseline path (<config>/baseline by default.\n");
         System.out.println("-d" +
                         "\nDo the diff between plan files in baseline and the current ones.\n");
-        System.out.println("-e" +
+        System.out.println("-re" +
                         "\nOutput explained plan along with diff.\n");
-        System.out.println("-s" +
+        System.out.println("-rs" +
                         "\nOutput sql statement along with diff.\n");
+        System.out.println("-dv" +
+                        "\nSame as -d -re -rs.\n");
+        System.out.println("-sv" +
+                        "\nSame as -s -re -rs.\n");
 
     }
 
-    public static void setUp( String pathConfigFile ) throws IOException {
-        m_currentConfig = pathConfigFile;
+    public static boolean setUp( String config ) throws IOException {
         m_partitionColumns.clear();
-        BufferedReader reader = new BufferedReader( new FileReader( pathConfigFile ) );
+        m_baselinePath = (m_fixedBaselinePath != null) ? m_fixedBaselinePath : (config + "/baseline/");
+        m_ddlFilePath = null;
+        m_stmts.clear();
+        BufferedReader reader = new BufferedReader( new FileReader(config + "/config") );
         String line = null;
         while( ( line = reader.readLine() ) != null ) {
             if( line.startsWith("#") ) {
                 continue;
             }
-            else if( line.equalsIgnoreCase("Name:") ) {
-                line = reader.readLine();
-                m_testName = line;
-            }
-            else if ( line.equalsIgnoreCase("Ref:") ) {
-                line = reader.readLine();
-                m_pathRefPlan = new File( line ).getCanonicalPath();
-                m_pathRefPlan += "/";
-            }
             else if( line.equalsIgnoreCase("DDL:")) {
-                line = reader.readLine();
-                m_pathDDL = new File( line ).getCanonicalPath();
-            }
-            else if( line.equalsIgnoreCase("Base Name:") ) {
-                line = reader.readLine();
-                m_baseName = line;
+                if ( ( line = reader.readLine() ) == null ) {
+                    break;
+                }
+                m_ddlFilePath = new File( line ).getCanonicalPath();
             }
             else if( line.equalsIgnoreCase("SQL:")) {
-                m_stmts.clear();
-                while( (line = reader.readLine()).length() > 6 ) {
+                boolean atEof = false;
+                while (true) {
+                    if ( ( line = reader.readLine() ) == null ) {
+                        atEof = true;
+                        break;
+                    }
                     if( line.startsWith("#") ) {
                         continue;
                     }
+                    if (line.length() <= 6 ) {
+                        break;
+                    }
                     m_stmts.add( line );
                 }
-            }
-            else if( line.equalsIgnoreCase("Save Path:") ) {
-                    line = reader.readLine();
-                    m_savePlanPath = ( new File( line ).getCanonicalPath() ) + "/";
+                if (atEof) {
+                    break;
+                }
             }
             else if( line.equalsIgnoreCase("Partition Columns:") ) {
-                line = reader.readLine();
-                int index = line.indexOf(".");
-                if( index == -1 ) {
-                    System.err.println("Config file syntax error : Partition Columns should be table.column");
+                if ( ( line = reader.readLine() ) == null ) {
+                    break;
                 }
-                m_partitionColumns.put( line.substring(0, index).toLowerCase(), line.substring(index+1).toLowerCase());
+                String [] cols = line.split(",");
+                for( String col : cols ) {
+                    int index = col.indexOf(".");
+                    if( index == -1 ) {
+                        System.err.println("Config file syntax error : Partition Columns should be in comma-separated table.column format.");
+                    }
+                    m_partitionColumns.put( col.substring(0, index).toLowerCase(), col.substring(index+1).toLowerCase());
+                }
+            }
+            else if ( ! line.trim().equals("")) {
+                System.err.println("Config file syntax error : ignoring line: " + line);
             }
         }
+        boolean success = true;
+        if (m_ddlFilePath == null ) {
+            System.err.println("ERROR: syntax error : config file '" + config + "/config' has no 'DDL:' section");
+            success = false;
+        }
+        if (m_stmts.isEmpty()) {
+            System.err.println("ERROR: syntax error : config file '" + config + "/config' has no 'SQL:' section or SQL statements");
+            success = false;
+        }
         try {
-            setUpSchema();
+            if (success) {
+                setUpSchema(config);
+            }
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
+        return success;
     }
 
-    public static void setUpForTest( String pathDDL, String baseName, String table, String column ) {
+    public static void setUpForTest( String pathDDL, String config, String table, String column ) {
         m_partitionColumns.clear();
         m_partitionColumns.put( table.toLowerCase(), column.toLowerCase());
-        m_pathDDL = pathDDL;
-        m_baseName = baseName;
+        m_ddlFilePath = pathDDL;
         try {
-            setUpSchema();
+            setUpSchema(config);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void setUpSchema() throws Exception {
-        File ddlFile = new File(m_pathDDL);
-        aide = new PlannerTestAideDeCamp(ddlFile.toURI().toURL(),
-                m_baseName);
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
+    public static void setUpSchema(String config) throws Exception {
+        File ddlFile = new File(m_ddlFilePath);
+        m_aide = new PlannerTestAideDeCamp(ddlFile.toURI().toURL(), config);
+        // Set specified tables to non-replicated.
+        Cluster cluster = m_aide.getCatalog().getClusters().get("cluster");
         CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
         for( String tableName : m_partitionColumns.keySet() ) {
             Table t = tmap.getIgnoreCase( tableName );
@@ -362,19 +357,11 @@ public class plannerTester {
         }
     }
 
-    public static void setTestName ( String name ) {
-        m_testName = name;
-    }
-
     protected void tearDown() throws Exception {
-        aide.tearDown();
     }
 
-    public static List<AbstractPlanNode> compile( String sql, int paramCount,
-            boolean singlePartition ) throws Exception {
-        List<AbstractPlanNode> pnList = null;
-        pnList =  aide.compile(sql, paramCount, singlePartition);
-        return pnList;
+    public static List<AbstractPlanNode> compile(String sql) throws Exception {
+        return m_aide.compile(sql, 0);
     }
 
     public static void writePlanToFile( AbstractPlanNode pn, String pathToDir, String fileName, String sql) {
@@ -417,7 +404,7 @@ public class plannerTester {
         try {
             jobj = new JSONObject( prettyJson );
             JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-            Database db = aide.getDatabase();
+            Database db = m_aide.getDatabase();
             pnt.loadFromJSONArray(jarray, db);
         } catch (JSONException e) {
             e.printStackTrace();
@@ -437,52 +424,69 @@ public class plannerTester {
         return joinNodeList;
     }
 
-    public static void batchCompileSave( ) throws Exception {
+    public static void configCompileSave(String config, boolean isSave) throws Exception {
+        if ( ! setUp( config )) {
+            return;
+        }
         int size = m_stmts.size();
         for( int i = 0; i < size; i++ ) {
-            List<AbstractPlanNode> pnList = compile( m_stmts.get(i), 0, false);
+            List<AbstractPlanNode> pnList = compile(m_stmts.get(i));
             AbstractPlanNode pn = pnList.get(0);
             if( pnList.size() == 2 ){//multi partition query plan
                 assert( pnList.get(1) instanceof SendPlanNode );
                 if( ! pn.reattachFragment( ( SendPlanNode) pnList.get(1) ) ) {
-                    System.err.println( "Receive plan node not found while reattachFragment." );
+                    System.err.println( "Receive plan node not found in reattachFragment." );
                 }
             }
-            writePlanToFile(pn, m_savePlanPath, m_testName+".plan"+i, m_stmts.get(i) );
+            writePlanToFile(pn, m_workPath, config+".plan"+i, m_stmts.get(i) );
+            if (isSave) {
+                writePlanToFile(pn, m_baselinePath, config+".plan"+i, m_stmts.get(i) );
+            }
         }
-        System.out.println("Plan files generated at: "+m_savePlanPath);
+        if (isSave) {
+            System.out.println("Baseline files generated at: " + m_baselinePath);
+        }
     }
 
     //parameters : path to baseline and the new plans
     //size : number of total files in the baseline directory
-    public static void batchDiff( ) throws IOException {
+    public static void configDiff(String config) throws IOException {
+        if ( ! setUp( config )) {
+            return;
+        }
+        m_reportWriter.write( "===================================================================Begin "+config+"\n" );
         PlanNodeTree pnt1 = null;
         PlanNodeTree pnt2 = null;
         int size = m_stmts.size();
         String baseStmt = null;
         for( int i = 0; i < size; i++ ){
+            //* Enable for debug:*/ System.out.println("DEBUG: comparing " + m_savePlanPath+config+".plan"+i + " and " + m_baselinePath+config+".plan"+i);
             ArrayList<String> getsql = new ArrayList<String>();
             try {
-                pnt1 = loadPlanFromFile( m_pathRefPlan+m_testName+".plan"+i, getsql );
+                pnt1 = loadPlanFromFile( m_baselinePath+config+".plan"+i, getsql );
                 baseStmt = getsql.get(0);
             } catch (FileNotFoundException e) {
-                System.err.println("Plan file "+m_pathRefPlan+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
+                String message = "ERROR: Plan file "+m_baselinePath+config+".plan"+i+" doesn't exist. Use -s (the Compile/Save option) or 'ant plannertestrefresh -Dconfig="+config + " ' to generate plans to the baseline directory.\n";
+                System.err.print(message);
+                m_reportWriter.write(message);
                 System.exit(1);
             }
 
             //if sql stmts not consistent
             if( !baseStmt.equalsIgnoreCase( m_stmts.get(i)) ) {
                 diffPair strPair = new diffPair( baseStmt, m_stmts.get(i) );
-                m_reportWriter.write("Statement "+i+" of "+m_testName+":\n SQL statement is not consistent with the one in baseline :"+"\n"+
+                m_reportWriter.write("Statement "+i+" of "+config+"/config:\n SQL statement is not consistent with the one in baseline :"+"\n"+
                         strPair.toString()+"\n");
                 m_numFail++;
                 continue;
             }
 
             try{
-                pnt2  = loadPlanFromFile( m_savePlanPath+m_testName+".plan"+i, getsql );
+                pnt2  = loadPlanFromFile( m_workPath+config+".plan"+i, getsql );
             } catch (FileNotFoundException e) {
-                System.err.println("Plan file "+m_savePlanPath+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
+                String message = "ERROR: Temporary plan file "+m_workPath+config+".plan"+i+" was not generated.\n";
+                System.err.print(message);
+                m_reportWriter.write(message);
                 System.exit(1);
             }
             AbstractPlanNode pn1 = pnt1.getRootPlanNode();
@@ -493,7 +497,7 @@ public class plannerTester {
                 m_numPass++;
             } else {
                 m_numFail++;
-                m_reportWriter.write( "Statement "+i+" of "+m_testName+": \n" );
+                m_reportWriter.write( "Statement "+i+" of "+config+": \n" );
                 //TODO add more logic to determine which plan is better
                 if( !m_changedSQL ){
                     if( m_treeSizeDiff < 0 ){
@@ -515,28 +519,22 @@ public class plannerTester {
                     if( !isIgnore )
                         m_reportWriter.write( msg+"\n\n" );
                 }
-                if( m_showSQLStatement ) {
+                if( m_reportSQLStatement ) {
                     m_reportWriter.write( "SQL statement:\n"+baseStmt+"\n==>\n"+m_stmts.get(i)+"\n");
                 }
 
-                if( m_showExpainedPlan ) {
+                if( m_reportExplainedPlan ) {
                     m_reportWriter.write("\nExplained plan:\n"+pn1.toExplainPlanString()+"\n==>\n"+pn2.toExplainPlanString()+"\n");
                 }
 
-                m_reportWriter.write("Path to the config file :"+m_currentConfig+"\n"
-                        +"Path to the baseline file :"+m_pathRefPlan+m_testName+".plan"+i+"\n"
-                        +"Path to the current plan file :"+m_savePlanPath+m_testName+".plan"+i+
-                        "\n\n----------------------------------------------------------------------\n");
+                m_reportWriter.write("Path to the config file :"+config+"\n" +
+                                     "Path to the baseline file :"+m_baselinePath+config+".plan"+i+"\n" +
+                                     "Path to the current plan file :"+m_workPath+config+".plan"+i +
+                                     "\n\n----------------------------------------------------------------------\n");
             }
         }
-        m_reportWriter.flush();
-    }
-
-    public static void startDiff( ) throws IOException {
-        m_reportWriter.write( "===================================================================Begin test "+m_testName+"\n" );
-        batchDiff( );
-        m_reportWriter.write( "==================================================================="+
-                "End of "+m_testName+"\n");
+        m_reportWriter.write("===================================================================" +
+                            "End "+config+"\n");
         m_reportWriter.flush();
     }
 
