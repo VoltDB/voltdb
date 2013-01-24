@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,19 +25,19 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
-
-import org.voltdb.MemoryStats;
-import org.voltdb.NodeDRGateway;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.MemoryStats;
+import org.voltdb.NodeDRGateway;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.export.ExportManager;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -70,11 +70,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     };
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
-            SnapshotCompletionMonitor snapMonitor)
+            SnapshotCompletionMonitor snapMonitor, boolean forRejoin)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
-                "SP", agent);
+                "SP", agent, forRejoin);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }
@@ -84,11 +84,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
+                          VoltDB.START_ACTION startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway nodeDRGateway)
+                          NodeDRGateway nodeDRGateway,
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -98,8 +99,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable(),
-                agent, memStats, cl);
+                startAction,
+                agent, memStats, cl, coreBindIds);
 
         m_tickProducer.start();
 
@@ -119,6 +120,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void acceptPromotion()
     {
         try {
+
             long startTime = System.currentTimeMillis();
             Boolean success = false;
             m_term = createTerm(m_messenger.getZK(),
@@ -130,6 +132,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 repair = createPromoteAlgo(m_term.getInterestingHSIds(),
                         m_initiatorMailbox, m_whoami);
 
+                // if rejoining, a promotion can not be accepted. If the rejoin is
+                // in-progress, the loss of the master will terminate the rejoin
+                // anyway. If the rejoin has transferred data but not left the rejoining
+                // state, it will respond REJOINING to new work which will break
+                // the MPI and/or be unexpected to external clients.
+                if (!m_initiatorMailbox.acceptPromotion()) {
+                    tmLog.error(m_whoami
+                            + "rejoining site can not be promoted to leader. Terminating.");
+                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
+                    return;
+                }
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
                 Pair<Boolean, Long> result = repair.start().get();
@@ -137,8 +150,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 if (success) {
                     m_initiatorMailbox.setLeaderState(result.getSecond());
                     tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                             + "finished leader promotion. Took "
+                             + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
@@ -158,6 +171,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
             }
             super.acceptPromotion();
+            // Tag along and become the export master too
+            ExportManager.instance().acceptMastership(m_partitionId);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
@@ -189,5 +204,15 @@ public class SpInitiator extends BaseInitiator implements Promotable
     @Override
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
+    }
+
+    @Override
+    public void shutdown() {
+        try {
+            m_leaderCache.shutdown();
+        } catch (InterruptedException e) {
+            tmLog.info("Interrupted during shutdown", e);
+        }
+        super.shutdown();
     }
 }

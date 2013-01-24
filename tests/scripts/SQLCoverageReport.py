@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2013 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -26,9 +26,10 @@ import sys
 import cgi
 import os
 import cPickle
+import decimal
 from distutils.util import strtobool
 from optparse import OptionParser
-from voltdbclient import VoltColumn, VoltTable
+from voltdbclient import VoltColumn, VoltTable, FastSerializer
 
 __quiet = True
 
@@ -175,32 +176,48 @@ def is_different(x, cntonly):
     if x["jni"]["Status"] != x["hsqldb"]["Status"]:
         if int(x["jni"]["Status"]) > 0 or int(x["hsqldb"]["Status"]) > 0:
             x["highlight"] = ["Status"]
+            # print "DEBUG is_different -- just different errors (0 or less)"
             return True
 
     if "Result" in x["jni"] and "Result" in x["hsqldb"]:
         x["highlight"] = []
-        if (x["jni"]["Result"] == None or x["hsqldb"]["Result"] == None
-            or len(x["jni"]["Result"]) != len(x["hsqldb"]["Result"])):
+        jniResult = x["jni"]["Result"]
+        hsqldbResult = x["hsqldb"]["Result"]
+        if jniResult == None or hsqldbResult == None:
+            # print "DEBUG is_different -- got a Result of None"
             return True
-        for i in xrange(len(x["jni"]["Result"])):
+        if len(jniResult) != len(hsqldbResult):
+            # print "DEBUG is_different -- got different result lengths"
+            return True
+        for i in xrange(len(jniResult)):
             x["highlight"].append([])
             # Disable column type checking for now because Volt and HSQL don't
             # promote int types in the same way.
-            # if x["jni"]["Result"][i].columns != x["hsqldb"]["Result"][i].columns:
+            # if jniResult[i].columns != hsqldbResult[i].columns:
             #     x["highlight"][i].append(2) # Column names and types
-            if len(x["jni"]["Result"][i].tuples) != \
-                    len(x["hsqldb"]["Result"][i].tuples):
+            if len(jniResult[i].tuples) != len(hsqldbResult[i].tuples):
                 x["highlight"][i].append(1) # Tuple count
+                # print "DEBUG is_different -- got different numbers of tuples?"
                 return True
-            for j in xrange(len(x["jni"]["Result"][i].tuples)):
-                if x["jni"]["Result"][i].tuples[j] != \
-                        x["hsqldb"]["Result"][i].tuples[j]:
-                    x["highlight"][i].append(j + 4) # Offset to the correct row
+            if cntonly != True:
+                # print "DEBUG is_different -- count only got FALSE return"
+                return False # The results are close enough to pass a count-only check
+                for j in xrange(len(jniResult[i].tuples)):
+                    # print "DEBUG is_different -- comparing highlight? ", i, j, jniResult[i].tuples[j], hsqldbResult[i].tuples[j]
+                    if jniResult[i].tuples[j] != hsqldbResult[i].tuples[j]:
+                        # Work around any false value differences caused by default type differences.
+                        # These differences are "properly" ignored by the Decimal/float != implementation post-python 2.6.
+                        if (jniResult[i].columns[j].type == FastSerializer.VOLTTYPE_FLOAT and
+                            hsqldbResult[i].columns[j].type == FastSerializer.VOLTTYPE_DECIMAL and
+                            decimal.Decimal(str(jniResult[i].tuples[j])) == hsqldbResult[i].tuples[j]):
+                            continue
+                        # print "DEBUG is_different -- appending highlight? ", i, j
+                        x["highlight"][i].append(j + 4) # Offset the mismatched row to skip the hard-coded values used above.
         if cntonly != True:
             for i in x["highlight"]:
-                if i:
-                    return True
-
+                # print "DEBUG is_different -- different highlight: ", i
+                return True
+    # print "DEBUG is_different -- got FALSE return"
     return False
 
 def usage(prog_name):
@@ -228,6 +245,7 @@ def generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
     while True:
         try:
             statement = cPickle.load(statements_file)
+            # print "DEBUG loaded statement ", statement
         except EOFError:
             break
 
@@ -258,7 +276,7 @@ def generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
     jni_file.close()
 
     topLine = getTopSummaryLine()
-    keyStats = createSummaryInHTML(count, failures, mismatches, seed)
+    keyStats = createSummaryInHTML(count, failures, len(mismatches), seed)
     report = """
 <html>
 <head>
@@ -312,22 +330,21 @@ def getTopSummaryLine():
 """
     return topLine
 
-def createSummaryInHTML(count, failures, mismatches, seed):
-    passed = count - (failures + len(mismatches))
-    passed_ps = fail_ps = mis_ps = cell4misPct = cell4misCnt = color = None
+def createSummaryInHTML(count, failures, misses, seed):
+    passed = count - (failures + misses)
+    passed_ps = fail_ps = cell4misPct = cell4misCnt = color = None
     if(failures == 0):
         fail_ps = "0.00%"
     else:
         fail_ps = str("{0:.2f}".format((failures/float(count)) * 100)) + "%"
-    if(len(mismatches) == 0):
-        mis_ps = "0.00%"
-        cell4misPct = "<td align=right>" + mis_ps + "</td>"
-        cell4misCnt = "<td align=right>" + str(len(mismatches)) + "</td>"
+    if(misses == 0):
+        cell4misPct = "<td align=right>0.00%</td>"
+        cell4misCnt = "<td align=right>0</td>"
     else:
         color = "#FF0000" # red
-        mis_ps = str("{0:.2f}".format((len(mismatches)/float(count)) * 100)) + "%"
-        cell4misPct = "<td align=right bgcolor=" + color + ">" + mis_ps + "</td>"
-        cell4misCnt = "<td align=right bgcolor=" + color + ">" + str(len(mismatches)) + "</td>"
+        mis_ps = "{0:.2f}".format((misses/float(count)) * 100)
+        cell4misPct = "<td align=right bgcolor=" + color + ">" + mis_ps + "%</td>"
+        cell4misCnt = "<td align=right bgcolor=" + color + ">" + str(misses) + "</td>"
     misRow = cell4misCnt + cell4misPct
 
     if(passed == count):

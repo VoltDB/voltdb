@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -20,26 +20,29 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -65,19 +68,43 @@ public class SnapshotSiteProcessor {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /** Global count of execution sites on this node performing snapshot */
-    public static final AtomicInteger ExecutionSitesCurrentlySnapshotting =
-        new AtomicInteger(-1);
-
+    public static final Set<Object> ExecutionSitesCurrentlySnapshotting =
+            Collections.synchronizedSet(new HashSet<Object>());
     /**
      * Ensure only one thread running the setup fragment does the creation
      * of the targets and the distribution of the work.
      */
     public static final Object m_snapshotCreateLock = new Object();
-    public static Semaphore m_snapshotCreateSetupPermit = null;
+    public static CyclicBarrier m_snapshotCreateSetupBarrier = null;
+    public static CyclicBarrier m_snapshotCreateFinishBarrier = null;
+    public static final Runnable m_snapshotCreateSetupBarrierAction = new Runnable() {
+        @Override
+        public void run() {
+            Runnable r = SnapshotSiteProcessor.m_snapshotCreateSetupBarrierActualAction.getAndSet(null);
+            if (r != null) {
+                r.run();
+            }
+        }
+    };
+    public static AtomicReference<Runnable> m_snapshotCreateSetupBarrierActualAction =
+            new AtomicReference<Runnable>();
+
+    public static void readySnapshotSetupBarriers(int numSites) {
+        synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
+            if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numSites);
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
+                        new CyclicBarrier(numSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
+            } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();
+            }
+        }
+    }
 
     //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
-    public static ArrayList<Long> m_partitionLastSeenTransactionIds =
-            new ArrayList<Long>();
+    public static Map<Integer, Long> m_partitionLastSeenTransactionIds =
+            new HashMap<Integer, Long>();
 
     /**
      * Only proceed once permits are available after setup completes
@@ -94,8 +121,17 @@ public class SnapshotSiteProcessor {
      * Sequence numbers for export tables. This is repopulated before each snapshot by each execution site
      * that reaches the snapshot.
      */
-    private static final Map<String, List<Pair<Integer, Long>>> m_exportSequenceNumbers =
-        new HashMap<String, List<Pair<Integer, Long>>>();
+    private static final Map<String, Map<Integer, Pair<Long, Long>>> m_exportSequenceNumbers =
+        new HashMap<String, Map<Integer, Pair<Long, Long>>>();
+
+    /**
+     * This field is the same values as m_exportSequenceNumbers once they have been extracted
+     * in SnapshotSaveAPI.createSetup and then passed back in to SSS.initiateSnapshots. The only
+     * odd thing is that setting up a snapshot can fail in which case values will have been populated into
+     * m_exportSequenceNumbers and kept until the next snapshot is started in which case they are repopulated.
+     * Decoupling them seems like a good idea in case snapshot code is every re-organized.
+     */
+    private Map<String, Map<Integer, Pair<Long,Long>>> m_exportSequenceNumbersToLogOnCompletion;
 
     /*
      * Do some random tasks that are deferred to the snapshot termination thread.
@@ -184,24 +220,25 @@ public class SnapshotSiteProcessor {
             if (!CatalogUtil.isTableExportOnly(database, t))
                 continue;
 
-            List<Pair<Integer, Long>> sequenceNumbers = m_exportSequenceNumbers.get(t.getTypeName());
+            Map<Integer, Pair<Long,Long>> sequenceNumbers = m_exportSequenceNumbers.get(t.getTypeName());
             if (sequenceNumbers == null) {
-                sequenceNumbers = new ArrayList<Pair<Integer,Long>>();
+                sequenceNumbers = new HashMap<Integer, Pair<Long, Long>>();
                 m_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
             long[] ackOffSetAndSequenceNumber =
                 context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
-            sequenceNumbers.add(
-                    Pair.of(
+            sequenceNumbers.put(
                             context.getPartitionId(),
-                            ackOffSetAndSequenceNumber[1]));
+                            Pair.of(
+                                ackOffSetAndSequenceNumber[0],
+                                ackOffSetAndSequenceNumber[1]));
         }
     }
 
-    public static Map<String, List<Pair<Integer, Long>>> getExportSequenceNumbers() {
-        HashMap<String, List<Pair<Integer,Long>>> sequenceNumbers =
-            new HashMap<String, List<Pair<Integer, Long>>>(m_exportSequenceNumbers);
+    public static Map<String, Map<Integer, Pair<Long, Long>>> getExportSequenceNumbers() {
+        HashMap<String, Map<Integer, Pair<Long, Long>>> sequenceNumbers =
+            new HashMap<String, Map<Integer, Pair<Long, Long>>>(m_exportSequenceNumbers);
         m_exportSequenceNumbers.clear();
         return sequenceNumbers;
     }
@@ -232,13 +269,19 @@ public class SnapshotSiteProcessor {
         m_idlePredicate = idlePredicate;
     }
 
-    public void shutdown() {
+    public void shutdown() throws InterruptedException {
         for (BBContainer c : m_snapshotBufferOrigins ) {
             c.discard();
         }
         m_snapshotBufferOrigins.clear();
         m_availableSnapshotBuffers.clear();
-        m_snapshotCreateSetupPermit = null;
+        m_snapshotCreateSetupBarrier = null;
+        m_snapshotCreateFinishBarrier = null;
+        if (m_snapshotTargetTerminators != null) {
+            for (Thread t : m_snapshotTargetTerminators) {
+                t.join();
+            }
+        }
     }
 
     void initializeBufferPool() {
@@ -299,7 +342,7 @@ public class SnapshotSiteProcessor {
                                     (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
                         } else {
                             //Schedule it to happen after the quiet period has elapsed
-                            VoltDB.instance().scheduleWork(
+                            VoltDB.instance().schedulePriorityWork(
                                     m_onPotentialSnapshotWork,
                                     quietUntil - now,
                                     0,
@@ -323,7 +366,13 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    public void initiateSnapshots(ExecutionEngine ee, Deque<SnapshotTableTask> tasks, long txnId, int numHosts) {
+    public void initiateSnapshots(
+            ExecutionEngine ee,
+            Deque<SnapshotTableTask> tasks,
+            long txnId,
+            int numHosts,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+        ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
         m_lastSnapshotSucceded = true;
@@ -332,17 +381,24 @@ public class SnapshotSiteProcessor {
         m_snapshotTableTasks = new ArrayDeque<SnapshotTableTask>(tasks);
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
+        m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
         for (final SnapshotTableTask task : tasks) {
             if ((!task.m_isReplicated) || (!task.m_target.getFormat().isTableBased())) {
                 assert(task != null);
                 assert(m_snapshotTargets != null);
                 m_snapshotTargets.add(task.m_target);
             }
-            if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
-                hostLog.error("Attempted to activate copy on write mode for table "
-                        + task.m_name + " and failed");
-                hostLog.error(task);
-                VoltDB.crashLocalVoltDB("No additional info", false, null);
+            /*
+             * Why do the extra work for a /dev/null target
+             * Check if it is dev null and don't activate COW
+             */
+            if (!task.m_isDevNull) {
+                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
+                    hostLog.error("Attempted to activate copy on write mode for table "
+                            + task.m_name + " and failed");
+                    hostLog.error(task);
+                    VoltDB.crashLocalVoltDB("No additional info", false, null);
+                }
             }
         }
         /*
@@ -352,7 +408,7 @@ public class SnapshotSiteProcessor {
          */
         if (m_isIV2Enabled) {
             for (int ii = 0; ii < m_availableSnapshotBuffers.size(); ii++) {
-                VoltDB.instance().scheduleWork(
+                VoltDB.instance().schedulePriorityWork(
                         m_onPotentialSnapshotWork,
                         (m_quietUntil + (5 * m_snapshotPriority) - now),
                         0,
@@ -390,17 +446,25 @@ public class SnapshotSiteProcessor {
             final SnapshotTableTask currentTask = m_snapshotTableTasks.peek();
             assert(currentTask != null);
             final int headerSize = currentTask.m_target.getHeaderSize();
+            int serialized = 0;
             final BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
             assert(snapshotBuffer != null);
             snapshotBuffer.b.clear();
             snapshotBuffer.b.position(headerSize);
-            final int serialized =
-                ee.tableStreamSerializeMore(
-                    snapshotBuffer,
-                    currentTask.m_tableId,
-                    TableStreamType.SNAPSHOT);
-            if (serialized < 0) {
-                VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
+
+            /*
+             * For a dev null target don't do the work. The table wasn't
+             * put in COW mode anyway so this will fail
+             */
+            if (!currentTask.m_isDevNull) {
+                serialized =
+                    ee.tableStreamSerializeMore(
+                        snapshotBuffer,
+                        currentTask.m_tableId,
+                        TableStreamType.SNAPSHOT);
+                if (serialized < 0) {
+                    VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
+                }
             }
 
             /**
@@ -439,7 +503,7 @@ public class SnapshotSiteProcessor {
             /**
              * The block from the EE will contain raw tuple data with no length prefix etc.
              */
-            snapshotBuffer.b.limit(headerSize + serialized);
+            snapshotBuffer.b.limit(serialized + headerSize);
             snapshotBuffer.b.position(0);
             Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
             for (SnapshotDataFilter filter : currentTask.m_filters) {
@@ -475,16 +539,29 @@ public class SnapshotSiteProcessor {
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
             m_snapshotTargets = null;
             m_snapshotTableTasks = null;
-            final int result = ExecutionSitesCurrentlySnapshotting.decrementAndGet();
+            boolean IamLast = false;
+            synchronized (ExecutionSitesCurrentlySnapshotting) {
+                if (!ExecutionSitesCurrentlySnapshotting.contains(this)) {
+                    VoltDB.crashLocalVoltDB(
+                            "Currently snapshotting site didn't find itself in set of snapshotting sites", true, null);
+                }
+                IamLast = ExecutionSitesCurrentlySnapshotting.size() == 1;
+                if (!IamLast) {
+                    ExecutionSitesCurrentlySnapshotting.remove(this);
+                }
+            }
 
             /**
              * If this is the last one then this EE must close all the SnapshotDataTargets.
              * Done in a separate thread so the EE can go and do other work. It will
              * sync every file descriptor and that may block for a while.
              */
-            if (result == 0) {
+            if (IamLast) {
                 final long txnId = m_lastSnapshotTxnId;
                 final int numHosts = m_lastSnapshotNumHosts;
+                final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
+                        m_exportSequenceNumbersToLogOnCompletion;
+                m_exportSequenceNumbersToLogOnCompletion = null;
                 final Thread terminatorThread =
                     new Thread("Snapshot terminator") {
                     @Override
@@ -526,14 +603,20 @@ public class SnapshotSiteProcessor {
                             }
                         } finally {
                             try {
-                                logSnapshotCompleteToZK(txnId, numHosts, m_lastSnapshotSucceded);
+                                logSnapshotCompleteToZK(
+                                        txnId,
+                                        numHosts,
+                                        m_lastSnapshotSucceded,
+                                        exportSequenceNumbers);
                             } finally {
                                 /**
-                                 * Set it to -1 indicating the system is ready to perform another snapshot.
-                                 * Changed to wait until all the previous snapshot work has finished so
-                                 * that snapshot initiation doesn't wait on the file system
+                                 * Remove this last site from the set here after the terminator has run
+                                 * so that new snapshots won't start until
+                                 * everything is on disk for the previous snapshot. This prevents a really long
+                                 * snapshot initiation procedure from occurring because it has to contend for
+                                 * filesystem resources
                                  */
-                                ExecutionSitesCurrentlySnapshotting.decrementAndGet();
+                                ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
                         }
                     }
@@ -547,7 +630,11 @@ public class SnapshotSiteProcessor {
     }
 
 
-    private static void logSnapshotCompleteToZK(long txnId, int numHosts, boolean snapshotSuccess) {
+    private static void logSnapshotCompleteToZK(
+            long txnId,
+            int numHosts,
+            boolean snapshotSuccess,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
@@ -569,13 +656,13 @@ public class SnapshotSiteProcessor {
                 if (jsonObj.getLong("txnId") != txnId) {
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
-                int numHostsFinished = jsonObj.getInt("finishedHosts") + 1;
-                jsonObj.put("finishedHosts", numHostsFinished);
+                int remainingHosts = jsonObj.getInt("hostCount") - 1;
+                jsonObj.put("hostCount", remainingHosts);
                 if (!snapshotSuccess) {
                     hostLog.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
                 }
-
+                mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
                 zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
                 continue;
@@ -612,6 +699,65 @@ public class SnapshotSiteProcessor {
             hostLog.warn("Expect the snapshot node to already exist during deletion", e);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+    }
+
+    /*
+     * When recording snapshot completion we also record export sequence numbers
+     * as JSON. Need to merge our sequence numbers with existing numbers
+     * since multiple replicas will submit the sequence number
+     */
+    private static void mergeExportSequenceNumbers(JSONObject jsonObj,
+            Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) throws JSONException {
+        JSONObject tableSequenceMap;
+        if (jsonObj.has("exportSequenceNumbers")) {
+            tableSequenceMap = jsonObj.getJSONObject("exportSequenceNumbers");
+        } else {
+            tableSequenceMap = new JSONObject();
+            jsonObj.put("exportSequenceNumbers", tableSequenceMap);
+        }
+
+        for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> tableEntry : exportSequenceNumbers.entrySet()) {
+            JSONObject sequenceNumbers;
+            final String tableName = tableEntry.getKey();
+            if (tableSequenceMap.has(tableName)) {
+                sequenceNumbers = tableSequenceMap.getJSONObject(tableName);
+            } else {
+                sequenceNumbers = new JSONObject();
+                tableSequenceMap.put(tableName, sequenceNumbers);
+            }
+
+            for (Map.Entry<Integer, Pair<Long, Long>> partitionEntry : tableEntry.getValue().entrySet()) {
+                final Integer partitionId = partitionEntry.getKey();
+                final String partitionIdString = partitionId.toString();
+                final Long ackOffset = partitionEntry.getValue().getFirst();
+                final Long partitionSequenceNumber = partitionEntry.getValue().getSecond();
+
+                /*
+                 * Check that the sequence number is the same everywhere and log if it isn't.
+                 * Not going to crash because we are worried about poison pill transactions.
+                 */
+                if (sequenceNumbers.has(partitionIdString)) {
+                    JSONObject existingEntry = sequenceNumbers.getJSONObject(partitionIdString);
+                    Long existingSequenceNumber = existingEntry.getLong("sequenceNumber");
+                    if (!existingSequenceNumber.equals(partitionSequenceNumber)) {
+                        hostLog.error("Found a mismatch in export sequence numbers while recording snapshot metadata " +
+                                " for partition " + partitionId +
+                                " the sequence number should be the same at all replicas, but one had " +
+                                existingSequenceNumber
+                                + " and another had " + partitionSequenceNumber);
+                    }
+                    existingEntry.put(partitionIdString, Math.max(existingSequenceNumber, partitionSequenceNumber));
+
+                    Long existingAckOffset = existingEntry.getLong("ackOffset");
+                    existingEntry.put("ackOffset", Math.max(ackOffset, existingAckOffset));
+                } else {
+                    JSONObject newObj = new JSONObject();
+                    newObj.put("sequenceNumber", partitionSequenceNumber);
+                    newObj.put("ackOffset", ackOffset);
+                    sequenceNumbers.put(partitionIdString, newObj);
+                }
+            }
         }
     }
 

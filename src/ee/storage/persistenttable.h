@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -73,7 +73,6 @@ class TupleSerializer;
 class SerializeInput;
 class Topend;
 class ReferenceSerializeOutput;
-class ExecutorContext;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class PersistentTableUndoDeleteAction;
@@ -254,7 +253,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         m_nonInlinedMemorySize -= bytes;
     }
 
-protected:
+  private:
 
     size_t allocatedBlockCount() const {
         return m_data.size();
@@ -291,7 +290,7 @@ protected:
 
     bool checkNulls(TableTuple &tuple) const;
 
-    PersistentTable(ExecutorContext *ctx, bool exportEnabled);
+    PersistentTable(int partitionColumn);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
@@ -314,16 +313,11 @@ protected:
 
     TBPtr allocateNextBlock();
 
-    // pointer to current transaction id and other "global" state.
-    // abstract this out of VoltDBEngine to avoid creating dependendencies
-    // between the engine and the storage layers - which complicate test.
-    ExecutorContext *m_executorContext;
-
     // CONSTRAINTS
-    bool* m_allowNulls;
+    std::vector<bool> m_allowNulls;
 
     // partition key
-    int m_partitionColumn;
+    const int m_partitionColumn;
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,6 +41,7 @@ import junit.framework.TestCase;
 import org.junit.Test;
 import org.mockito.InOrder;
 import org.voltcore.utils.Pair;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -109,6 +110,7 @@ public class TestMpPromoteAlgo extends TestCase
             long sourceHSId, int sequence, int ofTotal, long handle)
     {
         FragmentTaskMessage frag = mock(FragmentTaskMessage.class);
+        when(frag.getInitiateTask()).thenReturn(mock(Iv2InitiateTaskMessage.class));
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId, sequence,
             ofTotal, handle, handle, frag);
         m.m_sourceHSId = sourceHSId;

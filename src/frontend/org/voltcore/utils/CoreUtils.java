@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltcore.utils;
@@ -36,6 +36,8 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -45,9 +47,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import jsr166y.LinkedTransferQueue;
+
 import org.voltcore.logging.VoltLogger;
 
-import jsr166y.LinkedTransferQueue;
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -57,11 +61,31 @@ import com.google.common.util.concurrent.MoreExecutors;
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    public static final int SMALL_STACK_SIZE = 1024 * 128;
+
+    /**
+     * Get a single thread executor that caches it's thread meaning that the thread will terminate
+     * after keepAlive milliseconds. A new thread will be created the next time a task arrives and that will be kept
+     * around for keepAlive milliseconds. On creation no thread is allocated, the first task creates a thread.
+     *
+     * Uses LinkedTransferQueue to accept tasks and has a small stack.
+     */
+    public static ListeningExecutorService getCachedSingleThreadExecutor(String name, long keepAlive) {
+        return MoreExecutors.listeningDecorator(new ThreadPoolExecutor(
+                0,
+                1,
+                keepAlive,
+                TimeUnit.MILLISECONDS,
+                new LinkedTransferQueue<Runnable>(),
+                CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null)));
+    }
+
     /**
      * Create an unbounded single threaded executor
      */
     public static ListeningExecutorService getSingleThreadExecutor(String name) {
-        ExecutorService ste = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(name));
+        ExecutorService ste =
+                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -81,13 +105,33 @@ public class CoreUtils {
      * futures.
      */
     public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize, int stackSize) {
-        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
+        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(null, name, stackSize, poolSize > 1, null));
         ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
         return ses;
     }
 
-    public static ListeningExecutorService getListeningExecutorService(final String name, final int threads) {
+    public static ListeningExecutorService getListeningExecutorService(
+            final String name,
+            final int threads) {
+        return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>(), null);
+    }
+    public static ListeningExecutorService getListeningExecutorService(
+            final String name,
+            final int threads,
+            Queue<String> coreList) {
+        return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>(), coreList);
+    }
+
+    public static ListeningExecutorService getListeningExecutorService(
+            final String name,
+            int threadsTemp,
+            final BlockingQueue<Runnable> queue,
+            final Queue<String> coreList) {
+        if (coreList != null && !coreList.isEmpty()) {
+            threadsTemp = coreList.size();
+        }
+        final int threads = threadsTemp;
         if (threads < 1) {
             throw new IllegalArgumentException("Must specify > 0 threads");
         }
@@ -97,29 +141,20 @@ public class CoreUtils {
         return MoreExecutors.listeningDecorator(
                 new ThreadPoolExecutor(threads, threads,
                         0L, TimeUnit.MILLISECONDS,
-                        new LinkedTransferQueue<Runnable>(),
-                        new ThreadFactory() {
-                            private int threadIndex = 0;
-                            @Override
-                            public synchronized Thread  newThread(Runnable r) {
-                                String nameToUse = threads == 1 ? name : name + " - " + threadIndex++;
-                                Thread t = new Thread(null, r, nameToUse, 131072);
-                                t.setDaemon(true);
-                                return t;
-                            }
-                        }));
+                        queue,
+                        getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false, coreList)));
     }
 
     public static ThreadFactory getThreadFactory(String name) {
-        return getThreadFactory(name, 131072);
+        return getThreadFactory(name, SMALL_STACK_SIZE);
     }
 
     public static ThreadFactory getThreadFactory(String groupName, String name) {
-        return getThreadFactory(groupName, name, 131072);
+        return getThreadFactory(groupName, name, SMALL_STACK_SIZE, true, null);
     }
 
     public static ThreadFactory getThreadFactory(String name, int stackSize) {
-        return getThreadFactory(null, name, stackSize);
+        return getThreadFactory(null, name, stackSize, true, null);
     }
 
     /**
@@ -132,7 +167,12 @@ public class CoreUtils {
      * @param stackSize
      * @return
      */
-    public static ThreadFactory getThreadFactory(final String groupName, final String name, final int stackSize) {
+    public static ThreadFactory getThreadFactory(
+            final String groupName,
+            final String name,
+            final int stackSize,
+            final boolean incrementThreadNames,
+            final Queue<String> coreList) {
         ThreadGroup group = null;
         if (groupName != null) {
             group = new ThreadGroup(Thread.currentThread().getThreadGroup(), groupName);
@@ -143,11 +183,20 @@ public class CoreUtils {
             private final AtomicLong m_createdThreadCount = new AtomicLong(0);
             private final ThreadGroup m_group = finalGroup;
             @Override
-            public Thread newThread(final Runnable r) {
-                final String threadName = name + " - " + m_createdThreadCount.getAndIncrement();
+            public synchronized Thread newThread(final Runnable r) {
+                final String threadName = name +
+                        (incrementThreadNames ? " - " + m_createdThreadCount.getAndIncrement() : "");
+                String coreTemp = null;
+                if (coreList != null && !coreList.isEmpty()) {
+                    coreTemp = coreList.poll();
+                }
+                final String core = coreTemp;
                 Runnable runnable = new Runnable() {
                     @Override
                     public void run() {
+                        if (core != null) {
+                            PosixJNAAffinity.INSTANCE.setAffinity(core);
+                        }
                         try {
                             r.run();
                         } catch (Throwable t) {

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb.utils;
@@ -21,7 +21,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
@@ -43,9 +46,14 @@ public class CommandLine extends VoltDB.Configuration
 
     public static final String VEM_TAG_PROPERTY = "org.voltdb.vemtag";
 
+    public CommandLine(VoltDB.START_ACTION start_action)
+    {
+        m_startAction = start_action;
+    }
+
     // Copy ctor.
     public CommandLine makeCopy() {
-        CommandLine cl = new CommandLine();
+        CommandLine cl = new CommandLine(m_startAction);
         // first copy the base class fields
         cl.m_ipcPorts.addAll(m_ipcPorts);
         cl.m_backend = m_backend;
@@ -64,7 +72,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_httpPort = m_httpPort;
         // final in baseclass: cl.m_isEnterprise = m_isEnterprise;
         cl.m_deadHostTimeoutMS = m_deadHostTimeoutMS;
-        cl.m_startAction = m_startAction;
         cl.m_startMode = m_startMode;
         cl.m_replicationRole = m_replicationRole;
         cl.m_selectedRejoinInterface = m_selectedRejoinInterface;
@@ -79,7 +86,6 @@ public class CommandLine extends VoltDB.Configuration
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
         cl.debugPort = debugPort;
-        cl.ipcPortList = ipcPortList;
         cl.zkport = zkport;
         cl.buildDir = buildDir;
         cl.java_library_path = java_library_path;
@@ -92,6 +98,13 @@ public class CommandLine extends VoltDB.Configuration
         cl.jmxPort = jmxPort;
         cl.jmxHost = jmxHost;
         cl.customCmdLn = customCmdLn;
+        // deep copy the propety map if it exists
+        if (javaProperties != null) {
+            cl.javaProperties = new TreeMap<String, String>();
+            for (Entry<String, String> e : javaProperties.entrySet()) {
+                cl.javaProperties.put(e.getKey(), e.getValue());
+            }
+        }
 
         return cl;
     }
@@ -139,16 +152,16 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine startCommand(String command)
     {
         String upcmd = command.toUpperCase();
-        VoltDB.START_ACTION action = VoltDB.START_ACTION.START;
+        VoltDB.START_ACTION action = VoltDB.START_ACTION.CREATE;
         try {
             action = VoltDB.START_ACTION.valueOf(upcmd);
         }
         catch (IllegalArgumentException iae)
         {
-            // command wasn't a valid enum type;  default to START and warn
-            // the user
-            hostLog.warn("Unknown start command: " + command +
-                         ".  CommandLine will default to START");
+            // command wasn't a valid enum type, throw an exception.
+            String msg = "Unknown action: " + command + ". ";
+            hostLog.warn(msg);
+            throw new IllegalArgumentException(msg);
         }
         m_startAction = action;
         return this;
@@ -201,12 +214,7 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String ipcPortList = "";
     public CommandLine ipcPort(int port) {
-        if (!ipcPortList.isEmpty()) {
-            ipcPortList += ",";
-        }
-        ipcPortList += Integer.toString(port);
         m_ipcPorts.add(port);
         return this;
     }
@@ -357,6 +365,16 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public Map<String, String> javaProperties = null;
+    public CommandLine setJavaProperty(String property, String value)
+    {
+        if (javaProperties == null) {
+            javaProperties = new TreeMap<String, String>();
+        }
+        javaProperties.put(property, value);
+        return this;
+    }
+
     public void dumpToFile(String filename) {
         try {
             FileWriter out = new FileWriter(filename);
@@ -424,6 +442,17 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Dvolt.rmi.server.hostname=" + jmxHost);
         }
 
+        if (javaProperties != null) {
+            for (Entry<String, String> e : javaProperties.entrySet()) {
+                if (e.getValue() != null) {
+                    cmdline.add("-D" + e.getKey() + "=" + e.getValue());
+                }
+                else {
+                    cmdline.add("-D" + e.getKey());
+                }
+            }
+        }
+
         if (debugPort > -1) {
             cmdline.add("-Xdebug");
             cmdline.add("-agentlib:jdwp=transport=dt_socket,address=" + debugPort + ",server=y,suspend=n");
@@ -440,10 +469,6 @@ public class CommandLine extends VoltDB.Configuration
         // VOLTDB main() parameters
         //
         cmdline.add("org.voltdb.VoltDB");
-
-        if (m_isEnterprise) {
-            cmdline.add("license"); cmdline.add(m_pathToLicense);
-        }
 
         if (m_startAction == START_ACTION.LIVE_REJOIN) {
             // annoying, have to special case live rejoin
@@ -483,8 +508,7 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("replicationport"); cmdline.add(Integer.toString(m_drAgentPortStart));
         }
 
-        if (target().isIPC) {
-            cmdline.add("ipcports"); cmdline.add(ipcPortList);
+        if (target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             cmdline.add("valgrind");
         }
 
@@ -501,6 +525,10 @@ public class CommandLine extends VoltDB.Configuration
         if (m_enableIV2)
         {
             cmdline.add("enableiv2");
+        }
+
+        if (m_isEnterprise) {
+            cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
 
         if (customCmdLn != null && !customCmdLn.trim().isEmpty())

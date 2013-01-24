@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -30,29 +30,38 @@ import org.voltdb.expressions.ExpressionUtil;
 public class ParsedDeleteStmt extends AbstractParsedStmt {
     Table table = null;
 
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedDeleteStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
+    }
+
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode) {
         String tableName = stmtNode.attributes.get("table");
         assert(tableName != null);
         tableName = tableName.trim();
-        table = db.getTables().getIgnoreCase(tableName);
+        table = getTableFromDB(tableName);
         tableList.add(table);
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("condition"))
-                parseCondition(child, db);
+                parseCondition(child);
         }
     }
 
     //XXX: This looks a lot like it might be a slightly more verbose duplicate of AbstractParsedStmt.parseConditions
-    private void parseCondition(VoltXMLElement conditionNode, Database db) {
+    private void parseCondition(VoltXMLElement conditionNode) {
         AbstractExpression tempWhere = null;
         for (VoltXMLElement exprNode : conditionNode.children) {
             if (tempWhere == null) {
-                tempWhere = parseExpressionTree(exprNode, db);
+                tempWhere = parseExpressionTree(exprNode);
             }
             else {
-                tempWhere = ExpressionUtil.combine(tempWhere, parseExpressionTree(exprNode, db));
+                tempWhere = ExpressionUtil.combine(tempWhere, parseExpressionTree(exprNode));
             }
         }
         assert(where == null); // Should be non-reentrant -- never overwriting a previous value!

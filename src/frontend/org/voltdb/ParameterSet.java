@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,9 +22,8 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedList;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -53,10 +52,15 @@ import org.voltdb.types.VoltDecimalHelper;
      * Once created, they are not mutated. So it should be safe to not
      * synchronize on them.
      */
-    private final LinkedList<byte[]> m_encodedStrings = new LinkedList<byte[]>();
-    private final LinkedList<byte[][]> m_encodedStringArrays = new LinkedList<byte[][]>();
+    private byte[][] m_encodedStrings = null;
+    private byte[][][] m_encodedStringArrays = null;
     // memoized serialized size (start assuming valid size for empty ParameterSet)
     private int m_serializedSize = 2;
+
+    // we serialize to compute a crc
+    // save the serialization for needed later
+    private byte[] m_serializedParams = null;
+    private boolean m_hasSerialization = false;
 
     public ParameterSet() {
     }
@@ -74,6 +78,7 @@ import org.voltdb.types.VoltDecimalHelper;
     /** Sets the internal array to params. Note: this does *not* copy the argument. */
     public void setParameters(Object... params) {
         this.m_params = params;
+
         // create encoded copies of strings and calculate size
         m_serializedSize = calculateSerializedSize();
     }
@@ -125,6 +130,11 @@ import org.voltdb.types.VoltDecimalHelper;
 
     @Override
     public void writeExternal(FastSerializer out) throws IOException {
+        if (m_hasSerialization) {
+            out.write(m_serializedParams);
+            return;
+        }
+
         out.writeShort(m_params.length);
 
         for (Object obj : m_params) {
@@ -477,6 +487,9 @@ import org.voltdb.types.VoltDecimalHelper;
      * @return
      */
     private int calculateSerializedSize() {
+        m_encodedStringArrays = new byte[m_params.length][][];
+        m_encodedStrings = new byte[m_params.length][];
+
         if (m_serializedSize != 2) {
             throw new RuntimeException("Trying to calculate the serialized size " +
                                        "of the parameter set twice");
@@ -539,7 +552,7 @@ import org.voltdb.types.VoltDecimalHelper;
                                 size += 4 + encodedStrings[zz].length;
                             }
                         }
-                        m_encodedStringArrays.add(encodedStrings);
+                        m_encodedStringArrays[ii] = encodedStrings;
                         break;
                     case TIMESTAMP:
                         size += 8 * ((TimestampType[])obj).length;
@@ -601,7 +614,7 @@ import org.voltdb.types.VoltDecimalHelper;
                     try {
                         byte encodedString[] = ((String)obj).getBytes("UTF-8");
                         size += 4 + encodedString.length;
-                        m_encodedStrings.add(encodedString);
+                        m_encodedStrings[ii] = encodedString;
                     } catch (UnsupportedEncodingException e) {
                         VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
                     }
@@ -624,11 +637,16 @@ import org.voltdb.types.VoltDecimalHelper;
     }
 
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        Iterator<byte[][]> strArrayIter = m_encodedStringArrays.iterator();
-        Iterator<byte[]> strIter = m_encodedStrings.iterator();
+
+        if (m_hasSerialization) {
+            buf.put(m_serializedParams);
+            return;
+        }
+
         buf.putShort((short)m_params.length);
 
-        for (Object obj : m_params) {
+        for (int i = 0; i < m_params.length; i++) {
+            Object obj = m_params[i];
             if ((obj == null) || (obj == JSONObject.NULL)) {
                 VoltType type = VoltType.NULL;
                 buf.put(type.getValue());
@@ -680,19 +698,18 @@ import org.voltdb.types.VoltDecimalHelper;
                         FastSerializer.writeArray((double[]) obj, buf);
                         break;
                     case STRING:
-                        if (!strArrayIter.hasNext()) {
+                        if (m_encodedStringArrays[i] == null) {
                             // should not happen
                             throw new IOException("String array not encoded");
                         }
-                        byte encodedStrings[][] = strArrayIter.next();
                         // This check used to be done by FastSerializer.writeArray(), but things changed?
-                        if (encodedStrings.length > Short.MAX_VALUE) {
+                        if (m_encodedStringArrays[i].length > Short.MAX_VALUE) {
                             throw new IOException("Array exceeds maximum length of "
                                                   + Short.MAX_VALUE + " bytes");
                         }
-                        buf.putShort((short)encodedStrings.length);
-                        for (int zz = 0; zz < encodedStrings.length; zz++) {
-                            FastSerializer.writeString(encodedStrings[zz], buf);
+                        buf.putShort((short)m_encodedStringArrays[i].length);
+                        for (int zz = 0; zz < m_encodedStringArrays[i].length; zz++) {
+                            FastSerializer.writeString(m_encodedStringArrays[i][zz], buf);
                         }
                         break;
                     case TIMESTAMP:
@@ -755,11 +772,11 @@ import org.voltdb.types.VoltDecimalHelper;
                         throw new RuntimeException("Can't cast parameter type to Double");
                     break;
                 case STRING:
-                    if (!strIter.hasNext()) {
+                    if (m_encodedStrings[i] == null) {
                         // should not happen
                         throw new IOException("String not encoded: " + (String) obj);
                     }
-                    FastSerializer.writeString(strIter.next(), buf);
+                    FastSerializer.writeString(m_encodedStrings[i], buf);
                     break;
                 case TIMESTAMP:
                     long micros = timestampToMicroseconds(obj);
@@ -775,6 +792,20 @@ import org.voltdb.types.VoltDecimalHelper;
                     throw new RuntimeException("FIXME: Unsupported type " + type);
             }
         }
+    }
+
+    /**
+     * Used to get a CRC of params on their way to the EE.
+     * Assumes scalar values compatible with the EE (i.e. no VoltTables)
+     * @param crc
+     * @throws IOException
+     */
+    void addToCRC(PureJavaCrc32C crc) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(m_serializedSize);
+        flattenToBuffer(buf);
+        m_serializedParams = buf.array();
+        m_hasSerialization = true;
+        crc.update(m_serializedParams);
     }
 
     static long timestampToMicroseconds(Object obj) {

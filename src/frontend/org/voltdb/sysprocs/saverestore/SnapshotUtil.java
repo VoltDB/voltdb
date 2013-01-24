@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,7 +19,6 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.BufferedInputStream;
 import java.io.CharArrayWriter;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -31,6 +30,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -43,12 +43,13 @@ import java.util.TreeSet;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
@@ -67,7 +68,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -90,9 +90,10 @@ public class SnapshotUtil {
         String nonce,
         List<Table> tables,
         int hostId,
-        Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers,
-        List<Long> partitionTransactionIds,
-        InstanceId instanceId)
+        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+        Map<Integer, Long> partitionTransactionIds,
+        InstanceId instanceId,
+        long timestamp)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -101,80 +102,129 @@ public class SnapshotUtil {
                 throw new IOException("Unable to write table list file " + f);
             }
         }
-        final FileOutputStream fos = new FileOutputStream(f);
-        StringWriter sw = new StringWriter();
-        JSONStringer stringer = new JSONStringer();
+        boolean success = false;
         try {
-            stringer.object();
-            stringer.key("version").value(1);
-            stringer.key("txnId").value(txnId);
-            stringer.key("tables").array();
-            for (int ii = 0; ii < tables.size(); ii++) {
-                stringer.value(tables.get(ii).getTypeName());
-            }
-            stringer.endArray();
-            stringer.key("exportSequenceNumbers").array();
-            for (Map.Entry<String, List<Pair<Integer, Long>>> entry : exportSequenceNumbers.entrySet()) {
+            final FileOutputStream fos = new FileOutputStream(f);
+            StringWriter sw = new StringWriter();
+            JSONStringer stringer = new JSONStringer();
+            try {
                 stringer.object();
-
-                stringer.key("exportTableName").value(entry.getKey());
-
-                stringer.key("sequenceNumberPerPartition").array();
-                for (Pair<Integer, Long> sequenceNumber : entry.getValue()) {
+                stringer.key("version").value(1);
+                stringer.key("txnId").value(txnId);
+                stringer.key("timestamp").value(timestamp);
+                stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
+                stringer.key("tables").array();
+                for (int ii = 0; ii < tables.size(); ii++) {
+                    stringer.value(tables.get(ii).getTypeName());
+                }
+                stringer.endArray();
+                stringer.key("exportSequenceNumbers").array();
+                for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : exportSequenceNumbers.entrySet()) {
                     stringer.object();
-                    stringer.key("partition").value(sequenceNumber.getFirst());
-                    stringer.key("exportSequenceNumber").value(sequenceNumber.getSecond());
+
+                    stringer.key("exportTableName").value(entry.getKey());
+
+                    stringer.key("sequenceNumberPerPartition").array();
+                    for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
+                        stringer.object();
+                        stringer.key("partition").value(sequenceNumber.getKey());
+                        //First value is the ack offset which matters for pauseless rejoin, but not persistence
+                        stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
+                        stringer.endObject();
+                    }
+                    stringer.endArray();
+
                     stringer.endObject();
                 }
                 stringer.endArray();
-
-                stringer.endObject();
-            }
-            stringer.endArray();
-            if (VoltDB.instance().isIV2Enabled()) {
-                stringer.key("partitionTransactionIds").object();
-                for (Long txnid : partitionTransactionIds) {
-                    stringer.key(Long.toString(TxnEgo.getPartitionId(txnid))).value(txnid);
+                if (VoltDB.instance().isIV2Enabled()) {
+                    stringer.key("partitionTransactionIds").object();
+                    for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
+                        stringer.key(entry.getKey().toString()).value(entry.getValue());
+                    }
+                    stringer.endObject();
                 }
+                stringer.key("catalogCRC").value(catalogCRC);
+                stringer.key("instanceId").value(instanceId.serializeToJSONObject());
                 stringer.endObject();
+            } catch (JSONException e) {
+                throw new IOException(e);
             }
-            stringer.key("catalogCRC").value(catalogCRC);
-            stringer.key("instanceId").value(instanceId.serializeToJSONObject());
-            stringer.endObject();
-        } catch (JSONException e) {
-            throw new IOException(e);
-        }
 
-        sw.append(stringer.toString());
+            sw.append(stringer.toString());
 
-        final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
-        final CRC32 crc = new CRC32();
-        crc.update(tableListBytes);
-        ByteBuffer fileBuffer = ByteBuffer.allocate(tableListBytes.length + 4);
-        fileBuffer.putInt((int)crc.getValue());
-        fileBuffer.put(tableListBytes);
-        fileBuffer.flip();
-        fos.getChannel().write(fileBuffer);
-        return new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    fos.getChannel().force(true);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } finally {
+            final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
+            final PureJavaCrc32 crc = new PureJavaCrc32();
+            crc.update(tableListBytes);
+            ByteBuffer fileBuffer = ByteBuffer.allocate(tableListBytes.length + 4);
+            fileBuffer.putInt((int)crc.getValue());
+            fileBuffer.put(tableListBytes);
+            fileBuffer.flip();
+            fos.getChannel().write(fileBuffer);
+            success = true;
+            return new Runnable() {
+                @Override
+                public void run() {
                     try {
-                        fos.close();
+                        fos.getChannel().force(true);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
+                    } finally {
+                        try {
+                            fos.close();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
                     }
                 }
+            };
+        } finally {
+            if (!success) {
+                f.delete();
             }
-        };
+        }
+    }
+
+    /**
+     * Get the nonce from the filename of the digest file.
+     * @param filename The filename of the digest file
+     * @return The nonce
+     */
+    public static String parseNonceFromDigestFilename(String filename) {
+        if (filename == null || !filename.endsWith(".digest")) {
+            throw new IllegalArgumentException("Bad digest filename: " + filename);
+        }
+
+        return parseNonceFromSnapshotFilename(filename);
+    }
+
+    /**
+     * Get the nonce from any snapshot-related file.
+     */
+    public static String parseNonceFromSnapshotFilename(String filename)
+    {
+        if (filename == null) {
+            throw new IllegalArgumentException("Bad snapshot filename: " + filename);
+        }
+
+        // For the snapshot catalog
+        if (filename.endsWith(".jar")) {
+            return filename.substring(0, filename.indexOf(".jar"));
+        }
+        // for everything else valid in new format or volt1.2 or earlier table files
+        else if (filename.indexOf("-") > 0) {
+           return filename.substring(0, filename.indexOf("-"));
+        }
+        // volt 1.2 and earlier digest filename
+        else if (filename.endsWith(".digest")) {
+            return filename.substring(0, filename.indexOf(".digest"));
+        }
+
+        throw new IllegalArgumentException("Bad snapshot filename: " + filename);
     }
 
     public static List<JSONObject> retrieveDigests(String path,
-            String nonce) throws Exception {
+            String nonce, VoltLogger logger) throws Exception {
         VoltFile directoryWithDigest = new VoltFile(path);
         ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
         if (directoryWithDigest.listFiles() == null) {
@@ -183,7 +233,10 @@ public class SnapshotUtil {
         for (File f : directoryWithDigest.listFiles()) {
             if ( f.getName().equals(nonce + ".digest") || //old style digest name
                     (f.getName().startsWith(nonce + "-host_") && f.getName().endsWith(".digest"))) {//new style
-                digests.add(CRCCheck(f));
+                JSONObject retval = CRCCheck(f, logger);
+                if (retval != null) {
+                    digests.add(retval);
+                }
             }
         }
         return digests;
@@ -204,7 +257,7 @@ public class SnapshotUtil {
         catch (IOException ioe)
         {
             throw new IOException("Unable to write snapshot catalog to file: " +
-                                  path + File.separator + filename);
+                                  path + File.separator + filename, ioe);
         }
     }
 
@@ -222,15 +275,16 @@ public class SnapshotUtil {
      * @throws IOException
      *             If CRC does not match
      */
-    public static JSONObject CRCCheck(File f) throws IOException {
+    public static JSONObject CRCCheck(File f, VoltLogger logger) throws IOException {
         final FileInputStream fis = new FileInputStream(f);
         try {
             final BufferedInputStream bis = new BufferedInputStream(fis);
             ByteBuffer crcBuffer = ByteBuffer.allocate(4);
             if (4 != bis.read(crcBuffer.array())) {
-                throw new EOFException(
+                logger.warn(
                         "EOF while attempting to read CRC from snapshot digest " + f +
                         " on host " + CoreUtils.getHostnameOrAddress());
+                return null;
             }
             final int crc = crcBuffer.getInt();
             final InputStreamReader isr = new InputStreamReader(bis, "UTF-8");
@@ -269,12 +323,13 @@ public class SnapshotUtil {
             if (obj == null) {
                 String tableList = caw.toString();
                 byte tableListBytes[] = tableList.getBytes("UTF-8");
-                CRC32 tableListCRC = new CRC32();
+                PureJavaCrc32 tableListCRC = new PureJavaCrc32();
                 tableListCRC.update(tableListBytes);
                 tableListCRC.update("\n".getBytes("UTF-8"));
                 final int calculatedValue = (int)tableListCRC.getValue();
                 if (crc != calculatedValue) {
-                    throw new IOException("CRC of snapshot digest did not match digest contents");
+                    logger.warn("CRC of snapshot digest " + f + " did not match digest contents");
+                    return null;
                 }
 
                 String tableNames[] = tableList.split(",");
@@ -288,7 +343,8 @@ public class SnapshotUtil {
                         obj.append("tables", tableNames[ii]);
                     }
                 } catch (JSONException e) {
-                    throw new IOException(e);
+                    logger.warn("Exception parsing JSON of digest " + f, e);
+                    return null;
                 }
                 return obj;
             } else {
@@ -297,14 +353,18 @@ public class SnapshotUtil {
                  */
                 String tableList = caw.toString();
                 byte tableListBytes[] = tableList.getBytes("UTF-8");
-                CRC32 tableListCRC = new CRC32();
+                PureJavaCrc32 tableListCRC = new PureJavaCrc32();
                 tableListCRC.update(tableListBytes);
                 final int calculatedValue = (int)tableListCRC.getValue();
                 if (crc != calculatedValue) {
-                    throw new IOException("CRC of snapshot digest did not match digest contents");
+                    logger.warn("CRC of snapshot digest " + f + " did not match digest contents");
+                    return null;
                 }
                 return obj;
             }
+        } catch (Exception e) {
+            logger.warn("Exception while parsing snapshot digest " + f, e);
+            return null;
         } finally {
             try {
                 if (fis != null)
@@ -317,9 +377,42 @@ public class SnapshotUtil {
      * Storage for information about files that are part of a specific snapshot
      */
     public static class Snapshot {
+        public Snapshot(String nonce, long txnId)
+        {
+            m_nonce = nonce;
+            m_txnId = txnId;
+        }
+
+        public void setInstanceId(InstanceId id)
+        {
+            if (m_instanceId == null) {
+                m_instanceId = id;
+            }
+            else if (!m_instanceId.equals(id)) {
+                throw new RuntimeException("Snapshot named " + m_nonce +
+                        " has digests with conflicting cluster instance IDs." +
+                        " Please ensure that there is only one snapshot named " + m_nonce + " in your" +
+                        " cluster nodes' VOLTDBROOT directories and try again.");
+            }
+        }
+
+        public InstanceId getInstanceId()
+        {
+            return m_instanceId;
+        }
+
+        public long getTxnId()
+        {
+            return m_txnId;
+        }
+
         public final List<File> m_digests = new ArrayList<File>();
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
+
+        private String m_nonce;
+        private InstanceId m_instanceId = null;
+        private long m_txnId;
     }
 
     /**
@@ -375,6 +468,7 @@ public class SnapshotUtil {
             }
 
             for (String snapshotName : snapshotNames) {
+                // izzy: change this to use parseNonceFromSnapshotFilename at some point
                 if (pathname.getName().startsWith(snapshotName + "-")  ||
                         pathname.getName().equals(snapshotName + ".digest")) {
                     return true;
@@ -397,10 +491,11 @@ public class SnapshotUtil {
      */
     public static void retrieveSnapshotFiles(
             File directory,
-            Map<Long, Snapshot> snapshots,
+            Map<String, Snapshot> namedSnapshots,
             FileFilter filter,
             int recursion,
-            boolean validate) {
+            boolean validate,
+            VoltLogger logger) {
         if (recursion == 32) {
             return;
         }
@@ -423,7 +518,7 @@ public class SnapshotUtil {
                     System.err.println("Warning: Skipping directory " + f.getPath()
                             + " due to lack of read permission");
                 } else {
-                    retrieveSnapshotFiles( f, snapshots, filter, recursion++, validate);
+                    retrieveSnapshotFiles( f, namedSnapshots, filter, recursion++, validate, logger);
                 }
                 continue;
             }
@@ -442,20 +537,27 @@ public class SnapshotUtil {
 
             try {
                 if (f.getName().endsWith(".digest")) {
-                    JSONObject digest = CRCCheck(f);
+                    JSONObject digest = CRCCheck(f, logger);
+                    if (digest == null) continue;
                     Long snapshotTxnId = digest.getLong("txnId");
-                    Snapshot s = snapshots.get(snapshotTxnId);
-                    if (s == null) {
-                        s = new Snapshot();
-                        snapshots.put(snapshotTxnId, s);
+                    String nonce = parseNonceFromSnapshotFilename(f.getName());
+                    Snapshot named_s = namedSnapshots.get(nonce);
+                    if (named_s == null) {
+                        named_s = new Snapshot(nonce, snapshotTxnId);
+                        namedSnapshots.put(nonce, named_s);
                     }
+                    InstanceId iid = new InstanceId(0,0);
+                    if (digest.has("instanceId")) {
+                        iid = new InstanceId(digest.getJSONObject("instanceId"));
+                    }
+                    named_s.setInstanceId(iid);
                     TreeSet<String> tableSet = new TreeSet<String>();
                     JSONArray tables = digest.getJSONArray("tables");
                     for (int ii = 0; ii < tables.length(); ii++) {
                         tableSet.add(tables.getString(ii));
                     }
-                    s.m_digestTables.add(tableSet);
-                    s.m_digests.add(f);
+                    named_s.m_digestTables.add(tableSet);
+                    named_s.m_digests.add(f);
                 } else {
                     HashSet<Integer> partitionIds = new HashSet<Integer>();
                     TableSaveFile saveFile = new TableSaveFile(fis.getChannel(), 1, null, true);
@@ -472,22 +574,23 @@ public class SnapshotUtil {
                             }
                         }
                         partitionIds.removeAll(saveFile.getCorruptedPartitionIds());
-                        Snapshot s = snapshots.get(saveFile.getTxnId());
-                        if (s == null) {
-                            s = new Snapshot();
-                            snapshots.put(saveFile.getTxnId(), s);
+                        String nonce = parseNonceFromSnapshotFilename(f.getName());
+                        Snapshot named_s = namedSnapshots.get(nonce);
+                        if (named_s == null) {
+                            named_s = new Snapshot(nonce, saveFile.getTxnId());
+                            namedSnapshots.put(nonce, named_s);
                         }
 
-                        TableFiles tableFiles = s.m_tableFiles.get(saveFile.getTableName());
-                        if (tableFiles == null) {
-                            tableFiles = new TableFiles(saveFile.isReplicated());
-                            s.m_tableFiles.put(saveFile.getTableName(), tableFiles);
+                        TableFiles namedTableFiles = named_s.m_tableFiles.get(saveFile.getTableName());
+                        if (namedTableFiles == null) {
+                            namedTableFiles = new TableFiles(saveFile.isReplicated());
+                            named_s.m_tableFiles.put(saveFile.getTableName(), namedTableFiles);
                         }
-                        tableFiles.m_files.add(f);
-                        tableFiles.m_completed.add(saveFile.getCompleted());
-                        tableFiles.m_validPartitionIds.add(partitionIds);
-                        tableFiles.m_corruptParititionIds.add(saveFile.getCorruptedPartitionIds());
-                        tableFiles.m_totalPartitionCounts.add(saveFile.getTotalPartitions());
+                        namedTableFiles.m_files.add(f);
+                        namedTableFiles.m_completed.add(saveFile.getCompleted());
+                        namedTableFiles.m_validPartitionIds.add(partitionIds);
+                        namedTableFiles.m_corruptParititionIds.add(saveFile.getCorruptedPartitionIds());
+                        namedTableFiles.m_totalPartitionCounts.add(saveFile.getTotalPartitions());
                     } finally {
                         saveFile.close();
                     }
@@ -1043,7 +1146,15 @@ public class SnapshotUtil {
                             break;
                         }
                     } catch (ForwardClientException e) {
-                        break;
+                        //This happens when something goes wrong in the snapshot daemon
+                        //I think it will always be that there was an existing snapshot request
+                        //It should eventually terminate and then we can submit one.
+                        try {
+                            Thread.sleep(5000);
+                        } catch (InterruptedException e1) {}
+                        new VoltLogger("HOST").warn("Partition detection was unable to submit a snapshot request" +
+                                                     "because one already existed. Retrying.");
+                        continue;
                     } catch (InterruptedException ignore) {}
                 }
 
@@ -1055,5 +1166,11 @@ public class SnapshotUtil {
         ThreadFactory factory = CoreUtils.getThreadFactory("Snapshot Request - " + nonce);
         Thread workThread = factory.newThread(work);
         workThread.start();
+    }
+
+    public static String formatHumanReadableDate(long timestamp) {
+        SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING + "z");
+        sdf.setTimeZone(VoltDB.VOLT_TIMEZONE);
+        return sdf.format(new Date(timestamp));
     }
 }

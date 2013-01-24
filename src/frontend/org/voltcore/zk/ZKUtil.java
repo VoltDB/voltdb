@@ -1,45 +1,52 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltcore.zk;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
-import java.io.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.zip.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.Pair;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 public class ZKUtil {
 
@@ -165,7 +172,7 @@ public class ZKUtil {
 
         byte resultBuffers[][] = new byte[chunks.size() - 1][];
         int ii = 0;
-        CRC32 crc = getCRC ? new CRC32() : null;
+        PureJavaCrc32 crc = getCRC ? new PureJavaCrc32() : null;
         for (String chunk : chunks) {
             if (chunk.endsWith("_complete")) continue;
             resultBuffers[ii] = zk.getData(chunk, false, null);
@@ -222,6 +229,43 @@ public class ZKUtil {
         return zk;
     }
 
+    public static final void mkdirs(ZooKeeper zk, String dirDN) {
+        ZKUtil.StringCallback callback = asyncMkdirs(zk, dirDN );
+        try {
+            callback.get();
+        } catch (Throwable t) {
+            Throwables.propagate(t);
+        }
+    }
+
+    public static ZKUtil.StringCallback asyncMkdirs( ZooKeeper zk, String dirDN) {
+        Preconditions.checkArgument(
+                dirDN != null &&
+                ! dirDN.trim().isEmpty() &&
+                ! "/".equals(dirDN) &&
+                dirDN.startsWith("/")
+                );
+
+        StringBuilder dsb = new StringBuilder(128);
+        ZKUtil.StringCallback lastCallback = null;
+        try {
+            for (String dirPortion: dirDN.substring(1).split("/")) {
+                lastCallback = new ZKUtil.StringCallback();
+                dsb.append('/').append(dirPortion);
+                zk.create(
+                        dsb.toString(),
+                        null,
+                        Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT,
+                        lastCallback,
+                        null);
+            }
+        }
+        catch (Throwable t) {
+            Throwables.propagate(t);
+        }
+        return lastCallback;
+    }
     /**
      * Sorts the sequential nodes based on their sequence numbers.
      * @param nodes
@@ -430,6 +474,11 @@ public class ZKUtil {
             done.countDown();
         }
 
+        @SuppressWarnings("unchecked")
+        public List<String> getChildren()  throws InterruptedException, KeeperException  {
+            done.await();
+            return (List<String>)getResult()[3];
+        }
     }
 
 }

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -23,10 +23,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
@@ -42,9 +46,9 @@ import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.NotImplementedException;
 
+import com.google.common.base.Charsets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -99,17 +103,21 @@ public class RawProcessor implements ExportDataProcessor {
     private final Runnable m_runLoop = new Runnable() {
         @Override
         public void run() {
-            Runnable r;
-            while (m_shouldContinue.get() == true) {
-                try {
-                    r = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);
-                    if (r != null) {
-                        r.run();
+            try {
+                Runnable r;
+                while (m_shouldContinue.get() == true) {
+                    try {
+                        r = m_mailbox.poll(5000, TimeUnit.MILLISECONDS);
+                        if (r != null) {
+                            r.run();
+                        }
+                    }
+                    catch (InterruptedException e) {
+                        // acceptable. just re-loop.
                     }
                 }
-                catch (InterruptedException e) {
-                    // acceptable. just re-loop.
-                }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error in RawProcessor run loop", true, e);
             }
         }
     };
@@ -223,34 +231,41 @@ public class RawProcessor implements ExportDataProcessor {
 
                 // Respond by advertising the full data source set and
                 //  the set of up nodes that are up
-                FastSerializer fs = new FastSerializer();
+                byte jsonBytes[] = null;
                 try {
-
-                    // serialize an array of DataSources that are locally available
-                    fs.writeInt(m_sourcesArray.size());
+                    JSONStringer stringer = new JSONStringer();
+                    stringer.object();
+                    stringer.key("sources").array();
                     for (ExportDataSource src : m_sourcesArray) {
-                        src.writeAdvertisementTo(fs);
+                        stringer.object();
+                        src.writeAdvertisementTo(stringer);
+                        stringer.endObject();
                     }
+                    stringer.endArray();
 
                     // serialize the makup of the cluster
                     //  - the catalog context knows which hosts are up
                     //  - the hostmessenger knows the hostnames of hosts
-                    fs.writeInt(m_clusterMetadata.size());
+                    stringer.key("clusterMetadata").array();
                     for (String metadata : m_clusterMetadata.values()) {
-                        fs.writeString(metadata);
+                        stringer.value(metadata);
                     }
+                    stringer.endArray();
+                    stringer.endObject();
+
+                    jsonBytes = new JSONObject(stringer.toString()).toString(4).getBytes(Charsets.UTF_8);
 //                    else {
 //                        // for test code
 //                        fs.writeInt(0);
 //                    }
                 }
-                catch (IOException e) {
+                catch (JSONException e) {
                     protocolError(m, "Error producing open response advertisement.");
                     return;
                 }
 
                 final ExportProtoMessage r = new ExportProtoMessage( -1, -1, "");
-                r.openResponse(fs.getBuffer());
+                r.openResponse(ByteBuffer.wrap(jsonBytes));
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override
@@ -447,6 +462,12 @@ public class RawProcessor implements ExportDataProcessor {
         }
         ExportDataSource source = partmap.get(signature);
         return source;
+    }
+
+
+
+    @Override
+    public void setProcessorConfig(Properties config) {
     }
 
     @Override

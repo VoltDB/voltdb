@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -49,10 +49,13 @@ public abstract class ExpressionUtil {
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
         stack.addAll(exps);
 
-        // TODO: This code probably doesn't need to go through all this trouble to create balanced AND trees
-        // like "(A and B) and (C and D)".
-        // Simpler skewed AND trees like "A and (B and (C and D))" are likely as good if not better and can be
-        // constructed serially with much less effort.
+        // TODO: This code probably doesn't need to go through all this trouble to create AND trees
+        // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
+        // There is an easier algorithm that does not require stacking intermediate results.
+        // Even better, it would be easier here to generate "(D and (C and (B and A)))"
+        // which would also short-circuit slightly faster in the executor.
+        // NOTE: Any change to the structure of the trees produced by this algorithm should be
+        // reflected in the algorithm used to reverse the process in uncombine(AbstractExpression expr).
 
         AbstractExpression ret = null;
         while (stack.size() > 1) {
@@ -81,6 +84,37 @@ public abstract class ExpressionUtil {
     }
 
     /**
+     * Undo the effects of the combine(List<AbstractExpression> exps) method to reconstruct the list
+     * of expressions in its original order, basically right-to-left in the given expression tree.
+     * NOTE: This implementation is tuned to the odd shape of the trees produced by combine,
+     * namely leaf-nodes-on-the-right "(((D and C) and B) and A)" from "[A,B,C,D]".
+     * Any change there should have a corresponding change here.
+     * @param expr
+     * @return
+     */
+    public static List<AbstractExpression> uncombine(AbstractExpression expr)
+    {
+        if (expr == null) {
+            return new ArrayList<AbstractExpression>();
+        }
+        if (expr instanceof ConjunctionExpression) {
+            ConjunctionExpression conj = (ConjunctionExpression)expr;
+            if (conj.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
+                // Calculate the list for the tree or leaf on the left.
+                List<AbstractExpression> branch = uncombine(conj.getLeft());
+                // Insert the leaf on the right at the head of that list
+                branch.add(0, conj.getRight());
+                return branch;
+            }
+            // Any other kind of conjunction must have been a leaf. Fall through.
+        }
+        // At the left-most leaf, start a new list.
+        List<AbstractExpression> leaf = new ArrayList<AbstractExpression>();
+        leaf.add(expr);
+        return leaf;
+    }
+
+    /**
      *
      * @param left
      * @param right
@@ -88,30 +122,6 @@ public abstract class ExpressionUtil {
      */
     public static AbstractExpression combine(AbstractExpression left, AbstractExpression right) {
         return new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, left, right);
-    }
-
-    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, String tableName) {
-        assert(expr != null);
-        AbstractExpression retval = expr.getLeft();
-
-        AbstractExpression left = expr.getLeft();
-        if (left instanceof TupleValueExpression) {
-            TupleValueExpression lv = (TupleValueExpression) left;
-            if (lv.getTableName().equals(tableName))
-                retval = null;
-        }
-
-        if (retval == null) {
-            retval = expr.getRight();
-            AbstractExpression right = expr.getRight();
-            if (right instanceof TupleValueExpression) {
-                TupleValueExpression rv = (TupleValueExpression) right;
-                if (rv.getTableName().equals(tableName))
-                    retval = null;
-            }
-        }
-
-        return retval;
     }
 
     /**
@@ -286,7 +296,7 @@ public abstract class ExpressionUtil {
             }
 
             // handle the types that can be converted to decimal
-            if (neededType == VoltType.DECIMAL) {
+            else if (neededType == VoltType.DECIMAL) {
                 if ((cve.getValueType().isExactNumeric()) || (cve.getValueType() == VoltType.FLOAT)) {
                     cve.setValueType(neededType);
                     cve.setValueSize(neededSize);
@@ -295,7 +305,7 @@ public abstract class ExpressionUtil {
                 }
             }
 
-            if (neededType == VoltType.VARBINARY) {
+            else if (neededType == VoltType.VARBINARY) {
                 if ((cve.getValueType() == VoltType.STRING) && (Encoder.isHexEncodedString(cve.getValue()))) {
                     cve.setValueType(neededType);
                     cve.setValueSize(neededSize);
@@ -304,22 +314,23 @@ public abstract class ExpressionUtil {
                 }
             }
 
-            if (neededType == VoltType.TIMESTAMP) {
+            else if (neededType == VoltType.TIMESTAMP) {
                 if (cve.getValueType() == VoltType.STRING) {
                     try {
                         TimestampType ts = new TimestampType(cve.m_value);
                         cve.m_value = String.valueOf(ts.getTime());
                         cve.setValueType(neededType);
                         cve.setValueSize(neededSize);
-                        checkConstantValueTypeSafety(cve);
+                        return;
                     }
-                    // ignore errors if it's not the right format
+                    // It couldn't be converted to timestamp, fall through and throw Exception.
                     catch (IllegalArgumentException e) {}
-                    return;
                 }
             }
 
-            throw new Exception("Constant value cannot be converted to column type.");
+            throw new Exception(
+                    String.format("Constant value cannot be converted to %s column type.",
+                                  neededType.name()));
         }
         else {
             input.setValueType(neededType);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import junit.framework.TestCase;
 
@@ -62,6 +63,10 @@ public class TestExportDecoderBase extends TestCase
      VoltType.BIGINT, VoltType.FLOAT, VoltType.TIMESTAMP,
      VoltType.STRING, VoltType.DECIMAL};
 
+    static final Integer COLUMN_LENGTHS[] = {
+        0, 0, 0, 0, 0, 0, 64, 0
+    };
+
     static AdvertisedDataSource constructTestSource() {
         return constructTestSource(0);
     }
@@ -77,7 +82,7 @@ public class TestExportDecoderBase extends TestCase
         }
         AdvertisedDataSource source =
             new AdvertisedDataSource(partition, "foo", "yankeelover", 0, 32,
-                                     col_names, col_types);
+                                     col_names, col_types, Arrays.asList(COLUMN_LENGTHS));
         return source;
     }
 

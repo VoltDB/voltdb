@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -229,7 +229,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId);
+            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -285,7 +285,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId);
+            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -338,7 +338,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId);
+            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -393,7 +393,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId);
+            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -453,7 +453,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId);
+            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId, false);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -506,7 +506,7 @@ public class Iv2TestMpTransactionState extends TestCase
         Mailbox mailbox = mock(Mailbox.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId);
+            new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId, false);
 
         // create local work and verify the created localwork has the
         // expected truncation point.

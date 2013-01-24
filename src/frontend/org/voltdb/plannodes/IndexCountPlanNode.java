@@ -1,24 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
@@ -33,8 +32,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
-import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.ExpressionType;
@@ -79,11 +77,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
+    private ArrayList<AbstractExpression> m_bindings;
+
     public IndexCountPlanNode() {
         super();
     }
 
-    public IndexCountPlanNode(IndexScanPlanNode isp, AggregatePlanNode apn) {
+    private IndexCountPlanNode(IndexScanPlanNode isp, AggregatePlanNode apn,
+                               IndexLookupType endType, List<AbstractExpression> endKeys)
+    {
         super();
 
         m_catalogIndex = isp.m_catalogIndex;
@@ -99,9 +101,67 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_lookupType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
         m_predicate = null;
+        m_bindings = isp.getBindings();
 
         m_outputSchema = apn.getOutputSchema().clone();
-        this.setEndKeyExpression(isp.getEndExpression());
+
+        m_endType = endType;
+        m_endkeyExpressions.addAll(endKeys);
+    }
+
+    // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
+    // UNLESS the indexscan's end expressions aren't a form that can be modeled with an end key.
+    // The supported forms for end expression are:
+    //   - null
+    //   - one filter expression per index key component (ANDed together) as "combined" for the IndexScan.
+    //   - fewer filter expressions than index key components with one of them (the last) being a LT comparison.
+    // The LT restriction comes because when index key prefixes are identical to the prefix-only end key,
+    // the entire index key sorts greater than the prefix-only end-key, because it is always longer.
+    // These prefix-equal cases would be missed in an EQ or LTE filter, causing undercounts.
+    // A prefix-only LT filter is intended to discard prefix-equal cases, so it is allowed.
+    // @return the IndexCountPlanNode or null if one is not possible.
+    public static IndexCountPlanNode createOrNull(IndexScanPlanNode isp, AggregatePlanNode apn)
+    {
+        List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
+        // Initially assume that there will be an equality filter on all key components.
+        IndexLookupType endType = IndexLookupType.EQ;
+        List<AbstractExpression> endComparisons = ExpressionUtil.uncombine(isp.getEndExpression());
+        for (AbstractExpression ae: endComparisons) {
+            // There should be no more end expressions after an LT or LTE has reset the end type.
+            assert(endType == IndexLookupType.EQ);
+
+            if (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
+                endType = IndexLookupType.LT;
+            }
+            else if (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                endType = IndexLookupType.LTE;
+            } else {
+                assert(ae.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+            }
+
+            // PlanNodes all need private deep copies of expressions
+            // so that the resolveColumnIndexes results
+            // don't get bashed by other nodes or subsequent planner runs
+            try
+            {
+                endKeys.add((AbstractExpression)ae.getRight().clone());
+            }
+            catch (CloneNotSupportedException e)
+            {
+                // This shouldn't ever happen
+                e.printStackTrace();
+                throw new RuntimeException(e.toString());
+            }
+        }
+
+        // Avoid the cases that would cause undercounts for prefix matches.
+        // A prefix-only key exists and does not use LT.
+        if ((endType != IndexLookupType.LT) &&
+            (endKeys.size() > 0) &&
+            (endKeys.size() < isp.getCatalogIndex().getColumns().size())) {
+            return null;
+        }
+        return new IndexCountPlanNode(isp, apn, endType, endKeys);
     }
 
     @Override
@@ -130,130 +190,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     @Override
     public boolean isOrderDeterministic() {
         return true;
-    }
-
-    public void setCatalogIndex(Index index)
-    {
-        m_catalogIndex = index;
-    }
-
-    public Index getCatalogIndex()
-    {
-        return m_catalogIndex;
-    }
-
-    /**
-     *
-     * @param keyIterate
-     */
-    public void setKeyIterate(Boolean keyIterate) {
-        m_keyIterate = keyIterate;
-    }
-
-    /**
-     *
-     * @return Does this scan iterate over values in the index.
-     */
-    public Boolean getKeyIterate() {
-        return m_keyIterate;
-    }
-
-    /**
-     *
-     * @return The type of this lookup.
-     */
-    public IndexLookupType getLookupType() {
-        return m_lookupType;
-    }
-
-    /**
-     *
-     * @param lookupType
-     */
-    public void setLookupType(IndexLookupType lookupType) {
-        m_lookupType = lookupType;
-    }
-
-    /**
-     * @return the target_index_name
-     */
-    public String getTargetIndexName() {
-        return m_targetIndexName;
-    }
-
-    /**
-     * @param targetIndexName the target_index_name to set
-     */
-    public void setTargetIndexName(String targetIndexName) {
-        m_targetIndexName = targetIndexName;
-    }
-
-    public void addSearchKeyExpression(AbstractExpression expr)
-    {
-        if (expr != null)
-        {
-            // PlanNodes all need private deep copies of expressions
-            // so that the resolveColumnIndexes results
-            // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                m_searchkeyExpressions.add((AbstractExpression) expr.clone());
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * @return the searchkey_expressions
-     */
-    // Please don't use me to add search key expressions.  Use
-    // addSearchKeyExpression() so that the expression gets cloned
-    public List<AbstractExpression> getSearchKeyExpressions() {
-        return Collections.unmodifiableList(m_searchkeyExpressions);
-    }
-
-    public void addEndKeyExpression(AbstractExpression expr)
-    {
-        if (expr != null)
-        {
-            // PlanNodes all need private deep copies of expressions
-            // so that the resolveColumnIndexes results
-            // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                m_endkeyExpressions.add(0,(AbstractExpression) expr.clone());
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * When call this function, we can assume there is not post expression
-     * when I want to set endKey. And the endKey can not be null.
-     * @param endExpr
-     */
-    public void setEndKeyExpression(AbstractExpression endExpr) {
-        if (endExpr != null) {
-            ArrayList <AbstractExpression> subEndExpr = endExpr.findAllSubexpressionsOfClass(ComparisonExpression.class);
-            for (AbstractExpression ae: subEndExpr) {
-                assert (ae.getLeft() instanceof TupleValueExpression);
-                if (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHAN)
-                    m_endType = IndexLookupType.LT;
-                else if (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO)
-                    m_endType = IndexLookupType.LTE;
-                this.addEndKeyExpression(ae.getRight());
-            }
-        }
     }
 
     @Override
@@ -363,5 +299,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         retval += " using \"" + m_targetIndexName + "\"";
         retval += " " + usageInfo;
         return retval;
+    }
+
+    public ArrayList<AbstractExpression> getBindings() {
+        return m_bindings;
     }
 }

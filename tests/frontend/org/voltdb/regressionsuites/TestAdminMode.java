@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -190,6 +190,12 @@ public class TestAdminMode extends RegressionSuite
     // Somewhat hacky test of the LIVECLIENTS @Statistics selector
     public void testBacklogAndPolling() throws Exception
     {
+        if (isValgrind()) {
+            // no reasonable way to get the timing right in valgrind
+            // also, this test isn't really about c++ code
+            return;
+        }
+
         ClientConfig config = new ClientConfig();
         config.setProcedureCallTimeout(600000);
         final Client adminclient = ClientFactory.createClient(config);

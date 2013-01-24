@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008
@@ -43,19 +43,19 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -74,9 +74,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.Pair;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 /** Produces work for registered ports that are selected for read, write */
 class VoltNetwork implements Runnable
@@ -89,6 +92,7 @@ class VoltNetwork implements Runnable
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
+    private final String m_coreBindId;
 
     private final int m_networkId;
     /**
@@ -103,11 +107,11 @@ class VoltNetwork implements Runnable
      * If the network is not going to provide any threads provideOwnThread should be false
      * and runOnce should be called periodically
      **/
-    VoltNetwork(int networkId) {
+    VoltNetwork(int networkId, String coreBindId) {
         m_thread = new Thread(this, "Volt Network - " + networkId);
         m_networkId = networkId;
         m_thread.setDaemon(true);
-
+        m_coreBindId = coreBindId;
         try {
             m_selector = Selector.open();
         } catch (IOException ex) {
@@ -120,6 +124,7 @@ class VoltNetwork implements Runnable
         m_thread = null;
         m_networkId = 0;
         m_selector = s;
+        m_coreBindId = null;
     }
 
     /** Instruct the network to stop after the current loop */
@@ -260,6 +265,9 @@ class VoltNetwork implements Runnable
 
     @Override
     public void run() {
+        if (m_coreBindId != null) {
+            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindId);
+        }
         try {
             while (m_shouldStop == false) {
                 try {

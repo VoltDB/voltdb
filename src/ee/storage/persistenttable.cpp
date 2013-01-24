@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -51,6 +51,7 @@
 #include "storage/persistenttable.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
+#include "common/ExecutorContext.hpp"
 #include "common/FailureInjection.h"
 #include "common/tabletuple.h"
 #include "common/UndoQuantum.h"
@@ -81,11 +82,11 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
+PersistentTable::PersistentTable(int partitionColumn) :
     Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
-    m_executorContext(ctx),
-    m_allowNulls(NULL),
+    m_allowNulls(),
+    m_partitionColumn(partitionColumn),
     stats_(this),
     m_COWContext(NULL),
     m_failedCompactionCount(0)
@@ -112,8 +113,6 @@ PersistentTable::~PersistentTable() {
         tuple.freeObjectColumns();
         tuple.setActiveFalse();
     }
-
-    if (m_allowNulls) delete[] m_allowNulls;
 
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
@@ -273,13 +272,13 @@ bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
         /*
          * Create and register an undo action.
          */
-        UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+        UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
         assert(undoQuantum);
         Pool *pool = undoQuantum->getDataPool();
         assert(pool);
         PersistentTableUndoInsertAction *ptuia =
-        new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
-        PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
+            new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
+            PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
         undoQuantum->registerUndoAction(ptuia);
     }
 
@@ -348,7 +347,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
      * Create and register an undo action and then use the copy of
      * the target (old value with no updates)
      */
-    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
@@ -502,7 +501,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     /*
      * Create and register an undo action.
      */
-    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
     assert(undoQuantum);
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
@@ -700,8 +699,7 @@ std::string PersistentTable::debug() {
 }
 
 void PersistentTable::onSetColumns() {
-    if (m_allowNulls != NULL) delete[] m_allowNulls;
-    m_allowNulls = new bool[m_columnCount];
+    m_allowNulls.resize(m_columnCount);
     for (int i = m_columnCount - 1; i >= 0; --i) {
         m_allowNulls[i] = m_schema->columnAllowNull(i);
     }

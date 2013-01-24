@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -189,7 +189,7 @@ public class TestPartitionDDL extends TestCase {
 
             // Compile the catalog.
             final VoltCompiler compiler = new VoltCompiler();
-            boolean success = compiler.compile(xmlPath, testout_jar);
+            boolean success = compiler.compileWithProjectXML(xmlPath, testout_jar);
 
             // Check for expected compilation success or failure.
             String s = getMessages(compiler, false);

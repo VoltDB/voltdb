@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -139,8 +139,8 @@ public class SpPromoteAlgo implements RepairAlgo
         }
 
         tmLog.info(m_whoami + "found (including self) " + m_survivors.size()
-                + " surviving replicas to repair. "
-                + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
+                 + " surviving replicas to repair. "
+                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest =
             new Iv2RepairLogRequestMessage(m_requestId, Iv2RepairLogRequestMessage.SPREQUEST);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
@@ -153,16 +153,16 @@ public class SpPromoteAlgo implements RepairAlgo
         if (message instanceof Iv2RepairLogResponseMessage) {
             Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
             if (response.getRequestId() != m_requestId) {
-                tmLog.info(m_whoami + "rejecting stale repair response."
-                        + " Current request id is: " + m_requestId
-                        + " Received response for request id: " + response.getRequestId());
+                tmLog.debug(m_whoami + "rejecting stale repair response."
+                          + " Current request id is: " + m_requestId
+                          + " Received response for request id: " + response.getRequestId());
                 return;
             }
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
             if (rrs.m_expectedResponses < 0) {
-                tmLog.info(m_whoami + "collecting " + response.getOfTotal()
-                        + " repair log entries from "
-                        + CoreUtils.hsIdToString(response.m_sourceHSId));
+                tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
+                          + " repair log entries from "
+                          + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
             // Long.MAX_VALUE has rejoin semantics
             if (response.getHandle() != Long.MAX_VALUE) {
@@ -172,9 +172,9 @@ public class SpPromoteAlgo implements RepairAlgo
                 m_repairLogUnion.add(response);
             }
             if (rrs.update(response)) {
-                tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
-                        + " responses for " + rrs.m_expectedResponses +
-                        " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
+                tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
+                          + " responses for " + rrs.m_expectedResponses
+                          + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
                 if (areRepairLogsComplete()) {
                     repairSurvivors();
                 }
@@ -205,7 +205,7 @@ public class SpPromoteAlgo implements RepairAlgo
         }
 
         int queued = 0;
-        tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
@@ -221,7 +221,7 @@ public class SpPromoteAlgo implements RepairAlgo
                 m_mailbox.repairReplicasWith(needsRepair, li.getPayload());
             }
         }
-        tmLog.info(m_whoami + "finished queuing " + queued + " replica repair messages.");
+        tmLog.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
 
         m_promotionResult.done(m_maxSeenTxnId);
     }

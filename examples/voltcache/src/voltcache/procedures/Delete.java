@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,8 +25,6 @@ package voltcache.procedures;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 
-import voltcache.api.VoltCacheResult;
-
 @ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
 
 public class Delete extends VoltCacheProcBase
@@ -44,19 +42,19 @@ public class Delete extends VoltCacheProcBase
         {
             voltQueueSQL(delete, key);
             if (voltExecuteSQL()[1].fetchRow(0).getLong(0) == 0)
-                return VoltCacheResult.NOT_FOUND;
-            return VoltCacheResult.DELETED;
+                return Result.NOT_FOUND;
+            return Result.DELETED;
         }
         // Otherwise find item and queue for deletion
         else
         {
             voltQueueSQL(check, key, now);
             if (voltExecuteSQL()[1].getRowCount() == 0)
-                return VoltCacheResult.NOT_FOUND;
+                return Result.NOT_FOUND;
 
             voltQueueSQL(update, expirationTimestamp(expires), key);
             voltExecuteSQL(true);
-            return VoltCacheResult.DELETED;
+            return Result.DELETED;
         }
     }
 }

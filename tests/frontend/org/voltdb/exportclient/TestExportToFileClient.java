@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,6 +28,7 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.TimeZone;
 
 import junit.framework.TestCase;
 
@@ -38,6 +39,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportToFileClient.ExportToFileDecoder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.VoltFile;
 
 public class TestExportToFileClient extends TestCase {
 
@@ -54,7 +56,8 @@ public class TestExportToFileClient extends TestCase {
                 false,
                 false,
                 false,
-                0);
+                0,
+                ExportToFileClient.BinaryEncoding.HEX);
         AdvertisedDataSource source0 = TestExportDecoderBase.constructTestSource(0);
         AdvertisedDataSource source1 = TestExportDecoderBase.constructTestSource(1);
         ExportToFileDecoder decoder0 = exportClient.constructExportDecoder(source0);
@@ -65,20 +68,12 @@ public class TestExportToFileClient extends TestCase {
     }
 
     public void testNoAutoDiscovery() throws Exception {
-        // clean up any files that exist
-        File tmpdir = new File("/tmp");
-        assertTrue(tmpdir.exists());
-        assertTrue(tmpdir.isDirectory());
-        FileFilter filter = new FileFilter() {
+        final FileFilter filter = new FileFilter() {
             @Override
             public boolean accept(File pathname) {
                 return pathname.getPath().contains("nadclient") && pathname.getPath().contains(".csv");
             }
         };
-        File[] filesToDelete = tmpdir.listFiles(filter);
-        for (File f : filesToDelete) {
-            f.delete();
-        }
 
         String simpleSchema =
             "create table blah (" +
@@ -99,6 +94,10 @@ public class TestExportToFileClient extends TestCase {
         assertTrue(success);
         cluster.startUp(true);
 
+        File tmpdir = new VoltFile("/tmp");
+        assertTrue(tmpdir.exists());
+        assertTrue(tmpdir.isDirectory());
+
         final String listener = cluster.getListenerAddresses().get(0);
         final Client client = ClientFactory.createClient();
         client.createConnection(listener);
@@ -109,7 +108,7 @@ public class TestExportToFileClient extends TestCase {
                 new ExportToFileClient(
                     ',',
                     "nadclient1",
-                    new File("/tmp/"),
+                    new VoltFile("/tmp/"),
                     1,
                     "yyyyMMddHHmmss",
                     null,
@@ -118,12 +117,14 @@ public class TestExportToFileClient extends TestCase {
                     false,
                     false,
                     0,
-                    false);
+                    false,
+                    TimeZone.getDefault(),
+                    ExportToFileClient.BinaryEncoding.HEX);
         final ExportToFileClient exportClient2 =
                 new ExportToFileClient(
                     ',',
                     "nadclient2",
-                    new File("/tmp/"),
+                    new VoltFile("/tmp/"),
                     1,
                     "yyyyMMddHHmmss",
                     null,
@@ -132,7 +133,9 @@ public class TestExportToFileClient extends TestCase {
                     false,
                     false,
                     0,
-                    false);
+                    false,
+                    TimeZone.getDefault(),
+                    ExportToFileClient.BinaryEncoding.HEX);
 
         InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", cluster.port(0));
         InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", cluster.port(1));
@@ -145,14 +148,14 @@ public class TestExportToFileClient extends TestCase {
             @Override
             public void run() {
                 try {
-                    exportClient1.run(5000);
+                    exportClient1.run(10000);
                 } catch (ExportClientException e) {
                     e.printStackTrace();
                 }
             }
         };
         other.start();
-        exportClient2.run(5000);
+        exportClient2.run(10000);
         other.join();
 
         cluster.shutDown();

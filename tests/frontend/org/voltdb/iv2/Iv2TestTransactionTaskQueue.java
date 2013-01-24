@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -190,7 +190,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
 
         while (!expected_order.isEmpty())
         {
-            TransactionTask next_poll = (TransactionTask)task_queue.poll();
+            TransactionTask next_poll = (TransactionTask)task_queue.take();
             TransactionTask expected = expected_order.removeFirst();
             assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
             assertEquals(expected.getTxnId(), next_poll.getTxnId());

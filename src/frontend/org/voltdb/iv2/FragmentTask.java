@@ -1,22 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -26,10 +27,13 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 
 public class FragmentTask extends TransactionTask
@@ -38,6 +42,19 @@ public class FragmentTask extends TransactionTask
     final FragmentTaskMessage m_task;
     final Map<Integer, List<VoltTable>> m_inputDeps;
 
+    // This constructor is used during live rejoin log replay.
+    FragmentTask(Mailbox mailbox,
+            FragmentTaskMessage message,
+            ParticipantTransactionState txnState)
+    {
+        this(mailbox,
+            txnState,
+            null,
+            message,
+            null);
+    }
+
+    // This constructor is used during normal operation.
     FragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
                  TransactionTaskQueue queue,
@@ -53,7 +70,9 @@ public class FragmentTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.debug("STARTING: " + this);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this);
+        }
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
@@ -66,21 +85,48 @@ public class FragmentTask extends TransactionTask
         // completion?
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
-        hostLog.debug("COMPLETE: " + this);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE: " + this);
+        }
     }
 
+    @Override
+    public long getSpHandle()
+    {
+        return m_task.getSpHandle();
+    }
 
     /**
      * Produce a rejoining response.
      */
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
+        taskLog.logTask(m_task);
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_task, m_initiator.getHSId());
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
         m_initiator.deliver(response);
+    }
+
+    /**
+     * Run for replay after a live rejoin snapshot transfer.
+     */
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        // Set the begin undo token if we haven't already
+        // In the future we could record a token per batch
+        // and do partial rollback
+        if (!m_txn.isReadOnly()) {
+            if (m_txn.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+            }
+        }
+        // ignore response.
+        processFragmentTask(siteConnection);
     }
 
 
@@ -95,6 +141,13 @@ public class FragmentTask extends TransactionTask
 
         if (m_inputDeps != null) {
             siteConnection.stashWorkUnitDependencies(m_inputDeps);
+        }
+
+        if (m_task.isEmptyForRestart()) {
+            int outputDepId = m_task.getOutputDepId(0);
+            currentFragResponse.addDependency(outputDepId,
+                    new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+            return currentFragResponse;
         }
 
         for (int frag = 0; frag < m_task.getFragmentCount(); frag++)
@@ -130,7 +183,8 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        m_txn.txnId,
+                        m_txn.spHandle,
+                        m_txn.uniqueId,
                         m_txn.isReadOnly())[0];
 
                 if (hostLog.isTraceEnabled()) {

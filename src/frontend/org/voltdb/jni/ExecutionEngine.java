@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -297,10 +297,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void release() throws EEException, InterruptedException;
 
     /** Pass the catalog to the engine */
-    abstract public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException;
+    abstract public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
+    abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
     /** Load a fragment, given a plan, into the EE with a specific fragment id */
     abstract public long loadPlanFragment(byte[] plan) throws EEException;
@@ -310,8 +310,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                      long[] planFragmentIds,
                                                      long[] inputDepIds,
                                                      ParameterSet[] parameterSets,
-                                                     long txnId,
-                                                     long lastCommittedTxnId,
+                                                     long spHandle,
+                                                     long lastCommittedSpHandle,
+                                                     long uniqueId,
                                                      long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
@@ -320,8 +321,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public long getThreadLocalPoolAllocations();
 
     abstract public void loadTable(
-        int tableId, VoltTable table, long txnId,
-        long lastCommittedTxnId) throws EEException;
+        int tableId, VoltTable table, long spHandle,
+        long lastCommittedSpHandle) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -336,13 +337,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param time The current time in milliseconds since the epoch. See
      * System.currentTimeMillis();
      */
-    abstract public void tick(long time, long lastCommittedTxnId);
+    abstract public void tick(long time, long lastCommittedSpHandle);
 
     /**
      * Instruct EE to come to an idle state. Flush Export buffers, finish
      * any in-progress checkpoint, etc.
      */
-    abstract public void quiesce(long lastCommittedTxnId);
+    abstract public void quiesce(long lastCommittedSpHandle);
 
     /**
      * Retrieve a set of statistics using the specified selector from the StatisticsSelector enum.
@@ -424,7 +425,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * NOTE: Call initialize() separately for initialization.
      * This does strictly nothing so that this method never throws an exception.
      * @return the created VoltDBEngine pointer casted to jlong.
-    */
+     */
     protected native long nativeCreate(boolean isSunJVM);
     /**
      * Releases all resources held in the execution engine.
@@ -478,7 +479,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * human-readable text strings separated by line feeds.
      * @return error code
      */
-    protected native int nativeLoadCatalog(long pointer, long txnId, byte serialized_catalog[]);
+    protected native int nativeLoadCatalog(long pointer, long timestamp, byte serialized_catalog[]);
 
     /**
      * Update the EE's catalog.
@@ -488,7 +489,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, long txnId, byte diff_commands[]);
+    protected native int nativeUpdateCatalog(long pointer, long timestamp, byte diff_commands[]);
 
     /**
      * This method is called to initially load table data.
@@ -499,7 +500,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken token for undo quantum where changes should be logged.
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long txnId, long lastCommittedTxnId);
+            long spHandle, long lastCommittedSpHandle);
 
     protected native int nativeLoadPlanFragment(long pointer, byte[] plan);
 
@@ -515,7 +516,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int numFragments,
             long[] planFragmentIds,
             long[] inputDepIds,
-            long txnId, long lastCommittedTxnId, long undoToken);
+            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
 
     /**
      * Serialize the result temporary table.
@@ -534,13 +535,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param time The current time in milliseconds since the epoch. See
      * System.currentTimeMillis();
      */
-    protected native void nativeTick(long pointer, long time, long lastCommittedTxnId);
+    protected native void nativeTick(long pointer, long time, long lastCommittedSpHandle);
 
     /**
      * Native implementation of quiesce engine interface method.
      * @param pointer
      */
-    protected native void nativeQuiesce(long pointer, long lastCommittedTxnId);
+    protected native void nativeQuiesce(long pointer, long lastCommittedSpHandle);
 
     /**
      * Retrieve a set of statistics using the specified selector ordinal from the StatisticsSelector enum.

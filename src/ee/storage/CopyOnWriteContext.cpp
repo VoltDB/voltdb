@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "storage/CopyOnWriteContext.h"
@@ -22,7 +22,6 @@
 #include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>
-#include <boost/crc.hpp>
 
 namespace voltdb {
 
@@ -38,13 +37,9 @@ CopyOnWriteContext::CopyOnWriteContext(PersistentTable *table, TupleSerializer *
              m_tuplesSerialized(0) {}
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
-    boost::crc_32_type crc;
-    boost::crc_32_type partitionIdCRC;
     out->writeInt(m_partitionId);
-    partitionIdCRC.process_bytes(out->data() + out->position() - 4, 4);
-    out->writeInt(partitionIdCRC.checksum());
-    const std::size_t crcPosition = out->reserveBytes(4);//For CRC
     int rowsSerialized = 0;
+    const std::size_t rowCountPosition = out->reserveBytes(4);
 
     TableTuple tuple(m_table->schema());
     if (out->remaining() < (m_maxTupleLength + sizeof(int32_t))) {
@@ -65,9 +60,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
          */
         if (!hadMore) {
             if (m_finishedTableScan) {
-                out->writeInt(rowsSerialized);
-                crc.process_bytes(out->data() + out->position() - 4, 4);
-                out->writeIntAt(crcPosition, crc.checksum());
+                out->writeIntAt( rowCountPosition, rowsSerialized);
                 return false;
             } else {
                 m_finishedTableScan = true;
@@ -79,7 +72,6 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         const std::size_t tupleStartPosition = out->position();
         m_serializer->serializeTo( tuple, out);
         const std::size_t tupleEndPosition = out->position();
-        crc.process_block(out->data() + tupleStartPosition, out->data() + tupleEndPosition);
         m_tuplesSerialized++;
         rowsSerialized++;
 
@@ -111,9 +103,7 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
      * can be included in the CRC. It will be moved back to the front
      * to match the table serialization format when chunk is read later.
      */
-    out->writeInt(rowsSerialized);
-    crc.process_bytes(out->data() + out->position() - 4, 4);
-    out->writeIntAt(crcPosition, crc.checksum());
+    out->writeIntAt( rowCountPosition, rowsSerialized);
     return true;
 }
 

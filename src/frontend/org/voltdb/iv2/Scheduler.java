@@ -1,29 +1,32 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.rejoin.TaskLog;
 
 /**
  * Scheduler's rough current responsibility is to take appropriate local action
@@ -47,6 +50,21 @@ import org.voltdb.VoltDB;
 abstract public class Scheduler implements InitiatorMessageHandler
 {
     protected VoltLogger hostLog = new VoltLogger("HOST");
+
+    // A null task that unblocks the site task queue, used during shutdown
+    protected static final SiteTasker m_nullTask = new SiteTasker() {
+        @Override
+        public void run(SiteProcedureConnection siteConnection)
+        {
+        }
+
+        @Override
+        public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+        throws IOException
+        {
+        }
+    };
+
     // The queue which the Site's runloop is going to poll for new work.  This
     // is fronted here by the TransactionTaskQueue and should not be directly
     // offered work.
@@ -57,6 +75,25 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
+
+    /*
+     * This lock is extremely dangerous to use without known the pattern.
+     * It is the intrinsic lock on the InitiatorMailbox. For an SpInitiator
+     * this is a real thing, but for the MpInitiator the intrinsic lock isn't used
+     * because it uses MpInitiatorMailbox (as subclass of InitiatorMailbox)
+     * which uses a dedicated thread instead of locking.
+     *
+     * In the MpInitiator case locking on this will not provide any isolation because
+     * the InitiatorMailbox thread doesn't use the lock.
+     *
+     * Right now this lock happens to only be used to gain isolation for
+     * command logging while submitting durable tasks. Only SpInitiators log
+     * so this is fine.
+     *
+     * Think twice and ask around before using it for anything else.
+     * You should probably be going through InitiatorMailbox.deliver which automatically
+     * handles the transition between locking vs. submitting to the MpInitiatorMailbox task queue.
+     */
     protected Object m_lock;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)

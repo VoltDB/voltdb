@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,7 +29,7 @@ import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.utils.Encoder;
 
-class ExportTestVerifier extends ExportDecoderBase
+public class ExportTestVerifier extends ExportDecoderBase
 {
     private final ArrayDeque<Object[]> m_data;
     private boolean m_rowFailed = false;
@@ -175,7 +175,7 @@ class ExportTestVerifier extends ExportDecoderBase
 
     boolean done()
     {
-        return (m_ackRepeats > 3); // arbitrary value
+        return empty();
     }
 
     boolean empty()

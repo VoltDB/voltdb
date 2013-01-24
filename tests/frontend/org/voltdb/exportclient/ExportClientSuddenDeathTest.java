@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -50,7 +50,8 @@ public class ExportClientSuddenDeathTest extends TestCase {
                                                          false,
                                                          false,
                                                          false,
-                                                         0);
+                                                         0,
+                                                         ExportToFileClient.BinaryEncoding.HEX);
 
         InetSocketAddress addr = new InetSocketAddress("127.0.0.1", VoltDB.DEFAULT_PORT);
         etfc.addServerInfo(addr);

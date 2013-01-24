@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -86,6 +86,24 @@ public class CatalogDiffEngine {
 
         // non-unique indexes don't help with this check
         if (existingIndex.getUnique() == false) {
+            return false;
+        }
+
+        // expression indexes only help if they are on exactly the same expressions in the same order.
+        // OK -- that's obviously overspecifying the requirement, since expression order has nothing
+        // to do with it, and uniqueness of just a subset of the new index expressions would do, but
+        // that's hard to check for, so we punt on optimized dynamic update except for the critical
+        // case of grand-fathering in a surviving pre-existing index.
+        if (existingIndex.getExpressionsjson().length() > 0) {
+            if (existingIndex.getExpressionsjson().equals(newIndex.getExpressionsjson())) {
+                return true;
+            } else {
+                return false;
+            }
+        } else if (newIndex.getExpressionsjson().length() > 0) {
+            // A column index does not generally provide coverage for an expression index,
+            // though there are some special cases not being recognized, here,
+            // like expression indexes that list a mix of non-column expressions and unique columns.
             return false;
         }
 
@@ -190,7 +208,7 @@ public class CatalogDiffEngine {
      * @return true if the CatalogType can be dynamically added or removed
      * from a running system.
      */
-    boolean checkAddDropWhitelist(CatalogType suspect, ChangeType changeType) {
+    private boolean checkAddDropWhitelist(CatalogType suspect, ChangeType changeType) {
         // should generate this from spec.txt
         CatalogType orig = suspect;
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -454,7 +454,8 @@ public class TestVoltProcedure extends TestCase {
             // get some catalog shortcuts ready
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
-            m_context = new CatalogContext(System.currentTimeMillis(), catalog, null, 0, 0, 0);
+            long now = System.currentTimeMillis();
+            m_context = new CatalogContext( now, now, catalog, null, 0, 0, 0);
             m_tracker = tracker;
         }
     }

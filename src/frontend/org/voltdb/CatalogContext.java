@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -27,6 +27,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
@@ -41,11 +42,13 @@ public class CatalogContext {
     public final Cluster cluster;
     public final Database database;
     public final CatalogMap<Procedure> procedures;
+    public final CatalogMap<Table> tables;
     public final AuthSystem authSystem;
     public final int catalogVersion;
     private final long catalogCRC;
     public final long deploymentCRC;
-    public long m_transactionId;
+    public final long m_transactionId;
+    public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
 
     /*
@@ -60,12 +63,14 @@ public class CatalogContext {
 
     public CatalogContext(
             long transactionId,
+            long uniqueId,
             Catalog catalog,
             byte[] catalogBytes,
             long deploymentCRC,
             int version,
             long prevCRC) {
         m_transactionId = transactionId;
+        m_uniqueId = uniqueId;
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
         if (catalog == null)
@@ -92,6 +97,7 @@ public class CatalogContext {
         cluster = catalog.getClusters().get("cluster");
         database = cluster.getDatabases().get("database");
         procedures = database.getProcedures();
+        tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         this.deploymentCRC = deploymentCRC;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
@@ -101,6 +107,7 @@ public class CatalogContext {
 
     public CatalogContext update(
             long txnId,
+            long uniqueId,
             byte[] catalogBytes,
             String diffCommands,
             boolean incrementVersion,
@@ -123,6 +130,7 @@ public class CatalogContext {
         CatalogContext retval =
             new CatalogContext(
                     txnId,
+                    uniqueId,
                     newCatalog,
                     bytes,
                     realDepCRC,

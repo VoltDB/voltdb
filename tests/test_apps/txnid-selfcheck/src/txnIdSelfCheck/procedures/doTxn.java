@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,10 +46,10 @@ public class doTxn extends VoltProcedure {
     }
 
     public VoltTable[] run(byte cid, long rid, long oldestRid, byte[] value) {
-        final long txnId = getTransactionId();
-        final long ts = getTransactionTime().getTime();
+        final long txnId = getVoltPrivateRealTransactionIdDontUseMe();
+        final long uniqueId = getUniqueId();
 
-        voltQueueSQL(insertTxnid, txnId, ts, cid, getRid(rid), value);
+        voltQueueSQL(insertTxnid, txnId, uniqueId, cid, getRid(rid), value);
         voltQueueSQL(deleteOldTxns, cid, getRid(oldestRid));
         voltExecuteSQL();
 

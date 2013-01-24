@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -324,7 +324,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     }
                     //Forward the sequence number to the EE
                     context.getSiteProcedureConnection().exportAction(
-                            false,
+                            true,
                             0,
                             sequenceNumber,
                             myPartitionId,
@@ -371,7 +371,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     TRACE_LOG.trace("Checking saved table digest state for restore of: "
                             + m_filePath + ", " + m_fileNonce);
                     List<JSONObject> digests =
-                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce);
+                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce, HOST_LOG);
 
                     for (JSONObject obj : digests) {
                         result.addRow(obj.toString(), "SUCCESS", null);
@@ -622,8 +622,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             String table_name = (String) params.toArray()[0];
             long site_id = (Long) params.toArray()[1];
             int dependency_id = (Integer) params.toArray()[2];
-            TRACE_LOG.trace("Distributing replicated table: " + table_name +
-                    " to: " + site_id);
+            TRACE_LOG.trace(CoreUtils.hsIdToString(context.getSiteId()) + " distributing replicated table: " + table_name +
+                    " to: " + CoreUtils.hsIdToString(site_id));
             VoltTable result = performDistributeReplicatedTable(table_name, site_id);
             return new DependencyPair(dependency_id, result);
         }
@@ -636,7 +636,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             String table_name = (String) params.toArray()[0];
             int dependency_id = (Integer) params.toArray()[1];
             byte compressedTable[] = (byte[]) params.toArray()[2];
-            TRACE_LOG.trace("Received replicated table: " + table_name);
+            TRACE_LOG.trace("Received replicated table at " + CoreUtils.hsIdToString(context.getSiteId()) +
+                    " dependency id " + dependency_id);
             String result_str = "SUCCESS";
             String error_msg = "";
             try
@@ -667,7 +668,10 @@ public class SnapshotRestore extends VoltSystemProcedure
         {
             assert(params.toArray()[0] != null);
             int dependency_id = (Integer) params.toArray()[0];
-            TRACE_LOG.trace("Received confirmmation of successful replicated table load");
+            TRACE_LOG.trace(
+                    "Received confirmation of successful replicated table load at " +
+                            CoreUtils.hsIdToString(context.getSiteId()));
+
             VoltTable result = constructResultsTable();
             for (int dep_id : dependencies.keySet())
             {
@@ -810,9 +814,12 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(paramsArray.length == 1);
             assert(paramsArray[0] instanceof Long);
             long coordinatorHSId = (Long)paramsArray[0];
-
             Mailbox m = VoltDB.instance().getHostMessenger().createMailbox();
             m_mbox = m;
+            TRACE_LOG.trace(
+                    "Entering async run loop at " + CoreUtils.hsIdToString(context.getSiteId()) +
+                    " listening on mbox " + CoreUtils.hsIdToString(m.getHSId()));
+
 
             /*
              * Send the generated mailbox id to the coordinator mapping
@@ -855,6 +862,9 @@ public class SnapshotRestore extends VoltSystemProcedure
 
                 if (vm instanceof FragmentTaskMessage) {
                     FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
+                    TRACE_LOG.trace(
+                            CoreUtils.hsIdToString(context.getSiteId()) + " received fragment id " +
+                    ftm.getFragmentId(0));
                     DependencyPair dp =
                             m_runner.executePlanFragment(
                                     m_runner.getTxnState(),
@@ -1103,7 +1113,7 @@ public class SnapshotRestore extends VoltSystemProcedure
          * we do want a truncation snapshot if CL is enabled.
          */
         final boolean isStartWithNoAutomatedRestore =
-            startAction == VoltDB.START_ACTION.START && mode != org.voltdb.OperationMode.INITIALIZING;
+            startAction == VoltDB.START_ACTION.CREATE && mode != org.voltdb.OperationMode.INITIALIZING;
 
         final boolean isCLEnabled =
             VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl");
@@ -1115,7 +1125,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
             HOST_LOG.info("Requesting truncation snapshot to make data loaded by snapshot restore durable.");
             zk.create(
-                    "/request_truncation_snapshot",
+                    VoltZK.request_truncation_snapshot,
                     null,
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.PERSISTENT,
@@ -1823,16 +1833,9 @@ public class SnapshotRestore extends VoltSystemProcedure
             partitioned_tables[partition].add(loadedTable);
         }
 
-        /*
-         * Get all hands on deck for compression, do it async to minimize latency
-         */
-        ArrayList<Future<byte[]>> compressTableTasks = new ArrayList<Future<byte[]>>();
-        for (int ii = 0; ii < number_of_partitions; ii++) {
-            compressTableTasks.add(partitioned_tables[ii].getCompressedBytesAsync());
-        }
         byte compressedTables[][] = new byte[number_of_partitions][];
         for (int ii = 0; ii < compressedTables.length; ii++) {
-            compressedTables[ii] = compressTableTasks.get(ii).get();
+            compressedTables[ii] = partitioned_tables[ii].getCompressedBytes();
         }
         return compressedTables;
     }

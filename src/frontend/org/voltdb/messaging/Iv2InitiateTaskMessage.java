@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -23,7 +23,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.StoredProcedureInvocation;
 
 /**
@@ -57,7 +56,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long coordinatorHSId,
                         long truncationHandle,
                         long txnId,
-                        long timestamp,
+                        long uniqueId,
                         boolean isReadOnly,
                         boolean isSinglePartition,
                         StoredProcedureInvocation invocation,
@@ -65,7 +64,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long connectionId,
                         boolean isForReplay)
     {
-        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
+        super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
         super.setOriginalTxnId(invocation.getOriginalTxnId());
 
         setTruncationHandle(truncationHandle);
@@ -186,7 +185,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
         sb.append(m_txnId).append("\n");
-        sb.append(" TIMESTAMP ").append(m_timestamp).append("\n");
+        sb.append(" UNIQUE ID ").append(m_uniqueId).append("\n");
         sb.append(") TRUNC HANDLE ");
         sb.append(getTruncationHandle()).append("\n");
         sb.append("SP HANDLE: ").append(getSpHandle()).append("\n");

@@ -110,7 +110,6 @@ public class DeploymentBuilder {
 
     private Integer m_maxTempTableMemory = 100;
 
-    String m_elloader = null;         // loader package.Classname
     private boolean m_elenabled;      // true if enabled; false if disabled
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -169,8 +168,7 @@ public class DeploymentBuilder {
         m_ppdPrefix = ppdPrefix;
     }
 
-    public void addExport(final String loader, boolean enabled) {
-        m_elloader = loader;
+    public void addExport(boolean enabled) {
         m_elenabled = enabled;
     }
 
@@ -337,9 +335,6 @@ public class DeploymentBuilder {
         ExportType export = factory.createExportType();
         deployment.setExport(export);
         export.setEnabled(m_elenabled);
-        if (m_elloader != null) {
-            export.setClazz(m_elloader);
-        }
 
         // Have some yummy boilerplate!
         JAXBContext context = JAXBContext.newInstance(DeploymentType.class);

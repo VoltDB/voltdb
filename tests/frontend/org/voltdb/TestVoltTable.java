@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -52,7 +52,7 @@ public class TestVoltTable extends TestCase {
         t2 = new VoltTable();
     }
 
-    void addAllPrimitives(Class<?>[] permittedTypes) {
+    void addAllPrimitives(VoltTable table, Class<?>[] permittedTypes) {
         Object[] primitives = {
                 null,
                 (byte) 0,
@@ -71,7 +71,7 @@ public class TestVoltTable extends TestCase {
 
         for (Object o : primitives) {
             try {
-                t.addRow(o);
+                table.addRow(o);
                 if (o != null && !contains(permittedTypes, o.getClass())) {
                     fail(o.getClass()
                             + " is not permitted but addRow succeeded");
@@ -416,7 +416,7 @@ public class TestVoltTable extends TestCase {
 
     public void testStrings() {
         t = new VoltTable(new ColumnInfo("", VoltType.STRING));
-        addAllPrimitives(new Class[] { String.class, byte[].class });
+        addAllPrimitives(t, new Class[] { String.class, byte[].class });
         t.addRow("");
         assertEquals("string", t.fetchRow(1).getString(0));
 
@@ -471,7 +471,7 @@ public class TestVoltTable extends TestCase {
 
     public void testIntegers() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT));
-        addAllPrimitives(new Class[] { Long.class, Integer.class, Short.class,
+        addAllPrimitives(t, new Class[] { Long.class, Integer.class, Short.class,
                 Byte.class, Double.class, Float.class });
 
         t2 = FastSerializableTestUtil.roundTrip(t);
@@ -498,7 +498,7 @@ public class TestVoltTable extends TestCase {
                         .setScale(VoltDecimalHelper.kDefaultScale));
 
         t = new VoltTable(new ColumnInfo("foo", VoltType.DECIMAL));
-        addAllPrimitives(new Class[] { BigDecimal.class });
+        addAllPrimitives(t, new Class[] { BigDecimal.class });
 
         t2 = FastSerializableTestUtil.roundTrip(t);
         assertEquals(2, t2.getRowCount());
@@ -520,7 +520,7 @@ public class TestVoltTable extends TestCase {
 
     public void testFloats() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.FLOAT));
-        addAllPrimitives(new Class[] { Long.class, Integer.class, Short.class,
+        addAllPrimitives(t, new Class[] { Long.class, Integer.class, Short.class,
                 Byte.class, Double.class, Float.class });
 
         t2 = FastSerializableTestUtil.roundTrip(t);
@@ -595,7 +595,7 @@ public class TestVoltTable extends TestCase {
 
     public void testTimestamps() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.TIMESTAMP));
-        addAllPrimitives(new Class[] { Byte.class, Short.class, Integer.class,
+        addAllPrimitives(t, new Class[] { Byte.class, Short.class, Integer.class,
                 Long.class, Float.class, Double.class, TimestampType.class });
 
         t2 = FastSerializableTestUtil.roundTrip(t);
@@ -852,6 +852,56 @@ public class TestVoltTable extends TestCase {
             rowcounter++;
         }
         assertEquals(rowcounter, content.length);
+    }
+
+    public void testFormattedString() throws JSONException, IOException {
+        // Set the default timezone since we're using a timestamp type.  Eliminate test flakeyness.
+        VoltDB.setDefaultTimezone();
+
+        VoltTable table = new VoltTable(
+                new ColumnInfo("tinyint", VoltType.TINYINT), new ColumnInfo(
+                        "smallint", VoltType.SMALLINT), new ColumnInfo(
+                        "integer", VoltType.INTEGER), new ColumnInfo("bigint",
+                        VoltType.BIGINT), new ColumnInfo("float",
+                        VoltType.FLOAT), new ColumnInfo("string",
+                        VoltType.STRING), new ColumnInfo("varbinary",
+                        VoltType.VARBINARY), new ColumnInfo("timestamp",
+                        VoltType.TIMESTAMP), new ColumnInfo("decimal",
+                        VoltType.DECIMAL));
+
+        // add a row of nulls the hard way
+        table.addRow(VoltType.NULL_TINYINT, VoltType.NULL_SMALLINT,
+                VoltType.NULL_INTEGER, VoltType.NULL_BIGINT,
+                VoltType.NULL_FLOAT, VoltType.NULL_STRING_OR_VARBINARY,
+                VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_TIMESTAMP,
+                VoltType.NULL_DECIMAL);
+
+        // add a row of nulls the easy way
+        table.addRow(null, null, null, null, null, null, null, null, null);
+
+        // add a row of actual data.  Hard-code the timestamp so that we can compare deterministically
+        table.addRow(123, 12345, 1234567, 12345678901L, 1.234567, "aabbcc",
+                new byte[] { 10, 26, 10 },
+                new TimestampType(99), new BigDecimal(
+                        "123.45"));
+        String formatted_string = table.toFormattedString();
+
+        String expected =
+"tinyint  smallint  integer  bigint       float     string  varbinary  timestamp                   decimal          \n" +
+"-------- --------- -------- ------------ --------- ------- ---------- --------------------------- -----------------\n" +
+"    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
+"    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
+"     123     12345  1234567  12345678901  1.234567 aabbcc  0A1A0A     1970-01-01 00:00:00.000099   123.450000000000\n";
+
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output:");
+            System.out.println(formatted_string);
+            System.out.println("Expected output:");
+            System.out.println(expected);
+        }
+
+        assertTrue(formatted_string.equals(expected));
     }
 
     @SuppressWarnings("deprecation")

@@ -1,23 +1,25 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.rejoin;
 
 import java.nio.ByteBuffer;
+
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -32,6 +34,8 @@ import org.voltdb.VoltDB;
  * This class is not thread-safe.
  */
 public class StreamSnapshotSink implements RejoinSiteProcessor {
+    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+
     private Mailbox m_mb = null;
     private StreamSnapshotDataReceiver m_in = null;
     private Thread m_inThread = null;
@@ -103,17 +107,14 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
      * @return
      */
     private ByteBuffer getNextChunk(ByteBuffer buf) {
+        buf.position(buf.position() + 4);//skip partition id
         int length = m_schema.length + buf.remaining();
-        int rowCount = buf.getInt(buf.limit() - 4);
-        buf.limit(buf.limit() - 4);
-        // skip partition ID, partition ID CRC, and content CRC
-        buf.position(buf.position() + 12);
 
         ByteBuffer outputBuffer = getOutputBuffer(length);
         outputBuffer.put(m_schema);
-        outputBuffer.putInt(rowCount);
         outputBuffer.put(buf);
         outputBuffer.flip();
+
         return outputBuffer;
     }
 
@@ -166,11 +167,23 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
             ByteBuffer block = container.b;
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
             StreamSnapshotMessageType type = StreamSnapshotMessageType.values()[typeByte];
+            if (type == StreamSnapshotMessageType.FAILURE) {
+                VoltDB.crashLocalVoltDB("Rejoin source sent failure message.", false, null);
+
+                // for test code only
+                m_EOF = true;
+                return null;
+            }
             if (type == StreamSnapshotMessageType.END) {
+                rejoinLog.trace("Got END message");
+
                 // End of stream, no need to ack this buffer
                 m_EOF = true;
                 return null;
-            } else if (type == StreamSnapshotMessageType.SCHEMA) {
+            }
+            else if (type == StreamSnapshotMessageType.SCHEMA) {
+                rejoinLog.trace("Got SCHEMA message");
+
                 block.position(block.position() + 1);
                 m_schema = new byte[block.remaining()];
                 block.get(m_schema);

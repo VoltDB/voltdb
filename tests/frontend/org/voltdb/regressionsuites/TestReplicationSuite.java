@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -150,12 +150,6 @@ public class TestReplicationSuite extends RegressionSuite
 
         // CLUSTER, 3 hosts, each with two sites, replication of 1
         config = new LocalCluster("replication-offset-cluster.jar", 2, 3,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
-        // CLUSTER, 3 hosts, each with one site, replication of 1
-        config = new LocalCluster("replication-odd-cluster.jar", 1, 3,
                                   1, BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
         builder.addServerConfig(config);

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -37,12 +37,17 @@ public class AdHocPlannedStatement {
     public final CorePlan core;
     public final byte[] sql;
     public final ParameterSet extractedParamValues;
+    private final int[] boundParamIndexes;
+    public final String[] extractedParamStrings;
+    private String[] boundParamStrings;
     public final Object partitionParam; // not serialized
 
-    AdHocPlannedStatement(CompiledPlan plan, int catalogVersion) {
+    AdHocPlannedStatement(CompiledPlan plan, int catalogVersion, String[] extractedLiterals) {
         sql = plan.sql.getBytes(VoltDB.UTF8ENCODING);
         core = new CorePlan(plan, catalogVersion);
         extractedParamValues = plan.extractedParamValues;
+        boundParamIndexes = plan.boundParamIndexes();
+        extractedParamStrings = extractedLiterals;
         partitionParam = plan.getPartitioningKey();
 
         validate();
@@ -59,15 +64,20 @@ public class AdHocPlannedStatement {
     public AdHocPlannedStatement(byte[] sql,
                                  CorePlan core,
                                  ParameterSet extractedParamValues,
+                                 String[] extractedParamStrings,
+                                 String[] constants,
                                  Object partitionParam) {
 
         this.sql = sql;
         this.core = core;
         this.extractedParamValues = extractedParamValues;
+        this.boundParamIndexes = null;
+        this.extractedParamStrings = extractedParamStrings;
+        this.boundParamStrings = constants;
         this.partitionParam = partitionParam;
 
-        // as this constructor is used for deserializaton on the proc-running side,
-        // no partitioning param object is needed
+        // When this constructor is used for deserializaton on the proc-running side,
+        // the bound param and extracted param string constants and the partitioning param object are not required.
 
         validate();
     }
@@ -141,7 +151,7 @@ public class AdHocPlannedStatement {
         FastDeserializer fds = new FastDeserializer(buf);
         parameterSet.readExternal(fds);
 
-        return new AdHocPlannedStatement(sql, core, parameterSet, null);
+        return new AdHocPlannedStatement(sql, core, parameterSet, null, null, null);
     }
 
     /* (non-Javadoc)
@@ -186,5 +196,22 @@ public class AdHocPlannedStatement {
     public int hashCode() {
         assert false : "hashCode not designed";
         return 42; // any arbitrary constant will do
+    }
+
+    public String[] parameterBindings() {
+        if (boundParamStrings != null) {
+            return boundParamStrings;
+        }
+        if (extractedParamStrings == null) {
+            return null;
+        }
+        if (boundParamIndexes == null || boundParamIndexes.length == 0) {
+            return null;
+        }
+        boundParamStrings = new String[extractedParamValues.size()];
+        for (int paramIndex : boundParamIndexes) {
+            boundParamStrings[paramIndex] = extractedParamStrings[paramIndex];
+        }
+        return boundParamStrings;
     }
 }

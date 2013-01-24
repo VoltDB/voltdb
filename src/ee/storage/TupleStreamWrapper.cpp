@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -43,8 +43,8 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
     : m_partitionId(partitionId), m_siteId(siteId),
       m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
-      m_openTransactionId(0), m_openTransactionUso(0),
-      m_committedTransactionId(0), m_committedUso(0),
+      m_openSpHandle(0), m_openTransactionUso(0),
+      m_committedSpHandle(0), m_committedUso(0),
       m_signature(""), m_generation(0)
 {
     extendBufferChain(m_defaultCapacity);
@@ -54,8 +54,8 @@ void
 TupleStreamWrapper::setDefaultCapacity(size_t capacity)
 {
     assert (capacity > 0);
-    if (m_uso != 0 || m_openTransactionId != 0 ||
-        m_openTransactionUso != 0 || m_committedTransactionId != 0)
+    if (m_uso != 0 || m_openSpHandle != 0 ||
+        m_openTransactionUso != 0 || m_committedSpHandle != 0)
     {
         throwFatalException("setDefaultCapacity only callable before "
                             "TupleStreamWrapper is used");
@@ -106,9 +106,9 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
          * is not reset and remains constant. USO is really just for transport purposes.
          */
         m_uso = 0;
-        m_openTransactionId = 0;
+        m_openSpHandle = 0;
         m_openTransactionUso = 0;
-        m_committedTransactionId = 0;
+        m_committedSpHandle = 0;
         m_committedUso = 0;
         //Reconstruct the next block so it has a USO of 0.
         assert(m_currBlock->offset() == 0);
@@ -121,23 +121,23 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
 /*
  * Handoff fully committed blocks to the top end.
  *
- * This is the only function that should modify m_openTransactionId,
+ * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId, bool sync)
+void TupleStreamWrapper::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, bool sync)
 {
-    if (currentTxnId < m_openTransactionId)
+    if (currentSpHandle < m_openSpHandle)
     {
         throwFatalException("Active transactions moving backwards");
     }
 
     // more data for an ongoing transaction with no new committed data
-    if ((currentTxnId == m_openTransactionId) &&
-        (lastCommittedTxnId == m_committedTransactionId))
+    if ((currentSpHandle == m_openSpHandle) &&
+        (lastCommittedSpHandle == m_committedSpHandle))
     {
-        //std::cout << "Current txnid(" << currentTxnId << ") == m_openTransactionId(" << m_openTransactionId <<
-        //") && lastCommittedTxnId(" << lastCommittedTxnId << ") m_committedTransactionId(" <<
-        //m_committedTransactionId << ")" << std::endl;
+        //std::cout << "Current spHandle(" << currentSpHandle << ") == m_openSpHandle(" << m_openSpHandle <<
+        //") && lastCommittedSpHandle(" << lastCommittedSpHandle << ") m_committedSpHandle(" <<
+        //m_committedSpHandle << ")" << std::endl;
         if (sync) {
             ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
                     m_generation,
@@ -153,25 +153,25 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
     // If the current TXN ID has advanced, then we know that:
     // - The old open transaction has been committed
     // - The current transaction is now our open transaction
-    if (m_openTransactionId < currentTxnId)
+    if (m_openSpHandle < currentSpHandle)
     {
-        //std::cout << "m_openTransactionId(" << m_openTransactionId << ") < currentTxnId("
-        //<< currentTxnId << ")" << std::endl;
+        //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
+        //<< currentSpHandle << ")" << std::endl;
         m_committedUso = m_uso;
         // Advance the tip to the new transaction.
-        m_committedTransactionId = m_openTransactionId;
-        m_openTransactionId = currentTxnId;
+        m_committedSpHandle = m_openSpHandle;
+        m_openSpHandle = currentSpHandle;
     }
 
-    // now check to see if the lastCommittedTxn tells us that our open
+    // now check to see if the lastCommittedSpHandle tells us that our open
     // transaction should really be committed.  If so, update the
     // committed state.
-    if (m_openTransactionId <= lastCommittedTxnId)
+    if (m_openSpHandle <= lastCommittedSpHandle)
     {
-        //std::cout << "m_openTransactionId(" << m_openTransactionId << ") <= lastCommittedTxnId(" <<
-        //lastCommittedTxnId << ")" << std::endl;
+        //std::cout << "m_openSpHandle(" << m_openSpHandle << ") <= lastCommittedSpHandle(" <<
+        //lastCommittedSpHandle << ")" << std::endl;
         m_committedUso = m_uso;
-        m_committedTransactionId = m_openTransactionId;
+        m_committedSpHandle = m_openSpHandle;
     }
 
     while (!m_pendingBlocks.empty())
@@ -307,8 +307,8 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
  */
 void
 TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
-                                  int64_t lastCommittedTxnId,
-                                  int64_t currentTxnId)
+                                  int64_t lastCommittedSpHandle,
+                                  int64_t currentSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
@@ -321,34 +321,35 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
         // Due to tryToSneakInASinglePartitionProcedure (and probable
         // speculative execution in the future), the EE is not
         // guaranteed to see all transactions in transaction ID order.
-        // periodicFlush is handed whatever the most recent txnId
-        // executed is, whether or not that txnId is relevant to this
+        // periodicFlush is handed whatever the most recent SpHandle
+        // executed is, whether or not that SpHandle is relevant to this
         // export stream.  commit() is enforcing the invariants that
         // the TupleStreamWrapper needs to see for relevant
-        // transaction IDs; we choose whichever of currentTxnId or
-        // m_openTransactionId here will allow commit() to continue
+        // transaction IDs; we choose whichever of currentSpHandle or
+        // m_openSpHandle here will allow commit() to continue
         // operating correctly.
-        int64_t txnId = currentTxnId;
-        if (m_openTransactionId > currentTxnId)
+        int64_t spHandle = currentSpHandle;
+        if (m_openSpHandle > currentSpHandle)
         {
-            txnId = m_openTransactionId;
+            spHandle = m_openSpHandle;
         }
 
         extendBufferChain(0);
-        commit(lastCommittedTxnId, txnId, timeInMillis < 0 ? true : false);
+        commit(lastCommittedSpHandle, spHandle, timeInMillis < 0 ? true : false);
     }
 }
 
 /*
- * If txnId represents a new transaction, commit previous data.
+ * If SpHandle represents a new transaction, commit previous data.
  * Always serialize the supplied tuple in to the stream.
  * Return m_uso before this invocation - this marks the point
  * in the stream the caller can rollback to if this append
  * should be rolled back.
  */
-size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
-                                       int64_t txnId,
+size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedSpHandle,
+                                       int64_t spHandle,
                                        int64_t seqNo,
+                                       int64_t uniqueId,
                                        int64_t timestamp,
                                        TableTuple &tuple,
                                        TupleStreamWrapper::Type type)
@@ -358,12 +359,12 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
-    if (txnId < m_openTransactionId)
+    if (spHandle < m_openSpHandle)
     {
         throwFatalException("Active transactions moving backwards");
     }
 
-    commit(lastCommittedTxnId, txnId);
+    commit(lastCommittedSpHandle, spHandle);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -389,7 +390,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
                              m_currBlock->remaining() - rowHeaderSz);
 
     // write metadata columns
-    io.writeLong(txnId);
+    io.writeLong(spHandle);
     io.writeLong(timestamp);
     io.writeLong(seqNo);
     io.writeLong(m_partitionId);

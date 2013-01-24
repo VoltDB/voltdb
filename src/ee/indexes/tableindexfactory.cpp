@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -46,8 +46,10 @@
 #include <cassert>
 #include <iostream>
 #include "indexes/tableindexfactory.h"
+#include "common/SerializableEEException.h"
 #include "common/types.h"
 #include "catalog/index.h"
+#include "expressions/tuplevalueexpression.h"
 #include "indexes/tableindex.h"
 #include "indexes/indexkey.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
@@ -99,7 +101,15 @@ class TableIndexPicker
                       m_scheme.name.c_str());
             m_type = BALANCED_TREE_INDEX;
         }
-        return getInstanceForKeyType<GenericKey<KeySize> >();
+        // If any indexed expression value can not either be stored "inline" within a (GenericKey) key tuple
+        // or specifically in a non-inlined object shared with the base table (because it is a simple column value),
+        // then the GenericKey will have to reference and maintain its own persistent non-inline storage.
+        // That's exactly what the GenericPersistentKey subtype of GenericKey does. This incurs extra overhead
+        // for object copying and freeing, so is only enabled as needed.
+        if (m_inlinesOrColumnsOnly) {
+            return getInstanceForKeyType<GenericKey<KeySize> >();
+        }
+        return getInstanceForKeyType<GenericPersistentKey<KeySize> >();
     }
 
     template <int ColCount>
@@ -153,6 +163,7 @@ public:
 
         // no int specialization beyond this size (32 bytes == 4 'uint64_t's)
         m_intsOnly = false;
+        //TODO: short term, throw if scheme uses generalized indexed expressions (m_scheme.indexedExpressions.size() > 0)
 
         if ((result = getInstanceIfKeyFits<48>())) {
             return result;
@@ -184,11 +195,13 @@ public:
         }
     }
 
-    TableIndexPicker(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
+    TableIndexPicker(const TupleSchema *keySchema, bool intsOnly, bool inlinesOrColumnsOnly,
+                     const TableIndexScheme &scheme) :
         m_scheme(scheme),
         m_keySchema(keySchema),
         m_keySize(keySchema->tupleLength()),
-        m_intsOnly(scheme.intsOnly),
+        m_intsOnly(intsOnly),
+        m_inlinesOrColumnsOnly(inlinesOrColumnsOnly),
         m_type(scheme.type)
     {}
 
@@ -197,24 +210,71 @@ private:
     const TupleSchema *m_keySchema;
     const int m_keySize;
     bool m_intsOnly;
+    bool m_inlinesOrColumnsOnly;
     TableIndexType m_type;
 };
 
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
-    int colCount = (int)scheme.columnIndices.size();
-    TupleSchema *tupleSchema = scheme.tupleSchema;
+    const TupleSchema *tupleSchema = scheme.tupleSchema;
     assert(tupleSchema);
+    bool isIntsOnly = true;
+    bool isInlinesOrColumnsOnly = true;
     std::vector<ValueType> keyColumnTypes;
     std::vector<int32_t> keyColumnLengths;
-    std::vector<bool> keyColumnAllowNull(colCount, true);
-    for (int i = 0; i < colCount; ++i) {
-        keyColumnTypes.push_back(tupleSchema->columnType(scheme.columnIndices[i]));
-        keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[i]));
+    size_t valueCount = 0;
+    size_t exprCount = scheme.indexedExpressions.size();
+    if (exprCount != 0) {
+        valueCount = exprCount;
+        // TODO: This is where we could gain some extra runtime and space efficiency by
+        // somehow marking which indexed expressions happen to be non-inlined column expressions.
+        // This case is significant because it presents an opportunity for the GenericPersistentKey
+        // index keys to avoid a persistent allocation and copy of an already persistent value.
+        // This could be implemented as a bool attribute of TupleSchema::ColumnInfo that is only
+        // set to true in this special case. It would universally disable deep copying of that
+        // particular "tuple column"'s referenced object.
+        for (size_t ii = 0; ii < valueCount; ++ii) {
+            ValueType exprType = scheme.indexedExpressions[ii]->getValueType();
+            if ( ! isIntegralType(exprType)) {
+                isIntsOnly = false;
+            }
+            uint32_t declaredLength;
+            if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
+                // Setting the column length to TUPLE_SCHEMA_COLUMN_MAX_VALUE_LENGTH constrains the
+                // maximum length of expression values that can be indexed with the same limit
+                // that gets applied to column values.
+                // In theory, indexed expression values could have an independent limit
+                // up to any length that can be allocated via ThreadLocalPool.
+                // Currently, all of these cases are constrained with the same limit,
+                // which is also the default/maximum size for variable columns defined in schema,
+                // as controlled in java by VoltType.MAX_VALUE_LENGTH.
+                // It's not clear whether scheme.indexedExpressions[ii]->getValueSize()
+                // can or should be called for a more useful answer.
+                // There's probably little to gain since expressions usually do not contain enough information
+                // to reliably determine that the result value is always small enough to "inline".
+                declaredLength = TupleSchema::COLUMN_MAX_VALUE_LENGTH;
+                isInlinesOrColumnsOnly = false;
+            } else {
+                declaredLength = NValue::getTupleStorageSize(exprType);
+            }
+            keyColumnTypes.push_back(exprType);
+            keyColumnLengths.push_back(declaredLength);
+        }
+    } else {
+        valueCount = scheme.columnIndices.size();
+        for (size_t ii = 0; ii < valueCount; ++ii) {
+            ValueType exprType = tupleSchema->columnType(scheme.columnIndices[ii]);
+            if ( ! isIntegralType(exprType)) {
+                isIntsOnly = false;
+            }
+            keyColumnTypes.push_back(exprType);
+            keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[ii]));
+        }
     }
+    std::vector<bool> keyColumnAllowNull(valueCount, true);
     TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
     assert(keySchema);
-    VOLT_TRACE("Creating index for %s.\n%s", scheme.name.c_str(), keySchema->debug().c_str());
-    TableIndexPicker picker(keySchema, scheme);
+    VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
+    TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);
     TableIndex *retval = picker.getInstance();
     return retval;
 }

@@ -1,21 +1,24 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.expressions;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -34,6 +37,11 @@ public class ParameterValueExpression extends AbstractValueExpression {
     }
 
     protected int m_paramIndex = -1;
+    // Only parameters injected by the plan cache "parameterizer" have an associated constant
+    // representing the original statement's constant value that the parameter replaces.
+    // The constant value does not need to participate in parameter value identity (equality/hashing)
+    // or serialization (export to EE).
+    private ConstantValueExpression m_originalValue = null;
 
     public ParameterValueExpression() {
         super(ExpressionType.VALUE_PARAMETER);
@@ -43,6 +51,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
     public Object clone() throws CloneNotSupportedException {
         ParameterValueExpression clone = (ParameterValueExpression)super.clone();
         clone.m_paramIndex = m_paramIndex;
+        clone.m_originalValue = m_originalValue;
         return clone;
     }
 
@@ -106,19 +115,50 @@ public class ParameterValueExpression extends AbstractValueExpression {
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
+        if (columnType == null) {
+            return;
+        }
         if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isInteger()) {
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
+        } else if (m_valueType == null) {
+            m_valueType = columnType;
+            m_valueSize = columnType.getMaxLengthInBytes();
         }
     }
 
     @Override
     public void finalizeValueTypes() {
-        if (m_valueType != VoltType.NUMERIC) {
+        // At this late stage, it's better to force a specific type than to leave one that will only
+        // cause problems in the ProcedureRunner (chokes on null or NUMERIC) or executor (chokes on NUMERIC).
+        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+    }
+
+    public void setOriginalValue(ConstantValueExpression cve) {
+        m_originalValue = cve;
+    }
+
+    public ConstantValueExpression getOriginalValue() {
+        return m_originalValue;
+    }
+
+    // Return this parameter in a list of bound parameters if the expr argument is in fact
+    // its original value constant "binding". This ensures that the index plan that depends
+    // on the parameter binding to a critical constant value does not get misapplied to a later
+    // query in which that constant differs.
+    @Override
+    public List<AbstractExpression> bindingToIndexedExpression(AbstractExpression expr) {
+        if (m_originalValue == null || ! m_originalValue.equals(expr)) {
+            return null;
+        }
+        // This parameter's value was matched, so return this as one bound parameter.
+        List<AbstractExpression> result = new ArrayList<AbstractExpression>();
+        result.add(this);
+        return result;
     }
 
 }

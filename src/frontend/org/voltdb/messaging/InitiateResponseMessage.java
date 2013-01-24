@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -39,6 +39,7 @@ public class InitiateResponseMessage extends VoltMessage {
     private long m_connectionId;
     private boolean m_commit;
     private boolean m_recovering;
+    private boolean m_readOnly;
     private ClientResponseImpl m_response;
 
     /** Empty constructor for de-serialization */
@@ -60,6 +61,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_subject = Subject.DEFAULT.getId();
         m_clientInterfaceHandle = task.getClientInterfaceHandle();
         m_connectionId = task.getConnectionId();
+        m_readOnly = task.isReadOnly();
     }
 
     /**
@@ -76,6 +78,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_subject = Subject.DEFAULT.getId();
         m_clientInterfaceHandle = Long.MIN_VALUE;
         m_connectionId = Long.MIN_VALUE;
+        m_readOnly = task.isReadOnly();
     }
 
     public void setClientHandle(long clientHandle) {
@@ -127,6 +130,10 @@ public class InitiateResponseMessage extends VoltMessage {
         m_response = r;
     }
 
+    public boolean isReadOnly() {
+        return m_readOnly;
+    }
+
     @Override
     public int getSerializedSize()
     {
@@ -137,6 +144,7 @@ public class InitiateResponseMessage extends VoltMessage {
             + 8 // coordinator HSId
             + 8 // client interface handle
             + 8 // client connection id
+            + 1 // read only
             + 1; // node recovering indication
 
         msgsize += m_response.getSerializedSize();
@@ -154,6 +162,7 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.putLong(m_coordinatorHSId);
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
+        buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
         assert(buf.capacity() == buf.position());
@@ -169,6 +178,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_coordinatorHSId = buf.getLong();
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
+        m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
@@ -187,6 +197,7 @@ public class InitiateResponseMessage extends VoltMessage {
         sb.append("\n COORDINATOR HSID: " + CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append("\n CLIENT INTERFACE HANDLE: " + m_clientInterfaceHandle);
         sb.append("\n CLIENT CONNECTION ID: " + m_connectionId);
+        sb.append("\n READ-ONLY: " + m_readOnly);
         if (m_commit)
             sb.append("\n  COMMIT");
         else

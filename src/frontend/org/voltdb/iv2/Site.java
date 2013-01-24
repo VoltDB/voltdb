@@ -1,22 +1,26 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -26,8 +30,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -60,7 +66,14 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -83,7 +96,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     final BackendTarget m_backend;
 
     // Is the site in a rejoining mode.
-    boolean m_isRejoining;
+    private final static int kStateRunning = 0;
+    private final static int kStateRejoining = 1;
+    private final static int kStateReplayingRejoin = 2;
+    private int m_rejoinState;
+    private TaskLog m_rejoinTaskLog;
+    private RejoinProducer.ReplayCompletionAction m_replayCompletionAction;
+    private final VoltDB.START_ACTION m_startAction;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -121,16 +140,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Current topology
     int m_partitionId;
 
+    private final String m_coreBindIds;
+
     // Need temporary access to some startup parameters in order to
     // initialize EEs in the right thread.
     private static class StartupConfig
     {
         final String m_serializedCatalog;
-        final long m_txnId;
-        StartupConfig(final String serCatalog, final long txnId)
+        final long m_timestamp;
+        StartupConfig(final String serCatalog, final long timestamp)
         {
             m_serializedCatalog = serCatalog;
-            m_txnId = txnId;
+            m_timestamp = timestamp;
         }
     }
     private StartupConfig m_startupConfig = null;
@@ -205,12 +226,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return m_siteId;
         }
 
+        /*
+         * Expensive to compute, memoize it
+         */
+        private Boolean m_isLowestSiteId = null;
         @Override
         public boolean isLowestSiteId()
         {
-            // FUTURE: should pass this status in at construction.
-            long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
-            return m_siteId == lowestSiteId;
+            if (m_isLowestSiteId != null) {
+                return m_isLowestSiteId;
+            } else {
+                // FUTURE: should pass this status in at construction.
+                long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
+                m_isLowestSiteId = m_siteId == lowestSiteId;
+                return m_isLowestSiteId;
+            }
         }
 
 
@@ -282,11 +312,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long txnId,
             int partitionId,
             int numPartitions,
-            boolean createForRejoin,
+            VoltDB.START_ACTION startAction,
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
-            MemoryStats memStats)
+            MemoryStats memStats,
+            String coreBindIds)
     {
         m_siteId = siteId;
         m_context = context;
@@ -294,14 +325,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_isRejoining = createForRejoin;
+        m_startAction = startAction;
+        m_rejoinState = VoltDB.createForRejoin(startAction) ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
-        m_startupConfig = new StartupConfig(serializedCatalog, txnId);
+        m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
         m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
+        m_coreBindIds = coreBindIds;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -328,7 +361,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     /** Thread specific initialization */
-    void initialize(String serializedCatalog, long txnId)
+    void initialize(String serializedCatalog, long timestamp)
     {
         if (m_backend == BackendTarget.NONE) {
             m_hsql = null;
@@ -341,7 +374,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         else {
             m_hsql = null;
-            m_ee = initializeEE(serializedCatalog, txnId);
+            m_ee = initializeEE(serializedCatalog, timestamp);
         }
 
         m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
@@ -352,16 +385,68 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         },
         m_snapshotPriority,
         new SnapshotSiteProcessor.IdlePredicate() {
-
             @Override
             public boolean idle(long now) {
                 return (now - 5) > m_lastTxnTime;
             }
         });
+
+        if (m_startAction == VoltDB.START_ACTION.LIVE_REJOIN) {
+            initializeForLiveRejoin();
+        }
+
+        if (m_rejoinTaskLog == null) {
+            m_rejoinTaskLog = new TaskLog() {
+                @Override
+                public void logTask(TransactionInfoBaseMessage message)
+                        throws IOException {
+                }
+
+                @Override
+                public TransactionInfoBaseMessage getNextMessage()
+                        throws IOException {
+                    return null;
+                }
+
+                @Override
+                public void setEarliestTxnId(long txnId) {
+                }
+
+                @Override
+                public boolean isEmpty() throws IOException {
+                    return true;
+                }
+
+                @Override
+                public void close() throws IOException {
+                }
+            };
+        }
+    }
+
+
+    void initializeForLiveRejoin()
+    {
+        // Construct task log and start logging task messages
+        File overflowDir =
+            new File(m_context.cluster.getVoltroot(), "rejoin_overflow");
+        Class<?> taskLogKlass =
+            MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Rejoin", false);
+        if (taskLogKlass != null) {
+            Constructor<?> taskLogConstructor;
+            try {
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir, true);
+            } catch (InvocationTargetException e) {
+                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e);
+            }
+        }
     }
 
     /** Create a native VoltDB execution engine */
-    ExecutionEngine initializeEE(String serializedCatalog, final long txnId)
+    ExecutionEngine initializeEE(String serializedCatalog, final long timestamp)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
         ExecutionEngine eeTemp = null;
@@ -377,10 +462,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                         m_numberOfPartitions);
-                eeTemp.loadCatalog( txnId, serializedCatalog);
-                // TODO: export integration will require a tick.
-                // lastTickTime = EstTime.currentTimeMillis();
-                // eeTemp.tick(lastTickTime, txnId);
+                eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
                 // set up the EE over IPC
@@ -396,10 +478,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
                             m_numberOfPartitions);
-                eeTemp.loadCatalog( 0, serializedCatalog);
-                // TODO: export integration will require a tick.
-                // lastTickTime = EstTime.currentTimeMillis();
-                // eeTemp.tick( lastTickTime, 0);
+                eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
         }
         // just print error info an bail if we run into an error here
@@ -416,16 +495,33 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void run()
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
-        initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_txnId);
+        if (m_coreBindIds != null) {
+            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
+        }
+        initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
         m_startupConfig = null; // release the serializedCatalog bytes.
 
         try {
             while (m_shouldContinue) {
-                runLoop();
+                if (m_rejoinState == kStateRunning) {
+                    // Normal operation blocks the site thread on the sitetasker queue.
+                    SiteTasker task = m_scheduler.take();
+                    if (task instanceof TransactionTask) {
+                        m_currentTxnId = ((TransactionTask)task).getTxnId();
+                        m_lastTxnTime = EstTime.currentTimeMillis();
+                    }
+                    task.run(getSiteProcedureConnection());
+                }
+                else {
+                    // Rejoin operation poll and try to do some catchup work. Tasks
+                    // are responsible for logging any rejoin work they might have.
+                    SiteTasker task = m_scheduler.poll();
+                    if (task != null) {
+                        task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
+                    }
+                    replayFromTaskLog();
+                }
             }
-        }
-        catch (final InterruptedException e) {
-            // acceptable - this is how site blocked on an empty scheduler terminates.
         }
         catch (OutOfMemoryError e)
         {
@@ -445,21 +541,99 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         shutdown();
     }
 
-    void runLoop() throws InterruptedException
+    ParticipantTransactionState global_replay_mpTxn = null;
+    void replayFromTaskLog() throws IOException
     {
-        SiteTasker task = m_scheduler.poll();
-        if (task != null) {
-            if (task instanceof TransactionTask) {
-                m_currentTxnId = ((TransactionTask)task).getTxnId();
-                m_lastTxnTime = EstTime.currentTimeMillis();
+        // not yet time to catch-up.
+        if (m_rejoinState != kStateReplayingRejoin) {
+            return;
+        }
+
+        // replay 10:1 in favor of replay
+        for (int i=0; i < 10; ++i) {
+            if (m_rejoinTaskLog.isEmpty()) {
+                break;
             }
-            if (m_isRejoining) {
-                task.runForRejoin(getSiteProcedureConnection());
+
+            TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
+            if (tibm == null) {
+                break;
+            }
+
+            if (tibm instanceof Iv2InitiateTaskMessage) {
+                Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
+                SpProcedureTask t = new SpProcedureTask(
+                        m_initiatorMailbox, m.getStoredProcedureName(),
+                        null, m, null);
+                if (!filter(tibm)) {
+                    t.runFromTaskLog(this);
+                }
+            }
+            else if (tibm instanceof FragmentTaskMessage) {
+                FragmentTaskMessage m = (FragmentTaskMessage)tibm;
+                if (global_replay_mpTxn == null) {
+                    global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
+                }
+                else if (global_replay_mpTxn.txnId != m.getTxnId()) {
+                    VoltDB.crashLocalVoltDB("Started a MP transaction during replay before completing " +
+                            " open transaction.", false, null);
+                }
+                FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+                if (!filter(tibm)) {
+                    t.runFromTaskLog(this);
+                }
+            }
+            else if (tibm instanceof CompleteTransactionMessage) {
+                // Needs improvement: completes for sysprocs aren't filterable as sysprocs.
+                // Only complete transactions that are open...
+                if (global_replay_mpTxn != null) {
+                    CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
+                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
+                    if (!m.isRestart()) {
+                        global_replay_mpTxn = null;
+                    }
+                    if (!filter(tibm)) {
+                        t.runFromTaskLog(this);
+                    }
+                }
             }
             else {
-                task.run(getSiteProcedureConnection());
+                VoltDB.crashLocalVoltDB("Can not replay message type " +
+                        tibm + " during live rejoin. Unexpected error.",
+                        false, null);
             }
         }
+
+        // exit replay being careful not to exit in the middle of a multi-partititon
+        // transaction. The SPScheduler doesn't have a valid transaction state for a
+        // partially replayed MP txn and in case of rollback the scheduler's undo token
+        // is wrong. Run MP txns fully kStateRejoining or fully kStateRunning.
+        if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
+            setReplayRejoinComplete();
+        }
+    }
+
+    private boolean filter(TransactionInfoBaseMessage tibm)
+    {
+        // don't log sysproc fragments or iv2 intiiate task messages.
+        // this is all jealously; should be refactored to ask tibm
+        // if it wants to be filtered for rejoin and eliminate this
+        // horrible introspection. This implementation mimics the
+        // original live rejoin code for ExecutionSite...
+        if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
+            return true;
+        }
+        else if (tibm instanceof Iv2InitiateTaskMessage) {
+            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
+            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
+                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void startShutdown()
@@ -477,7 +651,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_ee.release();
             }
             if (m_snapshotter != null) {
-                m_snapshotter.shutdown();
+                try {
+                    m_snapshotter.shutdown();
+                } catch (InterruptedException e) {
+                    hostLog.warn("Interrupted during shutdown", e);
+                }
             }
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);
@@ -488,8 +666,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // SiteSnapshotConnection interface
     //
     @Override
-    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
-        m_snapshotter.initiateSnapshots(m_ee, tasks, txnId, numLiveHosts);
+    public void initiateSnapshots(
+            Deque<SnapshotTableTask> tasks,
+            long txnId,
+            int numLiveHosts,
+            Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
+        m_snapshotter.initiateSnapshots(m_ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
     }
 
     /*
@@ -543,11 +725,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void loadTable(long txnId, int tableId, VoltTable data)
+    public void loadTable(long spHandle, int tableId, VoltTable data)
     {
         m_ee.loadTable(tableId, data,
-                txnId,
-                m_lastCommittedTxnId);
+                spHandle,
+                m_lastCommittedSpHandle);
     }
 
     @Override
@@ -636,7 +818,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         long time = System.currentTimeMillis();
 
-        m_ee.tick(time, m_lastCommittedTxnId);
+        m_ee.tick(time, m_lastCommittedSpHandle);
         statsTick(time);
     }
 
@@ -675,9 +857,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 // rollup the table memory stats for this site
                 while (stats.advanceRow()) {
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     tupleCount += stats.getLong(7);
+                    assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     tupleAllocatedMem += (int) stats.getLong(8);
+                    assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
                     tupleDataMem += (int) stats.getLong(9);
+                    assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
                     stringMem += (int) stats.getLong(10);
                 }
                 stats.resetRowPosition();
@@ -694,7 +881,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 // rollup the index memory stats for this site
                 while (stats.advanceRow()) {
-                    indexMem += stats.getLong(10);
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
+                    indexMem += stats.getLong(11);
                 }
                 stats.resetRowPosition();
 
@@ -717,12 +906,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void quiesce()
     {
-        m_ee.quiesce(m_lastCommittedTxnId);
+        m_ee.quiesce(m_lastCommittedSpHandle);
     }
 
     @Override
     public void exportAction(boolean syncAction,
-                             int ackOffset,
+                             long ackOffset,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
@@ -744,8 +933,55 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setRejoinComplete() {
-        m_isRejoining = false;
+    public void setRejoinComplete(
+            RejoinProducer.ReplayCompletionAction replayComplete,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+        // transition from kStateRejoining to live rejoin replay.
+        // pass through this transition in all cases; if not doing
+        // live rejoin, will transfer to kStateRunning as usual
+        // as the rejoin task log will be empty.
+        assert(m_rejoinState == kStateRejoining);
+
+        if (replayComplete == null) {
+            throw new RuntimeException("Null Replay Complete Action.");
+        }
+
+        for (Map.Entry<String, Map<Integer, Pair<Long,Long>>> tableEntry : exportSequenceNumbers.entrySet()) {
+            final Table catalogTable = m_context.tables.get(tableEntry.getKey());
+            if (catalogTable == null) {
+                VoltDB.crashLocalVoltDB(
+                        "Unable to find catalog entry for table named " + tableEntry.getKey(),
+                        true,
+                        null);
+            }
+            Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
+            if (sequenceNumbers == null) {
+                VoltDB.crashLocalVoltDB(
+                        "Could not find export sequence numbers for partition " +
+                                m_partitionId + " table " +
+                                tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
+            }
+            exportAction(
+                    true,
+                    sequenceNumbers.getFirst().longValue(),
+                    sequenceNumbers.getSecond(),
+                    m_partitionId,
+                    catalogTable.getSignature());
+        }
+
+        m_rejoinState = kStateReplayingRejoin;
+        m_replayCompletionAction = replayComplete;
+        if (m_rejoinTaskLog != null) {
+            m_rejoinTaskLog.setEarliestTxnId(
+                    m_replayCompletionAction.getSnapshotTxnId());
+        }
+    }
+
+    private void setReplayRejoinComplete() {
+        // transition out of rejoin replay to normal running state.
+        assert(m_rejoinState == kStateReplayingRejoin);
+        m_replayCompletionAction.run();
+        m_rejoinState = kStateRunning;
     }
 
     @Override
@@ -756,15 +992,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
-            ParameterSet[] parameterSets, long txnId, boolean readOnly)
+            ParameterSet[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
             throws EEException {
         return m_ee.executePlanFragments(
                 numFragmentIds,
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
-                txnId,
-                m_lastCommittedTxnId,
+                spHandle,
+                m_lastCommittedSpHandle,
+                uniqueId,
                 readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
@@ -786,7 +1023,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             //Necessary to quiesce before updating the catalog
             //so export data for the old generation is pushed to Java.
             m_ee.quiesce(m_lastCommittedTxnId);
-            m_ee.updateCatalog(m_context.m_transactionId, diffCmds);
+            m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
         }
 
         return true;

@@ -1,21 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
+
+import java.io.UnsupportedEncodingException;
 
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,6 +41,8 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
+
+import org.voltdb.VoltDB;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -118,12 +122,17 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     @Override
     public void put(int partitionId, long HSId) throws KeeperException, InterruptedException {
         try {
-            m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
-                    Long.toString(HSId).getBytes(),
-                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException e) {
-            m_zk.setData(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
-                        Long.toString(HSId).getBytes(), -1);
+            try {
+                m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
+                        Long.toString(HSId).getBytes("UTF-8"),
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            } catch (KeeperException.NodeExistsException e) {
+                m_zk.setData(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
+                        Long.toString(HSId).getBytes("UTF-8"), -1);
+            }
+        }
+        catch (UnsupportedEncodingException utf8) {
+            VoltDB.crashLocalVoltDB("Invalid string encoding: UTF-8", true, utf8);
         }
     }
 
@@ -139,7 +148,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     private final String m_rootNode;
 
     // All watch processing is run serially in this thread.
-    private final ListeningExecutorService m_es = CoreUtils.getSingleThreadExecutor("LeaderCache");
+    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache", 15000);
 
     // previous children snapshot for internal use.
     private Set<String> m_lastChildren = new HashSet<String>();
@@ -284,11 +293,13 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         ByteArrayCallback cb = new ByteArrayCallback();
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
+            // cb.getData() and cb.getPath() throw KeeperException
             byte payload[] = cb.getData();
             long HSId = Long.valueOf(new String(payload, "UTF-8"));
             cacheCopy.put(getPartitionIdFromZKPath(cb.getPath()), HSId);
         } catch (KeeperException.NoNodeException e) {
-            cacheCopy.remove(event.getPath());
+            // rtb: I think result's path is the same as cb.getPath()?
+            cacheCopy.remove(getPartitionIdFromZKPath(event.getPath()));
         }
         m_publicCache.set(ImmutableMap.copyOf(cacheCopy));
         if (m_cb != null) {

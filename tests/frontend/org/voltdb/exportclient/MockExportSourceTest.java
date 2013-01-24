@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@
 package org.voltdb.exportclient;
 
 import java.io.File;
+import java.util.TimeZone;
 
 import junit.framework.TestCase;
 
@@ -41,7 +42,8 @@ public class MockExportSourceTest extends TestCase {
         File dir = new File(System.getProperty("user.dir") + File.separator + "00_exportout");
         System.out.printf("Working dir is %s\n", dir.getPath());
         ExportToFileClient exportClient = new ExportToFileClient(
-                ',', "testy", dir, 1, "yyyyMMddHHmmss", "&amp;\u0000\\\n", 0, false, true, true, 5, false);
+                ',', "testy", dir, 1, "yyyyMMddHHmmss", "&amp;\u0000\\\n", 0,
+                false, true, true, 5, false, TimeZone.getDefault(), ExportToFileClient.BinaryEncoding.HEX);
         //ExportToFileClient exportClient = new ExportToFileClient(',', "testy", dir, 1, "yyyyMMddHHmmss", 0, false);
         //DiscardingExportClient exportClient = new DiscardingExportClient(false);
         exportClient.addServerInfo("localhost", false);

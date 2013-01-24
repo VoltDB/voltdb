@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,8 +32,8 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DistinctPlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
@@ -284,7 +284,7 @@ public class TestPushDownAggregates extends TestCase {
         assertTrue(pn.size() > 0);
 
         AbstractPlanNode p = pn.get(0).getChild(0);
-        assertTrue(p instanceof HashAggregatePlanNode);
+        assertTrue(p instanceof AggregatePlanNode);
         if (pushDownTypes != null) {
             for (ExpressionType type : pushDownTypes) {
                 assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
@@ -305,7 +305,7 @@ public class TestPushDownAggregates extends TestCase {
         }
 
         if (pushDownTypes != null) {
-            assertTrue(p instanceof HashAggregatePlanNode);
+            assertTrue(p instanceof AggregatePlanNode);
             for (ExpressionType type : aggTypes) {
                 assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
                                                      type.toString() + "\""));

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -150,7 +150,7 @@ public class TestReplayTxnState extends TestCase {
 
         assertFalse(mpTxn.doWork(true));
 
-        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 2, 1, false, false, true, false, false);
+        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 2, 1, false, 0, false, true, false, false);
         mpTxn.processCompleteTransaction(ctm);
 
         while (!mpTxn.doWork(true));
@@ -253,7 +253,7 @@ public class TestReplayTxnState extends TestCase {
             mpTxn.doWork(true);
         }
 
-        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 1, 2, false, false, true, false, false);
+        CompleteTransactionMessage ctm = new CompleteTransactionMessage(0, 1, 2, false, 0, false, true, false, false);
         CompleteTransactionResponseMessage ctrm = new CompleteTransactionResponseMessage(ctm, 2);
         mpTxn.processCompleteTransactionResponse(ctrm);
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,6 +40,7 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.TreeSet;
 
+import org.voltdb.VoltDB;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
@@ -70,6 +71,36 @@ public class ExportVerifier {
 
     ExportVerifier()
     {
+    }
+
+    int splitClientTrace(String trace, long [] splat)
+    {
+        if (trace == null || splat == null || splat.length == 0) return 0;
+
+        int columnCount = 0;
+        int cursor = 0;
+        int columnPos = trace.indexOf(':', cursor);
+
+        try {
+            while (columnPos >= 0 && splat.length > columnCount+1) {
+                splat[columnCount] = Long.parseLong(trace.substring(cursor, columnPos));
+                cursor = columnPos + 1;
+                columnCount = columnCount + 1;
+                columnPos = trace.indexOf(':', cursor);
+            }
+            if (cursor < trace.length()) {
+                columnPos = columnPos < 0 ? trace.length() : columnPos;
+                splat[columnCount] = Long.parseLong(trace.substring(cursor, columnPos));
+            } else {
+                columnCount = columnCount - 1;
+            }
+        } catch (NumberFormatException nfex) {
+            return 0;
+        } catch (IndexOutOfBoundsException ioobex) {
+            return -1;
+        }
+
+        return columnCount+1;
     }
 
     void verify(String[] args) throws IOException, ValidationErr
@@ -151,10 +182,11 @@ public class ExportVerifier {
             // no more export rows, and there are still unchecked client txnids,
             // attempt to validate as many client txnids as possible
             more_txnids = true;
+            long [] rec = new long [3];
             while ((canCheckClient() || !more_rows) && more_txnids)
             {
-                String txnId = txnIdReader.readLine();
-                if (txnId == null)
+                String trace = txnIdReader.readLine();
+                if (trace == null)
                 {
                     txnIdReader = openNextClientFile();
                     if (txnIdReader == null)
@@ -164,13 +196,18 @@ public class ExportVerifier {
                     }
                     else
                     {
-                        txnId = txnIdReader.readLine();
+                        trace = txnIdReader.readLine();
                     }
                 }
-                if (txnId != null)
+                int recColumns = splitClientTrace(trace, rec);
+                if (recColumns == rec.length)
                 {
-                    //System.out.println("Added txnId: " + txnId + " to outstanding client");
-                    m_clientTxnIds.add(Long.parseLong(txnId));
+                    long txid = rec[1];
+
+                    if (txid >= 0)
+                    {
+                        m_clientTxnIds.add(txid);
+                    }
                 }
                 boolean progress = true;
                 while (!m_clientTxnIds.isEmpty() && progress)
@@ -234,6 +271,7 @@ public class ExportVerifier {
     {
         FileFilter acceptor = new FileFilter()
         {
+            @Override
             public boolean accept(File pathname) {
                 return !pathname.getName().contains("active");
             }
@@ -241,6 +279,7 @@ public class ExportVerifier {
 
         Comparator<File> comparator = new Comparator<File>()
         {
+            @Override
             public int compare(File f1, File f2)
             {
                 long first_ts = Long.parseLong((f1.getName().split("-")[3]).split("\\.")[0]);
@@ -280,13 +319,15 @@ public class ExportVerifier {
     {
         FileFilter acceptor = new FileFilter()
         {
+            @Override
             public boolean accept(File pathname) {
-                return pathname.getName().contains("dude");
+                return pathname.getName().contains("dude") && !pathname.getName().startsWith("active-");
             }
         };
 
         Comparator<File> comparator = new Comparator<File>()
         {
+            @Override
             public int compare(File f1, File f2)
             {
                 long first = Long.parseLong(f1.getName().split("-")[0]);
@@ -511,6 +552,10 @@ public class ExportVerifier {
     File m_clientPath = null;
     File[] m_clientFiles = {};
     int m_clientIndex = 0;
+
+    static {
+        VoltDB.setDefaultTimezone();
+    }
 
     public static void main(String[] args) {
         ExportVerifier verifier = new ExportVerifier();

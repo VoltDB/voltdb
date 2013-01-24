@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -70,20 +70,19 @@ class ExecutorContext;
 class TableFactory {
 public:
     /**
-    * Creates an empty persistent table with given name and columns.
+    * Creates an empty persistent table with given name, columns, PK index, other indexes, partition column, etc.
     * Every PersistentTable must be instantiated via this method.
     * Also, columns can't be added/changed/removed after a PersistentTable
     * instance is made. TableColumn is immutable.
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
         const std::string &name,
         TupleSchema* schema,
-        const std::string* columnNames,
-        int partitionColumn,
-        bool exportEnabled,
-        bool exportOnly);
+        const std::vector<std::string> &columnNames,
+        int partitionColumn = -1, // defaults provided for ease of testing.
+        bool exportEnabled = false,
+        bool exportOnly = false);
 
     /**
     * Creates an empty temp table with given name and columns.
@@ -95,7 +94,7 @@ public:
         voltdb::CatalogId databaseId,
         const std::string &name,
         TupleSchema* schema,
-        const std::string* columnNames,
+        const std::vector<std::string> &columnNames,
         TempTableLimits* limits);
 
     /**
@@ -113,12 +112,11 @@ private:
         Table *table,
         const std::string &name,
         TupleSchema *schema,
-        const std::string *columnNames,
+        const std::vector<std::string> &columnNames,
         const bool ownsTupleSchema);
 
     static void configureStats(
         voltdb::CatalogId databaseId,
-        ExecutorContext *ctx,
         std::string name,
         Table *table);
 };

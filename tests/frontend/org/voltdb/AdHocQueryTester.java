@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 
 import junit.framework.TestCase;
@@ -33,6 +34,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 public abstract class AdHocQueryTester extends TestCase {
 
@@ -97,6 +99,8 @@ public abstract class AdHocQueryTester extends TestCase {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
 
+        //Clean up before each test
+        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         setUpSchema(builder, pathToCatalog, pathToDeployment);

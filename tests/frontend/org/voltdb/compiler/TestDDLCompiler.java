@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -181,7 +181,7 @@ public class TestDDLCompiler extends TestCase {
 
         // compile successfully (but with two warnings hopefully)
         VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compile(projectPath, jarOut.getPath());
+        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
         assertTrue(success);
 
         // verify the warnings exist
@@ -213,7 +213,7 @@ public class TestDDLCompiler extends TestCase {
         //compiler = new VoltCompiler();
 
         // compile successfully with no warnings
-        success = compiler.compile(projectPath, jarOut.getPath());
+        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
         assertTrue(success);
 
         // verify no warnings

@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -200,7 +200,10 @@ class Table {
     // COLUMNS
     // ------------------------------------------------------------------
     int columnIndex(const std::string &name) const;
-    std::vector<std::string> getColumnNames();
+    const std::vector<std::string>& getColumnNames() const {
+        return m_columnNames;
+    }
+
 
     inline const TupleSchema* schema() const {
         return m_schema;
@@ -212,10 +215,6 @@ class Table {
 
     inline int columnCount() const {
         return m_columnCount;
-    }
-
-    const std::string *columnNames() {
-        return m_columnNames;
     }
 
     // ------------------------------------------------------------------
@@ -244,11 +243,7 @@ class Table {
         return m_pkeyIndex;
     }
 
-    void configureIndexStats(CatalogId hostId,
-                             std::string hostname,
-                             int64_t siteId,
-                             CatalogId partitionId,
-                             CatalogId databaseId);
+    void configureIndexStats(CatalogId databaseId);
 
     // mutating indexes
     virtual void addIndex(TableIndex *index);
@@ -380,7 +375,7 @@ protected:
         return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
     }
 
-    void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
+    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema);
 
     // per table-type initialization
     virtual void onSetColumns() {
@@ -405,7 +400,7 @@ protected:
     TupleSchema* m_schema;
 
     // schema as array of string names
-    std::string* m_columnNames;
+    std::vector<std::string> m_columnNames;
     char *m_columnHeaderData;
     int32_t m_columnHeaderSize;
 

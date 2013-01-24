@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -57,13 +57,11 @@
 #include "common/Pool.hpp"
 
 namespace voltdb {
-
 Table* TableFactory::getPersistentTable(
             voltdb::CatalogId databaseId,
-            ExecutorContext *ctx,
             const std::string &name,
             TupleSchema* schema,
-            const std::string* columnNames,
+            const std::vector<std::string> &columnNames,
             int partitionColumn,
             bool exportEnabled,
             bool exportOnly)
@@ -71,18 +69,16 @@ Table* TableFactory::getPersistentTable(
     Table *table = NULL;
 
     if (exportOnly) {
-        table = new StreamedTable(ctx, exportEnabled);
-        TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
+        table = new StreamedTable(exportEnabled);
     }
     else {
-        table = new PersistentTable(ctx, exportEnabled);
-        PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
-        TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
-        pTable->m_partitionColumn = partitionColumn;
+        table = new PersistentTable(partitionColumn);
     }
 
+    initCommon(databaseId, table, name, schema, columnNames, true);
+
     // initialize stats for the table
-    configureStats(databaseId, ctx, name, table);
+    configureStats(databaseId, name, table);
 
     return dynamic_cast<Table*>(table);
 }
@@ -91,11 +87,11 @@ TempTable* TableFactory::getTempTable(
             const voltdb::CatalogId databaseId,
             const std::string &name,
             TupleSchema* schema,
-            const std::string* columnNames,
+            const std::vector<std::string> &columnNames,
             TempTableLimits* limits)
 {
     TempTable* table = new TempTable();
-    TableFactory::initCommon(databaseId, table, name, schema, columnNames, true);
+    initCommon(databaseId, table, name, schema, columnNames, true);
     table->m_limits = limits;
     return table;
 }
@@ -110,8 +106,7 @@ TempTable* TableFactory::getCopiedTempTable(
             TempTableLimits* limits)
 {
     TempTable* table = new TempTable();
-    TableFactory::initCommon(databaseId, table, name, template_table->m_schema,
-                             template_table->m_columnNames, false);
+    initCommon(databaseId, table, name, template_table->m_schema, template_table->m_columnNames, false);
     table->m_limits = limits;
     return table;
 }
@@ -121,12 +116,12 @@ void TableFactory::initCommon(
             Table *table,
             const std::string &name,
             TupleSchema *schema,
-            const std::string *columnNames,
+            const std::vector<std::string> &columnNames,
             const bool ownsTupleSchema) {
 
     assert(table != NULL);
     assert(schema != NULL);
-    assert(columnNames != NULL);
+    assert(columnNames.size() != 0);
 
     table->m_databaseId = databaseId;
     table->m_name = name;
@@ -135,16 +130,10 @@ void TableFactory::initCommon(
 }
 
 void TableFactory::configureStats(voltdb::CatalogId databaseId,
-                                  ExecutorContext *ctx,
                                   std::string name,
                                   Table *table) {
-
     // initialize stats for the table
     table->getTableStats()->configure(name + " stats",
-                                      ctx->m_hostId,
-                                      ctx->m_hostname,
-                                      ctx->m_siteId,
-                                      ctx->m_partitionId,
                                       databaseId);
 }
 

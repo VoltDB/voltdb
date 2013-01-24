@@ -153,6 +153,9 @@ public class Database {
     /** true means filesReadOnly but CACHED and TEXT tables are disallowed */
     private boolean                filesInJar;
     public boolean                 sqlEnforceStrictSize;
+    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    public boolean                sqlConvertTruncate     = true;
+    // END Cherry-picked code change from hsqldb-2.2.8
     private boolean                bIgnoreCase;
     private boolean                bReferentialIntegrity;
     private HsqlDatabaseProperties databaseProperties;

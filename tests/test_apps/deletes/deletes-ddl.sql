@@ -21,6 +21,12 @@ CREATE TABLE big_table (
 CREATE INDEX treeBigTableFullnameCompany ON big_table (fullname, sig, addr3, company, ts);
 CREATE INDEX treeBigTableFullnameTs ON big_table (fullname, ts);
 
+-- This index uses string concatenation to exercise index-managed out-of-line storage.
+-- It purposely avoids NULL-able strings that would produce lots of duplicate NULL 
+-- concatenation results, since (NULL||x) == (x||NULL) == NULL,
+-- that would have to be serially scanned on deletes.
+CREATE INDEX treeBigTableConcatNonNullStrings ON big_table (text1 || fullname || sig || addr1 || addr2);
+
 CREATE VIEW view1(fullname, deceased,weight,seconds,text2,addr1, total)
     AS SELECT fullname, deceased,weight,seconds,text2,addr1, COUNT(*)
     FROM big_table

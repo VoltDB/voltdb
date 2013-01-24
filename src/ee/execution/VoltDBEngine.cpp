@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -306,7 +306,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int32_t outputDependencyId,
                                int32_t inputDependencyId,
                                const NValueArray &params,
-                               int64_t txnId, int64_t lastCommittedTxnId,
+                               int64_t spHandle, int64_t lastCommittedSpHandle,
+                               int64_t uniqueId,
                                bool first, bool last)
 {
     assert(planfragmentId != 0);
@@ -341,8 +342,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
 
     // configure the execution context.
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
-                                             txnId,
-                                             lastCommittedTxnId);
+                                             spHandle,
+                                             lastCommittedSpHandle,
+                                             uniqueId);
 
     // count the number of plan fragments executed
     ++m_pfCount;
@@ -508,7 +510,15 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     return true;
 }
 
-bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload) {
+bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPayload) {
+    assert(m_executorContext != NULL);
+    ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
+    if (executorContext == NULL) {
+        VOLT_DEBUG("Rebinding EC (%ld) to new thread", (long)m_executorContext);
+        // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
+        m_executorContext->bindToThread();
+    }
+
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
     m_catalog->execute(catalogPayload);
@@ -535,7 +545,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
     }
 
     // load up all the tables, adding all tables
-    if (processCatalogAdditions(true, txnId) == false) {
+    if (processCatalogAdditions(true, timestamp) == false) {
         return false;
     }
 
@@ -567,7 +577,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
  * processCatalogAdditions(..) for dumb reasons.
  */
 bool
-VoltDBEngine::processCatalogDeletes(int64_t txnId)
+VoltDBEngine::processCatalogDeletes(int64_t timestamp )
 {
     vector<string> deletions;
     m_catalog->getDeletedPaths(deletions);
@@ -584,7 +594,7 @@ VoltDBEngine::processCatalogDeletes(int64_t txnId)
              */
             if (tcd && tcd->exportEnabled()) {
                 m_exportingTables.erase(tcd->signature());
-                tcd->getTable()->setSignatureAndGeneration( tcd->signature(), txnId);
+                tcd->getTable()->setSignatureAndGeneration( tcd->signature(), timestamp);
             }
             pos->second->deleteCommand();
             delete pos->second;
@@ -642,7 +652,7 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
  * data.
  */
 bool
-VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
+VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 {
     // iterate over all of the tables in the new catalog
     map<string, catalog::Table*>::const_iterator catTableIter;
@@ -664,7 +674,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                                                                  catalogTable->signature());
 
             // use the delegate to init the table and create indexes n' stuff
-            if (tcd->init(m_executorContext, *m_database, *catalogTable) != 0) {
+            if (tcd->init(*m_database, *catalogTable) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            catTableIter->second->name().c_str());
                 return false;
@@ -673,7 +683,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 
             // set export info on the new table
             if (tcd->exportEnabled()) {
-                tcd->getTable()->setSignatureAndGeneration(catalogTable->signature(), txnId);
+                tcd->getTable()->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 m_exportingTables[catalogTable->signature()] = tcd->getTable();
             }
         }
@@ -706,7 +716,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
              * that no more data is coming for the previous generation
              */
             if (tcd->exportEnabled()) {
-                table->setSignatureAndGeneration(catalogTable->signature(), txnId);
+                table->setSignatureAndGeneration(catalogTable->signature(), timestamp);
             }
 
             //////////////////////////////////////////
@@ -716,7 +726,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
             //////////////////////////////////////////
 
             if (!hasSameSchema(catalogTable, table)) {
-                tcd->processSchemaChanges(m_executorContext, *m_database, *catalogTable);
+                tcd->processSchemaChanges(*m_database, *catalogTable);
 
                 // don't continue on to modify/add/remove indexes, because the
                 // call above should rebuild them all anyway
@@ -772,10 +782,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                     // add the index to the stats source
                     index->getIndexStats()->configure(index->getName() + " stats",
                                                       table->name(),
-                                                      m_executorContext->m_hostId,
-                                                      m_executorContext->m_hostname,
-                                                      m_executorContext->m_siteId,
-                                                      m_executorContext->m_partitionId,
                                                       indexIter->second->relativeIndex());
                 }
             }
@@ -823,7 +829,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
  * delete or modify the corresponding exectution engine objects.
  */
 bool
-VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
+VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayload)
 {
     assert(m_catalog != NULL); // the engine must be initialized
 
@@ -838,12 +844,12 @@ VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
         return false;
     }
 
-    if (processCatalogDeletes(txnId) == false) {
+    if (processCatalogDeletes(timestamp) == false) {
         VOLT_ERROR("Error processing catalog deletions.");
         return false;
     }
 
-    if (processCatalogAdditions(false, txnId) == false) {
+    if (processCatalogAdditions(false, timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
@@ -872,11 +878,16 @@ VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
-                        int64_t txnId, int64_t lastCommittedTxnId)
+                        int64_t spHandle, int64_t lastCommittedSpHandle)
 {
+    //Not going to thread the unique id through.
+    //The spHandle and lastCommittedSpHandle aren't really used in load table
+    //since their only purpose as of writing this (1/2013) they are only used
+    //for export data and we don't technically support loading into an export table
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
-                                             txnId,
-                                             lastCommittedTxnId);
+                                             spHandle,
+                                             -1,
+                                             lastCommittedSpHandle);
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {
@@ -1193,8 +1204,8 @@ bool VoltDBEngine::isLocalSite(const NValue& value)
 }
 
 /** Perform once per second, non-transactional work. */
-void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
-    m_executorContext->setupForTick(lastCommittedTxnId);
+void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
+    m_executorContext->setupForTick(lastCommittedSpHandle);
     typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
@@ -1202,8 +1213,8 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
-void VoltDBEngine::quiesce(int64_t lastCommittedTxnId) {
-    m_executorContext->setupForQuiesce(lastCommittedTxnId);
+void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
+    m_executorContext->setupForQuiesce(lastCommittedSpHandle);
     typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
@@ -1323,11 +1334,19 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     }
 }
 
+
+void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
+{
+    m_currentUndoQuantum = undoQuantum;
+    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
+}
+
+
 /*
  * Exists to transition pre-existing unit test cases.
  */
 ExecutorContext * VoltDBEngine::getExecutorContext() {
-    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum());
+    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
     return m_executorContext;
 }
 

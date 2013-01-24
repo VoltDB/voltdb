@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -589,7 +589,7 @@ public class TestOrderBySuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("testorderby-cluster.jar", 3, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("testorderby-cluster.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

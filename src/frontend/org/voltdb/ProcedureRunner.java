@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
@@ -52,6 +53,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
@@ -111,6 +113,9 @@ public class ProcedureRunner {
     // dependency ids for ad hoc
     protected final static int AGG_DEPID = 1;
 
+    // current hash of sql and params
+    protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
+
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {
@@ -123,7 +128,14 @@ public class ProcedureRunner {
                     SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
-        m_procedureName = procedure.getClass().getSimpleName();
+        assert(m_inputCRC.getValue() == 0L);
+
+        if (procedure instanceof StmtProcedure) {
+            m_procedureName = catProc.getTypeName().intern();
+        }
+        else {
+            m_procedureName = procedure.getClass().getSimpleName();
+        }
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
@@ -172,7 +184,7 @@ public class ProcedureRunner {
     Random getSeededRandomNumberGenerator() {
         // this value is memoized here and reset at the beginning of call(...).
         if (m_cachedRNG == null) {
-            m_cachedRNG = new Random(getTransactionId());
+            m_cachedRNG = new Random(getUniqueId());
         }
         return m_cachedRNG;
     }
@@ -182,6 +194,9 @@ public class ProcedureRunner {
         assert(m_statusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
+
+        // reset the hash of results
+        m_inputCRC.reset();
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
@@ -225,7 +240,7 @@ public class ProcedureRunner {
                 } catch (Exception e) {
                     m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
-                            ": " + e.getMessage();
+                            ": " + e.toString();
                     status = ClientResponse.GRACEFUL_FAILURE;
                     return getErrorResponse(status, msg, null);
                 }
@@ -307,6 +322,17 @@ public class ProcedureRunner {
                         m_statusString,
                         results,
                         null);
+
+            int hash = (int) m_inputCRC.getValue();
+            if ((retval.getStatus() == ClientResponse.SUCCESS) && (hash != 0)) {
+                retval.setHash(hash);
+            }
+            if ((m_txnState != null) && // may be null for tests
+                (m_txnState.getInvocation() != null) &&
+                (m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED))
+            {
+                retval.convertResultsToHashForDeterminism();
+            }
         }
         finally {
             // finally at the call(..) scope to ensure params can be
@@ -351,12 +377,47 @@ public class ProcedureRunner {
         m_statusString = statusString;
     }
 
+    /*
+     * Extract the timestamp from the timestamp field we have been passing around
+     * that is now a unique id with a timestamp encoded in the most significant bits ala
+     * a pre-IV2 transaction id.
+     */
     public Date getTransactionTime() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
         if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
-            return new Date(invocation.getOriginalTimestamp());
+            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(invocation.getOriginalUniqueId()));
         } else {
-            return new Date(m_txnState.timestamp);
+            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(m_txnState.uniqueId));
+        }
+    }
+
+    /*
+     * The timestamp field is no longer really a timestamp, it is a unique id that is time based
+     * and is similar to a pre-IV2 transaction ID except the less significant bits are set
+     * to allow matching partition counts with IV2. It's OK, still can do 512k txns/second per
+     * partition so plenty of headroom.
+     */
+    public long getUniqueId() {
+        StoredProcedureInvocation invocation = m_txnState.getInvocation();
+        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+            return invocation.getOriginalUniqueId();
+        } else {
+            return m_txnState.uniqueId;
+        }
+    }
+
+    private void updateCRC(QueuedSQL queuedSQL) {
+        if (!queuedSQL.stmt.isReadOnly()) {
+            m_inputCRC.update(queuedSQL.stmt.sqlCRC);
+            try {
+                queuedSQL.params.addToCRC(m_inputCRC);
+            } catch (IOException e) {
+                log.error("Unable to compute CRC of parameters to " +
+                        "a SQL statement in procedure: " + m_procedureName, e);
+                // don't crash
+                // presumably, this will fail deterministically at all replicas
+                // just log the error and hope people report it
+            }
         }
     }
 
@@ -368,6 +429,8 @@ public class ProcedureRunner {
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, args);
         queuedSQL.stmt = stmt;
+
+        updateCRC(queuedSQL);
         m_batch.add(queuedSQL);
     }
 
@@ -381,7 +444,8 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition()).get();
+            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition(),
+                    ProcedureInvocationType.ORIGINAL, 0, 0).get();
             if (paw.errorMsg != null) {
                 throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + paw.errorMsg);
             }
@@ -399,6 +463,7 @@ public class ProcedureRunner {
                     plannedStatement.core.aggregatorFragment,
                     plannedStatement.core.collectorFragment,
                     plannedStatement.core.isReplicatedTableDML,
+                    plannedStatement.core.readOnly,
                     plannedStatement.core.parameterTypes);
             if (plannedStatement.extractedParamValues.size() == 0) {
                 // case handles if there were parameters OR
@@ -418,8 +483,11 @@ public class ProcedureRunner {
                 }
                 queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
             }
+
+            updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             if (e instanceof ExecutionException) {
                 throw new VoltAbortException(e.getCause());
             }
@@ -431,51 +499,56 @@ public class ProcedureRunner {
     }
 
     public VoltTable[] voltExecuteSQL(boolean isFinalSQL) {
-        if (m_seenFinalBatch) {
-            throw new RuntimeException("Procedure " + m_procedureName +
-                                       " attempted to execute a batch " +
-                                       "after claiming a previous batch was final " +
-                                       "and will be aborted.\n  Examine calls to " +
-                                       "voltExecuteSQL() and verify that the call " +
-                                       "with the argument value 'true' is actually " +
-                                       "the final one");
-        }
-        m_seenFinalBatch = isFinalSQL;
-
-        // memo-ize the original batch size here
-        int batchSize = m_batch.size();
-
-        // if batch is small (or reasonable size), do it in one go
-        if (batchSize <= MAX_BATCH_SIZE) {
-            return executeQueriesInABatch(m_batch, isFinalSQL);
-        }
-        // otherwise, break it into sub-batches
-        else {
-            List<VoltTable[]> results = new ArrayList<VoltTable[]>();
-
-            while (m_batch.size() > 0) {
-                int subSize = Math.min(MAX_BATCH_SIZE, m_batch.size());
-
-                // get the beginning of the batch (or all if small enough)
-                // note: this is a view into the larger list and changes to it
-                //  will mutate the larger m_batch.
-                List<QueuedSQL> subBatch = m_batch.subList(0, subSize);
-
-                // decide if this sub-batch should be marked final
-                boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
-
-                // run the sub-batch and copy the sub-results into the list of lists of results
-                // note: executeQueriesInABatch removes items from the batch as it runs.
-                //  this means subBatch will be empty after running and since subBatch is a
-                //  view on the larger batch, it removes subBatch.size() elements from m_batch.
-                results.add(executeQueriesInABatch(subBatch, finalSubBatch));
+        try {
+            if (m_seenFinalBatch) {
+                throw new RuntimeException("Procedure " + m_procedureName +
+                                           " attempted to execute a batch " +
+                                           "after claiming a previous batch was final " +
+                                           "and will be aborted.\n  Examine calls to " +
+                                           "voltExecuteSQL() and verify that the call " +
+                                           "with the argument value 'true' is actually " +
+                                           "the final one");
             }
+            m_seenFinalBatch = isFinalSQL;
 
-            // merge the list of lists into something returnable
-            VoltTable[] retval = MiscUtils.concatAll(new VoltTable[0], results);
-            assert(retval.length == batchSize);
+            // memo-ize the original batch size here
+            int batchSize = m_batch.size();
 
-            return retval;
+            // if batch is small (or reasonable size), do it in one go
+            if (batchSize <= MAX_BATCH_SIZE) {
+                return executeQueriesInABatch(m_batch, isFinalSQL);
+            }
+            // otherwise, break it into sub-batches
+            else {
+                List<VoltTable[]> results = new ArrayList<VoltTable[]>();
+
+                while (m_batch.size() > 0) {
+                    int subSize = Math.min(MAX_BATCH_SIZE, m_batch.size());
+
+                    // get the beginning of the batch (or all if small enough)
+                    // note: this is a view into the larger list and changes to it
+                    //  will mutate the larger m_batch.
+                    List<QueuedSQL> subBatch = m_batch.subList(0, subSize);
+
+                    // decide if this sub-batch should be marked final
+                    boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
+
+                    // run the sub-batch and copy the sub-results into the list of lists of results
+                    // note: executeQueriesInABatch removes items from the batch as it runs.
+                    //  this means subBatch will be empty after running and since subBatch is a
+                    //  view on the larger batch, it removes subBatch.size() elements from m_batch.
+                    results.add(executeQueriesInABatch(subBatch, finalSubBatch));
+                }
+
+                // merge the list of lists into something returnable
+                VoltTable[] retval = MiscUtils.concatAll(new VoltTable[0], results);
+                assert(retval.length == batchSize);
+
+                return retval;
+            }
+        }
+        finally {
+            m_batch.clear();
         }
     }
 
@@ -637,9 +710,15 @@ public class ProcedureRunner {
 
                 for (ProcParameter param : m_catProc.getParameters()) {
                     VoltType type = VoltType.get((byte) param.getType());
-                    if (type == VoltType.INTEGER) type = VoltType.BIGINT;
-                    if (type == VoltType.SMALLINT) type = VoltType.BIGINT;
-                    if (type == VoltType.TINYINT) type = VoltType.BIGINT;
+                    if (type == VoltType.INTEGER) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.SMALLINT) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.TINYINT) {
+                        type = VoltType.BIGINT;
+                    } else if (type == VoltType.NUMERIC) {
+                        type = VoltType.FLOAT;
+                    }
 
                     m_paramTypes[param.getIndex()] = type.classFromType();
                     m_paramTypeIsPrimitive[param.getIndex()] = m_paramTypes[param.getIndex()].isPrimitive();
@@ -763,6 +842,10 @@ public class ProcedureRunner {
            msg.append("HSQL-BACKEND ERROR\n");
            if (e.getCause() != null)
                e = e.getCause();
+       }
+       else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
+           status = ClientResponse.TXN_RESTART;
+           msg.append("TRANSACTION RESTART\n");
        }
        else {
            msg.append("UNEXPECTED FAILURE:\n");
@@ -961,7 +1044,7 @@ public class ProcedureRunner {
            m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                  siteId,
                                                  m_txnState.txnId,
-                                                 m_txnState.timestamp,
+                                                 m_txnState.uniqueId,
                                                  m_txnState.isReadOnly(),
                                                  false,
                                                  txnState.isForReplay());
@@ -970,7 +1053,7 @@ public class ProcedureRunner {
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        siteId,
                                                        m_txnState.txnId,
-                                                       m_txnState.timestamp,
+                                                       m_txnState.uniqueId,
                                                        m_txnState.isReadOnly(),
                                                        finalTask,
                                                        txnState.isForReplay());
@@ -1229,7 +1312,8 @@ public class ProcedureRunner {
                        fragmentIds,
                        null,
                        params,
-                       m_txnState.txnId,
+                       m_txnState.spHandle,
+                       m_txnState.uniqueId,
                        m_catProc.getReadonly());
                }
 
@@ -1248,7 +1332,8 @@ public class ProcedureRunner {
                            new long[] { fragId },
                            new long[] { AGG_DEPID },
                            new ParameterSet[] {queuedSQL.params},
-                           m_txnState.txnId,
+                           m_txnState.spHandle,
+                           m_txnState.uniqueId,
                            m_catProc.getReadonly())[0];
                    }
                    return results;

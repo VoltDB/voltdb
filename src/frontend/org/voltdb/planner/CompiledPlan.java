@@ -1,27 +1,34 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.List;
+
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlanNodeType;
@@ -58,7 +65,7 @@ public class CompiledPlan {
      */
     public String explainedPlan = null;
 
-    /** A list of parameter names, indexes and types */
+    /** Parameter types in parameter index order */
     public VoltType[] parameters = null;
 
     /** Parameter values, if the planner pulled constants out of the plan */
@@ -208,4 +215,63 @@ public class CompiledPlan {
         PlanNodeList planList = new PlanNodeList(planGraph);
         return planList.toJSONString().getBytes(VoltDB.UTF8ENCODING);
     }
+
+    // A reusable step extracted from boundParamIndexes so it can be applied to two different
+    // sources of bindings, IndexScans and IndexCounts.
+    private static void setParamIndexes(BitSet ints, List<AbstractExpression> params) {
+        for(AbstractExpression ae : params) {
+            assert(ae instanceof ParameterValueExpression);
+            ParameterValueExpression pve = (ParameterValueExpression) ae;
+            int param = pve.getParameterIndex();
+            ints.set(param);
+        }
+    }
+
+    // An obvious but apparently missing BitSet utility function
+    // to convert the set bits to their integer indexes.
+    private static int[] bitSetToIntVector(BitSet ints) {
+        int intCount = ints.cardinality();
+        if (intCount == 0) {
+            return null;
+        }
+        int[] result = new int[intCount];
+        int nextBit = ints.nextSetBit(0);
+        for (int ii = 0; ii < intCount; ii++) {
+            assert(nextBit != -1);
+            result[ii] = nextBit;
+            nextBit = ints.nextSetBit(nextBit+1);
+        }
+        assert(nextBit == -1);
+        return result;
+    }
+
+    /// Extract a sorted de-duped vector of all the bound parameter indexes in a plan. Or null if none.
+    public int[] boundParamIndexes() {
+        if (parameters.length == 0) {
+            return null;
+        }
+
+        BitSet ints = new BitSet();
+        ArrayList<AbstractPlanNode> ixscans = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        if (subPlanGraph != null) {
+            ixscans.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN));
+        }
+        for (AbstractPlanNode apn : ixscans) {
+            assert(apn instanceof IndexScanPlanNode);
+            IndexScanPlanNode ixs = (IndexScanPlanNode) apn;
+            setParamIndexes(ints, ixs.getBindings());
+        }
+
+        ArrayList<AbstractPlanNode> ixcounts = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT);
+        if (subPlanGraph != null) {
+            ixcounts.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT));
+        }
+        for (AbstractPlanNode apn : ixcounts) {
+            assert(apn instanceof IndexCountPlanNode);
+            IndexCountPlanNode ixc = (IndexCountPlanNode) apn;
+            setParamIndexes(ints, ixc.getBindings());
+        }
+        return bitSetToIntVector(ints);
+    }
+
 }

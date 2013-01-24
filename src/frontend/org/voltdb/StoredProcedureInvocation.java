@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -25,8 +25,8 @@ import java.util.concurrent.FutureTask;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -49,7 +49,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
      * for determinism, we can provide them again. -1 means not set.
      */
     long originalTxnId = -1;
-    long originalTs = -1;
+    long originalUniqueId = -1;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -71,7 +71,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         copy.params = params;
         copy.procName = procName;
         copy.originalTxnId = originalTxnId;
-        copy.originalTs = originalTs;
+        copy.originalUniqueId = originalUniqueId;
         if (serializedParams != null)
         {
             copy.serializedParams = serializedParams.duplicate();
@@ -85,7 +85,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     }
 
     private void setType() {
-        if (originalTxnId == -1 && originalTs == -1) {
+        if (originalTxnId == -1 && originalUniqueId == -1) {
             type = ProcedureInvocationType.ORIGINAL;
         } else {
             type = ProcedureInvocationType.REPLICATED;
@@ -101,8 +101,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         setType();
     }
 
-    public void setOriginalTimestamp(long ts) {
-        originalTs = ts;
+    public void setOriginalUniqueId(long uniqueId) {
+        originalUniqueId = uniqueId;
         setType();
     }
 
@@ -131,8 +131,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         return originalTxnId;
     }
 
-    public long getOriginalTimestamp() {
-        return originalTs;
+    public long getOriginalUniqueId() {
+        return originalUniqueId;
     }
 
     public ParameterSet getParams() {
@@ -197,7 +197,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         buf.put(type.getValue()); //version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(originalTxnId);
-            buf.putLong(originalTs);
+            buf.putLong(originalUniqueId);
         }
         buf.putInt(procName.length());
         buf.put(procName.getBytes());
@@ -206,6 +206,9 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         {
             if (!serializedParams.isReadOnly())
             {
+                // if position can be non-zero, then the dup/rewind logic below
+                // would be wrong?
+                assert(serializedParams.position() == 0);
                 buf.put(serializedParams.array(),
                         serializedParams.position() + serializedParams.arrayOffset(),
                         serializedParams.remaining());
@@ -213,6 +216,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             else
             {
                 // duplicate for thread-safety
+                assert(serializedParams.position() == 0);
                 ByteBuffer dup = serializedParams.duplicate();
                 dup.rewind();
                 buf.put(dup);
@@ -236,10 +240,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          */
         if (type == ProcedureInvocationType.REPLICATED) {
             originalTxnId = in.readLong();
-            originalTs = in.readLong();
+            originalUniqueId = in.readLong();
         }
 
-        procName = in.readString();
+        procName = in.readString().intern();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
         serializedParams = in.remainder();
@@ -265,10 +269,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          */
         if (type == ProcedureInvocationType.REPLICATED) {
             originalTxnId = in.readLong();
-            originalTs = in.readLong();
+            originalUniqueId = in.readLong();
         }
 
-        procName = in.readString();
+        procName = in.readString().intern();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
         serializedParams = in.remainder();
@@ -289,7 +293,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         out.write(type.getValue());//version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             out.writeLong(originalTxnId);
-            out.writeLong(originalTs);
+            out.writeLong(originalUniqueId);
         }
         out.writeString(procName);
         out.writeLong(clientHandle);
@@ -306,11 +310,16 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         ParameterSet params = getParams();
         if (params != null)
             for (Object o : params.toArray()) {
-                retval += o.toString() + ", ";
+                retval += String.valueOf(o) + ", ";
             }
         else
             retval += "null";
         retval += ")";
+        retval += " type=" + String.valueOf(type);
+        retval += " clientHandle=" + String.valueOf(clientHandle);
+        retval += " originalTxnId=" + String.valueOf(originalTxnId);
+        retval += " originalUniqueId=" + String.valueOf(originalUniqueId);
+
         return retval;
     }
 

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.voltdb.utils;
@@ -35,6 +35,9 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.net.HostAndPort;
@@ -591,5 +594,34 @@ public class MiscUtils {
             pos += subArray.length;
         }
         return result;
+    }
+
+    public static void deleteRecursively( File file) {
+        if (file == null || !file.exists() || !file.canRead() || !file.canWrite()) return;
+        if (file.isDirectory() && file.canExecute()) {
+            for (File f: file.listFiles()) {
+                deleteRecursively(f);
+            }
+        }
+        file.delete();
+    }
+
+    /**
+     * Get the resident set size, in mb for the voltdb server on the other end of the client
+     */
+    public static long getMBRss(Client client) {
+        assert(client != null);
+        try {
+            ClientResponse r = client.callProcedure("@Statistics", "MEMORY", 0);
+            VoltTable stats = r.getResults()[0];
+            stats.advanceRow();
+            long rss = stats.getLong("RSS") / 1024;
+            return rss;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            System.exit(-1);
+            return 0;
+        }
     }
 }

@@ -1,10 +1,5 @@
 import org.voltdb.*;
 
-@ProcInfo(
-    partitionInfo = "USERACCOUNT.EMAIL: 0",
-    singlePartition = true
-)
-
 public class RegisterUser extends VoltProcedure {
 
   public final SQLStmt insertuser = new SQLStmt(
@@ -15,7 +10,7 @@ public class RegisterUser extends VoltProcedure {
                    String lastname, String language)
       throws VoltAbortException {
 
-              // Insert a new record using the Email
+              // Insert a new record
           voltQueueSQL( insertuser, email, firstname, 
                         lastname, null, language);
           return voltExecuteSQL();

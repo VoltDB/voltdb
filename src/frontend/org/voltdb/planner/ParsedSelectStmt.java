@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -64,8 +64,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public boolean grouped = false;
     public boolean distinct = false;
 
+    /**
+    * Class constructor
+    * @param paramValues
+    * @param db
+    */
+    public ParsedSelectStmt(String[] paramValues, Database db) {
+        super(paramValues, db);
+    }
+
     @Override
-    void parse(VoltXMLElement stmtNode, Database db) {
+    void parse(VoltXMLElement stmtNode) {
         String node;
 
         if ((node = stmtNode.attributes.get("limit")) != null)
@@ -87,21 +96,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns"))
-                parseDisplayColumns(child, db);
+                parseDisplayColumns(child);
             else if (child.name.equalsIgnoreCase("querycondition"))
-                parseConditions(child, db);
+                parseConditions(child);
             else if (child.name.equalsIgnoreCase("ordercolumns"))
-                parseOrderColumns(child, db);
+                parseOrderColumns(child);
             else if (child.name.equalsIgnoreCase("groupcolumns")) {
-                parseGroupByColumns(child, db);
+                parseGroupByColumns(child);
             }
         }
     }
 
-    void parseDisplayColumns(VoltXMLElement columnsNode, Database db) {
+    void parseDisplayColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
             ParsedColInfo col = new ParsedColInfo();
-            col.expression = parseExpressionTree(child, db);
+            col.expression = parseExpressionTree(child);
             if (col.expression instanceof ConstantValueExpression) {
                 assert(col.expression.getValueType() != VoltType.NUMERIC);
             }
@@ -130,16 +139,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    void parseGroupByColumns(VoltXMLElement columnsNode, Database db) {
+    void parseGroupByColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
-            parseGroupByColumn(child, db);
+            parseGroupByColumn(child);
         }
     }
 
-    void parseGroupByColumn(VoltXMLElement groupByNode, Database db) {
+    void parseGroupByColumn(VoltXMLElement groupByNode) {
 
         ParsedColInfo col = new ParsedColInfo();
-        col.expression = parseExpressionTree(groupByNode, db);
+        col.expression = parseExpressionTree(groupByNode);
         assert(col.expression != null);
 
         if (groupByNode.name.equals("columnref"))
@@ -155,21 +164,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         assert(col.alias.equalsIgnoreCase(col.columnName));
-        assert(db.getTables().getIgnoreCase(col.tableName) != null);
-        assert(db.getTables().getIgnoreCase(col.tableName).getColumns().getIgnoreCase(col.columnName) != null);
+        assert(getTableFromDB(col.tableName) != null);
+        assert(getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName) != null);
         org.voltdb.catalog.Column catalogColumn =
-            db.getTables().getIgnoreCase(col.tableName).getColumns().getIgnoreCase(col.columnName);
+                getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName);
         col.index = catalogColumn.getIndex();
         groupByColumns.add(col);
     }
 
-    void parseOrderColumns(VoltXMLElement columnsNode, Database db) {
+    void parseOrderColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
-            parseOrderColumn(child, db);
+            parseOrderColumn(child);
         }
     }
 
-    void parseOrderColumn(VoltXMLElement orderByNode, Database db) {
+    void parseOrderColumn(VoltXMLElement orderByNode) {
         // make sure everything is kosher
         assert(orderByNode.name.equalsIgnoreCase("operation"));
         String operationType = orderByNode.attributes.get("type");
@@ -188,7 +197,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ParsedColInfo order_col = new ParsedColInfo();
         order_col.orderBy = true;
         order_col.ascending = !descending;
-        AbstractExpression order_exp = parseExpressionTree(child, db);
+        AbstractExpression order_exp = parseExpressionTree(child);
 
         // Cases:
         // inner child could be columnref, in which case it's just a normal

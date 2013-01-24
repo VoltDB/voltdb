@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -74,7 +74,6 @@ public class TestTxnEgo extends TestCase
         long then = System.currentTimeMillis();
         Thread.sleep(100);
         TxnEgo te = new TxnEgo(TxnEgo.SEQUENCE_ZERO, 16000);
-        assertTrue(te.getWallClock() > then);
         assertEquals(TxnEgo.SEQUENCE_ZERO, te.getSequence());
         assertEquals(16000, te.getPartitionId());
     }

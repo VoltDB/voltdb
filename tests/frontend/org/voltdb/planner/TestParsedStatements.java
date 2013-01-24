@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -86,7 +86,7 @@ public class TestParsedStatements extends TestCase {
         BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString());
 
         // get a parsed statement from the xml
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, m_db, null);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, null, m_db, null);
         // output a description of the parsed stmt
         BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString());
 

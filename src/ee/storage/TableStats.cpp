@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "storage/TableStats.h"
@@ -74,7 +74,7 @@ TableStats::generateEmptyTableStatsTable()
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
                                                             name,
                                                             schema,
-                                                            &columnNames[0],
+                                                            columnNames,
                                                             NULL));
 }
 
@@ -100,12 +100,8 @@ TableStats::TableStats(Table* table)
  */
 void TableStats::configure(
         string name,
-        CatalogId hostId,
-        string hostname,
-        int64_t siteId,
-        CatalogId partitionId,
         CatalogId databaseId) {
-    StatsSource::configure(name, hostId, hostname, siteId, partitionId, databaseId);
+    StatsSource::configure(name, databaseId);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
 }

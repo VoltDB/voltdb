@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -273,7 +273,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             throw new EOFException();
                         }
                     }
-
+                    messageBuffer.flip();
                     final int reasonLength = messageBuffer.getInt();
                     final byte reasonBytes[] = new byte[reasonLength];
                     messageBuffer.get(reasonBytes);
@@ -293,6 +293,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     for (int ii = 0; ii < numTraces; ii++) {
                         final int traceLength = messageBuffer.getInt();
                         final byte traceBytes[] = new byte[traceLength];
+                        messageBuffer.get(traceBytes);
                         traces[ii] = new String(traceBytes, "UTF-8");
                     }
 
@@ -333,8 +334,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             uso,
                             0,
                             length == 0 ? null : exportBuffer,
-                            sync,
-                            isEndOfGeneration);
+                                    sync,
+                                    isEndOfGeneration);
                     continue;
                 }
                 if (status == kErrorCode_getQueuedExportBytes) {
@@ -578,7 +579,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the catalog as a UTF-8 byte string via connection */
     @Override
-    public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException {
+    public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -588,7 +589,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
             m_data.putInt(Commands.LoadCatalog.m_id);
-            m_data.putLong(txnId);
+            m_data.putLong(timestamp);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -609,7 +610,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
+    public void updateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -619,7 +620,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_data = ByteBuffer.allocate(catalogBytes.length + 100);
             }
             m_data.putInt(Commands.UpdateCatalog.m_id);
-            m_data.putLong(txnId);
+            m_data.putLong(timestamp);
             m_data.put(catalogBytes);
             m_data.put((byte)'\0');
         } catch (final UnsupportedEncodingException ex) {
@@ -639,12 +640,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void tick(final long time, final long lastCommittedTxnId) {
+    public void tick(final long time, final long lastCommittedSpHandle) {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
         m_data.putInt(Commands.Tick.m_id);
         m_data.putLong(time);
-        m_data.putLong(lastCommittedTxnId);
+        m_data.putLong(lastCommittedSpHandle);
         try {
             m_data.flip();
             m_connection.write();
@@ -658,11 +659,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void quiesce(long lastCommittedTransactionId) {
+    public void quiesce(long lastCommittedSpHandle) {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
         m_data.putInt(Commands.Quiesce.m_id);
-        m_data.putLong(lastCommittedTransactionId);
+        m_data.putLong(lastCommittedSpHandle);
         try {
             m_data.flip();
             m_connection.write();
@@ -679,8 +680,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
             final ParameterSet[] parameterSets,
-            final long txnId,
-            final long lastCommittedTxnId,
+            final long spHandle,
+            final long lastCommittedSpHandle,
+            final long uniqueId,
             final long undoToken)
     {
         // big endian, not direct
@@ -704,8 +706,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         m_data.clear();
         m_data.putInt(cmd.m_id);
-        m_data.putLong(txnId);
-        m_data.putLong(lastCommittedTxnId);
+        m_data.putLong(spHandle);
+        m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(uniqueId);
         m_data.putLong(undoToken);
         m_data.putInt(numFragmentIds);
         for (int i = 0; i < numFragmentIds; ++i) {
@@ -781,12 +784,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final ParameterSet[] parameterSets,
-            final long txnId,
-            final long lastCommittedTxnId,
+            final long spHandle,
+            final long lastCommittedSpHandle,
+            final long uniqueId,
             final long undoToken) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
-                txnId, lastCommittedTxnId, undoToken);
+                spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
         try {
             result = m_connection.readStatusByte();
@@ -825,15 +829,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
 
     @Override
-    public void loadTable(final int tableId, final VoltTable table, final long txnId,
-            final long lastCommittedTxnId)
-        throws EEException
+    public void loadTable(final int tableId, final VoltTable table, final long spHandle,
+            final long lastCommittedSpHandle)
+    throws EEException
     {
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
         m_data.putInt(tableId);
-        m_data.putLong(txnId);
-        m_data.putLong(lastCommittedTxnId);
+        m_data.putLong(spHandle);
+        m_data.putLong(lastCommittedSpHandle);
 
         final ByteBuffer tableBytes = table.getTableDataReference();
         if (m_data.remaining() < tableBytes.remaining()) {

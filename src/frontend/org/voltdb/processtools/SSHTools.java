@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -27,12 +27,15 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 
+import org.voltcore.logging.VoltLogger;
+
 import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 
 public class SSHTools {
+    protected static final VoltLogger cmdLog = new VoltLogger("REMOTECMD");
     private final String m_username;
     private final String m_keyFile;
 
@@ -177,6 +180,7 @@ public class SSHTools {
         try{
             boolean ptimestamp = true;
             String command="scp " + (ptimestamp ? "-p" :"") +" -t "+remote_file;
+            cmdLog.debug("CMD: '" + command + "'");
 
             JSch jsch=new JSch();
             // Set the private key
@@ -263,7 +267,7 @@ public class SSHTools {
     }
 
     // The Jsch method for SCP from.
-    // This code is direcly copied from the Jsch SCP sample program.
+    // This code is directly copied from the Jsch SCP sample program.  Error handling has been modified by VoltDB.
     public boolean ScpFrom(String user, String key, String host, String remote_file, String local_file){
 
         FileOutputStream fos=null;
@@ -274,6 +278,7 @@ public class SSHTools {
             }
 
             String command="scp -f "+remote_file;
+            cmdLog.debug("CMD: '" + command + "'");
 
             JSch jsch=new JSch();
             // Set the private key
@@ -330,11 +335,14 @@ public class SSHTools {
                     }
                 }
 
+                String destination_file = prefix==null ? local_file : prefix+file;
+                cmdLog.debug("CMD: scp to local file '" + destination_file + "'");
+
                 // send '\0'
                 buf[0]=0; out.write(buf, 0, 1); out.flush();
 
                 // read a content of lfile
-                fos=new FileOutputStream(prefix==null ? local_file : prefix+file);
+                fos=new FileOutputStream(destination_file);
                 int foo;
                 while(true){
                     if(buf.length<filesize) foo=buf.length;
@@ -352,6 +360,7 @@ public class SSHTools {
                 fos=null;
 
                 if(checkAck(in)!=0){
+                    cmdLog.debug("CMD: scp checkAck failed");
                     System.out.println("checkAck did not equal zero.");
                     return false;
                 }
@@ -364,8 +373,12 @@ public class SSHTools {
         }
         catch(Exception e){
             System.out.println(e);
-            try{if(fos!=null)fos.close();}catch(Exception ee){}
+            cmdLog.debug("CMD: scp failed with exception: " + e.toString());
             return false;
+        }
+        finally
+        {
+            try{if(fos!=null)fos.close();}catch(Exception ee){}
         }
 
         return true;

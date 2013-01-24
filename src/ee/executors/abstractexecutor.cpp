@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -48,6 +48,8 @@
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
+#include "storage/tablefactory.h"
+
 #include <vector>
 
 using namespace std;
@@ -143,5 +145,45 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     }
     return true;
 }
+
+/**
+ * Set up a multi-column temp output table for those executors that require one.
+ * Called from p_init.
+ */
+void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
+    assert(limits);
+    TupleSchema* schema = m_abstractNode->generateTupleSchema(true);
+    int column_count = (int)m_abstractNode->getOutputSchema().size();
+    std::vector<std::string> column_names(column_count);
+    assert(column_count >= 1);
+    for (int ctr = 0; ctr < column_count; ctr++)
+    {
+        column_names[ctr] = m_abstractNode->getOutputSchema()[ctr]->getColumnName();
+    }
+    m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                              tempTableName,
+                                                              schema,
+                                                              column_names,
+                                                              limits));
+}
+
+/**
+ * Set up a single-column temp output table for DML executors that require one to return their counts.
+ * Called from p_init.
+ */
+void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
+    TupleSchema* schema = m_abstractNode->generateTupleSchema(false);
+    // The column count (1) and column name for the DML counter column is hard-coded in the planner
+    // and passed via the output schema -- kind of pointless since they could just as easily be hard-coded here,
+    // possibly saving the trouble of serializing an outputSchema at all for DML nodes.
+    assert(m_abstractNode->getOutputSchema().size() == 1);
+    std::vector<std::string> columnNames(1, m_abstractNode->getOutputSchema()[0]->getColumnName());
+    m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                              "temp",
+                                                              schema,
+                                                              columnNames,
+                                                              limits));
+}
+
 
 AbstractExecutor::~AbstractExecutor() {}

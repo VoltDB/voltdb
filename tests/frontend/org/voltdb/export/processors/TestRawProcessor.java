@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -97,6 +97,13 @@ public class TestRawProcessor extends TestCase {
         public static int m_site = 1;
         public static int m_part = 2;
 
+        public static final Runnable m_noopRunnable = new Runnable() {
+            @Override
+            public void run() {
+                // NOOP
+            }
+        };
+
         static {
 
             m_mockVoltDB.addSite(CoreUtils.getHSIdFromHostAndSite( m_host, m_site), m_part);
@@ -109,7 +116,7 @@ public class TestRawProcessor extends TestCase {
         public MockExportDataSource(String db, String tableName,
                                  int partitionId, int siteId, String tableSignature) throws Exception
         {
-            super(null, db, tableName, partitionId, siteId, tableSignature, 0,
+            super(m_noopRunnable, db, tableName, partitionId, siteId, tableSignature, 0,
                   m_mockVoltDB.getCatalogContext().database.getTables().get("TableName").getColumns(),
                   "/tmp/" + System.getProperty("user.name"));
         }

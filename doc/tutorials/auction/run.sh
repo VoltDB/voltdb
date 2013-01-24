@@ -19,13 +19,15 @@ else
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+CLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 CSVLOADER="$VOLTDB_BIN/csvloader"
 EXPORTTOFILE="$VOLTDB_BIN/exporttofile"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 
 DATAFILES="src/com/auctionexample/datafiles/"
 
@@ -49,7 +51,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar auction-ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -67,9 +69,9 @@ function server() {
 function client() {
     # load the csv files
     $CSVLOADER -f $DATAFILES/items.txt \
-			-p InsertIntoItemAndBid \
-         		--user program \
-         		--password pass
+            -p InsertIntoItemAndBid \
+                --user program \
+                --password pass
     $CSVLOADER -f $DATAFILES/categories.txt \
                         -p InsertIntoCategory \
                         --user program \

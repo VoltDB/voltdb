@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,11 +19,15 @@ package org.voltdb.sysprocs;
 
 import java.io.File;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.DependencyPair;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
@@ -320,10 +324,29 @@ public class SystemInformation extends VoltSystemProcedure
         VoltTable vt = constructOverviewTable();
         int hostId = VoltDB.instance().getHostMessenger().getHostId();
 
+        // try to get the external interface first, if none was set, use local addresses
+        InetAddress addr = null;
+        int clientPort = VoltDB.DEFAULT_PORT;
+        try {
+            String localMetadata = VoltDB.instance().getLocalMetadata();
+            JSONObject jsObj = new JSONObject(localMetadata);
+            JSONArray interfaces = jsObj.getJSONArray("interfaces");
+            String iface = interfaces.getString(0);
+            addr = InetAddress.getByName(iface);
+            clientPort = jsObj.getInt("clientPort");
+        } catch (JSONException e) {
+            hostLog.error("Failed to get local metadata", e);
+        } catch (UnknownHostException e) {
+            hostLog.error("Failed to determine hostname", e);
+        }
+
         // host name and IP address.
-        InetAddress addr = org.voltcore.utils.CoreUtils.getLocalAddress();
+        if (addr == null) {
+            addr = org.voltcore.utils.CoreUtils.getLocalAddress();
+        }
         vt.addRow(hostId, "IPADDRESS", addr.getHostAddress());
         vt.addRow(hostId, "HOSTNAME", addr.getHostName());
+        vt.addRow(hostId, "CLIENTPORT", Integer.toString(clientPort));
 
         // build string
         vt.addRow(hostId, "BUILDSTRING", VoltDB.instance().getBuildString());

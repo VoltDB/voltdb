@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -59,7 +59,7 @@ public class TestPlannerTool extends TestCase {
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
 
         m_pt = new PlannerTool(context.cluster, context.database, 0);
 
@@ -152,7 +152,7 @@ public class TestPlannerTool extends TestCase {
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, c, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, c, bytes, 0, 0, 0);
 
         m_pt = new PlannerTool(context.cluster, context.database, 0);
 

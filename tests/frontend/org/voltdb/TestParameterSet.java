@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -53,9 +53,12 @@ package org.voltdb;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.Date;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
@@ -178,5 +181,52 @@ public class TestParameterSet extends TestCase {
         p2 = ParameterSet.fromJSONString(json);
 
         assertEquals("0a1A0A", p2.toArray()[6]);
+    }
+
+    public void testGetCRCWithoutCrash() throws IOException {
+        ParameterSet pset;
+        PureJavaCrc32C crc;
+
+        Object[] psetObjs = new Object[] {
+                null, VoltType.INTEGER.getNullValue(), VoltType.DECIMAL.getNullValue(), // null values
+                (byte)1, (short)2, (int)3, (long)4, 1.2f, 3.6d, // numbers
+                "This is spinal tap", "", // strings
+                "ABCDF012", new byte[] { 1, 3, 5 }, new byte[0], // binary
+                new BigDecimal(5.5), // decimal
+                new TimestampType(new Date()) // timestamp
+        };
+
+        pset = new ParameterSet();
+        pset.setParameters(psetObjs);
+        crc = new PureJavaCrc32C();
+        pset.addToCRC(crc);
+        long crc1 = crc.getValue();
+
+        ArrayUtils.reverse(psetObjs);
+
+        pset = new ParameterSet();
+        pset.setParameters(psetObjs);
+        crc = new PureJavaCrc32C();
+        pset.addToCRC(crc);
+        long crc2 = crc.getValue();
+
+        pset = new ParameterSet();
+        pset.setParameters(new Object[0]);
+        crc = new PureJavaCrc32C();
+        pset.addToCRC(crc);
+        long crc3 = crc.getValue();
+
+        pset = new ParameterSet();
+        pset.setParameters(new Object[] { 1 });
+        crc = new PureJavaCrc32C();
+        pset.addToCRC(crc);
+        long crc4 = crc.getValue();
+
+        assertNotSame(crc1, crc2);
+        assertNotSame(crc1, crc3);
+        assertNotSame(crc1, crc4);
+        assertNotSame(crc2, crc3);
+        assertNotSame(crc2, crc4);
+        assertNotSame(crc3, crc4);
     }
 }

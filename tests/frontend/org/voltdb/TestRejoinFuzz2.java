@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -65,8 +65,8 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     false, true,
                     false); // doesnt run with IV2 yet
         cluster.setMaxHeap(256);
-        String build = System.getProperties().getProperty("build", "release");
-        if (cluster.isValgrind() || build.equalsIgnoreCase("MEMCHECK")) {
+        cluster.overrideAnyRequestForValgrind();
+        if (cluster.isValgrind() || cluster.isMemcheckDefined()) {
             //Way to much data in this test. Using less data makes it redundant
             return;
         }

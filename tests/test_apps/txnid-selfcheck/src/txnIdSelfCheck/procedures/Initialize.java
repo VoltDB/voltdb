@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,9 +46,9 @@ public class Initialize extends VoltProcedure
         }
 
         // initialize the data using the txnId
-        long txnId = getTransactionId();
-        long ts = getTransactionTime().getTime();
-        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, ts, -1, 0);
+        long txnId = getVoltPrivateRealTransactionIdDontUseMe();
+        long uniqueId = getUniqueId();
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, uniqueId, -1, 0);
         voltExecuteSQL(true);
 
         // return the rid

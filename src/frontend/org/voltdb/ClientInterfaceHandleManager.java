@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -157,6 +157,10 @@ public class ClientInterfaceHandleManager
             @Override
             synchronized Iv2InFlight findHandle(long ciHandle) {
                 return super.findHandle(ciHandle);
+            }
+            @Override
+            synchronized Iv2InFlight removeHandle(long ciHandle) {
+                return super.removeHandle(ciHandle);
             }
             @Override
             synchronized long getOutstandingTxns() {
@@ -331,6 +335,58 @@ public class ClientInterfaceHandleManager
             }
         }
         tmLog.error("Unable to find Client data for client interface handle: " + ciHandle);
+        return null;
+    }
+
+    /** Remove a specific handle without destroying any handles ordered before it */
+    Iv2InFlight removeHandle(long ciHandle)
+    {
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
+        //Check read only encoded bit
+        final boolean readOnly = getReadBit(ciHandle);
+        //Remove read only encoding so comparison works
+        ciHandle = unsetReadBit(ciHandle);
+
+        // Shouldn't see any reads in this path, since the whole point of this
+        // method is to remove writes during replay which aren't going to get
+        // done.  However, this is logically correct, so go ahead and allow it.
+        Iv2InFlight inflight = m_shortCircuitReads.remove(ciHandle);
+        if (inflight != null) {
+            m_acg.reduceBackpressure(inflight.m_messageSize);
+            m_outstandingTxns--;
+            return inflight;
+        }
+
+        /*
+         * Not a short circuit read, check the partition specific
+         * queue of handles
+         */
+        int partitionId = getPartIdFromHandle(ciHandle);
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
+        if (partitionStuff == null) {
+            // whoa, bad
+            tmLog.error("Unable to find handle list for partition: " + partitionId);
+            return null;
+        }
+
+        final Deque<Iv2InFlight> perPartDeque = readOnly ? partitionStuff.m_reads : partitionStuff.m_writes;
+        Iterator<Iv2InFlight> iter = perPartDeque.iterator();
+        while (iter.hasNext()) {
+            Iv2InFlight inFlight = iter.next();
+            if (inFlight.m_ciHandle > ciHandle) {
+                // we've gone too far, this handle doesn't exist
+                tmLog.error("CI clientData lookup for remove missing handle: " + ciHandle
+                        + ". Next expected client data handle is: " + inFlight.m_ciHandle);
+                break;
+            }
+            else if (inFlight.m_ciHandle == ciHandle) {
+                m_acg.reduceBackpressure(inFlight.m_messageSize);
+                m_outstandingTxns--;
+                iter.remove();
+                return inFlight;
+            }
+        }
+        tmLog.error("Unable to find Client data to remove client interface handle: " + ciHandle);
         return null;
     }
 

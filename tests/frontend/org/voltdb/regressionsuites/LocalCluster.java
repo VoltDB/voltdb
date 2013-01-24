@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -110,7 +110,7 @@ public class LocalCluster implements VoltServerConfig {
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
     // instance.
-    private final CommandLine templateCmdLine = new CommandLine();
+    private final CommandLine templateCmdLine = new CommandLine(START_ACTION.CREATE);
 
     public LocalCluster(String jarFileName, int siteCount,
             int hostCount, int kfactor, BackendTarget target) {
@@ -246,6 +246,10 @@ public class LocalCluster implements VoltServerConfig {
 
     public void setCustomCmdLn(String customCmdLn) {
         templateCmdLine.customCmdLn(customCmdLn);
+    }
+
+    public void setJavaProperty(String property, String value) {
+        templateCmdLine.setJavaProperty(property, value);
     }
 
     @Override
@@ -549,7 +553,13 @@ public class LocalCluster implements VoltServerConfig {
             if (m_target == BackendTarget.NATIVE_EE_IPC) {
                 // set 1 port per site
                 for (int i = 0; i < m_siteCount; i++) {
-                    cmdln.m_ipcPorts.add(portGenerator.next());
+                    cmdln.ipcPort(portGenerator.next());
+                }
+            }
+            if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+                for (EEProcess proc : m_eeProcs.get(hostId)) {
+                    assert(proc != null);
+                    cmdln.ipcPort(proc.port());
                 }
             }
 
@@ -560,13 +570,6 @@ public class LocalCluster implements VoltServerConfig {
 
             if (m_debug) {
                 cmdln.debugPort(portGenerator.next());
-            }
-
-            if (cmdln.target().isIPC) {
-                for (EEProcess proc : m_eeProcs.get(hostId)) {
-                    assert(proc != null);
-                    cmdln.ipcPort(portGenerator.next());
-                }
             }
 
             cmdln.zkport(portGenerator.next());
@@ -584,7 +587,13 @@ public class LocalCluster implements VoltServerConfig {
 
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
-            m_procBuilder.command().addAll(cmdln.createCommandLine());
+            List<String> cmdlnList = cmdln.createCommandLine();
+            String cmdLineFull = "Start cmd host=" + String.valueOf(hostId) + " :";
+            for (String element : cmdlnList) {
+                cmdLineFull += " " + element;
+            }
+            log.info(cmdLineFull);
+            m_procBuilder.command().addAll(cmdlnList);
 
             // for debug, dump the command line to a file.
             //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
@@ -696,6 +705,9 @@ public class LocalCluster implements VoltServerConfig {
         long start = 0;
         try {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
+            // some tests need this
+            rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
+
             if (liveRejoin) {
                 rejoinCmdLn.startCommand(START_ACTION.LIVE_REJOIN.name());
             } else {
@@ -714,8 +726,15 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.m_internalPort = portGenerator.next();
             setPortsFromConfig(hostId, rejoinCmdLn);
 
+            List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
+            String cmdLineFull = "Rejoin cmd line:";
+            for (String element : rejoinCmdLnStr) {
+                cmdLineFull += " " + element;
+            }
+            log.info(cmdLineFull);
+
             m_procBuilder.command().clear();
-            m_procBuilder.command().addAll(rejoinCmdLn.createCommandLine());
+            m_procBuilder.command().addAll(rejoinCmdLnStr);
             Process proc = m_procBuilder.start();
             start = System.currentTimeMillis();
 
@@ -1089,12 +1108,12 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_leader = config.m_leader;
     }
 
-    protected boolean isMemcheckDefined() {
+    public boolean isMemcheckDefined() {
         final String buildType = System.getenv().get("BUILD");
         if (buildType == null) {
             return false;
         }
-        return buildType.startsWith("memcheck");
+        return buildType.toLowerCase().startsWith("memcheck");
     }
 
     @Override
@@ -1130,6 +1149,15 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
         return files;
+    }
+
+    @Override
+    public File[] getPathInSubroots(File path) throws IOException {
+        File retval[] = new File[m_subRoots.size()];
+        for (int ii = 0; ii < m_subRoots.size(); ii++) {
+            retval[ii] = new File(m_subRoots.get(ii), path.getPath());
+        }
+        return retval;
     }
 
 

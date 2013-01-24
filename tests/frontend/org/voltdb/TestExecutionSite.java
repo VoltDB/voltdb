@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -692,7 +692,7 @@ public class TestExecutionSite extends TestCase {
                         FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
-                                                m_txnState.timestamp,
+                                                m_txnState.uniqueId,
                                                 m_txnState.isReadOnly(),
                                                 1,
                                                 localTask_outputDep,
@@ -706,7 +706,7 @@ public class TestExecutionSite extends TestCase {
                         FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
-                                                m_txnState.timestamp,
+                                                m_txnState.uniqueId,
                                                 m_txnState.isReadOnly(),
                                                 0,
                                                 localTask_startDep,

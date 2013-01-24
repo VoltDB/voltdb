@@ -1,24 +1,27 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Encapsulates an Iv2 transaction id, timestamp and random number seed.
@@ -33,6 +36,7 @@ final public class TxnEgo {
     // maximum values for the fields
     static final long SEQUENCE_MAX_VALUE = (1L << SEQUENCE_BITS) - 1L;
     static final int PARTITIONID_MAX_VALUE = (1 << PARTITIONID_BITS) - 1;
+    static public final int MP_PARTITIONID = PARTITIONID_MAX_VALUE;
 
     // (Copy/Pasted (on purpose) from voltdb.TransactionIdManager)
     // The legacy transaction id included 40-bits of timestamp starting
@@ -69,7 +73,6 @@ final public class TxnEgo {
 
     // per TxnEgo data.
     private final long m_txnId;
-    private final long m_wallClock;
 
     /**
      * Make the zero-valued (initial) TxnEgo for a partition
@@ -114,17 +117,11 @@ final public class TxnEgo {
         }
 
         m_txnId = (sequence << PARTITIONID_BITS) | partitionId;
-        m_wallClock = System.currentTimeMillis();
     }
 
     final public long getTxnId()
     {
         return m_txnId;
-    }
-
-    final public long getWallClock()
-    {
-        return m_wallClock;
     }
 
     public static long getSequence(long txnId) {
@@ -154,26 +151,45 @@ final public class TxnEgo {
         sb.append("TxnId: ").append(getTxnId());
         sb.append("  Sequence: ").append(getSequence());
         sb.append("  PartitionId: ").append(getPartitionId());
-        sb.append("  Wallclock: ").append(getWallClock());
-        Date date = new Date(getWallClock());
-        sb.append("  Date: ").append(date.toString());
         return sb.toString();
     }
 
     public String toBitString() {
-        String retval = "";
+        StringBuffer retval = new StringBuffer();
         long mask = 0x8000000000000000L;
         for(int i = 0; i < 64; i++) {
-            if ((getTxnId() & mask) == 0) retval += "0";
-            else retval += "1";
+            if ((getTxnId() & mask) == 0) retval.append("0");
+            else retval.append("1");
             mask >>>= 1;
         }
-        return retval;
+        return retval.toString();
     }
 
     public static String txnIdToString(long txnId)
     {
         return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +
             TxnEgo.getPartitionId(txnId) + ")";
+    }
+
+    public static String txnIdCollectionToString(Collection<Long> ids) {
+        List<String> idstrings = new ArrayList<String>();
+        for (Long id : ids) {
+            idstrings.add(txnIdToString(id));
+        }
+        // Easy hack, sort txn IDs lexically.
+        Collections.sort(idstrings);
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        boolean first = false;
+        for (String id : idstrings) {
+            if (!first) {
+                first = true;
+            } else {
+                sb.append(", ");
+            }
+            sb.append(id);
+        }
+        sb.append("]");
+        return sb.toString();
     }
 }
