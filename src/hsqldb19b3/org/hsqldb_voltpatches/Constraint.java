@@ -1066,7 +1066,7 @@ public final class Constraint implements SchemaObject {
             constraint = new VoltXMLElement("constraint");
 
             constraint.attributes.put("name", getName().name);
-            constraint.attributes.put("type", getTypeName());
+            constraint.attributes.put("constrainttype", getTypeName());
 
             // Foreign Keys
             if (this.constType == FOREIGN_KEY) {

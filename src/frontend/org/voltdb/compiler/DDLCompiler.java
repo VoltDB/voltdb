@@ -1034,7 +1034,7 @@ public class DDLCompiler {
         assert node.name.equals("column");
 
         String name = node.attributes.get("name");
-        String typename = node.attributes.get("type");
+        String typename = node.attributes.get("valuetype");
         String nullable = node.attributes.get("nullable");
         String sizeString = node.attributes.get("size");
         String defaultvalue = null;
@@ -1050,14 +1050,9 @@ public class DDLCompiler {
                     // Value
                     if (inner_child.name.equals("value")) {
                         defaultvalue = inner_child.attributes.get("value");
-                        defaulttype = inner_child.attributes.get("type");
+                        defaulttype = inner_child.attributes.get("valuetype");
+                        if (defaultvalue != null) break;
                     }
-                    // Function
-                    /*else if (inner_child.name.equals("function")) {
-                        defaultvalue = inner_child.attributes.get("name");
-                        defaulttype = VoltType.VOLTFUNCTION.name();
-                    }*/
-                    if (defaultvalue != null) break;
                 }
             }
         }
@@ -1337,7 +1332,7 @@ public class DDLCompiler {
         assert node.name.equals("constraint");
 
         String name = node.attributes.get("name");
-        String typeName = node.attributes.get("type");
+        String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
         if (type == null) {
             throw m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");

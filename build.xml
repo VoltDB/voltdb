@@ -1825,18 +1825,59 @@ TEST CASES
   </findbugs>
 </target>
 
+<property name="ptdefaultconfigs" value="voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549"
+  description = "default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
     <property name="plannertester.dir" value="tests/scripts/plannertester"/>
-    <fileset id="plannertester.configs" dir="${plannertester.dir}/config" includes="**"/>
     <echo message="Running from ${plannertester.dir}"/>
+
+    <condition property="user" value="${env.USER}" else="anonymous">
+        <isset property="env.USER"/>
+    </condition>
+    <condition property="config" value="${config}" else="${ptdefaultconfigs}">
+        <isset property="config"/>
+    </condition>
+    <condition property="workpath" value="${workpath}" else="/tmp/${user}/plannertester/">
+        <isset property="workpath"/>
+    </condition>
+    <condition property="reportpath" value="${reportpath}" else="reports/">
+        <isset property="reportpath"/>
+    </condition>
 
     <java classname="org.voltdb.planner.plannerTester"
           classpathref="project.classpath"
           dir="${plannertester.dir}"
           failonerror="true"
           fork="true">
-        <arg line="-C=config/voter,config/voltkv,config/voltcache -d -s -e -cs -r=reports -sp=plan-voter,plan-voltkv,plan-voltcache"/>
+        <arg line="-C=${config} -dv -r=${reportpath} -sp=${workpath}"/>
+    </java>
+</target>
+
+<target name="plannertestrefresh" description="Run plannertester baseline refresh">
+    <property name="plannertester.dir" value="tests/scripts/plannertester"/>
+    <fileset id="plannertester.configs" dir="${plannertester.dir}/config" includes="**"/>
+    <echo message="Running from ${plannertester.dir}"/>
+
+    <condition property="user" value="${env.USER}" else="anonymous">
+        <isset property="env.USER"/>
+    </condition>
+    <condition property="config" value="${config}" else="${ptdefaultconfigs}">
+        <isset property="config"/>
+    </condition>
+    <condition property="workpath" value="${workpath}" else="/tmp/${user}/plannertester/">
+        <isset property="workpath"/>
+    </condition>
+    <condition property="reportpath" value="${reportpath}" else="reports/">
+        <isset property="reportpath"/>
+    </condition>
+
+    <java classname="org.voltdb.planner.plannerTester"
+          classpathref="project.classpath"
+          dir="${plannertester.dir}"
+          failonerror="true"
+          fork="true">
+        <arg line="-C=${config} -sv -r=${reportpath} -sp=${workpath} "/>
     </java>
 </target>
 

@@ -84,7 +84,7 @@ public class Iv2TransactionCreator implements TransactionCreator
 
     @Override
     public void sendSentinel(long txnId, int partitionId) {
-        m_ci.sendSentinel(txnId, partitionId, true);
+        m_ci.sendSentinel(txnId, partitionId);
     }
 
     @Override

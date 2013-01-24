@@ -23,43 +23,13 @@
 
 package org.voltdb.planner;
 
-import java.util.List;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 
-import junit.framework.TestCase;
-
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
-import org.voltdb.plannodes.*;
-
-public class TestJoinOrder extends TestCase {
-    private PlannerTestAideDeCamp aide;
-
-    private AbstractPlanNode compile(String sql, int paramCount,
-                                     boolean singlePartition,
-                                     String joinOrder)
-    {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn =  aide.compile(sql, paramCount, singlePartition, joinOrder);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
-    }
-
+public class TestJoinOrder extends PlannerTestCase {
     public void testBasicJoinOrder() {
-        AbstractPlanNode pn = compile("select * FROM T1, T2, T3, T4, T5, T6, T7", 0, false, "T7,T6,T5,T4,T3,T2,T1");
+        AbstractPlanNode pn = compileWithJoinOrder("select * FROM T1, T2, T3, T4, T5, T6, T7", "T7,T6,T5,T4,T3,T2,T1");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         for (int ii = 1; ii <= 7; ii++) {
             if (ii == 6) {
@@ -75,7 +45,7 @@ public class TestJoinOrder extends TestCase {
             }
         }
 
-        pn = compile("select * FROM T1, T2, T3, T4, T5, T6, T7", 0, false, "T1,T2,T3,T4,T5,T6,T7");
+        pn = compileWithJoinOrder("select * FROM T1, T2, T3, T4, T5, T6, T7", "T1,T2,T3,T4,T5,T6,T7");
         n = pn.getChild(0).getChild(0);
         for (int ii = 7; ii > 0; ii--) {
             if (ii == 2) {
@@ -94,20 +64,12 @@ public class TestJoinOrder extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestJoinOrder.class.getResource("testjoinorder-ddl.sql"),
-                                         "testjoinorder");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(true);
-        }
+        setupSchema(TestJoinOrder.class.getResource("testjoinorder-ddl.sql"), "testjoinorder", true);
+        forceReplication();
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 }

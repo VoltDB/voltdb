@@ -25,6 +25,9 @@ import org.voltcore.utils.CoreUtils;
 
 public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage {
 
+    long m_ciHandle;
+    long m_connectionId;
+
     MultiPartitionParticipantMessage() {
         super();
     }
@@ -39,11 +42,16 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
                 txnId,
                 isReadOnly,
                 false);
+
+        m_ciHandle = -1;
+        m_connectionId = -1;
     }
 
     public MultiPartitionParticipantMessage(long initiatorHSId,
                                             long coordinatorHSId,
                                             long txnId,
+                                            long ciHandle,
+                                            long connectionId,
                                             boolean isReadOnly,
                                             boolean isForReplay) {
         super(initiatorHSId,
@@ -52,12 +60,27 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
                 txnId,
                 isReadOnly,
                 isForReplay);
+
+        m_ciHandle = ciHandle;
+        m_connectionId = connectionId;
+    }
+
+    public long getClientInterfaceHandle()
+    {
+        return m_ciHandle;
+    }
+
+    public long getConnectionId()
+    {
+        return m_connectionId;
     }
 
     @Override
     public int getSerializedSize()
     {
-        int msgsize = super.getSerializedSize();
+        int msgsize = super.getSerializedSize()
+                + 8 // m_ciHandle
+                + 8; // m_connectionId
         return msgsize;
     }
 
@@ -66,6 +89,8 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
     {
         buf.put(VoltDbMessageFactory.PARTICIPANT_NOTICE_ID);
         super.flattenToBuffer(buf);
+        buf.putLong(m_ciHandle);
+        buf.putLong(m_connectionId);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -73,6 +98,8 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
         super.initFromBuffer(buf);
+        m_ciHandle = buf.getLong();
+        m_connectionId = buf.getLong();
     }
 
     @Override
@@ -83,6 +110,10 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
+        sb.append(" CLIENTINTERFACEHANDLE ");
+        sb.append(m_ciHandle);
+        sb.append(" CONNECTIONID ");
+        sb.append(m_connectionId);
 
         return sb.toString();
     }
