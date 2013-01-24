@@ -29,10 +29,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 
@@ -42,8 +40,6 @@ import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -52,7 +48,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 import com.google.common.primitives.Longs;
 
@@ -141,9 +136,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
-
-    // helper class to put command log work in order
-    private final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -244,85 +236,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
-    /**
-     * Poll the replay sequencer and process the messages until it returns null
-     */
-    private void deliverReadyTxns() {
-        VoltMessage m = m_replaySequencer.poll();
-        while(m != null) {
-            deliver2(m);
-            m = m_replaySequencer.poll();
-        }
-    }
-
-    /**
-     * Poll the replay sequencer and respond to all SPs with an IGNORED response
-     */
-    private void drainReplaySequencer()
-    {
-        VoltMessage m = m_replaySequencer.poll();
-        while (m != null) {
-            if (m instanceof Iv2InitiateTaskMessage) {
-                // Send IGNORED response for all SPs
-                Iv2InitiateTaskMessage task = (Iv2InitiateTaskMessage) m;
-                final InitiateResponseMessage response = new InitiateResponseMessage(task);
-                response.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                                                           new VoltTable[0],
-                                                           ClientResponseImpl.IGNORED_TRANSACTION));
-                m_mailbox.send(response.getInitiatorHSId(), response);
-            }
-            m = m_replaySequencer.poll();
-        }
-    }
-
     // SpInitiators will see every message type.  The Responses currently come
     // from local work, but will come from replicas when replication is
     // implemented
     @Override
     public void deliver(VoltMessage message)
-    {
-        long sequenceWithTxnId = Long.MIN_VALUE;
-
-        boolean sequenceForCommandLog =
-            (m_isLeader && message instanceof TransactionInfoBaseMessage &&
-             (((TransactionInfoBaseMessage)message).isForReplay()));
-
-        boolean sequenceForDR = m_isLeader &&
-             ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
-
-        boolean sequenceForSentinel = m_isLeader &&
-            (message instanceof MultiPartitionParticipantMessage);
-
-        boolean sequenceForReplay =
-                sequenceForCommandLog || sequenceForSentinel || sequenceForDR;
-
-        assert(!(sequenceForCommandLog && sequenceForDR));
-
-        if (sequenceForCommandLog || sequenceForSentinel) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
-        }
-        else if (sequenceForDR) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
-        }
-
-        if (sequenceForReplay) {
-            if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage)message)) {
-                deliver2(message);
-            }
-            else if (m_replaySequencer.isMPIEOLReached()) {
-                drainReplaySequencer();
-            }
-            else {
-                deliverReadyTxns();
-            }
-        }
-        else {
-            deliver2(message);
-        }
-    }
-
-    private void deliver2(VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);

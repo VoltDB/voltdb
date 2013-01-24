@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 import junit.framework.TestCase;
@@ -43,7 +44,15 @@ public class TestReplaySequencer extends TestCase
 
     TransactionInfoBaseMessage makeIv2InitTask(long unused)
     {
+        return makeIv2InitTask(unused, "Proc");
+    }
+
+    TransactionInfoBaseMessage makeIv2InitTask(long unused, String procName)
+    {
         Iv2InitiateTaskMessage m = mock(Iv2InitiateTaskMessage.class);
+        StoredProcedureInvocation invocation = mock(StoredProcedureInvocation.class);
+        when(invocation.getProcName()).thenReturn(procName);
+        when(m.getStoredProcedureInvocation()).thenReturn(invocation);
         when(m.isForReplay()).thenReturn(true);
         return m;
     }
@@ -539,6 +548,110 @@ public class TestReplaySequencer extends TestCase
         assertFalse(dut.offer(1L, frag));
         assertFalse(dut.offer(1L, frag2));
         assertEquals(null, dut.poll());
+    }
+
+    @Test
+    public void testDupInitMsg()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        // simple deduping
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(1L);
+
+        assertFalse(dut.offer(1L, init1));
+        assertNotNull(dut.dedupe(1L, init1));
+        assertTrue(dut.offer(1L, init1));
+        assertNull(dut.poll());
+
+        // dedupe with sentinels mixed
+        TransactionInfoBaseMessage sntl1 = makeSentinel(2L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(3L);
+
+        assertTrue(dut.offer(2L, sntl1));
+        assertTrue(dut.offer(3L, init2));
+        assertNotNull(dut.dedupe(3L, init2));
+        assertTrue(dut.offer(3L, init2));
+        assertNull(dut.poll());
+
+        TransactionInfoBaseMessage frag1 = makeFragment(2L);
+
+        assertTrue(dut.offer(2L, frag1));
+        assertEquals(frag1, dut.poll());
+        assertEquals(init2, dut.poll());
+        assertNull(dut.poll());
+
+        // dedupe with already polled
+        assertNotNull(dut.dedupe(1L, init1));
+        assertTrue(dut.offer(1L, init1));
+        assertNull(dut.poll());
+    }
+
+    /**
+     * No harm in sending duplicate sentinels
+     */
+    @Test
+    public void testDupSentinels()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sntl1 = makeSentinel(1L);
+        TransactionInfoBaseMessage frag1 = makeFragment(1L);
+        TransactionInfoBaseMessage cmpl1 = makeCompleteTxn(1L);
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(2L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(3L);
+
+        assertTrue(dut.offer(1L, sntl1));
+        assertTrue(dut.offer(1L, frag1));
+        assertTrue(dut.offer(2L, init1));
+        assertEquals(frag1, dut.poll());
+        assertEquals(init1, dut.poll());
+        assertFalse(dut.offer(1L, cmpl1));
+        assertNull(dut.poll());
+
+        assertNull(dut.dedupe(1L, sntl1)); // don't care about sentinels
+        assertTrue(dut.offer(1L, sntl1));
+        assertFalse(dut.offer(3L, init2));
+        assertNull(dut.poll());
+    }
+
+    @Test
+    public void testAllowLoadTableWithSameTxnId()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(1L, "@LoadSinglepartitionTable");
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(2L, "@LoadMultipartitionTable");
+
+        assertFalse(dut.offer(1L, init1));
+        assertNull(dut.dedupe(1L, init1));
+        assertFalse(dut.offer(1L, init1));
+        assertNull(dut.poll());
+
+        assertFalse(dut.offer(2L, init2));
+        assertNull(dut.dedupe(2L, init2));
+        assertFalse(dut.offer(2L, init2));
+        assertNull(dut.poll());
+    }
+
+    @Test
+    public void testCompleteWithoutFirstFrag()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sntl = makeSentinel(1L);
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage cmpl = makeCompleteTxn(1L);
+
+        assertTrue(dut.offer(1L, sntl));
+        // a restart complete arrives before the first fragment
+        assertFalse(dut.offer(1L, cmpl));
+        assertTrue(dut.offer(1L, frag));
+        // this one should be queued
+        assertTrue(dut.offer(1L, cmpl));
+
+        assertEquals(frag, dut.poll());
+        assertEquals(cmpl, dut.poll());
+        assertNull(dut.poll());
     }
 }
 
