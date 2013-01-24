@@ -636,6 +636,51 @@ public class TestReplaySequencer extends TestCase
     }
 
     @Test
+    public void testDrain2()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        // A bunch of sentinels before some SP transactions
+        // We need drain to skip the 3 sentinels and get to the SPs.
+        // need
+        // mp1
+        // mp2
+        // mp3
+        // sp1
+        // sp2
+        // sp3
+        // sp4
+
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(101L);
+        TransactionInfoBaseMessage sentinel1 = makeSentinel(1L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(102L);
+        TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
+        TransactionInfoBaseMessage init3 = makeIv2InitTask(103L);
+        TransactionInfoBaseMessage sentinel3 = makeSentinel(3L);
+        TransactionInfoBaseMessage init4 = makeIv2InitTask(104L);
+
+        assertTrue(dut.offer(1L, sentinel1));
+        assertTrue(dut.offer(2L, sentinel2));
+        assertTrue(dut.offer(3L, sentinel3));
+        assertTrue(dut.offer(101L, init1));
+        assertTrue(dut.offer(102L, init2));
+        assertTrue(dut.offer(103L, init3));
+        assertTrue(dut.offer(104L, init4));
+        assertNull(dut.drain());
+        // SPI EOL
+        assertTrue(dut.offer(0L, makeEOL(false)));
+        assertNull(dut.drain());
+        // MPI EOL
+        assertTrue(dut.offer(0L, makeEOL(true)));
+        // Now, we need to be able to drain all of the SP inits out in order to respond IGNORING
+        assertNull(dut.poll());
+        assertEquals(init1, dut.drain());
+        assertEquals(init2, dut.drain());
+        assertEquals(init3, dut.drain());
+        assertEquals(init4, dut.drain());
+        assertNull(dut.drain());
+    }
+    @Test
     public void testEarlyMPIEOL()
     {
         ReplaySequencer dut = new ReplaySequencer();

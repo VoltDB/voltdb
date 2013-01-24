@@ -242,10 +242,15 @@ public class ReplaySequencer
             return null;
         }
         VoltMessage head = m_replayEntries.firstEntry().getValue().drain();
-        if (head == null) {
+        while (head == null) {
             m_replayEntries.pollFirstEntry();
             if (!m_replayEntries.isEmpty()) {
+                // This will end up null if the next ReplayEntry was just a sentinel.
+                // We'll keep going.
                 head = m_replayEntries.firstEntry().getValue().drain();
+            }
+            else {
+                break;
             }
         }
         return head;
