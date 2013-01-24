@@ -226,7 +226,7 @@ final class RangeVariable {
     public int findColumn(String columnName) {
 
         if (namedJoinColumnExpressions != null
-                && namedJoinColumnExpressions.containsKey(columnName)) {
+                && !namedJoinColumnExpressions.containsKey(columnName)) {
             return -1;
         }
 
@@ -349,9 +349,16 @@ final class RangeVariable {
                         exprList.add(position, e);
                     }
 
-                    e = getColumnExpression(columnName);
-
-                    exprList.set(position, e);
+                    ExpressionColumn ce = getColumnExpression(columnName);
+                    // If column expression doesn't have table name set reuse table name from
+                    // the original expression
+                    String t = ce.getTableName();
+                    if (ce != null && (ce.getTableName() == null || ce.getTableName().length() == 0)) {
+                        if (e instanceof ExpressionColumn) {
+                            ce.tableName = ((ExpressionColumn) e).getTableName();
+                        }
+                    }
+                    exprList.set(position, ce);
 
                     position++;
                 }
@@ -1179,8 +1186,14 @@ final class RangeVariable {
         }
 
         // note if this is an outer join
-        if (isLeftJoin || isRightJoin) {
-            scan.attributes.put("isouterjoin", "true");
+        if (isLeftJoin && isRightJoin) {
+            scan.attributes.put("jointype", "full");
+        } else if (isLeftJoin) {
+            scan.attributes.put("jointype", "left");
+        } else if (isRightJoin) {
+            scan.attributes.put("jointype", "right");
+        } else {
+            scan.attributes.put("jointype", "inner");
         }
 
         // start with the indexCondition

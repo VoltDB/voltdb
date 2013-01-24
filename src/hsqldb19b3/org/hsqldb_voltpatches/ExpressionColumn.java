@@ -334,14 +334,15 @@ public class ExpressionColumn extends Expression {
     public boolean resolveColumnReference(RangeVariable rangeVar) {
 
         if (tableName == null) {
-            Expression e = rangeVar.getColumnExpression(columnName);
+            ExpressionColumn e = rangeVar.getColumnExpression(columnName);
 
             if (e != null) {
                 opType   = e.opType;
                 nodes    = e.nodes;
                 dataType = e.dataType;
-
-                return true;
+                if (e.getTableName() != null && e.getTableName().length() != 0) {
+                    return true;
+                }
             }
 
             if (rangeVar.variables != null) {

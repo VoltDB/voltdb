@@ -38,6 +38,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.JoinType;
 
 public abstract class AbstractParsedStmt {
 
@@ -519,6 +520,9 @@ public abstract class AbstractParsedStmt {
     private void parseTables(VoltXMLElement tablesNode) {
         Set<Table> visited = new HashSet<Table>(tableList);
 
+        // temp restriction on number of outer joins
+        int tableCount = 0;
+        boolean isOuter = false;
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -529,6 +533,21 @@ public abstract class AbstractParsedStmt {
 
                 if( visited.contains( table)) {
                     throw new PlanningErrorException("VoltDB does not yet support self joins, consider using views instead");
+                }
+
+                String joinTypeStr = node.attributes.get("jointype");
+                assert(joinTypeStr != null);
+                JoinType joinType = JoinType.get(joinTypeStr);
+                assert(joinType != JoinType.INVALID);
+                if (joinType == JoinType.FULL) {
+                    throw new PlanningErrorException("VoltDB does not yet support full outer joins");
+                }
+                if (joinType != JoinType.INNER && !isOuter) {
+                    isOuter = true;
+                }
+                ++tableCount;
+                if (isOuter && tableCount > 2) {
+                    throw new PlanningErrorException("VoltDB does not yet support outer joins with more than two tables involved");
                 }
 
                 visited.add(table);
