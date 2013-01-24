@@ -737,7 +737,7 @@ public class VoltProjectBuilder {
             System.err.println("ERROR: Call compile() before trying to get the deployment path.");
             return null;
         } else {
-            System.out.println("path to deployemnt is " + m_pathToDeployment);
+            System.out.println("path to deployment is " + m_pathToDeployment);
             return m_pathToDeployment;
         }
     }
