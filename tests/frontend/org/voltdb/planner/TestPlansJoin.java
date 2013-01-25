@@ -57,8 +57,9 @@ public class TestPlansJoin extends TestCase {
         assertTrue(pn.get(0) != null);
         return pn.get(0);
     }
-/*
+
     public void testBasicInnerJoin() {
+
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
@@ -96,6 +97,14 @@ public class TestPlansJoin extends TestCase {
         pn = compile("select R1.C, R2.C FROM R1 INNER JOIN R2 USING (C)", 0, false, null);
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
+
+        pn = compile("select R2.A, R2.C FROM R2 JOIN R3 USING(C)", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
+        AbstractExpression pred = nlj.getPredicate();
+        assertTrue(pred != null);
+
     }
 
     public void testBasicThreeTableInnerJoin() {
@@ -131,19 +140,10 @@ public class TestPlansJoin extends TestCase {
         assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
         assertTrue(n.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null);
     }
-/*/
-   public void testUsingJoin() {
-       AbstractPlanNode pn = compile("select R2.A, R2.C FROM R2 JOIN R3 USING(A,C)", 0, false, null);
-       AbstractPlanNode n = pn.getChild(0).getChild(0);
-       assertTrue(n instanceof NestLoopPlanNode);
-       NestLoopPlanNode nlj = (NestLoopPlanNode) n;
-       AbstractExpression pred = nlj.getPredicate();
-       assertTrue(pred != null);
-       assertTrue(pred.getExpressionType() == ExpressionType.CONJUNCTION_AND);
-       }
-/*
-   public void testOnJoin() {
-       AbstractPlanNode pn = compile("select R2.A, R2.C FROM R2 JOIN R3 on (R2.A = R3.A AND R2.A = R3.C)", 0, false, null);
+
+   public void testMultiColumnJoin() {
+       // Test multi column condition on non index columns
+       AbstractPlanNode pn = compile("select R1.A, R2.A FROM R2 JOIN R1 USING(A, C)", 0, false, null);
        AbstractPlanNode n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopPlanNode);
        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
@@ -151,14 +151,47 @@ public class TestPlansJoin extends TestCase {
        assertTrue(pred != null);
        assertTrue(pred.getExpressionType() == ExpressionType.CONJUNCTION_AND);
 
-       pn = compile("select R2.A, R2.C FROM R2 JOIN R3 on R2.A > R3.A", 0, false, null);
+       pn = compile("select R1.A, R2.A FROM R2 JOIN R1 on R1.A = R2.A and R1.C = R2.C", 0, false, null);
        n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopPlanNode);
        nlj = (NestLoopPlanNode) n;
        pred = nlj.getPredicate();
+       assertTrue(pred != null);
        assertTrue(pred.getExpressionType() == ExpressionType.CONJUNCTION_AND);
-       }
 
+      // Test multi column condition on index columns
+       pn = compile("select R3.A, R2.A FROM R2 JOIN R3 USING(A)", 0, false, null);
+       n = pn.getChild(0).getChild(0);
+       assertTrue(n instanceof NestLoopIndexPlanNode);
+       NestLoopIndexPlanNode nlij = (NestLoopIndexPlanNode) n;
+       pred = ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getPredicate();
+       assertTrue(pred != null);
+       assertTrue(pred.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+
+       pn = compile("select R3.A, R2.A FROM R2 JOIN R3 ON R3.A = R2.A", 0, false, null);
+       n = pn.getChild(0).getChild(0);
+       assertTrue(n instanceof NestLoopIndexPlanNode);
+       nlij = (NestLoopIndexPlanNode) n;
+       pred = ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getPredicate();
+       assertTrue(pred != null);
+       assertTrue(pred.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+
+       pn = compile("select R3.A, R2.A FROM R3 JOIN R2 USING(A, C)", 0, false, null);
+       n = pn.getChild(0).getChild(0);
+       assertTrue(n instanceof NestLoopIndexPlanNode);
+       nlij = (NestLoopIndexPlanNode) n;
+       pred = ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getPredicate();
+       assertTrue(pred != null);
+       assertTrue(pred.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+
+       pn = compile("select R3.A, R2.A FROM R3 JOIN R2 ON R3.A = R2.A AND R3.C = R2.C", 0, false, null);
+       n = pn.getChild(0).getChild(0);
+       assertTrue(n instanceof NestLoopIndexPlanNode);
+       nlij = (NestLoopIndexPlanNode) n;
+       pred = ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getPredicate();
+       assertTrue(pred != null);
+       assertTrue(pred.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+       }
 
    public void testDistributedJoin() {
        // JOIN replicated and one distributed table
@@ -185,40 +218,40 @@ public class TestPlansJoin extends TestCase {
            List<AbstractPlanNode> pn = aide.compile("select R2.C FROM (R1 JOIN R2 ON R1.C = R2.C) JOIN R3 ON R1.C = R3.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           ex.printStackTrace();
+           System.out.println(ex.getMessage());
        }
        // JOIN with join hierarchy (HSQL limitation)
        try {
            List<AbstractPlanNode> pn = aide.compile("select * FROM R1 JOIN R2 JOIN R3 ON R1.C = R2.C ON R1.C = R3.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           ex.printStackTrace();
+           System.out.println(ex.getMessage());
        }
        // FUUL JOIN. Temporary restriction
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 FULL JOIN R2 ON R1.C = R2.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           ex.printStackTrace();
+           System.out.println(ex.getMessage());
        }
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 FULL OUTER JOIN R2 ON R1.C = R2.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           ex.printStackTrace();
+           System.out.println(ex.getMessage());
        }
        // OUTER JOIN with more then two tables. Temporary restriction
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           ex.printStackTrace();
+           System.out.println(ex.getMessage());
        }
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           ex.printStackTrace();
+           System.out.println(ex.getMessage());
        }
 
        // Self JOIN . Temporary restriction
@@ -226,11 +259,11 @@ public class TestPlansJoin extends TestCase {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           ex.printStackTrace();
+           System.out.println(ex.getMessage());
        }
 
    }
-*/
+
     @Override
     protected void setUp() throws Exception {
         aide = new PlannerTestAideDeCamp(TestJoinOrder.class.getResource("testplans-join-ddl.sql"),

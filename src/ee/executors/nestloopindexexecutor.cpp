@@ -327,7 +327,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple inner_tuple(inner_table->schema());
     TableIterator outer_iterator = outer_table->iterator();
     int num_of_outer_cols = outer_table->columnCount();
-    int num_of_inner_cols = inner_table->columnCount();
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = output_table->tempTuple();
@@ -535,12 +534,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             //
             // Append NULLs to the end of our join tuple
             //
-            for (int col_ctr = 0; col_ctr < num_of_inner_cols; ++col_ctr)
+            for (int col_ctr = num_of_outer_cols; col_ctr < join_tuple.sizeInValues(); ++col_ctr)
             {
-                const int index = col_ctr + num_of_outer_cols;
-                NValue value = join_tuple.getNValue(index);
+                NValue value = join_tuple.getNValue(col_ctr);
                 value.setNull();
-                join_tuple.setNValue(col_ctr + num_of_outer_cols, value);
+                join_tuple.setNValue(col_ctr, value);
             }
             output_table->insertTupleNonVirtual(join_tuple);
         }

@@ -225,10 +225,10 @@ final class RangeVariable {
      */
     public int findColumn(String columnName) {
 
-        if (namedJoinColumnExpressions != null
-                && !namedJoinColumnExpressions.containsKey(columnName)) {
-            return -1;
-        }
+        //if (namedJoinColumnExpressions != null
+        //        && !namedJoinColumnExpressions.containsKey(columnName)) {
+        //    return -1;
+        //}
 
         if (variables != null) {
             return variables.getIndex(columnName);

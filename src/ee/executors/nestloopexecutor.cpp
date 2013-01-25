@@ -224,7 +224,10 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator0 = outer_table->iterator();
     while (iterator0.next(outer_tuple)) {
 
-        // populate output table's temp tuple with outer table's values
+         // did this loop body find at least one match for this tuple?
+        bool match = false;
+
+       // populate output table's temp tuple with outer table's values
         // probably have to do this at least once - avoid doing it many
         // times per outer tuple
         for (int col_ctr = 0; col_ctr < outer_cols; col_ctr++) {
@@ -233,13 +236,30 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
         TableIterator iterator1 = inner_table->iterator();
         while (iterator1.next(inner_tuple)) {
+            match = true;
             if (predicate == NULL || predicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                match = true;
                 // Matched! Complete the joined tuple with the inner column values.
                 for (int col_ctr = 0; col_ctr < inner_cols; col_ctr++) {
                     joined.setNValue(col_ctr + outer_cols, inner_tuple.getNValue(col_ctr));
                 }
                 output_table->insertTupleNonVirtual(joined);
             }
+        }
+        //
+        // Left Outer Join
+        //
+        if (!match && join_type == JOIN_TYPE_LEFT) {
+            //
+            // Append NULLs to the end of our join tuple
+            //
+            for (int col_ctr = 0; col_ctr < inner_cols; ++col_ctr)
+            {
+                NValue value = joined.getNValue(col_ctr + outer_cols);
+                value.setNull();
+                joined.setNValue(col_ctr + outer_cols, value);
+            }
+            output_table->insertTupleNonVirtual(joined);
         }
     }
 
