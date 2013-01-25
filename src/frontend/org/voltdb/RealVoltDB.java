@@ -1244,8 +1244,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             // note the heart beats are specified in seconds in xml, but ms internally
             HeartbeatType hbt = m_deployment.getHeartbeat();
-            if (hbt != null)
+            if (hbt != null) {
                 m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
+                m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
+            }
+
 
             // create a dummy catalog to load deployment info into
             Catalog catalog = new Catalog();

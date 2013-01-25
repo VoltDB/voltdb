@@ -50,7 +50,7 @@ public class ForeignHost {
     private final SocketChannel m_sc;
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
-    private final long m_deadHostTimeout;
+    private long m_deadHostTimeout;
     private long m_lastMessageMillis;
 
     /** ForeignHost's implementation of InputHandler */
@@ -113,8 +113,6 @@ public class ForeignHost {
         m_socket = socket.socket();
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
-        hostLog.info("Heartbeat timeout to host: " + m_socket.getRemoteSocketAddress() + " is " +
-                         m_deadHostTimeout + " milliseconds");
     }
 
     public void register(HostMessenger host) throws IOException {
@@ -326,5 +324,9 @@ public class ForeignHost {
         message.put(errBytes);
         message.flip();
         m_connection.writeStream().enqueue(message);
+    }
+
+    public void updateDeadHostTimeout(int timeout) {
+        m_deadHostTimeout = timeout;
     }
 }
