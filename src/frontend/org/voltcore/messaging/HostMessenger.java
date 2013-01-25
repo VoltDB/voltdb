@@ -54,6 +54,8 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
+import com.google.common.base.Preconditions;
+
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
  * that are addressable from anywhere within that mesh. Host messenger also provides
@@ -926,6 +928,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             if (fh != null && fh.isUp()) {
                 fh.sendPoisonPill(err);
             }
+        }
+    }
+
+    public void setDeadHostTimeout(int timeout) {
+        Preconditions.checkArgument(timeout > 0, "Timeout value must be > 0, was %s", timeout);
+        hostLog.info("Dead host timeout set to " + timeout + " milliseconds");
+        m_config.deadHostTimeout = (int)timeout;
+        for (ForeignHost fh : m_foreignHosts.values()) {
+            fh.updateDeadHostTimeout(timeout);
         }
     }
 }
