@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 import junit.framework.TestCase;
@@ -43,7 +44,15 @@ public class TestReplaySequencer extends TestCase
 
     TransactionInfoBaseMessage makeIv2InitTask(long unused)
     {
+        return makeIv2InitTask(unused, "Proc");
+    }
+
+    TransactionInfoBaseMessage makeIv2InitTask(long unused, String procName)
+    {
         Iv2InitiateTaskMessage m = mock(Iv2InitiateTaskMessage.class);
+        StoredProcedureInvocation invocation = mock(StoredProcedureInvocation.class);
+        when(invocation.getProcName()).thenReturn(procName);
+        when(m.getStoredProcedureInvocation()).thenReturn(invocation);
         when(m.isForReplay()).thenReturn(true);
         return m;
     }
@@ -93,6 +102,7 @@ public class TestReplaySequencer extends TestCase
         assertEquals(true, result);
         assertEquals(frag, dut.poll());
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -115,6 +125,7 @@ public class TestReplaySequencer extends TestCase
         result = dut.offer(1L, frag2);
         assertEquals(false, result);
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -134,6 +145,7 @@ public class TestReplaySequencer extends TestCase
         assertEquals(true, result);
         assertEquals(frag, dut.poll());
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -179,6 +191,8 @@ public class TestReplaySequencer extends TestCase
 
         // Nothing satisified.
         assertEquals(null, dut.poll());
+        // Nothing drained
+        assertNull(dut.drain());
 
         // Offer the first fragment to free up the first half.
         dut.offer(1L, frag1);
@@ -188,6 +202,7 @@ public class TestReplaySequencer extends TestCase
         assertEquals(sp1c, dut.poll());
         assertEquals(sp1d, dut.poll());
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
 
         // Offer the second fragment to free up the second half
         dut.offer(2L, frag2);
@@ -197,6 +212,7 @@ public class TestReplaySequencer extends TestCase
         assertEquals(sp2c, dut.poll());
         assertEquals(sp2d, dut.poll());
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -219,11 +235,13 @@ public class TestReplaySequencer extends TestCase
 
         // Nothing satisified.
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
 
         // Offer the first fragment to free up the first half.
         dut.offer(1L, frag1);
         assertEquals(frag1, dut.poll());
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
 
         // Offer the second fragment to free up the second half
         dut.offer(2L, frag2);
@@ -231,6 +249,7 @@ public class TestReplaySequencer extends TestCase
         assertEquals(sp2a, dut.poll());
         assertEquals(sp2b, dut.poll());
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -253,6 +272,7 @@ public class TestReplaySequencer extends TestCase
 
         assertEquals(frag1, dut.poll());
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -270,23 +290,28 @@ public class TestReplaySequencer extends TestCase
         result = dut.offer(1L, frag);
         assertTrue(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         assertTrue(dut.offer(0L, makeEOL(false)));
         assertEquals(frag, dut.poll());
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(1L, frag2);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(1L, complete);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         // another txn
         result = dut.offer(2L, frag3);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -306,18 +331,22 @@ public class TestReplaySequencer extends TestCase
         result = dut.offer(1L, frag);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(1L, frag2);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(1L, complete);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(2L, frag3);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -339,14 +368,17 @@ public class TestReplaySequencer extends TestCase
         assertTrue(result);
         assertEquals(frag, dut.poll());
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(1L, frag2);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(1L, complete);
         assertFalse(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
     }
 
     /**
@@ -369,14 +401,17 @@ public class TestReplaySequencer extends TestCase
         result = dut.offer(1L, frag);
         assertTrue(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(1L, complete);
         assertTrue(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         result = dut.offer(2L, frag3);
         assertTrue(result);
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         assertTrue(dut.offer(0L, makeEOL(false)));
 
@@ -384,6 +419,7 @@ public class TestReplaySequencer extends TestCase
         assertEquals(complete, dut.poll());
         assertEquals(frag3, dut.poll());
         assertNull(dut.poll());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -406,13 +442,17 @@ public class TestReplaySequencer extends TestCase
         assertTrue(dut.offer(102L, init2));
         assertTrue(dut.offer(103L, init3));
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
+        // The outstanding sentinel and the MP EOL should
+        // move us to the draining state
         assertTrue(dut.offer(0L, makeEOL(true)));
-        assertTrue(dut.isMPIEOLReached());
 
-        // MPI EOL should release all blocked SPs
-        assertEquals(init2, dut.poll());
-        assertEquals(init3, dut.poll());
+        // poll() should shut up and drain should start just
+        // giving us everything
+        assertNull(dut.poll());
+        assertEquals(init2, dut.drain());
+        assertEquals(init3, dut.drain());
 
         TransactionInfoBaseMessage init4 = makeIv2InitTask(104L);
         TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
@@ -422,9 +462,10 @@ public class TestReplaySequencer extends TestCase
         assertTrue(dut.offer(104L, init4));
         assertTrue(dut.offer(2L, sentinel2));
         assertTrue(dut.offer(105L, init5));
-        assertEquals(init4, dut.poll());
-        assertEquals(init5, dut.poll());
         assertNull(dut.poll());
+        assertEquals(init4, dut.drain());
+        assertEquals(init5, dut.drain());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -440,19 +481,21 @@ public class TestReplaySequencer extends TestCase
         assertFalse(dut.offer(102L, init2));
         assertFalse(dut.offer(103L, init3));
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         assertTrue(dut.offer(0L, makeEOL(true)));
-        assertTrue(dut.isMPIEOLReached());
 
         TransactionInfoBaseMessage init4 = makeIv2InitTask(104L);
         TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
         TransactionInfoBaseMessage init5 = makeIv2InitTask(105L);
 
-        // These SPIs should not be offered
         assertFalse(dut.offer(104L, init4));
+        // This will re-block us and should induce drain()
         assertTrue(dut.offer(2L, sentinel2));
-        assertFalse(dut.offer(105L, init5));
+        assertTrue(dut.offer(105L, init5));
         assertNull(dut.poll());
+        assertEquals(init5, dut.drain());
+        assertNull(dut.drain());
     }
 
     @Test
@@ -484,11 +527,13 @@ public class TestReplaySequencer extends TestCase
         assertTrue(dut.offer(104L, init4));
         assertTrue(dut.offer(105L, init5));
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         assertTrue(dut.offer(0L, makeEOL(false)));
 
         // SPI EOL shouldn't release blocked SPs
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         TransactionInfoBaseMessage frag1 = makeFragment(1L);
         TransactionInfoBaseMessage complete1 = makeCompleteTxn(1L);
@@ -499,17 +544,20 @@ public class TestReplaySequencer extends TestCase
         assertEquals(init2, dut.poll());
         assertEquals(init3, dut.poll());
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
         assertFalse(dut.offer(1L, complete1));
         assertNull(dut.poll());
+        assertNull(dut.drain());
 
+        // Move us to drain() mode
         assertTrue(dut.offer(0L, makeEOL(true)));
-        assertTrue(dut.isMPIEOLReached());
 
         // All blocked SPs should be released
-        assertEquals(init4, dut.poll());
-        assertEquals(init5, dut.poll());
         assertNull(dut.poll());
+        assertEquals(init4, dut.drain());
+        assertEquals(init5, dut.drain());
+        assertNull(dut.drain());
     }
 
     /**
@@ -529,16 +577,245 @@ public class TestReplaySequencer extends TestCase
         assertTrue(dut.offer(1L, frag));
         assertEquals(frag, dut.poll());
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
 
         // subsequent fragments won't block the queue.
         assertFalse(dut.offer(1L, frag2));
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
 
         // Dupe sentinels and fragments
         assertTrue(dut.offer(1L, sntl));
         assertFalse(dut.offer(1L, frag));
         assertFalse(dut.offer(1L, frag2));
         assertEquals(null, dut.poll());
+        assertNull(dut.drain());
+    }
+
+    @Test
+    public void testDrain()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        // need
+        // sp1
+        // mp1
+        // sp2
+        // mp2
+        // sp3
+        // mp3
+        // sp4
+
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(101L);
+        TransactionInfoBaseMessage sentinel1 = makeSentinel(1L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(102L);
+        TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
+        TransactionInfoBaseMessage init3 = makeIv2InitTask(103L);
+        TransactionInfoBaseMessage sentinel3 = makeSentinel(3L);
+        TransactionInfoBaseMessage init4 = makeIv2InitTask(104L);
+
+        assertFalse(dut.offer(101L, init1));
+        assertTrue(dut.offer(1L, sentinel1));
+        assertTrue(dut.offer(102L, init2));
+        assertTrue(dut.offer(2L, sentinel2));
+        assertTrue(dut.offer(103L, init3));
+        assertTrue(dut.offer(3L, sentinel3));
+        assertTrue(dut.offer(104L, init4));
+        assertNull(dut.drain());
+        // SPI EOL
+        assertTrue(dut.offer(0L, makeEOL(false)));
+        assertNull(dut.drain());
+        // MPI EOL
+        assertTrue(dut.offer(0L, makeEOL(true)));
+        // Now, we need to be able to drain all of the SP inits out in order to respond IGNORING
+        assertNull(dut.poll());
+        assertEquals(init2, dut.drain());
+        assertEquals(init3, dut.drain());
+        assertEquals(init4, dut.drain());
+        assertNull(dut.drain());
+    }
+
+    @Test
+    public void testDrain2()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        // A bunch of sentinels before some SP transactions
+        // We need drain to skip the 3 sentinels and get to the SPs.
+        // need
+        // mp1
+        // mp2
+        // mp3
+        // sp1
+        // sp2
+        // sp3
+        // sp4
+
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(101L);
+        TransactionInfoBaseMessage sentinel1 = makeSentinel(1L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(102L);
+        TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
+        TransactionInfoBaseMessage init3 = makeIv2InitTask(103L);
+        TransactionInfoBaseMessage sentinel3 = makeSentinel(3L);
+        TransactionInfoBaseMessage init4 = makeIv2InitTask(104L);
+
+        assertTrue(dut.offer(1L, sentinel1));
+        assertTrue(dut.offer(2L, sentinel2));
+        assertTrue(dut.offer(3L, sentinel3));
+        assertTrue(dut.offer(101L, init1));
+        assertTrue(dut.offer(102L, init2));
+        assertTrue(dut.offer(103L, init3));
+        assertTrue(dut.offer(104L, init4));
+        assertNull(dut.drain());
+        // SPI EOL
+        assertTrue(dut.offer(0L, makeEOL(false)));
+        assertNull(dut.drain());
+        // MPI EOL
+        assertTrue(dut.offer(0L, makeEOL(true)));
+        // Now, we need to be able to drain all of the SP inits out in order to respond IGNORING
+        assertNull(dut.poll());
+        assertEquals(init1, dut.drain());
+        assertEquals(init2, dut.drain());
+        assertEquals(init3, dut.drain());
+        assertEquals(init4, dut.drain());
+        assertNull(dut.drain());
+    }
+    @Test
+    public void testEarlyMPIEOL()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        // need
+        // Fragment 1
+        // Fragment 2
+        // MPI EOL
+        // Sentinel 1
+        // Sentinel 2
+        TransactionInfoBaseMessage frag1 = makeFragment(1L);
+        TransactionInfoBaseMessage sentinel1 = makeSentinel(1L);
+        TransactionInfoBaseMessage complete1 = makeCompleteTxn(1L);
+        TransactionInfoBaseMessage frag2 = makeFragment(2L);
+        TransactionInfoBaseMessage sentinel2 = makeSentinel(2L);
+        TransactionInfoBaseMessage complete2 = makeCompleteTxn(2L);
+
+        assertTrue(dut.offer(1L, frag1));
+        assertTrue(dut.offer(1L, complete1));
+        assertTrue(dut.offer(2L, frag2));
+        assertTrue(dut.offer(2L, complete2));
+        // We get a really early MPI EOL before we have any of our partition's sentinels
+        assertTrue(dut.offer(0L, makeEOL(true)));
+        assertTrue(dut.offer(1L, sentinel1));
+        assertEquals(frag1, dut.poll());
+        assertEquals(complete1, dut.poll());
+        assertTrue(dut.offer(2L, sentinel2));
+        assertEquals(frag2, dut.poll());
+        assertEquals(complete2, dut.poll());
+        assertNull(dut.poll());
+        assertNull(dut.drain());
+    }
+
+    @Test
+    public void testDupInitMsg()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        // simple deduping
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(1L);
+
+        assertFalse(dut.offer(1L, init1));
+        assertNotNull(dut.dedupe(1L, init1));
+        assertTrue(dut.offer(1L, init1));
+        assertNull(dut.poll());
+
+        // dedupe with sentinels mixed
+        TransactionInfoBaseMessage sntl1 = makeSentinel(2L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(3L);
+
+        assertTrue(dut.offer(2L, sntl1));
+        assertTrue(dut.offer(3L, init2));
+        assertNotNull(dut.dedupe(3L, init2));
+        assertTrue(dut.offer(3L, init2));
+        assertNull(dut.poll());
+
+        TransactionInfoBaseMessage frag1 = makeFragment(2L);
+
+        assertTrue(dut.offer(2L, frag1));
+        assertEquals(frag1, dut.poll());
+        assertEquals(init2, dut.poll());
+        assertNull(dut.poll());
+
+        // dedupe with already polled
+        assertNotNull(dut.dedupe(1L, init1));
+        assertTrue(dut.offer(1L, init1));
+        assertNull(dut.poll());
+    }
+
+    /**
+     * No harm in sending duplicate sentinels
+     */
+    @Test
+    public void testDupSentinels()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sntl1 = makeSentinel(1L);
+        TransactionInfoBaseMessage frag1 = makeFragment(1L);
+        TransactionInfoBaseMessage cmpl1 = makeCompleteTxn(1L);
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(2L);
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(3L);
+
+        assertTrue(dut.offer(1L, sntl1));
+        assertTrue(dut.offer(1L, frag1));
+        assertTrue(dut.offer(2L, init1));
+        assertEquals(frag1, dut.poll());
+        assertEquals(init1, dut.poll());
+        assertFalse(dut.offer(1L, cmpl1));
+        assertNull(dut.poll());
+
+        assertNull(dut.dedupe(1L, sntl1)); // don't care about sentinels
+        assertTrue(dut.offer(1L, sntl1));
+        assertFalse(dut.offer(3L, init2));
+        assertNull(dut.poll());
+    }
+
+    @Test
+    public void testAllowLoadTableWithSameTxnId()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage init1 = makeIv2InitTask(1L, "@LoadSinglepartitionTable");
+        TransactionInfoBaseMessage init2 = makeIv2InitTask(2L, "@LoadMultipartitionTable");
+
+        assertFalse(dut.offer(1L, init1));
+        assertNull(dut.dedupe(1L, init1));
+        assertFalse(dut.offer(1L, init1));
+        assertNull(dut.poll());
+
+        assertFalse(dut.offer(2L, init2));
+        assertNull(dut.dedupe(2L, init2));
+        assertFalse(dut.offer(2L, init2));
+        assertNull(dut.poll());
+    }
+
+    @Test
+    public void testCompleteWithoutFirstFrag()
+    {
+        ReplaySequencer dut = new ReplaySequencer();
+
+        TransactionInfoBaseMessage sntl = makeSentinel(1L);
+        TransactionInfoBaseMessage frag = makeFragment(1L);
+        TransactionInfoBaseMessage cmpl = makeCompleteTxn(1L);
+
+        assertTrue(dut.offer(1L, sntl));
+        // a restart complete arrives before the first fragment
+        assertFalse(dut.offer(1L, cmpl));
+        assertTrue(dut.offer(1L, frag));
+        // this one should be queued
+        assertTrue(dut.offer(1L, cmpl));
+
+        assertEquals(frag, dut.poll());
+        assertEquals(cmpl, dut.poll());
+        assertNull(dut.poll());
     }
 }
 
