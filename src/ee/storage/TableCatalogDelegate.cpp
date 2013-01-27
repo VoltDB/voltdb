@@ -430,7 +430,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     boost::scoped_array<int> columnSourceMap_array(new int[columnCount]);
     int *columnSourceMap = columnSourceMap_array.get();
 
-    vector<std::string> oldColumnNames = existingTable->getColumnNames();    
+    vector<std::string> oldColumnNames = existingTable->getColumnNames();
 
     int i = 0;
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
@@ -451,7 +451,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
             std::string defaultValue = column->defaultvalue();
             defaults[index] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue);
         }
-        
+
         // find a source column in the existing table, if one exists
         columnSourceMap[i] = -1; // -1 is code for not found, use defaults
         for (int j = 0; j < oldColumnNames.size(); j++) {

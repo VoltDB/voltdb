@@ -639,7 +639,7 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
             return false;
         }
     }
-    
+
     return true;
 }
 
