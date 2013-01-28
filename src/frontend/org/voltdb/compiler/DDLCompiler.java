@@ -1289,10 +1289,13 @@ public class DDLCompiler {
                 // get ready for replacements from constraints created later
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
-                // add a warning but don't fail
-                String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
-                        index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
-                m_compiler.addWarn(msg);
+                // if the index is a user-named index...
+                if (index.getTypeName().startsWith("SYS_IDX_") == false) {
+                    // on dup-detection, add a warning but don't fail
+                    String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
+                            index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
+                    m_compiler.addWarn(msg);
+                }
 
                 // drop the index and GTFO
                 table.getIndexes().delete(index.getTypeName());
