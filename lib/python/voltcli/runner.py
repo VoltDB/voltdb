@@ -475,20 +475,18 @@ class VOLT(object):
         for name, function in inspect.getmembers(verb_decorators, inspect.ismethod):
             if not name.startswith('_'):
                 setattr(self, name, function)
-        # For declaring options in command decorators.
-        self.BooleanOption   = cli.BooleanOption
-        self.StringOption    = cli.StringOption
-        self.IntegerOption   = cli.IntegerOption
-        self.StringArgument  = cli.StringArgument
-        self.IntegerArgument = cli.IntegerArgument
-        self.EnumOption      = cli.EnumOption
-        # Expose voltdbclient symbols for Volt client commands.
-        self.VoltProcedure   = voltdbclient.VoltProcedure
-        self.VoltResponse    = voltdbclient.VoltResponse
-        self.VoltException   = voltdbclient.VoltException
-        self.VoltTable       = voltdbclient.VoltTable
-        self.VoltColumn      = voltdbclient.VoltColumn
-        self.FastSerializer  = voltdbclient.FastSerializer
+        # Expose all BaseOption and BaseArgument derivatives used for declaring
+        # options and arguments in command decorators.
+        for name, cls in inspect.getmembers(cli, inspect.isclass):
+            if issubclass(cls, cli.BaseOption) or issubclass(cls, cli.BaseArgument):
+                setattr(self, name, cls)
+        # Expose specific useful voltdbclient symbols for Volt client commands.
+        self.VoltProcedure  = voltdbclient.VoltProcedure
+        self.VoltResponse   = voltdbclient.VoltResponse
+        self.VoltException  = voltdbclient.VoltException
+        self.VoltTable      = voltdbclient.VoltTable
+        self.VoltColumn     = voltdbclient.VoltColumn
+        self.FastSerializer = voltdbclient.FastSerializer
         # For declaring multi-command verbs like "show".
         self.Modifier = Modifier
         # Bundles
