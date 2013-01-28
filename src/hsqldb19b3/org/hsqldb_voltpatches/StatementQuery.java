@@ -485,7 +485,7 @@ public class StatementQuery extends StatementDMQL {
             parameter.attributes.put("id", param.getUniqueId(session));
             Type paramType = param.getDataType();
             if (paramType != null) {
-                parameter.attributes.put("type", Types.getTypeName(paramType.typeCode));
+                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
             }
         }
 

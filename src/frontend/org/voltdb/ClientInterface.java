@@ -185,12 +185,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
             new HashMap<String, List<InvocationAcceptancePolicy>>();
 
-    /**
-     * For IV2 only: this is used to track the last txnId replicated for a
-     * certain partition, so that duped DR txns can be dropped.
-     */
-    private final Map<Integer, Long> m_partitionTxnIds = new HashMap<Integer, Long>();
-
     /*
      * Allow the async compiler thread to immediately process completed planning tasks
      * without waiting for the periodic work thread to poll the mailbox.
@@ -1026,34 +1020,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             Long initiatorHSId = null;
             boolean isShortCircuitRead = false;
 
-            if (invocation.getType() == ProcedureInvocationType.REPLICATED)
-            {
-                int partitionId;
-                if (isSinglePartition) {
-                    partitionId = partitions[0];
-                } else {
-                    partitionId = MpInitiator.MP_INIT_PID;
-                }
-
-                Long lastTxnId = m_partitionTxnIds.get(partitionId);
-                if (lastTxnId != null) {
-                    /*
-                     * Ning - @LoadSinglepartTable and @LoadMultipartTable
-                     * always have the same txnId which is the txnId of the
-                     * snapshot.
-                     */
-                    if (!(invocation.getProcName().equalsIgnoreCase("@LoadSinglepartitionTable") ||
-                            invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
-                            invocation.getOriginalTxnId() <= lastTxnId)
-                    {
-                        hostLog.debug("Dropping duplicate replicated transaction " + invocation.getProcName() + ", txnid: " +
-                                invocation.getOriginalTxnId() + ", last seen: " + lastTxnId);
-                        return false;
-                    }
-                }
-                m_partitionTxnIds.put(partitionId, invocation.getOriginalTxnId());
-            }
-
             /*
              * If this is a read only single part, check if there is a local replica,
              * if there is, send it to the replica as a short circuit read
@@ -1706,7 +1672,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void sendSentinelsToAllPartitions(long txnId)
     {
         for (int partition : m_allPartitions) {
-            sendSentinel(txnId, partition, false);
+            final long initiatorHSId = m_iv2Masters.get(partition);
+            /*
+             * HACK! DR LoadMultipartitionTable generates sentinels here,
+             * they pretend to be for replay so that the SPIs won't generate responses for them.
+             */
+            sendSentinel(txnId, initiatorHSId, -1, -1, true);
         }
     }
 
@@ -1714,28 +1685,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Send a multipart sentinel to the specified partition. This comes from the
      * DR agent in prepare of a multipart transaction.
      *
-     * @param buf
+     * @param connectionId
+     * @param now
+     * @param size
      * @param invocation
-     * @return
      */
-    ClientResponseImpl dispatchSendSentinel(ByteBuffer buf,
-                                            StoredProcedureInvocation invocation)
+    void dispatchSendSentinel(long connectionId, long now, int size,
+                              StoredProcedureInvocation invocation)
     {
+        ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
+        // First parameter of the invocation is the partition ID
+        int pid = (Integer) invocation.getParameterAtIndex(0);
+        final long initiatorHSId = m_iv2Masters.get(pid);
+        long handle = cihm.getHandle(true, pid, invocation.getClientHandle(), size, now,
+                invocation.getProcName(), initiatorHSId, true, false);
+
         /*
          * Sentinels will be deduped by ReplaySequencer. They don't advance the
          * last replayed txnIds.
          */
-
-        // First parameter is the partition ID
-        sendSentinel(invocation.getOriginalTxnId(),
-                     (Integer) invocation.getParameterAtIndex(0), false);
-
-        ClientResponseImpl response =
-                new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                       new VoltTable[0],
-                                       ClientResponseImpl.DUPE_TRANSACTION,
-                                       invocation.clientHandle);
-        return response;
+        sendSentinel(invocation.getOriginalTxnId(), initiatorHSId, handle, connectionId, false);
     }
 
     ClientResponseImpl dispatchStatistics(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
@@ -1928,7 +1897,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchExplainProcedure(task, handler, ccxn);
             }
             else if (task.procName.equals("@SendSentinel")) {
-                return dispatchSendSentinel(buf, task);
+                dispatchSendSentinel(handler.connectionId(), now, buf.capacity(), task);
+                return null;
             }
             else if (task.procName.equals("@Promote")) {
                 // Map @Promote to @PromoteReplicaState.
@@ -2404,7 +2374,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         if (m_localReplicasBuilder != null) {
             m_localReplicasBuilder.join(10000);
-            hostLog.error("Local replica map builder took more than ten seconds, probably hung");
+            if (m_localReplicasBuilder.isAlive()) {
+                hostLog.error("Local replica map builder took more than ten seconds, probably hung");
+            }
             m_localReplicasBuilder.join();
         }
     }
@@ -2693,18 +2665,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return m_snapshotDaemon;
     }
 
-    public void sendSentinel(long txnId, int partitionId, boolean forReplay) {
-        assert(m_isIV2Enabled);
+    /**
+     * Send a command log replay sentinel to the given partition.
+     * @param txnId
+     * @param partitionId
+     */
+    public void sendSentinel(long txnId, int partitionId) {
         final long initiatorHSId = m_iv2Masters.get(partitionId);
+        sendSentinel(txnId, initiatorHSId, -1, -1, true);
+    }
+
+    private void sendSentinel(long txnId, long initiatorHSId, long ciHandle,
+                              long connectionId, boolean forReplay) {
+        assert(m_isIV2Enabled);
 
         //The only field that is relevant is txnid, and forReplay.
         MultiPartitionParticipantMessage mppm =
                 new MultiPartitionParticipantMessage(
+                        m_siteId,
                         initiatorHSId,
-                        m_cartographer.getHSIdForMultiPartitionInitiator(),
                         txnId,
+                        ciHandle,
+                        connectionId,
                         false,  // isReadOnly
-                        true);  // isForReplay
+                        forReplay);  // isForReplay
         m_mailbox.send(initiatorHSId, mppm);
     }
 

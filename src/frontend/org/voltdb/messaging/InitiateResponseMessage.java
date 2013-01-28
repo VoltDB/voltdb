@@ -65,6 +65,20 @@ public class InitiateResponseMessage extends VoltMessage {
     }
 
     /**
+     * IV2 constructor for sentinel response
+     * @param sentinel
+     */
+    public InitiateResponseMessage(MultiPartitionParticipantMessage sentinel) {
+        m_txnId = sentinel.getTxnId();
+        m_spHandle = sentinel.getSpHandle();
+        m_initiatorHSId = sentinel.getInitiatorHSId();
+        m_coordinatorHSId = sentinel.getCoordinatorHSId();
+        m_subject = Subject.DEFAULT.getId();
+        m_clientInterfaceHandle = sentinel.getClientInterfaceHandle();
+        m_connectionId = sentinel.getConnectionId();
+    }
+
+    /**
      * Create a response from a request.
      * Note that some private request data is copied to the response.
      * @param task The initiation request object to collect the

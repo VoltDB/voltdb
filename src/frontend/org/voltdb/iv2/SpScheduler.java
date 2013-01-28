@@ -32,18 +32,19 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 
 import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -52,7 +53,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
+
+import org.voltdb.VoltTable;
 
 import com.google.common.primitives.Longs;
 
@@ -141,9 +143,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
-
-    // helper class to put command log work in order
-    private final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -248,31 +247,98 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      * Poll the replay sequencer and process the messages until it returns null
      */
     private void deliverReadyTxns() {
+        // First, pull all the sequenced messages, if any.
         VoltMessage m = m_replaySequencer.poll();
         while(m != null) {
-            deliver2(m);
+            deliver(m);
             m = m_replaySequencer.poll();
         }
-    }
-
-    /**
-     * Poll the replay sequencer and respond to all SPs with an IGNORED response
-     */
-    private void drainReplaySequencer()
-    {
-        VoltMessage m = m_replaySequencer.poll();
+        // Then, try to pull all the drainable messages, if any.
+        m = m_replaySequencer.drain();
         while (m != null) {
             if (m instanceof Iv2InitiateTaskMessage) {
                 // Send IGNORED response for all SPs
                 Iv2InitiateTaskMessage task = (Iv2InitiateTaskMessage) m;
                 final InitiateResponseMessage response = new InitiateResponseMessage(task);
                 response.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                                                           new VoltTable[0],
-                                                           ClientResponseImpl.IGNORED_TRANSACTION));
+                            new VoltTable[0],
+                            ClientResponseImpl.IGNORED_TRANSACTION));
                 m_mailbox.send(response.getInitiatorHSId(), response);
             }
-            m = m_replaySequencer.poll();
+            m = m_replaySequencer.drain();
         }
+    }
+
+    /**
+     * Sequence the message for replay if it's for CL or DR.
+     *
+     * @param message
+     * @return true if the message can be delivered directly to the scheduler,
+     * false if the message is queued
+     */
+    public boolean sequenceForReplay(VoltMessage message)
+    {
+        boolean canDeliver = false;
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
+                (((TransactionInfoBaseMessage)message).isForReplay()));
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        boolean sentinel = message instanceof MultiPartitionParticipantMessage;
+
+        boolean replay = commandLog || sentinel || dr;
+        boolean sequenceForReplay = m_isLeader && replay;
+
+        assert(!(commandLog && dr));
+
+        if (commandLog || sentinel) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+        }
+        else if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+        }
+
+        if (sequenceForReplay) {
+            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            if (dupe != null) {
+                // Duplicate initiate task message, send response
+                m_mailbox.send(dupe.getInitiatorHSId(), dupe);
+            }
+            else if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage) message)) {
+                canDeliver = true;
+            }
+            else {
+                deliverReadyTxns();
+            }
+
+            // If it's a DR sentinel, send an acknowledgement
+            if (sentinel && !commandLog) {
+                MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage) message;
+                final InitiateResponseMessage response = new InitiateResponseMessage(mppm);
+                ClientResponseImpl clientResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0], ClientResponseImpl.DUPE_TRANSACTION);
+                response.setResults(clientResponse);
+                m_mailbox.send(response.getInitiatorHSId(), response);
+            }
+        }
+        else {
+            if (replay) {
+                // Update last seen and last polled txnId for replicas
+                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+                m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+            }
+
+            canDeliver = true;
+        }
+
+        return canDeliver;
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -280,49 +346,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // implemented
     @Override
     public void deliver(VoltMessage message)
-    {
-        long sequenceWithTxnId = Long.MIN_VALUE;
-
-        boolean sequenceForCommandLog =
-            (m_isLeader && message instanceof TransactionInfoBaseMessage &&
-             (((TransactionInfoBaseMessage)message).isForReplay()));
-
-        boolean sequenceForDR = m_isLeader &&
-             ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
-
-        boolean sequenceForSentinel = m_isLeader &&
-            (message instanceof MultiPartitionParticipantMessage);
-
-        boolean sequenceForReplay =
-                sequenceForCommandLog || sequenceForSentinel || sequenceForDR;
-
-        assert(!(sequenceForCommandLog && sequenceForDR));
-
-        if (sequenceForCommandLog || sequenceForSentinel) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
-        }
-        else if (sequenceForDR) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
-        }
-
-        if (sequenceForReplay) {
-            if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage)message)) {
-                deliver2(message);
-            }
-            else if (m_replaySequencer.isMPIEOLReached()) {
-                drainReplaySequencer();
-            }
-            else {
-                deliverReadyTxns();
-            }
-        }
-        else {
-            deliver2(message);
-        }
-    }
-
-    private void deliver2(VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);

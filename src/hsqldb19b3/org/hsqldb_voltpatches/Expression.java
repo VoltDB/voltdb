@@ -1456,7 +1456,7 @@ public class Expression {
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
             exp.name = "value";
-            exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
+            exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
 
             if (isParam) {
                 exp.attributes.put("isparam", "true");
