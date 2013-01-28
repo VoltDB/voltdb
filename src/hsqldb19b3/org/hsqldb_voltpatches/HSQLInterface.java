@@ -239,7 +239,7 @@ public class HSQLInterface {
         HashMappedList hsqlTables = schemaManager.getTables(schemaName);
         for (int i = 0; i < hsqlTables.size(); i++) {
             Table table = (Table) hsqlTables.get(i);
-            VoltXMLElement vxmle = table.voltGetXML(sessionProxy);
+            VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
             xml.children.add(vxmle);
             assert(vxmle != null);
         }
