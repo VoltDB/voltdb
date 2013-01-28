@@ -234,7 +234,24 @@ class IntegerArgument(BaseArgument):
         try:
             return int(value)
         except ValueError, e:
-            utility.abort('"%s" argument is not a valid integer: %s' % value)
+            utility.abort('"%s" argument is not a valid integer: %s' % (self.name, str(value)))
+
+#===============================================================================
+class PathArgument(StringArgument):
+#===============================================================================
+    def __init__(self, name, help, **kwargs):
+        # For now the only intelligence is to check for absolute paths when required.
+        # TODO: Add options to check existence, directories, files, attributes, etc..
+        self.absolute = utility.kwargs_get_boolean(kwargs, 'absolute', default = False)
+        help2 = help
+        if self.absolute:
+            help2 += ' (absolute path)'
+        StringArgument.__init__(self, name, help2, **kwargs)
+    def get(self, value):
+        svalue = str(value)
+        if self.absolute and not svalue.startswith('/'):
+            utility.abort('Path argument "%s" is not absolute: %s' % (self.name, svalue))
+        return svalue
 
 #===============================================================================
 class ParsedCommand(object):
@@ -367,7 +384,7 @@ class CLIParser(ExtendedHelpOptionParser):
                     # All other arguments are treated as scalars.
                     value = args[iarg]
                     iarg += 1
-                setattr(verb_opts, arg.name, value)
+                setattr(verb_opts, arg.name, arg.get(value))
         # Abort if extra arguments were provided.
         if iarg < len(args):
             utility.abort('Extra arguments were provided:', args[iarg:])
