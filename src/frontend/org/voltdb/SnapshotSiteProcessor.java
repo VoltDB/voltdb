@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -110,12 +109,6 @@ public class SnapshotSiteProcessor {
      * Only proceed once permits are available after setup completes
      */
     public static Semaphore m_snapshotPermits = new Semaphore(0);
-
-    /**
-     * Global collection populated by snapshot creator, poll'd by individual sites
-     */
-    public static final LinkedList<Deque<SnapshotTableTask>> m_taskListsForSites =
-        new LinkedList<Deque<SnapshotTableTask>>();
 
     /**
      * Sequence numbers for export tables. This is repopulated before each snapshot by each execution site

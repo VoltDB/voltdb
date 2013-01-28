@@ -32,6 +32,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
@@ -79,6 +80,12 @@ public class SnapshotSaveAPI
 
     // ugh, ick, ugh
     public static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
+
+    /**
+     * Global collection populated by snapshot creator, poll'd by individual sites
+     */
+    private static final LinkedList<Deque<SnapshotTableTask>> m_taskListsForSites =
+        new LinkedList<Deque<SnapshotTableTask>>();
 
     /*
      * Ugh!, needs to be visible to all the threads doing the snapshot,
@@ -184,8 +191,8 @@ public class SnapshotSaveAPI
                  * The synchronized block doesn't throw IE or BBE, but wrapping
                  * both barriers saves writing the exception handling twice
                  */
-                synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
-                    final Deque<SnapshotTableTask> m_taskList = SnapshotSiteProcessor.m_taskListsForSites.poll();
+                synchronized (m_taskListsForSites) {
+                    final Deque<SnapshotTableTask> m_taskList = m_taskListsForSites.poll();
                     if (m_taskList == null) {
                         return result;
                     } else {
@@ -788,17 +795,17 @@ public class SnapshotSaveAPI
                             err_msg);
                 }
 
-                synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
+                synchronized (m_taskListsForSites) {
                     //Seems like this should be cleared out just in case
                     //Log if there is actually anything to clear since it is unexpected
-                    if (!SnapshotSiteProcessor.m_taskListsForSites.isEmpty()) {
+                    if (!m_taskListsForSites.isEmpty()) {
                         HOST_LOG.warn("Found lingering snapshot tasks while setting up a snapshot");
-                        SnapshotSiteProcessor.m_taskListsForSites.clear();
+                        m_taskListsForSites.clear();
                     }
                     boolean aborted = false;
                     if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
                         for (int ii = 0; ii < numLocalSites; ii++) {
-                            SnapshotSiteProcessor.m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>());
+                            m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>());
                         }
                     } else {
                         SnapshotRegistry.discardSnapshot(snapshotRecord);
@@ -809,16 +816,16 @@ public class SnapshotSaveAPI
                      * Distribute the writing of replicated tables to exactly one partition.
                      */
                     for (int ii = 0; ii < numLocalSites && !partitionedSnapshotTasks.isEmpty(); ii++) {
-                        SnapshotSiteProcessor.m_taskListsForSites.get(ii).addAll(partitionedSnapshotTasks);
+                        m_taskListsForSites.get(ii).addAll(partitionedSnapshotTasks);
                         if (!format.isTableBased()) {
-                            SnapshotSiteProcessor.m_taskListsForSites.get(ii).addAll(replicatedSnapshotTasks);
+                            m_taskListsForSites.get(ii).addAll(replicatedSnapshotTasks);
                         }
                     }
 
                     if (format.isTableBased()) {
                         int siteIndex = 0;
                         for (SnapshotTableTask t : replicatedSnapshotTasks) {
-                            SnapshotSiteProcessor.m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
+                            m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
                         }
                     }
                     if (!aborted) {
@@ -840,7 +847,7 @@ public class SnapshotSaveAPI
                 /*
                  * Close all the targets to release the threads. Don't let sites get any tasks.
                  */
-                SnapshotSiteProcessor.m_taskListsForSites.clear();
+                m_taskListsForSites.clear();
                 for (SnapshotDataTarget sdt : targets) {
                     try {
                         sdt.close();
