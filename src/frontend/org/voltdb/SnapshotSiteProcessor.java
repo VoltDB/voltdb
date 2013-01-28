@@ -33,7 +33,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -100,11 +99,6 @@ public class SnapshotSiteProcessor {
             }
         }
     }
-
-    /**
-     * Only proceed once permits are available after setup completes
-     */
-    public static Semaphore m_snapshotPermits = new Semaphore(0);
 
     /**
      * Sequence numbers for export tables. This is repopulated before each snapshot by each execution site
