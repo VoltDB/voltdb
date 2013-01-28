@@ -20,10 +20,14 @@ package org.voltdb.planner.microoptimizations;
 import java.util.List;
 
 import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.CompiledPlan;
 
-public interface MicroOptimization {
+public abstract class MicroOptimization {
 
-    public List<CompiledPlan> apply(CompiledPlan plan, Database db);
+    boolean shouldRun(DeterminismMode detMode) {
+        return true;
+    }
 
+    public abstract List<CompiledPlan> apply(CompiledPlan plan, Database db);
 }

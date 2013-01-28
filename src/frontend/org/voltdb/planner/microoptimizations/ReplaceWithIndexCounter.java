@@ -32,7 +32,7 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.types.SortDirectionType;
 
-public class ReplaceWithIndexCounter implements MicroOptimization {
+public class ReplaceWithIndexCounter extends MicroOptimization {
 
     @Override
     public List<CompiledPlan> apply(CompiledPlan plan, Database db) {

@@ -15,10 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.compiler;
 
 public enum DeterminismMode {
-    UNSAFE,
-    NORMAL,
-    SAFE
+    FASTER, // Pick the fastest plan without regard for determinism
+    SAFER   // Pick a fast plan that is more likely to be deterministic
+            //  In practice, this means avoiding table scans, but could
+            //  still fail on non-unique indexes
+    //SAFE  // Not yet added, but could add an order-by all over the place
+            //  if that made sense.
 }

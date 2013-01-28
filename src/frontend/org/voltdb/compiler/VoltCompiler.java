@@ -1541,6 +1541,9 @@ public class VoltCompiler {
             }
             outputStream.println("------------------------------------------");
 
+            //
+            // post-compile determinism warning
+            //
             if (!nonDetProcs.isEmpty()) {
 
                 outputStream.println(

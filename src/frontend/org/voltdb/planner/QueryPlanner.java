@@ -20,12 +20,12 @@ package org.voltdb.planner;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.DeterminismMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -115,9 +115,10 @@ public class QueryPlanner {
         m_costModel = costModel;
         m_paramHints = paramHints;
         m_joinOrder = joinOrder;
+        m_detMode = detMode;
         m_planSelector = new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName,
-                m_procName, m_sql, m_costModel, m_paramHints, suppressDebugOutput,
-                System.getProperties().containsKey("compilerdebug"));
+                m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
+                suppressDebugOutput, System.getProperties().containsKey("compilerdebug"));
     }
 
     /**

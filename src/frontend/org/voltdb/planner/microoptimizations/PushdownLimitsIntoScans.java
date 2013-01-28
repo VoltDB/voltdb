@@ -26,7 +26,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 
-public class PushdownLimitsIntoScans implements MicroOptimization {
+public class PushdownLimitsIntoScans extends MicroOptimization {
 
     @Override
     public List<CompiledPlan> apply(CompiledPlan plan, Database db) {

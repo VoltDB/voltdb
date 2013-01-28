@@ -23,6 +23,8 @@ import java.util.List;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -32,7 +34,15 @@ import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
 
-public class SeqScansToUniqueTreeScans implements MicroOptimization {
+public class SeqScansToUniqueTreeScans extends MicroOptimization {
+
+    /**
+     * Only applies when stronger determinism is needed.
+     */
+    @Override
+    boolean shouldRun(DeterminismMode detMode) {
+        return detMode != DeterminismMode.FASTER;
+    }
 
     @Override
     public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
@@ -119,6 +129,7 @@ public class SeqScansToUniqueTreeScans implements MicroOptimization {
             indexScanNode.addInlinePlanNode(inlineNode);
         }
         indexScanNode.generateOutputSchema(db);
+        indexScanNode.setBindings(new ArrayList<AbstractExpression>());
 
         return indexScanNode;
     }
