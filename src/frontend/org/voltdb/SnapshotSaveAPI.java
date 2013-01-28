@@ -87,6 +87,10 @@ public class SnapshotSaveAPI
     private static final LinkedList<Deque<SnapshotTableTask>> m_taskListsForSites =
         new LinkedList<Deque<SnapshotTableTask>>();
 
+    //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
+    private static Map<Integer, Long> m_partitionLastSeenTransactionIds =
+            new HashMap<Integer, Long>();
+
     /*
      * Ugh!, needs to be visible to all the threads doing the snapshot,
      * pbulished under the snapshot create lock.
@@ -130,9 +134,9 @@ public class SnapshotSaveAPI
                 public void run() {
                     Map<Integer, Long>  partitionTransactionIds = new HashMap<Integer, Long>();
                     if (VoltDB.instance().isIV2Enabled()) {
-                        partitionTransactionIds = SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
+                        partitionTransactionIds = m_partitionLastSeenTransactionIds;
                         HOST_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
-                        SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
+                        m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
                         partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
 
 
@@ -179,8 +183,7 @@ public class SnapshotSaveAPI
             if (VoltDB.instance().isIV2Enabled()) {
                 HOST_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
                         TxnEgo.getPartitionId(partitionTxnId));
-                SnapshotSiteProcessor.m_partitionLastSeenTransactionIds.put(
-                        TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
+                m_partitionLastSeenTransactionIds.put(TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
             }
         }
 

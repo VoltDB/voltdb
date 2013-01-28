@@ -101,10 +101,6 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
-    public static Map<Integer, Long> m_partitionLastSeenTransactionIds =
-            new HashMap<Integer, Long>();
-
     /**
      * Only proceed once permits are available after setup completes
      */
