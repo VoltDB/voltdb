@@ -60,6 +60,53 @@ public class ClusterConfig
         return partitions;
     }
 
+    /**
+     * Add a list of hosts to the current topology. New partitions will be assigned to the sites
+     * on the new nodes.
+     *
+     * Ideally, this method will assign masters of partitions to the new nodes uniformly. But it
+     * currently doesn't do that.
+     *
+     * This method modifies the topology in place.
+     *
+     * @param hostIds The new hosts
+     * @param topo The existing topology, which will be updated in-place.
+     */
+    public static void addHosts(List<Integer> hostIds, JSONObject topo) throws JSONException
+    {
+        ClusterConfig config = new ClusterConfig(topo);
+        int partition = config.getPartitionCount(); // new partitions start from this ID
+        int kfactor = config.getReplicationFactor();
+        int partitionsToAdd = config.getSitesPerHost();
+
+        if (hostIds.size() != kfactor + 1) {
+            VoltDB.crashLocalVoltDB("Only adding " + (kfactor + 1) + " nodes at a time is " +
+                    "supported, currently trying to add " + hostIds.size(), false, null);
+        }
+
+        // increase host count first
+        topo.put("hostcount", config.getHostCount() + hostIds.size());
+        JSONArray partitions = topo.getJSONArray("partitions");
+        for (int i = 0; i < partitionsToAdd; i++) {
+            JSONStringer newPart = new JSONStringer();
+            newPart.object();
+            newPart.key("partition_id").value(partition++);
+            // Round-robin the mastership of new partitions
+            int index = i % hostIds.size();
+            int master = hostIds.get(index);
+            newPart.key("master").value(master);
+            newPart.key("replicas").array();
+            for (int host : hostIds) {
+                newPart.value(host);
+            }
+            newPart.endArray();
+            newPart.endObject();
+
+            // Add the new partition to the existing partition list
+            partitions.put(new JSONObject(newPart.toString()));
+        }
+    }
+
     public ClusterConfig(int hostCount, int sitesPerHost, int replicationFactor)
     {
         m_hostCount = hostCount;
