@@ -50,7 +50,7 @@ VoltCompiler = 'org.voltdb.compiler.VoltCompiler'
 
     # Command line arguments.
     arguments = (
-        VOLT.StringArgument('ddl', 'DDL file(s)', min_count = 0, max_count = None)
+        VOLT.PathArgument('ddl', 'DDL file(s)', exists = True, min_count = 0, max_count = None)
     )
 )
 
@@ -70,14 +70,6 @@ def compile(runner):
     if runner.opts.project and not runner.opts.project.lower().endswith('.xml'):
         runner.abort('Project file "%s" does not have a ".xml" extension.'
                             % runner.opts.project)
-
-    # Look for missing files.
-    missing = []
-    for path in utility.flatten(runner.opts.project, runner.opts.ddl):
-        if not os.path.exists(path):
-            missing.append(path)
-    if missing:
-        runner.abort('Missing files:', missing)
 
     # Verbose argument display.
     if runner.is_verbose():
