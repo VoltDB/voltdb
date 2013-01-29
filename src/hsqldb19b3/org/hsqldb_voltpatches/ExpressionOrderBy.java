@@ -153,10 +153,9 @@ public class ExpressionOrderBy extends Expression {
     @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        VoltXMLElement exp = new VoltXMLElement("operation");
+        VoltXMLElement exp = new VoltXMLElement("orderby");
         // We want to keep track of which expressions are the same in the XML output
         exp.attributes.put("id", getUniqueId(session));
-        exp.attributes.put("type", "orderby");
         if ((this.alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
         }

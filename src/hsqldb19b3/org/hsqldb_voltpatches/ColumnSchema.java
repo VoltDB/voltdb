@@ -342,7 +342,7 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
         // output column metadata
         column.attributes.put("name", columnName.name);
         String typestring = Types.getTypeName(dataType.typeCode);
-        column.attributes.put("type", typestring);
+        column.attributes.put("valuetype", typestring);
         column.attributes.put("nullable", String.valueOf(isNullable()));
         column.attributes.put("size", String.valueOf(dataType.precision));
 
