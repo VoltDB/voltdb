@@ -79,6 +79,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
      * Accept a single write even though simulating a full disk is enabled;
      */
     private volatile boolean m_acceptOneWrite = false;
+    private boolean m_needsFinalClose = true;
 
     @SuppressWarnings("unused")
     private final String m_tableName;
@@ -157,6 +158,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();
+        m_needsFinalClose = !isReplicated;
         final FastSerializer fs = new FastSerializer();
         fs.writeInt(0);//CRC
         fs.writeInt(0);//Header length placeholder
@@ -241,6 +243,12 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
             }
         }, 1, 1, TimeUnit.SECONDS);
         m_syncTask = syncTask;
+    }
+
+    @Override
+    public boolean needsFinalClose()
+    {
+        return m_needsFinalClose;
     }
 
     @Override

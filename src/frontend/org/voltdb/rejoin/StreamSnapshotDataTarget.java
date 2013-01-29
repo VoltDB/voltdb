@@ -19,6 +19,7 @@ package org.voltdb.rejoin;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -64,7 +65,7 @@ implements SnapshotDataTarget {
     final static long WATCHDOG_PERIOS_S = 5;
 
     // schemas for all the tables on this partition
-    private final Map<Integer, byte[]> m_schemas;
+    private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
     // Mailbox used to transfer snapshot data
     private Mailbox m_mb;
     // HSId of the destination mailbox
@@ -98,18 +99,17 @@ implements SnapshotDataTarget {
     private Exception m_lastAckReceiverException = null;
     private Exception m_lastSenderException = null;
 
-    public StreamSnapshotDataTarget(Map<Integer, Long> streamMap, Map<Integer, byte[]> schemas) throws IOException
+    public StreamSnapshotDataTarget(long HSId, Map<Integer, byte[]> schemas)
     {
         super();
-        long hsId = streamMap.values().iterator().next();
-        m_schemas = schemas;
-        m_destHSId = hsId;
+        m_schemas.putAll(schemas);
+        m_destHSId = HSId;
         m_mb = VoltDB.instance().getHostMessenger().createMailbox();
 
         m_snapshotProcessorId = m_totalSnapshotTargetCount.getAndIncrement();
         rejoinLog.info(String.format("Initializing snapshot stream processor " +
                 "for source site id: %s, and with processorid: %d",
-                CoreUtils.hsIdToString(hsId), m_snapshotProcessorId));
+                CoreUtils.hsIdToString(HSId), m_snapshotProcessorId));
 
         m_in = new AckReceiver();
         m_in.setDaemon(true);
@@ -476,6 +476,13 @@ implements SnapshotDataTarget {
         m_outstandingWork.put(blockIndex, sendWork);
         m_outstandingWorkCount.incrementAndGet();
         m_sendQueue.add(sendWork);
+    }
+
+    @Override
+    public boolean needsFinalClose()
+    {
+        // Streamed snapshot targets always need to be closed by the last site
+        return true;
     }
 
     @Override

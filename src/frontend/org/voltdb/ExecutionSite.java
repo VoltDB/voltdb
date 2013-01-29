@@ -2386,10 +2386,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     @Override
     public void initiateSnapshots(
             Deque<SnapshotTableTask> tasks,
+            List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(ee, tasks, targets, txnId, numLiveHosts, exportSequenceNumbers);
     }
 
     /*
