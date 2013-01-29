@@ -215,6 +215,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                     "NULL" : predicate->debug(true).c_str());
     }
 
+    // Join type
+    JoinType join_type = node->getJoinType();
+
     int outer_cols = outer_table->columnCount();
     int inner_cols = inner_table->columnCount();
     TableTuple outer_tuple(node->getInputTables()[0]->schema());
