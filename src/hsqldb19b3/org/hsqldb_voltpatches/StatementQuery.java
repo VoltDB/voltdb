@@ -395,16 +395,13 @@ public class StatementQuery extends StatementDMQL {
                 groupByCols.add(expr);
             } else if (expr.opType == OpTypes.ORDER_BY) {
                 orderByCols.add(expr);
-            } else if (expr.opType == OpTypes.SIMPLE_COLUMN && expr.isAggregate && expr.alias != null) {
+            } else if ((expr.opType != OpTypes.SIMPLE_COLUMN) || (expr.isAggregate && expr.alias != null)) {
                 // Add aggregate aliases to the display columns to maintain
                 // the output schema column ordering.
                 displayCols.add(expr);
-            } else if (expr.opType == OpTypes.SIMPLE_COLUMN) {
-                // Other simple columns are ignored. If others exist, maybe
-                // volt infers a display column from another column collection?
-            } else {
-                displayCols.add(expr);
             }
+            // else, other simple columns are ignored. If others exist, maybe
+            // volt infers a display column from another column collection?
         }
 
         for (Pair<Integer, SimpleName> alias : aliases) {

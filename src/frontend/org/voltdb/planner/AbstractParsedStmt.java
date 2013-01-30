@@ -95,8 +95,8 @@ public abstract class AbstractParsedStmt {
     // if this is null, that means ALL the columns get used.
     public HashMap<String, ArrayList<SchemaColumn>> scanColumns = null;
 
-    protected String[] m_paramValues;
-    protected Database m_db;
+    protected final String[] m_paramValues;
+    protected final Database m_db;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
