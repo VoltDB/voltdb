@@ -22,7 +22,6 @@
  */
 package org.voltdb.compiler;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -96,22 +95,9 @@ public class TestClusterCompiler extends TestCase
         assertEquals(0, topo.getInt("kfactor"));
         assertEquals(6, topo.getJSONArray("partitions").length());
 
-        ClusterConfig.addHosts(Arrays.asList(1), topo);
+        ClusterConfig.addHosts(1, topo);
         assertEquals(2, topo.getInt("hostcount"));
         assertEquals(0, topo.getInt("kfactor"));
-        assertEquals(12, topo.getJSONArray("partitions").length());
-
-        JSONArray parts = topo.getJSONArray("partitions");
-        int newPartCount = 0;
-        for (int i = 6; i < parts.length(); i++) {
-            JSONObject part = parts.getJSONObject(i);
-            assertEquals(i, part.getInt("partition_id"));
-            assertEquals(1, part.getInt("master"));
-            assertEquals(1, part.getJSONArray("replicas").length());
-            assertEquals(1, part.getJSONArray("replicas").get(0));
-            newPartCount++;
-        }
-        assertEquals(6, newPartCount);
     }
 
     public void testAddHostsToNonKsafe() throws JSONException
@@ -125,7 +111,7 @@ public class TestClusterCompiler extends TestCase
 
         VoltDB.ignoreCrash = true;
         try {
-            ClusterConfig.addHosts(Arrays.asList(2, 3), topo);
+            ClusterConfig.addHosts(2, topo);
             fail("Shouldn't allow adding more than one node");
         } catch (AssertionError e) {}
     }
@@ -139,27 +125,9 @@ public class TestClusterCompiler extends TestCase
         assertEquals(1, topo.getInt("kfactor"));
         assertEquals(6, topo.getJSONArray("partitions").length());
 
-        ClusterConfig.addHosts(Arrays.asList(2, 3), topo);
+        ClusterConfig.addHosts(2, topo);
         assertEquals(4, topo.getInt("hostcount"));
         assertEquals(1, topo.getInt("kfactor"));
-        assertEquals(12, topo.getJSONArray("partitions").length());
-
-        JSONArray parts = topo.getJSONArray("partitions");
-        int newPartCount = 0;
-        for (int i = 6; i < parts.length(); i++) {
-            JSONObject part = parts.getJSONObject(i);
-            assertEquals(i, part.getInt("partition_id"));
-            int master = part.getInt("master");
-            assertTrue(master == 2 || master == 3);
-            JSONArray replicas = part.getJSONArray("replicas");
-            HashSet<Integer> replicaHosts = new HashSet<Integer>();
-            replicaHosts.add(replicas.getInt(0));
-            replicaHosts.add(replicas.getInt(1));
-            assertTrue(replicaHosts.contains(2));
-            assertTrue(replicaHosts.contains(3));
-            newPartCount++;
-        }
-        assertEquals(6, newPartCount);
     }
 
     public void testAddMoreThanKsafeHosts() throws JSONException
@@ -173,7 +141,7 @@ public class TestClusterCompiler extends TestCase
 
         VoltDB.ignoreCrash = true;
         try {
-            ClusterConfig.addHosts(Arrays.asList(2, 3, 4), topo);
+            ClusterConfig.addHosts(3, topo);
             fail("Shouldn't allow adding more than ksafe + 1 node");
         } catch (AssertionError e) {}
     }
