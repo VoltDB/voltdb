@@ -23,143 +23,75 @@
 
 package org.voltdb.planner;
 
-import java.util.List;
-
-import junit.framework.TestCase;
-
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.PlanNodeType;
 
-public class TestPlansOrderBy extends TestCase {
-
-    private PlannerTestAideDeCamp aide;
-
-    private AbstractPlanNode compile(String sql, int paramCount) {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn =  aide.compile(sql, paramCount);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(pn != null);
-        assertFalse(pn.isEmpty());
-        assertTrue(pn.get(0) != null);
-        return pn.get(0);
-    }
-
+public class TestPlansOrderBy extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestPlansGroupBy.class.getResource("testplans-orderby-ddl.sql"), "testplansorderby");
-
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(true);
-        }
+        setupSchema(TestPlansGroupBy.class.getResource("testplans-orderby-ddl.sql"),
+                    "testplansorderby", false);
+        forceReplication();
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
+    }
+
+    void validatePlan(String sql, boolean expectIndexScan, boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
+    {
+        AbstractPlanNode pn = compile(sql);
+        assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
+        assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
+        assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
+        assertEquals(expectHashAggregate, pn.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE));
     }
 
     public void testOrderByOne() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT * from T ORDER BY T_PKEY", 0);
-        if (pn != null) {
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.INDEXSCAN).isEmpty());
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.SEQSCAN).isEmpty());
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
-        }
+        validatePlan("SELECT * from T ORDER BY T_PKEY", true, false, false, false);
     }
 
     public void testOrderByTwo() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT * from T ORDER BY T_PKEY, T_D1", 0);
-        if (pn != null) {
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.INDEXSCAN).isEmpty());
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.SEQSCAN).isEmpty());
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
-        }
+        validatePlan("SELECT * from T ORDER BY T_PKEY, T_D1", true, false, false, false);
     }
 
     public void testOrderByTwoDesc() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT * from T ORDER BY T_PKEY DESC, T_D1 DESC", 0);
-        if (pn != null) {
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.INDEXSCAN).isEmpty());
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.SEQSCAN).isEmpty());
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
-        }
+        validatePlan("SELECT * from T ORDER BY T_PKEY DESC, T_D1 DESC", true, false, false, false);
     }
 
     public void testOrderByTwoAscDesc() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT * from T ORDER BY T_PKEY, T_D1 DESC", 0);
-        if (pn != null) {
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.INDEXSCAN).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.SEQSCAN).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
-        }
+        validatePlan("SELECT * from T ORDER BY T_PKEY, T_D1 DESC", false, true, true, false);
     }
 
     public void testOrderByThree() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT * from T ORDER BY T_PKEY, T_D1, T_D2", 0);
-        if (pn != null) {
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.INDEXSCAN).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.SEQSCAN).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
-        }
+        validatePlan("SELECT * from T ORDER BY T_PKEY, T_D1, T_D2", false, true, true, false);
     }
 
     public void testNoOrderBy() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT * FROM T ORDER BY T_D2", 0);
-        if (pn != null) {
-            assertTrue(pn.findAllNodesOfType(PlanNodeType.INDEXSCAN).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.SEQSCAN).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
-        }
+        validatePlan("SELECT * FROM T ORDER BY T_D2", false, true, true, false);
     }
 
+    //TODO: This test actually validates that we generate a sub-optimal plan for this query
+    //-- but we're keeping the test because, well, at least the query compiles to SOME kind of plan?
+    //When ENG-4096 is addressed, the validation will be quite different.
     public void testOrderByCountStar() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT T_PKEY, COUNT(*) AS FOO FROM T GROUP BY T_PKEY ORDER BY FOO", 0);
-        if (pn != null) {
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.SEQSCAN).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
-        }
+        validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM T GROUP BY T_PKEY ORDER BY FOO", false, true, true, true);
+        //Expected ENG-4096 effect:
+        //validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM T GROUP BY T_PKEY ORDER BY FOO", true, false, true, false);
     }
 
     public void testEng450()
     {
+        // This used to not compile. It does now. That's all we care about.
         compile("select T.T_PKEY, " +
                      "sum(T.T_D1) " +
                      "from T " +
                      "group by T.T_PKEY " +
-                     "order by T.T_PKEY;", 0);
+                     "order by T.T_PKEY;");
     }
 
     public void testOrderDescWithEquality() {
-        AbstractPlanNode pn = null;
-        pn = compile("SELECT * FROM T WHERE T_PKEY = 2 ORDER BY T_PKEY DESC, T_D1 DESC", 0);
-        if (pn != null) {
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.INDEXSCAN).isEmpty());
-            assertFalse(pn.findAllNodesOfType(PlanNodeType.ORDERBY).isEmpty());
-        }
+        validatePlan("SELECT * FROM T WHERE T_PKEY = 2 ORDER BY T_PKEY DESC, T_D1 DESC", true, false, true, false);
     }
 }
