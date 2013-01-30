@@ -58,7 +58,6 @@ public class Cartographer extends StatsSource
     private final LeaderCacheReader m_iv2Masters;
     private final LeaderCacheReader m_iv2Mpi;
     private final ZooKeeper m_zk;
-    private final int m_numberOfPartitions;
     private final Set<Integer> m_allMasters = new HashSet<Integer>();
 
     /**
@@ -88,10 +87,9 @@ public class Cartographer extends StatsSource
         }
     }
 
-    public Cartographer(ZooKeeper zk, int numberOfPartitions)
+    public Cartographer(ZooKeeper zk)
     {
         super(false);
-        m_numberOfPartitions = numberOfPartitions;
         m_zk = zk;
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters);
         m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi);
@@ -271,13 +269,13 @@ public class Cartographer extends StatsSource
     public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
     {
         ClusterConfig clusterConfig = new ClusterConfig(topology);
-        hostLog.info("Computing partitions to replace.  Total partitions: " + m_numberOfPartitions);
+        hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
         Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
-        for (int i = 0; i < m_numberOfPartitions; i++) {
+        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
             repsPerPart.put(i, getReplicaCountForPartition(i));
         }
         List<Integer> partitions = computeReplacementPartitions(repsPerPart, clusterConfig.getReplicationFactor(),
-                clusterConfig.getSitesPerHost(), m_numberOfPartitions);
+                clusterConfig.getSitesPerHost(), clusterConfig.getPartitionCount());
         hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
         return partitions;
     }
