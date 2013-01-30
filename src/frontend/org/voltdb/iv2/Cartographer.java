@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -159,6 +160,29 @@ public class Cartographer extends StatsSource
     }
 
     /**
+     * Returns the IDs of the partitions currently in the cluster.
+     * @return A list of partition IDs
+     */
+    public static List<Integer> getPartitions(ZooKeeper zk) {
+        List<Integer> partitions = new ArrayList<Integer>();
+        try {
+            List<String> children = zk.getChildren(VoltZK.leaders_initiators, null);
+            for (String child : children) {
+                partitions.add(LeaderElector.getPartitionFromElectionDir(child));
+            }
+        } catch (KeeperException e) {
+            VoltDB.crashLocalVoltDB("Failed to get partition IDs from ZK", true, e);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Failed to get partition IDs from ZK", true, e);
+        }
+        return partitions;
+    }
+
+    public List<Integer> getPartitions() {
+        return Cartographer.getPartitions(m_zk);
+    }
+
+    /**
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */
     public List<Long> getReplicasForPartition(int partition) {
@@ -278,6 +302,36 @@ public class Cartographer extends StatsSource
                 clusterConfig.getSitesPerHost(), clusterConfig.getPartitionCount());
         hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
         return partitions;
+    }
+
+    /**
+     * Compute the new partition IDs to add to the cluster based on the new topology.
+     *
+     * @param  zk Zookeeper client
+     * @param topo The new topology which should include the new host count
+     * @return A list of partitions IDs to add to the cluster.
+     * @throws JSONException
+     */
+    public static List<Integer> getPartitionsToAdd(ZooKeeper zk, JSONObject topo)
+            throws JSONException
+    {
+        ClusterConfig  clusterConfig = new ClusterConfig(topo);
+        List<Integer> newPartitions = new ArrayList<Integer>();
+        Set<Integer> existingParts = new HashSet<Integer>(getPartitions(zk));
+        // Remove MPI
+        existingParts.remove(MpInitiator.MP_INIT_PID);
+        int partsToAdd = clusterConfig.getPartitionCount() - existingParts.size();
+
+        if (partsToAdd > 0) {
+            hostLog.info("Computing new partitions to add. Total partitions: " + clusterConfig.getPartitionCount());
+            for (int i = 0; newPartitions.size() != partsToAdd; i++) {
+                if (!existingParts.contains(i)) {
+                    newPartitions.add(i);
+                }
+            }
+            hostLog.info("Adding " + partsToAdd + " partitions: " + newPartitions);
+        }
+        return newPartitions;
     }
 
     private List<MailboxNodeContent> getMailboxNodeContentList()
