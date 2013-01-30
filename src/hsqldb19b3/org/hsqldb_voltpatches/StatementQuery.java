@@ -239,10 +239,6 @@ public class StatementQuery extends StatementDMQL {
         VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
             query.attributes.put("distinct", "true");
-        if (select.isGrouped)
-            query.attributes.put("grouped", "true");
-        if (select.isAggregated)
-            query.attributes.put("aggregated", "true");
 
         // limit
         if ((select.sortAndSlice != null) && (select.sortAndSlice.limitCondition != null)) {
@@ -477,7 +473,7 @@ public class StatementQuery extends StatementDMQL {
         assert(scans != null);
 
         for (RangeVariable rangeVariable : rangeVariables)
-            scans.children.add(rangeVariable.voltGetXML(session));
+            scans.children.add(rangeVariable.voltGetRangeVariableXML(session));
 
         Expression cond = null;
         // conditions

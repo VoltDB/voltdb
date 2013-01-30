@@ -1294,7 +1294,7 @@ public class StatementDML extends StatementDMQL {
     {
         // Joins in DML statements are not yet supported, so, for now,
         // just represent the one (target) table scan.
-        VoltXMLElement child = targetRangeVariables[0].voltGetXML(session);
+        VoltXMLElement child = targetRangeVariables[0].voltGetRangeVariableXML(session);
         assert(child != null);
         xml.children.add(child);
     }
