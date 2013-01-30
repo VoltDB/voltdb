@@ -41,6 +41,7 @@ import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Statement implementation for DML and base DQL statements.
@@ -821,11 +822,46 @@ public abstract class StatementDMQL extends Statement {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-     VoltXMLElement voltGetXML(Session session)
-     throws HSQLParseException {
-         // XXX this seems, how you say, dumb.  leaving it though until I track
-         // down that nobody cares
-         assert(false);
-         return null;
+    VoltXMLElement voltGetStatementXML(Session session) throws HSQLParseException
+    {
+        // XXX this seems, how you say, dumb.  leaving it though until I track
+        // down that nobody cares
+        assert(false);
+        return null;
     }
+
+    protected void voltAppendParameters(Session session, VoltXMLElement xml)
+    {
+        VoltXMLElement parameterXML = new VoltXMLElement("parameters");
+        xml.children.add(parameterXML);
+        assert(parameterXML != null);
+
+        for (int i = 0; i < parameters.length; i++) {
+            VoltXMLElement parameter = new VoltXMLElement("parameter");
+            parameterXML.children.add(parameter);
+            parameter.attributes.put("index", String.valueOf(i));
+            Expression param = parameters[i];
+            parameter.attributes.put("id", param.getUniqueId(session));
+            Type paramType = param.getDataType();
+            if (paramType != null) {
+                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
+            }
+        }
+    }
+
+    protected static Expression voltCombineWithAnd(Expression... conditions)
+    {
+        Expression result = null;
+        for(Expression child : conditions) {
+            if (child != null) {
+                if (result == null) {
+                    result = child;
+                    continue;
+                }
+                result = new ExpressionLogical(OpTypes.AND, result, child);
+            }
+        }
+        return result;
+    }
+
 }

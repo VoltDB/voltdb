@@ -28,8 +28,6 @@ import org.voltdb.expressions.ExpressionUtil;
  *
  */
 public class ParsedDeleteStmt extends AbstractParsedStmt {
-    Table table = null;
-
     /**
     * Class constructor
     * @param paramValues
@@ -44,7 +42,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         String tableName = stmtNode.attributes.get("table");
         assert(tableName != null);
         tableName = tableName.trim();
-        table = getTableFromDB(tableName);
+        Table table = getTableFromDB(tableName);
         tableList.add(table);
 
         for (VoltXMLElement child : stmtNode.children) {
@@ -53,31 +51,4 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         }
     }
 
-    //XXX: This looks a lot like it might be a slightly more verbose duplicate of AbstractParsedStmt.parseConditions
-    private void parseCondition(VoltXMLElement conditionNode) {
-        AbstractExpression tempWhere = null;
-        for (VoltXMLElement exprNode : conditionNode.children) {
-            if (tempWhere == null) {
-                tempWhere = parseExpressionTree(exprNode);
-            }
-            else {
-                tempWhere = ExpressionUtil.combine(tempWhere, parseExpressionTree(exprNode));
-            }
-        }
-        assert(where == null); // Should be non-reentrant -- never overwriting a previous value!
-        where = tempWhere;
-        if (where == null) {
-            return;
-        }
-        ExpressionUtil.finalizeValueTypes(where);
-    }
-
-    @Override
-    public String toString() {
-        String retval = super.toString() + "\n";
-
-        retval = retval.trim();
-
-        return retval;
-    }
 }

@@ -42,7 +42,6 @@ import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
-import org.hsqldb_voltpatches.types.Type;
 
 /**
  * Implementation of Statement for query expressions.<p>
@@ -179,12 +178,12 @@ public class StatementQuery extends StatementDMQL {
      * @throws HSQLParseException
      */
     @Override
-    VoltXMLElement voltGetXML(Session session)
+    VoltXMLElement voltGetStatementXML(Session session)
     throws HSQLParseException
     {
         return voltGetXMLExpression(queryExpression, session);
     }
-    
+
     VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, Session session)
     throws HSQLParseException
     {
@@ -212,7 +211,7 @@ public class StatementQuery extends StatementDMQL {
             /**
              * Try to merge parent and the child nodes for UNION and INTERSECT (ALL) set operation.
              * In case of EXCEPT(ALL) operation only the left child can be merged with the parent in order to preserve
-             * associativity - (Select 1 EXCEPT Select2) EXCEPT Select3 vs. Select 1 EXCEPT (Select2 EXCEPT Select3) 
+             * associativity - (Select1 EXCEPT Select2) EXCEPT Select3 vs. Select1 EXCEPT (Select2 EXCEPT Select3)
              */
             if ("union".equalsIgnoreCase(leftExpr.name) &&
                     queryExpr.operatorName().equalsIgnoreCase(leftExpr.attributes.get("uniontype"))) {
@@ -340,7 +339,6 @@ public class StatementQuery extends StatementDMQL {
         // columns
         VoltXMLElement cols = new VoltXMLElement("columns");
         query.children.add(cols);
-        assert(cols != null);
 
         ArrayList<Expression> orderByCols = new ArrayList<Expression>();
         ArrayList<Expression> groupByCols = new ArrayList<Expression>();
@@ -471,23 +469,7 @@ public class StatementQuery extends StatementDMQL {
         }
 
         // parameters
-        VoltXMLElement params = new VoltXMLElement("parameters");
-        query.children.add(params);
-        assert(params != null);
-
-        for (int i = 0; i < parameters.length; i++) {
-            VoltXMLElement parameter = new VoltXMLElement("parameter");
-            params.children.add(parameter);
-            assert(parameter != null);
-
-            parameter.attributes.put("index", String.valueOf(i));
-            ExpressionColumn param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId(session));
-            Type paramType = param.getDataType();
-            if (paramType != null) {
-                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
-            }
-        }
+        voltAppendParameters(session, query);
 
         // scans
         VoltXMLElement scans = new VoltXMLElement("tablescans");
@@ -497,51 +479,33 @@ public class StatementQuery extends StatementDMQL {
         for (RangeVariable rangeVariable : rangeVariables)
             scans.children.add(rangeVariable.voltGetXML(session));
 
+        Expression cond = null;
         // conditions
+        // XXX: Are queryCondition and rv.nonIndexJoinCondition and rv.indexCondition/rv.indexEndCondition
+        // REALLY mutually exclusive, or might they be complementary? or might they be partially redundant?
+        // look for inner joins expressed on range variables. It may be that we can't experience all of
+        // the possible combinations until we support joins with ON and USING clauses.
         if (select.queryCondition != null) {
-            VoltXMLElement condition = new VoltXMLElement("querycondition");
-            query.children.add(condition);
-            assert(condition != null);
-            condition.children.add(select.queryCondition.voltGetXML(session));
-        }
-        else {
-            // look for inner joins expressed on range variables
-            Expression cond = null;
+            cond = select.queryCondition;
+        } else {
             for (int rvi=0; rvi < select.rangeVariables.length; ++rvi) {
                 RangeVariable rv = rangeVariables[rvi];
                 // joins on non-indexed columns for inner join tokens created a range variable
                 // and assigned this expression.
                 if (rv.nonIndexJoinCondition != null) {
-                    if (cond != null) {
-                        cond = new ExpressionLogical(OpTypes.AND, cond, rv.nonIndexJoinCondition);
-                    } else {
-                        cond = rv.nonIndexJoinCondition;
-                    }
+                    cond = voltCombineWithAnd(cond, rv.nonIndexJoinCondition);
                 }
                 // joins on indexed columns for inner join tokens created a range variable
                 // and assigned an expression and set the flag isJoinIndex.
                 else if (rv.isJoinIndex) {
-                    if (rv.indexCondition != null) {
-                        if (cond != null) {
-                            cond = new ExpressionLogical(OpTypes.AND, cond, rv.indexCondition);
-                        } else {
-                            cond = rv.indexCondition;
-                        }
-                    }
-                    if (rv.indexEndCondition != null) {
-                        if (cond != null) {
-                            cond = new ExpressionLogical(OpTypes.AND, cond, rv.indexCondition);
-                        } else {
-                            cond = rv.indexCondition;
-                        }
-                    }
+                    cond = voltCombineWithAnd(cond, rv.indexCondition, rv.indexEndCondition);
                 }
             }
-            if (cond != null) {
-                VoltXMLElement condition = new VoltXMLElement("querycondition");
-                query.children.add(condition);
-                condition.children.add(cond.voltGetXML(session));
-            }
+        }
+        if (cond != null) {
+            VoltXMLElement condition = new VoltXMLElement("querycondition");
+            query.children.add(condition);
+            condition.children.add(cond.voltGetXML(session));
         }
 
         // having

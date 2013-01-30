@@ -98,7 +98,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (child.name.equalsIgnoreCase("columns"))
                 parseDisplayColumns(child);
             else if (child.name.equalsIgnoreCase("querycondition"))
-                parseConditions(child);
+                parseCondition(child);
             else if (child.name.equalsIgnoreCase("ordercolumns"))
                 parseOrderColumns(child);
             else if (child.name.equalsIgnoreCase("groupcolumns")) {
