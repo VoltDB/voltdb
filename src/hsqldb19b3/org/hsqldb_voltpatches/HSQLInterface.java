@@ -181,7 +181,7 @@ public class HSQLInterface {
             throw new HSQLParseException(result.getMainString());
 
         VoltXMLElement xml = null;
-        xml = cs.voltGetXML(sessionProxy);
+        xml = cs.voltGetStatementXML(sessionProxy);
 
         // this releases some small memory hsql uses that builds up over time if not
         // cleared

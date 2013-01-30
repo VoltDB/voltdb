@@ -62,30 +62,9 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
-                for (VoltXMLElement colNode : node.children) {
-                    if (colNode.name.equalsIgnoreCase("column")) {
-                         parseInsertColumn(colNode, table);
-                    }
-                }
+                parseTargetColumns(node, table, columns);
             }
         }
-    }
-
-    void parseInsertColumn(VoltXMLElement columnNode, Table table) {
-        String tableName = columnNode.attributes.get("table");
-        String columnName = columnNode.attributes.get("name");
-
-        assert(tableName.equalsIgnoreCase(table.getTypeName()));
-        Column column = table.getColumns().getIgnoreCase(columnName);
-
-        AbstractExpression expr = null;
-        for (VoltXMLElement node : columnNode.children) {
-            expr = parseExpressionTree(node);
-            expr.refineValueType(VoltType.get((byte)column.getType()));
-            ExpressionUtil.finalizeValueTypes(expr);
-        }
-
-        columns.put(column, expr);
     }
 
     @Override
