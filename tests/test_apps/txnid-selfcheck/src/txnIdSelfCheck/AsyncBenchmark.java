@@ -43,6 +43,7 @@ package txnIdSelfCheck;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,8 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
 
@@ -188,7 +191,7 @@ public class AsyncBenchmark {
 
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+                System.err.printf(new Date() + " Connection to %s:%d was lost.\n", hostname, port);
             }
             clients.remove(this.client);
 
@@ -253,13 +256,13 @@ public class AsyncBenchmark {
             try {
                 client.createConnection(server);
                 clients.add(client);
-                System.out.printf("Connected to VoltDB node at: %s.\n", server);
+                System.out.printf(new Date() + " Connected to VoltDB node at: %s.\n", server);
                 break;
             }
             catch (Exception e) {
-                System.err.printf("Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
+                System.err.printf(new Date() + " Connection to " + server + " failed - retrying in %d second(s).\n", sleep / 1000);
                 try { Thread.sleep(sleep); } catch (Exception interruted) {}
-                if (sleep < 8000) sleep += sleep;
+                if (sleep < 1000) sleep += sleep;
             }
         }
     }
@@ -383,6 +386,8 @@ public class AsyncBenchmark {
                 if (response.getAppStatus() != updateReplicated.AbortStatus.NORMAL.ordinal()) {
                     crash(response.getStatusString());
                 }
+            } else if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
+                crash(response.getStatusString());
             } else {
                 // Could be server connection lost
                 //System.err.println("updateReplicated failed: " + response.getStatusString());
@@ -400,9 +405,8 @@ public class AsyncBenchmark {
         public void clientCallback(ClientResponse response) throws Exception {
             c.incrementAndGet();
 
-            if (response.getStatus() != ClientResponse.SUCCESS) {
-//                System.err.println("doTxn for cid " + cid + " failed: " +
-//                        response.getStatusString());
+            if (response.getStatus() == ClientResponse.UNEXPECTED_FAILURE) {
+                crash(response.getStatusString());
             }
         }
     }
@@ -422,15 +426,31 @@ public class AsyncBenchmark {
         // connect to one or more servers, loop until success
         connect();
 
-        // initialize using synchronous call
-        Client initClient = clients.get(0);
-        initClient.callProcedure("Initialize");
-        ClientResponse rowResp = initClient.callProcedure("getLastRow");
-        VoltTable[] rowResults = rowResp.getResults();
-        assert(rowResp.getStatus() == ClientResponse.SUCCESS);
-        ClientResponse replicatedRowResp = initClient.callProcedure("getLastReplicatedRow");
-        VoltTable[] replicatedResults = replicatedRowResp.getResults();
-        assert(replicatedRowResp.getStatus() == ClientResponse.SUCCESS);
+        VoltTable[] rowResults = null;
+        VoltTable[] replicatedResults = null;
+        boolean succeeded = false;
+        // If server fails during initialization, try again
+        while (!succeeded) {
+            try {
+                // initialize using synchronous call
+                Client initClient = clients.get(0);
+                initClient.callProcedure("Initialize");
+                ClientResponse rowResp = initClient.callProcedure("getLastRow");
+                rowResults = rowResp.getResults();
+                assert (rowResp.getStatus() == ClientResponse.SUCCESS);
+                System.err.println("start");
+                Thread.sleep(3000);
+                System.err.println("end");
+                ClientResponse replicatedRowResp = initClient.callProcedure("getLastReplicatedRow");
+                replicatedResults = replicatedRowResp.getResults();
+                assert (replicatedRowResp.getStatus() == ClientResponse.SUCCESS);
+                succeeded = true;
+            } catch (ProcCallException e) {
+                System.err.println(e.getMessage());
+            } catch (NoConnectionsException e) {
+                System.err.println("Failed to initialize, will retry: " + e.getMessage());
+            }
+        }
 
         // total of 127 cids
         final int cidCount = 127;
@@ -467,6 +487,8 @@ public class AsyncBenchmark {
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        Long noClientGracePeriodStart = null;
+        long noClientGracePeriodMs = 15 * 1000l;
         while (benchmarkEndTime > System.currentTimeMillis()) {
             int cid;
             if (r.nextDouble() < config.multisingleratio) {
@@ -481,7 +503,19 @@ public class AsyncBenchmark {
             Client client = null;
             try {
                 if (clients.isEmpty()) {
-                    crash("No connection to any server");
+                    if (noClientGracePeriodStart == null) {
+                        noClientGracePeriodStart = System.currentTimeMillis();
+                        continue;
+                    }
+                    else if ((System.currentTimeMillis() - noClientGracePeriodStart) < noClientGracePeriodMs) {
+                        continue;
+                    }
+                    else {
+                        crash("No connection to any server");
+                    }
+                }
+                else {
+                    noClientGracePeriodStart = null;
                 }
 
                 if (cid == -1) {
