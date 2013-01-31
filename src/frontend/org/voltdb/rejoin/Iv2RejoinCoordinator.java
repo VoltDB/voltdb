@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -55,6 +57,8 @@ import org.voltdb.VoltTable;
 public class Iv2RejoinCoordinator extends RejoinCoordinator {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
+    private long m_startTime;
+
     // This lock synchronizes all data structure access. Do not hold this
     // across blocking external calls.
     private final Object m_lock = new Object();
@@ -65,8 +69,12 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
 
     private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
-    // contains all sites that haven't started streaming snapshot
+    // contains all sites that haven't started rejoin initialization
     private final Queue<Long> m_pendingSites;
+    // contains all sites that are waiting to start a snapshot
+    private final Queue<Long> m_snapshotSites = new LinkedList<Long>();
+    // Mapping of source to destination HSIds for the current snapshot
+    private final Map<Long, Long> m_destToSource = new HashMap<Long, Long>();
     // contains all sites that haven't finished replaying transactions
     private final Queue<Long> m_rejoiningSites = new LinkedList<Long>();
     // true if performing live rejoin
@@ -102,18 +110,28 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
      * Send rejoin initiation message to the local site
      * @param HSId
      */
-    private void initiateRejoinOnSite(long HSId) {
+    private void initiateRejoinOnSites(long HSId) {
+        List<Long> HSIds = new ArrayList<Long>();
+        HSIds.add(HSId);
+        initiateRejoinOnSites(HSIds);
+    }
+
+    private void initiateRejoinOnSites(List<Long> HSIds) {
+        // We're going to share this snapshot across the provided HSIDs.
+        // Steal just the first one to disabiguate it.
+        String nonce = makeSnapshotNonce(HSIds.get(0));
         // Must not hold m_lock across the send() call to manage lock
         // acquisition ordering with other in-process mailboxes.
-        String nonce = makeSnapshotNonce(HSId);
         synchronized(m_lock) {
-            m_nonces.put(HSId, nonce);
+            for (long HSId : HSIds) {
+                m_nonces.put(HSId, nonce);
+            }
         }
         RejoinMessage msg = new RejoinMessage(getHSId(),
                 m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                RejoinMessage.Type.INITIATION_COMMUNITY,
                                nonce);
-        send(HSId, msg);
+        send(com.google.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
         if (m_rejoinDeathTestMode && !m_rejoinDeathTestCancel &&
@@ -127,14 +145,16 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
         return "Rejoin_" + HSId + "_" + System.currentTimeMillis();
     }
 
-    private String makeSnapshotRequest(long HSId, long sourceSite)
+    private String makeSnapshotRequest(Map<Long, Long> sourceToDests)
     {
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
             jsStringer.key("streamPairs");
             jsStringer.object();
-            jsStringer.key(Long.toString(sourceSite)).value(Long.toString(HSId));
+            for (Entry<Long, Long> entry : sourceToDests.entrySet()) {
+                jsStringer.key(Long.toString(entry.getKey())).value(Long.toString(entry.getValue()));
+            }
             jsStringer.endObject();
             jsStringer.endObject();
             return jsStringer.toString();
@@ -147,14 +167,27 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
 
     @Override
     public void startRejoin() {
-        long firstSite;
-        synchronized (m_lock) {
-            firstSite = m_pendingSites.poll();
-            m_rejoiningSites.add(firstSite);
+        m_startTime = System.currentTimeMillis();
+        if (m_liveRejoin) {
+            long firstSite;
+            synchronized (m_lock) {
+                firstSite = m_pendingSites.poll();
+                m_snapshotSites.add(firstSite);
+            }
+            String HSIdString = CoreUtils.hsIdToString(firstSite);
+            REJOINLOG.info("Initiating snapshot stream to first site: " + HSIdString);
+            initiateRejoinOnSites(firstSite);
         }
-        String HSIdString = CoreUtils.hsIdToString(firstSite);
-        REJOINLOG.info("Initiating snapshot stream to first site: " + HSIdString);
-        initiateRejoinOnSite(firstSite);
+        else {
+            List<Long> firstSites = new ArrayList<Long>();
+            synchronized (m_lock) {
+                firstSites.addAll(m_pendingSites);
+                m_snapshotSites.addAll(m_pendingSites);
+                m_pendingSites.clear();
+            }
+            REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
+            initiateRejoinOnSites(firstSites);
+        }
     }
 
     private void onSnapshotStreamFinished(long HSId) {
@@ -163,7 +196,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
         synchronized (m_lock) {
             if (!m_pendingSites.isEmpty()) {
                 nextSite = m_pendingSites.poll();
-                m_rejoiningSites.add(nextSite);
+                m_snapshotSites.add(nextSite);
                 REJOINLOG.info("Finished streaming snapshot to site: " +
                         CoreUtils.hsIdToString(HSId) +
                         " and initiating snapshot stream to next site: " +
@@ -175,7 +208,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             }
         }
         if (nextSite != null) {
-            initiateRejoinOnSite(nextSite);
+            initiateRejoinOnSites(nextSite);
         }
     }
 
@@ -189,6 +222,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             String msg = "Finished rejoining site " + CoreUtils.hsIdToString(HSId);
             ArrayList<Long> remainingSites = new ArrayList<Long>(m_pendingSites);
             remainingSites.addAll(m_rejoiningSites);
+            remainingSites.addAll(m_snapshotSites);
             if (!remainingSites.isEmpty()) {
                 msg += ". Remaining sites to rejoin: " +
                     CoreUtils.hsIdCollectionToString(remainingSites);
@@ -197,10 +231,13 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
                 msg += ". All sites completed rejoin.";
             }
             REJOINLOG.info(msg);
-            allDone = m_rejoiningSites.isEmpty();
+            allDone = m_snapshotSites.isEmpty() && m_rejoiningSites.isEmpty();
         }
 
         if (allDone) {
+            long delta = (System.currentTimeMillis() - m_startTime) / 1000;
+            REJOINLOG.info("" + (m_liveRejoin ? "Live" : "Blocking") + " rejoin data transfer completed in " +
+                    delta + " seconds.");
             // no more sites to rejoin, we're done
             VoltDB.instance().onExecutionSiteRejoinCompletion(0l);
         }
@@ -242,18 +279,28 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
 
     private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId)
     {
-        String data = makeSnapshotRequest(dataSinkHSId, masterHSId);
         String nonce = null;
+        String data = null;
         synchronized(m_lock) {
+            m_snapshotSites.remove(HSId);
+            m_destToSource.put(masterHSId, dataSinkHSId);
+            m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
+            if (m_snapshotSites.isEmpty()) {
+                data = makeSnapshotRequest(m_destToSource);
+                m_destToSource.clear();
+            }
         }
         if (nonce == null) {
             // uh-oh, shouldn't be possible
             throw new RuntimeException("Received an INITIATION_RESPONSE for an HSID for which no nonce exists: " +
                     CoreUtils.hsIdToString(HSId));
         }
-        SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
-                m_handler, true);
+        if (data != null) {
+            REJOINLOG.debug("Snapshot request: " + data);
+            SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
+                    m_handler, true);
+        }
     }
 
     @Override
