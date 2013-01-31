@@ -1673,7 +1673,7 @@ public class IndexAVL implements Index {
      * @throws HSQLParseException
      */
     @Override
-    public VoltXMLElement voltGetXML(Session session) throws HSQLParseException {
+    public VoltXMLElement voltGetIndexXML(Session session) throws HSQLParseException {
         VoltXMLElement index = new VoltXMLElement("index");
 
         index.attributes.put("name", getName().name);
