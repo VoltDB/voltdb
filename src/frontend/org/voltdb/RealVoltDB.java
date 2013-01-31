@@ -617,9 +617,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             // Initialize stats
-            m_partitionCountStats = new PartitionCountStats( clusterConfig.getPartitionCount());
-            m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
-                    0, m_partitionCountStats);
             m_ioStats = new IOStats();
             m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
                     0, m_ioStats);
@@ -628,7 +625,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     0, m_memoryStats);
             if (isIV2Enabled()) {
                 m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+                m_partitionCountStats = new PartitionCountStats(m_cartographer);
+            } else {
+                m_partitionCountStats = new PartitionCountStats(clusterConfig.getPartitionCount());
             }
+            m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
+                    0, m_partitionCountStats);
 
             /*
              * Initialize the command log on rejoin before configuring the IV2
