@@ -87,6 +87,12 @@ public abstract class AbstractParsedStmt {
 
     public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
+    // @TODO temp solution to carry additional join info
+    // So far only two table outer (left/right) join is supported. Capturing just the join type is enough to guarantee the right join order
+    // This would also work when more than two tables are involved but only two of them are joined with outer join 
+    // because of the join order associativity (T1 inner T2) left/right T3 = T1 inner (T2 left/right T3) 
+    public HashMap<Table, JoinType> tableJoinList = new HashMap<Table, JoinType>();
+
     //User specified join order, null if none is specified
     public String joinOrder = null;
 
@@ -211,6 +217,17 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseExpressionTree(VoltXMLElement root) {
         AbstractExpression exprTree = parseExpressionTree(m_paramsById, root);
+        if (exprTree instanceof TupleValueExpression) {
+            TupleValueExpression e = (TupleValueExpression) exprTree;
+            if (e.getTableName() == null && e.getColumnName() != null) {
+                // Columns from USING expression in join are not qualified.
+                // if join is INNER then the column in question can be from any table
+                // participating in join. In case of OUTER join, it must be the outer column
+                e.setTableName(getTableForJoinedColumn(e.getColumnName()));
+                root.attributes.put("table", e.getTableName());
+            }
+        }
+
         exprTree.resolveForDB(m_db);
 
         if (m_paramValues != null) {
@@ -225,6 +242,30 @@ public abstract class AbstractParsedStmt {
 
         }
         return exprTree;
+    }
+    
+    String getTableForJoinedColumn(String columnName) {
+        // Right now it's simple
+        JoinType joinType = JoinType.INNER;
+        for (Map.Entry<Table, JoinType> entry : tableJoinList.entrySet()) {
+            if (entry.getValue() != JoinType.INNER) {
+                joinType = entry.getValue();
+                break;
+            }
+        }
+        
+        for (Map.Entry<Table, JoinType> entry : this.tableJoinList.entrySet()) {
+            Table table = entry.getKey();
+            JoinType tableJoinType = entry.getValue();
+            if (table.getColumns().get(columnName) != null) {
+                if (joinType == JoinType.INNER || 
+                        tableJoinType == JoinType.RIGHT || 
+                        joinType == JoinType.LEFT && tableJoinType == JoinType.INNER) {
+                        return table.getTypeName();
+                }
+            }
+        }
+        return null;
     }
 
     // TODO: This static function and the functions (below) that it calls to deal with various Expression types
@@ -522,7 +563,7 @@ public abstract class AbstractParsedStmt {
 
         // temp restriction on number of outer joins
         int tableCount = 0;
-        boolean isOuter = false;
+        boolean hasOuter = false;
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -542,16 +583,17 @@ public abstract class AbstractParsedStmt {
                 if (joinType == JoinType.FULL) {
                     throw new PlanningErrorException("VoltDB does not yet support full outer joins");
                 }
-                if (joinType != JoinType.INNER && !isOuter) {
-                    isOuter = true;
+                if (joinType != JoinType.INNER) {
+                    hasOuter = true;
                 }
                 ++tableCount;
-                if (isOuter && tableCount > 2) {
+                if (hasOuter && tableCount > 2) {
                     throw new PlanningErrorException("VoltDB does not yet support outer joins with more than two tables involved");
                 }
 
                 visited.add(table);
                 tableList.add(table);
+                tableJoinList.put(table, joinType);
             }
         }
     }

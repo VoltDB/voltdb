@@ -340,9 +340,7 @@ public class ExpressionColumn extends Expression {
                 opType   = e.opType;
                 nodes    = e.nodes;
                 dataType = e.dataType;
-                if (e.getTableName() != null && e.getTableName().length() != 0) {
-                    return true;
-                }
+                return true;
             }
 
             if (rangeVar.variables != null) {
