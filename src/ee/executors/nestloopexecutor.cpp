@@ -224,6 +224,10 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple inner_tuple(node->getInputTables()[1]->schema());
     TableTuple &joined = output_table->tempTuple();
 
+    // NULL value for outer join
+    NValue nullValue;
+    nullValue.setNull();
+
     TableIterator iterator0 = outer_table->iterator();
     while (iterator0.next(outer_tuple)) {
 
@@ -239,7 +243,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
         TableIterator iterator1 = inner_table->iterator();
         while (iterator1.next(inner_tuple)) {
-            match = true;
             if (predicate == NULL || predicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
                 match = true;
                 // Matched! Complete the joined tuple with the inner column values.
@@ -253,15 +256,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         // Left Outer Join
         //
         if (!match && join_type == JOIN_TYPE_LEFT) {
-            //
-            // Append NULLs to the end of our join tuple
-            //
-            for (int col_ctr = 0; col_ctr < inner_cols; ++col_ctr)
-            {
-                NValue value = joined.getNValue(col_ctr + outer_cols);
-                value.setNull();
-                joined.setNValue(col_ctr + outer_cols, value);
-            }
+            joined.setNValue(outer_cols, joined.sizeInValues(), nullValue);
             output_table->insertTupleNonVirtual(joined);
         }
     }

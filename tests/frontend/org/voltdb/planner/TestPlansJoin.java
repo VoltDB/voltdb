@@ -58,73 +58,85 @@ public class TestPlansJoin extends TestCase {
         assertTrue(pn.get(0) != null);
         return pn.get(0);
     }
-    public void testBasicInnerJoin() {
-
-        AbstractPlanNode pn = compile("select * FROM R1  RIGHT JOIN R2 USING(C)", 0, false, null);
-//        AbstractPlanNode pn = compile("select r1.A FROM R1 JOIN R2 using(a)", 0, false, null);
-//        AbstractPlanNode pn = compile("select A FROM R1 JOIN R2 on r1.c = r2.c", 0, false, null);
-        AbstractPlanNode n = pn.getChild(0).getChild(0);
-    }    
 /*
     public void testBasicInnerJoin() {
-
+        // select * with ON clause should return all columns from all tables
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         NestLoopPlanNode nlj = (NestLoopPlanNode) n;
-        assertTrue(nlj.getJoinType() == JoinType.INNER);
+        //assertTrue(nlj.getJoinType() == JoinType.INNER);
         for (int ii = 0; ii < 2; ii++) {
             assertTrue(n.getChild(ii) instanceof SeqScanPlanNode);
         }
+        assertTrue(pn.getOutputSchema().getColumns().size() == 5);
 
-        pn = compile("select C FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);
+        // select * with USING clause should contain only one column for each column from the USING expression
+        pn = compile("select * FROM R1 JOIN R2 USING(C)", 0, false, null);
+        assertTrue(n instanceof NestLoopPlanNode);
+        assertTrue(pn.getOutputSchema().getColumns().size() == 4);
+
+        pn = compile("select A,C,D FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
+        assertTrue(pn.getOutputSchema().getColumns().size() == 3);
 
-        pn = compile("select R1.C, R2.C FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);
+        pn = compile("select A,C,D FROM R1 JOIN R2 USING(C)", 0, false, null);
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
+        assertTrue(pn.getOutputSchema().getColumns().size() == 3);
 
-        pn = compile("select R1.C, R2.C FROM R1 INNER JOIN R2 ON R1.C = R2.C", 0, false, null);
+        pn = compile("select R1.A, R2.C, R1.D FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
-        nlj = (NestLoopPlanNode) n;
-        assertTrue(nlj.getJoinType() == JoinType.INNER);
+        assertTrue(pn.getOutputSchema().getColumns().size() == 3);
+        assertTrue(pn.getOutputSchema().getColumns().get(0).getTableName().equalsIgnoreCase("R1"));
+        assertTrue(pn.getOutputSchema().getColumns().get(1).getTableName().equalsIgnoreCase("R2"));
 
-        pn = compile("select * FROM R1 JOIN R2 USING (C)", 0, false, null);
+        // The output table for C canbe either R1 or R2 because it's an INNER join
+        pn = compile("select R1.A, C, R1.D FROM R1 JOIN R2 USING(C)", 0, false, null);
         n = pn.getChild(0).getChild(0);
+        String table = pn.getOutputSchema().getColumns().get(1).getTableName();
         assertTrue(n instanceof NestLoopPlanNode);
-        for (int ii = 0; ii < 2; ii++) {
-            assertTrue(n.getChild(ii) instanceof SeqScanPlanNode);
+        assertTrue(pn.getOutputSchema().getColumns().size() == 3);
+        assertTrue(pn.getOutputSchema().getColumns().get(0).getTableName().equalsIgnoreCase("R1"));
+        assertTrue(table.equalsIgnoreCase("R2") || table.equalsIgnoreCase("R1"));
+
+        // Column from USING expression can not have qualifier in the SELECT clause
+        try {
+            List<AbstractPlanNode> pnl = aide.compile("select R1.C FROM R1 JOIN R2 USING(C)", 0, false, null);
+            fail();
+        } catch (PlanningErrorException ex) {
+            System.out.println(ex.getMessage());
+        }
+        try {
+            List<AbstractPlanNode> pnl = aide.compile("select R2.C FROM R1 JOIN R2 USING(C)", 0, false, null);
+            fail();
+        } catch (PlanningErrorException ex) {
+            System.out.println(ex.getMessage());
         }
 
-        pn = compile("select C FROM R1 JOIN R2 USING (C)", 0, false, null);
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof NestLoopPlanNode);
-
-        pn = compile("select R1.C, R2.C FROM R1 JOIN R2 USING (C)", 0, false, null);
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof NestLoopPlanNode);
-
-        pn = compile("select R1.C, R2.C FROM R1 INNER JOIN R2 USING (C)", 0, false, null);
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof NestLoopPlanNode);
-
-        pn = compile("select R2.A, R2.C FROM R2 JOIN R3 USING(C)", 0, false, null);
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof NestLoopPlanNode);
-        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
-        AbstractExpression pred = nlj.getPredicate();
-        assertTrue(pred != null);
-
+        try {
+            List<AbstractPlanNode> pnl = aide.compile("select R2.C FROM R1 JOIN R2 USING(X)", 0, false, null);
+            fail();
+        } catch (PlanningErrorException ex) {
+            System.out.println(ex.getMessage());
+        }
+        try {
+            List<AbstractPlanNode> pnl = aide.compile("select R2.C FROM R1 JOIN R2 ON R1.X = R2.X", 0, false, null);
+            fail();
+        } catch (PlanningErrorException ex) {
+            System.out.println(ex.getMessage());
+        }
     }
-
+*/
     public void testBasicThreeTableInnerJoin() {
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C JOIN R3 ON R3.C = R2.C", 0, false, null);
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
         assertTrue(n.getChild(1) instanceof NestLoopPlanNode);
+        assertTrue(pn.getOutputSchema().getColumns().size() == 7);
 
         pn = compile("select R1.C, R2.C R3.C FROM R1 INNER JOIN R2 ON R1.C = R2.C INNER JOIN R3 ON R3.C = R2.C", 0, false, null);
         n = pn.getChild(0).getChild(0);
@@ -132,11 +144,27 @@ public class TestPlansJoin extends TestCase {
         assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
         assertTrue(n.getChild(1) instanceof NestLoopPlanNode);
 
-        pn = compile("select R1.C, R2.C R3.C FROM R1 INNER JOIN R2 USING (C) INNER JOIN R3 USING(C)", 0, false, null);
+        pn = compile("select C FROM R1 INNER JOIN R2 USING (C) INNER JOIN R3 USING(C)", 0, false, null);
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
         assertTrue(n.getChild(1) instanceof NestLoopPlanNode);
+        assertTrue(pn.getOutputSchema().getColumns().size() == 1);
+
+        pn = compile("select C FROM R1 INNER JOIN R2 USING (C), R3 WHERE R1.A = R3.A", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(n.getChild(1) instanceof NestLoopIndexPlanNode);
+        assertTrue(pn.getOutputSchema().getColumns().size() == 1);
+
+        try {
+            List<AbstractPlanNode> pnl = aide.compile("select C, R3.C FROM R1 INNER JOIN R2 USING (C) INNER JOIN R3 ON R1.C = R3.C", 0, false, null);
+            fail();
+        } catch (PlanningErrorException ex) {
+            System.out.println(ex.getMessage());
+        }
+
     }
 
    public void testIndexInnerJoin() {
@@ -155,7 +183,7 @@ public class TestPlansJoin extends TestCase {
 
    public void testMultiColumnJoin() {
        // Test multi column condition on non index columns
-       AbstractPlanNode pn = compile("select R1.A, R2.C FROM R2 JOIN R1 USING(A, C)", 0, false, null);
+       AbstractPlanNode pn = compile("select A, C FROM R2 JOIN R1 USING(A, C)", 0, false, null);
        AbstractPlanNode n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopPlanNode);
        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
@@ -172,7 +200,7 @@ public class TestPlansJoin extends TestCase {
        assertTrue(pred.getExpressionType() == ExpressionType.CONJUNCTION_AND);
 
       // Test multi column condition on index columns
-       pn = compile("select R3.A, R2.A FROM R2 JOIN R3 USING(A)", 0, false, null);
+       pn = compile("select A FROM R2 JOIN R3 USING(A)", 0, false, null);
        n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopIndexPlanNode);
        NestLoopIndexPlanNode nlij = (NestLoopIndexPlanNode) n;
@@ -188,7 +216,7 @@ public class TestPlansJoin extends TestCase {
        assertTrue(pred != null);
        assertTrue(pred.getExpressionType() == ExpressionType.COMPARE_EQUAL);
 
-       pn = compile("select R3.A, R2.A FROM R3 JOIN R2 USING(A, C)", 0, false, null);
+       pn = compile("select A, C FROM R3 JOIN R2 USING(A, C)", 0, false, null);
        n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopIndexPlanNode);
        nlij = (NestLoopIndexPlanNode) n;
@@ -223,7 +251,7 @@ public class TestPlansJoin extends TestCase {
            fail();
        }
    }
-
+/*
    public void testLeftJoin() {
        // Test multi column condition on non index columns
        AbstractPlanNode pn = compile("select R1.A FROM R2 JOIN R1 on R1.A = R2.A", 0, false, null);
@@ -239,7 +267,7 @@ public class TestPlansJoin extends TestCase {
        assertTrue(o.getTargetTableName().equalsIgnoreCase("R2"));
        assertTrue(i.getTargetTableName().equalsIgnoreCase("R1"));
    }
-   
+*/
    public void testNonSupportedJoin() {
        // JOIN with parentheses (HSQL limitation)
        try {
@@ -290,7 +318,7 @@ public class TestPlansJoin extends TestCase {
            System.out.println(ex.getMessage());
        }
    }
-*/
+
     @Override
     protected void setUp() throws Exception {
         aide = new PlannerTestAideDeCamp(TestJoinOrder.class.getResource("testplans-join-ddl.sql"),

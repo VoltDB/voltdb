@@ -209,6 +209,7 @@ public:
     }
 
     void setNValue(const int idx, voltdb::NValue value);
+    void setNValue(const int beginIdx, const int endIdx, const voltdb::NValue& value);
 
     /*
      * Version of setNValue that will allocate space to copy
@@ -401,6 +402,12 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     char *dataPtr = getDataPtr(idx);
     const int32_t columnLength = m_schema->columnLength(idx);
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
+}
+/** Multi column version. */
+inline void TableTuple::setNValue(const int beginIdx, const int endIdx, const voltdb::NValue& value) {
+    for (int idx = beginIdx; idx < endIdx; ++ idx) {
+        setNValue(idx, value);
+    }
 }
 
 /* Copy strictly by value from slimvalue into this tuple */

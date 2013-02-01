@@ -331,6 +331,10 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = output_table->tempTuple();
 
+    // NULL value for outer join
+    NValue nullValue;
+    nullValue.setNull();
+
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while (outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
@@ -531,15 +535,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         // Left Outer Join
         //
         if (!match && join_type == JOIN_TYPE_LEFT) {
-            //
-            // Append NULLs to the end of our join tuple
-            //
-            for (int col_ctr = num_of_outer_cols; col_ctr < join_tuple.sizeInValues(); ++col_ctr)
-            {
-                NValue value = join_tuple.getNValue(col_ctr);
-                value.setNull();
-                join_tuple.setNValue(col_ctr, value);
-            }
+            join_tuple.setNValue(num_of_outer_cols, join_tuple.sizeInValues(), nullValue);
             output_table->insertTupleNonVirtual(join_tuple);
         }
     }

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -89,8 +90,8 @@ public abstract class AbstractParsedStmt {
 
     // @TODO temp solution to carry additional join info
     // So far only two table outer (left/right) join is supported. Capturing just the join type is enough to guarantee the right join order
-    // This would also work when more than two tables are involved but only two of them are joined with outer join 
-    // because of the join order associativity (T1 inner T2) left/right T3 = T1 inner (T2 left/right T3) 
+    // This would also work when more than two tables are involved but only two of them are joined with outer join
+    // because of the join order associativity (T1 inner T2) left/right T3 = T1 inner (T2 left/right T3)
     public HashMap<Table, JoinType> tableJoinList = new HashMap<Table, JoinType>();
 
     //User specified join order, null if none is specified
@@ -217,13 +218,13 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseExpressionTree(VoltXMLElement root) {
         AbstractExpression exprTree = parseExpressionTree(m_paramsById, root);
+        // Columns from USING expression in join are not qualified.
+        // if join is INNER then the column in question can be from any table
+        // participating in join. In case of OUTER join, it must be the outer column
         if (exprTree instanceof TupleValueExpression) {
             TupleValueExpression e = (TupleValueExpression) exprTree;
             if (e.getTableName() == null && e.getColumnName() != null) {
-                // Columns from USING expression in join are not qualified.
-                // if join is INNER then the column in question can be from any table
-                // participating in join. In case of OUTER join, it must be the outer column
-                e.setTableName(getTableForJoinedColumn(e.getColumnName()));
+                e.setTableName(getTableForUsingColumn(e.getColumnName()));
                 root.attributes.put("table", e.getTableName());
             }
         }
@@ -243,23 +244,32 @@ public abstract class AbstractParsedStmt {
         }
         return exprTree;
     }
-    
-    String getTableForJoinedColumn(String columnName) {
-        // Right now it's simple
+
+    /**
+     * Columns from USING expression are unqualified. In case of INNER join, it doesn't matter
+     * we can pick the first table which contains the input column. In case of OUTER joins, we must
+     * the OUTER table - if it's a null-able column the outer join must return them.
+     * @param columnName
+     * @return table name this column belongs to
+     */
+    private String getTableForUsingColumn(String columnName) {
+        // Only one OUTER join for a whole select is supported so far
         JoinType joinType = JoinType.INNER;
         for (Map.Entry<Table, JoinType> entry : tableJoinList.entrySet()) {
             if (entry.getValue() != JoinType.INNER) {
+                assert(joinType == JoinType.INNER);
                 joinType = entry.getValue();
-                break;
             }
         }
-        
+
         for (Map.Entry<Table, JoinType> entry : this.tableJoinList.entrySet()) {
             Table table = entry.getKey();
             JoinType tableJoinType = entry.getValue();
             if (table.getColumns().get(columnName) != null) {
-                if (joinType == JoinType.INNER || 
-                        tableJoinType == JoinType.RIGHT || 
+                // If there are no OUTER joins we can take the first table which has this column
+                // If there is an OUTER join we need to pick the outer table
+                if (joinType == JoinType.INNER ||
+                        tableJoinType == JoinType.RIGHT ||
                         joinType == JoinType.LEFT && tableJoinType == JoinType.INNER) {
                         return table.getTypeName();
                 }
