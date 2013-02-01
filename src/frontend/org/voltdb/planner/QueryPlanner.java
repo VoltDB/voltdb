@@ -101,6 +101,7 @@ public class QueryPlanner {
         assert(catalogDb != null);
         assert(costModel != null);
         assert(catalogDb.getCatalog() == catalogCluster.getCatalog());
+        assert(detMode != null);
 
         m_sql = sql;
         m_stmtName = stmtName;
