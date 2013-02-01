@@ -334,12 +334,13 @@ public class ExpressionColumn extends Expression {
     public boolean resolveColumnReference(RangeVariable rangeVar) {
 
         if (tableName == null) {
-            ExpressionColumn e = rangeVar.getColumnExpression(columnName);
+            Expression e = rangeVar.getColumnExpression(columnName);
 
             if (e != null) {
                 opType   = e.opType;
                 nodes    = e.nodes;
                 dataType = e.dataType;
+
                 return true;
             }
 

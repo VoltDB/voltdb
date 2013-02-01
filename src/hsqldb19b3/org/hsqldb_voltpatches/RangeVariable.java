@@ -224,8 +224,9 @@ final class RangeVariable {
      * @return int index or -1 if not found
      */
     public int findColumn(String columnName) {
+
         if (namedJoinColumnExpressions != null
-                && !namedJoinColumnExpressions.containsKey(columnName)) {
+                && namedJoinColumnExpressions.containsKey(columnName)) {
             return -1;
         }
 
@@ -347,6 +348,7 @@ final class RangeVariable {
                         exprList.remove(i);
                         exprList.add(position, e);
                     }
+
                     e = getColumnExpression(columnName);
 
                     exprList.set(position, e);
