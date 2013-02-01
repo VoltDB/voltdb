@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
@@ -166,6 +167,25 @@ public abstract class AbstractParsedStmt {
      */
     abstract void parse(VoltXMLElement stmtElement);
 
+    void parseTargetColumns(VoltXMLElement columnsNode, Table table, HashMap<Column, AbstractExpression> columns)
+    {
+        for (VoltXMLElement child : columnsNode.children) {
+            assert(child.name.equals("column"));
+
+            String name = child.attributes.get("name");
+            assert(name != null);
+            Column col = table.getColumns().getIgnoreCase(name.trim());
+
+            assert(child.children.size() == 1);
+            VoltXMLElement subChild = child.children.get(0);
+            AbstractExpression expr = parseExpressionTree(subChild);
+            assert(expr != null);
+            expr.refineValueType(VoltType.get((byte)col.getType()));
+            ExpressionUtil.finalizeValueTypes(expr);
+            columns.put(col, expr);
+        }
+    }
+
     /**Parse tables and parameters
      * .
      * @param root
@@ -177,7 +197,6 @@ public abstract class AbstractParsedStmt {
                 this.parseParameters(node);
             }
             if (node.name.equalsIgnoreCase("tablescans")) {
-                String str = node.toString();
                 this.parseTables(node);
             }
             if (node.name.equalsIgnoreCase("scan_columns")) {
@@ -317,7 +336,6 @@ public abstract class AbstractParsedStmt {
     /**
      *
      * @param exprNode
-     * @param attrs
      * @return
      */
     private static AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
@@ -338,7 +356,6 @@ public abstract class AbstractParsedStmt {
      *
      * @param paramsById
      * @param exprNode
-     * @param attrs
      * @return
      */
     private static AbstractExpression parseOperationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
@@ -610,7 +627,7 @@ public abstract class AbstractParsedStmt {
 
     /**
      */
-void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
+    void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
         // This next bit of code identifies which tables get classified how
         HashSet<Table> tableSet = new HashSet<Table>();
         for (AbstractExpression expr : whereList) {
@@ -800,16 +817,9 @@ void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
     }
 
     /** Parse a where clause. This behavior is common to all kinds of statements.
-     *  TODO: It's not clear why ParsedDeleteStmt has its own VERY SIMILAR code to do this in method parseCondition.
-     *  There's a minor difference in how "ANDs" are modeled -- are they multiple condition nodes or
-     *  single condition nodes with multiple children? That distinction may be due to an arbitrary difference
-     *  in the parser's handling of different statements, but even if it's justified, this method could easily
-     *  be extended to handle multiple multi-child conditionNodes.
      */
-    protected void parseConditions(VoltXMLElement conditionNode) {
-        if (conditionNode.children.size() == 0)
-            return;
-
+    protected void parseCondition(VoltXMLElement conditionNode) {
+        assert(conditionNode.children.size() == 1);
         VoltXMLElement exprNode = conditionNode.children.get(0);
         assert(where == null); // Should be non-reentrant -- not overwriting any previous value!
         where = parseExpressionTree(exprNode);

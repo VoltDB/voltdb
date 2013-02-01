@@ -2661,7 +2661,7 @@ public class Table extends TableBase implements SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetTableXML(Session session) throws HSQLParseException
     {
         VoltXMLElement table = new VoltXMLElement("table");
 
@@ -2671,11 +2671,10 @@ public class Table extends TableBase implements SchemaObject {
         // read all the columns
         VoltXMLElement columns = new VoltXMLElement("columns");
         table.children.add(columns);
-        assert(columns != null);
         int[] columnIndices = getColumnMap();
         for (int i : columnIndices) {
             ColumnSchema column = getColumn(i);
-            VoltXMLElement colChild = column.voltGetXML(session);
+            VoltXMLElement colChild = column.voltGetColumnXML(session);
             columns.children.add(colChild);
             assert(colChild != null);
         }
@@ -2683,9 +2682,8 @@ public class Table extends TableBase implements SchemaObject {
         // read all the indexes
         VoltXMLElement indexes = new VoltXMLElement("indexes");
         table.children.add(indexes);
-        assert(indexes != null);
         for (Index index : getIndexes()) {
-            VoltXMLElement indexChild = index.voltGetXML(session);
+            VoltXMLElement indexChild = index.voltGetIndexXML(session);
             indexes.children.add(indexChild);
             assert(indexChild != null);
         }
@@ -2693,9 +2691,8 @@ public class Table extends TableBase implements SchemaObject {
         // read all the constraints
         VoltXMLElement constraints = new VoltXMLElement("constraints");
         table.children.add(constraints);
-        assert(constraints != null);
         for (Constraint constraint : getConstraints()) {
-            VoltXMLElement constraintChild = constraint.voltGetXML(session);
+            VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
             if (constraintChild != null) {
                 constraints.children.add(constraintChild);
             }

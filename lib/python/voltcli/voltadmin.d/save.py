@@ -40,12 +40,12 @@ import urllib
                         default = 'native')
     ),
     arguments = (
-        VOLT.StringArgument('directory', 'the local snapshot directory path'),
+        VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
         VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
     )
 )
 def save(runner):
-    uri   = 'file://%s' % urllib.quote(os.path.realpath(runner.opts.directory))
+    uri = 'file://%s' % urllib.quote(runner.opts.directory)
     nonce = runner.opts.nonce.replace('"', '\\"')
     if runner.opts.blocking:
         blocking = 'true'
