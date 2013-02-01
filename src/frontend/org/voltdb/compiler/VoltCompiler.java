@@ -1548,21 +1548,20 @@ public class VoltCompiler {
 
                 outputStream.println(
                         "\nNON-DETERMINISM WARNING:\n\n" +
-                        "The procedures listed below contain a mix of non-deterministic\n" +
-                        "reads as well as writes. If the output of the reads is used as\n" +
-                        "input to the writes, VoltDB could be forced to stop the cluster\n" +
-                        "to preserve consistency among replicas.\n");
+                        "The procedures listed below contain non-deterministic queries.\n");
 
                 for (Procedure p : nonDetProcs) {
                     outputStream.println("    " + p.getClassname());
                 }
 
                 outputStream.println(
-                        "\nTo avoid this warning, use the output above to determine non-\n" +
-                        "deterministic SQL statements and make them deterministic. If the\n" +
-                        "statement is doing a sequential scan, try adding a non-hash primary\n" +
-                        "key index. If the statement is scanning non-unique tree index, an\n" +
-                        "explicit order-by statement may be required.\n");
+                        "\nUsing the output of these queries as input to subsequent\n" +
+                        "write queries can result in differences between replicated\n" +
+                        "partitions at runtime, forcing VoltDB to shutdown the cluster.\n" +
+                        "Review the compiler messages above to identify the offending\n" +
+                        "SQL statements (marked as \"[NDO] or [NDC]\").  Add a unique\n" +
+                        "index to the schema or an explicit ORDER BY clause to the\n" +
+                        "query to make these queries deterministic.\n");
 
                 outputStream.println("------------------------------------------");
             }
