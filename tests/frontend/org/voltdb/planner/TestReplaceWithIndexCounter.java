@@ -29,7 +29,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 
 public class TestReplaceWithIndexCounter extends PlannerTestCase {
@@ -69,7 +68,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = p.getChild(0);
-        assertTrue(p instanceof SeqScanPlanNode);
+        assertTrue(p instanceof IndexScanPlanNode);
     }
 
     // This is generated as an IndexScan which can't be converted into an index count,
