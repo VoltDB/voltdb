@@ -209,7 +209,15 @@ public:
     }
 
     void setNValue(const int idx, voltdb::NValue value);
-    void setNValue(const int beginIdx, const int endIdx, const voltdb::NValue& value);
+    /*
+     * Copies NValues from one tuple to another for a given range.
+     */
+    void setNValues(const TableTuple &rhs, const int beginIdx, const int endIdx);
+
+    /*
+     * Sets NValue to null for all indexies..
+     */
+    void setNullNValues();
 
     /*
      * Version of setNValue that will allocate space to copy
@@ -404,8 +412,19 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }
 /** Multi column version. */
-inline void TableTuple::setNValue(const int beginIdx, const int endIdx, const voltdb::NValue& value) {
+inline void TableTuple::setNValues(const TableTuple &rhs, const int beginIdx, const int endIdx) {
+    assert(m_schema && rhs.m_schema);
+    assert(m_schema->equals(rhs.m_schema));
+    assert(beginIdx <= endIdx && endIdx <= sizeInValues());
     for (int idx = beginIdx; idx < endIdx; ++ idx) {
+        setNValue(idx, rhs.getNValue(idx));
+    }
+}
+
+inline void TableTuple::setNullNValues() {
+    for (int idx = 0; idx < sizeInValues(); ++ idx) {
+        NValue value = getNValue(idx);
+        value.setNull();
         setNValue(idx, value);
     }
 }

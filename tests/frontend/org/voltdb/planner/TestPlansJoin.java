@@ -58,7 +58,7 @@ public class TestPlansJoin extends TestCase {
         assertTrue(pn.get(0) != null);
         return pn.get(0);
     }
-/*
+
     public void testBasicInnerJoin() {
         // select * with ON clause should return all columns from all tables
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);
@@ -107,29 +107,29 @@ public class TestPlansJoin extends TestCase {
             List<AbstractPlanNode> pnl = aide.compile("select R1.C FROM R1 JOIN R2 USING(C)", 0, false, null);
             fail();
         } catch (PlanningErrorException ex) {
-            System.out.println(ex.getMessage());
+            assertTrue("user lacks privilege or object not found: R1.C".equalsIgnoreCase(ex.getMessage()));
         }
         try {
             List<AbstractPlanNode> pnl = aide.compile("select R2.C FROM R1 JOIN R2 USING(C)", 0, false, null);
             fail();
         } catch (PlanningErrorException ex) {
-            System.out.println(ex.getMessage());
+            assertTrue("user lacks privilege or object not found: R2.C".equalsIgnoreCase(ex.getMessage()));
         }
 
         try {
             List<AbstractPlanNode> pnl = aide.compile("select R2.C FROM R1 JOIN R2 USING(X)", 0, false, null);
             fail();
         } catch (PlanningErrorException ex) {
-            System.out.println(ex.getMessage());
+            assertTrue("user lacks privilege or object not found: X".equalsIgnoreCase(ex.getMessage()));
         }
         try {
             List<AbstractPlanNode> pnl = aide.compile("select R2.C FROM R1 JOIN R2 ON R1.X = R2.X", 0, false, null);
             fail();
         } catch (PlanningErrorException ex) {
-            System.out.println(ex.getMessage());
+            assertTrue("user lacks privilege or object not found: R1.X".equalsIgnoreCase(ex.getMessage()));
         }
     }
-*/
+
     public void testBasicThreeTableInnerJoin() {
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C JOIN R3 ON R3.C = R2.C", 0, false, null);
         AbstractPlanNode n = pn.getChild(0).getChild(0);
@@ -162,7 +162,7 @@ public class TestPlansJoin extends TestCase {
             List<AbstractPlanNode> pnl = aide.compile("select C, R3.C FROM R1 INNER JOIN R2 USING (C) INNER JOIN R3 ON R1.C = R3.C", 0, false, null);
             fail();
         } catch (PlanningErrorException ex) {
-            System.out.println(ex.getMessage());
+            assertTrue("user lacks privilege or object not found: R1.C".equalsIgnoreCase(ex.getMessage()));
         }
 
     }
@@ -246,8 +246,9 @@ public class TestPlansJoin extends TestCase {
 
        // Two Distributed tables join on non-partitioned column
        try {
-           pn = compile("select * FROM P1 JOIN P2 ON P1.C = P2.A", 0, false, null);
+           List<AbstractPlanNode> pnl = aide.compile("select * FROM P1 JOIN P2 ON P1.C = P2.A", 0, false, null);
        } catch (NullPointerException ex) {
+           System.out.println(ex.getMessage());
            fail();
        }
    }
@@ -274,40 +275,40 @@ public class TestPlansJoin extends TestCase {
            List<AbstractPlanNode> pn = aide.compile("select R2.C FROM (R1 JOIN R2 ON R1.C = R2.C) JOIN R3 ON R1.C = R3.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           System.out.println(ex.getMessage());
+           assertTrue("user lacks privilege or object not found: R1.C".equalsIgnoreCase(ex.getMessage()));
        }
        // JOIN with join hierarchy (HSQL limitation)
        try {
            List<AbstractPlanNode> pn = aide.compile("select * FROM R1 JOIN R2 JOIN R3 ON R1.C = R2.C ON R1.C = R3.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           System.out.println(ex.getMessage());
+           assertTrue(ex.getMessage().contains("unexpected token"));
        }
        // FUUL JOIN. Temporary restriction
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 FULL JOIN R2 ON R1.C = R2.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           System.out.println(ex.getMessage());
+           assertTrue("VoltDB does not yet support full outer joins".equalsIgnoreCase(ex.getMessage()));
        }
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 FULL OUTER JOIN R2 ON R1.C = R2.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           System.out.println(ex.getMessage());
+           assertTrue("VoltDB does not yet support full outer joins".equalsIgnoreCase(ex.getMessage()));
        }
        // OUTER JOIN with more then two tables. Temporary restriction
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           System.out.println(ex.getMessage());
+           assertTrue("VoltDB does not yet support outer joins with more than two tables involved".equalsIgnoreCase(ex.getMessage()));
        }
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           System.out.println(ex.getMessage());
+           assertTrue("VoltDB does not yet support outer joins with more than two tables involved".equalsIgnoreCase(ex.getMessage()));
        }
 
        // Self JOIN . Temporary restriction
@@ -315,7 +316,7 @@ public class TestPlansJoin extends TestCase {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           System.out.println(ex.getMessage());
+           assertTrue("VoltDB does not yet support self joins, consider using views instead".equalsIgnoreCase(ex.getMessage()));
        }
    }
 

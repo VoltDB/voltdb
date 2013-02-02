@@ -224,9 +224,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple inner_tuple(node->getInputTables()[1]->schema());
     TableTuple &joined = output_table->tempTuple();
 
-    // NULL value for outer join
-    NValue nullValue;
-    nullValue.setNull();
+    // NULL tuple for outer join
+    TableTuple null_tuple(outer_table->schema());
+    null_tuple.setNullNValues();
 
     TableIterator iterator0 = outer_table->iterator();
     while (iterator0.next(outer_tuple)) {
@@ -256,7 +256,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         // Left Outer Join
         //
         if (!match && join_type == JOIN_TYPE_LEFT) {
-            joined.setNValue(outer_cols, joined.sizeInValues(), nullValue);
+            joined.setNValues(null_tuple, outer_cols, joined.sizeInValues());
             output_table->insertTupleNonVirtual(joined);
         }
     }
