@@ -480,7 +480,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on subquery");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support subqueries") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
             }
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
                     "           FROM STAFF \n" +
@@ -492,7 +492,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on exists clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support EXISTS clause") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
             }
             adHocQuery = "   SELECT STAFF.EMPNAME \n" +
                     "          FROM STAFF \n" +
@@ -509,7 +509,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on subquery");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support subqueries") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
             }
             adHocQuery = "SELECT FIRST1.EMPNUM, SECOND2.EMPNUM \n" +
                     "          FROM STAFF FIRST1, STAFF SECOND2 \n" +
@@ -520,7 +520,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on selfjoin");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support self joins") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support self joins") > 0);
             }
             adHocQuery = "SELECT PNAME \n" +
                     "         FROM PROJ \n" +
@@ -531,7 +531,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on static clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("does not yet support where clauses containing only constants") > 0);
+                assertTrue(pcex.getMessage().indexOf("does not support WHERE clauses containing only constants") > 0);
             }
             adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
             try {
@@ -599,7 +599,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on having clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support the HAVING clause") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support the HAVING clause") > 0);
             }
         }
         finally {
