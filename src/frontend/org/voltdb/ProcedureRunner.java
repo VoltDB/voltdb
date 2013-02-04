@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -767,24 +768,51 @@ public class ProcedureRunner {
             }
         }
 
-        // iterate through the fields and deal with sql statements
-        Map<String, Field> stmtMap = null;
+        Map<String, Field> fieldMap = null;
+        Map<String, SQLStmt> stmtMap = new HashMap<String, SQLStmt>();
         try {
-            stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), true);
+            fieldMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), true);
         } catch (Exception e1) {
             // shouldn't throw anything outside of the compiler
             e1.printStackTrace();
             return;
         }
 
-        Field[] fields = new Field[stmtMap.size()];
-        int index = 0;
-        for (Field f : stmtMap.values()) {
-            fields[index++] = f;
+        // iterate through the fields and deal with for classic reflection
+        for (Field f : fieldMap.values()) {
+            String stmtName = f.getName();
+            SQLStmt stmt = null;
+
+            try {
+                stmt = (SQLStmt) f.get(m_procedure);
+            } catch (IllegalArgumentException e) {
+                e.printStackTrace();
+                continue;
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+                continue;
+            }
+
+            stmtMap.put(stmtName, stmt);
         }
-        for (final Field f : fields) {
-            String name = f.getName();
-            Statement s = m_catProc.getStatements().get(name);
+
+        // augment statements via a secondary method (for clojure)
+        try {
+            Method m = m_procedure.getClass().getMethod("statements", new Class<?>[0]);
+            // only invoke statements if the method exists (for clojure)
+            Map<String, SQLStmt> moreStatements = (Map<String, SQLStmt>) m.invoke(m_procedure);
+            stmtMap.putAll(moreStatements);
+        } catch (Exception e) {
+            // do nothing (catch all)
+            // if anything goes wrong we soft fail, as this is not that important...
+        }
+
+        // iterate thru and deal with sql statements
+        for (Map.Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
+            String stmtName = entry.getKey();
+            SQLStmt stmt = entry.getValue();
+
+            Statement s = m_catProc.getStatements().get(stmtName);
             if (s != null) {
                 try {
                     /*
@@ -792,17 +820,11 @@ public class ProcedureRunner {
                      * procedure locally instead of pulling them from the catalog on
                      * a regular basis.
                      */
-                    SQLStmt stmt = (SQLStmt) f.get(m_procedure);
-
-                    // done in a static method in an abstract class so users don't call it
                     initSQLStmt(stmt, s);
 
                 } catch (IllegalArgumentException e) {
                     e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
                 }
-                //LOG.fine("Found statement " + name);
             }
         }
     }

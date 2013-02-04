@@ -227,9 +227,12 @@ public abstract class ProcedureCompiler {
         String exampleSPstatement = null;
         Object exampleSPvalue = null;
 
-        // iterate through the fields and deal with
-        Map<String, Field> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, true);
-        for (Field f : stmtMap.values()) {
+        Map<String, Field> fieldMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, true);
+        Map<String, SQLStmt> stmtMap = new HashMap<String, SQLStmt>();
+
+        // iterate through the fields and deal with for classic reflection
+        for (Field f : fieldMap.values()) {
+            String stmtName = f.getName();
             SQLStmt stmt = null;
 
             try {
@@ -242,8 +245,27 @@ public abstract class ProcedureCompiler {
                 continue;
             }
 
+            stmtMap.put(stmtName, stmt);
+        }
+
+        // augment statements via a secondary method (for clojure)
+        try {
+            Method m = procClass.getMethod("statements", new Class<?>[0]);
+            // only invoke statements if the method exists (for clojure)
+            Map<String, SQLStmt> moreStatements = (Map<String, SQLStmt>) m.invoke(procInstance);
+            stmtMap.putAll(moreStatements);
+        } catch (Exception e) {
+            // do nothing (catch all)
+            // if anything goes wrong we soft fail, as this is not that important...
+        }
+
+        // add statements to catalog
+        for (Map.Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
+            String stmtName = entry.getKey();
+            SQLStmt stmt = entry.getValue();
+
             // add the statement to the catalog
-            Statement catalogStmt = procedure.getStatements().add(f.getName());
+            Statement catalogStmt = procedure.getStatements().add(stmtName);
 
             // compile the statement
             Object partitionParameter = null;
