@@ -139,6 +139,7 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[4] != null);
             assert(params.toArray()[5] != null);
             assert(params.toArray()[6] != null);
+            assert(params.toArray()[7] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
@@ -162,12 +163,13 @@ public class SnapshotSave extends VoltSystemProcedure
             }
 
             String data = (String) params.toArray()[6];
+            final long timestamp = (Long)params.toArray()[7];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
                                                          context.getLastCommittedSpHandle(),
                                                          Longs.toArray(perPartitionTransactionIdsToKeep),
-                                                         data, context, hostname);
+                                                         data, context, hostname, timestamp);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -473,7 +475,8 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data);
+        params.setParameters(
+                filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data, System.currentTimeMillis());
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files

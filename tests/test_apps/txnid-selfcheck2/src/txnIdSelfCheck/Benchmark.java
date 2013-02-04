@@ -46,6 +46,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcCallException;
@@ -216,6 +217,12 @@ public class Benchmark {
             }
 
             activeConnections.decrementAndGet();
+
+            // reset the connection id so the client will connect to a recovered cluster
+            // this is a bit of a hack
+            if (connectionsLeft == 0) {
+                ((ClientImpl) client).resetInstanceId();
+            }
 
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {

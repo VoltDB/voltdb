@@ -848,7 +848,7 @@ public class ExpressionColumn extends Expression {
             // This eliminates a NullPointerException which MAY be a sign of insufficient type inference,
             // but there MAY be cases where a parameter type can't legitimately be inferred, so let it go.
             if (dataType != null) {
-                exp.attributes.put("type", Types.getTypeName(dataType.typeCode));
+                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
             }
             exp.attributes.put("isparam", "true");
         }

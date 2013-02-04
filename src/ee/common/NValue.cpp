@@ -17,6 +17,7 @@
 
 #include "common/NValue.hpp"
 #include "common/executorcontext.hpp"
+#include "logging/LogManager.h"
 
 #include <cstdio>
 #include <sstream>
@@ -393,3 +394,16 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     }
     return getDecimalValue(retval);
 }
+
+
+namespace voltdb {
+
+int warn_if(int condition, const char* message)
+{
+    if (condition) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN, message);
+    }
+    return condition;
+}
+
+};

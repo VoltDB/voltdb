@@ -41,6 +41,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte FRAGMENT_TASK_LOG_ID = VOLTCORE_MESSAGE_ID_MAX + 15;
     final public static byte IV2_LOG_FAULT_ID = VOLTCORE_MESSAGE_ID_MAX + 16;
     final public static byte IV2_EOL_ID = VOLTCORE_MESSAGE_ID_MAX + 17;
+    final public static byte DUMP = VOLTCORE_MESSAGE_ID_MAX + 18;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -104,6 +105,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case IV2_EOL_ID:
             message = new Iv2EndOfLogMessage();
+            break;
+        case DUMP:
+            message = new DumpMessage();
             break;
         default:
             message = null;

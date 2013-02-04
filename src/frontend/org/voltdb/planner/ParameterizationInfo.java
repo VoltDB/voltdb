@@ -125,8 +125,8 @@ class ParameterizationInfo {
 
                 VoltXMLElement paramIndexNode = new VoltXMLElement("parameter");
                 paramIndexNode.attributes.put("index", String.valueOf(paramIndex));
-                String typeStr = node.attributes.get("type");
-                paramIndexNode.attributes.put("type", typeStr);
+                String typeStr = node.attributes.get("valuetype");
+                paramIndexNode.attributes.put("valuetype", typeStr);
                 paramIndexNode.attributes.put("id", idStr);
                 paramsNode.children.add(paramIndexNode);
 

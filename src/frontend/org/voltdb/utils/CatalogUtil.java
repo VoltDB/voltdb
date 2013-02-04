@@ -113,7 +113,7 @@ public abstract class CatalogUtil {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {2, 0};
+    public static final int[] minCompatibleVersion = {3, 0};
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
@@ -664,8 +664,9 @@ public abstract class CatalogUtil {
         if (pdt != null) {
             sb.append(pdt.isEnabled()).append(",");
             PartitionDetectionType.Snapshot st = pdt.getSnapshot();
-            assert(st != null);
-            sb.append(st.getPrefix()).append(",");
+            if (st != null) {
+                sb.append(st.getPrefix()).append(",");
+            }
         }
 
         sb.append(" SECURITY ");
@@ -939,12 +940,18 @@ public abstract class CatalogUtil {
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
             // copy partition detection configuration from xml to catalog
+            String defaultPPDPrefix = "partition_detection";
             if (deployment.getPartitionDetection() != null) {
                 if (deployment.getPartitionDetection().isEnabled()) {
                     catCluster.setNetworkpartition(true);
                     CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                     SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
+                    if (deployment.getPartitionDetection().getSnapshot() != null) {
+                        sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
+                    }
+                    else {
+                        sched.setPrefix(defaultPPDPrefix);
+                    }
                     if (printLog) {
                         hostLog.info("Detection of network partitions in the cluster is enabled.");
                     }
@@ -962,7 +969,7 @@ public abstract class CatalogUtil {
                     catCluster.setNetworkpartition(true);
                     CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                     SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    sched.setPrefix("partition_detection");
+                    sched.setPrefix(defaultPPDPrefix);
                     if (printLog) {
                         hostLog.info("Detection of network partitions in the cluster is enabled.");
                     }

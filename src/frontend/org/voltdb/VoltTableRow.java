@@ -74,6 +74,7 @@ public abstract class VoltTableRow {
     static final int ROW_HEADER_SIZE = Integer.SIZE/8;
     static final int ROW_COUNT_SIZE = Integer.SIZE/8;
     static final int STRING_LEN_SIZE = Integer.SIZE/8;
+    static final int VARBINARY_LEN_SIZE = Integer.SIZE/8;
     static final int INVALID_ROW_INDEX = -1;
 
     /** Stores the row data (and possibly much more) */
@@ -488,11 +489,24 @@ public abstract class VoltTableRow {
         validateColumnType(columnIndex, VoltType.VARBINARY);
         int pos = m_buffer.position();
         m_buffer.position(getOffset(columnIndex));
+        // Sanity check the varbinary size int position.
+        if (VARBINARY_LEN_SIZE > m_buffer.remaining()) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::getVarbinary: Can't read varbinary size as %d byte integer " +
+                    "from buffer with %d bytes remaining.",
+                    VARBINARY_LEN_SIZE, m_buffer.remaining()));
+        }
         int len = m_buffer.getInt();
         if (len == VoltTable.NULL_STRING_INDICATOR) {
             m_wasNull = true;
             m_buffer.position(pos);
             return null;
+        }
+        // Sanity check the size against the remaining buffer size.
+        if (len > m_buffer.remaining()) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::getVarbinary: Can't read %d byte varbinary " +
+                    "from buffer with %d bytes remaining.", len, m_buffer.remaining()));
         }
         m_wasNull = false;
         byte[] data = new byte[len];
@@ -663,7 +677,8 @@ public abstract class VoltTableRow {
     void putJSONRep(int columnIndex, JSONStringer js) throws JSONException {
         long value; double dvalue;
 
-        switch (getColumnType(columnIndex)) {
+        VoltType columnType = getColumnType(columnIndex);
+        switch (columnType) {
         case TINYINT:
             value = getLong(columnIndex);
             if (value == VoltType.NULL_TINYINT)
@@ -720,6 +735,16 @@ public abstract class VoltTableRow {
             else
                 js.value(dec.toString());
             break;
+        case DECIMAL_STRING:
+            break;
+        case INVALID:
+            break;
+        case NULL:
+            break;
+        case NUMERIC:
+            break;
+        case VOLTTABLE:
+            break;
         }
     }
 
@@ -740,6 +765,14 @@ public abstract class VoltTableRow {
 
     /** Reads a string from a buffer with a specific encoding. */
     final String readString(int position, String encoding) {
+        // Sanity check the string size int position. Note that the eventual
+        // m_buffer.get() does check for underflow, getInt() does not.
+        if (STRING_LEN_SIZE > m_buffer.limit() - position) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::readString: Can't read string size as %d byte integer " +
+                    "from buffer with %d bytes remaining.",
+                    STRING_LEN_SIZE, m_buffer.limit() - position));
+        }
         final int len = m_buffer.getInt(position);
         //System.out.println(len);
 
@@ -749,6 +782,14 @@ public abstract class VoltTableRow {
 
         if (len < 0) {
             throw new RuntimeException("Invalid object length.");
+        }
+
+        // Sanity check the size against the remaining buffer size.
+        if (position + STRING_LEN_SIZE + len > m_buffer.limit()) {
+            throw new RuntimeException(String.format(
+                    "VoltTableRow::readString: Can't read %d byte string " +
+                    "from buffer with %d bytes remaining.",
+                    len, m_buffer.limit() - position - STRING_LEN_SIZE));
         }
 
         // this is a bit slower than directly getting the array (see below)

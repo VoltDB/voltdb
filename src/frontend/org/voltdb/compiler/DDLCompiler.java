@@ -1034,7 +1034,7 @@ public class DDLCompiler {
         assert node.name.equals("column");
 
         String name = node.attributes.get("name");
-        String typename = node.attributes.get("type");
+        String typename = node.attributes.get("valuetype");
         String nullable = node.attributes.get("nullable");
         String sizeString = node.attributes.get("size");
         String defaultvalue = null;
@@ -1050,14 +1050,9 @@ public class DDLCompiler {
                     // Value
                     if (inner_child.name.equals("value")) {
                         defaultvalue = inner_child.attributes.get("value");
-                        defaulttype = inner_child.attributes.get("type");
+                        defaulttype = inner_child.attributes.get("valuetype");
+                        if (defaultvalue != null) break;
                     }
-                    // Function
-                    /*else if (inner_child.name.equals("function")) {
-                        defaultvalue = inner_child.attributes.get("name");
-                        defaulttype = VoltType.VOLTFUNCTION.name();
-                    }*/
-                    if (defaultvalue != null) break;
                 }
             }
         }
@@ -1294,10 +1289,13 @@ public class DDLCompiler {
                 // get ready for replacements from constraints created later
                 indexReplacementMap.put(index.getTypeName(), existingIndex.getTypeName());
 
-                // add a warning but don't fail
-                String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
-                        index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
-                m_compiler.addWarn(msg);
+                // if the index is a user-named index...
+                if (index.getTypeName().startsWith("SYS_IDX_") == false) {
+                    // on dup-detection, add a warning but don't fail
+                    String msg = String.format("Dropping index %s on table %s because it duplicates index %s.",
+                            index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
+                    m_compiler.addWarn(msg);
+                }
 
                 // drop the index and GTFO
                 table.getIndexes().delete(index.getTypeName());
@@ -1337,12 +1335,8 @@ public class DDLCompiler {
         assert node.name.equals("constraint");
 
         String name = node.attributes.get("name");
-        String typeName = node.attributes.get("type");
+        String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
-        if (type == null) {
-            throw m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");
-        }
-
         if (type == ConstraintType.CHECK) {
             String msg = "VoltDB does not enforce check constraints. ";
             msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
@@ -1355,13 +1349,6 @@ public class DDLCompiler {
             m_compiler.addWarn(msg);
             return;
         }
-        else if (type == ConstraintType.PRIMARY_KEY) {
-            // create the unique index below
-            // primary key code is in other places as well
-        }
-        else if (type == ConstraintType.UNIQUE) {
-            // just create the unique index below
-        }
         else if (type == ConstraintType.MAIN) {
             // should never see these
             assert(false);
@@ -1370,45 +1357,38 @@ public class DDLCompiler {
             // these get handled by table metadata inspection
             return;
         }
+        else if (type != ConstraintType.PRIMARY_KEY &&  type != ConstraintType.UNIQUE) {
+            throw m_compiler.new VoltCompilerException("Invalid constraint type '" + typeName + "'");
+        }
+
+        // else, create the unique index below
+        // primary key code is in other places as well
 
         // The constraint is backed by an index, therefore we need to create it
         // TODO: We need to be able to use indexes for foreign keys. I am purposely
         //       leaving those out right now because HSQLDB just makes too many of them.
-        Constraint catalog_const = null;
-        if (node.attributes.get("index") != null) {
-            String indexName = node.attributes.get("index");
+        Constraint catalog_const = table.getConstraints().add(name);
+        String indexName = node.attributes.get("index");
+        assert(indexName != null);
+        // handle replacements from duplicate index pruning
+        if (indexReplacementMap.containsKey(indexName)) {
+            indexName = indexReplacementMap.get(indexName);
+        }
 
-            // handle replacements from duplicate index pruning
-            if (indexReplacementMap.containsKey(indexName)) {
-                indexName = indexReplacementMap.get(indexName);
-            }
+        Index catalog_index = indexMap.get(indexName);
 
-            Index catalog_index = indexMap.get(indexName);
-
+        if (catalog_index != null) {
             // if the constraint name contains index type hints, exercise them (giant hack)
-            if (catalog_index != null) {
-                String constraintNameNoCase = name.toLowerCase();
-                if (constraintNameNoCase.contains("tree"))
-                    catalog_index.setType(IndexType.BALANCED_TREE.getValue());
-                if (constraintNameNoCase.contains("hash"))
-                    catalog_index.setType(IndexType.HASH_TABLE.getValue());
-            }
+            String constraintNameNoCase = name.toLowerCase();
+            if (constraintNameNoCase.contains("tree"))
+                catalog_index.setType(IndexType.BALANCED_TREE.getValue());
+            if (constraintNameNoCase.contains("hash"))
+                catalog_index.setType(IndexType.HASH_TABLE.getValue());
 
-            catalog_const = table.getConstraints().add(name);
-            if (catalog_index != null) {
-                catalog_const.setIndex(catalog_index);
-                catalog_index.setUnique(type == ConstraintType.UNIQUE || type == ConstraintType.PRIMARY_KEY);
-            }
-        } else {
-            catalog_const = table.getConstraints().add(name);
+            catalog_const.setIndex(catalog_index);
+            catalog_index.setUnique(true);
         }
         catalog_const.setType(type.getValue());
-
-        // NO ADDITIONAL WORK
-        // since we only really support unique constraints, setting up a
-        // unique index above is all we need to do to make that work
-
-        return;
     }
 
     /**

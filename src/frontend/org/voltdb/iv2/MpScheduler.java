@@ -24,10 +24,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
+
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -58,6 +60,10 @@ public class MpScheduler extends Scheduler
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+    // We need to lag the current MP execution point by at least two committed TXN ids
+    // since that's the first point we can be sure is safely agreed on by all nodes.
+    // Let the one we can't be sure about linger here.  See ENG-4211 for more.
+    long m_repairLogAwaitingCommit = Long.MIN_VALUE;
 
     MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
     {
@@ -128,6 +134,37 @@ public class MpScheduler extends Scheduler
             }
         };
         m_pendingTasks.repair(repairTask, replicaCopy);
+    }
+
+    /**
+     * Sequence the message for replay if it's for DR.
+     * @return true if the message can be delivered directly to the scheduler,
+     * false if the message was a duplicate
+     */
+    public boolean sequenceForReplay(VoltMessage message)
+    {
+        boolean canDeliver = true;
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            if (dupe != null) {
+                canDeliver = false;
+                // Duplicate initiate task message, send response
+                m_mailbox.send(dupe.getInitiatorHSId(), dupe);
+            }
+            else {
+                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+                canDeliver = true;
+            }
+        }
+        return canDeliver;
     }
 
     @Override
@@ -292,7 +329,11 @@ public class MpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
-                m_repairLogTruncationHandle = message.getTxnId();
+                // Only advance the truncation point on committed transactions.  See ENG-4211
+                if (message.shouldCommit()) {
+                    m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                    m_repairLogAwaitingCommit = message.getTxnId();
+                }
                 m_outstandingTxns.remove(message.getTxnId());
 
                 m_mailbox.send(counter.m_destinationId, message);
@@ -303,9 +344,13 @@ public class MpScheduler extends Scheduler
             // doing duplicate suppresion: all done.
         }
         else {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            m_repairLogTruncationHandle = message.getTxnId();
+            // Only advance the truncation point on committed transactions.
+            if (message.shouldCommit()) {
+                m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                m_repairLogAwaitingCommit = message.getTxnId();
+            }
             m_outstandingTxns.remove(message.getTxnId());
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }

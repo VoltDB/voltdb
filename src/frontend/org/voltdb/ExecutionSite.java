@@ -1798,7 +1798,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       new long[0],//this param not used pre-iv2
                                       null,
                                       m_systemProcedureContext,
-                                      CoreUtils.getHostnameOrAddress());
+                                      CoreUtils.getHostnameOrAddress(),
+                                      TransactionIdManager
+                                          .getTimestampFromTransactionId(snapshotMsg.m_roadblockTransactionId));
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty() &&
                 snapshotMsg.crash) {
                 String msg = "Partition detection snapshot completed. Shutting down. " +
@@ -2914,7 +2916,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public void exportAction(boolean syncAction,
-                             int ackOffset,
+                             long ackOffset,
                              Long sequenceNumber,
                              Integer partitionId,
                              String tableSignature)

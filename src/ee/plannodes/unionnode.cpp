@@ -48,10 +48,16 @@
 #include "unionnode.h"
 #include "common/common.h"
 #include "expressions/abstractexpression.h"
+#include "storage/table.h"
 
 using namespace std;
 
 namespace voltdb {
+
+UnionPlanNode::~UnionPlanNode() {
+    delete getOutputTable();
+    setOutputTable(NULL);
+}
 
 std::string UnionPlanNode::debugInfo(const std::string &spacer) const {
     ostringstream buffer;
