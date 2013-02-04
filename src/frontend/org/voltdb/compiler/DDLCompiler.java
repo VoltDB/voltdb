@@ -1049,9 +1049,10 @@ public class DDLCompiler {
                 for (VoltXMLElement inner_child : child.children) {
                     // Value
                     if (inner_child.name.equals("value")) {
+                        assert(defaulttype == null); // There should be only one default value/type.
                         defaultvalue = inner_child.attributes.get("value");
                         defaulttype = inner_child.attributes.get("valuetype");
-                        if (defaultvalue != null) break;
+                        assert(defaulttype != null);
                     }
                 }
             }
