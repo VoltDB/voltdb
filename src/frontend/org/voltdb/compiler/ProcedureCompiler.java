@@ -50,6 +50,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -73,10 +74,10 @@ public abstract class ProcedureCompiler {
             compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
     }
 
-    public static Map<String, Field> getValidSQLStmts(VoltCompiler compiler, String procName, Class<?> procClass, boolean withPrivate)
+    public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler, String procName, Class<?> procClass, Object procInstance, boolean withPrivate)
             throws VoltCompilerException {
 
-        Map<String, Field> retval = new HashMap<String, Field>();
+        Map<String, SQLStmt> retval = new HashMap<String, SQLStmt>();
 
         Field[] fields = procClass.getDeclaredFields();
         for (Field f : fields) {
@@ -104,13 +105,26 @@ public abstract class ProcedureCompiler {
             }
 
             f.setAccessible(true);
-            retval.put(f.getName(), f);
+
+            SQLStmt stmt = null;
+
+            try {
+                stmt = (SQLStmt) f.get(procInstance);
+            }
+            // this exception handling here comes from other parts of the code
+            // it's weird, but seems rather hard to hit
+            catch (Exception e) {
+                e.printStackTrace();
+                continue;
+            }
+
+            retval.put(f.getName(), stmt);
         }
 
         Class<?> superClass = procClass.getSuperclass();
         if (superClass != null) {
-            Map<String, Field> superStmts = getValidSQLStmts(compiler, procName, superClass, false);
-            for (Entry<String, Field> e : superStmts.entrySet()) {
+            Map<String, SQLStmt> superStmts = getValidSQLStmts(compiler, procName, superClass, procInstance, false);
+            for (Entry<String, SQLStmt> e : superStmts.entrySet()) {
                 if (retval.containsKey(e.getKey()) == false)
                     retval.put(e.getKey(), e.getValue());
             }
@@ -227,23 +241,29 @@ public abstract class ProcedureCompiler {
         String exampleSPstatement = null;
         Object exampleSPvalue = null;
 
-        // iterate through the fields and deal with
-        Map<String, Field> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, true);
-        for (Field f : stmtMap.values()) {
-            SQLStmt stmt = null;
+        // iterate through the fields and get valid sql statements
+        Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
 
-            try {
-                stmt = (SQLStmt) f.get(procInstance);
-            } catch (IllegalArgumentException e) {
-                e.printStackTrace();
-                continue;
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-                continue;
+        // determine if proc is read or read-write by checking if the proc contains any write sql stmts
+        boolean readWrite = false;
+        for (SQLStmt stmt : stmtMap.values()) {
+            QueryType qtype = QueryType.getFromSQL(stmt.getText());
+            if (!qtype.isReadOnly()) {
+                readWrite = true;
+                break;
             }
+        }
+
+        // default to FASTER determinism mode, which may favor non-deterministic plans
+        // but if it's a read-write proc, use a SAFER planning mode wrt determinism.
+        final DeterminismMode detMode = readWrite ? DeterminismMode.SAFER : DeterminismMode.FASTER;
+
+        for (Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
+            String stmtName = entry.getKey();
+            SQLStmt stmt = entry.getValue();
 
             // add the statement to the catalog
-            Statement catalogStmt = procedure.getStatements().add(f.getName());
+            Statement catalogStmt = procedure.getStatements().add(stmtName);
 
             // compile the statement
             Object partitionParameter = null;
@@ -254,7 +274,8 @@ public abstract class ProcedureCompiler {
             }
             PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
             StatementCompiler.compile(compiler, hsql, catalog, db,
-                    estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(), partitioning);
+                    estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
+                    detMode, partitioning);
 
             if (partitioning.wasSpecifiedAsSingle()) {
                 procWantsCommonPartitioning = false; // Don't try to infer what's already been asserted.
@@ -264,7 +285,8 @@ public abstract class ProcedureCompiler {
                 // message that the passed parameter is assumed to be equal to the hard-coded partition key constant (expression).
 
                 // Validate any inferred statement partitioning given the statement's possible usage, until a contradiction is found.
-            } else if (procWantsCommonPartitioning) {
+            }
+            else if (procWantsCommonPartitioning) {
                 // Only consider statements that are capable of running SP with a partitioning parameter that does not seem to
                 // conflict with the partitioning of prior statements.
                 if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
@@ -274,29 +296,34 @@ public abstract class ProcedureCompiler {
                             commonPartitionExpression = statementPartitionExpression;
                             exampleSPstatement = stmt.getText();
                             exampleSPvalue = partitioning.inferredPartitioningValue();
-                        } else if (commonPartitionExpression.equals(statementPartitionExpression) ||
+                        }
+                        else if (commonPartitionExpression.equals(statementPartitionExpression) ||
                                    (statementPartitionExpression instanceof ParameterValueExpression &&
                                     commonPartitionExpression instanceof ParameterValueExpression)) {
                             // Any constant used for partitioning would have to be the same for all statements, but
                             // any statement parameter used for partitioning MIGHT come from the same proc parameter as
                             // any other statement's parameter used for partitioning.
-                        } else {
+                        }
+                        else {
                             procWantsCommonPartitioning = false; // appears to be different partitioning for different statements
                         }
-                    } else {
+                    }
+                    else {
                         // There is a statement with a partitioned table whose partitioning column is
                         // not equality filtered with a constant or param. Abandon all hope.
                         procWantsCommonPartitioning = false;
                     }
 
                 // Usually, replicated-only statements in a mix with others have no effect on the MP/SP decision
-                } else if (partitioning.getCountOfPartitionedTables() == 0) {
+                }
+                else if (partitioning.getCountOfPartitionedTables() == 0) {
                     // but SP is strictly forbidden for DML, to maintain the consistency of the replicated data.
                     if (partitioning.getIsReplicatedTableDML()) {
                         procWantsCommonPartitioning = false;
                     }
 
-                } else {
+                }
+                else {
                     // There is a statement with a partitioned table whose partitioning column is
                     // not equality filtered with a constant or param. Abandon all hope.
                     procWantsCommonPartitioning = false;
@@ -304,8 +331,9 @@ public abstract class ProcedureCompiler {
             }
 
             // if a single stmt is not read only, then the proc is not read only
-            if (catalogStmt.getReadonly() == false)
+            if (catalogStmt.getReadonly() == false) {
                 procHasWriteStmts = true;
+            }
 
             if (catalogStmt.getSeqscancount() > 0) {
                 procHasSeqScans = true;
@@ -519,7 +547,6 @@ public abstract class ProcedureCompiler {
             shortName = parts[parts.length - 1];
         }
 
-
         // add an entry to the catalog (using the full className)
         final Procedure procedure = db.getProcedures().add(shortName);
         for (String groupName : procedureDescriptor.m_authGroups) {
@@ -563,9 +590,10 @@ public abstract class ProcedureCompiler {
             partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
         }
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
+        // default to FASTER detmode because stmt procs can't feed read output into writes
         StatementCompiler.compile(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
-                procedureDescriptor.m_joinOrder, partitioning);
+                procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
         // if the single stmt is not read only, then the proc is not read only
         boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);

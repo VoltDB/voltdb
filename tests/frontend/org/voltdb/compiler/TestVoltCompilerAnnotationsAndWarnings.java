@@ -157,7 +157,7 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertTrue(foundLineMatching(lines, ".*\\[RW].*NondeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[RW].*DeterministicRWProc.*"));
 
-        assertTrue(countLinesMatching(lines, ".*\\[NDC].*NDC=true.*") == 2);
+        assertEquals(1, countLinesMatching(lines, ".*\\[NDC].*NDC=true.*"));
 
         assertFalse(foundLineMatching(lines, ".*\\[NDC].*NDC=false.*"));
 

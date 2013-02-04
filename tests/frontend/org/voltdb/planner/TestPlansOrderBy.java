@@ -61,22 +61,26 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderByTwoAscDesc() {
-        validatePlan("SELECT * from T ORDER BY T_PKEY, T_D1 DESC", false, true, true, false);
+        validatePlan("SELECT * from T ORDER BY T_PKEY, T_D1 DESC", true, false, true, false);
+        validatePlan("SELECT * from Tnokey ORDER BY T_PKEY, T_D1 DESC", false, true, true, false);
     }
 
     public void testOrderByThree() {
-        validatePlan("SELECT * from T ORDER BY T_PKEY, T_D1, T_D2", false, true, true, false);
+        validatePlan("SELECT * from T ORDER BY T_PKEY, T_D1, T_D2", true, false, true, false);
+        validatePlan("SELECT * from Tnokey ORDER BY T_PKEY, T_D1, T_D2", false, true, true, false);
     }
 
     public void testNoOrderBy() {
-        validatePlan("SELECT * FROM T ORDER BY T_D2", false, true, true, false);
+        validatePlan("SELECT * FROM T ORDER BY T_D2", true, false, true, false);
+        validatePlan("SELECT * FROM Tnokey ORDER BY T_D2", false, true, true, false);
     }
 
     //TODO: This test actually validates that we generate a sub-optimal plan for this query
     //-- but we're keeping the test because, well, at least the query compiles to SOME kind of plan?
     //When ENG-4096 is addressed, the validation will be quite different.
     public void testOrderByCountStar() {
-        validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM T GROUP BY T_PKEY ORDER BY FOO", false, true, true, true);
+        validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM T GROUP BY T_PKEY ORDER BY FOO", true, false, true, true);
+        validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM Tnokey GROUP BY T_PKEY ORDER BY FOO", false, true, true, true);
         //Expected ENG-4096 effect:
         //validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM T GROUP BY T_PKEY ORDER BY FOO", true, false, true, false);
     }
