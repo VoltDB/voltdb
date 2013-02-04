@@ -95,8 +95,8 @@ public abstract class AbstractParsedStmt {
     // if this is null, that means ALL the columns get used.
     public HashMap<String, ArrayList<SchemaColumn>> scanColumns = null;
 
-    protected String[] m_paramValues;
-    protected Database m_db;
+    protected final String[] m_paramValues;
+    protected final Database m_db;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
@@ -282,8 +282,8 @@ public abstract class AbstractParsedStmt {
 
     /**
      *
+     * @param paramsById
      * @param exprNode
-     * @param attrs
      * @return
      */
     private static AbstractExpression parseValueExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
@@ -373,10 +373,6 @@ public abstract class AbstractParsedStmt {
             throw new RuntimeException(e.getMessage(), e);
         }
         expr.setExpressionType(exprType);
-
-        // Allow expressions to read expression-specific data from exprNode.
-        // The design fully abstracts other volt classes from the XML serialization,
-        // putting this here instead of in derived Expression implementations.
 
         // get the first (left) node that is an element
         VoltXMLElement leftExprNode = exprNode.children.get(0);
@@ -580,6 +576,10 @@ public abstract class AbstractParsedStmt {
         }
     }
 
+    /**
+     * Populate the statement's paramList from the "parameters" element
+     * @param paramsNode
+     */
     private void parseParameters(VoltXMLElement paramsNode) {
         paramList = new VoltType[paramsNode.children.size()];
 
