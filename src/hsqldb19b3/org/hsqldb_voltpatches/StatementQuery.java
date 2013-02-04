@@ -239,10 +239,6 @@ public class StatementQuery extends StatementDMQL {
         VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
             query.attributes.put("distinct", "true");
-        if (select.isGrouped)
-            query.attributes.put("grouped", "true");
-        if (select.isAggregated)
-            query.attributes.put("aggregated", "true");
 
         // limit
         if ((select.sortAndSlice != null) && (select.sortAndSlice.limitCondition != null)) {
@@ -399,16 +395,13 @@ public class StatementQuery extends StatementDMQL {
                 groupByCols.add(expr);
             } else if (expr.opType == OpTypes.ORDER_BY) {
                 orderByCols.add(expr);
-            } else if (expr.opType == OpTypes.SIMPLE_COLUMN && expr.isAggregate && expr.alias != null) {
+            } else if ((expr.opType != OpTypes.SIMPLE_COLUMN) || (expr.isAggregate && expr.alias != null)) {
                 // Add aggregate aliases to the display columns to maintain
                 // the output schema column ordering.
                 displayCols.add(expr);
-            } else if (expr.opType == OpTypes.SIMPLE_COLUMN) {
-                // Other simple columns are ignored. If others exist, maybe
-                // volt infers a display column from another column collection?
-            } else {
-                displayCols.add(expr);
             }
+            // else, other simple columns are ignored. If others exist, maybe
+            // volt infers a display column from another column collection?
         }
 
         for (Pair<Integer, SimpleName> alias : aliases) {
@@ -477,7 +470,7 @@ public class StatementQuery extends StatementDMQL {
         assert(scans != null);
 
         for (RangeVariable rangeVariable : rangeVariables)
-            scans.children.add(rangeVariable.voltGetXML(session));
+            scans.children.add(rangeVariable.voltGetRangeVariableXML(session));
 
         Expression cond = null;
         // conditions

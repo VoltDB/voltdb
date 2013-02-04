@@ -55,10 +55,11 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         tableList.add(table);
 
         for (VoltXMLElement child : stmtNode.children) {
-            if (child.name.equalsIgnoreCase("columns"))
+            if (child.name.equalsIgnoreCase("columns")) {
                 parseTargetColumns(child, table, columns);
-            else if (child.name.equalsIgnoreCase("condition"))
+            } else if (child.name.equalsIgnoreCase("condition")) {
                 parseCondition(child);
+            }
         }
     }
 
