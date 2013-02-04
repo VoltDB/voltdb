@@ -149,8 +149,8 @@ public class TestDeterminism extends PlannerTestCase {
         // non-prefix keys don't help
         assertPlanDeterminism("select b, c from ttree;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
         // if a table has a unique index... it can be used to scan in a r/w transaction
-        assertPlanDeterminism("select a from tunique;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select a from tpk;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        assertPlanDeterminism("select a from tunique;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select a from tpk;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
         assertPlanDeterminism("select a from tunique;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
         assertPlanDeterminism("select a from tpk;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
         // hashes don't help, here

@@ -21,6 +21,8 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
+
 /**
  *
  */
@@ -78,28 +80,26 @@ public enum QueryType {
      * @return Type of query
      */
     public static QueryType getFromSQL(String stmt) {
-        // Cleanup whitespace newlines for catalog compatibility
-        // and to make statement parsing easier.
-        stmt = stmt.replaceAll("\n", " ");
-        stmt = stmt.trim();
+        // trim the front whitespace, substring to the first word and normalize
+        stmt = StringUtils.stripStart(stmt, null).substring(0, 6).toLowerCase();
 
         // determine the type of the query
-        if (stmt.toLowerCase().startsWith("insert")) {
+        if (stmt.startsWith("insert")) {
             return QueryType.INSERT;
         }
-        else if (stmt.toLowerCase().startsWith("update")) {
+        else if (stmt.startsWith("update")) {
             return QueryType.UPDATE;
         }
-        else if (stmt.toLowerCase().startsWith("delete")) {
+        else if (stmt.startsWith("delete")) {
             return QueryType.DELETE;
         }
-        else if (stmt.toLowerCase().startsWith("select")) {
+        else if (stmt.startsWith("select")) {
             // This covers simple select statements as well as UNIONs and other set operations that are being used with default precedence
             // as in "select ... from ... UNION select ... from ...;"
             // Even if set operations are not currently supported, let them pass as "select" statements to let the parser sort them out.
             return QueryType.SELECT;
         }
-        else if (stmt.toLowerCase().startsWith("(")) {
+        else if (stmt.startsWith("(")) {
             // There does not seem to be a need to support parenthesized DML statements, so assume a read-only statement.
             // If that assumption is wrong, then it has probably gotten to the point that we want to drop this up-front
             // logic in favor of relying on the full parser/planner to determine the cataloged query type and read-only-ness.
@@ -120,6 +120,6 @@ public enum QueryType {
     }
 
     public boolean isReadOnly() {
-        return (this == SELECT) || (this == NOOP);
+        return (this == SELECT) || (this == NOOP) || (this == INVALID);
     }
 }

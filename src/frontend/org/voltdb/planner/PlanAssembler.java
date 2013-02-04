@@ -301,7 +301,7 @@ public class PlanAssembler {
      * @param parsedStmt Current SQL statement to generate plan for
      * @return The best cost plan or null.
      */
-    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt, Database db) {
+    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
 
         // set up the plan assembler for this statement
         setupForNewPlans(parsedStmt);
@@ -325,7 +325,7 @@ public class PlanAssembler {
             if (rawplan == null)
                 break;
             // Update the best cost plan so far
-            m_planSelector.considerCandidatePlan(rawplan, db);
+            m_planSelector.considerCandidatePlan(rawplan);
         }
         return m_planSelector.m_bestPlan;
     }
@@ -439,7 +439,7 @@ public class PlanAssembler {
             processor.m_planId = planId;
             PlanAssembler assembler = new PlanAssembler(
                     m_catalogCluster, m_catalogDb, partitioning, processor);
-            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt, m_catalogDb);
+            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
             // make sure we got a winner
             if (bestChildPlan == null) {
                 if (m_recentErrorMsg == null) {

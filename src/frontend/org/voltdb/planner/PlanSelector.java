@@ -145,10 +145,10 @@ public class PlanSelector implements Cloneable {
     /** Picks the best cost plan for a given raw plan
      * @param rawplan
      */
-   public void considerCandidatePlan(CompiledPlan rawplan, Database db) {
+   public void considerCandidatePlan(CompiledPlan rawplan) {
 
         // run the set of microptimizations, which may return many plans (or not)
-        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, db, m_detMode);
+        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, m_db, m_detMode);
 
         // iterate through the subset of plans
         for (CompiledPlan plan : optimizedPlans) {

@@ -46,6 +46,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
+/**
+ * Used for manually testing ENG-4009 performance impact.
+ * Eventually this kind of test should be part of a broader performance tracking framework.
+ */
 public class ScanPerfTest extends TestCase {
 
     public static class ScanTable extends VoltProcedure {

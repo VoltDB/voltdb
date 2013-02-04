@@ -184,10 +184,6 @@ public abstract class ProcedureCompiler {
         procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(true);
 
-        // default to FASTER determinism mode, which may favor non-deterministic plans
-        // override this later if the situation merits it
-        DeterminismMode detMode = DeterminismMode.FASTER;
-
         // get the annotation
         // first try to get one that has been passed from the compiler
         ProcInfoData info = compiler.getProcInfoOverride(shortName);
@@ -245,22 +241,22 @@ public abstract class ProcedureCompiler {
         String exampleSPstatement = null;
         Object exampleSPvalue = null;
 
-        // iterate through the fields and deal with
+        // iterate through the fields and get valid sql statements
         Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
 
         // determine if proc is read or read-write by checking if the proc contains any write sql stmts
-        boolean readOnly = true;
+        boolean readWrite = false;
         for (SQLStmt stmt : stmtMap.values()) {
             QueryType qtype = QueryType.getFromSQL(stmt.getText());
-            if (qtype.isReadOnly() == false) {
-                readOnly = false;
+            if (!qtype.isReadOnly()) {
+                readWrite = true;
+                break;
             }
         }
 
-        // if it's a read-only proc, use a safer planning mode wrt determinism.
-        if (readOnly == false) {
-            detMode = DeterminismMode.SAFER;
-        }
+        // default to FASTER determinism mode, which may favor non-deterministic plans
+        // but if it's a read-write proc, use a SAFER planning mode wrt determinism.
+        final DeterminismMode detMode = readWrite ? DeterminismMode.SAFER : DeterminismMode.FASTER;
 
         for (Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
             String stmtName = entry.getKey();

@@ -295,7 +295,7 @@ public class QueryPlanner {
         // to keep track of the best plan
         PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
-        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, m_db);
+        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 
         // make sure we got a winner
         if (bestPlan == null) {

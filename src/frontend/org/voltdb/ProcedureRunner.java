@@ -780,20 +780,15 @@ public class ProcedureRunner {
             String name = entry.getKey();
             Statement s = m_catProc.getStatements().get(name);
             if (s != null) {
-                try {
-                    /*
-                     * Cache all the information we need about the statements in this stored
-                     * procedure locally instead of pulling them from the catalog on
-                     * a regular basis.
-                     */
-                    SQLStmt stmt = entry.getValue();
+                /*
+                 * Cache all the information we need about the statements in this stored
+                 * procedure locally instead of pulling them from the catalog on
+                 * a regular basis.
+                 */
+                SQLStmt stmt = entry.getValue();
 
-                    // done in a static method in an abstract class so users don't call it
-                    initSQLStmt(stmt, s);
-                }
-                catch (Exception e) {
-                    e.printStackTrace();
-                }
+                // done in a static method in an abstract class so users don't call it
+                initSQLStmt(stmt, s);
                 //LOG.fine("Found statement " + name);
             }
         }

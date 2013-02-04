@@ -66,8 +66,9 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
         ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
 
-        for (int i = 0; i < plan.getChildCount(); i++)
+        for (int i = 0; i < plan.getChildCount(); i++) {
             children.add(plan.getChild(i));
+        }
 
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
@@ -80,12 +81,13 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
             plan.addAndLinkChild(newChild);
         }
 
-        // check for an aggregation of the right form
+        // skip the meat if this isn't a scan node
         if ((plan instanceof SeqScanPlanNode) == false) {
             return plan;
         }
         assert(plan.getChildCount() == 0);
 
+        // got here? we're got ourselves a sequential scan
         SeqScanPlanNode scanNode = (SeqScanPlanNode) plan;
 
         String tableName = scanNode.getTargetTableName();
@@ -94,6 +96,10 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
         Index indexToScan = null;
 
+        // Pick the narrowest index from all of the unique tree indexes.
+        // note: This is not the same as picking the narrowest key in c++,
+        // which is probably what you want if it turns out this optimization
+        // does anything for performance at all.
         for (Index index : table.getIndexes()) {
             // skip non-unique indexes
             if (index.getUnique() == false) {
@@ -104,8 +110,14 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
                 continue;
             }
             else {
-                indexToScan = index;
-                break;
+                if (indexToScan == null) {
+                    indexToScan = index;
+                }
+                else {
+                    if (indexToScan.getColumns().size() > index.getColumns().size()) {
+                        indexToScan = index;
+                    }
+                }
             }
         }
 
@@ -113,11 +125,11 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
             return plan;
         }
 
+        // make an index node from the scan node
         IndexScanPlanNode indexScanNode = new IndexScanPlanNode();
         indexScanNode.setTargetTableName(scanNode.getTargetTableName());
         indexScanNode.setTargetTableAlias(scanNode.getTargetTableAlias());
         indexScanNode.setEndExpression(null);
-        //SchemaColumn
         indexScanNode.setScanColumns(new ArrayList<SchemaColumn>());
         indexScanNode.setCatalogIndex(indexToScan);
         indexScanNode.setKeyIterate(true);

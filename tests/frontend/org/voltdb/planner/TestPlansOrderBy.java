@@ -83,7 +83,6 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM Tnokey GROUP BY T_PKEY ORDER BY FOO", false, true, true, true);
         //Expected ENG-4096 effect:
         //validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM T GROUP BY T_PKEY ORDER BY FOO", true, false, true, false);
-        //validatePlan("SELECT T_PKEY, COUNT(*) AS FOO FROM Tnokey GROUP BY T_PKEY ORDER BY FOO", true, false, true, false);
     }
 
     public void testEng450()
