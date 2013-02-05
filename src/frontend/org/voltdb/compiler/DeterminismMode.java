@@ -15,19 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner.microoptimizations;
+package org.voltdb.compiler;
 
-import java.util.List;
-
-import org.voltdb.catalog.Database;
-import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.planner.CompiledPlan;
-
-public abstract class MicroOptimization {
-
-    boolean shouldRun(DeterminismMode detMode) {
-        return true;
-    }
-
-    public abstract List<CompiledPlan> apply(CompiledPlan plan, Database db);
+public enum DeterminismMode {
+    FASTER, // Pick the fastest plan without regard for determinism
+    SAFER   // Pick a fast plan that is more likely to be deterministic
+            //  In practice, this means avoiding table scans, but could
+            //  still fail on non-unique indexes
+    //SAFE  // Not yet added, but could add an order-by all over the place
+            //  if that made sense.
 }
