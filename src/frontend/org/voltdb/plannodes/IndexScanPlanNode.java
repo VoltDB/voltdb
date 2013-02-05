@@ -320,10 +320,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             keyWidth -= 0.5;
         }
 
-        // estimate cost of scan (AND each projection and sort thereafter)
+        // Estimate the cost of the scan (AND each projection and sort thereafter).
+        // This "tuplesToRead" is not strictly speaking an expected count of tuples.
+        // Its multiple uses are explained below.
         int tuplesToRead = 0;
 
-        // minor priorities for index types (tiebreakers)
+        // Assign minor priorities for different index types (tiebreakers).
         if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue())
             tuplesToRead = 2;
         else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
@@ -331,29 +333,40 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             tuplesToRead = 3;
         assert(tuplesToRead > 0);
 
-        // if not a unique, covering index, pick the choice with the most columns
+        // If not a unique, covering index, favor (discount) the choice with the most columns pre-filteredby the index.
         if (!m_catalogIndex.getUnique() || (colCount > keyWidth)) {
-            // Cost starts with an 80% discount off of a comparable seqscan
-            // AND gets reduced further by 80% for each fully covered column.
-            // One main intent is for a single range-covered (i.e. half-covered) column
-            // to cost less than 50% of a "for ordering purposes only" index scan.
-            // At 80% off per FULLY covered column -- it now gets discounted by ~55% for a single-column range scan.
-            // The target of 50% is to anticipate and completely compensate for the disadvantage of the
-            // up to 2X overhead imposed by an "order by" node which would now be required.
-            tuplesToRead += (int) (tableEstimates.maxTuples * Math.pow(0.20, (1.0 + keyWidth)));
-            // Yet, make sure that any non-"covering unique" index scan costs more than
-            // any covering unique one, no matter how many indexed column filters get piled on.
+            // Cost starts at 90% of a comparable seqscan
+            // AND gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
+            // One intentional benchmark is for a single range-covered (i.e. half-covered, keyWidth == 0.5) column
+            // to have less than 1/3 the cost of a "for ordering purposes only" index scan (keyWidth == 0).
+            // This is to completely compensate for the up to 3X final cost resulting from
+            // the "order by" and non-inlined "projection" nodes that must be added later to the
+            // inconveniently ordered scan result.
+            // Using a factor of 0.1 per FULLY covered (equality-filtered) column, the effective scale factor for
+            // a single PARTIALLY covered (range-filtered) comes to SQRT(0.1) which is just under 32% FTW!
+            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
+
+            // With all this discounting, make sure that any non-"covering unique" index scan costs more than
+            // any "covering unique" one, no matter how many indexed column filters get piled on.
+            // It's theoretically possible to be wrong here -- that a not-strictly-unique combination of
+            // indexed column filters statistically selects fewer (fractional) rows per scan than a unique index,
+            // but we favor the unique index anyway because:
+            // -- the "unique" declaration guarantees a worse-case upper limit of 1 row per scan.
+            // -- the per-indexed-column selectivity factors used above are highly fictionalized -- actual cardinality
+            //    for individual components of compound indexes MIGHT be very low,
+            //    making them much less selective than estimated.
             if (tuplesToRead < 4) {
-                tuplesToRead = 4;
+                tuplesToRead = 4; // i.e. costing 1 unit more than a covered unique btree.
             }
         }
 
         stats.incrementStatistic(0, StatsField.TUPLES_READ, tuplesToRead);
         // This tuplesToRead value estimates the number of base table tuples fetched from the index scan.
         // It's a vague measure of the cost of the scan whose accuracy depends a lot on what kind of
-        // post-filtering or projection needs to happen.
-        // The tuplesRead value is also used here to estimate the number of RESULT rows, regardless of
-        // how effective post-filtering might be -- as if all rows found in the index passed any post-filters.
+        // post-filtering needs to happen.
+        // The tuplesRead value is also used here to estimate the number of RESULT rows.
+        // This valus is estimated without regard to any post-filtering effect there might be
+        // -- as if all rows found in the index passed any additional post-filter conditions.
         // This ignoring of post-filter effects is at least consistent with the processing in SeqScanPlanNode.
         // In effect, it gives index scans an "unfair" advantage -- follow-on sorts (etc.) are costed lower
         // as if they are operating on fewer rows than would have come out of the seqscan, though that's nonsense.
