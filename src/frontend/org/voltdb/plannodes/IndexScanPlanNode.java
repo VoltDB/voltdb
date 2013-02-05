@@ -319,6 +319,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (keyWidth > 0.0 && m_lookupType != IndexLookupType.EQ) {
             keyWidth -= 0.5;
         }
+        // When there is no start key, count an end-key as a single-column range scan key.
+        else if (keyWidth == 0.0 && m_endExpression != null) {
+            keyWidth = 0.5;
+        }
+
 
         // Estimate the cost of the scan (AND each projection and sort thereafter).
         // This "tuplesToRead" is not strictly speaking an expected count of tuples.
@@ -326,11 +331,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         int tuplesToRead = 0;
 
         // Assign minor priorities for different index types (tiebreakers).
-        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue())
+        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
             tuplesToRead = 2;
+        }
         else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
-            (m_catalogIndex.getType() == IndexType.BTREE.getValue()))
+                 (m_catalogIndex.getType() == IndexType.BTREE.getValue())) {
             tuplesToRead = 3;
+        }
         assert(tuplesToRead > 0);
 
         // If not a unique, covering index, favor (discount) the choice with the most columns pre-filteredby the index.
@@ -427,6 +434,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         int indexSize = m_catalogIndex.getColumns().size();
         int keySize = m_searchkeyExpressions.size();
+
+        // When there is no start key, count an end-key as a single-column range scan key.
+        if (keySize == 0 && m_endExpression != null) {
+            keySize = 1;
+        }
 
         String scanType = "unique-scan";
         if (m_lookupType != IndexLookupType.EQ)
