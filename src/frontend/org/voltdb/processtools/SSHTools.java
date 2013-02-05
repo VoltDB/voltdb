@@ -68,6 +68,10 @@ public class SSHTools {
         return cmdSSH(user, key, host, stringify(command));
     }
 
+    public SFTPSession getSftpSession(String hostname, VoltLogger logger) {
+        return new SFTPSession(m_username, m_keyFile, hostname, logger);
+    }
+
     /*
      * The code from here to the end of the file is code that integrates with an external
      * SSH library (JSCH, http://www.jcraft.com/jsch/).  If you wish to replaces this

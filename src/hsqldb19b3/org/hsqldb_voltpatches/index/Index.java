@@ -278,7 +278,7 @@ public interface Index extends SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    public VoltXMLElement voltGetXML(Session session) throws HSQLParseException;
+    public VoltXMLElement voltGetIndexXML(Session session) throws HSQLParseException;
 
     /**
      * VoltDB added method to get a list of indexed expressions that contain one or more non-columns.

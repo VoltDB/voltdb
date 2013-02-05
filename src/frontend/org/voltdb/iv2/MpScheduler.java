@@ -24,10 +24,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
+
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -132,6 +134,37 @@ public class MpScheduler extends Scheduler
             }
         };
         m_pendingTasks.repair(repairTask, replicaCopy);
+    }
+
+    /**
+     * Sequence the message for replay if it's for DR.
+     * @return true if the message can be delivered directly to the scheduler,
+     * false if the message was a duplicate
+     */
+    public boolean sequenceForReplay(VoltMessage message)
+    {
+        boolean canDeliver = true;
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            if (dupe != null) {
+                canDeliver = false;
+                // Duplicate initiate task message, send response
+                m_mailbox.send(dupe.getInitiatorHSId(), dupe);
+            }
+            else {
+                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+                canDeliver = true;
+            }
+        }
+        return canDeliver;
     }
 
     @Override
