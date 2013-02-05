@@ -20,15 +20,16 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 
-public class PushdownLimitsIntoScans implements MicroOptimization {
+public class PushdownLimitsIntoScans extends MicroOptimization {
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan) {
+    public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
         AbstractPlanNode planGraph = plan.rootPlanGraph;

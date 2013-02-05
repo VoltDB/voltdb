@@ -23,6 +23,8 @@
 
 package org.voltdb.planner;
 
+import org.voltdb.compiler.DeterminismMode;
+
 public class TestDeterminism extends PlannerTestCase {
 
     @Override
@@ -44,20 +46,28 @@ public class TestDeterminism extends PlannerTestCase {
      */
     private void assertPlanDeterminism(String sql, boolean order, boolean content)
     {
-        CompiledPlan cp = compileAdHocPlan(sql);
+        assertPlanDeterminism(sql, order, content, DeterminismMode.SAFER);
+    }
+
+    private void assertPlanDeterminism(String sql, boolean order, boolean content, DeterminismMode detMode)
+    {
+        CompiledPlan cp = compileAdHocPlan(sql, detMode);
         assertTrue(order == cp.isOrderDeterministic());
         assertTrue(content == cp.isContentDeterministic());
         assertTrue(cp.isContentDeterministic() || ! cp.isOrderDeterministic());
         assertTrue(cp.isOrderDeterministic() || (null != cp.nondeterminismDetail()));
     }
 
-    private void assertPlanDeterminism(String sql, boolean order, boolean content, boolean alsoTryWithLimit) {
-        assertPlanDeterminism(sql, order, content);
+    private void assertPlanDeterminism(String sql, boolean order, boolean content, boolean alsoTryWithLimit, DeterminismMode detMode) {
+        assertPlanDeterminism(sql, order, content, detMode);
         if (alsoTryWithLimit) {
             String limitedStatement = sql.replaceAll(";", " LIMIT 2;");
-            assertPlanDeterminism(limitedStatement, order, order);
+            assertPlanDeterminism(limitedStatement, order, order, detMode);
         }
+    }
 
+    private void assertPlanDeterminism(String sql, boolean order, boolean content, boolean alsoTryWithLimit) {
+        assertPlanDeterminism(sql, order, content, alsoTryWithLimit, DeterminismMode.SAFER);
     }
 
     // TODO: Replace w/ true when/if indexscan is forced, and forced to order results.
@@ -73,8 +83,11 @@ public class TestDeterminism extends PlannerTestCase {
     // TODO replace references to these with opposite constants as cases get support
     public void testDeterminismOfSelectStar() {
         assertPlanDeterminism("select * from ttree;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select * from tunique;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select * from tpk;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // if a table has a unique index... it can be used to scan in a r/w transaction
+        assertPlanDeterminism("select * from tunique;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select * from tpk;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select * from tunique;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
+        assertPlanDeterminism("select * from tpk;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
     }
 
     public void testDeterminismOfJoin() {
@@ -135,8 +148,11 @@ public class TestDeterminism extends PlannerTestCase {
         assertPlanDeterminism("select a, b, c from ttree;", LATER_TO_BE_ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
         // non-prefix keys don't help
         assertPlanDeterminism("select b, c from ttree;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select a from tunique;", LATER_TO_BE_ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select a from tpk;", LATER_TO_BE_ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // if a table has a unique index... it can be used to scan in a r/w transaction
+        assertPlanDeterminism("select a from tunique;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select a from tpk;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select a from tunique;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
+        assertPlanDeterminism("select a from tpk;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
         // hashes don't help, here
         assertPlanDeterminism("select a, b from thash;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
         assertPlanDeterminism("select a, b, c from thash;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
