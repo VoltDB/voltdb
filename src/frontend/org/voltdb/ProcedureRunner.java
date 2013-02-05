@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -32,6 +31,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
@@ -694,10 +694,9 @@ public class ProcedureRunner {
         // fill in the sql for single statement procs
         if (m_catProc.getHasjava() == false) {
             try {
-                Map<String, Field> stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), true);
-                Field f = stmtMap.get(VoltDB.ANON_STMT_NAME);
-                assert(f != null);
-                SQLStmt stmt = (SQLStmt) f.get(m_procedure);
+                Map<String, SQLStmt> stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
+                SQLStmt stmt = stmtMap.get(VoltDB.ANON_STMT_NAME);
+                assert(stmt != null);
                 Statement statement = m_catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
                 stmt.sqlText = statement.getSqltext().getBytes(VoltDB.UTF8ENCODING);
                 m_cachedSingleStmt.stmt = stmt;
@@ -768,40 +767,28 @@ public class ProcedureRunner {
         }
 
         // iterate through the fields and deal with sql statements
-        Map<String, Field> stmtMap = null;
+        Map<String, SQLStmt> stmtMap = null;
         try {
-            stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), true);
+            stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
         } catch (Exception e1) {
             // shouldn't throw anything outside of the compiler
             e1.printStackTrace();
             return;
         }
 
-        Field[] fields = new Field[stmtMap.size()];
-        int index = 0;
-        for (Field f : stmtMap.values()) {
-            fields[index++] = f;
-        }
-        for (final Field f : fields) {
-            String name = f.getName();
+        for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
+            String name = entry.getKey();
             Statement s = m_catProc.getStatements().get(name);
             if (s != null) {
-                try {
-                    /*
-                     * Cache all the information we need about the statements in this stored
-                     * procedure locally instead of pulling them from the catalog on
-                     * a regular basis.
-                     */
-                    SQLStmt stmt = (SQLStmt) f.get(m_procedure);
+                /*
+                 * Cache all the information we need about the statements in this stored
+                 * procedure locally instead of pulling them from the catalog on
+                 * a regular basis.
+                 */
+                SQLStmt stmt = entry.getValue();
 
-                    // done in a static method in an abstract class so users don't call it
-                    initSQLStmt(stmt, s);
-
-                } catch (IllegalArgumentException e) {
-                    e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                }
+                // done in a static method in an abstract class so users don't call it
+                initSQLStmt(stmt, s);
                 //LOG.fine("Found statement " + name);
             }
         }
