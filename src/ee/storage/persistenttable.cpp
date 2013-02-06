@@ -51,7 +51,6 @@
 #include "storage/persistenttable.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
-#include "common/ExecutorContext.hpp"
 #include "common/FailureInjection.h"
 #include "common/tabletuple.h"
 #include "common/UndoQuantum.h"
