@@ -294,7 +294,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
         // HOW WE COST INDEXES
         // unique, covering index always wins
@@ -302,7 +302,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // count non-equality scans as -0.5 coverage
         // prefer array to hash to tree, all else being equal
 
-        // FYI: Index scores should range between 1 and 48898 (I think)
+        // FYI: Index scores should range between 2 and 800003 (I think)
 
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
         assert(target != null);
@@ -310,45 +310,78 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stats.incrementStatistic(0, StatsField.TREE_INDEX_LEVELS_TRAVERSED, (long)(Math.log(tableEstimates.maxTuples)));
 
         // get the width of the index and number of columns used
-        int colCount = m_catalogIndex.getColumns().size();
-        int keyWidth = m_searchkeyExpressions.size();
+        // need doubles for math
+        double colCount = m_catalogIndex.getColumns().size();
+        double keyWidth = m_searchkeyExpressions.size();
         assert(keyWidth <= colCount);
 
-        // need a double for math
-        double keyWidthFl = keyWidth;
-        // count a scan as a half cover
-        if (m_lookupType != IndexLookupType.EQ)
-            keyWidthFl -= 0.5;
-        // when choosing between multiple matched indexes with 10 or more columns,
-        // we won't always pick the optimal one.
-        // if you hit this, you're probably in a silly use case
-        final double MAX_INTERESTING_INDEX_WIDTH = 10.0;
-        if (keyWidthFl > MAX_INTERESTING_INDEX_WIDTH)
-            keyWidthFl = MAX_INTERESTING_INDEX_WIDTH;
+        // count a range scan as a half covered column
+        if (keyWidth > 0.0 && m_lookupType != IndexLookupType.EQ) {
+            keyWidth -= 0.5;
+        }
+        // When there is no start key, count an end-key as a single-column range scan key.
+        else if (keyWidth == 0.0 && m_endExpression != null) {
+            keyWidth = 0.5;
+        }
 
-        // estimate cost of scan
+
+        // Estimate the cost of the scan (AND each projection and sort thereafter).
+        // This "tuplesToRead" is not strictly speaking an expected count of tuples.
+        // Its multiple uses are explained below.
         int tuplesToRead = 0;
 
-        // minor priorities for index types (tiebreakers)
-        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue())
+        // Assign minor priorities for different index types (tiebreakers).
+        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
             tuplesToRead = 2;
-        if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
-            (m_catalogIndex.getType() == IndexType.BTREE.getValue()))
+        }
+        else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
+                 (m_catalogIndex.getType() == IndexType.BTREE.getValue())) {
             tuplesToRead = 3;
+        }
         assert(tuplesToRead > 0);
 
-        // if not a unique, covering index, pick the choice with the most columns
-        if (!m_catalogIndex.getUnique() || (colCount != keyWidth)) {
-            assert(keyWidthFl <= MAX_INTERESTING_INDEX_WIDTH);
-            // cost starts at 100 and goes down by 10 for each column used
-            final double MAX_TUPLES_READ = MAX_INTERESTING_INDEX_WIDTH * 10.0;
-            tuplesToRead += (int) (10.0 * (MAX_TUPLES_READ - keyWidthFl));
+        // If not a unique, covering index, favor (discount) the choice with the most columns pre-filteredby the index.
+        if (!m_catalogIndex.getUnique() || (colCount > keyWidth)) {
+            // Cost starts at 90% of a comparable seqscan
+            // AND gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
+            // One intentional benchmark is for a single range-covered (i.e. half-covered, keyWidth == 0.5) column
+            // to have less than 1/3 the cost of a "for ordering purposes only" index scan (keyWidth == 0).
+            // This is to completely compensate for the up to 3X final cost resulting from
+            // the "order by" and non-inlined "projection" nodes that must be added later to the
+            // inconveniently ordered scan result.
+            // Using a factor of 0.1 per FULLY covered (equality-filtered) column, the effective scale factor for
+            // a single PARTIALLY covered (range-filtered) comes to SQRT(0.1) which is just under 32% FTW!
+            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
+
+            // With all this discounting, make sure that any non-"covering unique" index scan costs more than
+            // any "covering unique" one, no matter how many indexed column filters get piled on.
+            // It's theoretically possible to be wrong here -- that a not-strictly-unique combination of
+            // indexed column filters statistically selects fewer (fractional) rows per scan than a unique index,
+            // but we favor the unique index anyway because:
+            // -- the "unique" declaration guarantees a worse-case upper limit of 1 row per scan.
+            // -- the per-indexed-column selectivity factors used above are highly fictionalized -- actual cardinality
+            //    for individual components of compound indexes MIGHT be very low,
+            //    making them much less selective than estimated.
+            if (tuplesToRead < 4) {
+                tuplesToRead = 4; // i.e. costing 1 unit more than a covered unique btree.
+            }
         }
 
         stats.incrementStatistic(0, StatsField.TUPLES_READ, tuplesToRead);
+        // This tuplesToRead value estimates the number of base table tuples fetched from the index scan.
+        // It's a vague measure of the cost of the scan whose accuracy depends a lot on what kind of
+        // post-filtering needs to happen.
+        // The tuplesRead value is also used here to estimate the number of RESULT rows.
+        // This valus is estimated without regard to any post-filtering effect there might be
+        // -- as if all rows found in the index passed any additional post-filter conditions.
+        // This ignoring of post-filter effects is at least consistent with the processing in SeqScanPlanNode.
+        // In effect, it gives index scans an "unfair" advantage -- follow-on sorts (etc.) are costed lower
+        // as if they are operating on fewer rows than would have come out of the seqscan, though that's nonsense.
+        // It's just an artifact of how SeqScanPlanNode costing ignores ALL filters but IndexScanPlanNode costing
+        // only ignores post-filters.
+        // In any case, it's important to keep this code roughly in synch with any changes
+        // to SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
         m_estimatedOutputTupleCount = tuplesToRead;
-
-        return true;
     }
 
     @Override
@@ -401,6 +434,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         int indexSize = m_catalogIndex.getColumns().size();
         int keySize = m_searchkeyExpressions.size();
+
+        // When there is no start key, count an end-key as a single-column range scan key.
+        if (keySize == 0 && m_endExpression != null) {
+            keySize = 1;
+        }
 
         String scanType = "unique-scan";
         if (m_lookupType != IndexLookupType.EQ)

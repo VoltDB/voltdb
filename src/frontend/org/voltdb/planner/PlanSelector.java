@@ -164,8 +164,7 @@ public class PlanSelector implements Cloneable {
             AbstractPlanNode planGraph = plan.rootPlanGraph;
 
             // compute statistics about a plan
-            boolean result = planGraph.computeEstimatesRecursively(m_stats, m_cluster, m_db, m_estimates, m_paramHints);
-            assert(result);
+            planGraph.computeEstimatesRecursively(m_stats, m_cluster, m_db, m_estimates, m_paramHints);
 
             // compute the cost based on the resources using the current cost model
             plan.cost = m_costModel.getPlanCost(m_stats);
