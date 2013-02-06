@@ -120,7 +120,7 @@ public class ExecutionSite
 implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSnapshotConnection
 {
     private VoltLogger m_txnlog;
-    private final VoltLogger m_rejoinLog = new VoltLogger("JOIN");
+    private final VoltLogger m_rejoinLog = new VoltLogger("REJOIN");
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);

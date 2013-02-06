@@ -52,7 +52,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  */
 public class StreamSnapshotDataTarget extends StreamSnapshotBase
 implements SnapshotDataTarget {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     // triggers specific test code for TestMidRejoinDeath
     private static boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtest");

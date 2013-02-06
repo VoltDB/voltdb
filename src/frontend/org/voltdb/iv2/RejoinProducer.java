@@ -51,7 +51,6 @@ import com.google.common.util.concurrent.SettableFuture;
  */
 public class RejoinProducer extends SiteTasker
 {
-    private static final VoltLogger HOSTLOG = new VoltLogger("HOST");
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait;
@@ -432,7 +431,7 @@ public class RejoinProducer extends SiteTasker
             try {
                 rejoinWork = m_rejoinSiteProcessor.take();
             } catch (InterruptedException e) {
-                HOSTLOG.warn("RejoinProducer interrupted at take()");
+                REJOINLOG.warn("RejoinProducer interrupted at take()");
                 rejoinWork = null;
             }
         }
