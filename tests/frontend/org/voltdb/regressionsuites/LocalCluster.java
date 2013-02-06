@@ -244,6 +244,11 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
+    public void overrideStartCommandVerb(String verb) {
+        if (verb == null || verb.trim().isEmpty()) return;
+        this.templateCmdLine.startCommand(verb);
+    }
+
     public void setCustomCmdLn(String customCmdLn) {
         templateCmdLine.customCmdLn(customCmdLn);
     }

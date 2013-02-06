@@ -43,13 +43,14 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     ProcedureInvocationType type = ProcedureInvocationType.ORIGINAL;
     String procName = null;
 
+    public static final long UNITIALIZED_ID = -1L;
     /*
      * The original txn ID and the timestamp the procedure invocation was
      * assigned with. They are saved here so that if the procedure needs them
      * for determinism, we can provide them again. -1 means not set.
      */
-    long originalTxnId = -1;
-    long originalUniqueId = -1;
+    long originalTxnId = UNITIALIZED_ID;
+    long originalUniqueId = UNITIALIZED_ID;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -85,7 +86,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     }
 
     private void setType() {
-        if (originalTxnId == -1 && originalUniqueId == -1) {
+        if (originalTxnId == UNITIALIZED_ID && originalUniqueId == UNITIALIZED_ID) {
             type = ProcedureInvocationType.ORIGINAL;
         } else {
             type = ProcedureInvocationType.REPLICATED;
