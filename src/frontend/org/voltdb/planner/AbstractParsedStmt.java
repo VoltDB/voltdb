@@ -567,7 +567,7 @@ public abstract class AbstractParsedStmt {
                 assert(table != null);
 
                 if( visited.contains( table)) {
-                    throw new PlanningErrorException("VoltDB does not yet support self joins, consider using views instead");
+                    throw new PlanningErrorException("VoltDB does not support self joins, consider using views instead");
                 }
 
                 visited.add(table);

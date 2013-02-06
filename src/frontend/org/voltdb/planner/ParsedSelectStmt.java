@@ -157,7 +157,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         else
         {
-            throw new RuntimeException("GROUP BY with complex expressions not yet supported");
+            throw new RuntimeException("GROUP BY with complex expressions not supported");
         }
 
         assert(col.alias.equalsIgnoreCase(col.columnName));

@@ -38,6 +38,11 @@ public class VoltXMLElement {
         this.name = name;
     }
 
+    public VoltXMLElement withValue(String key, String value) {
+        attributes.put(key, value);
+        return this;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
