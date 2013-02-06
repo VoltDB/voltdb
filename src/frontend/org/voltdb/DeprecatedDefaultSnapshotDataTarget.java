@@ -55,7 +55,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private Runnable m_onCloseHandler = null;
 
     /*
@@ -236,7 +236,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
                     try {
                         m_channel.force(false);
                     } catch (IOException e) {
-                        hostLog.error("Error syncing snapshot", e);
+                        SNAP_LOG.error("Error syncing snapshot", e);
                     }
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }
@@ -333,7 +333,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                 } catch (IOException e) {
                     m_writeException = e;
-                    hostLog.error("Error while attempting to write snapshot data to file " + m_file, e);
+                    SNAP_LOG.error("Error while attempting to write snapshot data to file " + m_file, e);
                     m_writeFailed = true;
                     throw e;
                 } finally {

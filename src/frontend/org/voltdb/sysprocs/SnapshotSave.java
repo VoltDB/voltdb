@@ -51,7 +51,7 @@ import com.google.common.primitives.Longs;
 public class SnapshotSave extends VoltSystemProcedure
 {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSave.class.getName());
-    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     private static final int DEP_saveTest = (int)
         SysProcFragmentId.PF_saveTest | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -239,7 +239,7 @@ public class SnapshotSave extends VoltSystemProcedure
                                 + file_path + ", " + file_nonce);
                 final int numSitesSnapshotting = SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.size();
                 if (numSitesSnapshotting > 0) {
-                    HOST_LOG.debug("Snapshot in progress, " +
+                    SNAP_LOG.debug("Snapshot in progress, " +
                             numSitesSnapshotting +
                             " sites are still snapshotting");
                     result.addRow(
@@ -348,7 +348,7 @@ public class SnapshotSave extends VoltSystemProcedure
              * Not going to make this fatal because I don't want people to
              * be blocked from getting their data out via snapshots.
              */
-            HOST_LOG.error(
+            SNAP_LOG.error(
                     "Failed to retrieve per partition transaction ids array from SnapshotDaemon." +
                     "This shouldn't happen and it prevents the snapshot from including transaction ids " +
                     "for partitions that are no longer active in the cluster. Those ids are necessary " +
@@ -361,9 +361,9 @@ public class SnapshotSave extends VoltSystemProcedure
         }
 
         if (format == SnapshotFormat.STREAM) {
-            HOST_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
+            SNAP_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
         } else {
-            HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
+            SNAP_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
         }
 
         ColumnInfo[] error_result_columns = new ColumnInfo[2];
@@ -417,12 +417,12 @@ public class SnapshotSave extends VoltSystemProcedure
             stringer.endObject();
             setAppStatusString(stringer.toString());
         } catch (Exception e) {
-            HOST_LOG.warn(e);
+            SNAP_LOG.warn(e);
         }
 
         final long finishTime = System.currentTimeMillis();
         final long duration = finishTime - startTime;
-        HOST_LOG.info("Snapshot initiation took " + duration + " milliseconds");
+        SNAP_LOG.info("Snapshot initiation took " + duration + " milliseconds");
         return results;
     }
 
