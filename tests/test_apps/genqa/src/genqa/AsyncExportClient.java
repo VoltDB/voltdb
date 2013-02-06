@@ -63,6 +63,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.exampleutils.AppHelper;
 
@@ -315,11 +316,17 @@ public class AsyncExportClient
             {
                 long currentRowId = rowId.incrementAndGet();
                 // Post the request, asynchronously
-                clientRef.get().callProcedure(
-                        new AsyncCallback(writer, currentRowId),
-                        config.procedure,
-                        currentRowId,
-                        0);
+                try {
+                    clientRef.get().callProcedure(
+                                                  new AsyncCallback(writer, currentRowId),
+                                                  config.procedure,
+                                                  currentRowId,
+                                                  0);
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
 
                 swap_count++;
                 if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
