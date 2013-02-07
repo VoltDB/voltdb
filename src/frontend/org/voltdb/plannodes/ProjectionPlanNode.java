@@ -23,14 +23,10 @@ import java.util.List;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.compiler.DatabaseEstimates;
-import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanStatistics;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -145,13 +141,6 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         m_outputSchema = new_schema;
 
         return;
-    }
-
-    @Override
-    public boolean computeEstimatesRecursively(PlanStatistics stats,
-            Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-        // TODO Auto-generated method stub
-        return super.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
     }
 
     @Override
