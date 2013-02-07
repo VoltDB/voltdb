@@ -243,6 +243,17 @@ public class TableHelper {
                 }
                 else {
                     row[i] = dest.getColumnDefaultValue(i);
+                    // handle no default specified
+                    if (row[i] == TableShorthand.ColMeta.NO_DEFAULT_VALUE) {
+                        if (dest.getColumnNullable(i)) {
+                            row[i] = null;
+                        }
+                        else {
+                            throw new RuntimeException(
+                                    String.format("New column %s needs a default value in migration",
+                                            dest.getColumnName(i)));
+                        }
+                    }
                 }
                 // make the values the core types of the target table
                 VoltType destColType = dest.getColumnType(i);

@@ -107,15 +107,18 @@ public class TestLiveTableSchemaMigration extends TestCase {
     }
 
     public void testBasicnessitude() throws Exception {
+        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:BIGINT, B:TINYINT)");
+
         // base case of widening column
-        /*migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (A:BIGINT, B:SMALLINT, C:INTEGER)");
+        migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (A:BIGINT, B:SMALLINT, C:INTEGER)");
 
         // string widening
         migrateSchema("FOO (A:BIGINT, B:VARCHAR12, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR24, C:INTEGER)");
         migrateSchema("FOO (A:BIGINT, B:VARCHAR100, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR120, C:INTEGER)");
-        migrateSchema("FOO (A:BIGINT, B:VARCHAR12, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR120, C:INTEGER)");*/
 
-        migrateSchema("FOO (VARCHAR12)", "FOO (VARCHAR120)");
+        // can't widen across inline/out-of-line boundaries yet
+        //migrateSchema("FOO (A:BIGINT, B:VARCHAR12, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR120, C:INTEGER)");
+        //migrateSchema("FOO (VARCHAR12)", "FOO (VARCHAR120)");
 
         // same schema with a new name for middle col
         migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (A:BIGINT, D:TINYINT, C:INTEGER)");

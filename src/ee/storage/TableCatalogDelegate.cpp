@@ -432,7 +432,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
 
     vector<std::string> oldColumnNames = existingTable->getColumnNames();
 
-    int i = 0;
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
     for (colIter = catalogTable.columns().begin();
          colIter != catalogTable.columns().end();
@@ -453,7 +452,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         }
 
         // find a source column in the existing table, if one exists
-        columnSourceMap[i] = -1; // -1 is code for not found, use defaults
+        columnSourceMap[index] = -1; // -1 is code for not found, use defaults
         for (int j = 0; j < oldColumnNames.size(); j++) {
             if (oldColumnNames[j].compare(colName) == 0) {
                 columnSourceMap[index] = j;

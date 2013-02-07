@@ -17,6 +17,7 @@
 
 package org.voltdb.compiler;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.LinkedHashSet;
@@ -188,6 +189,9 @@ public class DeploymentBuilder {
      * @throws JAXBException
      */
     public String getXML(String voltRoot) throws IOException, JAXBException {
+
+        // make sure voltroot exists
+        new File(voltRoot).mkdirs();
 
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
