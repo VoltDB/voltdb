@@ -180,8 +180,10 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         // handle strings
         else if ((value.startsWith("\"") && value.endsWith("\"")) ||
             (value.startsWith("'") && value.endsWith("'"))) {
-            if (current.getClass() != String.class)
+            // ignoring null types here is sketch-city, but other options seem worse?
+            if ((current != null) && (current.getClass() != String.class)) {
                 throw new CatalogException("Unexpected type for field.");
+            }
             value = value.substring(1, value.length() - 1);
             m_fields.put(field, value);
         }

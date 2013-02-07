@@ -28,7 +28,10 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
+import org.voltdb.TableHelper;
+import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
@@ -315,12 +318,22 @@ public class TestCatalogDiffs extends TestCase {
         return cat;
     }
 
+    Catalog getCatalogForTable(String tableName, String catname, VoltTable t) throws IOException {
+        CatalogBuilder builder = new CatalogBuilder();
+        builder.addLiteralSchema(TableHelper.ddlForTable(t));
+
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        builder.compile(testDir + File.separator + "test-" + catname + ".jar");
+        Catalog cat = catalogForJar(testDir + File.separator + "test-" + catname + ".jar");
+        return cat;
+    }
+
 
     // N.B. Some of the testcases assume this exact table structure .. if you change it,
     // check the callers...
     Catalog get2ColumnCatalogForTable(String tableName, String catname) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, C2 BIGINT DEFAULT 0 NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo(tableName, "C1");
         if (tableName.equals("A"))
             builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
@@ -380,9 +393,39 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testRemoveTableColumn() throws IOException {
-        Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumnrejected2");
-        Catalog catUpdated = getCatalogForTable("A", "removetablecolumnrejected1");
+        Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
+        Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
         verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testModifyTableColumn() throws IOException {
+        // should pass
+        VoltTable t1 = TableHelper.quickTable("(SMALLINT, VARCHAR30, VARCHAR80)");
+        VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
+        Catalog catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        Catalog catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
+        verifyDiff(catOriginal, catUpdated);
+
+        // fail integer contraction
+        t1 = TableHelper.quickTable("(BIGINT)");
+        t2 = TableHelper.quickTable("(INTEGER)");
+        catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
+
+        // fail string contraction
+        t1 = TableHelper.quickTable("(VARCHAR35)");
+        t2 = TableHelper.quickTable("(VARCHAR34)");
+        catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
+
+        // fail crossing inline - out-of-line boundary
+        t1 = TableHelper.quickTable("(VARBINARY30)");
+        t2 = TableHelper.quickTable("(VARBINARY70)");
+        catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testAddUniqueCoveringTableIndex() throws IOException {
@@ -526,7 +569,7 @@ public class TestCatalogDiffs extends TestCase {
 
         // without the primary key
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT DEFAULT 0 NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         builder.compile(testDir + File.separator + "dropconstraint2.jar");

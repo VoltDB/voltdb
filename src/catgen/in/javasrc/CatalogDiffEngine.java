@@ -163,7 +163,13 @@ public class CatalogDiffEngine {
     {
         // increases in size are cool; shrinks not so much
         if (oldType == newType) {
-            return (oldSize <= newSize);
+            // don't allow inline types to be made out-of-line types
+            if ((oldType == VoltType.VARBINARY) || (oldType == VoltType.STRING)) {
+                if (oldSize < 64 && newSize >= 64) {
+                    return false;
+                }
+            }
+            return oldSize <= newSize;
         }
 
         // allow people to convert timestamps to longs
@@ -256,7 +262,7 @@ public class CatalogDiffEngine {
             return true;
         }
 
-        // Support add/drop anywhere in these sub-trees
+        // Support add/drop anywhere in these sub-trees, except for a weird column case
         do {
             if (suspect instanceof User)
                 return true;
@@ -268,8 +274,18 @@ public class CatalogDiffEngine {
                 return true;
             if (suspect instanceof SnapshotSchedule)
                 return true;
-            if (suspect instanceof Column)
+            if (suspect instanceof Column) {
+                Column col = (Column) suspect;
+                if ((changeType == ChangeType.ADDITION) &&
+                    (! col.getNullable()) &&
+                    (col.getDefaultvalue() == null))
+                {
+                    m_errors.append("May not dynamically add non-nullable lue.\n");
+                    m_supported = false;
+                    return false;
+                }
                 return true;
+            }
 
             // refs are safe to add drop if the thing they reference is
             if (suspect instanceof ConstraintRef)
