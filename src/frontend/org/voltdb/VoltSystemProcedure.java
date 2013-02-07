@@ -68,7 +68,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected static long STATUS_OK = 0L;
     protected static long STATUS_FAILURE = 1L;
 
-    protected int m_numberOfPartitions;
     protected Procedure m_catProc;
     protected Cluster m_cluster;
     protected SiteProcedureConnection m_site;
@@ -81,11 +80,10 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         m_runner = procRunner;
     }
 
-    void initSysProc(int numberOfPartitions, SiteProcedureConnection site,
+    void initSysProc(SiteProcedureConnection site,
             LoadedProcedureSet loadedProcedureSet,
             Procedure catProc, Cluster cluster) {
 
-        m_numberOfPartitions = numberOfPartitions;
         m_site = site;
         m_catProc = catProc;
         m_cluster = cluster;

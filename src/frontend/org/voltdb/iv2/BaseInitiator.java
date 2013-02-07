@@ -154,8 +154,7 @@ public abstract class BaseInitiator implements Initiator
                     m_executionSite,
                     prf,
                     m_initiatorMailbox.getHSId(),
-                    0, // this has no meaning
-                    numberOfPartitions);
+                    0); // this has no meaning
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);

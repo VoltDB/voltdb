@@ -809,7 +809,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         m_systemProcedureContext = new SystemProcedureContext();
         ee = null;
         hsql = null;
-        m_loadedProcedures = new LoadedProcedureSet(this, null, m_siteId, siteIndex, 2);
+        m_loadedProcedures = new LoadedProcedureSet(this, null, m_siteId, siteIndex);
         m_snapshotter = null;
         m_mailbox = null;
         m_transactionQueue = null;
@@ -900,7 +900,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         if (runnerFactory != null) {
             runnerFactory.configure(this, m_systemProcedureContext);
         }
-        m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
+        m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex);
         m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType(), csp);
 
         int snapshotPriority = 6;
