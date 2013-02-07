@@ -359,12 +359,12 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private static AbstractExpression parseOperationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
-        String type = exprNode.attributes.get("optype");
-        ExpressionType exprType = ExpressionType.get(type);
+        String optype = exprNode.attributes.get("optype");
+        ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
 
         if (exprType == ExpressionType.INVALID) {
-            throw new PlanningErrorException("Unsupported operation type '" + type + "'");
+            throw new PlanningErrorException("Unsupported operation type '" + optype + "'");
         }
         try {
             expr = exprType.getExpressionClass().newInstance();
@@ -399,6 +399,15 @@ public abstract class AbstractParsedStmt {
             expr.setRight(rightExpr);
         } else {
             assert(rightExprNode == null);
+            if (exprType == ExpressionType.OPERATOR_CAST) {
+                String valuetype = exprNode.attributes.get("valuetype");
+                assert(valuetype != null);
+                VoltType voltType = VoltType.typeFromString(valuetype);
+                expr.setValueType(voltType);
+                // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
+                // so assume max length for variable-length types (VARCHAR and VARBINARY).
+                expr.setValueSize(voltType.getMaxLengthInBytes());
+            }
         }
 
         return expr;
@@ -441,8 +450,8 @@ public abstract class AbstractParsedStmt {
         // So, this goes here instead of in derived Expression implementations.
 
         String node;
-        if ((node = exprNode.attributes.get("distinct")) != null) {
-            expr.m_distinct = Boolean.parseBoolean(node);
+        if ((node = exprNode.attributes.get("distinct")) != null && Boolean.parseBoolean(node)) {
+            expr.setDistinct();
         }
 
         assert (exprNode.children.size() == 1);

@@ -75,7 +75,7 @@ public:
     }
 
     std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "OptimizedOperatorNotExpression");
+        return (spacer + "OperatorNotExpression");
     }
 };
 
@@ -100,6 +100,27 @@ class OperatorIsNullExpression : public AbstractExpression {
    std::string debugInfo(const std::string &spacer) const {
        return (spacer + "OperatorIsNullExpression");
    }
+};
+
+class OperatorCastExpression : public AbstractExpression {
+public:
+    OperatorCastExpression(ValueType vt, AbstractExpression *left)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_CAST)
+        , m_targetType(vt)
+    {
+        m_left = left;
+    };
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        assert (m_left);
+        return m_left->eval(tuple1, tuple2).castAs(m_targetType);
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "CastExpression");
+    }
+private:
+    ValueType m_targetType;
 };
 
 

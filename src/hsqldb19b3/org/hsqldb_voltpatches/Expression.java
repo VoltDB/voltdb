@@ -1516,7 +1516,7 @@ public class Expression {
         prototypes.put(OpTypes.VAR_POP,              (new VoltXMLElement("aggregation")).withValue("optype", "varpop"));
         prototypes.put(OpTypes.VAR_SAMP,             (new VoltXMLElement("aggregation")).withValue("optype", "varsamp"));
         // other operations
-        prototypes.put(OpTypes.CAST,                 null); // Planned for support as a special operation
+        prototypes.put(OpTypes.CAST,                 (new VoltXMLElement("operation")).withValue("optype", "cast"));
         prototypes.put(OpTypes.ZONE_MODIFIER,        null); // ???
         prototypes.put(OpTypes.CASEWHEN,             null); // Planned for support as a special function
         prototypes.put(OpTypes.ORDER_BY,             new VoltXMLElement("orderby"));
@@ -1660,6 +1660,13 @@ public class Expression {
             if (((ExpressionOrderBy)this).isDescending()) {
                 exp.attributes.put("desc", "true");
             }
+            return exp;
+
+        case OpTypes.CAST:
+            if (dataType == null) {
+                throw new HSQLParseException("VoltDB could not determine the type in a CAST operation");
+            }
+            exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
         default:
