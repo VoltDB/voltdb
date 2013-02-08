@@ -441,6 +441,13 @@ public class RejoinProducer extends SiteTasker
         // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
         // m_rejoinSiteProcessor = null;
 
+        // A bit of a hack; in some large database cases with more than 2 nodes,
+        // one of the nodes can finish streaming its sites LONG before the other
+        // nodes.  Since we won't see the SnapshotCompletionMonitor fire until
+        // all sites are done, the watchdog can fire first and abort the rejoin.
+        // Just turn the watchdog off after we've gotten the last block.
+        kickWatchdog(false);
+
         /*
          * Don't notify the rejoin coordinator yet. The stream snapshot may
          * have not finished on all nodes, let the snapshot completion
