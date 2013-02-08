@@ -1445,84 +1445,90 @@ public class Expression {
     static Map<Integer, VoltXMLElement> prototypes = new HashMap<Integer, VoltXMLElement>();
 
     static {
-        prototypes.put(OpTypes.VALUE,                new VoltXMLElement("value")); // constant value
-        prototypes.put(OpTypes.COLUMN,               new VoltXMLElement("columnref")); // references
-        prototypes.put(OpTypes.COALESCE,             null); // MAY require ExpressionColumn state
-        prototypes.put(OpTypes.DEFAULT,              new VoltXMLElement("columnref")); // an uninteresting!? ExpressionColumn case
-        prototypes.put(OpTypes.SIMPLE_COLUMN,        (new VoltXMLElement("simplecolumn")));
+        prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
+        prototypes.put(OpTypes.COLUMN,        new VoltXMLElement("columnref")); // reference
+        prototypes.put(OpTypes.COALESCE,      null); // MAY require ExpressionColumn state
+        prototypes.put(OpTypes.DEFAULT,       new VoltXMLElement("columnref")); // uninteresting!? ExpressionColumn
+        prototypes.put(OpTypes.SIMPLE_COLUMN, (new VoltXMLElement("simplecolumn")));
 
-        prototypes.put(OpTypes.VARIABLE,             null); // Some kind of HSQL session parameter? --paul
-        prototypes.put(OpTypes.PARAMETER,            null); // Some kind of HSQL session parameter? --paul
-        prototypes.put(OpTypes.DYNAMIC_PARAM,        (new VoltXMLElement("value")).withValue("isparam", "true")); // Proper query parameters.
-        prototypes.put(OpTypes.ASTERISK,             new VoltXMLElement("asterisk"));
-        prototypes.put(OpTypes.SEQUENCE,             null); // not yet supported sequence type
-        prototypes.put(OpTypes.SCALAR_SUBQUERY,      null); // not yet supported subquery feature // query based row or table
-        prototypes.put(OpTypes.ROW_SUBQUERY,         null); // not yet supported subquery feature
-        prototypes.put(OpTypes.TABLE_SUBQUERY,       null); // not yet supported subquery feature
-        prototypes.put(OpTypes.ROW,                  null); // not yet supported subquery feature    // rows
-        prototypes.put(OpTypes.TABLE,                null); // not yet supported subquery feature
-        prototypes.put(OpTypes.FUNCTION,             null); // not used (HSQL user-defined functions).
-        prototypes.put(OpTypes.SQL_FUNCTION,         new VoltXMLElement("function"));
-        prototypes.put(OpTypes.ROUTINE_FUNCTION,     null); // not used
+        prototypes.put(OpTypes.VARIABLE,      null); // Some kind of HSQL session parameter? --paul
+        prototypes.put(OpTypes.PARAMETER,     null); // Some kind of HSQL session parameter? --paul
+        prototypes.put(OpTypes.DYNAMIC_PARAM, (new VoltXMLElement("value")).withValue("isparam", "true")); // param
+        prototypes.put(OpTypes.ASTERISK,      new VoltXMLElement("asterisk"));
+        prototypes.put(OpTypes.SEQUENCE,      null); // not yet supported sequence type
+        prototypes.put(OpTypes.SCALAR_SUBQUERY,null); // not yet supported subquery feature, query based row/table
+        prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
+        prototypes.put(OpTypes.TABLE_SUBQUERY,null); // not yet supported subquery feature
+        prototypes.put(OpTypes.ROW,           null); // not yet supported subquery feature    // rows
+        prototypes.put(OpTypes.TABLE,         null); // not yet supported subquery feature
+        prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
+        prototypes.put(OpTypes.SQL_FUNCTION,  new VoltXMLElement("function"));
+        prototypes.put(OpTypes.ROUTINE_FUNCTION, null); // not used
 
-        prototypes.put(OpTypes.NEGATE,               (new VoltXMLElement("operation")).withValue("optype", "negate"));    // arithmetic operations
+        //arithmetic operations
+        prototypes.put(OpTypes.NEGATE,        (new VoltXMLElement("operation")).withValue("optype", "negate"));
 
-        prototypes.put(OpTypes.ADD,                  (new VoltXMLElement("operation")).withValue("optype", "add"));
-        prototypes.put(OpTypes.SUBTRACT,             (new VoltXMLElement("operation")).withValue("optype", "subtract"));
-        prototypes.put(OpTypes.MULTIPLY,             (new VoltXMLElement("operation")).withValue("optype", "multiply"));
-        prototypes.put(OpTypes.DIVIDE,               (new VoltXMLElement("operation")).withValue("optype", "divide"));
+        prototypes.put(OpTypes.ADD,           (new VoltXMLElement("operation")).withValue("optype", "add"));
+        prototypes.put(OpTypes.SUBTRACT,      (new VoltXMLElement("operation")).withValue("optype", "subtract"));
+        prototypes.put(OpTypes.MULTIPLY,      (new VoltXMLElement("operation")).withValue("optype", "multiply"));
+        prototypes.put(OpTypes.DIVIDE,        (new VoltXMLElement("operation")).withValue("optype", "divide"));
 
-        prototypes.put(OpTypes.CONCAT,               (new VoltXMLElement("function")).withValue("function_id", String.valueOf(FunctionCustom.FUNC_CONCAT))
-                                                                                     .withValue("name", Tokens.T_CONCAT_WORD)
-                                                                                     .withValue("valuetype", Type.SQL_VARCHAR.getNameString()));    // concatenation
+        prototypes.put(OpTypes.CONCAT,        (new VoltXMLElement("function")) // concatenation
+                                               .withValue("function_id", String.valueOf(FunctionCustom.FUNC_CONCAT))
+                                               .withValue("name", Tokens.T_CONCAT_WORD)
+                                               .withValue("valuetype", Type.SQL_VARCHAR.getNameString()));
 
-        prototypes.put(OpTypes.EQUAL,                (new VoltXMLElement("operation")).withValue("optype", "equal"));    // logical - comparison
-        prototypes.put(OpTypes.GREATER_EQUAL,        (new VoltXMLElement("operation")).withValue("optype", "greaterthanorequalto"));
-        prototypes.put(OpTypes.GREATER,              (new VoltXMLElement("operation")).withValue("optype", "greaterthan"));
-        prototypes.put(OpTypes.SMALLER,              (new VoltXMLElement("operation")).withValue("optype", "lessthan"));
-        prototypes.put(OpTypes.SMALLER_EQUAL,        (new VoltXMLElement("operation")).withValue("optype", "lessthanorequalto"));
-        prototypes.put(OpTypes.NOT_EQUAL,            (new VoltXMLElement("operation")).withValue("optype", "notequal"));
-        prototypes.put(OpTypes.IS_NULL,              (new VoltXMLElement("operation")).withValue("optype", "is_null"));
+        // logicals - comparisons
+        prototypes.put(OpTypes.EQUAL,         (new VoltXMLElement("operation")).withValue("optype", "equal"));
+        prototypes.put(OpTypes.GREATER_EQUAL, (new VoltXMLElement("operation")).withValue("optype", "greaterthanorequalto"));
+        prototypes.put(OpTypes.GREATER,       (new VoltXMLElement("operation")).withValue("optype", "greaterthan"));
+        prototypes.put(OpTypes.SMALLER,       (new VoltXMLElement("operation")).withValue("optype", "lessthan"));
+        prototypes.put(OpTypes.SMALLER_EQUAL, (new VoltXMLElement("operation")).withValue("optype", "lessthanorequalto"));
+        prototypes.put(OpTypes.NOT_EQUAL,     (new VoltXMLElement("operation")).withValue("optype", "notequal"));
+        prototypes.put(OpTypes.IS_NULL,       (new VoltXMLElement("operation")).withValue("optype", "is_null"));
 
-        prototypes.put(OpTypes.NOT,                  (new VoltXMLElement("operation")).withValue("optype", "not"));    // logical operations
-        prototypes.put(OpTypes.AND,                  (new VoltXMLElement("operation")).withValue("optype", "and"));
-        prototypes.put(OpTypes.OR,                   (new VoltXMLElement("operation")).withValue("optype", "or"));
+        // logicals - operations
+        prototypes.put(OpTypes.NOT,           (new VoltXMLElement("operation")).withValue("optype", "not"));
+        prototypes.put(OpTypes.AND,           (new VoltXMLElement("operation")).withValue("optype", "and"));
+        prototypes.put(OpTypes.OR,            (new VoltXMLElement("operation")).withValue("optype", "or"));
 
-        // logical - quantified comparison
-        prototypes.put(OpTypes.ALL_QUANTIFIED,       null); // not used -- an ExpressionLogical exprSubType value only
-        prototypes.put(OpTypes.ANY_QUANTIFIED,       null); // not used -- an ExpressionLogical exprSubType value only
-        prototypes.put(OpTypes.LIKE,                 (new VoltXMLElement("operation")).withValue("optype", "like"));    // logical - predicates
-        prototypes.put(OpTypes.IN,                   null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.EXISTS,               null); // not yet supported ExpressionLogical for subqueries
-        prototypes.put(OpTypes.OVERLAPS,             null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.UNIQUE,               null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.NOT_DISTINCT,         null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.MATCH_SIMPLE,         null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.MATCH_PARTIAL,        null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.MATCH_FULL,           null); // not yet supported ExpressionLogical
+        // logicals - quantified comparison
+        prototypes.put(OpTypes.ALL_QUANTIFIED,null); // not used -- an ExpressionLogical exprSubType value only
+        prototypes.put(OpTypes.ANY_QUANTIFIED,null); // not used -- an ExpressionLogical exprSubType value only
+
+        // logicals - other predicates
+        prototypes.put(OpTypes.LIKE,          (new VoltXMLElement("operation")).withValue("optype", "like"));
+        prototypes.put(OpTypes.IN,            null); // not yet supported ExpressionLogical
+        prototypes.put(OpTypes.EXISTS,        null); // not yet supported ExpressionLogical for subqueries
+        prototypes.put(OpTypes.OVERLAPS,      null); // not yet supported ExpressionLogical
+        prototypes.put(OpTypes.UNIQUE,        null); // not yet supported ExpressionLogical
+        prototypes.put(OpTypes.NOT_DISTINCT,  null); // not yet supported ExpressionLogical
+        prototypes.put(OpTypes.MATCH_SIMPLE,  null); // not yet supported ExpressionLogical
+        prototypes.put(OpTypes.MATCH_PARTIAL, null); // not yet supported ExpressionLogical
+        prototypes.put(OpTypes.MATCH_FULL,    null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_UNIQUE_SIMPLE,  null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_UNIQUE_PARTIAL, null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_UNIQUE_FULL,    null); // not yet supported ExpressionLogical
         // aggregate functions
-        prototypes.put(OpTypes.COUNT,                (new VoltXMLElement("aggregation")).withValue("optype", "count"));
-        prototypes.put(OpTypes.SUM,                  (new VoltXMLElement("aggregation")).withValue("optype", "sum"));
-        prototypes.put(OpTypes.MIN,                  (new VoltXMLElement("aggregation")).withValue("optype", "min"));
-        prototypes.put(OpTypes.MAX,                  (new VoltXMLElement("aggregation")).withValue("optype", "max"));
-        prototypes.put(OpTypes.AVG,                  (new VoltXMLElement("aggregation")).withValue("optype", "avg"));
-        prototypes.put(OpTypes.EVERY,                (new VoltXMLElement("aggregation")).withValue("optype", "every"));
-        prototypes.put(OpTypes.SOME,                 (new VoltXMLElement("aggregation")).withValue("optype", "some"));
-        prototypes.put(OpTypes.STDDEV_POP,           (new VoltXMLElement("aggregation")).withValue("optype", "stddevpop"));
-        prototypes.put(OpTypes.STDDEV_SAMP,          (new VoltXMLElement("aggregation")).withValue("optype", "stddevsamp"));
-        prototypes.put(OpTypes.VAR_POP,              (new VoltXMLElement("aggregation")).withValue("optype", "varpop"));
-        prototypes.put(OpTypes.VAR_SAMP,             (new VoltXMLElement("aggregation")).withValue("optype", "varsamp"));
+        prototypes.put(OpTypes.COUNT,         (new VoltXMLElement("aggregation")).withValue("optype", "count"));
+        prototypes.put(OpTypes.SUM,           (new VoltXMLElement("aggregation")).withValue("optype", "sum"));
+        prototypes.put(OpTypes.MIN,           (new VoltXMLElement("aggregation")).withValue("optype", "min"));
+        prototypes.put(OpTypes.MAX,           (new VoltXMLElement("aggregation")).withValue("optype", "max"));
+        prototypes.put(OpTypes.AVG,           (new VoltXMLElement("aggregation")).withValue("optype", "avg"));
+        prototypes.put(OpTypes.EVERY,         (new VoltXMLElement("aggregation")).withValue("optype", "every"));
+        prototypes.put(OpTypes.SOME,          (new VoltXMLElement("aggregation")).withValue("optype", "some"));
+        prototypes.put(OpTypes.STDDEV_POP,    (new VoltXMLElement("aggregation")).withValue("optype", "stddevpop"));
+        prototypes.put(OpTypes.STDDEV_SAMP,   (new VoltXMLElement("aggregation")).withValue("optype", "stddevsamp"));
+        prototypes.put(OpTypes.VAR_POP,       (new VoltXMLElement("aggregation")).withValue("optype", "varpop"));
+        prototypes.put(OpTypes.VAR_SAMP,      (new VoltXMLElement("aggregation")).withValue("optype", "varsamp"));
         // other operations
-        prototypes.put(OpTypes.CAST,                 null); // Planned for support as a special operation
-        prototypes.put(OpTypes.ZONE_MODIFIER,        null); // ???
-        prototypes.put(OpTypes.CASEWHEN,             null); // Planned for support as a special function
-        prototypes.put(OpTypes.ORDER_BY,             new VoltXMLElement("orderby"));
-        prototypes.put(OpTypes.LIMIT,                new VoltXMLElement("limit"));
-        prototypes.put(OpTypes.ALTERNATIVE,          null); // not yet supported ExpressionOp
-        prototypes.put(OpTypes.MULTICOLUMN,          null); // an uninteresting!? ExpressionColumn case
+        prototypes.put(OpTypes.CAST,          null); // Planned for support as a special operation
+        prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
+        prototypes.put(OpTypes.CASEWHEN,      null); // Planned for support as a special function
+        prototypes.put(OpTypes.ORDER_BY,      new VoltXMLElement("orderby"));
+        prototypes.put(OpTypes.LIMIT,         new VoltXMLElement("limit"));
+        prototypes.put(OpTypes.ALTERNATIVE,   null); // not yet supported ExpressionOp
+        prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
     }
 
     /**
@@ -1537,16 +1543,15 @@ public class Expression {
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
         // than its Expression class.
-        // Use the opType to find a prototype VoltXMLElement with any required hard-coded values pre-set (by withValue).
-        // Duplicate the prototype and add any expression particulars needed for the specific opType value,
-        // as well as a unique identifier, a possible alias, and child nodes.
         int exprOp = getType();
 
         // The opType value of "SIMPLE_COLUMN" is a special case that spans Expression classes and seems to
-        // need to determine the Expression's class to be able to correctly determine its VoltXMLElement representation.
+        // need to use the Expression's exact class to be able to correctly determine its VoltXMLElement
+        // representation.
         // Last minute "SIMPLE_COLUMN" substitutions can blast a new opType into an Expression of a class
-        // other than ExpressionColumn as an optimization for duplicated expressions -- VoltDB currently uses "alias"
-        // matching to navigate to the correct (duplicate) expression structure typically an ExpressionAggregate.
+        // other than ExpressionColumn as an optimization for duplicated expressions.
+        // VoltDB currently uses "alias" matching to navigate to the correct (duplicate) expression structure
+        // typically an ExpressionAggregate.
         // The prototypes dictionary is set up to handle a SIMPLE_COLUMN of any class EXCEPT ExpressionColumn.
         // A SIMPLE_COLUMN ExpressionColumn can be treated as a normal "COLUMN" ExpressionColumn.
         // That case gets explicitly enabled here by fudging the opType from SIMPLE_COLUMN to COLUMN.
@@ -1555,11 +1560,16 @@ public class Expression {
             exprOp = OpTypes.COLUMN;
         }
 
+        // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct
+        // name and any required hard-coded values pre-set.
         VoltXMLElement exp = prototypes.get(exprOp);
         if (exp == null) {
+            // Must have found an unsupported opType.
             throwForUnsupportedExpression(exprOp);
         }
 
+        // Duplicate the prototype and add any expression particulars needed for the specific opType value,
+        // as well as a unique identifier, a possible alias, and child nodes.
         exp = exp.duplicate();
         exp.attributes.put("id", this.getUniqueId(session));
 
@@ -1575,6 +1585,12 @@ public class Expression {
             }
         }
 
+        // Few opTypes need additional special case detailing or special case error detection.
+        // Very few need access to members defined on specific Expression classes, but they
+        // can usually be accessed via down-casting.
+        // Even fewer need private members, and they are accessed by delegation to a
+        // class-specific voltAnnotate... member function that directly manipulates the
+        // VoltXMLElement.
         switch (exprOp) {
         case OpTypes.VALUE:
             // Apparently at this stage, all valid non-NULL values must have a type determined by HSQL.
@@ -1700,12 +1716,16 @@ public class Expression {
     {
         String opAsString;
         switch (exprOp) {
-        case OpTypes.COALESCE:             opAsString = "the COALESCE operator. Consider using DECODE."; break; // MAY require ExpressionColumn state
+        case OpTypes.COALESCE:
+            opAsString = "the COALESCE operator. Consider using DECODE."; break; //MAY require ExpressionColumn state
 
-        case OpTypes.VARIABLE:             opAsString = "HSQL session variables"; break; // Some kind of HSQL session parameter? --paul
-        case OpTypes.PARAMETER:            opAsString = "HSQL session parameters"; break; // Some kind of HSQL session parameter? --paul
+        case OpTypes.VARIABLE:
+            opAsString = "HSQL session variables"; break; // Some kind of HSQL session parameter? --paul
+        case OpTypes.PARAMETER:
+            opAsString = "HSQL session parameters"; break; // Some kind of HSQL session parameter? --paul
 
-        case OpTypes.SEQUENCE:             opAsString = "sequence types"; break; // not yet supported sequence type
+        case OpTypes.SEQUENCE:
+            opAsString = "sequence types"; break; // not yet supported sequence type
 
         case OpTypes.SCALAR_SUBQUERY:
         case OpTypes.ROW_SUBQUERY:
@@ -1714,30 +1734,40 @@ public class Expression {
         case OpTypes.TABLE:
             throw new HSQLParseException("VoltDB does not support subqueries, consider using views or multiple statements instead");
 
-        case OpTypes.FUNCTION:             opAsString = "HSQL-style user-defined Java SQL functions"; break; // not used (HSQL user-defined functions).
+        case OpTypes.FUNCTION:             opAsString = "HSQL-style user-defined Java SQL functions"; break;
 
         case OpTypes.ROUTINE_FUNCTION:     opAsString = "HSQL routine functions"; break; // not used
 
-        case OpTypes.ALL_QUANTIFIED:       opAsString = "sequences or subqueries"; break; // not used -- an ExpressionLogical exprSubType value only
-        case OpTypes.ANY_QUANTIFIED:       opAsString = "sequences or subqueries"; break; // not used -- an ExpressionLogical exprSubType value only
+        case OpTypes.ALL_QUANTIFIED:
+        case OpTypes.ANY_QUANTIFIED:
+            opAsString = "sequences or subqueries"; break; // not used -- an ExpressionLogical exprSubType value only
 
-        case OpTypes.IN:                   opAsString = "the IN operator. Consider using an OR expression"; break; // not yet supported ExpressionLogical
-        case OpTypes.EXISTS:               opAsString = "subqueries"; break; // not yet supported ExpressionLogical for subqueries
-        case OpTypes.OVERLAPS:             opAsString = "sequences or subqueries"; break; // not yet supported ExpressionLogical
-        case OpTypes.UNIQUE:               opAsString = "sequences or subqueries"; break; // not yet supported ExpressionLogical
-        case OpTypes.NOT_DISTINCT:         opAsString = "sequences or subqueries"; break; // not yet supported ExpressionLogical
-        case OpTypes.MATCH_SIMPLE:         opAsString = "the MATCH operator"; break; // not yet supported ExpressionLogical
-        case OpTypes.MATCH_PARTIAL:        opAsString = "the MATCH operator"; break; // not yet supported ExpressionLogical
-        case OpTypes.MATCH_FULL:           opAsString = "the MATCH operator"; break; // not yet supported ExpressionLogical
-        case OpTypes.MATCH_UNIQUE_SIMPLE:  opAsString = "the MATCH operator"; break; // not yet supported ExpressionLogical
-        case OpTypes.MATCH_UNIQUE_PARTIAL: opAsString = "the MATCH operator"; break; // not yet supported ExpressionLogical
-        case OpTypes.MATCH_UNIQUE_FULL:    opAsString = "the MATCH operator"; break; // not yet supported ExpressionLogical
+        case OpTypes.IN:
+            opAsString = "the IN operator. Consider using an OR expression"; break; // not yet supported
+        case OpTypes.EXISTS:
+            opAsString = "subqueries"; break; // not yet supported ExpressionLogical for subqueries
 
-        // other operations
-        case OpTypes.CAST:                 opAsString = "Cast operators (explicit or implied)"; break; // Planned for support as a special operation
-        case OpTypes.ZONE_MODIFIER:        opAsString = "ZONE modifier operations"; break; // ???
-        case OpTypes.ALTERNATIVE:          opAsString = "ALTERNATIVE operations"; break; // not yet supported ExpressionOp
-        case OpTypes.MULTICOLUMN:          opAsString = "a MULTICOLUMN operation"; break; // an uninteresting!? ExpressionColumn case
+        case OpTypes.OVERLAPS:
+        case OpTypes.UNIQUE:
+        case OpTypes.NOT_DISTINCT:
+            opAsString = "sequences or subqueries"; break; // not yet supported ExpressionLogical
+
+        case OpTypes.MATCH_SIMPLE:       
+        case OpTypes.MATCH_PARTIAL:      
+        case OpTypes.MATCH_FULL:         
+        case OpTypes.MATCH_UNIQUE_SIMPLE:
+        case OpTypes.MATCH_UNIQUE_PARTIAL:
+        case OpTypes.MATCH_UNIQUE_FULL:
+            opAsString = "the MATCH operator"; break; // not yet supported ExpressionLogical
+
+        case OpTypes.CAST:
+            opAsString = "Cast operators (explicit or implied)"; break; // Planned for support as a special operation
+        case OpTypes.ZONE_MODIFIER:
+            opAsString = "ZONE modifier operations"; break; // ???
+        case OpTypes.ALTERNATIVE:
+            opAsString = "ALTERNATIVE operations"; break; // not yet supported ExpressionOp
+        case OpTypes.MULTICOLUMN:
+            opAsString = "a MULTICOLUMN operation"; break; // an uninteresting!? ExpressionColumn case
 
         default:
             opAsString = " the unknown operator with numeric code (" + String.valueOf(exprOp) + ")";
