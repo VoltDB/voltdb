@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,8 +46,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -1744,7 +1741,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         final Config m_sysProc;
         final StoredProcedureInvocation m_task;
-        final org.voltdb.catalog.CommandLog m_commandLog;
         final Connection m_ccxn;
         final boolean m_isAdmin;
         final String m_hostName;
@@ -1754,7 +1750,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // Constructor
         Promoter(final Config sysProc,
                  final StoredProcedureInvocation task,
-                 final org.voltdb.catalog.CommandLog commandLog,
                  final Connection ccxn,
                  final boolean isAdmin,
                  final String hostName,
@@ -1764,7 +1759,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             m_sysProc = sysProc;
             m_task = task.getShallowCopy();
             m_task.setProcName("@PromoteReplicaStatus");
-            m_commandLog = commandLog;
             m_ccxn = ccxn;
             m_isAdmin = isAdmin;
             m_hostName = hostName;
@@ -1790,33 +1784,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                               System.currentTimeMillis(),
                               false);
         }
-
-        // Trigger a truncation snapshot and then promote the replica.
-        void truncateAndPromote() {
-            try {
-                // Use the current time as an identifier (nonce) that can be
-                // recognized below by the monitor so that the promote doesn't
-                // happen until our snapshot completes.
-                final String reqId = java.util.UUID.randomUUID().toString();
-                SnapshotCompletionMonitor completionMonitor =
-                        VoltDB.instance().getSnapshotCompletionMonitor();
-                completionMonitor.addInterest(new SnapshotCompletionInterest() {
-                    @Override
-                    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
-                        // Is this our snapshot?
-                        if (event.truncationSnapshot && reqId.equals(event.requestId)) {
-                            promote();
-                        }
-                        return null;
-                    }
-                });
-                m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            }
-            catch (Exception e) {
-                VoltDB.crashGlobalVoltDB("ZK truncation snapshot request failed", false, e);
-            }
-        }
     }
 
     ClientResponseImpl dispatchPromote(Config sysProc,
@@ -1833,19 +1800,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
 
-        // ENG-3880 Perform a truncation snapshot so that transaction IDs and
-        // timestamps generated locally for command logging aren't used for durability.
-        // The host with the lowest host ID initiates the truncation snapshot.
-        org.voltdb.catalog.CommandLog logConfig = m_catalogContext.get().cluster.getLogconfig().get("log");
-        Promoter promoter = new Promoter(sysProc, task, logConfig, ccxn, handler.isAdmin(),
+        Promoter promoter = new Promoter(sysProc, task, ccxn, handler.isAdmin(),
                                          handler.m_hostname, handler.connectionId(), buf.capacity());
         // This only happens on one node so we don't need to pick a leader.
-        if (logConfig.getEnabled()) {
-            promoter.truncateAndPromote();
-        }
-        else {
-            promoter.promote();
-        }
+        promoter.promote();
         return null;
     }
 
