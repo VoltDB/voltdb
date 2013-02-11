@@ -253,11 +253,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         m_nonInlinedMemorySize -= bytes;
     }
 
-  private:
-
     size_t allocatedBlockCount() const {
         return m_data.size();
     }
+
+  private:
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {

@@ -460,45 +460,65 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         }
     }
 
-    TableIterator &iterator = m_table->iterator();
-    TableTuple &tupleToInsert = newTable->tempTuple();
-    TableTuple scannedTuple(m_table->schema());
+    // going to run until the source table has no allocated blocks
+    size_t blocksLeft = existingTable->allocatedBlockCount();
+    while (blocksLeft) {
 
-    std::vector<NValue> requiresFree;
+        TableIterator &iterator = m_table->iterator();
+        TableTuple &tupleToInsert = newTable->tempTuple();
+        TableTuple scannedTuple(m_table->schema());
 
-    while (iterator.next(scannedTuple)) {
-        // set the values from the old table or from defaults
-        for (int i = 0; i < columnCount; i++) {
-            if (columnSourceMap[i] >= 0) {
-                NValue value = scannedTuple.getNValue(columnSourceMap[i]);
-                printf("value: %s\n", value.debug().c_str());
+        // list of columns in a tuple that require explicit memory management
+        std::vector<NValue> requiresFree;
 
-                // check if the column is widening so it was inline and now is out of line
-                if (scannedTuple.getSchema()->columnIsInlined(columnSourceMap[i])) {
-                    if (!tupleToInsert.getSchema()->columnIsInlined(i)) {
-                        value = ValueFactory::convertToOutOfLine(value);
-                        if (!value.isNull()) {
-                            requiresFree.push_back(value);
+        while (iterator.next(scannedTuple)) {
+
+            //printf("tuple: %s\n", scannedTuple.debug(existingTable->name()).c_str());
+
+            // set the values from the old table or from defaults
+            for (int i = 0; i < columnCount; i++) {
+                if (columnSourceMap[i] >= 0) {
+                    NValue value = scannedTuple.getNValue(columnSourceMap[i]);
+
+                    // check if the column is widening so it was inline and now is out of line
+                    if (scannedTuple.getSchema()->columnIsInlined(columnSourceMap[i])) {
+                        if (!tupleToInsert.getSchema()->columnIsInlined(i)) {
+                            value = ValueFactory::convertToOutOfLine(value);
+                            if (!value.isNull()) {
+                                requiresFree.push_back(value);
+                            }
                         }
                     }
+
+                    tupleToInsert.setNValue(i, value);
                 }
-
-                tupleToInsert.setNValue(i, value);
+                else {
+                    tupleToInsert.setNValue(i, defaults[i]);
+                }
             }
-            else {
-                tupleToInsert.setNValue(i, defaults[i]);
-            }
-        }
-        // insert into the new table
-        newTable->insertTuple(tupleToInsert, false);
-        // delete from the old table
-        existingTable->deleteTupleForSchemaChange(scannedTuple);
 
-        while (requiresFree.size()) {
-            requiresFree.back().free();
-            requiresFree.pop_back();
+            // insert into the new table
+            newTable->insertTuple(tupleToInsert, false);
+
+            // delete from the old table
+            existingTable->deleteTupleForSchemaChange(scannedTuple);
+                        
+            while (requiresFree.size()) {
+                requiresFree.back().free();
+                requiresFree.pop_back();
+            }
+            
+            // if a block was just deleted, start the iterator again on the next block
+            // this avoids using the block iterator over a changing set of blocks
+            size_t prevBlocksLeft = blocksLeft;
+            blocksLeft = existingTable->allocatedBlockCount();
+            if (blocksLeft < prevBlocksLeft) {
+                break;
+            }
         }
     }
+
+    printf("1\n");
 
     // release any memory held by the default values --
     // normally you'd want this in a finally block, but since this code failing
@@ -507,11 +527,15 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         defaults[i].free();
     }
 
+    printf("2\n");
+
     ///////////////////////////////////////////////
     // Drop the old table
     ///////////////////////////////////////////////
 
     deleteCommand();
+
+    printf("3\n");
 
     ///////////////////////////////////////////////
     // Patch up the new table as a replacement
@@ -523,6 +547,9 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     m_table->configureIndexStats(catalogDatabase.relativeIndex());
 
     m_table->incrementRefcount();
+
+    printf("4\n");
+
     return 0;
 }
 
