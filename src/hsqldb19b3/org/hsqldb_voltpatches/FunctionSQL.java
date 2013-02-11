@@ -1961,13 +1961,11 @@ public class FunctionSQL extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltAnnotateFunctionXML(VoltXMLElement exp)
     {
         // XXX Should this throw HSQLParseException instead?
         assert(getType() == OpTypes.SQL_FUNCTION);
 
-        VoltXMLElement exp = new VoltXMLElement("function");
         exp.attributes.put("name", name);
         exp.attributes.put("valuetype", dataType.getNameString());
         if (parameterArg != -1) {
@@ -1986,7 +1984,7 @@ public class FunctionSQL extends Expression {
             }
             break;
         case FUNC_EXTRACT :
-            // A little tweaking is needed here because VoltDB wants to define separate functions for each extract "field" (hard-coded node[1] value).
+            // A little tweaking is needed here because VoltDB wants to define separate functions for each extract "field" (hard-coded node[0] value).
             String volt_alias = null;
             int keywordConstant = ((Integer) nodes[0].valueData).intValue();
             switch (keywordConstant) {
@@ -2072,8 +2070,8 @@ public class FunctionSQL extends Expression {
 
             exp.attributes.put("function_id", String.valueOf(keywordConstant + SQL_EXTRACT_VOLT_FUNC_OFFSET));
             exp.attributes.put("volt_alias", volt_alias);
-            VoltXMLElement vxmle = nodes[1].voltGetXML(session);
-            exp.children.add(vxmle);
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
             return exp;
 
         default :
@@ -2096,14 +2094,6 @@ public class FunctionSQL extends Expression {
             break;
         default :
             break;
-        }
-
-        for (Expression expr : nodes) {
-            if (expr != null) {
-                VoltXMLElement vxmle = expr.voltGetXML(session);
-                exp.children.add(vxmle);
-                assert(vxmle != null);
-            }
         }
 
         return exp;

@@ -827,39 +827,20 @@ public class ExpressionColumn extends Expression {
     /*************** VOLTDB *********************/
 
     /**
-     * VoltDB added method to get a non-catalog-dependent
+     * VoltDB added method to provide detail for a non-catalog-dependent
      * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
-     * some names.
      * @return XML, correctly indented, representing this object.
      */
-    @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp)
     {
-        VoltXMLElement exp = new VoltXMLElement("unset");
-        // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", this.getUniqueId(session));
-
-        if (opType == OpTypes.ASTERISK) {
-            exp.name = "asterisk";
+        if (tableName != null) {
+            exp.attributes.put("table", tableName);
         }
-        else if (isParam) {
-            exp.name = "value";
-            // This eliminates a NullPointerException which MAY be a sign of insufficient type inference,
-            // but there MAY be cases where a parameter type can't legitimately be inferred, so let it go.
-            if (dataType != null) {
-                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
-            }
-            exp.attributes.put("isparam", "true");
+        //TODO: also indicate RangeVariable in case table is ambiguus (for self-joins).
+        exp.attributes.put("column", columnName);
+        if ((alias == null) || (getAlias().length() == 0)) {
+            exp.attributes.put("alias", columnName);
         }
-        else {
-            exp.name = "columnref";
-            if (tableName != null)
-                exp.attributes.put("table", tableName);
-            exp.attributes.put("column", columnName);
-            exp.attributes.put("alias", (this.alias != null) && (getAlias().length() > 0) ? getAlias() : columnName);
-        }
-
         return exp;
     }
 }
