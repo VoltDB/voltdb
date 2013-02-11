@@ -32,6 +32,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 public class PlannerTestCase extends TestCase {
@@ -48,9 +49,8 @@ public class PlannerTestCase extends TestCase {
                 paramCount++;
             }
         }
-        List<AbstractPlanNode> pn = null;
         try {
-            pn = m_aide.compile(sql, paramCount, m_byDefaultPlanForSinglePartition, null);
+            m_aide.compile(sql, paramCount, m_byDefaultPlanForSinglePartition, null);
             fail();
         }
         catch (PlanningErrorException ex) {
@@ -65,9 +65,13 @@ public class PlannerTestCase extends TestCase {
     }
 
     protected CompiledPlan compileAdHocPlan(String sql) {
+        return compileAdHocPlan(sql, DeterminismMode.SAFER);
+    }
+
+    protected CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode) {
         CompiledPlan cp = null;
         try {
-            cp = m_aide.compileAdHocPlan(sql);
+            cp = m_aide.compileAdHocPlan(sql, detMode);
             assertTrue(cp != null);
         }
         catch (Exception ex) {

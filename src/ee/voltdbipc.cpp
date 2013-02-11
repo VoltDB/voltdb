@@ -194,7 +194,7 @@ using namespace voltdb;
 // file static help function to do a blocking write.
 // exit on a -1.. otherwise return when all bytes
 // written.
-static void writeOrDie(int fd, unsigned char *data, ssize_t sz) {
+static void writeOrDie(int fd, const unsigned char *data, ssize_t sz) {
     ssize_t written = 0;
     ssize_t last = 0;
     if (sz == 0) {
@@ -614,7 +614,7 @@ void VoltDBIPC::sendException(int8_t errorCode) {
     fflush(stdout);
 
     const std::size_t expectedSize = exceptionLength + sizeof(int32_t);
-    writeOrDie(m_fd, (unsigned char*)exceptionData, expectedSize);
+    writeOrDie(m_fd, (const unsigned char*)exceptionData, expectedSize);
 }
 
 /**
@@ -643,16 +643,16 @@ void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
 
     // make network suitable
     fragId = htonll(fragId);
-    int64_t wasHitLong = htonll((wasHit ? 1 : 0));
+    int64_t wasHitLong = htonll((wasHit ? 1L : 0L));
     cacheSize = htonll(cacheSize);
 
     // write the results array back across the wire
     const int8_t successResult = kErrorCode_Success;
     if (errors == 0) {
-        writeOrDie(m_fd, (unsigned char*)&successResult, sizeof(int8_t));
-        writeOrDie(m_fd, (unsigned char*)&fragId, sizeof(int64_t));
-        writeOrDie(m_fd, (unsigned char*)&wasHitLong, sizeof(int64_t));
-        writeOrDie(m_fd, (unsigned char*)&cacheSize, sizeof(int64_t));
+        writeOrDie(m_fd, (const unsigned char*)&successResult, sizeof(int8_t));
+        writeOrDie(m_fd, (const unsigned char*)&fragId, sizeof(int64_t));
+        writeOrDie(m_fd, (const unsigned char*)&wasHitLong, sizeof(int64_t));
+        writeOrDie(m_fd, (const unsigned char*)&cacheSize, sizeof(int64_t));
     } else {
         sendException(kErrorCode_Error);
     }
@@ -868,7 +868,7 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
         // write the results array back across the wire
         const int8_t successResult = kErrorCode_Success;
         if (result == 1) {
-            writeOrDie(m_fd, (unsigned char*)&successResult, sizeof(int8_t));
+            writeOrDie(m_fd, (const unsigned char*)&successResult, sizeof(int8_t));
 
             // write the dependency tables back across the wire
             // the result set includes the total serialization size

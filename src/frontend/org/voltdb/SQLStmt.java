@@ -32,6 +32,7 @@ import org.voltdb.catalog.Statement;
  * @see VoltProcedure
  */
 public class SQLStmt {
+
     // Used for uncompiled SQL.
     byte[] sqlText;
     String joinOrder;

@@ -38,6 +38,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.io.FileWriter;
+import java.io.IOException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -69,6 +71,8 @@ public class Benchmark {
     Timer timer;
     // Benchmark start time
     long benchmarkStartTS;
+    // Timer for writing the checkpoint count for apprunner
+    Timer checkpointTimer;
 
     final TxnId2PayloadProcessor processor;
 
@@ -312,6 +316,31 @@ public class Benchmark {
     }
 
     /**
+     * Create a Timer task to write the value of the txnCount to
+     * disk to make it available to apprunner
+     */
+    private void schedulePeriodicCheckpoint() throws IOException {
+        checkpointTimer = new Timer();
+        TimerTask checkpointTask = new TimerTask() {
+            @Override
+            public void run() {
+                String count = String.valueOf(txnCount.get()) + "\n";
+                try {
+                    FileWriter writer = new FileWriter(".checkpoint", false);
+                    writer.write(count);
+                    writer.close();
+                }
+                catch (Exception e) {
+                    System.err.println("Caught exception writing checkpoint file.");
+               }
+            }
+        };
+        checkpointTimer.scheduleAtFixedRate(checkpointTask,
+                                  1 * 1000,
+                                  1 * 1000);
+    }
+
+    /**
      * Create a Timer task to display performance data on the Vote procedure
      * It calls printStatistics() every displayInterval seconds
      */
@@ -407,6 +436,7 @@ public class Benchmark {
         // reset progress tracker
         lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
+        schedulePeriodicCheckpoint();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -455,6 +485,7 @@ public class Benchmark {
 
         // cancel periodic stats printing
         timer.cancel();
+        checkpointTimer.cancel();
 
         shutdown.set(true);
         es.shutdownNow();

@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -39,7 +40,7 @@ import org.voltdb.utils.BuildDirectoryUtils;
  * compute the cost of a specific plan. The plan with the lowest cost wins.
  *
  */
-public class PlanSelector implements Cloneable{
+public class PlanSelector implements Cloneable {
     /** pointer to the cluster object in the catalog */
     final Cluster m_cluster;
     /** pointer to the database object in the catalog */
@@ -64,6 +65,8 @@ public class PlanSelector implements Cloneable{
     PlanStatistics m_stats = null;
     /** The id of the plan under the evaluation */
     int m_planId = 0;
+    /** Determinism mode (for micro optimizations) */
+    final DeterminismMode m_detMode;
     /** Parameters to drive the output */
     boolean m_quietPlanner;
     boolean m_fullDebug = System.getProperties().contains("compilerdebug");
@@ -79,14 +82,15 @@ public class PlanSelector implements Cloneable{
      * @param sql SQL stmt text to be planned.
      * @param costModel The current cost model to evaluate plans with
      * @param paramHints Hints.
+     * @param detMode Determinism mode (for micro optimizations)
      * @param quietPlanner Controls the output.
      * @param fullDebug Controls the debug output.
      */
     public PlanSelector(Cluster cluster, Database db, DatabaseEstimates estimates,
             String stmtName, String procName, String sql,
             AbstractCostModel costModel, ScalarValueHints[] paramHints,
-            boolean quietPlanner,
-            boolean fullDebug) {
+            DeterminismMode detMode, boolean quietPlanner, boolean fullDebug)
+    {
         m_cluster = cluster;
         m_db = db;
         m_estimates = estimates;
@@ -95,6 +99,7 @@ public class PlanSelector implements Cloneable{
         m_sql = sql;
         m_costModel = costModel;
         m_paramHints = paramHints;
+        m_detMode = detMode;
         m_quietPlanner = quietPlanner;
         m_fullDebug = fullDebug;
     }
@@ -103,9 +108,10 @@ public class PlanSelector implements Cloneable{
      * Clone itself.
      * @return deep copy of self
      */
+    @Override
     public Object clone() {
         return new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName, m_procName, m_sql,
-                m_costModel, m_paramHints, m_quietPlanner, m_fullDebug);
+                m_costModel, m_paramHints, m_detMode, m_quietPlanner, m_fullDebug);
     }
 
     /**
@@ -142,7 +148,7 @@ public class PlanSelector implements Cloneable{
    public void considerCandidatePlan(CompiledPlan rawplan) {
 
         // run the set of microptimizations, which may return many plans (or not)
-        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan);
+        List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan, m_db, m_detMode);
 
         // iterate through the subset of plans
         for (CompiledPlan plan : optimizedPlans) {
@@ -158,8 +164,7 @@ public class PlanSelector implements Cloneable{
             AbstractPlanNode planGraph = plan.rootPlanGraph;
 
             // compute statistics about a plan
-            boolean result = planGraph.computeEstimatesRecursively(m_stats, m_cluster, m_db, m_estimates, m_paramHints);
-            assert(result);
+            planGraph.computeEstimatesRecursively(m_stats, m_cluster, m_db, m_estimates, m_paramHints);
 
             // compute the cost based on the resources using the current cost model
             plan.cost = m_costModel.getPlanCost(m_stats);

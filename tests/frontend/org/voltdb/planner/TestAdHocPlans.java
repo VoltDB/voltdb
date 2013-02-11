@@ -44,7 +44,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
     @Override
     protected void setUp() throws Exception {
         // For planner-only testing, we shouldn't care about IV2
-        VoltDB.Configuration config = setUpSPDB(false);
+        VoltDB.Configuration config = setUpSPDB();
         byte[] bytes = CatalogUtil.toBytes(new File(config.m_pathToCatalog));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         Catalog catalog = new Catalog();

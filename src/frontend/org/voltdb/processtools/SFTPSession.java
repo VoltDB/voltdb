@@ -203,15 +203,10 @@ public class SFTPSession {
         verifyAllAreAbsolutePaths(files);
 
         for (Map.Entry<File, File> entry: files.entrySet()) {
-            File srcFile = entry.getKey();
             String src = entry.getKey().getPath();
             String dst = entry.getValue().getPath();
             try {
                 m_channel.put(src, dst);
-
-                SftpATTRS dstAttr = m_channel.stat(dst);
-                new BasicAttributes(srcFile).setFor(dstAttr);
-                m_channel.setStat(dst,dstAttr);
 
                 if (m_log.isDebugEnabled()) {
                     m_log.debug("SFTP: put " + src + " " + dst);
@@ -246,10 +241,8 @@ public class SFTPSession {
         for (Map.Entry<File, File> entry: files.entrySet()) {
             String src = entry.getKey().getPath();
             String dst = entry.getValue().getPath();
-            File destFile = entry.getValue();
             try {
                 m_channel.get(src, dst);
-                new BasicAttributes(m_channel.stat(src)).setFor(destFile);
                 if (m_log.isDebugEnabled()) {
                     m_log.debug("SFTP: get " + src + " " + dst);
                 }

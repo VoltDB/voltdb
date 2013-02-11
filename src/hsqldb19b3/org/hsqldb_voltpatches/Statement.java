@@ -211,7 +211,7 @@ public abstract class Statement {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session)
+    VoltXMLElement voltGetStatementXML(Session session)
     throws HSQLParseException
     {
         throw new RuntimeException("Unsupported SQL verb in statement: \""+sql+"\"");

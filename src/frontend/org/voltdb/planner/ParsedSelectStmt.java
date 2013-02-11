@@ -61,7 +61,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public long offset = 0;
     private long limitParameterId = -1;
     private long offsetParameterId = -1;
-    public boolean grouped = false;
     public boolean distinct = false;
 
     /**
@@ -85,8 +84,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             limitParameterId = Long.parseLong(node);
         if ((node = stmtNode.attributes.get("offset_paramid")) != null)
             offsetParameterId = Long.parseLong(node);
-        if ((node = stmtNode.attributes.get("grouped")) != null)
-            grouped = Boolean.parseBoolean(node);
         if ((node = stmtNode.attributes.get("distinct")) != null)
             distinct = Boolean.parseBoolean(node);
 
@@ -98,7 +95,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (child.name.equalsIgnoreCase("columns"))
                 parseDisplayColumns(child);
             else if (child.name.equalsIgnoreCase("querycondition"))
-                parseConditions(child);
+                parseCondition(child);
             else if (child.name.equalsIgnoreCase("ordercolumns"))
                 parseOrderColumns(child);
             else if (child.name.equalsIgnoreCase("groupcolumns")) {
@@ -160,7 +157,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         else
         {
-            throw new RuntimeException("GROUP BY with complex expressions not yet supported");
+            throw new RuntimeException("GROUP BY with complex expressions not supported");
         }
 
         assert(col.alias.equalsIgnoreCase(col.columnName));
@@ -178,7 +175,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    void parseOrderColumn(VoltXMLElement orderByNode) {
+    private void parseOrderColumn(VoltXMLElement orderByNode) {
         // make sure everything is kosher
         assert(orderByNode.name.equalsIgnoreCase("orderby"));
 
@@ -186,7 +183,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         String desc = orderByNode.attributes.get("desc");
         boolean descending = (desc != null) && (desc.equalsIgnoreCase("true"));
 
-        // get the columnref expression inside the orderby node
+        // get the columnref or other expression inside the orderby node
         VoltXMLElement child = orderByNode.children.get(0);
         assert(child != null);
 
@@ -197,9 +194,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         AbstractExpression order_exp = parseExpressionTree(child);
 
         // Cases:
-        // inner child could be columnref, in which case it's just a normal
-        // column.  Just make a ParsedColInfo object for it and the planner
-        // will do the right thing later
+        // child could be columnref, in which case it's just a normal column.
+        // Just make a ParsedColInfo object for it and the planner will do the right thing later
         if (child.name.equals("columnref")) {
             // The ORDER BY column MAY be identical to a simple display column, in which case,
             // tagging the actual display column as being also an order by column
@@ -398,7 +394,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @return whether there are GROUP BY columns and they are all order-determined by ORDER BY columns
      */
     private boolean orderByColumnsDetermineUniqueColumns(ArrayList<AbstractExpression> outNonOrdered) {
-        if ((grouped == false) || groupByColumns.isEmpty()) {
+        if ( ! isGrouped()) {
             // TODO: Are there other ways to determine a unique set of columns without considering every display column?
             return false;
         }
@@ -521,7 +517,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     boolean guaranteesUniqueRow() {
-        if (((grouped == false) || groupByColumns.isEmpty() ) && displaysAgg()) {
+        if ( ( ! isGrouped() ) && displaysAgg()) {
             return true;
         }
         return false;
@@ -536,4 +532,5 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
+    public boolean isGrouped() { return ! groupByColumns.isEmpty(); }
 }

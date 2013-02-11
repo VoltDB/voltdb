@@ -28,6 +28,7 @@
 __author__ = 'scooper'
 
 import sys
+import os
 import optparse
 import shlex
 import copy
@@ -203,6 +204,11 @@ class HostOption(StringOption):
         return hosts
 
 #===============================================================================
+class ArgumentException(Exception):
+#===============================================================================
+    pass
+
+#===============================================================================
 class BaseArgument(object):
 #===============================================================================
     def __init__(self, name, help, **kwargs):
@@ -234,7 +240,32 @@ class IntegerArgument(BaseArgument):
         try:
             return int(value)
         except ValueError, e:
-            utility.abort('"%s" argument is not a valid integer: %s' % value)
+            raise ArgumentException('%s value is not a valid integer: %s'
+                                        % (self.name.upper(), str(value)))
+
+#===============================================================================
+class PathArgument(StringArgument):
+#===============================================================================
+    def __init__(self, name, help, **kwargs):
+        # For now the only intelligence is to check for absolute paths when required.
+        # TODO: Add options to check for directories, files, attributes, etc..
+        self.absolute = utility.kwargs_get_boolean(kwargs, 'absolute', default = False)
+        self.exists   = utility.kwargs_get_boolean(kwargs, 'exists', default = False)
+        requirements = []
+        if self.absolute:
+            requirements.append('absolute path')
+        if self.exists:
+            requirements.append('must exist')
+        if requirements:
+            help2 = ' (%s)' % ', '.join(requirements)
+        StringArgument.__init__(self, name, help + help2, **kwargs)
+    def get(self, value):
+        svalue = str(value)
+        if self.absolute and not svalue.startswith('/'):
+            raise ArgumentException('%s path is not absolute: %s' % (self.name.upper(), svalue))
+        if self.exists and not os.path.exists(svalue):
+            raise ArgumentException('%s path does not exist: %s' % (self.name.upper(), svalue))
+        return svalue
 
 #===============================================================================
 class ParsedCommand(object):
@@ -343,6 +374,7 @@ class CLIParser(ExtendedHelpOptionParser):
         args = copy.copy(verb_args) + verb.command_arguments
         # Set attributes for required arguments.
         missing = []
+        exceptions = []
         iarg = 0
         nargs = verb.get_argument_count()
         for arg in verb.iter_arguments():
@@ -352,34 +384,56 @@ class CLIParser(ExtendedHelpOptionParser):
             if iarg > len(args) or (iarg == len(args) and arg.min_count > 0):
                 missing.append((arg.name, arg.help))
             else:
+                value = None
                 # The last argument can have repeated arguments. If more than
                 # one are allowed the values are put into a list.
                 if iarg == nargs - 1 and arg.max_count > 1:
-                    value = list(args[iarg:])
-                    if len(value) < arg.min_count:
+                    if len(args) - iarg < arg.min_count:
                         utility.abort('A minimum of %d %s arguments are required.'
                                             % (arg.min_count, arg.name.upper()))
-                    if len(value) > arg.max_count:
+                    if len(args) - iarg > arg.max_count:
                         utility.abort('A maximum of %d %s arguments are allowed.'
                                             % (arg.max_count, arg.name.upper()))
-                    iarg += len(value)
+                    # Pass through argument class get() for validation, conversion, etc..
+                    # Skip bad values and report on them at the end.
+                    value = []
+                    for v in args[iarg:]:
+                        try:
+                            value.append(arg.get(v))
+                        except ArgumentException, e:
+                            exceptions.append(e)
+                    iarg = len(args)
                 else:
                     # All other arguments are treated as scalars.
-                    value = args[iarg]
+                    # Pass through argument class get() for validation, conversion, etc..
+                    try:
+                        value = arg.get(args[iarg])
+                    except ArgumentException, e:
+                        exceptions.append(e)
                     iarg += 1
-                setattr(verb_opts, arg.name, value)
-        # Abort if extra arguments were provided.
+                if value is not None:
+                    setattr(verb_opts, arg.name, value)
+        # Run the gauntlet of error disclosure. Abort and display usage as appropriate.
+        had_errors = 0
+        show_usage = False
+        if exceptions:
+            msg = 'Argument value %s:' % utility.pluralize('error', len(exceptions))
+            utility.error(msg, [e.message for e in exceptions])
+            had_errors += 1
         if iarg < len(args):
-            utility.abort('Extra arguments were provided:', args[iarg:])
-        # Abort if arguments are missing.
+            self._abort('Extra arguments were provided:', args[iarg:])
+            had_errors += 1
+            show_usage = True
         if missing:
-            if len(missing) > 1:
-                plural = 's'
-            else:
-                plural = ''
             fmt = '%%-%ds  %%s' % max([len(o) for (o, h) in missing])
-            self._abort('Missing required argument%s:' % plural,
-                        (fmt % (o.upper(), h) for (o, h) in missing))
+            msg = 'Missing required %s:' % utility.pluralize('argument', len(missing))
+            utility.error(msg, [fmt % (o.upper(), h) for (o, h) in missing])
+            had_errors += 1
+            show_usage = True
+        if had_errors > 0:
+            if show_usage:
+                self._abort()
+            sys.exit(1)
 
     def initialize_verb(self, verb_name):
         """
@@ -467,7 +521,7 @@ class CLIParser(ExtendedHelpOptionParser):
         description2 = self.verb.cli_spec.get_attr('description2', None)
         if description2:
             lines.extend(('', description2))
-        return '\n%s' % ('\n'.join(lines))
+        return '\n%s\n' % ('\n'.join(lines))
 
     def _abort(self, *msgs):
         utility.error(*msgs)
