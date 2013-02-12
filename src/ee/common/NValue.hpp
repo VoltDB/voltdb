@@ -441,7 +441,7 @@ class NValue {
     static ValueType s_doublePromotionTable[];
     static TTInt s_maxDecimalValue;
     static TTInt s_minDecimalValue;
-    // These initializers give the unique double values that are 
+    // These initializers give the unique double values that are
     // closest but not equal to +/-1E26 within the accuracy of a double.
     static const double s_gtMaxDecimalAsDouble = 1E26;
     static const double s_ltMinDecimalAsDouble = -1E26;
