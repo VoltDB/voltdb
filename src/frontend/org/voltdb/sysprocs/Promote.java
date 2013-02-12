@@ -21,17 +21,17 @@ import java.util.Map;
 
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.ReplicationRole;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 
 @ProcInfo(singlePartition = false)
-public class PromoteReplicaStatus extends VoltSystemProcedure {
+public class Promote extends VoltSystemProcedure {
 
     @Override
     public void init() {}
@@ -41,7 +41,7 @@ public class PromoteReplicaStatus extends VoltSystemProcedure {
                                               long fragmentId,
                                               ParameterSet params,
                                               SystemProcedureExecutionContext context) {
-        throw new RuntimeException("@PromoteReplicaStatus was given an " +
+        throw new RuntimeException("@Promote was given an " +
                                    "invalid fragment id: " + String.valueOf(fragmentId));
     }
 
