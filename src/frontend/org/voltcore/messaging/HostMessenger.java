@@ -596,9 +596,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * Do the usual thing of waiting for the agreement site
          * to join the cluster and creating the client
          */
+        ImmutableSet.Builder<Long> verbotenThreadBuilder = ImmutableSet.<Long>builder();
+        verbotenThreadBuilder.addAll(m_network.getThreadIds());
+        verbotenThreadBuilder.addAll(m_agreementSite.getThreadIds());
         m_agreementSite.waitForRecovery();
         m_zk = org.voltcore.zk.ZKUtil.getClient(
-                m_config.zkInterface, 60 * 1000, ImmutableSet.<Long>copyOf(m_network.getThreadIds()));
+                m_config.zkInterface, 60 * 1000, verbotenThreadBuilder.build());
         if (m_zk == null) {
             throw new Exception("Timed out trying to connect local ZooKeeper instance");
         }
