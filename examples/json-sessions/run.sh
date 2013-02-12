@@ -19,7 +19,7 @@ else
     VOLTDB_VOLTDB="`pwd`/../../voltdb"
 fi
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+APPCLASSPATH=$CLASSPATH:$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -33,7 +33,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH:gson-2.2.2.jar -d obj \
+    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH:gson-2.2.2.jar -d obj \
         src/json/*.java \
         src/json/procedures/*.java
     # stop if compilation fails
@@ -66,12 +66,12 @@ function client() {
 # Use this target for argument help
 function json-client-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj json.JSONClient --help
+    java -classpath obj:$APPCLASSPATH:obj json.JSONClient --help
 }
 
 function json-client() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj:gson-2.2.2.jar -Dlog4j.configuration=file://$LOG4J json.JSONClient
+    java -classpath obj:$APPCLASSPATH:obj:gson-2.2.2.jar -Dlog4j.configuration=file://$LOG4J json.JSONClient
 }
 
 
