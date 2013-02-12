@@ -1733,29 +1733,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
-    void promote( final Config sysProc, final StoredProcedureInvocation task,
-            final Connection ccxn, final ClientInputHandler handler,
-            final int messageSize) {
-
-        StoredProcedureInvocation promoteTask = task.getShallowCopy();
-        promoteTask.setProcName("@PromoteReplicaStatus");
-
-        createTransaction(
-                handler.connectionId(),
-                handler.m_hostname,
-                handler.isAdmin(),
-                promoteTask,
-                sysProc.getReadonly(),
-                sysProc.getSinglepartition(),
-                sysProc.getEverysite(),
-                m_allPartitions,
-                m_allPartitions.length,
-                ccxn,
-                messageSize,
-                System.currentTimeMillis(),
-                false);
-    }
-
     ClientResponseImpl dispatchPromote(Config sysProc,
                                        ByteBuffer buf,
                                        StoredProcedureInvocation task,
@@ -1771,7 +1748,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // This only happens on one node so we don't need to pick a leader.
-        promote( sysProc, task, ccxn, handler, buf.capacity());
+        createTransaction(
+                handler.connectionId(),
+                handler.m_hostname,
+                handler.isAdmin(),
+                task,
+                sysProc.getReadonly(),
+                sysProc.getSinglepartition(),
+                sysProc.getEverysite(),
+                m_allPartitions,
+                m_allPartitions.length,
+                ccxn,
+                buf.capacity(),
+                System.currentTimeMillis(),
+                false);
+
         return null;
     }
 
@@ -1825,11 +1816,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if (task.procName.equals("@SendSentinel")) {
                 dispatchSendSentinel(handler.connectionId(), now, buf.capacity(), task);
                 return null;
-            }
-            else if (task.procName.equals("@Promote")) {
-                // Map @Promote to @PromoteReplicaState.
-                sysProc = SystemProcedureCatalog.listing.get("@PromoteReplicaStatus");
-                assert(sysProc != null);
             }
         }
 
