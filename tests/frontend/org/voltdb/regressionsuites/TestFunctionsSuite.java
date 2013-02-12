@@ -2215,24 +2215,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("WHERE_FLOAT_CAST_FLOAT",   "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS FLOAT) = ?");
         project.addStmtProcedure("WHERE_FLOAT_CAST_DECIMAL", "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS FLOAT) = ?");
 
-        // Fudge slightly around the non-support for FLOAT-to-DECIMAL casting. (Should this be supported?)
-        project.addStmtProcedure("DISPLAY_DECIMAL", "select CAST(INTEGERNUM AS DECIMAL), CAST(TINYNUM AS DECIMAL), CAST(SMALLNUM AS DECIMAL), CAST(BIGNUM AS DECIMAL), CAST(DECIMALNUM AS DECIMAL), CAST(DECIMALNUM AS DECIMAL) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_DECIMAL", "select CAST(INTEGERNUM AS DECIMAL), CAST(TINYNUM AS DECIMAL), CAST(SMALLNUM AS DECIMAL), CAST(BIGNUM AS DECIMAL), CAST(FLOATNUM AS DECIMAL), CAST(DECIMALNUM AS DECIMAL) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_INTEGER", "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_TINYINT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_SMALLINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_BIGINT",     "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS DECIMAL)");
-        // Fudge slightly around the non-support for FLOAT-to-DECIMAL casting. (Should this be supported?)
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_FLOAT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM   AS DECIMAL)");
-        project.addStmtProcedure("ORDER_DECIMAL_CAST_DECIMAL", "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS DECIMAL)");
 
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_INTEGER", "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_TINYINT",    "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_SMALLINT",   "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_BIGINT",     "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS DECIMAL) = ?");
-        // Fudge slightly around the non-support for FLOAT-to-DECIMAL casting. (Should this be supported?)
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_FLOAT",   "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM   AS DECIMAL) = ?");
-        project.addStmtProcedure("WHERE_DECIMAL_CAST_DECIMAL", "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS DECIMAL) = ?");
 
         project.addStmtProcedure("DISPLAY_SUBSTRING", "select SUBSTRING (DESC FROM 2) from P1 where ID = -12");
         project.addStmtProcedure("DISPLAY_SUBSTRING2", "select SUBSTRING (DESC FROM 2 FOR 2) from P1 where ID = -12");

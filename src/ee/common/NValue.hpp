@@ -67,7 +67,10 @@ template<typename T>
 void throwCastSQLValueOutOfRangeException(
         const T value,
         const ValueType origType,
-        const ValueType newType);
+        const ValueType newType)
+{
+    throwCastSQLValueOutOfRangeException((intmax_t)value, origType, newType);
+}
 
 template<>
 inline void throwCastSQLValueOutOfRangeException<double>(
@@ -122,7 +125,8 @@ inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function
                                             "The C++ configuration (e.g. \"g++ --fast-math\") "
                                             "does not support SQL standard handling of numeric infinity errors.");
     // This uses a standard test for NaN, even though that fails in some configurations like LINUX "g++ -ffast-math".
-    // If it is known to fail in the current config, a warning has been sent to the log, so at this point, just relax the check.
+    // If it is known to fail in the current config, a warning has been sent to the log,
+    // so at this point, just relax the check.
     if ((warned_once_no_nan || ! std::isnan(value)) && (warned_once_no_inf || ! non_std_isinf(value))) {
         return;
     }
@@ -427,7 +431,6 @@ class NValue {
 
     // Function declarations for NValue.cpp definitions.
     void createDecimalFromString(const std::string &txt);
-    void createDecimalFromDouble(double& dbl);
     std::string createStringFromDecimal() const;
     NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
     NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
@@ -436,8 +439,12 @@ class NValue {
     static ValueType s_intPromotionTable[];
     static ValueType s_decimalPromotionTable[];
     static ValueType s_doublePromotionTable[];
-    static TTInt s_maxDecimal;
-    static TTInt s_minDecimal;
+    static TTInt s_maxDecimalValue;
+    static TTInt s_minDecimalValue;
+    // These initializers give the unique double values that are 
+    // closest but not equal to +/-1E26 within the accuracy of a double.
+    static const double s_gtMaxDecimalAsDouble = 1E26;
+    static const double s_ltMinDecimalAsDouble = -1E26;
 
     static ValueType promoteForOp(ValueType vta, ValueType vtb) {
         ValueType rt;
@@ -869,9 +876,10 @@ class NValue {
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
             TTInt fractional(scaledValue);
-            whole /= NValue::kMaxScaleFactor;
-            fractional %= NValue::kMaxScaleFactor;
-            retval = static_cast<double>(whole.ToInt()) + ((double)fractional.ToInt())/((double)NValue::kMaxScaleFactor);
+            whole /= kMaxScaleFactor;
+            fractional %= kMaxScaleFactor;
+            retval = static_cast<double>(whole.ToInt()) +
+                    (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
             return retval;
           }
           case VALUE_TYPE_VARCHAR:
@@ -896,13 +904,25 @@ class NValue {
           case VALUE_TYPE_INTEGER:
           case VALUE_TYPE_BIGINT:
           case VALUE_TYPE_TIMESTAMP: {
-            int64_t value = castAsBigIntAndGetValue();
+            int64_t value = castAsRawInt64AndGetValue();
             TTInt retval(value);
             retval *= NValue::kMaxScaleFactor;
             return retval;
           }
           case VALUE_TYPE_DECIMAL:
               return getDecimal();
+          case VALUE_TYPE_DOUBLE: {
+            int64_t intValue = castAsBigIntAndGetValue();
+            TTInt retval(intValue);
+            retval *= NValue::kMaxScaleFactor;
+
+            double value = getDouble();
+            value -= (double)intValue; // isolate decimal part
+            value *= NValue::kMaxScaleFactor; // scale up to integer.
+            TTInt fracval((int64_t)value);
+            retval += fracval;
+            return retval;
+          }
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
           default:
@@ -1217,27 +1237,28 @@ class NValue {
                 std::string fancyText = fancy.str();
                 size_t ePos = fancyText.find('E', 3); // find E after "[-]n.n".
                 assert(ePos != std::string::npos);
-                size_t endSignificantMantissa;
+                size_t endSignifMantissa;
                 // Never truncate mantissa down to the bare '.' EVEN for the case of "n.0".
-                for (endSignificantMantissa = ePos; fancyText[endSignificantMantissa-2] != '.'; --endSignificantMantissa) {
+                for (endSignifMantissa = ePos; fancyText[endSignifMantissa-2] != '.'; --endSignifMantissa) {
                     // Only truncate trailing '0's.
-                    if (fancyText[endSignificantMantissa-1] != '0') {
+                    if (fancyText[endSignifMantissa-1] != '0') {
                         break; // from loop
                     }
                 }
                 const char* optionalSign = (fancyText[ePos+1] == '-') ? "-" : "";
-                size_t startSignificantExponent;
+                size_t startSignifExponent;
                 // Always keep at least 1 exponent digit.
                 size_t endExponent = fancyText.length()-1;
-                for (startSignificantExponent = ePos+1; startSignificantExponent < endExponent; ++startSignificantExponent) {
-                    const char& exponentLeadChar = fancyText[startSignificantExponent];
+                for (startSignifExponent = ePos+1; startSignifExponent < endExponent; ++startSignifExponent) {
+                    const char& exponentLeadChar = fancyText[startSignifExponent];
                     // Only skip leading '-'s, '+'s and '0's.
                     if (exponentLeadChar != '-' && exponentLeadChar != '+' && exponentLeadChar != '0') {
                         break; // from loop
                     }
                 }
                 // Bring the truncated pieces together.
-                value << fancyText.substr(0, endSignificantMantissa) << 'E' << optionalSign << fancyText.substr(startSignificantExponent);
+                value << fancyText.substr(0, endSignifMantissa)
+                      << 'E' << optionalSign << fancyText.substr(startSignifExponent);
             }
             break;
         case VALUE_TYPE_DECIMAL:
@@ -1274,6 +1295,13 @@ class NValue {
         return retval;
     }
 
+    void createDecimalFromInt(int64_t rhsint)
+    {
+        TTInt scaled(rhsint);
+        scaled *= NValue::kMaxScaleFactor;
+        getDecimal() = scaled;
+    }
+
     NValue castAsDecimal() const {
         NValue retval(VALUE_TYPE_DECIMAL);
         const ValueType type = getValueType();
@@ -1282,19 +1310,47 @@ class NValue {
             return retval;
         }
         switch (type) {
-          case VALUE_TYPE_TINYINT:
-          case VALUE_TYPE_SMALLINT:
-          case VALUE_TYPE_INTEGER:
-          case VALUE_TYPE_BIGINT:
-          {
-              int64_t rhsint = castAsBigIntAndGetValue();
-              TTInt retval(rhsint);
-              retval *= NValue::kMaxScaleFactor;
-              return getDecimalValue(retval);
-         }
+        case VALUE_TYPE_TINYINT:
+        case VALUE_TYPE_SMALLINT:
+        case VALUE_TYPE_INTEGER:
+        case VALUE_TYPE_BIGINT:
+        {
+            int64_t rhsint = castAsRawInt64AndGetValue();
+            retval.createDecimalFromInt(rhsint);
+            break;
+        }
         case VALUE_TYPE_DECIMAL:
             ::memcpy(retval.m_data, m_data, sizeof(TTInt));
             break;
+        case VALUE_TYPE_DOUBLE:
+        {
+            const double& value = getDouble();
+            if (value >= s_gtMaxDecimalAsDouble || value <= s_ltMinDecimalAsDouble) {
+                char message[4096];
+                snprintf(message, 4096, "Attempted to cast value %f causing overflow/underflow", value);
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
+            }
+            // Resort to string as the intermediary since even int64_t does not cover the full range.
+            char decimalAsString[41]; // Large enough to account for digits, sign, decimal, and terminating null.
+            snprintf(decimalAsString, sizeof(decimalAsString), "%.12f", value);
+            // Shift the entire integer part 1 digit to the right, overwriting the decimal point.
+            // This effectively creates a potentially very large integer value
+            //  equal to the original double scaled up by 10^12.
+            for (char* intDigit = strchr(decimalAsString, '.'); intDigit > decimalAsString; --intDigit) {
+                *intDigit = *(intDigit-1);
+            }
+            TTInt result(decimalAsString+1);
+            retval.getDecimal() = result;
+            break;
+        }
+        case VALUE_TYPE_VARCHAR:
+        {
+            const int32_t length = getObjectLength();
+            const char* bytes = reinterpret_cast<const char*>(getObjectValue());
+            const std::string value(bytes, length);
+            retval.createDecimalFromString(value);
+            break;
+        }
         default:
             throwCastSQLException(type, VALUE_TYPE_DECIMAL);
         }
@@ -1317,7 +1373,9 @@ class NValue {
             const int32_t objectLength = getObjectLength();
             if (objectLength > maxLength) {
                 char msg[1024];
-                snprintf(msg, 1024, "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d", objectLength, maxLength);
+                snprintf(msg, 1024,
+                         "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d",
+                                    objectLength, maxLength);
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                    msg);
             }
@@ -1708,7 +1766,7 @@ class NValue {
         }
 
         TTInt retval(lhs.getDecimal());
-        if (retval.Add(rhs.getDecimal()) || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
+        if (retval.Add(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to add %s with %s causing overflow/underflow",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str());
@@ -1733,7 +1791,7 @@ class NValue {
         }
 
         TTInt retval(lhs.getDecimal());
-        if (retval.Sub(rhs.getDecimal()) || retval > NValue::s_maxDecimal || retval < NValue::s_minDecimal) {
+        if (retval.Sub(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to subtract %s from %s causing overflow/underflow",
                     rhs.createStringFromDecimal().c_str(), lhs.createStringFromDecimal().c_str());
