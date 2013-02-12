@@ -1733,57 +1733,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
-    /**
-     * Allows delayed transaction for @Promote promotion so that it can optionally
-     * happen after a truncation snapshot. (ENG-3880)
-     */
-    private class Promoter
-    {
-        final Config m_sysProc;
-        final StoredProcedureInvocation m_task;
-        final Connection m_ccxn;
-        final boolean m_isAdmin;
-        final String m_hostName;
-        final long m_connectionId;
-        final int m_messageSize;
+    void promote( final Config sysProc, final StoredProcedureInvocation task,
+            final Connection ccxn, final ClientInputHandler handler,
+            final int messageSize) {
 
-        // Constructor
-        Promoter(final Config sysProc,
-                 final StoredProcedureInvocation task,
-                 final Connection ccxn,
-                 final boolean isAdmin,
-                 final String hostName,
-                 final long connectionId,
-                 final int messageSize)
-        {
-            m_sysProc = sysProc;
-            m_task = task.getShallowCopy();
-            m_task.setProcName("@PromoteReplicaStatus");
-            m_ccxn = ccxn;
-            m_isAdmin = isAdmin;
-            m_hostName = hostName;
-            m_connectionId = connectionId;
-            m_messageSize = messageSize;
-        }
+        StoredProcedureInvocation promoteTask = task.getShallowCopy();
+        promoteTask.setProcName("@PromoteReplicaStatus");
 
-        // Promote the replica.
-        void promote() {
-            m_task.procName = "@PromoteReplicaStatus";
-            int[] involvedPartitions = m_allPartitions;
-            createTransaction(m_connectionId,
-                              m_hostName,
-                              m_isAdmin,
-                              m_task,
-                              m_sysProc.getReadonly(),
-                              m_sysProc.getSinglepartition(),
-                              m_sysProc.getEverysite(),
-                              involvedPartitions,
-                              involvedPartitions.length,
-                              m_ccxn,
-                              m_messageSize,
-                              System.currentTimeMillis(),
-                              false);
-        }
+        createTransaction(
+                handler.connectionId(),
+                handler.m_hostname,
+                handler.isAdmin(),
+                promoteTask,
+                sysProc.getReadonly(),
+                sysProc.getSinglepartition(),
+                sysProc.getEverysite(),
+                m_allPartitions,
+                m_allPartitions.length,
+                ccxn,
+                messageSize,
+                System.currentTimeMillis(),
+                false);
     }
 
     ClientResponseImpl dispatchPromote(Config sysProc,
@@ -1800,10 +1770,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
 
-        Promoter promoter = new Promoter(sysProc, task, ccxn, handler.isAdmin(),
-                                         handler.m_hostname, handler.connectionId(), buf.capacity());
         // This only happens on one node so we don't need to pick a leader.
-        promoter.promote();
+        promote( sysProc, task, ccxn, handler, buf.capacity());
         return null;
     }
 
