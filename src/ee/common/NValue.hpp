@@ -69,7 +69,7 @@ void throwCastSQLValueOutOfRangeException(
         const ValueType origType,
         const ValueType newType)
 {
-    throwCastSQLValueOutOfRangeException((intmax_t)value, origType, newType);
+    throwCastSQLValueOutOfRangeException((const int64_t)value, origType, newType);
 }
 
 template<>
