@@ -1214,11 +1214,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = true;
-/*  
-GARBAGE MATCH
-        final boolean expectDouble = true;
-        functionTest(fname, nonnegs, resultValues, filters, monotonic, ascending, expectDouble);
-*/
         final String expectedFormat = "DOUBLE";
         functionTest(fname, nonnegs, resultValues, filters, monotonic, ascending, expectedFormat);
     }
