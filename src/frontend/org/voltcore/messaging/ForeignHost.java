@@ -72,6 +72,8 @@ public class ForeignHost {
             m_isUp = false;
             if (!m_closing)
             {
+                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostname());
+                hostLog.warn("Received remote hangup from foreign host " + hostname());
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
         }
@@ -222,6 +224,7 @@ public class ForeignHost {
             hostLog.info("\tlast message: " + m_lastMessageMillis);
             hostLog.info("\tdelta (millis): " + current_delta);
             hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
+            VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
     }
