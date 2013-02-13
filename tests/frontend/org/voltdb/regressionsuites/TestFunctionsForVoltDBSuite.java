@@ -503,6 +503,34 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(9L,result.getLong(0));
 
+        cr = client.callProcedure("LikeFieldProc", "tag");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(2, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(2L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+
+        cr = client.callProcedure("LikeNoParamFieldProc");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(2, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(2L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+
+        // Try the last query as an ad hoc -- this gets different constant/parameter handling.
+        cr = client.callProcedure("@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') LIKE 't%' ORDER BY 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(2, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(2L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+
         cr = client.callProcedure("NullFieldProc", "funky");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -606,17 +634,25 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "  DOC VARCHAR(8192),\n" +
                 "  PRIMARY KEY(ID))\n" +
                 ";\n" +
+                "CREATE INDEX TAGS1 ON JS1 ( FIELD(DOC, 'tag') )\n" +
+                ";\n" +
                 "CREATE PROCEDURE FieldProc AS\n" +
-                "   SELECT FIELD(DOC, ?) AS JFIELD FROM JS1 WHERE FIELD( DOC, ?) = ?\n" +
+                "   SELECT FIELD(DOC, ?) AS JFIELD FROM JS1 WHERE FIELD(DOC, ?) = ?\n" +
                 ";\n" +
                 "CREATE PROCEDURE IdFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD( DOC, ?) = ? ORDER BY ID\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
                 ";\n" +
                 "CREATE PROCEDURE InnerFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ? ORDER BY ID\n" +
                 ";\n" +
                 "CREATE PROCEDURE NullFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD( DOC, ?) IS NULL ORDER BY ID\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE LikeFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) LIKE 't%' ORDER BY 1\n" +
+                ";\n" +
+                "CREATE PROCEDURE LikeNoParamFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') LIKE 't%' ORDER BY 1\n" +
                 ";\n" +
                 "CREATE TABLE JSBAD (\n" +
                 "  ID INTEGER NOT NULL,\n" +

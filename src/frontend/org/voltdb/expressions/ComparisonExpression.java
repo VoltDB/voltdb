@@ -88,4 +88,48 @@ public class ComparisonExpression extends AbstractExpression {
         m_valueType = VoltType.BIGINT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
+
+    private ComparisonExpression rangeFilterFromPrefixLike(ExpressionType rangeComparator, String comparand) {
+        ConstantValueExpression cve = new ConstantValueExpression();
+        cve.setValueType(VoltType.STRING);
+        cve.setValue(comparand);
+        cve.setValueSize(comparand.length());
+        ComparisonExpression rangeFilter = new ComparisonExpression(rangeComparator, m_left, cve);
+        return rangeFilter;
+    }
+
+    private String extractLikePatternPrefix() {
+        assert(getExpressionType() == ExpressionType.COMPARE_LIKE);
+        ConstantValueExpression cve;
+        if (m_right instanceof ParameterValueExpression) {
+            ParameterValueExpression pve = (ParameterValueExpression)m_right;
+            cve = pve.getOriginalValue();
+        }
+        else {
+            assert(m_right instanceof ConstantValueExpression);
+            cve = (ConstantValueExpression)m_right;
+        }
+        String pattern = cve.getValue();
+        return pattern.substring(0, pattern.length()-1);
+    }
+
+    private String extractAndIncrementLikePatternPrefix() {
+        String starter = extractLikePatternPrefix();
+        // Right or wrong, this mimics what HSQL does for the case of " column LIKE prefix-pattern ".
+        String ender = starter + "\uffff";
+        return ender;
+    }
+
+    public ComparisonExpression getGteFilterFromPrefixLike() {
+        ExpressionType rangeComparator = ExpressionType.COMPARE_GREATERTHANOREQUALTO;
+        String comparand = extractLikePatternPrefix();
+        return rangeFilterFromPrefixLike(rangeComparator, comparand);
+    }
+
+    public ComparisonExpression getLtFilterFromPrefixLike() {
+        ExpressionType rangeComparator = ExpressionType.COMPARE_LESSTHAN;
+        String comparand = extractAndIncrementLikePatternPrefix();
+        return rangeFilterFromPrefixLike(rangeComparator, comparand);
+    }
+
 }

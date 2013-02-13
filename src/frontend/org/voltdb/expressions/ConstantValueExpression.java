@@ -264,4 +264,19 @@ public class ConstantValueExpression extends AbstractValueExpression {
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
 
+    public boolean isPrefixPatternString() {
+        String patternString = getValue();
+        int length = patternString.length();
+        if (length == 0) {
+            return false;
+        }
+        int firstWildcard = patternString.indexOf('%');
+        // Indexable filters have only trailing '%'s.
+        // NOTE: not bothering to check for silly synonym patterns with multiple trailing '%'s.
+        if (firstWildcard != length-1) {
+            return false;
+        }
+        return true;
+    }
+
 }
