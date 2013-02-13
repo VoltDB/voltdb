@@ -541,6 +541,10 @@ public class VoltDB {
         return m_config.m_backend;
     }
 
+    /*
+     * Create a file that starts with the supplied message that contains
+     * human readable stack traces for all java threads in the current process.
+     */
     public static void dropStackTrace(String message) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
         String dateString = sdf.format(new Date());
@@ -568,9 +572,17 @@ public class VoltDB {
         }
     }
 
+    /*
+     * Print stack traces for all java threads in the current process to the supplied writer
+     */
     public static void printStackTraces(PrintWriter writer) {
         printStackTraces(writer, null);
     }
+
+    /*
+     * Print stack traces for all threads in the process to the supplied writer.
+     * If a List is supplied then the stack frames for the current thread will be placed in it
+     */
     public static void printStackTraces(PrintWriter writer, List<String> currentStacktrace) {
         if (currentStacktrace == null) {
             currentStacktrace = new ArrayList<String>();
