@@ -659,7 +659,6 @@ public class VoltDB {
         }
 
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
-        currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
         StackTraceElement[] myTrace = traces.get(Thread.currentThread());
         for (StackTraceElement ste : myTrace) {
             currentStacktrace.add(ste.toString());
@@ -697,6 +696,7 @@ public class VoltDB {
         // Even if the logger is null, don't stop.  We want to log the stack trace and
         // any other pertinent information to a .dmp file for crash diagnosis
         List<String> currentStacktrace = new ArrayList<String>();
+        currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
 
         // Create a special dump file to hold the stack trace
         try
