@@ -353,7 +353,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     throws IOException {
         Object[] params = new Object[2];
         params[0] = CatalogUtil.toBytes(catalogPath);
-        params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+        if (deploymentPath != null) {
+            params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+        }
+        else {
+            params[1] = null;
+        }
         return params;
     }
 
