@@ -53,6 +53,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
+import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 
 /**
@@ -935,5 +936,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public boolean validateForeignHostId(Integer hostId) {
         return !m_knownFailedHosts.contains(hostId);
+    }
+
+    public void setDeadHostTimeout(int timeout) {
+        Preconditions.checkArgument(timeout > 0, "Timeout value must be > 0, was %s", timeout);
+        hostLog.info("Dead host timeout set to " + timeout + " milliseconds");
+        m_config.deadHostTimeout = (int)timeout;
+        for (ForeignHost fh : m_foreignHosts.values()) {
+            fh.updateDeadHostTimeout(timeout);
+        }
     }
 }
