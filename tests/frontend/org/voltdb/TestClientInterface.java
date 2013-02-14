@@ -384,6 +384,9 @@ public class TestClientInterface {
         catalogResult.deploymentCRC = 1234l;
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
+        catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
+        catalogResult.originalTxnId = 12345678l;
+        catalogResult.originalUniqueId = 87654321l;
         m_ci.processFinishedCompilerWork(catalogResult).run();
 
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
@@ -407,6 +410,9 @@ public class TestClientInterface {
         assertEquals(3, invocationCaptor.getValue().getParameterAtIndex(2));
         assertEquals("blah", invocationCaptor.getValue().getParameterAtIndex(3));
         assertEquals(1234l, invocationCaptor.getValue().getParameterAtIndex(4));
+        assertEquals(ProcedureInvocationType.REPLICATED, invocationCaptor.getValue().getType());
+        assertEquals(12345678l, invocationCaptor.getValue().getOriginalTxnId());
+        assertEquals(87654321l, invocationCaptor.getValue().getOriginalUniqueId());
     }
 
     @Test
