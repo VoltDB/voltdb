@@ -95,7 +95,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotRestore.class.getName());
 
-    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private static final VoltLogger CONSOLE_LOG = new VoltLogger("CONSOLE");
 
     private static final int DEP_restoreScan = (int)
@@ -303,7 +303,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     //Sequence numbers for this table for every partition
                     Map<Integer, Long> sequenceNumberPerPartition = exportSequenceNumbers.get(name);
                     if (sequenceNumberPerPartition == null) {
-                        HOST_LOG.warn("Could not find export sequence number for table " + name +
+                        SNAP_LOG.warn("Could not find export sequence number for table " + name +
                                 ". This warning is safe to ignore if you are loading a pre 1.3 snapshot" +
                                 " which would not contain these sequence numbers (added in 1.3)." +
                                 " If this is a post 1.3 snapshot then the restore has failed and export sequence " +
@@ -314,7 +314,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     Long sequenceNumber =
                             sequenceNumberPerPartition.get(myPartitionId);
                     if (sequenceNumber == null) {
-                        HOST_LOG.warn("Could not find an export sequence number for table " + name +
+                        SNAP_LOG.warn("Could not find an export sequence number for table " + name +
                                 " partition " + myPartitionId +
                                 ". This warning is safe to ignore if you are loading a pre 1.3 snapshot " +
                                 " which would not contain these sequence numbers (added in 1.3)." +
@@ -332,7 +332,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 }
             } catch (Exception e) {
                 e.printStackTrace();//l4j doesn't print the stack trace
-                HOST_LOG.error(e);
+                SNAP_LOG.error(e);
                 result.addRow("FAILURE");
             }
             return new DependencyPair(DEP_restoreDistributeExportAndPartitionSequenceNumbers, result);
@@ -371,7 +371,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     TRACE_LOG.trace("Checking saved table digest state for restore of: "
                             + m_filePath + ", " + m_fileNonce);
                     List<JSONObject> digests =
-                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce, HOST_LOG);
+                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce, SNAP_LOG);
 
                     for (JSONObject obj : digests) {
                         result.addRow(obj.toString(), "SUCCESS", null);
@@ -382,7 +382,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     e.printStackTrace(pw);
                     pw.flush();
                     e.printStackTrace();//l4j doesn't print stack traces
-                    HOST_LOG.error(e);
+                    SNAP_LOG.error(e);
                     result.addRow(null, "FAILURE", sw.toString());
                     return new DependencyPair(DEP_restoreDigestScan, result);
                 }
@@ -1123,7 +1123,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         if ( isCLEnabled && (isStartedWithCreateAction || isStartWithNoAutomatedRestore)) {
 
             final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-            HOST_LOG.info("Requesting truncation snapshot to make data loaded by snapshot restore durable.");
+            SNAP_LOG.info("Requesting truncation snapshot to make data loaded by snapshot restore durable.");
             zk.create(
                     VoltZK.request_truncation_snapshot,
                     null,
@@ -1136,7 +1136,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                             if (rc != 0) {
                                 KeeperException.Code code = KeeperException.Code.get(rc);
                                 if (code != KeeperException.Code.NODEEXISTS) {
-                                    HOST_LOG.warn(
+                                    SNAP_LOG.warn(
                                             "Don't expect this ZK response when requesting a truncation snapshot "
                                             + code);
                                 }
@@ -1420,7 +1420,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 else
                 {
                     // LOG_TRIAGE reconsider info level here?
-                    HOST_LOG.info("Table: " + table.getTypeName() + " was saved " +
+                    SNAP_LOG.info("Table: " + table.getTypeName() + " was saved " +
                             "but is now a materialized table and will " +
                             "not be loaded from disk");
                 }
@@ -1429,7 +1429,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             {
                 if (table.getMaterializer() == null && !CatalogUtil.isTableExportOnly(m_database, table))
                 {
-                    HOST_LOG.info("Table: " + table.getTypeName() + " does not have " +
+                    SNAP_LOG.info("Table: " + table.getTypeName() + " does not have " +
                             "any savefile data and so will not be loaded " +
                             "from disk");
                 }
@@ -1514,7 +1514,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     SynthesizedPlanFragment[] restore_plan =
                             table_state.generateRestorePlan( t, st);
                     if (restore_plan == null) {
-                        HOST_LOG.error(
+                        SNAP_LOG.error(
                                 "Unable to generate restore plan for " + t.getTypeName() + " table not restored");
                         throw new VoltAbortException(
                                 "Unable to generate restore plan for " + t.getTypeName() + " table not restored");

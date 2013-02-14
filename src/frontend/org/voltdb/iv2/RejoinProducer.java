@@ -27,30 +27,22 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
-import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
-import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
-import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.SettableFuture;
 
 /**
@@ -59,13 +51,12 @@ import com.google.common.util.concurrent.SettableFuture;
  */
 public class RejoinProducer extends SiteTasker
 {
-    private static final VoltLogger HOSTLOG = new VoltLogger("HOST");
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait;
     private final SiteTaskerQueue m_taskQueue;
     private final int m_partitionId;
-    private final String m_snapshotNonce;
+    private String m_snapshotNonce;
     private final String m_whoami;
     private final AtomicBoolean m_currentlyRejoining;
     private ScheduledFuture<?> m_timeFuture;
@@ -83,7 +74,7 @@ public class RejoinProducer extends SiteTasker
         return m_liveRejoin;
     }
 
-    // Calculate the snapshot nonce first.
+    // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
     //
     // When the completion interest callback fires for the nonce,
@@ -233,7 +224,6 @@ public class RejoinProducer extends SiteTasker
     {
         m_partitionId = partitionId;
         m_taskQueue = taskQueue;
-        m_snapshotNonce = "Rejoin_" + m_partitionId + "_" + System.currentTimeMillis();
         m_completionMonitorAwait = SettableFuture.create();
         m_whoami = "Rejoin producer:" + m_partitionId + " ";
         m_currentlyRejoining = new AtomicBoolean(true);
@@ -293,6 +283,7 @@ public class RejoinProducer extends SiteTasker
         m_liveRejoin = message.getType() == RejoinMessage.Type.INITIATION;
         m_rejoinCoordinatorHsId = message.m_sourceHSId;
         m_rejoinSiteProcessor = new StreamSnapshotSink();
+        m_snapshotNonce = message.getSnapshotNonce();
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
@@ -303,15 +294,15 @@ public class RejoinProducer extends SiteTasker
                 + m_liveRejoin + ". Source site is: "
                 + CoreUtils.hsIdToString(sourceSite)
                 + " and destination rejoin processor is: "
-                + CoreUtils.hsIdToString(hsId));
+                + CoreUtils.hsIdToString(hsId)
+                + " and snapshot nonce is: "
+                + m_snapshotNonce);
 
-        // Initiate a snapshot with stream snapshot target
-        String data = makeSnapshotRequest(hsId, sourceSite);
         SnapshotCompletionAction interest = new SnapshotCompletionAction();
         interest.register();
-
-        SnapshotUtil.requestSnapshot(0l, "", m_snapshotNonce, !useLiveRejoin(), // community rejoin uses blocking snapshot (true)
-                SnapshotFormat.STREAM, data, m_handler, true);
+        // Tell the RejoinCoordinator everything it will need to know to get us our snapshot stream.
+        RejoinMessage initResp = new RejoinMessage(m_mailbox.getHSId(), sourceSite, hsId);
+        m_mailbox.send(m_rejoinCoordinatorHsId, initResp);
 
         // A little awkward here...
         // The site must stay unblocked until the first snapshot data block arrrives.
@@ -339,65 +330,14 @@ public class RejoinProducer extends SiteTasker
         firstSnapshotBlock.start();
     }
 
-    private String makeSnapshotRequest(long hsId, long sourceSite)
-    {
-        try {
-            JSONStringer jsStringer = new JSONStringer();
-            jsStringer.object();
-            jsStringer.key("hsId").value(hsId);
-            jsStringer.key("target_hsid").value(sourceSite);
-            jsStringer.endObject();
-            return jsStringer.toString();
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
-        }
-        // unreachable;
-        return null;
-    }
-
-    /*
-     * m_handler is called when a SnapshotUtil.requestSnapshot response occurs.
-     * This callback runs on the snapshot daemon thread.
-     */
-    SnapshotResponseHandler m_handler = new SnapshotResponseHandler() {
-        @Override
-        public void handleResponse(ClientResponse resp)
-        {
-            if (resp == null) {
-                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
-                        false, null);
-            } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
-                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: "
-                        + resp.getStatusString(), false, null);
-            }
-
-            VoltTable[] results = resp.getResults();
-            if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
-                String appStatus = resp.getAppStatusString();
-                if (appStatus == null) {
-                    VoltDB.crashLocalVoltDB("Rejoin snapshot request failed: "
-                            + resp.getStatusString(), false, null);
-                }
-                else {
-                    // success is buried down here...
-                    return;
-                }
-            } else {
-                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
-                        false, null);
-            }
-        }
-    };
-
     /**
      * SiteTasker run -- load this site!
      *
      * run() is invoked when the RejoinProducer (this) submits itself to the
      * site tasker. RejoinProducer submits itself to the site tasker queue
      * when rejoin data is available. Rejoin data is available after the
-     * snapshot request is fulfilled. The snapshot request is triggered
-     * by the node-wise snapshot coordinator telling this producer that it's
-     * its turn to start the rejoin sequence.
+     * snapshot request is fulfilled. The snapshot request is made by the rejoin
+     * coordinator on our behalf.
      */
     @Override
     public void run(SiteProcedureConnection siteConnection)
@@ -491,7 +431,7 @@ public class RejoinProducer extends SiteTasker
             try {
                 rejoinWork = m_rejoinSiteProcessor.take();
             } catch (InterruptedException e) {
-                HOSTLOG.warn("RejoinProducer interrupted at take()");
+                REJOINLOG.warn("RejoinProducer interrupted at take()");
                 rejoinWork = null;
             }
         }
@@ -500,6 +440,13 @@ public class RejoinProducer extends SiteTasker
 
         // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
         // m_rejoinSiteProcessor = null;
+
+        // A bit of a hack; in some large database cases with more than 2 nodes,
+        // one of the nodes can finish streaming its sites LONG before the other
+        // nodes.  Since we won't see the SnapshotCompletionMonitor fire until
+        // all sites are done, the watchdog can fire first and abort the rejoin.
+        // Just turn the watchdog off after we've gotten the last block.
+        kickWatchdog(false);
 
         /*
          * Don't notify the rejoin coordinator yet. The stream snapshot may
