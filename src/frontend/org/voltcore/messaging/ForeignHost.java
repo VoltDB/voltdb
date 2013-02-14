@@ -51,7 +51,7 @@ public class ForeignHost {
     private final SocketChannel m_sc;
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
-    private final long m_deadHostTimeout;
+    private long m_deadHostTimeout;
     private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
     /** ForeignHost's implementation of InputHandler */
@@ -73,6 +73,8 @@ public class ForeignHost {
             m_isUp = false;
             if (!m_closing)
             {
+                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostname());
+                hostLog.warn("Received remote hangup from foreign host " + hostname());
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
         }
@@ -113,8 +115,6 @@ public class ForeignHost {
         m_socket = socket.socket();
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
-        hostLog.info("Heartbeat timeout to host: " + m_socket.getRemoteSocketAddress() + " is " +
-                         m_deadHostTimeout + " milliseconds");
     }
 
     public void register(HostMessenger host) throws IOException {
@@ -222,6 +222,7 @@ public class ForeignHost {
             hostLog.info("\tlast message: " + m_lastMessageMillis);
             hostLog.info("\tdelta (millis): " + current_delta);
             hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
+            VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
     }
@@ -326,5 +327,9 @@ public class ForeignHost {
         message.put(errBytes);
         message.flip();
         m_connection.writeStream().enqueue(message);
+    }
+
+    public void updateDeadHostTimeout(int timeout) {
+        m_deadHostTimeout = timeout;
     }
 }

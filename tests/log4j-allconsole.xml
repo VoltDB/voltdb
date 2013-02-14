@@ -52,7 +52,11 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="JOIN">
+    <!-- logger name="REJOIN">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="SNAPSHOT">
         <level value="INFO"/>
     </logger -->
 

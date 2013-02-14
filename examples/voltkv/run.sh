@@ -19,7 +19,7 @@ else
     VOLTDB_VOLTDB="`pwd`/../../voltdb"
 fi
 
-CLASSPATH=$({ \
+APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
@@ -37,7 +37,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
+    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj \
         src/voltkv/*.java \
         src/voltkv/procedures/*.java
     # stop if compilation fails
@@ -70,12 +70,12 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltkv.AsyncBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj voltkv.AsyncBenchmark --help
 }
 
 function async-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -97,12 +97,12 @@ function async-benchmark() {
 # Use this target for argument help
 function sync-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltkv.SyncBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj voltkv.SyncBenchmark --help
 }
 
 function sync-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -121,12 +121,12 @@ function sync-benchmark() {
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltkv.JDBCBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj voltkv.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \

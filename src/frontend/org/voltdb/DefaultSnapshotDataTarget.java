@@ -67,7 +67,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private Runnable m_onCloseHandler = null;
 
     /*
@@ -91,6 +91,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
      * Accept a single write even though simulating a full disk is enabled;
      */
     private volatile boolean m_acceptOneWrite = false;
+
+    private boolean m_needsFinalClose = true;
 
     @SuppressWarnings("unused")
     private final String m_tableName;
@@ -150,6 +152,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();
+        m_needsFinalClose = !isReplicated;
         final FastSerializer fs = new FastSerializer();
         fs.writeInt(0);//CRC
         fs.writeInt(0);//Header length placeholder
@@ -251,13 +254,19 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     try {
                         m_channel.force(false);
                     } catch (IOException e) {
-                        hostLog.error("Error syncing snapshot", e);
+                        SNAP_LOG.error("Error syncing snapshot", e);
                     }
                     m_bytesAllowedBeforeSync.release(bytesSinceLastSync);
                 }
             }
         }, 1, 1, TimeUnit.SECONDS);
         m_syncTask = syncTask;
+    }
+
+    @Override
+    public boolean needsFinalClose()
+    {
+        return m_needsFinalClose;
     }
 
     @Override
@@ -401,7 +410,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     m_bytesWrittenSinceLastSync.addAndGet(totalWritten);
                 } catch (IOException e) {
                     m_writeException = e;
-                    hostLog.error("Error while attempting to write snapshot data to file " + m_file, e);
+                    SNAP_LOG.error("Error while attempting to write snapshot data to file " + m_file, e);
                     m_writeFailed = true;
                     throw e;
                 } finally {

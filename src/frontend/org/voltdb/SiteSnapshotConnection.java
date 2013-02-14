@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 import org.voltcore.utils.Pair;
@@ -29,12 +30,12 @@ import org.voltcore.utils.Pair;
  */
 public interface SiteSnapshotConnection
 {
-
     public void initiateSnapshots(
             Deque<SnapshotTableTask> tasks,
+            List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
-    public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
 
+    public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
 }

@@ -69,7 +69,10 @@ this="$(pwd -P)/$this"
 popd > /dev/null
 
 # the root of the VoltDB installation
-export VOLTDB_HOME=$(dirname $(dirname "$this"))
+if [ -z "${VOLTDB_HOME}" ]; then
+    export VOLTDB_HOME=$(dirname $(dirname "$this"))
+fi
+
 #echo $VOLTDB_HOME
 
 # compilation is handled by tools/volt
@@ -120,7 +123,7 @@ fi
 
 VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-3.*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
-  CLASSPATH=$VOLTDBJAR
+  CLASSPATH=$CLASSPATH:$VOLTDBJAR
 else
   echo "Couldn't find compiled VoltDB jar to run."
   exit 1
