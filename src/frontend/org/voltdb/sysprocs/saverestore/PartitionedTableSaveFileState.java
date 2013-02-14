@@ -42,7 +42,7 @@ import org.voltcore.utils.Pair;
 public class PartitionedTableSaveFileState extends TableSaveFileState
 {
     private static final VoltLogger LOG = new VoltLogger(PartitionedTableSaveFileState.class.getName());
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     public PartitionedTableSaveFileState(String tableName, long txnId)
     {
@@ -119,7 +119,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         else
         {
             // XXX Not implemented until we're going to support catalog changes
-            hostLog.error("Unable to convert partitioned table " + getTableName() + " to replicated because " +
+            SNAP_LOG.error("Unable to convert partitioned table " + getTableName() + " to replicated because " +
                 "the conversion is currently unsupported.");
         }
         return restore_plan;
@@ -214,7 +214,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             }
         }
 
-        hostLog.info("Distribution plan for table " + getTableName());
+        SNAP_LOG.info("Distribution plan for table " + getTableName());
         for (Integer host : m_partitionsAtHost.keySet()) {
             List<Integer> uncoveredPartitionsAtHostList = hostsToUncoveredPartitions
                     .get(host);
@@ -240,7 +240,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             for (Integer partition : uncoveredPartitionsAtHostList) {
                 sb.append(partition).append(' ');
             }
-            hostLog.info(sb.toString());
+            SNAP_LOG.info(sb.toString());
 
             /*
              * Assigning the FULL workload to each site. At the actual host

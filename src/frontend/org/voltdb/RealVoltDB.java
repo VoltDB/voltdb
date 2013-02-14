@@ -55,6 +55,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -72,6 +73,8 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+
+import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -504,7 +507,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
                     hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
 
-                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, hsidsToRejoin,
+                    m_rejoinCoordinator = new Iv2RejoinCoordinator(m_messenger, hsidsToRejoin,
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == START_ACTION.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
@@ -1196,6 +1199,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES);
+        GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
     int readDeploymentAndCreateStarterCatalogContext() {
@@ -1244,8 +1248,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             // note the heart beats are specified in seconds in xml, but ms internally
             HeartbeatType hbt = m_deployment.getHeartbeat();
-            if (hbt != null)
+            if (hbt != null) {
                 m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
+                m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
+            }
+
 
             // create a dummy catalog to load deployment info into
             Catalog catalog = new Catalog();

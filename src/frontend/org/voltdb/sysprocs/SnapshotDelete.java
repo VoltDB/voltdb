@@ -37,7 +37,7 @@ import org.voltdb.utils.VoltFile;
 @ProcInfo(singlePartition = false)
 public class SnapshotDelete extends VoltSystemProcedure {
 
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotStatus.class.getName());
 
@@ -95,7 +95,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
                                 }
                             }
                         }
-                        hostLog.info(sb.toString());
+                        SNAP_LOG.info(sb.toString());
                     }
                 }.start();
             }
@@ -181,7 +181,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
         final long endTime = System.currentTimeMillis();
         final long duration = endTime -startTime;
-        hostLog.info("Finished deleting snapshots. Took " + duration + " milliseconds");
+        SNAP_LOG.info("Finished deleting snapshots. Took " + duration + " milliseconds");
         return results;
     }
 

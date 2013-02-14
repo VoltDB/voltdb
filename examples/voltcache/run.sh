@@ -19,7 +19,7 @@ else
     VOLTDB_VOLTDB="`pwd`/../../voltdb"
 fi
 
-CLASSPATH=$({ \
+APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
@@ -37,7 +37,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
+    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj \
         src/voltcache/*.java \
         src/voltcache/api/*.java \
         src/voltcache/procedures/*.java
@@ -73,12 +73,12 @@ function client() {
 # Use this target for argument help
 function benchmark-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltcache.Benchmark --help
+    java -classpath obj:$APPCLASSPATH:obj voltcache.Benchmark --help
 }
 
 function benchmark() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltcache.Benchmark \
         --threads=40 \
         --displayinterval=5 \
@@ -96,7 +96,7 @@ function benchmark() {
 # Help on the Memcached Interface Server
 function memcached-interface-help() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltcache.api.MemcachedInterfaceServer --help
+    java -classpath obj:$APPCLASSPATH:obj voltcache.api.MemcachedInterfaceServer --help
 }
 
 # Provides a sample protocol transalation between VoltCache and Memcached, allowing
@@ -104,7 +104,7 @@ function memcached-interface-help() {
 # change (Text Protocol only)
 function memcached-interface() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj voltcache.api.MemcachedInterfaceServer \
+    java -classpath obj:$APPCLASSPATH:obj voltcache.api.MemcachedInterfaceServer \
         --vservers=localhost \
         --mport=11211
 }

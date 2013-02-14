@@ -41,7 +41,7 @@ import org.voltdb.utils.VoltFile;
  * when leaving this class.
  */
 public class SequentialRejoinCoordinator extends RejoinCoordinator {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     // This lock synchronizes all data structure access. Do not hold this
     // across blocking external calls.
