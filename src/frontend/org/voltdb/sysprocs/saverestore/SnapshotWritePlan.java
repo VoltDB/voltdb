@@ -161,7 +161,8 @@ public abstract class SnapshotWritePlan
                 try {
                     sdt.close();
                 } catch (Exception e) {
-                    SNAP_LOG.error(ex);
+                    SNAP_LOG.error("Failed to create snapshot write plan: " + ex.getMessage(), ex);
+                    SNAP_LOG.error("Failed closing data target after error: " + e.getMessage(), e);
                 }
             }
 
@@ -176,7 +177,7 @@ public abstract class SnapshotWritePlan
                     "FAILURE",
                     "SNAPSHOT INITIATION OF " + file_path + file_nonce +
                     "RESULTED IN Exception: \n" + sw.toString());
-            SNAP_LOG.error(ex);
+            SNAP_LOG.error("Failed to create snapshot write plan: " + ex.getMessage(), ex);
             return true;
         }
     }
@@ -264,7 +265,7 @@ public abstract class SnapshotWritePlan
                 sdt.close();
             }
         } catch (Exception e) {
-            SNAP_LOG.error(e);
+            SNAP_LOG.error("Failed to close snapshot data target after error: " + e.getMessage(), e);
         }
 
         StringWriter sw = new StringWriter();
