@@ -38,6 +38,7 @@ import pwd
 import grp
 import re
 from copy import copy
+import string
 
 myname = os.path.splitext(os.path.basename(__file__))[0]
 mydir  = os.path.dirname(os.path.realpath(__file__))
@@ -199,9 +200,13 @@ class Metadata:
         # Detect and configure for community vs. pro edition.
         if os.path.exists(os.path.join(self.volt_root, 'README.thirdparty.ent')):
             self.edition = 'voltdb-ent'
+            self.summary = 'VoltDB In-Memory Database Enterprise Edition'
+            self.license = 'Proprietary'
             src_dist_subdir = os.path.join('obj', 'pro', '%s-%s' % (self.edition, self.version))
         else:
             self.edition = 'voltdb'
+            self.summary = 'VoltDB In-Memory Database Community Edition'
+            self.license = 'AGPL'
             src_dist_subdir = os.path.join('obj', 'release', 'dist')
         # Detect and configure for distribution vs. source tree.
         if os.path.isdir(os.path.join(self.volt_root, 'obj')):
@@ -209,7 +214,7 @@ class Metadata:
         else:
             self.dist_subdir = ''
         # Property dictionary used for generating Debian control file.
-        self.control = dict(
+        self.deb_control = dict(
             pkgname     = self.edition,
             pkgrelease  = 1,
             arch        = 'amd64',
@@ -235,7 +240,7 @@ flawless fault tolerance and enable real-time visibility into the data that
 drives business value.''')
         )
         # Template for generating Debian control file.
-        self.control_template = '''\
+        self.deb_control_template = '''\
 Package: %(pkgname)s
 Priority: %(priority)s
 Section: %(section)s
@@ -248,6 +253,90 @@ Provides: %(provides)s
 Conflicts: %(conflicts)s
 Replaces: %(replaces)s
 Description: %(description)s
+'''
+
+        self.rpm_control = dict(
+            pkgname     = self.edition,
+            pkgversion  = self.version,
+            pkgrelease  = 1,
+            arch        = 'x86_64',
+            summary     = self.summary,
+            license     = self.license
+            )
+
+        self.rpm_control_template = '''\
+%%define        __spec_install_post %%{nil}
+%%define          debug_package %%{nil}
+
+Summary: %(summary)s
+Name: %(pkgname)s
+Version: %(pkgversion)s
+Release: %(pkgrelease)d
+License: %(license)s
+Group: Applications/Databases
+Distribution: .el6
+SOURCE0 : %%{name}-%%{version}.tar.gz
+URL: http://www.voltdb.com
+Provides: voltdb
+Conflicts: voltdb
+Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
+Requires: java >= 1.6_25, java-devel >= 1.6_25
+
+BuildRoot: %%{_tmppath}/%%{name}-%%{version}-%%{release}
+
+%%description
+VoltDB is a blazingly fast in memory (IMDB) NewSQL database system.
+
+It is specifically designed to run on modern scale-out architectures - fast,
+inexpensive servers connected via high-speed data networks.
+
+VoltDB is aimed at a new generation of database applications - real-time feeds,
+sensor-driven data streams, micro-transactions, low-latency trading systems -
+requiring database throughput that can reach millions of operations per second.
+What's more, the applications that use this data must scale on demand, provide
+flawless fault tolerance and enable real-time visibility into the data that
+drives business value.
+
+%%prep
+%%setup -q
+
+%%build
+
+%%install
+
+%%clean
+
+%%files
+%%defattr(-,root,root,-)
+%%include myfiles
+
+%%post
+ln -s /usr/share/%%{name}-%%{version}/bin/dragent       /usr/bin
+ln -s /usr/share/%%{name}-%%{version}/bin/voltadmin     /usr/bin
+ln -s /usr/share/%%{name}-%%{version}/bin/sqlcmd        /usr/bin
+ln -s /usr/share/%%{name}-%%{version}/bin/exporttofile  /usr/bin
+ln -s /usr/share/%%{name}-%%{version}/bin/voltdb        /usr/bin
+ln -s /usr/share/%%{name}-%%{version}/bin/csvloader     /usr/bin
+ln -s /usr/share/%%{name}-%%{version}/bin/voltcompiler  /usr/bin
+
+%%preun
+rm -f /usr/bin/dragent
+rm -f /usr/bin/voltadmin
+rm -f /usr/bin/sqlcmd
+rm -f /usr/bin/exporttofile
+rm -f /usr/bin/voltdb
+rm -f /usr/bin/csvloader
+rm -f /usr/bin/voltcompiler
+
+%%postun
+# remove voltdb directory tree
+if [ -n "%%{name}-%%{version}" ]; then
+    rm -rf /usr/share/%%{name}-%%{version}
+fi
+
+%%changelog
+* Fri Jan 14 2013  Phil Rosegay <support@voltdb.com> 3.0-1
+- GA-3.0
 '''
 
 # Set in main
@@ -456,9 +545,9 @@ def debian():
         # Perform substitutions with control_template to generate DEBIAN/control.
         # Merge local and global symbols.
         syms = copy(locals())
-        syms.update(meta.control)
+        syms.update(meta.deb_control)
         with open(os.path.join(debdir, 'control'), 'w') as fout:
-            fout.write(meta.control_template % syms)
+            fout.write(meta.deb_control_template % syms)
 
         ### Package creation
         pkgfile = os.path.join(meta.output_root,
@@ -474,6 +563,64 @@ def debian():
             shutil.rmtree(blddir)
 
         info('Done creating Debian package: %s' % pkgfile)
+
+def rpm():
+
+    blddir = os.path.join(meta.build_root, 'rpmbuild')
+    meta.options.prefix = blddir
+    if os.path.exists(meta.build_root):
+        info('Removing existing output directory "%s"...' % meta.build_root)
+        if not meta.options.dryrun:
+            fix_ownership(meta.build_root)
+            shutil.rmtree(meta.build_root)
+
+    # setup the rpmbuild working tree
+    for D in ["BUILD","SOURCES","RPMS","SPECS","SRPMS", "tmp"]:
+        p = os.path.join(blddir, D)
+        if not os.path.exists(p):
+            os.makedirs(os.path.join(blddir, D))
+
+    with open(os.path.join(os.environ["HOME"], ".rpmmacros"), 'w') as fout:
+        fout.write("%%_topdir\t%s\n" % blddir)
+        fout.write("%_tmppath\t%{_topdir}/tmp\n")
+
+    # assemble the SPEC file
+    syms = copy(locals())
+    syms.update(meta.rpm_control)
+    with open(os.path.join(blddir, 'SPECS', 'voltdb.spec'), 'w') as fout:
+        fout.write(meta.rpm_control_template % syms)
+
+    voltdb_dist = "%(pkgname)s-%(pkgversion)s" % syms
+    voltdb_build = voltdb_dist + "-%(pkgrelease)d" % syms
+
+    # stage the voltdb distribution files where rpmbuild needs them
+    buildroot = os.path.join(blddir, "tmp", voltdb_build)
+    #shutil.copytree(volt_root+"/..", os.path.join(buildroot, "usr", "share"), symlinks=False, ignore=None)
+    shutil.copytree(volt_root, os.path.join(buildroot, "usr", "share", voltdb_dist), symlinks=False, ignore=None)
+
+    # make a list of the files that rpmbuild will package
+    # only FILES that go into the rpm should be listed
+    # watch out for spaces and special characters in the filenames, hence the quotes
+    with ChDir(buildroot):
+        with open(os.path.join(blddir, "SPECS", "myfiles"), 'w') as fout:
+            for l in pipe_cmd("find", ".", "-type", "f"):
+                fout.write("\"%s\"\n" % string.lstrip(l, '.'))
+
+    # make an empty SOURCE tarball to satisfy rpmbuild's need to build something from source
+    rpm_sources = os.path.join(blddir, "SOURCES")
+    os.mkdir(os.path.join(rpm_sources, voltdb_dist))
+    with ChDir(os.path.join(blddir, "SOURCES")):
+        run_cmd("tar", "-cf", voltdb_dist+".tar.gz", voltdb_dist)
+        os.rmdir(voltdb_dist)
+
+    # build the rpm
+    with ChDir(os.path.join(blddir, "SPECS")):
+        run_cmd("rpmbuild", "-bb", "voltdb.spec")
+
+    # snag our new package
+    shutil.copy(os.path.join(blddir, "RPMS", "x86_64", 
+            '%(pkgname)s-%(pkgversion)s-%(pkgrelease)d.%(arch)s.rpm' % syms),
+                 meta.output_root)
 
 #### Clean package building output
 
@@ -521,10 +668,14 @@ def get_distribution_version(dist_dir):
     version = None
     try:
         info('Reading buildstring.txt from "%s"...' % jars[0])
-        with ZipFile(jars[0]) as zip:
-            with zip.open('buildstring.txt') as f:
-                version = f.readline().strip().split()[0]
-            assert version is not None
+        # see http://bugs.python.org/issue5511 Zipfile() with "with" fixed in python 2.7
+        # changed so it will work with python2.6 only for convenience
+        # with ZipFile(jars[0]) as zip:
+        #    with zip.open('buildstring.txt') as f:
+        zip = ZipFile(jars[0])
+        f = zip.open('buildstring.txt')
+        version = f.readline().strip().split()[0]
+        assert version is not None
     except (IOError, OSError, KeyError), e:
         abort('Error reading buildstring.txt from "%s".' % jars[0], e)
     return version
@@ -584,6 +735,8 @@ that tarball instead of the working directory.''')
                       help = 'create package in the specified output directory')
     parser.add_option('-p', '--prefix', type = 'string', dest = 'prefix', default = '/',
                       help = 'specify prefix directory for installation target (default=/)')
+    parser.add_option('-R', '--rpm', action = 'store_true', dest = 'rpm',
+                      help = 'create rpm package')
     parser.add_option('-u', '--uninstall', action = 'store_true', dest = 'uninstall',
                       help = 'uninstall VoltDB')
     parser.add_option('-v', '--verbose', action = 'store_true', dest = 'verbose',
@@ -611,6 +764,9 @@ that tarball instead of the working directory.''')
         if meta.options.debian:
             build_root  = tempfile.mkdtemp(prefix = '%s_' % myname, suffix = '_deb')
             clean_up_items.append(build_root)
+        elif meta.options.rpm:
+            build_root  = tempfile.mkdtemp(prefix = '%s_' % myname, suffix = '_rpmbuild')
+            clean_up_items.append(build_root)
         else:
             build_root = None
     else:
@@ -635,6 +791,9 @@ that tarball instead of the working directory.''')
             acted = True
         if meta.options.debian:
             debian()
+            acted = True
+        if meta.options.rpm:
+            rpm()
             acted = True
         if meta.options.install:
             install()
