@@ -194,6 +194,9 @@ public class AsyncCompilerAgent {
         retval.connectionId = work.connectionId;
         retval.adminConnection = work.adminConnection;
         retval.hostname = work.hostname;
+        retval.invocationType = work.invocationType;
+        retval.originalTxnId = work.originalTxnId;
+        retval.originalUniqueId = work.originalUniqueId;
 
         // catalog change specific boiler plate
         retval.catalogBytes = work.catalogBytes;
