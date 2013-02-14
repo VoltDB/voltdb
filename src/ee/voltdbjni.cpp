@@ -1004,10 +1004,8 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
             bool success = engine->activateTableStream(tableId, tableStreamType, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
-            VOLT_DEBUG("deserialized predicates");
-
-            if (success)
-                return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+            VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
+            return success;
         } catch (SerializableEEException &e) {
             engine->resetReusedResultOutputBuffer();
             e.serialize(engine->getExceptionOutputSerializer());
@@ -1103,7 +1101,7 @@ SHAREDLIB_JNIEXPORT jintArray JNICALL Java_org_voltdb_jni_ExecutionEngine_native
             } else {
                 result = (jintArray)env->NewGlobalRef(NULL);
             }
-            VOLT_DEBUG("deserialized buffers");
+            VOLT_DEBUG("deserialized %d buffers", (int)positions.size());
             return result;
         } catch (SerializableEEException &e) {
             engine->resetReusedResultOutputBuffer();

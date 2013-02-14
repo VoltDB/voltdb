@@ -1406,7 +1406,7 @@ bool VoltDBEngine::tableStreamSerializeMore(
        map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
         if (pos == m_snapshottingTables.end()) {
             // Sentinel value in element zero of -1 flags the end of stream.
-            retPositions[0] = -1;
+            retPositions.push_back(-1);
             // Success
             return true;
         } else {
@@ -1433,7 +1433,7 @@ bool VoltDBEngine::tableStreamSerializeMore(
         map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
         if (pos == m_tables.end()) {
             // Sentinel value in element zero of -1 flags the end of stream.
-            retPositions[0] = -1;
+            retPositions.push_back(-1);
             // Success
             return true;
         }
@@ -1450,8 +1450,9 @@ bool VoltDBEngine::tableStreamSerializeMore(
     // If more was streamed copy current positions for return.
     // Can this copy be avoided?
     for (size_t i = 0; i < nBuffers; i++) {
-        retPositions[i] = outputStreams[i].position();
+        retPositions.push_back(outputStreams[i].position());
     }
+
     // Success
     return true;
 }

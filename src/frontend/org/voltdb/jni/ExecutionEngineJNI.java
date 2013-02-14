@@ -494,11 +494,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (positions == null) {
             return -1;
         }
+        // TODO: Change the interface to really support multiple streams.
+        assert(positions.length == 1);
         if (positions[0] == -1) {
             return 0;
         }
-        // TODO: Change the interface to really support multiple streams.
-        assert(positions.length == 1);
         return positions[0];
     }
 
