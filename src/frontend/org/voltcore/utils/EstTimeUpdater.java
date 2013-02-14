@@ -19,10 +19,21 @@ package org.voltcore.utils;
 
 public class EstTimeUpdater {
     public static boolean update(final long now) {
-        if (EstTime.m_now.get() == now) {
+        final long estNow = EstTime.m_now.get();
+        if (estNow == now) {
             return false;
         }
         EstTime.m_now.lazySet(now);
-        return true;
+        /*
+         * Check if updating the estimated time was especially tardy.
+         * I am concerned that the thread responsible for updating the estimated
+         * time might be blocking on something and want to be able to log if
+         * that happens
+         */
+        if (now - estNow > 2000) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
