@@ -1619,6 +1619,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     task.clientHandle, handler.connectionId(), handler.m_hostname,
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
+                    task.type, task.originalTxnId, task.originalUniqueId,
                     m_adhocCompletionHandler));
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -2140,6 +2141,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                        changeResult.expectedCatalogVersion, changeResult.deploymentString,
                                        changeResult.deploymentCRC);
                         task.clientHandle = changeResult.clientHandle;
+                        // DR stuff
+                        task.type = changeResult.invocationType;
+                        task.originalTxnId = changeResult.originalTxnId;
+                        task.originalUniqueId = changeResult.originalUniqueId;
 
                         /*
                          * Round trip the invocation to initialize it for command logging
