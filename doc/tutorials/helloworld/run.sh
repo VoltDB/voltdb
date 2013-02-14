@@ -19,7 +19,7 @@ else
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
-CLASSPATH=$({ \
+APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
@@ -36,7 +36,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj *.java
+    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj *.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -61,7 +61,7 @@ function server() {
 # run the client that drives the example
 function client() {
     srccompile
-    java -classpath obj:$CLASSPATH Client
+    java -classpath obj:$APPCLASSPATH Client
 }
 
 function help() {
