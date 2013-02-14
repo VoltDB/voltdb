@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
@@ -212,7 +213,7 @@ public class ZKUtil {
         return baos.toByteArray();
     }
 
-    public static final ZooKeeper getClient(String zkAddress, int timeout) throws Exception {
+    public static final ZooKeeper getClient(String zkAddress, int timeout, Set<Long> verbotenThreads) throws Exception {
         final Semaphore zkConnect = new Semaphore(0);
         ZooKeeper zk = new ZooKeeper(zkAddress, 2000, new Watcher() {
             @Override
@@ -222,7 +223,8 @@ public class ZKUtil {
                 }
             }
 
-        });
+        },
+        verbotenThreads);
         if (!zkConnect.tryAcquire(timeout, TimeUnit.MILLISECONDS)) {
             return null;
         }

@@ -62,6 +62,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 
+import com.google.common.collect.ImmutableSet;
+
 /*
  * A wrapper around a single node ZK server. The server is a modified version of ZK that speaks the ZK
  * wire protocol and data model, but has no durability. Agreement is provided
@@ -181,8 +183,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         }
     }
 
+    private Set<Long> m_threadIds;
     public void start() throws InterruptedException, IOException {
-        m_cnxnFactory.startup(m_server);
+        m_threadIds = ImmutableSet.<Long>copyOf(m_cnxnFactory.startup(m_server));
+    }
+
+    public Set<Long> getThreadIds() {
+        return m_threadIds;
     }
 
     public void shutdown() throws InterruptedException {
