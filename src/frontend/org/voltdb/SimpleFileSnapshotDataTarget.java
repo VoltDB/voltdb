@@ -37,6 +37,7 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private final FileChannel m_fc;
     private long m_bytesWritten = 0;
     private Runnable m_onCloseTask;
+    private boolean m_needsFinalClose;
 
     /*
      * If a write fails then this snapshot is hosed.
@@ -50,11 +51,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     private volatile Throwable m_writeException = null;
 
     public SimpleFileSnapshotDataTarget(
-            File file) throws IOException {
+            File file, boolean needsFinalClose) throws IOException {
         m_file = file;
         m_tempFile = new File(m_file.getParentFile(), m_file.getName() + ".incomplete");
         RandomAccessFile ras = new RandomAccessFile(m_tempFile, "rw");
         m_fc = ras.getChannel();
+        m_needsFinalClose = needsFinalClose;
 
         m_es = CoreUtils.getSingleThreadExecutor("Snapshot write thread for " + m_file);
     }
@@ -101,6 +103,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                 return null;
             }
         });
+    }
+
+    @Override
+    public boolean needsFinalClose()
+    {
+        return m_needsFinalClose;
     }
 
     @Override

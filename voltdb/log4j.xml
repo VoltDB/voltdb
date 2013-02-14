@@ -84,6 +84,10 @@
         <level value="INFO"/>
     </logger -->
 
+    <!-- logger name="SNAPSHOT">
+        <level value="INFO"/>
+    </logger -->
+
     <!-- logger name="GC">
         <level value="INFO"/>
     </logger -->

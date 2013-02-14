@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -34,7 +34,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -65,7 +64,7 @@ import com.google.common.util.concurrent.MoreExecutors;
  */
 public class SnapshotSiteProcessor {
 
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     /** Global count of execution sites on this node performing snapshot */
     public static final Set<Object> ExecutionSitesCurrentlySnapshotting =
@@ -101,21 +100,6 @@ public class SnapshotSiteProcessor {
             }
         }
     }
-
-    //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
-    public static Map<Integer, Long> m_partitionLastSeenTransactionIds =
-            new HashMap<Integer, Long>();
-
-    /**
-     * Only proceed once permits are available after setup completes
-     */
-    public static Semaphore m_snapshotPermits = new Semaphore(0);
-
-    /**
-     * Global collection populated by snapshot creator, poll'd by individual sites
-     */
-    public static final LinkedList<Deque<SnapshotTableTask>> m_taskListsForSites =
-        new LinkedList<Deque<SnapshotTableTask>>();
 
     /**
      * Sequence numbers for export tables. This is repopulated before each snapshot by each execution site
@@ -369,9 +353,11 @@ public class SnapshotSiteProcessor {
     public void initiateSnapshots(
             ExecutionEngine ee,
             Deque<SnapshotTableTask> tasks,
+            List<SnapshotDataTarget> targets,
             long txnId,
             int numHosts,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
+    {
         ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
@@ -382,21 +368,30 @@ public class SnapshotSiteProcessor {
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
-        for (final SnapshotTableTask task : tasks) {
-            if ((!task.m_isReplicated) || (!task.m_target.getFormat().isTableBased())) {
-                assert(task != null);
-                assert(m_snapshotTargets != null);
-                m_snapshotTargets.add(task.m_target);
+        if (targets != null) { // HACK to keep legacy "working"
+            for (final SnapshotDataTarget target : targets) {
+                if (target.needsFinalClose()) {
+                    assert(m_snapshotTargets != null);
+                    m_snapshotTargets.add(target);
+                }
             }
+        }
+        for (final SnapshotTableTask task : tasks) {
+            if (targets == null) { // HACK to keep legecy "working"
+                if (task.m_target.needsFinalClose()) {
+                    m_snapshotTargets.add(task.m_target);
+                }
+            }
+            SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
             /*
              * Why do the extra work for a /dev/null target
              * Check if it is dev null and don't activate COW
              */
             if (!task.m_isDevNull) {
                 if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
-                    hostLog.error("Attempted to activate copy on write mode for table "
+                    SNAP_LOG.error("Attempted to activate copy on write mode for table "
                             + task.m_name + " and failed");
-                    hostLog.error(task);
+                    SNAP_LOG.error(task);
                     VoltDB.crashLocalVoltDB("No additional info", false, null);
                 }
             }
@@ -473,6 +468,7 @@ public class SnapshotSiteProcessor {
              */
             if (serialized == 0) {
                 final SnapshotTableTask t = m_snapshotTableTasks.poll();
+                SNAP_LOG.debug("Finished snapshot task: " + t);
                 /**
                  * Replicated tables are assigned to a single ES on each site and that ES
                  * is responsible for closing the data target. Done in a separate
@@ -519,7 +515,7 @@ public class SnapshotSiteProcessor {
                             retvalFinal.get();
                         } catch (Throwable t) {
                             if (m_lastSnapshotSucceded) {
-                                hostLog.error("Error while attempting to write snapshot data to file " +
+                                SNAP_LOG.error("Error while attempting to write snapshot data to file " +
                                         currentTask.m_target, t);
                                 m_lastSnapshotSucceded = false;
                             }
@@ -536,6 +532,7 @@ public class SnapshotSiteProcessor {
          * Check the AtomicInteger to find out if this is the last one.
          */
         if (m_snapshotTableTasks.isEmpty()) {
+            SNAP_LOG.debug("Finished with tasks");
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
             m_snapshotTargets = null;
             m_snapshotTableTasks = null;
@@ -557,6 +554,7 @@ public class SnapshotSiteProcessor {
              * sync every file descriptor and that may block for a while.
              */
             if (IamLast) {
+                SNAP_LOG.debug("I AM LAST!");
                 final long txnId = m_lastSnapshotTxnId;
                 final int numHosts = m_lastSnapshotNumHosts;
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
@@ -598,7 +596,7 @@ public class SnapshotSiteProcessor {
                                 try {
                                     r.run();
                                 } catch (Exception e) {
-                                    hostLog.error("Error running snapshot completion task", e);
+                                    SNAP_LOG.error("Error running snapshot completion task", e);
                                 }
                             }
                         } finally {
@@ -659,7 +657,7 @@ public class SnapshotSiteProcessor {
                 int remainingHosts = jsonObj.getInt("hostCount") - 1;
                 jsonObj.put("hostCount", remainingHosts);
                 if (!snapshotSuccess) {
-                    hostLog.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
+                    SNAP_LOG.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
                 }
                 mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
@@ -696,7 +694,7 @@ public class SnapshotSiteProcessor {
             VoltDB.instance().getHostMessenger().getZK().delete(
                     VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
         } catch (NoNodeException e) {
-            hostLog.warn("Expect the snapshot node to already exist during deletion", e);
+            SNAP_LOG.warn("Expect the snapshot node to already exist during deletion", e);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -741,7 +739,7 @@ public class SnapshotSiteProcessor {
                     JSONObject existingEntry = sequenceNumbers.getJSONObject(partitionIdString);
                     Long existingSequenceNumber = existingEntry.getLong("sequenceNumber");
                     if (!existingSequenceNumber.equals(partitionSequenceNumber)) {
-                        hostLog.error("Found a mismatch in export sequence numbers while recording snapshot metadata " +
+                        SNAP_LOG.error("Found a mismatch in export sequence numbers while recording snapshot metadata " +
                                 " for partition " + partitionId +
                                 " the sequence number should be the same at all replicas, but one had " +
                                 existingSequenceNumber
