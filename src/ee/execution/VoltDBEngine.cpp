@@ -1309,8 +1309,16 @@ int64_t VoltDBEngine::uniqueIdForFragment(catalog::PlanFragment *frag) {
 
 /**
  * Activate a table stream for the specified table
+ * Serialized data:
+ *  int: predicate count
+ *  string: predicate #1
+ *  string: predicate #2
+ *  ...
  */
-bool VoltDBEngine::activateTableStream(const CatalogId tableId, TableStreamType streamType) {
+bool VoltDBEngine::activateTableStream(
+        const CatalogId tableId,
+        TableStreamType streamType,
+        ReferenceSerializeInput &serializeIn) {
     map<int32_t, Table*>::iterator it = m_tables.find(tableId);
     if (it == m_tables.end()) {
         return false;
@@ -1323,8 +1331,17 @@ bool VoltDBEngine::activateTableStream(const CatalogId tableId, TableStreamType 
     }
 
     switch (streamType) {
-    case TABLE_STREAM_SNAPSHOT:
-        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId)) {
+    case TABLE_STREAM_SNAPSHOT: {
+        std::vector<std::string> predicate_strings;
+        int npreds = serializeIn.readInt();
+        if (npreds > 0) {
+            predicate_strings.reserve(npreds);
+            for (int ipred = 0; ipred < npreds; ipred++) {
+                std::string spred = serializeIn.readTextString();
+                predicate_strings.push_back(spred);
+            }
+        }
+        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings, m_totalPartitions)) {
             return false;
         }
 
@@ -1338,6 +1355,7 @@ bool VoltDBEngine::activateTableStream(const CatalogId tableId, TableStreamType 
         table->incrementRefcount();
         m_snapshottingTables[tableId] = table;
         break;
+    }
 
     case TABLE_STREAM_RECOVERY:
         if (table->activateRecoveryStream(it->first)) {
@@ -1351,19 +1369,33 @@ bool VoltDBEngine::activateTableStream(const CatalogId tableId, TableStreamType 
 }
 
 /**
- * Serialize more tuples from the specified table that is in COW mode.
- * Returns the number of bytes worth of tuple data serialized or 0 if
- * there are no more.  Returns -1 if the table is no in COW mode. The
- * table continues to be in COW (although no copies are made) after
- * all tuples have been serialize until the last call to
- * cowSerializeMore which returns 0 (and deletes the COW
- * context). Further calls will return -1
+ * Serialize tuples to output streams from a table in COW mode.
+ * Position vector smart pointer argument is populated here.
+ * Array element zero is set to -1 when no tuple data was streamed and
+ * the COW context was deleted.
+ * Returns true on success or false on error, e.g. when not in COW mode.
  */
-int VoltDBEngine::tableStreamSerializeMore(
-        ReferenceSerializeOutput *out,
+bool VoltDBEngine::tableStreamSerializeMore(
         const CatalogId tableId,
-        const TableStreamType streamType)
+        const TableStreamType streamType,
+        ReferenceSerializeInput &serializeIn,
+        std::vector<int> &retPositions)
 {
+    // Deserialize the output buffer ptr/offset/length values into a COWStreamList.
+    int nBuffers = serializeIn.readInt();
+    if (nBuffers <= 0) {
+        throwFatalException(
+                "Expected at least one output stream in tableStreamSerializeMore(), received %d",
+                nBuffers);
+    }
+    COWStreamList outputStreams(nBuffers);
+    for (int iBuffer = 0; iBuffer < nBuffers; iBuffer++) {
+        char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
+        int offset = serializeIn.readInt();
+        int length = serializeIn.readInt();
+        outputStreams.push_back(new COWStream(ptr + offset, length - offset));
+    }
+    retPositions.reserve(nBuffers);
 
     switch (streamType) {
     case TABLE_STREAM_SNAPSHOT: {
@@ -1371,16 +1403,19 @@ int VoltDBEngine::tableStreamSerializeMore(
         // Java engine will always poll a fully serialized table one more
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
-        map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
+       map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
         if (pos == m_snapshottingTables.end()) {
-            return 0;
-        }
-
-        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-        bool hasMore = table->serializeMore(out);
-        if (!hasMore) {
-            m_snapshottingTables.erase(tableId);
-            table->decrementRefcount();
+            // Sentinel value in element zero of -1 flags the end of stream.
+            retPositions[0] = -1;
+            // Success
+            return true;
+        } else {
+            PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+            bool hasMore = table->serializeMore(outputStreams);
+            if (!hasMore) {
+                m_snapshottingTables.erase(tableId);
+                table->decrementRefcount();
+            }
         }
         break;
     }
@@ -1390,20 +1425,35 @@ int VoltDBEngine::tableStreamSerializeMore(
          * Table ids don't change during recovery because
          * catalog changes are not allowed.
          */
+        if (outputStreams.size() != 1) {
+            throwFatalException(
+                    "Expected exactly one output stream for recovery, received %ld",
+                    outputStreams.size());
+        }
         map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
         if (pos == m_tables.end()) {
-            return 0;
+            // Sentinel value in element zero of -1 flags the end of stream.
+            retPositions[0] = -1;
+            // Success
+            return true;
         }
         PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-        table->nextRecoveryMessage(out);
+        table->nextRecoveryMessage(&outputStreams[0]);
         break;
     }
+
     default:
-        return -1;
+        // Failure
+        return false;
     }
 
-
-    return static_cast<int>(out->position());
+    // If more was streamed copy current positions for return.
+    // Can this copy be avoided?
+    for (size_t i = 0; i < nBuffers; i++) {
+        retPositions[i] = outputStreams[i].position();
+    }
+    // Success
+    return true;
 }
 
 /*

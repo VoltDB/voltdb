@@ -49,11 +49,12 @@
 #include <string>
 #include <vector>
 #include <cassert>
-#include "boost/shared_ptr.hpp"
-#include "boost/scoped_ptr.hpp"
+#include <boost/shared_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
+#include "common/COWStream.h"
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
@@ -72,7 +73,6 @@ class TableFactory;
 class TupleSerializer;
 class SerializeInput;
 class Topend;
-class ReferenceSerializeOutput;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class PersistentTableUndoDeleteAction;
@@ -203,8 +203,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     /**
      * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
+     * Support predicates for filtering results.
      */
-    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId);
+    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
+                             const std::vector<std::string> &predicate_strings,
+                             int32_t totalPartitions);
 
     /**
      * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
@@ -227,7 +230,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * output stream.  Returns true if there are more tuples and false
      * if there are no more tuples waiting to be serialized.
      */
-    bool serializeMore(ReferenceSerializeOutput *out);
+    bool serializeMore(COWStreamList &outputStreams);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash

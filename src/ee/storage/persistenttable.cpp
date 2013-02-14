@@ -722,7 +722,9 @@ TableStats* PersistentTable::getTableStats() {
 /**
  * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
  */
-bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
+bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
+                                          const std::vector<std::string> &predicate_strings,
+                                          int32_t totalPartitions) {
     if (m_COWContext != NULL) {
         return true;
     }
@@ -738,21 +740,30 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
         assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
     }
 
-    m_COWContext.reset(new CopyOnWriteContext( this, serializer, partitionId));
+    try {
+        // Constructor can throw exception when it parses the predicates.
+        assert(serializer != NULL);
+        m_COWContext.reset(new CopyOnWriteContext(*this, *serializer, partitionId,
+                                                  predicate_strings, totalPartitions));
+    }
+    catch(SerializableEEException &e) {
+        VOLT_ERROR("SerializableEEException: %s", e.message().c_str());
+        return true;
+    }
     return false;
 }
 
 /**
- * Attempt to serialize more tuples from the table to the provided output stream.
+ * Attempt to serialize more tuples from the table to the provided output streams.
  * Returns true if there are more tuples and false if there are no more tuples waiting to be
  * serialized.
  */
-bool PersistentTable::serializeMore(ReferenceSerializeOutput *out) {
+bool PersistentTable::serializeMore(COWStreamList &outputStreams) {
     if (m_COWContext == NULL) {
         return false;
     }
 
-    const bool hasMore = m_COWContext->serializeMore(out);
+    const bool hasMore = m_COWContext->serializeMore(outputStreams);
     if (!hasMore) {
         m_COWContext.reset(NULL);
     }

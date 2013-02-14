@@ -31,7 +31,7 @@ namespace voltdb {
 class Table;
 class ExecutorContext;
 class TupleSchema;
-class TableIndexScheme;
+struct TableIndexScheme;
 
 /*
  * Implementation of CatalogDelgate for Table

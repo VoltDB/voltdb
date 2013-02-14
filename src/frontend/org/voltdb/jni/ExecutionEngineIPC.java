@@ -1061,6 +1061,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
+        m_data.putInt(0);       // Predicate count
 
         try {
             m_data.flip();
@@ -1093,13 +1094,33 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putInt(Commands.TableStreamSerializeMore.m_id);
             m_data.putInt(tableId);
             m_data.putInt(streamType.ordinal());
-            m_data.putInt(c.b.remaining());
+            m_data.putInt(1);                   // Number of buffers
+            m_data.putInt(c.b.remaining());     // Byte limit
 
             m_data.flip();
             m_connection.write();
 
             m_connection.readStatusByte();
 
+            // Get the count.
+            ByteBuffer countBuffer = ByteBuffer.allocate(4);
+            while (countBuffer.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(countBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            countBuffer.flip();
+            final int count = countBuffer.getInt();
+
+            /*
+             * Error or no more tuple data for this table.
+             */
+            if (count == -1 || count == 0) {
+                return count;
+            }
+
+            // Get the first length.
             ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
             while (lengthBuffer.hasRemaining()) {
                 int read = m_connection.m_socketChannel.read(lengthBuffer);
@@ -1109,13 +1130,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             lengthBuffer.flip();
             final int length = lengthBuffer.getInt();
+
             bytesReturned = length;
-            /*
-             * Error or no more tuple data for this table.
-             */
-            if (length == -1 || length == 0) {
-                return length;
-            }
             view.limit(view.position() + length);
             while (view.hasRemaining()) {
                 m_connection.m_socketChannel.read(view);

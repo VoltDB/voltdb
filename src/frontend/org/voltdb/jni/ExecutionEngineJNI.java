@@ -468,12 +468,38 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType) {
-        return nativeActivateTableStream( pointer, tableId, streamType.ordinal());
+        FastSerializer fs = new FastSerializer();
+        try {
+            fs.writeInt(0);                 // Predicate count
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return nativeActivateTableStream( pointer, tableId, streamType.ordinal(), fs.getBytes());
     }
 
     @Override
     public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        return nativeTableStreamSerializeMore(pointer, c.address, c.b.position(), c.b.remaining(), tableId, streamType.ordinal());
+        FastSerializer fs = new FastSerializer();
+        try {
+            fs.writeInt(1);                 // Buffer count
+            fs.writeLong(c.address);        // Pointer
+            fs.writeInt(c.b.position());    // Offset
+            fs.writeInt(c.b.remaining());   // Length
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        int[] positions = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
+        if (positions == null) {
+            return -1;
+        }
+        if (positions[0] == -1) {
+            return 0;
+        }
+        // TODO: Change the interface to really support multiple streams.
+        assert(positions.length == 1);
+        return positions[0];
     }
 
     /**

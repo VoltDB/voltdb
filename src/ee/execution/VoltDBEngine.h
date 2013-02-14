@@ -52,8 +52,9 @@
 #include <vector>
 #include <cassert>
 
-#include "boost/shared_ptr.hpp"
-#include "json_spirit/json_spirit.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
+#include <json_spirit/json_spirit.h>
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"
@@ -65,6 +66,7 @@
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
+#include "common/COWStream.h"
 #include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
@@ -80,10 +82,6 @@
 
 #define MAX_BATCH_COUNT 1000
 #define MAX_PARAM_COUNT 1000 // or whatever
-
-namespace boost {
-template <typename T> class shared_ptr;
-}
 
 namespace catalog {
 class Catalog;
@@ -103,8 +101,6 @@ class SerializeInput;
 class SerializeOutput;
 class Table;
 class CatalogDelegate;
-class ReferenceSerializeInput;
-class ReferenceSerializeOutput;
 class PlanNodeFragment;
 class ExecutorContext;
 class RecoveryProtoMsg;
@@ -352,19 +348,23 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
          */
-        bool activateTableStream(const CatalogId tableId, const TableStreamType streamType);
+        bool activateTableStream(
+                const CatalogId tableId,
+                const TableStreamType streamType,
+                ReferenceSerializeInput &serializeIn);
 
         /**
-         * Serialize more tuples from the specified table that has an active stream of the specified type
-         * Returns the number of bytes worth of tuple data serialized or 0 if there are no more.
-         * Returns -1 if the table is not in COW mode. The table continues to be in COW (although no copies are made)
-         * after all tuples have been serialize until the last call to cowSerializeMore which returns 0 (and deletes
-         * the COW context). Further calls will return -1
+         * Serialize tuples to output streams from a table in COW mode.
+         * Position vector smart pointer argument is populated here.
+         * Array element zero is set to -1 when no tuple data was streamed and
+         * the COW context was deleted.
+         * Returns true on success or false on error, e.g. when not in COW mode.
          */
-        int tableStreamSerializeMore(
-                ReferenceSerializeOutput *out,
-                CatalogId tableId,
-                const TableStreamType streamType);
+        bool tableStreamSerializeMore(
+                const CatalogId tableId,
+                const TableStreamType streamType,
+                ReferenceSerializeInput &serializeIn,
+                std::vector<int> &retPositions);
 
         /*
          * Apply the updates in a recovery message.
