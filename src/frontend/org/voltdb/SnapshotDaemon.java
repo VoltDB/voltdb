@@ -460,8 +460,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
             }
         }, 0, 1, TimeUnit.HOURS);
-        truncationRequestExistenceCheck();
-        userSnapshotRequestExistenceCheck(false);
+        try {
+            truncationRequestExistenceCheck();
+            userSnapshotRequestExistenceCheck(false);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error while accepting snapshot daemon leadership", true, e);
+        }
     }
 
     /*
@@ -478,7 +482,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_es.schedule(new Runnable() {
                 @Override
                 public void run() {
-                    processSnapshotTruncationRequestCreated(event);
+                    try {
+                        processSnapshotTruncationRequestCreated(event);
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Error processing snapshot truncation request creation", true, e);
+                    }
                 }
             }, m_truncationGatheringPeriod, TimeUnit.SECONDS);
             return;
@@ -544,7 +552,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             /*
              * Should never happen, so fail fast
              */
-            VoltDB.crashLocalVoltDB("", false, e);
+            VoltDB.crashLocalVoltDB("", true, e);
         }
 
         long handle = m_nextCallbackHandle++;
@@ -656,7 +664,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             /*
              * Should never happen, so fail fast
              */
-            VoltDB.crashLocalVoltDB("", false, e);
+            VoltDB.crashLocalVoltDB("", true, e);
         }
         return;
     }
