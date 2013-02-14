@@ -29,9 +29,10 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -73,6 +74,8 @@ public class ForeignHost {
             m_isUp = false;
             if (!m_closing)
             {
+                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostname());
+                hostLog.warn("Received remote hangup from foreign host " + hostname());
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
         }
@@ -221,6 +224,7 @@ public class ForeignHost {
             hostLog.info("\tlast message: " + m_lastMessageMillis);
             hostLog.info("\tdelta (millis): " + current_delta);
             hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
+            VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
     }
