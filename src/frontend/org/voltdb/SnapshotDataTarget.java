@@ -42,6 +42,11 @@ public interface SnapshotDataTarget {
     public ListenableFuture<?> write(Callable<BBContainer> tupleData, SnapshotTableTask context);
 
     /**
+     * Does this target need to be closed by the last site to finish snapshotting?
+     */
+    public boolean needsFinalClose();
+
+    /**
      * Close this target releasing any held resources and writing any footer info
      * @throws IOException
      */

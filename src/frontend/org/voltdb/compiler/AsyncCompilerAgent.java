@@ -37,6 +37,8 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
+import org.voltdb.VoltZK;
+
 import com.google.common.util.concurrent.ListeningExecutorService;
 
 public class AsyncCompilerAgent {
@@ -192,6 +194,9 @@ public class AsyncCompilerAgent {
         retval.connectionId = work.connectionId;
         retval.adminConnection = work.adminConnection;
         retval.hostname = work.hostname;
+        retval.invocationType = work.invocationType;
+        retval.originalTxnId = work.originalTxnId;
+        retval.originalUniqueId = work.originalUniqueId;
 
         // catalog change specific boiler plate
         retval.catalogBytes = work.catalogBytes;
@@ -208,15 +213,27 @@ public class AsyncCompilerAgent {
             Catalog newCatalog = new Catalog();
             newCatalog.execute(newCatalogCommands);
 
-            // If VoltProjectBuilder was used, work.deploymentURL will be null. No deployment.xml file was
-            // given to the server in this case because its deployment info has already been added to the catalog.
-            if (work.deploymentString != null) {
-                retval.deploymentCRC =
-                        CatalogUtil.compileDeploymentStringAndGetCRC(newCatalog, work.deploymentString, false);
-                if (retval.deploymentCRC < 0) {
-                    retval.errorMsg = "Unable to read from deployment file string";
+            String deploymentString = work.deploymentString;
+            // work.deploymentString could be null if it wasn't provided to UpdateApplicationCatalog
+            if (deploymentString == null) {
+                // Go get the deployment string from ZK.  Hope it's there and up-to-date.  Yeehaw!
+                byte[] deploymentBytes =
+                    VoltDB.instance().getHostMessenger().getZK().getData(VoltZK.deploymentBytes, false, null);
+                if (deploymentBytes != null) {
+                    deploymentString = new String(deploymentBytes, "UTF-8");
+                }
+                if (deploymentBytes == null || deploymentString == null) {
+                    retval.errorMsg = "No deployment file provided and unable to recover previous " +
+                        "deployment settings.";
                     return retval;
                 }
+            }
+
+            retval.deploymentCRC =
+                CatalogUtil.compileDeploymentStringAndGetCRC(newCatalog, deploymentString, false);
+            if (retval.deploymentCRC < 0) {
+                retval.errorMsg = "Unable to read from deployment file string";
+                return retval;
             }
 
             // get the current catalog

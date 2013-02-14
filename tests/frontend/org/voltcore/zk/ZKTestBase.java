@@ -35,6 +35,8 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
 
+import com.google.common.collect.ImmutableSet;
+
 /**
  *
  */
@@ -85,7 +87,8 @@ public class ZKTestBase {
                     permit.release();
                 }
                 System.out.println(event);
-            }});
+            }},
+            ImmutableSet.<Long>of());
         m_clients.add(keeper);
         permit.acquire();
         return keeper;

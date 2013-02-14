@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
@@ -51,7 +52,7 @@ public class ForeignHost {
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
-    private long m_lastMessageMillis;
+    private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -110,7 +111,6 @@ public class ForeignHost {
         m_hostId = hostId;
         m_closing = false;
         m_isUp = true;
-        m_lastMessageMillis = Long.MAX_VALUE;
         m_sc = socket;
         m_socket = socket.socket();
         m_deadHostTimeout = deadHostTimeout;
@@ -210,7 +210,7 @@ public class ForeignHost {
             });
 
         long current_time = EstTime.currentTimeMillis();
-        long current_delta = current_time - m_lastMessageMillis;
+        long current_delta = current_time - m_lastMessageMillis.get();
         // NodeFailureFault no longer immediately trips FHInputHandler to
         // set m_isUp to false, so use both that and m_closing to
         // avoid repeat reports of a single node failure
@@ -298,7 +298,7 @@ public class ForeignHost {
         }
 
         //m_lastMessageMillis = System.currentTimeMillis();
-        m_lastMessageMillis = EstTime.currentTimeMillis();
+        m_lastMessageMillis.lazySet(EstTime.currentTimeMillis());
 
         // ENG-1608.  We sniff for FailureSiteUpdateMessages here so
         // that a node will participate in the failure resolution protocol
