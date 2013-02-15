@@ -87,7 +87,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         public void initiateSnapshotDaemonWork(final String procedureName, long clientData, Object params[]);
     };
 
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
     private final ScheduledThreadPoolExecutor m_esBase =
             new ScheduledThreadPoolExecutor(1,
@@ -277,7 +277,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             public void clientCallback(final ClientResponse clientResponse)
                     throws Exception {
                 if (clientResponse.getStatus() != ClientResponse.SUCCESS){
-                    hostLog.error(clientResponse.getStatusString());
+                    SNAP_LOG.error(clientResponse.getStatusString());
                     return;
                 }
 
@@ -373,7 +373,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             public void clientCallback(ClientResponse clientResponse)
                     throws Exception {
                 if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    hostLog.error(clientResponse.getStatusString());
+                    SNAP_LOG.error(clientResponse.getStatusString());
                 }
             }
 
@@ -787,7 +787,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
          * for later. It may be necessary to reschedule via this function multiple times.
          */
         if (isFirstAttempt) {
-            hostLog.info("A user snapshot request could not be immediately fulfilled and will be reattempted later");
+            SNAP_LOG.info("A user snapshot request could not be immediately fulfilled and will be reattempted later");
             /*
              * Construct a result to send to the client right now via ZK
              * saying we queued it to run later
@@ -833,7 +833,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                              * or things are broken.
                              */
                             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                                hostLog.error(clientResponse.getStatusString());
+                                SNAP_LOG.error(clientResponse.getStatusString());
                                 //Reset the watch, in case this is recoverable
                                 userSnapshotRequestExistenceCheck(true);
                                 return;
@@ -842,7 +842,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             VoltTable results[] = clientResponse.getResults();
                             //Do this check to avoid an NPE
                             if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
-                                hostLog.error("Queued user snapshot request reattempt received an unexpected response" +
+                                SNAP_LOG.error("Queued user snapshot request reattempt received an unexpected response" +
                                         " and will not be reattempted");
                                 /*
                                  * Don't think this should happen, reset the watch to allow later requests
@@ -869,7 +869,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                              * if there was a failure, abort the attempt and log.
                              */
                             if (snapshotInProgress) {
-                                hostLog.info("Queued user snapshot was reattempted, but a snapshot was " +
+                                SNAP_LOG.info("Queued user snapshot was reattempted, but a snapshot was " +
                                         " still in progress. It will be reattempted.");
                                 //Turtles all the way down
                                 scheduleSnapshotForLater(
@@ -877,7 +877,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                         null,//null because it shouldn't be used, request already responded to
                                         false);
                             } else if (haveFailure) {
-                                hostLog.info("Queued user snapshot was attempted, but there was a failure.");
+                                SNAP_LOG.info("Queued user snapshot was attempted, but there was a failure.");
                                 if (requestId != null) {
                                     ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
                                     ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
@@ -891,10 +891,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 userSnapshotRequestExistenceCheck(true);
                                 //Log the details of the failure, after resetting the watch in case of some odd NPE
                                 result.resetRowPosition();
-                                hostLog.info(result);
+                                SNAP_LOG.info(result);
                             } else {
                                 if (requestId != null) {
-                                    hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
+                                    SNAP_LOG.debug("Queued user snapshot was successfully requested, saving to path " +
                                             VoltZK.user_snapshot_response + requestId);
                                     /*
                                      * Snapshot was started no problem, reset the watch for new requests
@@ -1204,7 +1204,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     long handle = resp.getClientHandle();
                     m_procedureCallbacks.remove(handle).clientCallback(resp);
                 } catch (Exception e) {
-                    hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
+                    SNAP_LOG.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
                     throw e;
                 }
                 return null;
@@ -1258,7 +1258,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            hostLog.error("Snapshot failed with failure response: " + result.getString(0));
+            SNAP_LOG.error("Snapshot failed with failure response: " + result.getString(0));
             m_snapshots.removeLast();
             return;
         }
@@ -1268,7 +1268,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         while (result.advanceRow()) {
             if (!result.getString("RESULT").equals("SUCCESS")) {
                 success = false;
-                hostLog.warn("Snapshot save feasibility test failed for host "
+                SNAP_LOG.warn("Snapshot save feasibility test failed for host "
                         + result.getLong("HOST_ID") + " table " + result.getString("TABLE") +
                         " with error message " + result.getString("ERR_MSG"));
             }
@@ -1306,7 +1306,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            hostLog.error("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
+            SNAP_LOG.error("Snapshot delete failed with failure response: " + result.getString("ERR_MSG"));
             return;
         }
     }
@@ -1334,7 +1334,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             assert(advanced);
             assert(result.getColumnCount() == 1);
             assert(result.getColumnType(0) == VoltType.STRING);
-            hostLog.error("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
+            SNAP_LOG.error("Initial snapshot scan failed with failure response: " + result.getString("ERR_MSG"));
             return;
         }
         assert(results.length == 3);
@@ -1377,7 +1377,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final Snapshot s = m_snapshots.poll();
                 pathsToDelete[ii] = s.path;
                 noncesToDelete[ii] = s.nonce;
-                hostLog.info("Snapshot daemon deleting " + s.nonce);
+                SNAP_LOG.info("Snapshot daemon deleting " + s.nonce);
             }
             Object params[] =
                 new Object[] {
@@ -1399,9 +1399,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private void logFailureResponse(String message, ClientResponse response) {
-        hostLog.error(message, response.getException());
+        SNAP_LOG.error(message, response.getException());
         if (response.getStatusString() != null) {
-            hostLog.error(response.getStatusString());
+            SNAP_LOG.error(response.getStatusString());
         }
     }
 
@@ -1721,7 +1721,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             m_zk.delete(event.getPath(), -1, null, null);
         } catch (Exception e) {
-            hostLog.error("Error cleaning up user snapshot request response in ZK", e);
+            SNAP_LOG.error("Error cleaning up user snapshot request response in ZK", e);
         }
         ByteBuffer buf = ByteBuffer.wrap(responseBytes);
         ClientResponseImpl response = new ClientResponseImpl();

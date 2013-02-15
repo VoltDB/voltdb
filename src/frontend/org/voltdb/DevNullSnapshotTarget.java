@@ -49,6 +49,12 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     }
 
     @Override
+    public boolean needsFinalClose()
+    {
+        return true;
+    }
+
+    @Override
     public void close() throws IOException, InterruptedException {
         if (m_onClose != null) {
             m_onClose.run();

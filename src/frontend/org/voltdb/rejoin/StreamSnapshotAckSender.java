@@ -27,7 +27,7 @@ import org.voltcore.utils.Pair;
  * Sends acks of snapshot blocks to the snapshot sender.
  */
 public class StreamSnapshotAckSender implements Runnable {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     private final Mailbox m_mb;
     private final LinkedBlockingQueue<Pair<Long, Integer>> m_blockIndices =

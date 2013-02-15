@@ -21,9 +21,11 @@ import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -32,6 +34,7 @@ import java.util.Queue;
 import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
@@ -608,6 +611,78 @@ public class VoltDB {
         return m_config.m_backend;
     }
 
+    /*
+     * Create a file that starts with the supplied message that contains
+     * human readable stack traces for all java threads in the current process.
+     */
+    public static void dropStackTrace(String message) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
+        String dateString = sdf.format(new Date());
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+        HostMessenger hm = VoltDB.instance().getHostMessenger();
+        int hostId = 0;
+        if (hm != null) {
+            hostId = hm.getHostId();
+        }
+        String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+        try {
+            PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
+            writer.println(message);
+            printStackTraces(writer);
+        } catch (Exception e) {
+            try
+            {
+                VoltLogger log = new VoltLogger("HOST");
+                log.error("Error while dropping stack trace for \"" + message + "\"", e);
+            }
+            catch (RuntimeException rt_ex)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /*
+     * Print stack traces for all java threads in the current process to the supplied writer
+     */
+    public static void printStackTraces(PrintWriter writer) {
+        printStackTraces(writer, null);
+    }
+
+    /*
+     * Print stack traces for all threads in the process to the supplied writer.
+     * If a List is supplied then the stack frames for the current thread will be placed in it
+     */
+    public static void printStackTraces(PrintWriter writer, List<String> currentStacktrace) {
+        if (currentStacktrace == null) {
+            currentStacktrace = new ArrayList<String>();
+        }
+
+        Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
+        StackTraceElement[] myTrace = traces.get(Thread.currentThread());
+        for (StackTraceElement ste : myTrace) {
+            currentStacktrace.add(ste.toString());
+        }
+
+        writer.println();
+        writer.println("****** Current Thread ****** ");
+        for (String currentStackElem : currentStacktrace) {
+            writer.println(currentStackElem);
+        }
+
+        writer.println("****** All Threads ******");
+        Iterator<Thread> it = traces.keySet().iterator();
+        while (it.hasNext())
+        {
+            Thread key = it.next();
+            writer.println();
+            StackTraceElement[] st = traces.get(key);
+            writer.println("****** " + key + " ******");
+            for (StackTraceElement ste : st)
+                writer.println(ste);
+        }
+    }
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
@@ -622,11 +697,6 @@ public class VoltDB {
         // any other pertinent information to a .dmp file for crash diagnosis
         List<String> currentStacktrace = new ArrayList<String>();
         currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
-        Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
-        StackTraceElement[] myTrace = traces.get(Thread.currentThread());
-        for (StackTraceElement ste : myTrace) {
-            currentStacktrace.add(ste.toString());
-        }
 
         // Create a special dump file to hold the stack trace
         try
@@ -652,23 +722,7 @@ public class VoltDB {
                 thrown.printStackTrace(writer);
             }
 
-            writer.println();
-            writer.println("****** Current Thread ****** ");
-            for (String currentStackElem : currentStacktrace) {
-                writer.println(currentStackElem);
-            }
-
-            writer.println("****** All Threads ******");
-            Iterator<Thread> it = traces.keySet().iterator();
-            while (it.hasNext())
-            {
-                Thread key = it.next();
-                writer.println();
-                StackTraceElement[] st = traces.get(key);
-                writer.println("****** " + key + " ******");
-                for (StackTraceElement ste : st)
-                    writer.println(ste);
-            }
+            printStackTraces(writer, currentStacktrace);
             writer.close();
         }
         catch (Throwable err)

@@ -109,35 +109,42 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     class MockSnapshotMonitor extends SnapshotCompletionMonitor {
+        private final ExecutorService es = Executors.newSingleThreadExecutor();
         @Override
         public void init(final ZooKeeper zk) {
             try {
                 Watcher watcher = new Watcher() {
                     @Override
-                    public void process(WatchedEvent event) {
-                        try {
-                            List<String> children = zk.getChildren(VoltZK.root, this);
-                            for (String s : children) {
-                                if (s.equals("request_truncation_snapshot")) {
-                                    snapshotted = true;
-                                    LinkedList<SnapshotCompletionInterest> interests =
-                                            new LinkedList<SnapshotCompletionInterest>(m_interests);
-                                    for (SnapshotCompletionInterest i : interests) {
-                                        i.snapshotCompleted(
-                                                new SnapshotCompletionEvent(
-                                                        "",
-                                                        0,
-                                                        Collections.<Integer, Long>emptyMap(),
-                                                        true,
-                                                        "",
-                                                        null));
+                    public void process(final WatchedEvent event) {
+                        final Watcher thisWatcher = this;
+                        es.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    List<String> children = zk.getChildren(VoltZK.root, thisWatcher);
+                                    for (String s : children) {
+                                        if (s.equals("request_truncation_snapshot")) {
+                                            snapshotted = true;
+                                            LinkedList<SnapshotCompletionInterest> interests =
+                                                    new LinkedList<SnapshotCompletionInterest>(m_interests);
+                                            for (SnapshotCompletionInterest i : interests) {
+                                                i.snapshotCompleted(
+                                                        new SnapshotCompletionEvent(
+                                                                "",
+                                                                0,
+                                                                Collections.<Integer, Long>emptyMap(),
+                                                                true,
+                                                                "",
+                                                                null));
+                                            }
+                                            break;
+                                        }
                                     }
-                                    break;
+                                } catch (Exception e) {
+                                    e.printStackTrace();
                                 }
                             }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+                        });
                     }
                 };
 

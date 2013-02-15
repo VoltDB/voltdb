@@ -53,6 +53,8 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Longs;
 
 /**
@@ -276,7 +278,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                                 m_config.backwardsTimeForgivenessWindow);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
-            m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);
+            m_zk = org.voltcore.zk.ZKUtil.getClient(
+                    m_config.zkInterface, 60 * 1000, ImmutableSet.<Long>copyOf(m_network.getThreadIds()));
             if (m_zk == null) {
                 throw new Exception("Timed out trying to connect local ZooKeeper instance");
             }
@@ -594,8 +597,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * Do the usual thing of waiting for the agreement site
          * to join the cluster and creating the client
          */
+        ImmutableSet.Builder<Long> verbotenThreadBuilder = ImmutableSet.<Long>builder();
+        verbotenThreadBuilder.addAll(m_network.getThreadIds());
+        verbotenThreadBuilder.addAll(m_agreementSite.getThreadIds());
         m_agreementSite.waitForRecovery();
-        m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, 60 * 1000);
+        m_zk = org.voltcore.zk.ZKUtil.getClient(
+                m_config.zkInterface, 60 * 1000, verbotenThreadBuilder.build());
         if (m_zk == null) {
             throw new Exception("Timed out trying to connect local ZooKeeper instance");
         }
@@ -935,5 +942,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public boolean validateForeignHostId(Integer hostId) {
         return !m_knownFailedHosts.contains(hostId);
+    }
+
+    public void setDeadHostTimeout(int timeout) {
+        Preconditions.checkArgument(timeout > 0, "Timeout value must be > 0, was %s", timeout);
+        hostLog.info("Dead host timeout set to " + timeout + " milliseconds");
+        m_config.deadHostTimeout = (int)timeout;
+        for (ForeignHost fh : m_foreignHosts.values()) {
+            fh.updateDeadHostTimeout(timeout);
+        }
     }
 }

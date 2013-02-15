@@ -120,7 +120,7 @@ public class ExecutionSite
 implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSnapshotConnection
 {
     private VoltLogger m_txnlog;
-    private final VoltLogger m_rejoinLog = new VoltLogger("JOIN");
+    private final VoltLogger m_rejoinLog = new VoltLogger("REJOIN");
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -1355,11 +1355,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-            jsStringer.key("hsId").value(hsId);
+            jsStringer.key("streamPairs");
+            jsStringer.object();
+            jsStringer.key(Long.toString(sourceSite)).value(Long.toString(hsId));
+            jsStringer.endObject();
             // make this snapshot only contain data from this site
             m_rejoinLog.info("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
                                " is " + CoreUtils.hsIdToString(sourceSite));
-            jsStringer.key("target_hsid").value(sourceSite);
             jsStringer.endObject();
             data = jsStringer.toString();
         } catch (Exception e) {
@@ -2384,10 +2386,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     @Override
     public void initiateSnapshots(
             Deque<SnapshotTableTask> tasks,
+            List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(ee, tasks, targets, txnId, numLiveHosts, exportSequenceNumbers);
     }
 
     /*
