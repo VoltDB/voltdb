@@ -97,10 +97,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
+
+        // configure DR
+        PartitionDRGateway drGateway =
+                PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, true,
+                        VoltDB.createForRejoin(startAction));
+        ((SpScheduler) m_scheduler).setDRGateway(drGateway);
+
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
                 startAction,
-                agent, memStats, cl, coreBindIds);
+                agent, memStats, cl, coreBindIds, drGateway);
 
         m_tickProducer.start();
 
@@ -109,13 +116,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
-
-        // configure DR
-        ((SpScheduler) m_scheduler).setDRGateway(
-                PartitionDRGateway.getInstance(m_partitionId,
-                        nodeDRGateway,
-                        true,
-                        VoltDB.createForRejoin(startAction)));
     }
 
     @Override
