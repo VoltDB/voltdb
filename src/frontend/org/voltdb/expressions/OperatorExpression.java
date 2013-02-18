@@ -47,7 +47,13 @@ public class OperatorExpression extends AbstractExpression {
     public boolean needsRightExpression() {
         ExpressionType type = getExpressionType();
         //XXX Not sure how unary minus (and unary plus?) are handled (possibly via an implicit zero left argument?)
-        return type != ExpressionType.OPERATOR_NOT && type != ExpressionType.OPERATOR_IS_NULL;
+        switch(type) {
+        case OPERATOR_NOT:
+        case OPERATOR_IS_NULL:
+        case OPERATOR_CAST:
+            return false;
+        default: return true;
+        }
     }
 
     @Override
@@ -99,9 +105,11 @@ public class OperatorExpression extends AbstractExpression {
     {
         finalizeChildValueTypes();
         ExpressionType type = getExpressionType();
-        if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
-            m_valueType = VoltType.BIGINT;
-            m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+        if (m_right == null) {
+            if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
+                m_valueType = VoltType.BIGINT;
+                m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+            }
             return;
         }
         VoltType left_type = m_left.getValueType();

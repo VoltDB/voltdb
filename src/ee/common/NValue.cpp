@@ -101,15 +101,15 @@ ValueType NValue::s_decimalPromotionTable[] = {
     VALUE_TYPE_INVALID,   // 24 address
 };
 
-TTInt NValue::s_maxDecimal("9999999999"   //10 digits
-                           "9999999999"   //20 digits
-                           "9999999999"   //30 digits
-                           "99999999");    //38 digits
+TTInt NValue::s_maxDecimalValue("9999999999"   //10 digits
+                                "9999999999"   //20 digits
+                                "9999999999"   //30 digits
+                                "99999999");    //38 digits
 
-TTInt NValue::s_minDecimal("-9999999999"   //10 digits
-                           "9999999999"   //20 digits
-                           "9999999999"   //30 digits
-                           "99999999");    //38 digits
+TTInt NValue::s_minDecimalValue("-9999999999"   //10 digits
+                                 "9999999999"   //20 digits
+                                 "9999999999"   //30 digits
+                                 "99999999");    //38 digits
 
 /*
  * Produce a debugging string describing an NValue.
@@ -300,7 +300,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
         calc *= rhs.getDecimal();
         calc /= NValue::kMaxScaleFactor;
         TTInt retval;
-        if (retval.FromInt(calc)  || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
+        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
@@ -317,7 +317,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
         calc /= NValue::kMaxScaleFactor;
         TTInt retval;
         retval.FromInt(calc);
-        if (retval.FromInt(calc)  || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
+        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
@@ -335,7 +335,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
         calc /= NValue::kMaxScaleFactor;
         TTInt retval;
         retval.FromInt(calc);
-        if (retval.FromInt(calc)  || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
+        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
@@ -384,7 +384,7 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
                            message);
     }
     TTInt retval;
-    if (retval.FromInt(calc)  || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
+    if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
         char message[4096];
         snprintf( message, 4096, "Attempted to divide %s by %s causing overflow. Unscaled result was %s",
                 lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),

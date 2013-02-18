@@ -26,7 +26,7 @@ import org.voltdb.types.ExpressionType;
 public class AggregateExpression extends AbstractExpression {
 
     /** True if this aggregate requires distinct: e.g. count(distinct A) */
-    public boolean m_distinct = false;
+    private boolean m_distinct = false;
 
     public AggregateExpression(ExpressionType type) {
         super(type);
@@ -38,6 +38,10 @@ public class AggregateExpression extends AbstractExpression {
         //
         super();
     }
+
+    public void setDistinct() { m_distinct = true; }
+    public boolean isDistinct() { return m_distinct;  }
+
 
     @Override
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
