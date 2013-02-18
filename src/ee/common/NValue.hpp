@@ -135,6 +135,55 @@ inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function
     throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg);
 }
 
+
+/// Stream out a double value in SQL standard format, a specific variation of E-notation.
+/// TODO: it has been suggested that helper routines like this that are not specifically tied to
+/// the NValue representation should be defined in some other header to help reduce clutter, here.
+inline void streamSQLFloatFormat(std::stringstream& streamOut, double floatValue)
+{
+    // Standard SQL wants capital E scientific notation.
+    // Yet it differs in some detail from C/C++ E notation, even with all of its customization options.
+
+    // For starters, for 0, the standard explicitly calls for '0E0'.
+    // For across-the-board compatibility, the HSQL backend had to be patched it was using '0.0E0'.
+    // C++ uses 0.000000E+00 by default. So override that explicitly.
+    if (0.0 == floatValue) {
+        streamOut << "0E0";
+        return;
+    }
+    // For other values, C++ generally adds too much garnish to be standard
+    // -- trailing zeros in the mantissa, an explicit '+' on the exponent, and a
+    // leading 0 before single-digit exponents.  Trim it down to the minimalist sql standard.
+    std::stringstream fancy;
+    fancy << std::setiosflags(std::ios::scientific | std::ios::uppercase) << floatValue;
+    // match any format with the regular expression:
+    std::string fancyText = fancy.str();
+    size_t ePos = fancyText.find('E', 3); // find E after "[-]n.n".
+    assert(ePos != std::string::npos);
+    size_t endSignifMantissa;
+    // Never truncate mantissa down to the bare '.' EVEN for the case of "n.0".
+    for (endSignifMantissa = ePos; fancyText[endSignifMantissa-2] != '.'; --endSignifMantissa) {
+        // Only truncate trailing '0's.
+        if (fancyText[endSignifMantissa-1] != '0') {
+            break; // from loop
+        }
+    }
+    const char* optionalSign = (fancyText[ePos+1] == '-') ? "-" : "";
+    size_t startSignifExponent;
+    // Always keep at least 1 exponent digit.
+    size_t endExponent = fancyText.length()-1;
+    for (startSignifExponent = ePos+1; startSignifExponent < endExponent; ++startSignifExponent) {
+        const char& exponentLeadChar = fancyText[startSignifExponent];
+        // Only skip leading '-'s, '+'s and '0's.
+        if (exponentLeadChar != '-' && exponentLeadChar != '+' && exponentLeadChar != '0') {
+            break; // from loop
+        }
+    }
+    // Bring the truncated pieces together.
+    streamOut << fancyText.substr(0, endSignifMantissa)
+              << 'E' << optionalSign << fancyText.substr(startSignifExponent);
+}
+
 /**
  * A class to wrap all scalar values regardless of type and
  * storage. An NValue is not the representation used in the
@@ -950,7 +999,9 @@ class NValue {
                 return result;
             }
         }
-        throw SQLException(SQLException::data_exception_invalid_character_value_for_cast, "");
+        char errorDetail[strLength+10]; // Allocate enough extra for the text in the snprintf format.
+        snprintf(errorDetail, sizeof(errorDetail), "value: '%s'", safeBuffer);
+        throw SQLException(SQLException::data_exception_invalid_character_value_for_cast, errorDetail);
     }
 
     NValue castAsBigInt() const {
@@ -1012,18 +1063,32 @@ class NValue {
         case VALUE_TYPE_TIMESTAMP:
             retval.getTimestamp() = getTimestamp(); break;
         case VALUE_TYPE_DOUBLE:
+            // TODO: Consider just eliminating this switch case to throw a cast exception,
+            // or explicitly throwing some other exception here.
+            // Direct cast of double to timestamp (implemented via intermediate cast to integer, here)
+            // is not a SQL standard requirement, may not even make it past the planner's type-checks,
+            // or may just be too far a stretch.
+            // OR it might be a convenience for some obscure system-generated edge case?
+
             if (getDouble() > (double)INT64_MAX || getDouble() < (double)VOLT_INT64_MIN) {
                 throwCastSQLValueOutOfRangeException<double>(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_BIGINT);
             }
             retval.getTimestamp() = static_cast<int64_t>(getDouble()); break;
         case VALUE_TYPE_DECIMAL: {
+            // TODO: Consider just eliminating this switch case to throw a cast exception,
+            // or explicitly throwing some other exception here.
+            // Direct cast of decimal to timestamp (implemented via intermediate cast to integer, here)
+            // is not a SQL standard requirement, may not even make it past the planner's type-checks,
+            // or may just be too far a stretch.
+            // OR it might be a convenience for some obscure system-generated edge case?
+
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
             whole /= NValue::kMaxScaleFactor;
             retval.getTimestamp() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR:
-            //TODO: Seems like we want to also allow actual date formatting OR? a numeric value, here?
+            //TODO: Seems like we want to also allow actual date formatting OR? a numeric value, here? See ENG-4284.
             retval.getTimestamp() = static_cast<int64_t>(getNumberFromString()); break;
         case VALUE_TYPE_VARBINARY:
         default:
@@ -1217,49 +1282,12 @@ class NValue {
         case VALUE_TYPE_BIGINT:
             value << getBigInt(); break;
         //case VALUE_TYPE_TIMESTAMP:
-            //TODO: The SQL standard wants an actual date literal rather than a numeric value, here.
+            //TODO: The SQL standard wants an actual date literal rather than a numeric value, here. See ENG-4284.
             //value << static_cast<double>(getTimestamp()); break;
         case VALUE_TYPE_DOUBLE:
-            // Both HSQL and standard SQL want capital E scientific notation.
-            // Yet they differ in at least one minor detail:
-            // For 0, HSQL uses '0.0E0' and the standard explicitly calls for '0E0'.
-            // C++ uses 0.000000E+00 by default. So override that explicitly.
-            if (0.0 == getDouble()) {
-                value << "0E0";
-            }
-            else {
-                // For other values, C++ generally adds too much garnish to be standard
-                // -- trailing zeros in the mantissa, an explicit '+' on the exponent, and a
-                // leading 0 before single-digit exponents.  Trim it down to the minimalist sql standard.
-                std::stringstream fancy;
-                fancy << std::setiosflags(std::ios::scientific | std::ios::uppercase) << getDouble();
-                // match any format with the regular expression:
-                std::string fancyText = fancy.str();
-                size_t ePos = fancyText.find('E', 3); // find E after "[-]n.n".
-                assert(ePos != std::string::npos);
-                size_t endSignifMantissa;
-                // Never truncate mantissa down to the bare '.' EVEN for the case of "n.0".
-                for (endSignifMantissa = ePos; fancyText[endSignifMantissa-2] != '.'; --endSignifMantissa) {
-                    // Only truncate trailing '0's.
-                    if (fancyText[endSignifMantissa-1] != '0') {
-                        break; // from loop
-                    }
-                }
-                const char* optionalSign = (fancyText[ePos+1] == '-') ? "-" : "";
-                size_t startSignifExponent;
-                // Always keep at least 1 exponent digit.
-                size_t endExponent = fancyText.length()-1;
-                for (startSignifExponent = ePos+1; startSignifExponent < endExponent; ++startSignifExponent) {
-                    const char& exponentLeadChar = fancyText[startSignifExponent];
-                    // Only skip leading '-'s, '+'s and '0's.
-                    if (exponentLeadChar != '-' && exponentLeadChar != '+' && exponentLeadChar != '0') {
-                        break; // from loop
-                    }
-                }
-                // Bring the truncated pieces together.
-                value << fancyText.substr(0, endSignifMantissa)
-                      << 'E' << optionalSign << fancyText.substr(startSignifExponent);
-            }
+            // Use the specific standard SQL formatting for float values,
+            // which the C/C++ format options don't quite support.
+            streamSQLFloatFormat(value, getDouble());
             break;
         case VALUE_TYPE_DECIMAL:
             value << createStringFromDecimal(); break;
