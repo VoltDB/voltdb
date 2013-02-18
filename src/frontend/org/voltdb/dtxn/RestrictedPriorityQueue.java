@@ -43,7 +43,7 @@ import org.voltcore.utils.CoreUtils;
  */
 public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> implements RPQInterface  {
     private static final long serialVersionUID = 1L;
-    private final VoltLogger m_joinLog = new VoltLogger("JOIN");
+    private final VoltLogger m_joinLog = new VoltLogger("REJOIN");
 
     public enum QueueState {
         UNBLOCKED,

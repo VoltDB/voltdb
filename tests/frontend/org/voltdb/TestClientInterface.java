@@ -384,6 +384,9 @@ public class TestClientInterface {
         catalogResult.deploymentCRC = 1234l;
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
+        catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
+        catalogResult.originalTxnId = 12345678l;
+        catalogResult.originalUniqueId = 87654321l;
         m_ci.processFinishedCompilerWork(catalogResult).run();
 
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
@@ -407,6 +410,9 @@ public class TestClientInterface {
         assertEquals(3, invocationCaptor.getValue().getParameterAtIndex(2));
         assertEquals("blah", invocationCaptor.getValue().getParameterAtIndex(3));
         assertEquals(1234l, invocationCaptor.getValue().getParameterAtIndex(4));
+        assertEquals(ProcedureInvocationType.REPLICATED, invocationCaptor.getValue().getType());
+        assertEquals(12345678l, invocationCaptor.getValue().getOriginalTxnId());
+        assertEquals(87654321l, invocationCaptor.getValue().getOriginalUniqueId());
     }
 
     @Test
@@ -523,7 +529,7 @@ public class TestClientInterface {
             final ByteBuffer msg = createMsg("@Promote");
             m_ci.handleRead(msg, m_handler, null);
             // Verify that the truncation request node was created.
-            verify(m_zk).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
+            verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
                                 eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
         }
         finally {

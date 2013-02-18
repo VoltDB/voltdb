@@ -61,6 +61,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportOnServerType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
@@ -274,6 +275,12 @@ public class VoltProjectBuilder {
     private Properties m_elConfig;
     private boolean m_elOnServer;
     private String m_elExportTo;
+
+    private Integer m_deadHostTimeout = null;
+
+    public void setDeadHostTimeout(Integer deadHostTimeout) {
+        m_deadHostTimeout = deadHostTimeout;
+    }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
             Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
@@ -959,6 +966,12 @@ public class VoltProjectBuilder {
             PathEntry snapshotPathElement = factory.createPathEntry();
             snapshotPathElement.setPath(m_snapshotPath);
             paths.setSnapshots(snapshotPathElement);
+        }
+
+        if (m_deadHostTimeout != null) {
+            HeartbeatType heartbeat = factory.createHeartbeatType();
+            heartbeat.setTimeout(m_deadHostTimeout);
+            deployment.setHeartbeat(heartbeat);
         }
 
         if (m_commandLogPath != null) {

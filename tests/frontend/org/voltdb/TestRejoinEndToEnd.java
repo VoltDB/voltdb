@@ -353,7 +353,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
 
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
+        LocalCluster cluster = new LocalCluster("rejoin.jar", 4, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();

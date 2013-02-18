@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
@@ -50,8 +51,8 @@ public class ForeignHost {
     private final SocketChannel m_sc;
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
-    private final long m_deadHostTimeout;
-    private long m_lastMessageMillis;
+    private long m_deadHostTimeout;
+    private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -72,6 +73,8 @@ public class ForeignHost {
             m_isUp = false;
             if (!m_closing)
             {
+                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostname());
+                hostLog.warn("Received remote hangup from foreign host " + hostname());
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
         }
@@ -108,13 +111,10 @@ public class ForeignHost {
         m_hostId = hostId;
         m_closing = false;
         m_isUp = true;
-        m_lastMessageMillis = Long.MAX_VALUE;
         m_sc = socket;
         m_socket = socket.socket();
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
-        hostLog.info("Heartbeat timeout to host: " + m_socket.getRemoteSocketAddress() + " is " +
-                         m_deadHostTimeout + " milliseconds");
     }
 
     public void register(HostMessenger host) throws IOException {
@@ -210,7 +210,7 @@ public class ForeignHost {
             });
 
         long current_time = EstTime.currentTimeMillis();
-        long current_delta = current_time - m_lastMessageMillis;
+        long current_delta = current_time - m_lastMessageMillis.get();
         // NodeFailureFault no longer immediately trips FHInputHandler to
         // set m_isUp to false, so use both that and m_closing to
         // avoid repeat reports of a single node failure
@@ -222,6 +222,7 @@ public class ForeignHost {
             hostLog.info("\tlast message: " + m_lastMessageMillis);
             hostLog.info("\tdelta (millis): " + current_delta);
             hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
+            VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
     }
@@ -297,7 +298,7 @@ public class ForeignHost {
         }
 
         //m_lastMessageMillis = System.currentTimeMillis();
-        m_lastMessageMillis = EstTime.currentTimeMillis();
+        m_lastMessageMillis.lazySet(EstTime.currentTimeMillis());
 
         // ENG-1608.  We sniff for FailureSiteUpdateMessages here so
         // that a node will participate in the failure resolution protocol
@@ -326,5 +327,9 @@ public class ForeignHost {
         message.put(errBytes);
         message.flip();
         m_connection.writeStream().enqueue(message);
+    }
+
+    public void updateDeadHostTimeout(int timeout) {
+        m_deadHostTimeout = timeout;
     }
 }

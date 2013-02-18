@@ -29,11 +29,13 @@ import org.voltdb.client.ProcedureInvocationType;
  */
 public class ReplicaInvocationAcceptancePolicy extends InvocationAcceptancePolicy {
     public ReplicaInvocationAcceptancePolicy(boolean isOn) {
-        super(isOn);
+        super(isOn);  // isOn == TRUE means this is a Replica cluster.
     }
+
 
     private ClientResponseImpl shouldAcceptHelper(AuthUser user, StoredProcedureInvocation invocation,
                                  boolean isReadOnly) {
+        // NOT a dragent invocation.
         if (invocation.getType() == ProcedureInvocationType.ORIGINAL) {
             if (!isOn) {
                 return null;
@@ -54,20 +56,25 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationAcceptancePolic
                         " is not allowed in replica cluster",
                         invocation.clientHandle);
             }
-        } else {
+        }
+
+        // IS a dragent invocation
+        else {
             if (!isOn) {
                 return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0],
-                        "Replicated procedure " + invocation.procName +
-                        " is dropped from cluster",
+                        "Master cluster rejected dragent transaction " + invocation.procName
+                        + ". A DR master cluster will not accept transactions from the dragent.",
                         invocation.clientHandle);
             }
 
             if (isReadOnly) {
+                // This should be impossible since the dragent isn't passed read-only txns.
                 return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0],
-                        "Read replicated procedure " + invocation.procName +
-                        " is dropped from replica cluster",
+                        "Read-only procedure " + invocation.procName +
+                        " was not replayed on replica cluster. " +
+                        "Reads are not replicated across DR connections.",
                         invocation.clientHandle);
             } else {
                 return null;

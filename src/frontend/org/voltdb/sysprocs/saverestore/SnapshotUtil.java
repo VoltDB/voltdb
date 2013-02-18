@@ -1152,8 +1152,8 @@ public class SnapshotUtil {
                         try {
                             Thread.sleep(5000);
                         } catch (InterruptedException e1) {}
-                        new VoltLogger("HOST").warn("Partition detection was unable to submit a snapshot request" +
-                                                     "because one already existed. Retrying.");
+                        new VoltLogger("SNAPSHOT").warn("Partition detection was unable to submit a snapshot request" +
+                                "because one already existed. Retrying.");
                         continue;
                     } catch (InterruptedException ignore) {}
                 }

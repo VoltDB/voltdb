@@ -37,15 +37,16 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
         }
 
         ParameterSet params = invocation.getParams();
+        // deployment string can be null, indicating that the user
+        // doesn't want to alter that, and we'll use the previous deployment
         if (params.toArray().length != 2 ||
-            params.toArray()[0] == null ||
-            params.toArray()[1] == null)
+            params.toArray()[0] == null)
         {
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0],
                     "UpdateApplicationCatalog system procedure requires exactly " +
                     "two parameters, the catalog bytes and the deployment file " +
-                    "string.",
+                    "string (which may be null).",
                     invocation.clientHandle);
         }
 
