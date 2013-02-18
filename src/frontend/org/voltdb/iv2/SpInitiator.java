@@ -111,9 +111,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 Long.toString(getInitiatorHSId()), null);
 
         // configure DR
-        ((SpScheduler) m_scheduler).setDRGateway(PartitionDRGateway.getInstance(m_partitionId,
-                                                                                nodeDRGateway,
-                                                                                true));
+        ((SpScheduler) m_scheduler).setDRGateway(
+                PartitionDRGateway.getInstance(m_partitionId,
+                        nodeDRGateway,
+                        true,
+                        VoltDB.createForRejoin(startAction)));
     }
 
     @Override
