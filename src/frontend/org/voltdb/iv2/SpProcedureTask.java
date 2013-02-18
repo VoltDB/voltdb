@@ -52,7 +52,9 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.debug("STARTING: " + this);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this);
+        }
         if (!m_txn.isReadOnly()) {
             m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         }
@@ -67,7 +69,9 @@ public class SpProcedureTask extends ProcedureTask
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        hostLog.debug("COMPLETE: " + this);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE: " + this);
+        }
 
         logToDR(txn, response);
     }
