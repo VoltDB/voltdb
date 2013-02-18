@@ -864,7 +864,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         // initialize the DR gateway
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
