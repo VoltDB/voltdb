@@ -39,8 +39,8 @@ public class PartitionDRGateway {
      */
     public static PartitionDRGateway getInstance(int partitionId,
                                                  NodeDRGateway nodeGateway,
-                                                 boolean isRejoin,
-                                                 boolean iv2Enabled)
+                                                 boolean iv2Enabled,
+                                                 boolean isRejoin)
     {
         final VoltDBInterface vdb = VoltDB.instance();
         LicenseApi api = vdb.getLicenseApi();
