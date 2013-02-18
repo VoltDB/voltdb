@@ -33,7 +33,7 @@ import org.voltdb.utils.CompressionService;
  */
 public class StreamSnapshotDataReceiver extends StreamSnapshotBase
 implements Runnable {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     /*
      * element is a pair of <sourceHSId, blockData>. The hsId should remain the

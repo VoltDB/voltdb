@@ -178,7 +178,10 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 getVoltPrivateRealTransactionIdDontUseMe(),
                 getUniqueId(),
                 catalogBytes);
-        zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
+        if (deploymentString != null) {
+            zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1,
+                    new ZKUtil.StatCallback(), null);
+        }
 
         performCatalogUpdateWork(
                 catalogDiffCommands,
