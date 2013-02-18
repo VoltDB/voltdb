@@ -94,7 +94,8 @@ public class ParameterConverter {
         }
 
         if (isArray != pclass.isArray()) {
-            throw new Exception("Array / Scalar parameter mismatch");
+            throw new Exception(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    pclass.getName(), paramType.getName()));
         }
 
         if (isArray) {

@@ -45,26 +45,29 @@ import org.voltdb.utils.CatalogUtil;
 
 public class TestLiveTableSchemaMigration extends TestCase {
 
+    /**
+     * Assuming given table has schema metadata, make a catalog containing
+     * that table on disk.
+     */
     String catalogPathForTable(VoltTable t, String jarname) throws IOException {
         CatalogBuilder builder = new CatalogBuilder();
         builder.addLiteralSchema(TableHelper.ddlForTable(t));
-        System.out.println(TableHelper.ddlForTable(t));
         String retval = Configuration.getPathToCatalogForTest(jarname);
         boolean success = builder.compile(retval);
         assertTrue(success);
         return retval;
     }
 
-    void migrateSchema(String schema1, String schema2) throws Exception {
+    /**
+     * Assuming given tables have schema metadata, fill them with random data
+     * and compare a pure-java schema migration with an EE schema migration.
+     */
+    void migrateSchema(VoltTable t1, VoltTable t2) throws Exception {
         ServerThread server = null;
         Client client = null;
 
         try {
-            VoltTable t1 = TableHelper.quickTable(schema1);
-            VoltTable t2 = TableHelper.quickTable(schema2);
-
             TableHelper.randomFill(t1, 1000, 1024, new Random(0));
-            TableHelper.migrateTable(t1, t2);
 
             String catPath1 = catalogPathForTable(t1, "t1.jar");
             String catPath2 = catalogPathForTable(t2, "t2.jar");
@@ -84,6 +87,11 @@ public class TestLiveTableSchemaMigration extends TestCase {
             server.start();
             server.waitForInitialization();
 
+            System.out.printf("PRE:  %s\n", TableHelper.ddlForTable(t1));
+            System.out.printf("POST: %s\n", TableHelper.ddlForTable(t2));
+
+            TableHelper.migrateTable(t1, t2);
+
             ClientConfig clientConfig = new ClientConfig();
             client = ClientFactory.createClient(clientConfig);
             client.createConnection("localhost");
@@ -94,7 +102,12 @@ public class TestLiveTableSchemaMigration extends TestCase {
 
             VoltTable t3 = client.callProcedure("@AdHoc", "select * from FOO").getResults()[0];
 
-            assert(t3.hasSameContents(t2));
+            if (!t3.hasSameContents(t2)) {
+                System.out.println("Table Mismatch");
+                System.out.printf("PRE:  %s\n", t2.toFormattedString());
+                System.out.printf("POST: %s\n", t3.toFormattedString());
+                fail();
+            }
         }
         finally {
             if (client != null) {
@@ -106,10 +119,30 @@ public class TestLiveTableSchemaMigration extends TestCase {
         }
     }
 
-    public void testBasicnessitude() throws Exception {
-        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:BIGINT, B:TINYINT)");
+    /**
+     * Helper if you have quick schema, rather than tables.
+     */
+    void migrateSchema(String schema1, String schema2) throws Exception {
+        VoltTable t1 = TableHelper.quickTable(schema1);
+        VoltTable t2 = TableHelper.quickTable(schema2);
+
+        migrateSchema(t1, t2);
+    }
+
+    /**
+     * Test migrating between given schemas. Create random data and
+     * migrate it in java, then compare the results with a real schema
+     * change operation in the EE.
+     */
+    public void testFixedSchemas() throws Exception {
+        // do nada
+        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:INTEGER, B:TINYINT)");
+
+        // try to add a column in front of a pkey
+        migrateSchema("FOO (A:INTEGER) P(0)", "FOO (X:INTEGER, A:INTEGER) P(1)");
 
         // base case of widening column
+        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:BIGINT, B:TINYINT)");
         migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (A:BIGINT, B:SMALLINT, C:INTEGER)");
 
         // string widening
@@ -132,5 +165,23 @@ public class TestLiveTableSchemaMigration extends TestCase {
 
         // reordering columns
         migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (C:INTEGER, A:BIGINT, B:TINYINT)");
+    }
+
+    /**
+     * Create and mutate a bunch of random schemas and data in java,
+     * then compare the mutated results with a schema change in the EE.
+     *
+     * The number of times the loop is run can be changed to make the test
+     * better at the cost of runtime.
+     */
+    public void testRandomSchemas() throws Exception {
+        int count = 15;
+        Random rand = new Random(0);
+        for (int i = 0; i < count; i++) {
+            VoltTable t1 = TableHelper.getTotallyRandomTable("foo", rand);
+            VoltTable t2 = TableHelper.mutateTable(t1, rand);
+            migrateSchema(t1, t2);
+            System.out.printf("testRandomSchemas tested %d/%d\n", i+1, count);
+        }
     }
 }

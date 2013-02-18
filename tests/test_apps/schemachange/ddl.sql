@@ -1,0 +1,3 @@
+CREATE TABLE IGNORED_TABLE (
+    id BIGINT,
+);

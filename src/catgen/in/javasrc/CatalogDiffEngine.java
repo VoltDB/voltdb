@@ -113,9 +113,9 @@ public class CatalogDiffEngine {
             // see if the current column is also in the candidate index
             // for now, assume the tables in question have the same schema
             for (ColumnRef colRef : newIndex.getColumns()) {
-                int index1 = colRef.getColumn().getIndex();
-                int index2 = existingColRef.getColumn().getIndex();
-                if (index1 == index2) {
+                String colName1 = colRef.getColumn().getName();
+                String colName2 = existingColRef.getColumn().getName();
+                if (colName1.equals(colName2)) {
                     foundMatch = true;
                     break;
                 }

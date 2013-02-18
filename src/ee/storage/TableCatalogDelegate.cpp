@@ -518,8 +518,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         }
     }
 
-    printf("1\n");
-
     // release any memory held by the default values --
     // normally you'd want this in a finally block, but since this code failing
     // implies serious problems, we'll not worry our pretty little heads
@@ -527,15 +525,11 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         defaults[i].free();
     }
 
-    printf("2\n");
-
     ///////////////////////////////////////////////
     // Drop the old table
     ///////////////////////////////////////////////
 
     deleteCommand();
-
-    printf("3\n");
 
     ///////////////////////////////////////////////
     // Patch up the new table as a replacement
@@ -547,8 +541,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     m_table->configureIndexStats(catalogDatabase.relativeIndex());
 
     m_table->incrementRefcount();
-
-    printf("4\n");
 
     return 0;
 }

@@ -21,14 +21,14 @@ fi
 
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
 VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -42,10 +42,7 @@ function srccompile() {
 
 # build an application catalog
 function catalog() {
-    $VOLTCOMPILER obj project.xml $APPNAME.jar
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-    $VOLTCOMPILER obj project-withindex.xml $APPNAME-withindex.jar
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -62,11 +59,10 @@ function server() {
 # run the client that drives the example
 function client() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj schemachange.SchemaChangeClient \
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+        schemachange.SchemaChangeClient \
         --servers=localhost \
         --targetrssmb=2048 \
-        --pathtocat1=`pwd`/$APPNAME.jar \
-        --pathtocat2 =`pwd`/$APPNAME-withindex.jar \
         --pathtodeployment=`pwd`/deployment.xml
 }
 
