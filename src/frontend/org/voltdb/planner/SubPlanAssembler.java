@@ -503,6 +503,7 @@ public abstract class SubPlanAssembler {
                             // In that case, the parameter has to be added to the bound list for this index/statement.
                             ConstantValueExpression cve = pve.getOriginalValue();
                             if (cve == null || ! cve.isPrefixPatternString()) {
+                                binding = null; // the filter is not usable, so the binding is invalid
                                 continue;
                             }
                             // Remember that the binding list returned by bindingIfValidIndexedFilterOperand above
@@ -516,10 +517,12 @@ public abstract class SubPlanAssembler {
                             ConstantValueExpression cve = (ConstantValueExpression)otherExpr;
                             if ( ! cve.isPrefixPatternString()) {
                                 // The constant is not an index-friendly prefix pattern.
+                                binding = null; // the filter is not usable, so the binding is invalid
                                 continue;
                             }
                         } else {
                             // Other cases are not indexable, e.g. " T1.column LIKE T2.column "
+                            binding = null; // the filter is not usable, so the binding is invalid
                             continue;
                         }
                     }

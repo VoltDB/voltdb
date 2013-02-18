@@ -89,15 +89,28 @@ public class ComparisonExpression extends AbstractExpression {
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
 
-    private ComparisonExpression rangeFilterFromPrefixLike(ExpressionType rangeComparator, String comparand) {
+    /**
+     * Construct the upper or lower bound expression that is implied by a prefix LIKE operator, given its required elements.
+     * @param leftExpr - the LIKE operator's (and the result's) lhs expression
+     * @param rangeComparator - a GTE or LT operator to indicate lower or upper bound, respectively,
+     * @param comparand - a string operand value derived from the LIKE operator's rhs pattern
+     * A helper for getGteFilterFromPrefixLike/getLtFilterFromPrefixLike
+     **/
+    static private ComparisonExpression rangeFilterFromPrefixLike(AbstractExpression leftExpr, ExpressionType rangeComparator, String comparand) {
         ConstantValueExpression cve = new ConstantValueExpression();
         cve.setValueType(VoltType.STRING);
         cve.setValue(comparand);
         cve.setValueSize(comparand.length());
-        ComparisonExpression rangeFilter = new ComparisonExpression(rangeComparator, m_left, cve);
+        ComparisonExpression rangeFilter = new ComparisonExpression(rangeComparator, leftExpr, cve);
         return rangeFilter;
     }
 
+    /**
+     * Extract a prefix string from a prefix LIKE comparison's rhs pattern,
+     * suitable for use as a lower bound constant.
+     * Currently assumes the simple case of one final '%' wildcard character.
+     * A helper for getGteFilterFromPrefixLike/getLtFilterFromPrefixLike
+     **/
     private String extractLikePatternPrefix() {
         assert(getExpressionType() == ExpressionType.COMPARE_LIKE);
         ConstantValueExpression cve;
@@ -113,23 +126,32 @@ public class ComparisonExpression extends AbstractExpression {
         return pattern.substring(0, pattern.length()-1);
     }
 
+    /**
+     * Extract a modified prefix string from a prefix LIKE comparison's rhs pattern,
+     * suitable for use as an upper bound constant.
+     * Currently assumes the simple case of one final '%' wildcard character.
+     * A helper for getLtFilterFromPrefixLike
+     **/
     private String extractAndIncrementLikePatternPrefix() {
         String starter = extractLikePatternPrefix();
         // Right or wrong, this mimics what HSQL does for the case of " column LIKE prefix-pattern ".
+        // It assumes that this last-sorting JAVA UTF-16 character maps to a suitably last-sorting UTF-8 string.
         String ender = starter + "\uffff";
         return ender;
     }
 
+    /// Construct the lower bound comparison filter implied by a prefix LIKE comparison.
     public ComparisonExpression getGteFilterFromPrefixLike() {
         ExpressionType rangeComparator = ExpressionType.COMPARE_GREATERTHANOREQUALTO;
         String comparand = extractLikePatternPrefix();
-        return rangeFilterFromPrefixLike(rangeComparator, comparand);
+        return rangeFilterFromPrefixLike(m_left, rangeComparator, comparand);
     }
 
+    /// Construct the upper bound comparison filter implied by a prefix LIKE comparison.
     public ComparisonExpression getLtFilterFromPrefixLike() {
         ExpressionType rangeComparator = ExpressionType.COMPARE_LESSTHAN;
         String comparand = extractAndIncrementLikePatternPrefix();
-        return rangeFilterFromPrefixLike(rangeComparator, comparand);
+        return rangeFilterFromPrefixLike(m_left, rangeComparator, comparand);
     }
 
 }
