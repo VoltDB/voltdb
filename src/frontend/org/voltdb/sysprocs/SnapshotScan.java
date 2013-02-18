@@ -50,7 +50,7 @@ import org.voltdb.utils.VoltFile;
 public class SnapshotScan extends VoltSystemProcedure {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotStatus.class.getName());
 
-    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     private static final int DEP_snapshotDigestScan = (int)
         SysProcFragmentId.PF_snapshotDigestScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -159,12 +159,12 @@ public class SnapshotScan extends VoltSystemProcedure {
                                                                                                                ""
                                     );
                                 } catch (IOException e) {
-                                    HOST_LOG.warn(e);
+                                    SNAP_LOG.warn(e);
                                 } finally {
                                     savefile_input.close();
                                 }
                             } catch (IOException e) {
-                                HOST_LOG.warn(e);
+                                SNAP_LOG.warn(e);
                             }
                         } else {
                             results.addRow(
@@ -231,7 +231,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                         if (f.canRead()) {
                             try {
                                 HashSet<String> tableNames = new HashSet<String>();
-                                JSONObject digest = SnapshotUtil.CRCCheck(f, HOST_LOG);
+                                JSONObject digest = SnapshotUtil.CRCCheck(f, SNAP_LOG);
                                 if (digest == null) continue;
                                 JSONArray tables = digest.getJSONArray("tables");
                                 for (int ii = 0; ii < tables.length(); ii++) {
@@ -253,7 +253,7 @@ public class SnapshotScan extends VoltSystemProcedure {
                                                "SUCCESS",
                                 "");
                             } catch (Exception e) {
-                                HOST_LOG.warn(e);
+                                SNAP_LOG.warn(e);
                             }
                         }
                     }
@@ -642,7 +642,7 @@ public class SnapshotScan extends VoltSystemProcedure {
 
         final long endTime = System.currentTimeMillis();
         final long duration = endTime -startTime;
-        HOST_LOG.info("Finished scanning snapshots. Took " + duration + " milliseconds");
+        SNAP_LOG.info("Finished scanning snapshots. Took " + duration + " milliseconds");
         return new VoltTable[] { clientResults, diskFreeResults, scanResults };
     }
 

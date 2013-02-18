@@ -891,10 +891,8 @@ JAR BUILDING
             <include name="org/opencsv_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
-            <include name="org/apache/jute_voltpatches/**" />
+            <include name="org/apache/**" />
             <include name="vanilla/**" />
-            <include name="org/apache/zookeeper_voltpatches/**" />
-            <include name="org/apache/spearce_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
             <include name="org/voltdb/**" />

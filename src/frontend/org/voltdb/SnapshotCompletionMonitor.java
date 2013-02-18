@@ -41,7 +41,7 @@ import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import com.google.common.collect.ImmutableMap;
 
 public class SnapshotCompletionMonitor {
-    private static final VoltLogger LOG = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     final CopyOnWriteArrayList<SnapshotCompletionInterest> m_interests =
             new CopyOnWriteArrayList<SnapshotCompletionInterest>();
     private ZooKeeper m_zk;
@@ -77,7 +77,7 @@ public class SnapshotCompletionMonitor {
             new HashMap<Long, Map<Integer, Long>>();
 
     public void registerPartitionTxnIdsForSnapshot(long snapshotTxnId, Map<Integer, Long> partitionTxnIds) {
-        LOG.debug("Registering per partition txnids " + partitionTxnIds);
+        SNAP_LOG.debug("Registering per partition txnids " + partitionTxnIds);
         synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
             assert(!m_snapshotTxnIdsToPartitionTxnIds.containsKey(snapshotTxnId));
             m_snapshotTxnIdsToPartitionTxnIds.put(snapshotTxnId, partitionTxnIds);

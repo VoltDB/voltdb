@@ -19,7 +19,7 @@ else
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
 
-CLASSPATH=$({ \
+APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
@@ -40,7 +40,7 @@ function clean() {
 function srccompile() {
     mkdir -p obj/com/auctionexample/datafiles
     cp src/com/auctionexample/datafiles/*.txt obj/com/auctionexample/datafiles/
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
+    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj \
         src/com/auctionexample/*.java \
         procedures/com/auctionexample/*.java \
         procedures/com/auctionexample/debug/*.java
@@ -81,7 +81,7 @@ function client() {
                         --user program \
                         --password pass
     srccompile
-    java -classpath obj:$CLASSPATH com.auctionexample.Client
+    java -classpath obj:$APPCLASSPATH com.auctionexample.Client
 }
 
 function export() {
