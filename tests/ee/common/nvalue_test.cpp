@@ -238,19 +238,10 @@ TEST_F(NValueTest, TestCastToBigInt) {
     NValue doubleCastToBigInt = ValueFactory::castAsBigInt(doubleValue);
     EXPECT_EQ(ValuePeeker::peekBigInt(doubleCastToBigInt), 244643);
 
-    bool caught = false;
-    try
-    {
-        NValue decimalCastToBigInt = ValueFactory::castAsBigInt(decimalValue);
-        decimalCastToBigInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue decimalCastToBigInt = ValueFactory::castAsBigInt(decimalValue);
+    EXPECT_EQ(ValuePeeker::peekBigInt(decimalCastToBigInt), 10);
 
-    caught = false;
+    bool caught = false;
     try
     {
         NValue stringCastToBigInt = ValueFactory::castAsBigInt(stringValue);
@@ -319,19 +310,10 @@ TEST_F(NValueTest, TestCastToInteger) {
     NValue doubleCastToInteger = ValueFactory::castAsInteger(doubleValue);
     EXPECT_EQ(ValuePeeker::peekInteger(doubleCastToInteger), 244643);
 
-    bool caught = false;
-    try
-    {
-        NValue decimalCast = ValueFactory::castAsInteger(decimalValue);
-        decimalCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue decimalCastToInteger = ValueFactory::castAsInteger(decimalValue);
+    EXPECT_EQ(ValuePeeker::peekInteger(decimalCastToInteger), 10);
 
-    caught = false;
+    bool caught = false;
     try
     {
         NValue stringCast = ValueFactory::castAsInteger(stringValue);
@@ -424,19 +406,10 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     NValue doubleCastToSmallInt = ValueFactory::castAsSmallInt(doubleValue);
     EXPECT_EQ(ValuePeeker::peekSmallInt(doubleCastToSmallInt), 4643);
 
-    bool caught = false;
-    try
-    {
-        NValue decimalCast = ValueFactory::castAsSmallInt(decimalValue);
-        decimalCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue decimalCastToSmallInt = ValueFactory::castAsSmallInt(decimalValue);
+    EXPECT_EQ(ValuePeeker::peekSmallInt(decimalCastToSmallInt), 10);
 
-    caught = false;
+    bool caught = false;
     try
     {
         NValue stringCast = ValueFactory::castAsSmallInt(stringValue);
@@ -554,19 +527,10 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     NValue doubleCastToTinyInt = ValueFactory::castAsTinyInt(doubleValue);
     EXPECT_EQ(ValuePeeker::peekTinyInt(doubleCastToTinyInt), -32);
 
-    bool caught = false;
-    try
-    {
-        NValue decimalCast = ValueFactory::castAsTinyInt(decimalValue);
-        decimalCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue decimalCastToTinyInt = ValueFactory::castAsTinyInt(decimalValue);
+    EXPECT_EQ(ValuePeeker::peekTinyInt(decimalCastToTinyInt), 10);
 
-    caught = false;
+    bool caught = false;
     try
     {
         NValue stringCast = ValueFactory::castAsTinyInt(stringValue);
@@ -714,19 +678,11 @@ TEST_F(NValueTest, TestCastToDouble) {
     EXPECT_LT(ValuePeeker::peekDouble(doubleCastToDouble), 120.1);
     EXPECT_GT(ValuePeeker::peekDouble(doubleCastToDouble), 119.9);
 
-    bool caught = false;
-    try
-    {
-        NValue decimalCast = ValueFactory::castAsDouble(decimalValue);
-        decimalCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue decimalCastToDouble = ValueFactory::castAsDouble(decimalValue);
+    EXPECT_LT(ValuePeeker::peekDouble(decimalCastToDouble), 10.221);
+    EXPECT_GT(ValuePeeker::peekDouble(decimalCastToDouble), 10.219);
 
-    caught = false;
+    bool caught = false;
     try
     {
         NValue stringCast = ValueFactory::castAsDouble(stringValue);
@@ -743,6 +699,12 @@ TEST_F(NValueTest, TestCastToDouble) {
 }
 
 TEST_F(NValueTest, TestCastToString) {
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+
     NValue tinyInt = ValueFactory::getTinyIntValue(120);
     NValue smallInt = ValueFactory::getSmallIntValue(120);
     NValue integer = ValueFactory::getIntegerValue(120);
@@ -751,80 +713,45 @@ TEST_F(NValueTest, TestCastToString) {
     NValue stringValue = ValueFactory::getStringValue("dude");
     NValue decimalValue = ValueFactory::getDecimalValueFromString("10.22");
 
-    bool caught = false;
-    try
-    {
-        NValue cast = ValueFactory::castAsString(tinyInt);
-        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
 
-    caught = false;
-    try
-    {
-        NValue cast = ValueFactory::castAsString(smallInt);
-        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue bigIntCastToString = ValueFactory::castAsString(bigInt);
+    std::string bigIntPeekedString = ValuePeeker::peekStringCopy(bigIntCastToString);
+    EXPECT_EQ(strcmp(bigIntPeekedString.c_str(), "-64"), 0);
 
-    caught = false;
-    try
-    {
-        NValue cast = ValueFactory::castAsString(integer);
-        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue integerCastToString = ValueFactory::castAsString(integer);
+    std::string integerPeekedString = ValuePeeker::peekStringCopy(integerCastToString);
+    EXPECT_EQ(strcmp(integerPeekedString.c_str(), "120"), 0);
 
-    caught = false;
-    try
-    {
-        NValue cast = ValueFactory::castAsString(bigInt);
-        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue smallIntCastToString = ValueFactory::castAsString(smallInt);
+    std::string smallIntPeekedString = ValuePeeker::peekStringCopy(smallIntCastToString);
+    EXPECT_EQ(strcmp(smallIntPeekedString.c_str(), "120"), 0);
 
-    caught = false;
-    try
-    {
-        NValue cast = ValueFactory::castAsString(doubleValue);
-        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue tinyIntCastToString = ValueFactory::castAsString(tinyInt);
+    std::string tinyIntPeekedString = ValuePeeker::peekStringCopy(tinyIntCastToString);
+    EXPECT_EQ(strcmp(tinyIntPeekedString.c_str(), "120"), 0);
 
-    caught = false;
-    try
-    {
-        NValue cast = ValueFactory::castAsString(decimalValue);
-        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue doubleCastToString = ValueFactory::castAsString(doubleValue);
+    std::string doublePeekedString = ValuePeeker::peekStringCopy(doubleCastToString);
+    EXPECT_EQ(strcmp(doublePeekedString.c_str(), "-3.2E1"), 0);
+
+    NValue decimalCastToString = ValueFactory::castAsString(decimalValue);
+    std::string decimalPeekedString = ValuePeeker::peekStringCopy(decimalCastToString);
+    EXPECT_EQ(strcmp(decimalPeekedString.c_str(), "10.220000000000"), 0);
+
+    NValue stringCastToString = ValueFactory::castAsString(stringValue);
+    std::string stringPeekedString = ValuePeeker::peekStringCopy(stringCastToString);
+    EXPECT_EQ(strcmp(stringPeekedString.c_str(), "dude"), 0);
 
     // Make valgrind happy
+    bigIntCastToString.free();
+    integerCastToString.free();
+    smallIntCastToString.free();
+    tinyIntCastToString.free();
+    doubleCastToString.free();
+    decimalCastToString.free();
     stringValue.free();
+    delete poolHolder;
+    delete testPool;
 }
 
 TEST_F(NValueTest, TestCastToDecimal) {
@@ -845,19 +772,13 @@ TEST_F(NValueTest, TestCastToDecimal) {
     NValue castBigInt = ValueFactory::castAsDecimal(bigInt);
     EXPECT_EQ(0, decimalValue.compare(castBigInt));
 
-    bool caught = false;
-    try
-    {
-        NValue cast = ValueFactory::castAsDecimal(doubleValue);
-        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
-    }
-    catch (SQLException& ex)
-    {
-        caught = true;
-    }
-    EXPECT_TRUE(caught);
+    NValue castDouble = ValueFactory::castAsDecimal(doubleValue);
+    printf("DEBUG: %s\n", ValuePeeker::peekDecimalString(castDouble).c_str());
+    printf("DEBUG: %s\n", ValuePeeker::peekDecimalString(decimalValue).c_str());
 
-    caught = false;
+    EXPECT_EQ(0, decimalValue.compare(castDouble));
+
+    bool caught = false;
     try
     {
         NValue cast = ValueFactory::castAsDecimal(stringValue);
@@ -874,10 +795,10 @@ TEST_F(NValueTest, TestCastToDecimal) {
 
     /*
      * Now run a series of tests to make sure that out of range casts fail
-     * For Decimal only a double, BigInt, and Integer can be out of range.
+     * For Decimal, only a double can be out of range.
      */
-    NValue doubleOutOfRangeH = ValueFactory::getDoubleValue(92233720368547075809.0);
-    NValue doubleOutOfRangeL = ValueFactory::getDoubleValue(-92233720368547075809.0);
+    NValue doubleOutOfRangeH = ValueFactory::getDoubleValue(100000000000000000000000000.0);
+    NValue doubleOutOfRangeL = ValueFactory::getDoubleValue(-100000000000000000000000000.0);
     caught = false;
     try
     {

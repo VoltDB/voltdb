@@ -1190,11 +1190,77 @@ public final class NumberType extends Type {
                     return "0E0/0E0";
                 }
 
+                // START of VoltDB patch to comply literally with the SQL standard requirement
+                // that 0.0 be represented as a special cased "0E0"
+                // and NOT "0.0E0" as HSQL had been giving.
+                if (value == 0.0) {
+                    return "0E0";
+                }
+                // END of VoltDB patch.
+
                 String s = Double.toString(value);
 
                 // ensure the engine treats the value as a DOUBLE, not DECIMAL
                 if (s.indexOf('E') < 0) {
-                    s = s.concat("E0");
+                    // START of VoltDB patch to ALWAYS use proper E notation,
+                    // with a proper single-non-zero-digit integer part.
+                    // HSQL originally just had: s = s.concat("E0");
+                    int decimalOffset = s.indexOf('.');
+                    String optionalSign = (value < 0.0 ? "-" : "");
+                    int leadingNonZeroOffset;
+                    String decimalPart;
+                    int exponent;
+                    if (value > -10.0 && value < 10.0) {
+                        if (value <= -1.0 || value >= 1.0) {
+                            // OK -- exactly 1 leading digit. Done.
+                            s = s.concat("E0");
+                            return s;
+                        }
+
+                        // A zero leading digit, and maybe more zeros after the decimal.
+                        // Search for a significant digit past the decimal point.
+                        for(leadingNonZeroOffset = decimalOffset+1;
+                                leadingNonZeroOffset < s.length();
+                                    ++leadingNonZeroOffset) {
+                            if (s.charAt(leadingNonZeroOffset) != '0') {
+                                break;
+                            }
+                        }
+                        // Count 1 for the leading 0 but not for the decimal point.
+                        exponent = decimalOffset - leadingNonZeroOffset;
+                        // Since exact 0.0 was eliminated earlier,
+                        // s.charAt(leadingNonZeroOffset) must be our leading non-zero digit.
+                        // Rewrite 0.[0]*nn* as n.n*E-x where x is the number of leading zeros found
+                        // BUT rewrite 0.[0]*n as n.0E-x where x is the number of leading zeros found.
+                        if (leadingNonZeroOffset + 1 == s.length()) {
+                            decimalPart = "0";
+                        }
+                        else {
+                            decimalPart = s.substring(leadingNonZeroOffset+1);
+                        }
+                    }
+                    else {
+                        // Too many leading digits.
+                        leadingNonZeroOffset = optionalSign.length();
+                        // Set the exponent to how far the original decimal point was from its target
+                        // position, just after the leading digit. This is also the length of the
+                        // string of extra integer part digits that need to be moved into the decimal part.
+                        exponent = decimalOffset - (leadingNonZeroOffset + 1);
+
+                        decimalPart = s.substring(leadingNonZeroOffset+1, exponent) + s.substring(decimalOffset+1);
+                        // Trim any trailing zeros from the result.
+                        int lastIndex;
+                        for (lastIndex = decimalPart.length() - 1; lastIndex > 0; --lastIndex) {
+                            if (decimalPart.charAt(lastIndex) != '0') {
+                                break;
+                            }
+                        }
+                        if (lastIndex > 0 && decimalPart.charAt(lastIndex) == '0') {
+                            decimalPart = decimalPart.substring(lastIndex);
+                        }
+                    }
+                    s = optionalSign + s.charAt(leadingNonZeroOffset) + "." + decimalPart + "E" + exponent;
+                    // END of VoltDB patch to use proper E notation,
                 }
 
                 return s;

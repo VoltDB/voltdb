@@ -206,15 +206,17 @@ operatorFactory(ExpressionType et,
        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "Concat operator not yet supported.");
 
-     case (EXPRESSION_TYPE_OPERATOR_CAST):
-       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "Cast operator not yet supported.");
-
      default:
        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "operator ctor helper out of sync");
    }
    return ret;
+}
+
+static AbstractExpression* castFactory(ValueType vt,
+                                       AbstractExpression *lc)
+{
+    return new OperatorCastExpression(vt, lc);
 }
 
 /** convert the enumerated value type into a concrete type for
@@ -391,14 +393,18 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
 
     switch (et) {
 
-        // Operators
+    // Casts
+    case (EXPRESSION_TYPE_OPERATOR_CAST):
+        ret = castFactory(vt, lc);
+    break;
+
+    // Operators
     case (EXPRESSION_TYPE_OPERATOR_PLUS):
     case (EXPRESSION_TYPE_OPERATOR_MINUS):
     case (EXPRESSION_TYPE_OPERATOR_MULTIPLY):
     case (EXPRESSION_TYPE_OPERATOR_DIVIDE):
     case (EXPRESSION_TYPE_OPERATOR_CONCAT):
     case (EXPRESSION_TYPE_OPERATOR_MOD):
-    case (EXPRESSION_TYPE_OPERATOR_CAST):
     case (EXPRESSION_TYPE_OPERATOR_NOT):
     case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
         ret = operatorFactory(et, lc, rc);
