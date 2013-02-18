@@ -50,17 +50,12 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
 
     @Override
     void parse(VoltXMLElement stmtNode) {
-        String tableName = stmtNode.attributes.get("table");
-        assert(tableName != null);
-        tableName = tableName.trim();
-        table = getTableFromDB(tableName);
-        tableList.add(table);
+        assert(tableList.size() == 1);
+        table = tableList.get(0);
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns"))
                 parseColumns(child);
-            else if (child.name.equalsIgnoreCase("condition"))
-                parseConditions(child);
         }
     }
 

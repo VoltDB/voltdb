@@ -494,7 +494,7 @@ public class StatementQuery extends StatementDMQL {
         query.children.add(scans);
         assert(scans != null);
 
-        for (RangeVariable rangeVariable : rangeVariables)
+        for (RangeVariable rangeVariable : select.rangeVariables)
             scans.children.add(rangeVariable.voltGetXML(session));
 
         // conditions
@@ -503,45 +503,6 @@ public class StatementQuery extends StatementDMQL {
             query.children.add(condition);
             assert(condition != null);
             condition.children.add(select.queryCondition.voltGetXML(session));
-        }
-        else {
-            // look for inner joins expressed on range variables
-            Expression cond = null;
-            for (int rvi=0; rvi < select.rangeVariables.length; ++rvi) {
-                RangeVariable rv = rangeVariables[rvi];
-                // joins on non-indexed columns for inner join tokens created a range variable
-                // and assigned this expression.
-                if (rv.nonIndexJoinCondition != null) {
-                    if (cond != null) {
-                        cond = new ExpressionLogical(OpTypes.AND, cond, rv.nonIndexJoinCondition);
-                    } else {
-                        cond = rv.nonIndexJoinCondition;
-                    }
-                }
-                // joins on indexed columns for inner join tokens created a range variable
-                // and assigned an expression and set the flag isJoinIndex.
-                else if (rv.isJoinIndex) {
-                    if (rv.indexCondition != null) {
-                        if (cond != null) {
-                            cond = new ExpressionLogical(OpTypes.AND, cond, rv.indexCondition);
-                        } else {
-                            cond = rv.indexCondition;
-                        }
-                    }
-                    if (rv.indexEndCondition != null) {
-                        if (cond != null) {
-                            cond = new ExpressionLogical(OpTypes.AND, cond, rv.indexCondition);
-                        } else {
-                            cond = rv.indexCondition;
-                        }
-                    }
-                }
-            }
-            if (cond != null) {
-                VoltXMLElement condition = new VoltXMLElement("querycondition");
-                query.children.add(condition);
-                condition.children.add(cond.voltGetXML(session));
-            }
         }
 
         // having

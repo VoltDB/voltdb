@@ -30,6 +30,7 @@ import junit.framework.TestCase;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.*;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
@@ -167,15 +168,184 @@ public class TestPlansJoin extends TestCase {
 
     }
 
-   public void testIndexInnerJoin() {
-        AbstractPlanNode pn = compile("select * FROM R1 JOIN R3 ON R1.C = R3.A", 0, false, null);
-        AbstractPlanNode n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof NestLoopIndexPlanNode);
-        assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
-        assertTrue(n.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null);
+    public void testScanJoinConditions() {
+        AbstractPlanNode pn = compile("select * FROM R1 WHERE R1.C = 0", 0, false, null);
+        AbstractPlanNode n = pn.getChild(0);
+        assertTrue(n instanceof AbstractScanPlanNode);
+        AbstractScanPlanNode scan = (AbstractScanPlanNode) n;
+        AbstractExpression p = scan.getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_EQUAL);
 
-        pn = compile("select * FROM R3 JOIN R1 ON R1.C = R3.A", 0, false, null);
+        pn = compile("select * FROM R1, R2 WHERE R1.A = R2.A AND R1.C > 0", 0, false, null);
         n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        n = n.getChild(0);
+        assertTrue(n instanceof AbstractScanPlanNode);
+        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
+        p = ((AbstractScanPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
+
+        pn = compile("select * FROM R1, R2 WHERE R1.A = R2.A AND R1.C > R2.C", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.CONJUNCTION_AND);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.COMPARE_LESSTHAN);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(((AbstractScanPlanNode)n.getChild(0)).getPredicate() == null);
+        assertTrue(((AbstractScanPlanNode)n.getChild(1)).getPredicate() == null);
+
+        pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.A WHERE R1.C > 0", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        n = n.getChild(0);
+        assertTrue(n instanceof AbstractScanPlanNode);
+        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
+        p = ((AbstractScanPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
+
+        pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.A WHERE R1.C > R2.C", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.CONJUNCTION_AND);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.COMPARE_LESSTHAN);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(((AbstractScanPlanNode)n.getChild(0)).getPredicate() == null);
+        assertTrue(((AbstractScanPlanNode)n.getChild(1)).getPredicate() == null);
+
+        pn = compile("select * FROM R1, R2, R3 WHERE R1.A = R2.A AND R1.C = R3.C AND R1.A > 0", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.CONJUNCTION_AND);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        n = n.getChild(0);
+        assertTrue(n instanceof AbstractScanPlanNode);
+        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
+        p = ((AbstractScanPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
+
+        pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.A JOIN R3 ON R1.C = R3.C WHERE R1.A > 0", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.CONJUNCTION_AND);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        n = n.getChild(0);
+        assertTrue(n instanceof AbstractScanPlanNode);
+        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
+        p = ((AbstractScanPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
+}
+
+    public void testFunctionJoinConditions() {
+        AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON ABS(R1.A) = ABS(R2.A) ", 0, false, null);
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        AbstractExpression p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.FUNCTION);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.FUNCTION);
+
+        pn = compile("select * FROM R1 ,R2 WHERE ABS(R1.A) = ABS(R2.A) ", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.FUNCTION);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.FUNCTION);
+
+        // USING expression can have only comma separated list of column names
+        try {
+            List<AbstractPlanNode> pnl = aide.compile("select * FROM R1 JOIN R2 USING (ABS(A))", 0, false, null);
+            fail();
+        } catch (PlanningErrorException ex) {
+            System.out.println(ex.getMessage());
+            assertTrue("user lacks privilege or object not found: ABS".equalsIgnoreCase(ex.getMessage()));
+        }
+    }
+
+    public void testIndexJoinConditions() {
+        AbstractPlanNode pn = compile("select * FROM R3 WHERE R3.A = 0", 0, false, null);
+        AbstractPlanNode n = pn.getChild(0);
+        assertTrue(n instanceof IndexScanPlanNode);
+        assertTrue(((IndexScanPlanNode) n).getPredicate() == null);
+
+        pn = compile("select * FROM R3 WHERE R3.A > 0 and R3.A < 5 and R3.C = 4", 0, false, null);
+        n = pn.getChild(0);
+        assertTrue(n instanceof IndexScanPlanNode);
+        IndexScanPlanNode indexScan = (IndexScanPlanNode) n;
+        AbstractExpression p = indexScan.getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        p = indexScan.getEndExpression();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_LESSTHAN);
+        assertTrue(indexScan.getLookupType().equals(IndexLookupType.GT));
+
+        pn = compile("select * FROM R3, R2 WHERE R3.A = R2.A AND R3.C > 0 and R2.C >= 5", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+        assertTrue(((NestLoopIndexPlanNode) n).getPredicate() == null);
+        indexScan = (IndexScanPlanNode)n.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
+        assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        AbstractPlanNode seqScan = (SeqScanPlanNode) n.getChild(0);
+        assertTrue(seqScan instanceof SeqScanPlanNode);
+        assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHANOREQUALTO));
+
+        pn = compile("select * FROM R3 JOIN R2 ON R3.A = R2.A WHERE R3.C > 0 and R2.C >= 5", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+        assertTrue(((NestLoopIndexPlanNode) n).getPredicate() == null);
+        indexScan = (IndexScanPlanNode)n.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
+        assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        seqScan = (SeqScanPlanNode) n.getChild(0);
+        assertTrue(seqScan instanceof SeqScanPlanNode);
+        assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHANOREQUALTO));
+
+        pn = compile("select * FROM R3 JOIN R2 USING(A) WHERE R3.C > 0 and R2.C >= 5", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+        assertTrue(((NestLoopIndexPlanNode) n).getPredicate() == null);
+        indexScan = (IndexScanPlanNode)n.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
+        assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        seqScan = (SeqScanPlanNode) n.getChild(0);
+        assertTrue(seqScan instanceof SeqScanPlanNode);
+        assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHANOREQUALTO));
+
+        pn = compile("select * FROM R3 JOIN R2 ON R3.A = R2.A JOIN R1 ON R2.A = R1.A WHERE R3.C > 0 and R2.C >= 5", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        p = ((NestLoopPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        ExpressionType t = p.getLeft().getExpressionType();
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.VALUE_TUPLE);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.VALUE_TUPLE);
+        seqScan = n.getChild(0);
+        assertTrue(seqScan instanceof SeqScanPlanNode);
+        n = n.getChild(1);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+        NestLoopIndexPlanNode nlij = (NestLoopIndexPlanNode) n;
+        indexScan = (IndexScanPlanNode)nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
+        assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        seqScan = (SeqScanPlanNode) nlij.getChild(0);
+        assertTrue(seqScan instanceof SeqScanPlanNode);
+        assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHANOREQUALTO));
+
+    }
+
+    public void testIndexInnerJoin() {
+        AbstractPlanNode pn = compile("select * FROM R3 JOIN R1 ON R1.C = R3.A", 0, false, null);
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopIndexPlanNode);
         assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
         assertTrue(n.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null);
@@ -204,17 +374,14 @@ public class TestPlansJoin extends TestCase {
        n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopIndexPlanNode);
        NestLoopIndexPlanNode nlij = (NestLoopIndexPlanNode) n;
-       pred = ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getPredicate();
-       assertTrue(pred != null);
-       assertTrue(pred.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+       ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getLookupType().equals(IndexLookupType.GT);
 
        pn = compile("select R3.A, R2.A FROM R2 JOIN R3 ON R3.A = R2.A", 0, false, null);
        n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopIndexPlanNode);
        nlij = (NestLoopIndexPlanNode) n;
        pred = ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getPredicate();
-       assertTrue(pred != null);
-       assertTrue(pred.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+       ((IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN)).getLookupType().equals(IndexLookupType.GT);
 
        pn = compile("select A, C FROM R3 JOIN R2 USING(A, C)", 0, false, null);
        n = pn.getChild(0).getChild(0);
@@ -252,23 +419,7 @@ public class TestPlansJoin extends TestCase {
            fail();
        }
    }
-/*
-   public void testLeftJoin() {
-       // Test multi column condition on non index columns
-       AbstractPlanNode pn = compile("select R1.A FROM R2 JOIN R1 on R1.A = R2.A", 0, false, null);
-       AbstractPlanNode n = pn.getChild(0).getChild(0);
-       assertTrue(n instanceof NestLoopPlanNode);
-       NestLoopPlanNode nlj = (NestLoopPlanNode) n;
-       assertTrue(nlj.getJoinType() == JoinType.LEFT);
-       AbstractPlanNode outer = n.getChild(0);
-       AbstractPlanNode inner = n.getChild(1);
-       assertTrue(outer instanceof AbstractScanPlanNode && inner instanceof AbstractScanPlanNode);
-       AbstractScanPlanNode o = (AbstractScanPlanNode) outer;
-       AbstractScanPlanNode i = (AbstractScanPlanNode) inner;
-       assertTrue(o.getTargetTableName().equalsIgnoreCase("R2"));
-       assertTrue(i.getTargetTableName().equalsIgnoreCase("R1"));
-   }
-*/
+
    public void testNonSupportedJoin() {
        // JOIN with parentheses (HSQL limitation)
        try {

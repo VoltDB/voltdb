@@ -69,6 +69,7 @@ namespace voltdb {
 #define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
 
 class TableColumn;
+class StandaloneTuple;
 
 class TableTuple {
     friend class TableFactory;
@@ -80,6 +81,7 @@ class TableTuple {
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
+    friend class StandaloneTuple;
     template<std::size_t keySize> friend class IntsKey;
     template<std::size_t keySize> friend class GenericKey;
 
@@ -213,11 +215,6 @@ public:
      * Copies NValues from one tuple to another for a given range.
      */
     void setNValues(const TableTuple &rhs, const int beginIdx, const int endIdx);
-
-    /*
-     * Sets NValue to null for all indexies..
-     */
-    void setNullNValues();
 
     /*
      * Version of setNValue that will allocate space to copy
@@ -372,6 +369,51 @@ private:
     }
 };
 
+// A small class to hold together a standalone tuple (not backed by any table)
+// and the associated memory tokeep the actual data.
+class StandaloneTuple {
+    public:
+        StandaloneTuple() :
+            m_tupleMemory(),m_tuple() {
+        }
+
+        explicit StandaloneTuple(const TupleSchema* schema) :
+            m_tupleMemory(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]),
+            m_tuple(m_tupleMemory.get(), schema) {
+            m_tuple.setAllNulls();
+            m_tuple.setActiveTrue();
+        }
+
+        StandaloneTuple(const TableTuple& rhs) :
+            m_tupleMemory(),m_tuple() {
+            initFrom(rhs);
+        }
+
+        StandaloneTuple& operator=(const TableTuple& rhs)  {
+            initFrom(rhs);
+            return *this;
+        }
+
+        TableTuple getTuple() const {
+            return m_tuple;
+        }
+
+        TableTuple& getTuple() {
+            return m_tuple;
+        }
+    private:
+        void initFrom(const StandaloneTuple& rhs) {
+            assert(rhs.m_tuple.getSchema() != NULL);
+            assert(rhs.m_tuple.m_data != NULL);
+            m_tupleMemory.reset(new char[rhs.m_tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE]);
+            m_tuple = rhs.m_tuple;
+        }
+
+        boost::scoped_array<char> m_tupleMemory;
+        TableTuple m_tuple;
+
+};
+
 inline TableTuple::TableTuple() :
     m_schema(NULL), m_data(NULL) {
 }
@@ -418,14 +460,6 @@ inline void TableTuple::setNValues(const TableTuple &rhs, const int beginIdx, co
     assert(beginIdx <= endIdx && endIdx <= sizeInValues());
     for (int idx = beginIdx; idx < endIdx; ++ idx) {
         setNValue(idx, rhs.getNValue(idx));
-    }
-}
-
-inline void TableTuple::setNullNValues() {
-    for (int idx = 0; idx < sizeInValues(); ++ idx) {
-        NValue value = getNValue(idx);
-        value.setNull();
-        setNValue(idx, value);
     }
 }
 

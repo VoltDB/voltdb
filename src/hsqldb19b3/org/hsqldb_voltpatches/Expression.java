@@ -66,6 +66,9 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 
@@ -1491,6 +1494,54 @@ public class Expression {
         }
 
         return exp;
+    }
+    
+    /**
+     * VoltDB added method to simplify an expression by eliminating identical subexpressions (same id)
+     * The original expression must be a logical conjunction of form e1 AND e2 AND e3 AND e4. 
+     * If subexpression e1 is identical to the subexpression e2 the simplified expression would be
+     * e1 AND e3 AND e4.
+     * @param session The current Session object may be needed to resolve
+     * some names.
+     * @return simplified expression.
+     * @throws HSQLParseException
+     */
+    public Expression eliminateDuplicates(final Session session) {
+        // First build the list of child expressions joined by logical AND 
+        List<Expression> subExprList = new ArrayList<Expression>();
+        extractAndSubExpressions(this, subExprList);
+        // Eliminate duplicates
+        HashSet<String> uniqueIds = new HashSet<String>();
+        Iterator<Expression> it = subExprList.iterator();
+        while (it.hasNext()) {
+            Expression expr = it.next();
+            String id = expr.getUniqueId(session);
+            if (uniqueIds.contains(id)) {
+                it.remove();
+            } else {
+                uniqueIds.add(id);
+            }
+        }
+        // Reconstruct the expression
+        if (!subExprList.isEmpty()) {
+            Iterator<Expression> itExpr = subExprList.iterator();
+            Expression finalExpr = itExpr.next();
+            while (itExpr.hasNext()) {
+                finalExpr = new ExpressionLogical(OpTypes.AND, finalExpr, itExpr.next());
+            }
+            return finalExpr; 
+        }
+        return this;
+    }
+    
+    protected void extractAndSubExpressions(Expression expr, List<Expression> subExprList) {
+        // If it is a logical expression AND then traverse down the tree
+        if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
+            extractAndSubExpressions(expr.nodes[LEFT], subExprList);
+            extractAndSubExpressions(expr.nodes[RIGHT], subExprList);
+        } else {
+            subExprList.add(expr);
+       }
     }
 
     protected String cached_id = null;

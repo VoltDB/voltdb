@@ -343,7 +343,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
             if ((joinClauses != null) && (joinClauses.size() > 0))
                 nljNode.setPredicate(ExpressionUtil.combine(joinClauses));
-            nljNode.setJoinType(JoinType.LEFT);
+            nljNode.setJoinType(JoinType.INNER);
 
             // combine the tails plan graph with the new head node
             nljNode.addAndLinkChild(nljAccessPlan);

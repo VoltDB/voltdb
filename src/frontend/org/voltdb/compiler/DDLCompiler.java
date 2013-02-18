@@ -1447,11 +1447,14 @@ public class DDLCompiler {
             Table srcTable = stmt.tableList.get(0);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(destTable.getTypeName());
             matviewinfo.setDest(destTable);
-            if (stmt.where == null)
+            if (stmt.tableJoinList.isEmpty()) {
                 matviewinfo.setPredicate("");
-            else {
-                String hex = Encoder.hexEncode(stmt.where.toJSONString());
-                matviewinfo.setPredicate(hex);
+            } else {
+                AbstractExpression where = stmt.getCombinedExpression();
+                if (where != null) {
+                    String hex = Encoder.hexEncode(where.toJSONString());
+                    matviewinfo.setPredicate(hex);
+                }
             }
             destTable.setMaterializer(srcTable);
 

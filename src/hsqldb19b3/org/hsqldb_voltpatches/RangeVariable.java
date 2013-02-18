@@ -1207,25 +1207,18 @@ final class RangeVariable {
                 cond = nonIndexJoinCondition;
             }
         }
+        if (cond != null) {
+            cond = cond.eliminateDuplicates(session);
+            VoltXMLElement joinCond = new VoltXMLElement("joincond");
+            joinCond.children.add(cond.voltGetXML(session));
+            scan.children.add(joinCond);
+        }
+        
         // then go to the nonIndexWhereCondition
         if (nonIndexWhereCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, nonIndexWhereCondition);
-            } else {
-                cond = nonIndexWhereCondition;
-            }
-        }
-
-        //
-        // END EXPRESSION
-        //
-        if (indexEndCondition != null) {
-            VoltXMLElement postexp = new VoltXMLElement("postexp");
-            scan.children.add(postexp);
-            assert(postexp != null);
-            VoltXMLElement postexpchild = cond.voltGetXML(session);
-            postexp.children.add(postexpchild);
-            assert(postexpchild != null);
+            VoltXMLElement whereCond = new VoltXMLElement("wherecond");
+            whereCond.children.add(nonIndexWhereCondition.voltGetXML(session));
+            scan.children.add(whereCond);
         }
 
         return scan;
