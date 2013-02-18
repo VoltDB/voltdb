@@ -56,9 +56,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     static final String JSON_TYPE_KEY = "type";
     static final String JSON_EXCEPTION_KEY = "exception";
 
-    // Error string returned on duplicate replicated transaction from DR agent
-    public static final String DUPE_TRANSACTION = "Rejected duplicate replicated transaction";
-    // Error string returned when a replayed clog transaction is ignored
+    // Error string returned when a replayed clog transaction is ignored or a replayed DR
+    // transaction is a duplicate
     public static final String IGNORED_TRANSACTION = "Ignored replayed transaction";
 
     /** opaque data optionally provided by and returned to the client */
