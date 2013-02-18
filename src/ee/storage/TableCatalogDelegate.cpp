@@ -502,12 +502,12 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
 
             // delete from the old table
             existingTable->deleteTupleForSchemaChange(scannedTuple);
-                        
+
             while (requiresFree.size()) {
                 requiresFree.back().free();
                 requiresFree.pop_back();
             }
-            
+
             // if a block was just deleted, start the iterator again on the next block
             // this avoids using the block iterator over a changing set of blocks
             size_t prevBlocksLeft = blocksLeft;
