@@ -140,6 +140,9 @@ public class Benchmark {
         @Option(desc = "Timeout that kills the client if progress is not made.")
         int progresstimeout = 120;
 
+        @Option(desc = "Whether or not to disable adhoc writes.")
+        boolean disableadhoc = false;
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -453,7 +456,9 @@ public class Benchmark {
         readThread.start();
 
         AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client);
-        adHocMayhemThread.start();
+        if (!config.disableadhoc) {
+            adHocMayhemThread.start();
+        }
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
