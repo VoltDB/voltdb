@@ -30,7 +30,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.*;
@@ -166,7 +165,7 @@ public class TestSnapshotDaemon {
 
     @Test
     public void testParamCount() throws Exception {
-        System.out.println("--------------\n  testLegacyParams\n---------------");
+        System.out.println("--------------\n  testParamCount\n---------------");
         SnapshotDaemon dut = getSnapshotDaemon();
         Connection c = mock(Connection.class);
         WriteStream ws = mock(WriteStream.class);
@@ -195,6 +194,7 @@ public class TestSnapshotDaemon {
         assertTrue(resp.getStatusString().contains("@SnapshotSave requires 3 parameters"));
     }
 
+    // Quick unit test to check invalid legacy param cases
     @Test
     public void testLegacyParams() throws Exception {
         System.out.println("--------------\n  testLegacyParams\n---------------");
@@ -276,6 +276,99 @@ public class TestSnapshotDaemon {
         resp = getResponseFromConnectionMock(c);
         assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
         assertTrue(resp.getStatusString().contains("contains a prohibited character"));
+    }
+
+    // Quick unit test to check invalid JSON param cases
+    @Test
+    public void testJsonParams() throws Exception {
+        System.out.println("--------------\n  testJsonParams\n---------------");
+        SnapshotDaemon dut = getSnapshotDaemon();
+        Connection c = mock(Connection.class);
+        WriteStream ws = mock(WriteStream.class);
+        when(c.writeStream()).thenReturn(ws);
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        // Test null fail
+        Object[] params = new Object[1];
+        params[0] = null;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        ClientResponseImpl resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString(), resp.getStatusString().contains("@SnapshotSave JSON blob is null"));
+        // Test not a string
+        params = new Object[1];
+        params[0] = 0l;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString(), resp.getStatusString().contains("@SnapshotSave JSON blob is a"));
+        // Test no uripath
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        stringer.endObject();
+        params[0] = stringer.toString();
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString(), resp.getStatusString().contains("JSONException"));
+        // Test empty uripath
+        stringer = new JSONStringer();
+        stringer.object();
+        stringer.key("uripath").value("");
+        stringer.endObject();
+        params[0] = stringer.toString();
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString(), resp.getStatusString().contains("uripath cannot be empty"));
+        // Test invalid uripath null scheme
+        stringer = new JSONStringer();
+        stringer.object();
+        stringer.key("uripath").value("good.luck.chuck");
+        stringer.endObject();
+        params[0] = stringer.toString();
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString(), resp.getStatusString().contains("URI scheme cannot be null"));
+        // Test invalid uripath null scheme
+        stringer = new JSONStringer();
+        stringer.object();
+        stringer.key("uripath").value("http://good.luck.chuck");
+        stringer.endObject();
+        params[0] = stringer.toString();
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString(), resp.getStatusString().contains("Unsupported URI scheme"));
+        // Test no nonce
+        stringer = new JSONStringer();
+        stringer.object();
+        stringer.key("uripath").value("file://good.luck.chuck");
+        stringer.endObject();
+        params[0] = stringer.toString();
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString(), resp.getStatusString().contains("JSONException"));
+        // Test empty nonce
+        stringer = new JSONStringer();
+        stringer.object();
+        stringer.key("uripath").value("file://good.luck.chuck");
+        stringer.key("nonce").value("");
+        stringer.endObject();
+        params[0] = stringer.toString();
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString(), resp.getStatusString().contains("nonce cannot be empty"));
     }
 
     @Test
