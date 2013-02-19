@@ -136,24 +136,14 @@ public class TestIv2RejoinCoordinator {
         ArgumentCaptor<Long> clientHandleCaptor = ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<Connection> connectionCaptor = ArgumentCaptor.forClass(Connection.class);
         ArgumentCaptor<SnapshotInitiationInfo> infoCaptor = ArgumentCaptor.forClass(SnapshotInitiationInfo.class);
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> nonceCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Boolean> blockingCaptor = ArgumentCaptor.forClass(Boolean.class);
-        ArgumentCaptor<SnapshotFormat> formatCaptor = ArgumentCaptor.forClass(SnapshotFormat.class);
-        ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Boolean> notifyCaptor = ArgumentCaptor.forClass(Boolean.class);
         if (expected) {
             // this gets called from a new thread.  Wait for a long time
             verify(m_snapshotDaemon, timeout(120000)).createAndWatchRequestNode(clientHandleCaptor.capture(),
                     connectionCaptor.capture(),
                     infoCaptor.capture(),
-                    pathCaptor.capture(),
-                    nonceCaptor.capture(),
-                    blockingCaptor.capture(),
-                    formatCaptor.capture(),
-                    jsonCaptor.capture(),
                     notifyCaptor.capture());
-            System.out.println("JSON: " + jsonCaptor.getValue());
+            System.out.println("JSON: " + infoCaptor.getValue().getJSONBlob());
             VoltTable fake = new VoltTable(new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING),
                     new VoltTable.ColumnInfo("RESULT", VoltType.STRING));
             fake.addRow("", "SUCCESS");
@@ -169,11 +159,6 @@ public class TestIv2RejoinCoordinator {
             verify(m_snapshotDaemon, never()).createAndWatchRequestNode(clientHandleCaptor.capture(),
                     connectionCaptor.capture(),
                     infoCaptor.capture(),
-                    pathCaptor.capture(),
-                    nonceCaptor.capture(),
-                    blockingCaptor.capture(),
-                    formatCaptor.capture(),
-                    jsonCaptor.capture(),
                     notifyCaptor.capture());
         }
     }

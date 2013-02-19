@@ -1125,8 +1125,7 @@ public class SnapshotUtil {
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
                     try {
                         if (!hasRequested) {
-                            sd.createAndWatchRequestNode(clientHandle, c, snapInfo, path, nonce, blocking,
-                                                         format, data, notifyChanges);
+                            sd.createAndWatchRequestNode(clientHandle, c, snapInfo, notifyChanges);
                             hasRequested = true;
                         }
 

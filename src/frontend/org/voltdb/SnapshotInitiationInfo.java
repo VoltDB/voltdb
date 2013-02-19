@@ -17,6 +17,9 @@
 
 package org.voltdb;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+
 public class SnapshotInitiationInfo
 {
     public SnapshotInitiationInfo(String path, String nonce, boolean blocking,
@@ -27,6 +30,42 @@ public class SnapshotInitiationInfo
         m_blocking = blocking;
         m_format = format;
         m_data = data;
+    }
+
+    public String getPath()
+    {
+        return m_path;
+    }
+
+    public String getNonce()
+    {
+        return m_nonce;
+    }
+
+    public boolean isBlocking()
+    {
+        return m_blocking;
+    }
+
+    public SnapshotFormat getFormat()
+    {
+        return m_format;
+    }
+
+    public String getJSONBlob()
+    {
+        return m_data;
+    }
+
+    public JSONObject getJSONObjectForZK() throws JSONException
+    {
+        final JSONObject jsObj = new JSONObject();
+        jsObj.put("path", m_path);
+        jsObj.put("nonce", m_nonce);
+        jsObj.put("block", m_blocking);
+        jsObj.put("format", m_format.toString());
+        jsObj.putOpt("data", m_data);
+        return jsObj;
     }
 
     private String m_path;

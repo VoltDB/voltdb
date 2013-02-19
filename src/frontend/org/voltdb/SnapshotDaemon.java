@@ -1577,11 +1577,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 throw new Exception("Provided nonce " + nonce + " contains a prohibited character (- or ,)");
             }
 
+            // XXX-IZZY fill null with the JSON blob instead
             SnapshotInitiationInfo snapInfo =
                 new SnapshotInitiationInfo(path, nonce, blocking, format, null);
 
             createAndWatchRequestNode(invocation.clientHandle, c, snapInfo,
-                    path, nonce, blocking, format, null,
                     false);
         } catch (Exception e) {
             VoltTable tables[] = new VoltTable[0];
@@ -1618,14 +1618,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     public void createAndWatchRequestNode(final long clientHandle,
                                           final Connection c,
                                           SnapshotInitiationInfo snapInfo,
-                                          String path,
-                                          String nonce,
-                                          boolean blocking,
-                                          SnapshotFormat format,
-                                          String data,
                                           boolean notifyChanges) throws ForwardClientException {
         boolean requestExists = false;
-        final String requestId = createRequestNode(snapInfo, path, nonce, blocking, format, data);
+        final String requestId = createRequestNode(snapInfo);
         if (requestId == null) {
             requestExists = true;
         } else {
@@ -1650,29 +1645,17 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     /**
      * Try to create the ZK node to request the snapshot.
      *
-     * @param path can be null if the target is not a file target
-     * @param nonce
-     * @param blocking
-     * @param format
-     * @param data Any data to pass to the snapshot target
+     * @param snapInfo SnapshotInitiationInfo object with the requested snapshot initiation settings
      * @return The request ID if succeeded, otherwise null.
      */
-    private String createRequestNode(SnapshotInitiationInfo snapInfo,
-            String path, String nonce,
-            boolean blocking, SnapshotFormat format,
-            String data)
+    private String createRequestNode(SnapshotInitiationInfo snapInfo)
     {
         String requestId = null;
 
         try {
-            final JSONObject jsObj = new JSONObject();
-            jsObj.put("path", path);
-            jsObj.put("nonce", nonce);
-            jsObj.put("block", blocking);
-            jsObj.put("format", format.toString());
+            final JSONObject jsObj = snapInfo.getJSONObjectForZK();
             requestId = java.util.UUID.randomUUID().toString();
             jsObj.put("requestId", requestId);
-            jsObj.putOpt("data", data);
             String zkString = jsObj.toString(4);
             byte zkBytes[] = zkString.getBytes("UTF-8");
 
