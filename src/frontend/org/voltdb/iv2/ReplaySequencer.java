@@ -181,7 +181,7 @@ public class ReplaySequencer
                 final InitiateResponseMessage resp = new InitiateResponseMessage(init);
                 resp.setResults(new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0],
-                        ClientResponseImpl.DUPE_TRANSACTION));
+                        ClientResponseImpl.IGNORED_TRANSACTION));
                 return resp;
             }
         }

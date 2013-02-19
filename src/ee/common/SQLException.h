@@ -30,6 +30,7 @@ public:
     // Please keep these ordered alphabetically.
     // Names and codes are standardized.
     static const char* data_exception_division_by_zero;
+    static const char* data_exception_invalid_character_value_for_cast;
     static const char* data_exception_invalid_parameter;
     static const char* data_exception_most_specific_type_mismatch;
     static const char* data_exception_numeric_value_out_of_range;

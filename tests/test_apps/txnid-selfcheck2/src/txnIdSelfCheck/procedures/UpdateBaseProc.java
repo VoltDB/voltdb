@@ -123,8 +123,8 @@ public class UpdateBaseProc extends VoltProcedure {
         long cnt = 0;
 
         // read data modified by AdHocMayhemThread for later insertion
-        final long adhocInc = adhoc.fetchRow(0).getLong("inc");
-        final long adhocJmp = adhoc.fetchRow(0).getLong("jmp");
+        final long adhocInc = adhoc.getRowCount() > 0 ? adhoc.fetchRow(0).getLong("inc") : 0;
+        final long adhocJmp = adhoc.getRowCount() > 0 ? adhoc.fetchRow(0).getLong("jmp") : 0;
 
         // compute the cheesy checksum of all of the table's contents based on
         // this cid to subsequently store in the new row

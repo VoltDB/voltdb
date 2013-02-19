@@ -228,8 +228,10 @@ public class SnapshotSaveAPI
             try {
                 if (VoltDB.instance().isIV2Enabled()) {
                     synchronized (m_createLock) {
-                        SNAP_LOG.info("Found tasks for HSIds: " + CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
-                        SNAP_LOG.info("Looking for local HSID: " + CoreUtils.hsIdToString(context.getSiteId()));
+                        SNAP_LOG.debug("Found tasks for HSIds: " +
+                                CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
+                        SNAP_LOG.debug("Looking for local HSID: " +
+                                CoreUtils.hsIdToString(context.getSiteId()));
                         Deque<SnapshotTableTask> taskList = m_taskListsForHSIds.remove(context.getSiteId());
                         List<SnapshotDataTarget> targetList = new ArrayList<SnapshotDataTarget>(m_snapshotDataTargets);
                         // If createSetup failed, then the first site to reach here is going
@@ -629,11 +631,11 @@ public class SnapshotSaveAPI
         synchronized (m_createLock) {
             //Seems like this should be cleared out just in case
             //Log if there is actually anything to clear since it is unexpected
-            if (!m_taskListsForHSIds.isEmpty() || !m_snapshotDataTargets.isEmpty()) {
+            if (!m_taskListsForHSIds.isEmpty()) {
                 SNAP_LOG.warn("Found lingering snapshot tasks while setting up a snapshot");
-                m_taskListsForHSIds.clear();
-                m_snapshotDataTargets.clear();
             }
+            m_taskListsForHSIds.clear();
+            m_snapshotDataTargets.clear();
             m_createSuccess.set(!abort);
             m_createResult.set(result);
             if (!abort) {

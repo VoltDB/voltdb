@@ -1458,7 +1458,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         if (m_config.m_replicationRole == ReplicationRole.REPLICA) {
-            hostLog.info("Started as " + m_config.m_replicationRole.toString().toLowerCase() + " cluster. " +
+            consoleLog.info("Started as " + m_config.m_replicationRole.toString().toLowerCase() + " cluster. " +
                              "Clients can only call read-only procedures.");
         }
         if (httpPortExtraLogMessage != null) {

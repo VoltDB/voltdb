@@ -26,6 +26,9 @@ if [ $USER = "test" ] && ( [ $HOUR -ge 22 ] || [ $HOUR -le 7 ] ); then
       fi
    done
 fi
-Z=`$SUDO jps -l | grep " org.voltdb" | grep -v BenchmarkController | awk '{print $1}' | xargs`
-[ -n "$Z" ] && $SUDO kill -9 $Z
+for P in `$SUDO pgrep -f org.voltdb.VoltDB | xargs`
+do
+    logger -isp user.notice -t TESTKILL "$USER Killing `$SUDO ps --no-headers -p $P -o user,command`"
+    $SUDO kill -9 $P
+done
 exit 0

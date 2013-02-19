@@ -36,10 +36,6 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="JOIN">
-        <level value="INFO"/>
-    </logger -->
-
     <!-- logger name="COMPILER">
         <level value="INFO"/>
     </logger -->
