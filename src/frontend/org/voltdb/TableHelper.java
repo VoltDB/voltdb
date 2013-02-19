@@ -575,34 +575,11 @@ public class TableHelper {
     }
 
     /**
-     * Helper for fillTableWithBigintPkey to make a table of random data to be loaded
-     * with LoadSinglepartitionTable
-     */
-    protected static VoltTable fillJavaTableWithBigintPkey(VoltTable t, Random rand, long rows, long offset, long jump) {
-        // find the primary key, assume first col if not found
-        int pkeyColIndex = getBigintPrimaryKeyIndexIfExists(t);
-        if (pkeyColIndex == -1) {
-            pkeyColIndex = 0;
-            assert(t.getColumnType(0) == VoltType.BIGINT);
-        }
-
-        VoltTable t2 = t.clone(1024 * 1024);
-        long pkeyVal = offset;
-        for (int i = 0; i < rows; i++) {
-            Object[] row = randomRow(t, Integer.MAX_VALUE, rand);
-            row[pkeyColIndex] = pkeyVal;
-            pkeyVal += jump;
-            t2.addRow(row);
-        }
-
-        return t2;
-    }
-
-    /**
      * Load random data into a partitioned table in VoltDB that has a biging pkey.
      *
      * If the VoltTable indicates which column is its pkey, then it will use it, but otherwise it will
-     * assume the first column is the bigint pkey.
+     * assume the first column is the bigint pkey. Note, this works with other integer keys, but
+     * your keyspace is pretty small.
      *
      * @param t Table with or without schema metadata.
      * @param mb Target RSS (approximate)
@@ -620,18 +597,14 @@ public class TableHelper {
         int pkeyColIndex = getBigintPrimaryKeyIndexIfExists(t);
         if (pkeyColIndex == -1) {
             pkeyColIndex = 0;
-            assert(t.getColumnType(0) == VoltType.BIGINT);
+            assert(t.getColumnType(0).isInteger());
         }
 
-        // track outstanding responses so 10k can be out at a time
-        final AtomicInteger outstanding = new AtomicInteger(0);
         final AtomicLong rss = new AtomicLong(0);
 
-        ProcedureCallback callback = new ProcedureCallback() {
+        ProcedureCallback insertCallback = new ProcedureCallback() {
             @Override
             public void clientCallback(ClientResponse clientResponse) throws Exception {
-                outstanding.decrementAndGet();
-
                 if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                     System.out.println("Error in loader callback:");
                     System.out.println(((ClientResponseImpl)clientResponse).toJSONString());
@@ -667,23 +640,20 @@ public class TableHelper {
         long rows = 0;
         rssThread.start();
         while (rss.get() < mb) {
-            VoltTable toLoad = fillJavaTableWithBigintPkey(t, rand, 1000, i, jump);
-            i += 1000 * jump;
-            while (outstanding.get() == 10) {
-                Thread.yield();
-            }
-            client.callProcedure(callback, "@LoadSinglepartitionTable", t.m_name, toLoad);
-            outstanding.incrementAndGet();
-            rows += 1000;
-            if (rows % 100000 == 0) {
-                System.out.printf("Loading 100000 rows. %d inserts sent (%d max id).\n",
-                        rows, i - 1);
+            Object[] row = randomRow(t, Integer.MAX_VALUE, rand);
+            row[pkeyColIndex] = i;
+            i += jump;
+            client.callProcedure(insertCallback, t.m_name.toUpperCase() + ".insert", row);
+            rows++;
+            if ((rows % 100000) == 0) {
+                System.out.printf("Loading 100000 rows. %d inserts sent (%d max id).\n", rows, i - 1);
             }
         }
-        while (outstanding.get() > 0) {
-            Thread.yield();
-        }
+        client.drain();
         rssThread.join();
+
+        System.out.printf("Filled table %s with %d rows and now RSS=%dmb\n",
+                t.m_name, rows, rss.get());
     }
 
     /**
