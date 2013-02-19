@@ -19,6 +19,8 @@
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
+#include "common/COWStream.h"
+#include "common/COWStreamProcessor.h"
 #include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>
@@ -51,46 +53,37 @@ CopyOnWriteContext::CopyOnWriteContext(
 /*
  * Serialize to multiple output streams.
  */
-bool CopyOnWriteContext::serializeMore(COWStreamList &outputStreams) {
-
-    // It has to be either one predicate per output stream or none at all.
-    // Iterate both lists in parallel when predicates are supplied.
-    if (outputStreams.empty()) {
-        throwFatalException("Expect at least one output stream.");
-    }
-
-    // It has to be either one predicate per output stream or none at all.
-    // Iterate both lists in parallel when predicates are supplied.
-    bool havePredicates = !m_predicates.empty();
-    if (havePredicates && m_predicates.size() != outputStreams.size()) {
-        throwFatalException("Expect either no predicates or one per output stream.");
-    }
+bool CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
 
     // Count the total number of bytes serialized to allow throttling.
     std::size_t totalBytesSerialized = 0;
     // Stop after serializing this many bytes.
     const std::size_t bytesSerializedThreshold = 512 * 1024;
 
-    // Initialize the streams and check that we weren't improperly re-called.
-    COWStreamList::iterator iout;
-    for (iout = outputStreams.begin(); iout != outputStreams.end(); ++iout) {
-        iout->startRows(m_partitionId);
-        if (iout->remaining() < (m_maxTupleLength + sizeof(int32_t))) {
-            throwFatalException("Serialize more should never be called "
-                    "a 2nd time after return indicating there is no more data");
-    //        out->writeInt(0);
-    //        assert(false);
-    //        return false;
-        }
+    // Need to initialize the output stream list.
+    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_totalPartitions);
+
+    // It has to be either one predicate per output stream or none at all.
+    // Iterate both lists in parallel when predicates are supplied.
+    if (outputStreams.empty()) {
+        throwFatalException("serializeMore() expects at least one output stream.");
     }
 
-    //=== The outer loop processes each table tuple.
+    // It has to be either one predicate per output stream or none at all.
+    // Iterate both lists in parallel when predicates are supplied.
+    bool havePredicates = !m_predicates.empty();
+    if (havePredicates && m_predicates.size() != outputStreams.size()) {
+        throwFatalException("serializeMore() expects either no predicates or one per output stream.");
+    }
+
+    //=== Tuple processing loop
 
     TableTuple tuple(m_table.schema());
 
     // hasMore is returned to the caller to indicate whether we're finished or not.
     bool hasMore = true;
-    // done is true after tuples dry up, a buffer fills, or the byte count threshold is hit.
+    // Set to true to break out of the loop after the tuples dry up
+    // or the byte count threshold is hit.
     bool done = false;
     while (!done) {
 
@@ -98,33 +91,11 @@ bool CopyOnWriteContext::serializeMore(COWStreamList &outputStreams) {
         hasMore = m_iterator->next(tuple);
         if (hasMore) {
 
-            //=== The inner loop processes each output stream.
-
-            // Predicates, if supplied, are one per output stream (previously asserted).
-            StreamPredicateList::const_iterator iterPredicate;
-            if (havePredicates) {
-                iterPredicate = m_predicates.begin();
-            }
-            for (iout = outputStreams.begin(); !done && iout != outputStreams.end(); ++iout) {
-                // Get approval from corresponding output stream predicate, if provided.
-                //TODO: Serialization is probably the most expensive operation. Move
-                // outside the inner loop and copy pre-serialized bytes to each stream?
-                bool accepted = true;
-                if (havePredicates) {
-                    accepted = iterPredicate->accept(m_table, tuple, m_totalPartitions);
-                    // Keep walking through predicates in lock-step with the streams.
-                    ++iterPredicate;
-                }
-                if (accepted) {
-                    if (iout->canFit(m_maxTupleLength)) {
-                        totalBytesSerialized += iout->writeRow(m_serializer, tuple);
-                    } else {
-                        // The buffer is full.
-                        done = true;
-                    }
-                }
-            }
-            // end inner for loop (output streams)
+            /*
+             * Write the tuple to all the output streams.
+             * Done if any of the buffers filled up.
+             */
+            done = outputStreams.writeRow(m_serializer, tuple, totalBytesSerialized);
 
             /*
              * If this is the table scan, check to see if the tuple is pending
@@ -144,15 +115,15 @@ bool CopyOnWriteContext::serializeMore(COWStreamList &outputStreams) {
             }
 
             /*
-             * Yield control when the threshold is hit to allow other work.
+             * Yield control when the bytes threshold is hit to allow other work.
              * Check per tuple to avoid per-stream state for resuming.
              */
-            if (totalBytesSerialized >= bytesSerializedThreshold) {
+            if (!done && totalBytesSerialized >= bytesSerializedThreshold) {
                 done = true;
             }
 
         } else if (!m_finishedTableScan) {
-            /**
+            /*
              * After scanning the persistent table switch to scanning the temp
              * table with the tuples that were backed up.
              */
@@ -167,12 +138,10 @@ bool CopyOnWriteContext::serializeMore(COWStreamList &outputStreams) {
         }
 
     }
-    // end outer while loop (table tuples)
+    // end tuple processing while loop
 
-    // Insert row counts into all output streams since we're done for now.
-    for (iout = outputStreams.begin(); iout != outputStreams.end(); ++iout) {
-        iout->endRows();
-    }
+    // Need to close the output streams and insert row counts.
+    outputStreams.close();
 
     // Done when the table scan is finished and iteration is complete.
     return hasMore;

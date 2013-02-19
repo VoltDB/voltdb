@@ -16,13 +16,15 @@
  */
 
 #include "COWStream.h"
+#include "StreamPredicate.h"
 #include "TupleSerializer.h"
 #include "tabletuple.h"
+#include <limits>
 
 namespace voltdb {
 
-COWStream::COWStream(void *data, size_t length)
-    : ReferenceSerializeOutput(data, length), m_rowCount(0), m_rowCountPosition(0)
+COWStream::COWStream(void *data, std::size_t length)
+  : ReferenceSerializeOutput(data, length), m_rowCount(0), m_rowCountPosition(0)
 {
 }
 
@@ -30,7 +32,7 @@ COWStream::~COWStream()
 {
 }
 
-size_t COWStream::startRows(int32_t partitionId)
+std::size_t COWStream::startRows(int32_t partitionId)
 {
     writeInt(partitionId);
     m_rowCount = 0;
@@ -38,7 +40,7 @@ size_t COWStream::startRows(int32_t partitionId)
     return m_rowCountPosition;
 }
 
-size_t COWStream::writeRow(TupleSerializer &serializer, const TableTuple &tuple)
+std::size_t COWStream::writeRow(TupleSerializer &serializer, const TableTuple &tuple)
 {
     const std::size_t startPos = position();
     serializer.serializeTo(tuple, this);
@@ -47,7 +49,7 @@ size_t COWStream::writeRow(TupleSerializer &serializer, const TableTuple &tuple)
     return endPos - startPos;
 }
 
-bool COWStream::canFit(size_t nbytes) const
+bool COWStream::canFit(std::size_t nbytes) const
 {
     return (remaining() >= nbytes + sizeof(int32_t));
 }

@@ -58,6 +58,7 @@
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
+#include "common/COWStreamProcessor.h"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
@@ -1381,19 +1382,19 @@ bool VoltDBEngine::tableStreamSerializeMore(
         ReferenceSerializeInput &serializeIn,
         std::vector<int> &retPositions)
 {
-    // Deserialize the output buffer ptr/offset/length values into a COWStreamList.
+    // Deserialize the output buffer ptr/offset/length values into a COWStreamProcessor.
     int nBuffers = serializeIn.readInt();
     if (nBuffers <= 0) {
         throwFatalException(
                 "Expected at least one output stream in tableStreamSerializeMore(), received %d",
                 nBuffers);
     }
-    COWStreamList outputStreams(nBuffers);
+    COWStreamProcessor outputStreams(nBuffers);
     for (int iBuffer = 0; iBuffer < nBuffers; iBuffer++) {
         char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
         int offset = serializeIn.readInt();
         int length = serializeIn.readInt();
-        outputStreams.push_back(new COWStream(ptr + offset, length - offset));
+        outputStreams.add(ptr + offset, length - offset);
     }
     retPositions.reserve(nBuffers);
 
@@ -1450,7 +1451,7 @@ bool VoltDBEngine::tableStreamSerializeMore(
     // If more was streamed copy current positions for return.
     // Can this copy be avoided?
     for (size_t i = 0; i < nBuffers; i++) {
-        retPositions.push_back(outputStreams[i].position());
+        retPositions.push_back((int)outputStreams.at(i).position());
     }
 
     // Success

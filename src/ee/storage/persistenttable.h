@@ -54,7 +54,6 @@
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
-#include "common/COWStream.h"
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
@@ -76,6 +75,7 @@ class Topend;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class PersistentTableUndoDeleteAction;
+class COWStreamProcessor;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -210,6 +210,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
                              int32_t totalPartitions);
 
     /**
+     * COW activation wrapper for backward compatibility with some tests.
+     * It's okay for totalPartitions to be zero because it only feeds into hashing for predicates.
+     */
+    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
+        std::vector<std::string> predicate_strings;
+        return activateCopyOnWrite(serializer, partitionId, predicate_strings, 0);
+    }
+
+    /**
      * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
      */
     bool activateRecoveryStream(int32_t tableId);
@@ -230,7 +239,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * output stream.  Returns true if there are more tuples and false
      * if there are no more tuples waiting to be serialized.
      */
-    bool serializeMore(COWStreamList &outputStreams);
+    bool serializeMore(COWStreamProcessor &outputStreams);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash

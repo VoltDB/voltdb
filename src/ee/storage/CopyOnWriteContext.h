@@ -22,7 +22,6 @@
 #include <utility>
 #include "common/TupleSerializer.h"
 #include "common/StreamPredicate.h"
-#include "common/COWStream.h"
 #include "storage/persistenttable.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
@@ -33,8 +32,10 @@ namespace voltdb {
 class TupleIterator;
 class TempTable;
 class ParsedPredicate;
+class COWStreamProcessor;
 
 class CopyOnWriteContext {
+
 public:
     /**
      * Construct a copy on write context for the specified table that will serialize tuples
@@ -50,7 +51,7 @@ public:
      * Serialize tuples to the provided output until no more tuples can be serialized. Returns true
      * if there are more tuples to serialize and false otherwise.
      */
-    bool serializeMore(COWStreamList &output_targets);
+    bool serializeMore(COWStreamProcessor &output_targets);
 
     /**
      * Mark a tuple as dirty and make a copy if necessary. The new tuple param indicates

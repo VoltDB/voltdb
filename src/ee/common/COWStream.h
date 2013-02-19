@@ -18,12 +18,17 @@
 #ifndef COWSTREAM_H_
 #define COWSTREAM_H_
 
+#include <cstddef>
+#include <boost/ptr_container/ptr_vector.hpp>
 #include "serializeio.h"
 
 namespace voltdb {
 
 class TupleSerializer;
 class TableTuple;
+class StreamPredicateList;
+class PersistentTable;
+class TupleSerializer;
 
 /**
  * Serialization output class with some additional data that allows the
@@ -36,7 +41,7 @@ public:
     /**
      * Constructor.
      */
-    COWStream(void *data, size_t length);
+    COWStream(void *data, std::size_t length);
 
     /**
      * Destructor.
@@ -46,12 +51,12 @@ public:
     /**
      * Write the header and save space for the row count.
      */
-    size_t startRows(int32_t partitionId);
+    std::size_t startRows(int32_t partitionId);
 
     /**
      * Write a tuple and return the number of bytes written.
      */
-    size_t writeRow(TupleSerializer &serializer, const TableTuple &tuple);
+    std::size_t writeRow(TupleSerializer &serializer, const TableTuple &tuple);
 
     /**
      * Return true if nbytes can fit in the buffer's remaining space.
@@ -65,12 +70,9 @@ public:
 
 private:
 
-    int32_t m_rowCount;
-    size_t  m_rowCountPosition;
+    int32_t     m_rowCount;
+    std::size_t m_rowCountPosition;
 };
-
-/** Convenience type alias for vector of COWStream */
-typedef boost::ptr_vector<COWStream> COWStreamList;
 
 } // namespace voltdb
 

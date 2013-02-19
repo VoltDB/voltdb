@@ -27,6 +27,8 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
+#include "common/COWStream.h"
+#include "common/COWStreamProcessor.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
@@ -47,6 +49,15 @@ using namespace voltdb;
  * Counter for unique primary key values
  */
 static int32_t m_primaryKeyIndex = 0;
+
+// The smaller quantity is used for memcheck runs.
+#ifdef MEMCHECK
+const size_t TUPLE_COUNT = 1000;
+#else
+const size_t TUPLE_COUNT = 174762;
+#endif
+
+const size_t BUFFER_SIZE = 131072;
 
 /**
  * The strategy of this test is to create a table with 5 blocks of tuples with the first column (primary key)
@@ -185,7 +196,7 @@ public:
         m_tuplesInsertedInLastUndo = 0;
     }
 
-    void doRandomTableMutation(Table *table) {
+void doRandomTableMutation(Table *table) {
         int rand = ::rand();
         int op = rand % 3;
         switch (op) {
@@ -255,11 +266,7 @@ public:
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     initTable(true);
 
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 174762;
-#endif
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
 
     voltdb::TableIterator& iterator = m_table->iterator();
@@ -309,11 +316,7 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
 
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(true);
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 174762;
-#endif
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
@@ -334,11 +337,12 @@ TEST_F(CopyOnWriteTest, BigTest) {
         m_table->activateCopyOnWrite(&serializer, 0);
 
         stx::btree_set<int64_t> COWTuples;
-        char serializationBuffer[131072];
+        char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            ReferenceSerializeOutput out( serializationBuffer, 131072);
-            m_table->serializeMore(&out);
+            COWStreamProcessor outs(serializationBuffer, sizeof(serializationBuffer));
+            COWStream &out = outs.at(0);
+            m_table->serializeMore(outs);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
                 break;
@@ -397,11 +401,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
 
 TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     initTable(true);
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 174762;
-#endif
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
@@ -424,11 +424,12 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         m_table->activateCopyOnWrite(&serializer, 0);
 
         stx::btree_set<int64_t> COWTuples;
-        char serializationBuffer[131072];
+        char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            ReferenceSerializeOutput out( serializationBuffer, 131072);
-            m_table->serializeMore(&out);
+            COWStreamProcessor outs(serializationBuffer, sizeof(serializationBuffer));
+            COWStream &out = outs.at(0);
+            m_table->serializeMore(outs);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
                 break;
@@ -491,11 +492,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 
 TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     initTable(true);
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 174762;
-#endif
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
@@ -518,11 +515,12 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         m_table->activateCopyOnWrite(&serializer, 0);
 
         stx::btree_set<int64_t> COWTuples;
-        char serializationBuffer[131072];
+        char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            ReferenceSerializeOutput out( serializationBuffer, 131072);
-            m_table->serializeMore(&out);
+            COWStreamProcessor outs(serializationBuffer, sizeof(serializationBuffer));
+            COWStream &out = outs.at(0);
+            m_table->serializeMore(outs);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
                 break;

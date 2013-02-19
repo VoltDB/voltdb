@@ -758,7 +758,7 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
  * Returns true if there are more tuples and false if there are no more tuples waiting to be
  * serialized.
  */
-bool PersistentTable::serializeMore(COWStreamList &outputStreams) {
+bool PersistentTable::serializeMore(COWStreamProcessor &outputStreams) {
     if (m_COWContext == NULL) {
         return false;
     }

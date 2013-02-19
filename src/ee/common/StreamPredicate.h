@@ -26,11 +26,13 @@ namespace voltdb {
 class TableTuple;
 class PersistentTable;
 class StreamPredicate;
+class StreamPredicateList;
 
-typedef boost::ptr_vector<StreamPredicate> StreamPredicateList;
-
+/** A predicate for filtering output streams. */
 class StreamPredicate {
+
 public:
+
     virtual ~StreamPredicate() {}
 
     // Factory method to parse a bunch of predicate strings and return a vector
@@ -45,12 +47,18 @@ public:
                 int32_t totalPartitions) const;
 
 private:
+
     // Should go through parse() factory method.
-    StreamPredicate(size_t minHash, size_t maxHash) : m_minHash(minHash), m_maxHash(maxHash) {}
+    StreamPredicate(std::size_t minHash, std::size_t maxHash) : m_minHash(minHash), m_maxHash(maxHash) {}
 
     //TODO: Abstract out what's stored here. Someday it won't be only ranges.
-    int m_minHash;
-    int m_maxHash;
+    std::size_t m_minHash;
+    std::size_t m_maxHash;
+};
+
+/** A list (vector) of predicates. */
+class StreamPredicateList : public boost::ptr_vector<StreamPredicate>
+{
 };
 
 }
