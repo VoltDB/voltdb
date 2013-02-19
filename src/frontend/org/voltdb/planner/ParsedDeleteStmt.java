@@ -43,30 +43,6 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     void parse(VoltXMLElement stmtNode) {
         assert(tableList.size() == 1);
         table = tableList.get(0);
-
-        for (VoltXMLElement child : stmtNode.children) {
-            if (child.name.equalsIgnoreCase("condition"))
-                parseCondition(child);
-        }
-    }
-
-    //XXX: This looks a lot like it might be a slightly more verbose duplicate of AbstractParsedStmt.parseConditions
-    private void parseCondition(VoltXMLElement conditionNode) {
-        AbstractExpression tempWhere = null;
-        for (VoltXMLElement exprNode : conditionNode.children) {
-            if (tempWhere == null) {
-                tempWhere = parseExpressionTree(exprNode);
-            }
-            else {
-                tempWhere = ExpressionUtil.combine(tempWhere, parseExpressionTree(exprNode));
-            }
-        }
-        assert(where == null); // Should be non-reentrant -- never overwriting a previous value!
-        where = tempWhere;
-        if (where == null) {
-            return;
-        }
-        ExpressionUtil.finalizeValueTypes(where);
     }
 
     @Override
