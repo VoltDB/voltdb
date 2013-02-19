@@ -177,8 +177,17 @@ public class SnapshotCompletionMonitor {
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
-                interest.snapshotCompleted(nonce, txnId, Arrays.copyOf(partitionTxnIds,
-                                           partitionTxnIds.length), truncation, truncReqId);
+                try {
+                    interest.snapshotCompleted(
+                            nonce,
+                            txnId,
+                            Arrays.copyOf(partitionTxnIds,
+                                          partitionTxnIds.length),
+                            truncation,
+                            truncReqId);
+                } catch (Exception e) {
+                    LOG.warn("Exception while executing snapshot completion interest", e);
+                }
             }
         }
     }

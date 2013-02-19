@@ -469,6 +469,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     private void processTruncationRequestEvent(final WatchedEvent event) {
         if (event.getType() == EventType.NodeCreated) {
+            loggingLog.info("Scheduling truncation request processing 10 seconds from now");
             /*
              * Do it 10 seconds later because these requests tend to come in bunches
              * and we want one truncation snapshot to do truncation for all nodes
@@ -485,6 +486,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
             }, m_truncationGatheringPeriod, TimeUnit.SECONDS);
             return;
+        } else {
+            loggingLog.info("Truncation request event was not type created: " + event.getType());
+            try {
+                truncationRequestExistenceCheck();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error resetting truncation request existence check", true, e);
+            }
         }
     }
 
@@ -568,7 +576,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_es.schedule(new Runnable() {
                         @Override
                         public void run() {
-                            processTruncationRequestEvent(event);
+                            try {
+                                processTruncationRequestEvent(event);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB("Error processing snapshot truncation request event", true, e);
+                            }
                         }
                     }, 5, TimeUnit.MINUTES);
                     return;
@@ -599,6 +611,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
 
                 if (success) {
+                    loggingLog.info("Snapshot initiation for log truncation was successful");
                     /*
                      * Race to create the completion node before deleting
                      * the request node so that we can guarantee that the
@@ -646,7 +659,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_es.schedule(new Runnable() {
                         @Override
                         public void run() {
-                            processTruncationRequestEvent(event);
+                            try {
+                                processTruncationRequestEvent(event);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB("Exception processing truncation request event", true, e);
+                            }
                         }
                     }, 1, TimeUnit.MINUTES);
                 }
@@ -654,6 +671,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
         });
         try {
+            loggingLog.info("Initiating @SnapshotSave for log truncation");
             m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, new Object[] { jsObj.toString(4) });
         } catch (JSONException e) {
             /*
@@ -677,7 +695,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_es.execute(new Runnable() {
                 @Override
                 public void run() {
-                    processTruncationRequestEvent(event);
+                    try {
+                        processTruncationRequestEvent(event);
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Error procesing truncation request event", true, e);
+                    }
                 }
             });
         }
@@ -699,7 +721,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     try {
                         processUserSnapshotRequestEvent(event);
                     } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Error processing user snapshot request event", false, e);
+                        VoltDB.crashLocalVoltDB("Error processing user snapshot request event", true, e);
                     }
                 }
             });
@@ -919,6 +941,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle,
                             new Object[] { requestObj });
                 } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Exception initiating user snapshot request", true, e);
                 }
             }
         };
@@ -964,7 +987,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * for a truncation snapshot
      */
     void truncationRequestExistenceCheck() throws KeeperException, InterruptedException {
+        loggingLog.info("Checking for existence of snapshot truncation request");
         if (m_zk.exists(VoltZK.request_truncation_snapshot, m_truncationRequestExistenceWatcher) != null) {
+            loggingLog.info("A truncation request node already existed, processing truncation request event");
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
@@ -1033,7 +1058,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 try {
                     doPeriodicWork(System.currentTimeMillis());
                 } catch (Exception e) {
-
+                    hostLog.warn("Error doing periodic snapshot management work", e);
                 }
             }
         }, 0, m_periodicWorkInterval, TimeUnit.MILLISECONDS);
@@ -1435,7 +1460,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
-                submitUserSnapshotRequest(invocation, c);
+                try {
+                    submitUserSnapshotRequest(invocation, c);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Exception submitting user snapshot request", true, e);
+                }
             }
         });
     }
