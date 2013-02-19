@@ -67,7 +67,10 @@ template<typename T>
 void throwCastSQLValueOutOfRangeException(
         const T value,
         const ValueType origType,
-        const ValueType newType);
+        const ValueType newType)
+{
+    throwCastSQLValueOutOfRangeException((const int64_t)value, origType, newType);
+}
 
 template<>
 inline void throwCastSQLValueOutOfRangeException<double>(
@@ -122,13 +125,63 @@ inline void throwDataExceptionIfInfiniteOrNaN(double value, const char* function
                                             "The C++ configuration (e.g. \"g++ --fast-math\") "
                                             "does not support SQL standard handling of numeric infinity errors.");
     // This uses a standard test for NaN, even though that fails in some configurations like LINUX "g++ -ffast-math".
-    // If it is known to fail in the current config, a warning has been sent to the log, so at this point, just relax the check.
+    // If it is known to fail in the current config, a warning has been sent to the log,
+    // so at this point, just relax the check.
     if ((warned_once_no_nan || ! std::isnan(value)) && (warned_once_no_inf || ! non_std_isinf(value))) {
         return;
     }
     char msg[1024];
     snprintf(msg, 1024, "Invalid result value (%f) from floating point %s", value, function);
     throw SQLException(SQLException::data_exception_numeric_value_out_of_range, msg);
+}
+
+
+/// Stream out a double value in SQL standard format, a specific variation of E-notation.
+/// TODO: it has been suggested that helper routines like this that are not specifically tied to
+/// the NValue representation should be defined in some other header to help reduce clutter, here.
+inline void streamSQLFloatFormat(std::stringstream& streamOut, double floatValue)
+{
+    // Standard SQL wants capital E scientific notation.
+    // Yet it differs in some detail from C/C++ E notation, even with all of its customization options.
+
+    // For starters, for 0, the standard explicitly calls for '0E0'.
+    // For across-the-board compatibility, the HSQL backend had to be patched it was using '0.0E0'.
+    // C++ uses 0.000000E+00 by default. So override that explicitly.
+    if (0.0 == floatValue) {
+        streamOut << "0E0";
+        return;
+    }
+    // For other values, C++ generally adds too much garnish to be standard
+    // -- trailing zeros in the mantissa, an explicit '+' on the exponent, and a
+    // leading 0 before single-digit exponents.  Trim it down to the minimalist sql standard.
+    std::stringstream fancy;
+    fancy << std::setiosflags(std::ios::scientific | std::ios::uppercase) << floatValue;
+    // match any format with the regular expression:
+    std::string fancyText = fancy.str();
+    size_t ePos = fancyText.find('E', 3); // find E after "[-]n.n".
+    assert(ePos != std::string::npos);
+    size_t endSignifMantissa;
+    // Never truncate mantissa down to the bare '.' EVEN for the case of "n.0".
+    for (endSignifMantissa = ePos; fancyText[endSignifMantissa-2] != '.'; --endSignifMantissa) {
+        // Only truncate trailing '0's.
+        if (fancyText[endSignifMantissa-1] != '0') {
+            break; // from loop
+        }
+    }
+    const char* optionalSign = (fancyText[ePos+1] == '-') ? "-" : "";
+    size_t startSignifExponent;
+    // Always keep at least 1 exponent digit.
+    size_t endExponent = fancyText.length()-1;
+    for (startSignifExponent = ePos+1; startSignifExponent < endExponent; ++startSignifExponent) {
+        const char& exponentLeadChar = fancyText[startSignifExponent];
+        // Only skip leading '-'s, '+'s and '0's.
+        if (exponentLeadChar != '-' && exponentLeadChar != '+' && exponentLeadChar != '0') {
+            break; // from loop
+        }
+    }
+    // Bring the truncated pieces together.
+    streamOut << fancyText.substr(0, endSignifMantissa)
+              << 'E' << optionalSign << fancyText.substr(startSignifExponent);
 }
 
 /**
@@ -430,7 +483,6 @@ class NValue {
 
     // Function declarations for NValue.cpp definitions.
     void createDecimalFromString(const std::string &txt);
-    void createDecimalFromDouble(double& dbl);
     std::string createStringFromDecimal() const;
     NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
     NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
@@ -439,8 +491,12 @@ class NValue {
     static ValueType s_intPromotionTable[];
     static ValueType s_decimalPromotionTable[];
     static ValueType s_doublePromotionTable[];
-    static TTInt s_maxDecimal;
-    static TTInt s_minDecimal;
+    static TTInt s_maxDecimalValue;
+    static TTInt s_minDecimalValue;
+    // These initializers give the unique double values that are
+    // closest but not equal to +/-1E26 within the accuracy of a double.
+    static const double s_gtMaxDecimalAsDouble = 1E26;
+    static const double s_ltMinDecimalAsDouble = -1E26;
 
     static ValueType promoteForOp(ValueType vta, ValueType vtb) {
         ValueType rt;
@@ -872,9 +928,10 @@ class NValue {
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
             TTInt fractional(scaledValue);
-            whole /= NValue::kMaxScaleFactor;
-            fractional %= NValue::kMaxScaleFactor;
-            retval = static_cast<double>(whole.ToInt()) + ((double)fractional.ToInt())/((double)NValue::kMaxScaleFactor);
+            whole /= kMaxScaleFactor;
+            fractional %= kMaxScaleFactor;
+            retval = static_cast<double>(whole.ToInt()) +
+                    (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
             return retval;
           }
           case VALUE_TYPE_VARCHAR:
@@ -899,19 +956,55 @@ class NValue {
           case VALUE_TYPE_INTEGER:
           case VALUE_TYPE_BIGINT:
           case VALUE_TYPE_TIMESTAMP: {
-            int64_t value = castAsBigIntAndGetValue();
+            int64_t value = castAsRawInt64AndGetValue();
             TTInt retval(value);
             retval *= NValue::kMaxScaleFactor;
             return retval;
           }
           case VALUE_TYPE_DECIMAL:
               return getDecimal();
+          case VALUE_TYPE_DOUBLE: {
+            int64_t intValue = castAsBigIntAndGetValue();
+            TTInt retval(intValue);
+            retval *= NValue::kMaxScaleFactor;
+
+            double value = getDouble();
+            value -= (double)intValue; // isolate decimal part
+            value *= NValue::kMaxScaleFactor; // scale up to integer.
+            TTInt fracval((int64_t)value);
+            retval += fracval;
+            return retval;
+          }
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
           default:
             throwCastSQLException(type, VALUE_TYPE_DECIMAL);
             return 0; // NOT REACHED
         }
+    }
+
+    double getNumberFromString() const
+    {
+        const int32_t strLength = getObjectLength();
+        // Guarantee termination at end of object -- or strtod might not stop there.
+        char safeBuffer[strLength+1];
+        memcpy(safeBuffer, getObjectValue(), strLength);
+        safeBuffer[strLength] = '\0';
+        char * bufferEnd = safeBuffer;
+        double result = strtod(safeBuffer, &bufferEnd);
+        // Needs to have consumed SOMETHING.
+        if (bufferEnd > safeBuffer) {
+            // Unconsumed trailing chars are OK if they are whitespace.
+            while (bufferEnd < safeBuffer+strLength && isspace(*bufferEnd)) {
+                ++bufferEnd;
+            }
+            if (bufferEnd == safeBuffer+strLength) {
+                return result;
+            }
+        }
+        char errorDetail[strLength+10]; // Allocate enough extra for the text in the snprintf format.
+        snprintf(errorDetail, sizeof(errorDetail), "value: '%s'", safeBuffer);
+        throw SQLException(SQLException::data_exception_invalid_character_value_for_cast, errorDetail);
     }
 
     NValue castAsBigInt() const {
@@ -939,9 +1032,15 @@ class NValue {
                 throwCastSQLValueOutOfRangeException<double>(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_BIGINT);
             }
             retval.getBigInt() = static_cast<int64_t>(getDouble()); break;
+        case VALUE_TYPE_DECIMAL: {
+            TTInt scaledValue = getDecimal();
+            TTInt whole(scaledValue);
+            whole /= NValue::kMaxScaleFactor;
+            retval.getBigInt() = whole.ToInt(); break;
+        }
         case VALUE_TYPE_VARCHAR:
+            retval.getBigInt() = static_cast<int64_t>(getNumberFromString()); break;
         case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_DECIMAL:
         default:
             throwCastSQLException(type, VALUE_TYPE_BIGINT);
         }
@@ -967,17 +1066,47 @@ class NValue {
         case VALUE_TYPE_TIMESTAMP:
             retval.getTimestamp() = getTimestamp(); break;
         case VALUE_TYPE_DOUBLE:
+            // TODO: Consider just eliminating this switch case to throw a cast exception,
+            // or explicitly throwing some other exception here.
+            // Direct cast of double to timestamp (implemented via intermediate cast to integer, here)
+            // is not a SQL standard requirement, may not even make it past the planner's type-checks,
+            // or may just be too far a stretch.
+            // OR it might be a convenience for some obscure system-generated edge case?
+
             if (getDouble() > (double)INT64_MAX || getDouble() < (double)VOLT_INT64_MIN) {
                 throwCastSQLValueOutOfRangeException<double>(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_BIGINT);
             }
             retval.getTimestamp() = static_cast<int64_t>(getDouble()); break;
+        case VALUE_TYPE_DECIMAL: {
+            // TODO: Consider just eliminating this switch case to throw a cast exception,
+            // or explicitly throwing some other exception here.
+            // Direct cast of decimal to timestamp (implemented via intermediate cast to integer, here)
+            // is not a SQL standard requirement, may not even make it past the planner's type-checks,
+            // or may just be too far a stretch.
+            // OR it might be a convenience for some obscure system-generated edge case?
+
+            TTInt scaledValue = getDecimal();
+            TTInt whole(scaledValue);
+            whole /= NValue::kMaxScaleFactor;
+            retval.getTimestamp() = whole.ToInt(); break;
+        }
         case VALUE_TYPE_VARCHAR:
+            //TODO: Seems like we want to also allow actual date formatting OR? a numeric value, here? See ENG-4284.
+            retval.getTimestamp() = static_cast<int64_t>(getNumberFromString()); break;
         case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_DECIMAL:
         default:
             throwCastSQLException(type, VALUE_TYPE_TIMESTAMP);
         }
         return retval;
+    }
+
+    template <typename T>
+    void narrowToInteger(const T value, ValueType sourceType)
+    {
+        if (value > (T)INT32_MAX || value < (T)VOLT_INT32_MIN) {
+            throwCastSQLValueOutOfRangeException(value, sourceType, VALUE_TYPE_INTEGER);
+        }
+        getInteger() = static_cast<int32_t>(value);
     }
 
     NValue castAsInteger() const {
@@ -995,27 +1124,34 @@ class NValue {
         case VALUE_TYPE_INTEGER:
             return *this;
         case VALUE_TYPE_BIGINT:
-            if (getBigInt() > INT32_MAX || getBigInt() < VOLT_INT32_MIN) {
-                throwCastSQLValueOutOfRangeException(getBigInt(), VALUE_TYPE_BIGINT, VALUE_TYPE_INTEGER);
-            }
-            retval.getInteger() = static_cast<int32_t>(getBigInt()); break;
+            retval.narrowToInteger(getBigInt(), type); break;
         case VALUE_TYPE_TIMESTAMP:
-            if (getTimestamp() > INT32_MAX || getTimestamp() < VOLT_INT32_MIN) {
-                throwCastSQLValueOutOfRangeException(getTimestamp(), VALUE_TYPE_TIMESTAMP, VALUE_TYPE_INTEGER);
-            }
-            retval.getInteger() = static_cast<int32_t>(getTimestamp()); break;
+            retval.narrowToInteger(getTimestamp(), type); break;
         case VALUE_TYPE_DOUBLE:
-            if (getDouble() > (double)INT32_MAX || getDouble() < (double)VOLT_INT32_MIN) {
-                throwCastSQLValueOutOfRangeException(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_INTEGER);
-            }
-            retval.getInteger() = static_cast<int32_t>(getDouble()); break;
+            retval.narrowToInteger(getDouble(), type); break;
+        case VALUE_TYPE_DECIMAL: {
+            TTInt scaledValue = getDecimal();
+            TTInt whole(scaledValue);
+            whole /= NValue::kMaxScaleFactor;
+            int64_t value = whole.ToInt();
+            retval.narrowToInteger(value, type); break;
+        }
         case VALUE_TYPE_VARCHAR:
+            retval.narrowToInteger(getNumberFromString(), type); break;
         case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_DECIMAL:
         default:
             throwCastSQLException(type, VALUE_TYPE_INTEGER);
         }
         return retval;
+    }
+
+    template <typename T>
+    void narrowToSmallInt(const T value, ValueType sourceType)
+    {
+        if (value > (T)INT16_MAX || value < (T)VOLT_INT16_MIN) {
+            throwCastSQLValueOutOfRangeException(value, sourceType, VALUE_TYPE_SMALLINT);
+        }
+        getSmallInt() = static_cast<int16_t>(value);
     }
 
     NValue castAsSmallInt() const {
@@ -1031,32 +1167,36 @@ class NValue {
         case VALUE_TYPE_SMALLINT:
             retval.getSmallInt() = getSmallInt(); break;
         case VALUE_TYPE_INTEGER:
-            if (getInteger() > INT16_MAX || getInteger() < VOLT_INT16_MIN) {
-                throwCastSQLValueOutOfRangeException((int64_t)getInteger(), VALUE_TYPE_INTEGER, VALUE_TYPE_SMALLINT);
-            }
-            retval.getSmallInt() = static_cast<int16_t>(getInteger()); break;
+            retval.narrowToSmallInt(getInteger(), type); break;
         case VALUE_TYPE_BIGINT:
-            if (getBigInt() > INT16_MAX || getBigInt() < VOLT_INT16_MIN) {
-                throwCastSQLValueOutOfRangeException(getBigInt(), VALUE_TYPE_BIGINT, VALUE_TYPE_SMALLINT);
-            }
-            retval.getSmallInt() = static_cast<int16_t>(getBigInt()); break;
+            retval.narrowToSmallInt(getBigInt(), type); break;
         case VALUE_TYPE_TIMESTAMP:
-            if (getTimestamp() > INT16_MAX || getTimestamp() < VOLT_INT16_MIN) {
-                throwCastSQLValueOutOfRangeException(getTimestamp(), VALUE_TYPE_BIGINT, VALUE_TYPE_SMALLINT);
-            }
-            retval.getSmallInt() = static_cast<int16_t>(getTimestamp()); break;
+            retval.narrowToSmallInt(getTimestamp(), type); break;
         case VALUE_TYPE_DOUBLE:
-            if (getDouble() > (double)INT16_MAX || getDouble() < (double)VOLT_INT16_MIN) {
-                throwCastSQLValueOutOfRangeException(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_SMALLINT);
-            }
-            retval.getSmallInt() = static_cast<int16_t>(getDouble()); break;
+            retval.narrowToSmallInt(getDouble(), type); break;
+        case VALUE_TYPE_DECIMAL: {
+            TTInt scaledValue = getDecimal();
+            TTInt whole(scaledValue);
+            whole /= NValue::kMaxScaleFactor;
+            int64_t value = whole.ToInt();
+            retval.narrowToSmallInt(value, type); break;
+        }
         case VALUE_TYPE_VARCHAR:
+            retval.narrowToSmallInt(getNumberFromString(), type); break;
         case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_DECIMAL:
         default:
             throwCastSQLException(type, VALUE_TYPE_SMALLINT);
         }
         return retval;
+    }
+
+    template <typename T>
+    void narrowToTinyInt(const T value, ValueType sourceType)
+    {
+        if (value > (T)INT8_MAX || value < (T)VOLT_INT8_MIN) {
+            throwCastSQLValueOutOfRangeException(value, sourceType, VALUE_TYPE_TINYINT);
+        }
+        getTinyInt() = static_cast<int8_t>(value);
     }
 
     NValue castAsTinyInt() const {
@@ -1070,33 +1210,25 @@ class NValue {
         case VALUE_TYPE_TINYINT:
             retval.getTinyInt() = getTinyInt(); break;
         case VALUE_TYPE_SMALLINT:
-            if (getSmallInt() > INT8_MAX || getSmallInt() < VOLT_INT8_MIN) {
-                throwCastSQLValueOutOfRangeException((int64_t)getSmallInt(), VALUE_TYPE_SMALLINT, VALUE_TYPE_TINYINT);
-            }
-            retval.getTinyInt() = static_cast<int8_t>(getSmallInt()); break;
+            retval.narrowToTinyInt(getSmallInt(), type); break;
         case VALUE_TYPE_INTEGER:
-            if (getInteger() > INT8_MAX || getInteger() < VOLT_INT8_MIN) {
-                throwCastSQLValueOutOfRangeException((int64_t)getInteger(), VALUE_TYPE_INTEGER, VALUE_TYPE_TINYINT);
-            }
-            retval.getTinyInt() = static_cast<int8_t>(getInteger()); break;
+            retval.narrowToTinyInt(getInteger(), type); break;
         case VALUE_TYPE_BIGINT:
-            if (getBigInt() > INT8_MAX || getBigInt() < VOLT_INT8_MIN) {
-                throwCastSQLValueOutOfRangeException(getBigInt(), VALUE_TYPE_BIGINT, VALUE_TYPE_TINYINT);
-            }
-            retval.getTinyInt() = static_cast<int8_t>(getBigInt()); break;
+            retval.narrowToTinyInt(getBigInt(), type); break;
         case VALUE_TYPE_TIMESTAMP:
-            if (getTimestamp() > INT8_MAX || getTimestamp() < VOLT_INT8_MIN) {
-                throwCastSQLValueOutOfRangeException(getTimestamp(), VALUE_TYPE_TIMESTAMP, VALUE_TYPE_TINYINT);
-            }
-            retval.getTinyInt() = static_cast<int8_t>(getTimestamp()); break;
+            retval.narrowToTinyInt(getTimestamp(), type); break;
         case VALUE_TYPE_DOUBLE:
-            if (getDouble() > (double)INT8_MAX || getDouble() < (double)VOLT_INT8_MIN) {
-                throwCastSQLValueOutOfRangeException(getDouble(), VALUE_TYPE_DOUBLE, VALUE_TYPE_TINYINT);
-            }
-            retval.getTinyInt() = static_cast<int8_t>(getDouble()); break;
+            retval.narrowToTinyInt(getDouble(), type); break;
+        case VALUE_TYPE_DECIMAL: {
+            TTInt scaledValue = getDecimal();
+            TTInt whole(scaledValue);
+            whole /= NValue::kMaxScaleFactor;
+            int64_t value = whole.ToInt();
+            retval.narrowToTinyInt(value, type); break;
+        }
         case VALUE_TYPE_VARCHAR:
+            retval.narrowToTinyInt(getNumberFromString(), type); break;
         case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_DECIMAL:
         default:
             throwCastSQLException(type, VALUE_TYPE_TINYINT);
         }
@@ -1123,9 +1255,11 @@ class NValue {
             retval.getDouble() = static_cast<double>(getTimestamp()); break;
         case VALUE_TYPE_DOUBLE:
             retval.getDouble() = getDouble(); break;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
         case VALUE_TYPE_DECIMAL:
+            retval.getDouble() = castAsDoubleAndGetValue(); break;
+        case VALUE_TYPE_VARCHAR:
+            retval.getDouble() = getNumberFromString(); break;
+        case VALUE_TYPE_VARBINARY:
         default:
             throwCastSQLException(type, VALUE_TYPE_DOUBLE);
         }
@@ -1133,24 +1267,46 @@ class NValue {
     }
 
     NValue castAsString() const {
-        NValue retval(VALUE_TYPE_VARCHAR);
-        const ValueType type = getValueType();
         if (isNull()) {
+            NValue retval(VALUE_TYPE_VARCHAR);
             retval.setNull();
             return retval;
         }
+        std::stringstream value;
+        const ValueType type = getValueType();
+        switch (type) {
+        case VALUE_TYPE_TINYINT:
+            // This cast keeps the tiny int from being confused for a char.
+            value << static_cast<int>(getTinyInt()); break;
+        case VALUE_TYPE_SMALLINT:
+            value << getSmallInt(); break;
+        case VALUE_TYPE_INTEGER:
+            value << getInteger(); break;
+        case VALUE_TYPE_BIGINT:
+            value << getBigInt(); break;
+        //case VALUE_TYPE_TIMESTAMP:
+            //TODO: The SQL standard wants an actual date literal rather than a numeric value, here. See ENG-4284.
+            //value << static_cast<double>(getTimestamp()); break;
+        case VALUE_TYPE_DOUBLE:
+            // Use the specific standard SQL formatting for float values,
+            // which the C/C++ format options don't quite support.
+            streamSQLFloatFormat(value, getDouble());
+            break;
+        case VALUE_TYPE_DECIMAL:
+            value << createStringFromDecimal(); break;
+        case VALUE_TYPE_VARCHAR:
+        case VALUE_TYPE_VARBINARY: {
         // note: we allow binary conversion to strings to support
         // byte[] as string parameters...
         // In the future, it would be nice to check this is a decent string here...
-        switch (type) {
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
+            NValue retval(VALUE_TYPE_VARCHAR);
             memcpy(retval.m_data, m_data, sizeof(m_data));
-            break;
+            return retval;
+        }
         default:
             throwCastSQLException(type, VALUE_TYPE_VARCHAR);
         }
-        return retval;
+        return getTempStringValue(value.str().c_str(), value.str().length());
     }
 
     NValue castAsBinary() const {
@@ -1170,6 +1326,13 @@ class NValue {
         return retval;
     }
 
+    void createDecimalFromInt(int64_t rhsint)
+    {
+        TTInt scaled(rhsint);
+        scaled *= NValue::kMaxScaleFactor;
+        getDecimal() = scaled;
+    }
+
     NValue castAsDecimal() const {
         NValue retval(VALUE_TYPE_DECIMAL);
         const ValueType type = getValueType();
@@ -1178,19 +1341,47 @@ class NValue {
             return retval;
         }
         switch (type) {
-          case VALUE_TYPE_TINYINT:
-          case VALUE_TYPE_SMALLINT:
-          case VALUE_TYPE_INTEGER:
-          case VALUE_TYPE_BIGINT:
-          {
-              int64_t rhsint = castAsBigIntAndGetValue();
-              TTInt retval(rhsint);
-              retval *= NValue::kMaxScaleFactor;
-              return getDecimalValue(retval);
-         }
+        case VALUE_TYPE_TINYINT:
+        case VALUE_TYPE_SMALLINT:
+        case VALUE_TYPE_INTEGER:
+        case VALUE_TYPE_BIGINT:
+        {
+            int64_t rhsint = castAsRawInt64AndGetValue();
+            retval.createDecimalFromInt(rhsint);
+            break;
+        }
         case VALUE_TYPE_DECIMAL:
             ::memcpy(retval.m_data, m_data, sizeof(TTInt));
             break;
+        case VALUE_TYPE_DOUBLE:
+        {
+            const double& value = getDouble();
+            if (value >= s_gtMaxDecimalAsDouble || value <= s_ltMinDecimalAsDouble) {
+                char message[4096];
+                snprintf(message, 4096, "Attempted to cast value %f causing overflow/underflow", value);
+                throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
+            }
+            // Resort to string as the intermediary since even int64_t does not cover the full range.
+            char decimalAsString[41]; // Large enough to account for digits, sign, decimal, and terminating null.
+            snprintf(decimalAsString, sizeof(decimalAsString), "%.12f", value);
+            // Shift the entire integer part 1 digit to the right, overwriting the decimal point.
+            // This effectively creates a potentially very large integer value
+            //  equal to the original double scaled up by 10^12.
+            for (char* intDigit = strchr(decimalAsString, '.'); intDigit > decimalAsString; --intDigit) {
+                *intDigit = *(intDigit-1);
+            }
+            TTInt result(decimalAsString+1);
+            retval.getDecimal() = result;
+            break;
+        }
+        case VALUE_TYPE_VARCHAR:
+        {
+            const int32_t length = getObjectLength();
+            const char* bytes = reinterpret_cast<const char*>(getObjectValue());
+            const std::string value(bytes, length);
+            retval.createDecimalFromString(value);
+            break;
+        }
         default:
             throwCastSQLException(type, VALUE_TYPE_DECIMAL);
         }
@@ -1213,7 +1404,9 @@ class NValue {
             const int32_t objectLength = getObjectLength();
             if (objectLength > maxLength) {
                 char msg[1024];
-                snprintf(msg, 1024, "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d", objectLength, maxLength);
+                snprintf(msg, 1024,
+                         "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d",
+                                    objectLength, maxLength);
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                    msg);
             }
@@ -1604,7 +1797,7 @@ class NValue {
         }
 
         TTInt retval(lhs.getDecimal());
-        if (retval.Add(rhs.getDecimal()) || retval > NValue::s_maxDecimal || retval < s_minDecimal) {
+        if (retval.Add(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to add %s with %s causing overflow/underflow",
                     lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str());
@@ -1629,7 +1822,7 @@ class NValue {
         }
 
         TTInt retval(lhs.getDecimal());
-        if (retval.Sub(rhs.getDecimal()) || retval > NValue::s_maxDecimal || retval < NValue::s_minDecimal) {
+        if (retval.Sub(rhs.getDecimal()) || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to subtract %s from %s causing overflow/underflow",
                     rhs.createStringFromDecimal().c_str(), lhs.createStringFromDecimal().c_str());

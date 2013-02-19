@@ -321,7 +321,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 final InitiateResponseMessage response = new InitiateResponseMessage(mppm);
                 ClientResponseImpl clientResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                new VoltTable[0], ClientResponseImpl.DUPE_TRANSACTION);
+                                new VoltTable[0], ClientResponseImpl.IGNORED_TRANSACTION);
                 response.setResults(clientResponse);
                 m_mailbox.send(response.getInitiatorHSId(), response);
             }

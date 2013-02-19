@@ -1522,7 +1522,7 @@ public class Expression {
         prototypes.put(OpTypes.VAR_POP,       (new VoltXMLElement("aggregation")).withValue("optype", "varpop"));
         prototypes.put(OpTypes.VAR_SAMP,      (new VoltXMLElement("aggregation")).withValue("optype", "varsamp"));
         // other operations
-        prototypes.put(OpTypes.CAST,          null); // Planned for support as a special operation
+        prototypes.put(OpTypes.CAST,          (new VoltXMLElement("operation")).withValue("optype", "cast"));
         prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.CASEWHEN,      null); // Planned for support as a special function
         prototypes.put(OpTypes.ORDER_BY,      new VoltXMLElement("orderby"));
@@ -1679,6 +1679,13 @@ public class Expression {
             }
             return exp;
 
+        case OpTypes.CAST:
+            if (dataType == null) {
+                throw new HSQLParseException("VoltDB could not determine the type in a CAST operation");
+            }
+            exp.attributes.put("valuetype", dataType.getNameString());
+            return exp;
+
         default:
             return exp;
         }
@@ -1761,8 +1768,6 @@ public class Expression {
         case OpTypes.MATCH_UNIQUE_FULL:
             opAsString = "the MATCH operator"; break; // not yet supported ExpressionLogical
 
-        case OpTypes.CAST:
-            opAsString = "Cast operators (explicit or implied)"; break; // Planned for support as a special operation
         case OpTypes.ZONE_MODIFIER:
             opAsString = "ZONE modifier operations"; break; // ???
         case OpTypes.ALTERNATIVE:

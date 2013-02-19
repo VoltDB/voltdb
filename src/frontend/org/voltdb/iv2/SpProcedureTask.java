@@ -52,7 +52,9 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.debug("STARTING: " + this);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this);
+        }
         if (!m_txn.isReadOnly()) {
             m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         }
@@ -60,7 +62,6 @@ public class SpProcedureTask extends ProcedureTask
         // cast up here .. ugly.
         SpTransactionState txn = (SpTransactionState)m_txn;
         final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
-        int hash = m_txn.getHash();
         if (!response.shouldCommit()) {
             m_txn.setNeedsRollback();
         }
@@ -68,14 +69,11 @@ public class SpProcedureTask extends ProcedureTask
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-        hostLog.debug("COMPLETE: " + this);
-
-        // Log invocation to DR
-        if (m_drGateway != null && !m_txn.isReadOnly() && !m_txn.needsRollback()) {
-            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.uniqueId, hash,
-                                                  txn.getInvocation(),
-                                                  response.getClientResponseData());
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE: " + this);
         }
+
+        logToDR(txn, response);
     }
 
     @Override
@@ -136,8 +134,18 @@ public class SpProcedureTask extends ProcedureTask
         if (hostLog.isTraceEnabled()) {
             hostLog.trace("COMPLETE replaying txn: " + this);
         }
+
+        logToDR(txn, response);
     }
 
+    private void logToDR(SpTransactionState txn, InitiateResponseMessage response)
+    {
+        // Log invocation to DR
+        if (m_drGateway != null && !txn.isReadOnly() && !txn.needsRollback()) {
+            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.uniqueId, txn.getHash(),
+                    txn.getInvocation(), response.getClientResponseData());
+        }
+    }
 
     @Override
     void completeInitiateTask(SiteProcedureConnection siteConnection)
