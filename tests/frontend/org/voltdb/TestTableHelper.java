@@ -92,4 +92,15 @@ public class TestTableHelper extends TestCase {
         System.out.println(t2.toString());
     }
 
+    /**
+     * Create and mutate random tables. Just try to not crash here.
+     * TestLiveTableSchemaMigration does more *real* stuff.
+     */
+    public void testRandomTables() {
+        for (int i = 0; i < 10; i++) {
+            VoltTable t1 = TableHelper.getTotallyRandomTable("foo", new Random());
+            /*VoltTable t2 =*/ TableHelper.mutateTable(t1, new Random());
+        }
+    }
+
 }
