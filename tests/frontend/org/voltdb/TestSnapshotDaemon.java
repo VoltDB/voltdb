@@ -23,10 +23,17 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.*;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
@@ -37,6 +44,11 @@ import org.json_voltpatches.JSONStringer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import org.voltcore.network.Connection;
+import org.voltcore.network.WriteStream;
+
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
@@ -138,6 +150,132 @@ public class TestSnapshotDaemon {
         m_daemon = new SnapshotDaemon();
         m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK(), null, null);
         return m_daemon;
+    }
+
+    private ClientResponseImpl getResponseFromConnectionMock(Connection c) throws IOException
+    {
+        ArgumentCaptor<ByteBuffer> buf = ArgumentCaptor.forClass(ByteBuffer.class);
+        verify(c.writeStream(), timeout(10000)).enqueue(buf.capture());
+        ClientResponseImpl resp = new ClientResponseImpl();
+        ByteBuffer b = buf.getValue();
+        b.position(4);
+        resp.initFromBuffer(b);
+        reset(c.writeStream());
+        return resp;
+    }
+
+    @Test
+    public void testParamCount() throws Exception {
+        System.out.println("--------------\n  testLegacyParams\n---------------");
+        SnapshotDaemon dut = getSnapshotDaemon();
+        Connection c = mock(Connection.class);
+        WriteStream ws = mock(WriteStream.class);
+        when(c.writeStream()).thenReturn(ws);
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        // test 0 fail
+        Object[] params = new Object[0];
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        ClientResponseImpl resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave requires 3 parameters"));
+        // test 2 fail
+        params = new Object[2];
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave requires 3 parameters"));
+        // test 4 fail and call it good
+        params = new Object[4];
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave requires 3 parameters"));
+    }
+
+    @Test
+    public void testLegacyParams() throws Exception {
+        System.out.println("--------------\n  testLegacyParams\n---------------");
+        SnapshotDaemon dut = getSnapshotDaemon();
+        Connection c = mock(Connection.class);
+        WriteStream ws = mock(WriteStream.class);
+        when(c.writeStream()).thenReturn(ws);
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        Object[] params = new Object[3];
+        // Test path null fail
+        params[0] = null;
+        params[1] = null;
+        params[2] = null;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        ClientResponseImpl resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave path is null"));
+        // Test nonce null fail
+        params[0] = "haha";
+        params[1] = null;
+        params[2] = null;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave nonce is null"));
+        // Test blocking null fail
+        params[0] = "haha";
+        params[1] = "hoho";
+        params[2] = null;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave blocking is null"));
+        // Test path is a string fail
+        params[0] = 0l;
+        params[1] = "hoho";
+        params[2] = 0;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave path param is a"));
+        // Test nonce is a string fail
+        params[0] = "haha";
+        params[1] = 0l;
+        params[2] = 0;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave nonce param is a"));
+        // Test blocking is a number fail
+        params[0] = "haha";
+        params[1] = "hoho";
+        params[2] = "0";
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("@SnapshotSave blocking param is a"));
+        // Test invalid nonce character '-'
+        params[0] = "haha";
+        params[1] = "ho-ho";
+        params[2] = 0;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("contains a prohibited character"));
+        // Test invalid nonce character ','
+        params[0] = "haha";
+        params[1] = "ho,ho";
+        params[2] = 0;
+        spi.setParams(params);
+        dut.requestUserSnapshot(spi, c);
+        resp = getResponseFromConnectionMock(c);
+        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertTrue(resp.getStatusString().contains("contains a prohibited character"));
     }
 
     @Test
