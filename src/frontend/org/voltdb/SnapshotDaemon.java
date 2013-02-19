@@ -1452,6 +1452,49 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     }
 
+    private void validateLegacyParams(Object[] params) throws Exception {
+        if (params[0] == null) {
+            throw new Exception("@SnapshotSave path is null");
+        }
+        if (params[1] == null) {
+            throw new Exception("@SnapshotSave nonce is null");
+        }
+        if (params[2] == null) {
+            throw new Exception("@SnapshotSave blocking is null");
+        }
+        if (!(params[0] instanceof String)) {
+            throw new Exception("@SnapshotSave path param is a " +
+                    params[0].getClass().getSimpleName() +
+                    " and should be a java.lang.String");
+        }
+        if (!(params[1] instanceof String)) {
+            throw new Exception("@SnapshotSave nonce param is a " +
+                    params[0].getClass().getSimpleName() +
+                    " and should be a java.lang.String");
+        }
+        if (!(params[2] instanceof Byte ||
+                    params[2] instanceof Short ||
+                    params[2] instanceof Integer ||
+                    params[2] instanceof Long))
+        {
+            throw new Exception("@SnapshotSave blocking param is a " +
+                    params[0].getClass().getSimpleName() +
+                    " and should be a java.lang.[Byte|Short|Integer|Long]");
+        }
+    }
+
+    private void validateJsonParams(Object[] params) throws Exception
+    {
+        if (params[0] == null) {
+            throw new Exception("@SnapshotSave JSON blob is null");
+        }
+        if (!(params[0] instanceof String)) {
+            throw new Exception("@SnapshotSave JSON blob is a " +
+                    params[0].getClass().getSimpleName() +
+                    " and should be a java.lang.String");
+        }
+    }
+
     private void submitUserSnapshotRequest(final StoredProcedureInvocation invocation, final Connection c) {
         Object params[] = invocation.getParams().toArray();
         String path = null;
@@ -1463,46 +1506,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             /*
              * Dang it, have to parse the params here to validate
              */
-            if (params.length != 3 && params.length != 1) {
+            if (params.length == 3) {
+                validateLegacyParams(params);
+            }
+            else if (params.length == 1) {
+                validateJsonParams(params);
+            }
+            else {
                 throw new Exception("@SnapshotSave requires 3 parameters or alternatively a single JSON blob. " +
                         "Path, nonce, and blocking");
-            }
-
-            if (params[0] == null) {
-                throw new Exception("@SnapshotSave path is null");
-            }
-
-            if (params.length == 3) {
-                if (params[1] == null) {
-                    throw new Exception("@SnapshotSave nonce is null");
-                }
-
-                if (params[2] == null) {
-                    throw new Exception("@SnapshotSave blocking is null");
-                }
-            }
-
-            if (!(params[0] instanceof String)) {
-                throw new Exception("@SnapshotSave path param is a " +
-                        params[0].getClass().getSimpleName() +
-                        " and should be a java.lang.String");
-            }
-
-            if (params.length == 3) {
-                if (!(params[1] instanceof String)) {
-                    throw new Exception("@SnapshotSave nonce param is a " +
-                            params[0].getClass().getSimpleName() +
-                            " and should be a java.lang.String");
-                }
-
-                if (!(params[2] instanceof Byte ||
-                        params[2] instanceof Short ||
-                        params[2] instanceof Integer ||
-                        params[2] instanceof Long)) {
-                    throw new Exception("@SnapshotSave blocking param is a " +
-                            params[0].getClass().getSimpleName() +
-                            " and should be a java.lang.[Byte|Short|Integer|Long]");
-                }
             }
 
             if (params.length == 1) {

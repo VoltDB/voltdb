@@ -296,7 +296,6 @@ public class TestSnapshotDaemon {
         assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
         assertTrue(resp.getStatusString(), resp.getStatusString().contains("@SnapshotSave JSON blob is null"));
         // Test not a string
-        params = new Object[1];
         params[0] = 0l;
         spi.setParams(params);
         dut.requestUserSnapshot(spi, c);
