@@ -71,6 +71,7 @@ import com.google.common.util.concurrent.MoreExecutors;
  *
  */
 public class SnapshotDaemon implements SnapshotCompletionInterest {
+
     private class TruncationSnapshotAttempt {
         private String path;
         private String nonce;
@@ -1576,7 +1577,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 throw new Exception("Provided nonce " + nonce + " contains a prohibited character (- or ,)");
             }
 
-            createAndWatchRequestNode(invocation.clientHandle, c, path, nonce, blocking, format, null, false);
+            SnapshotInitiationInfo snapInfo =
+                new SnapshotInitiationInfo(path, nonce, blocking, format, null);
+
+            createAndWatchRequestNode(invocation.clientHandle, c, snapInfo,
+                    path, nonce, blocking, format, null,
+                    false);
         } catch (Exception e) {
             VoltTable tables[] = new VoltTable[0];
             byte status = ClientResponseImpl.GRACEFUL_FAILURE;
@@ -1611,6 +1617,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     public void createAndWatchRequestNode(final long clientHandle,
                                           final Connection c,
+                                          SnapshotInitiationInfo snapInfo,
                                           String path,
                                           String nonce,
                                           boolean blocking,
@@ -1618,7 +1625,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                           String data,
                                           boolean notifyChanges) throws ForwardClientException {
         boolean requestExists = false;
-        final String requestId = createRequestNode(path, nonce, blocking, format, data);
+        final String requestId = createRequestNode(snapInfo, path, nonce, blocking, format, data);
         if (requestId == null) {
             requestExists = true;
         } else {
@@ -1650,9 +1657,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @param data Any data to pass to the snapshot target
      * @return The request ID if succeeded, otherwise null.
      */
-    private String createRequestNode(String path, String nonce,
-                                     boolean blocking, SnapshotFormat format,
-                                     String data) {
+    private String createRequestNode(SnapshotInitiationInfo snapInfo,
+            String path, String nonce,
+            boolean blocking, SnapshotFormat format,
+            String data)
+    {
         String requestId = null;
 
         try {
