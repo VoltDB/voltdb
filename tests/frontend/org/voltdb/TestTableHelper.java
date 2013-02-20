@@ -97,7 +97,7 @@ public class TestTableHelper extends TestCase {
      * TestLiveTableSchemaMigration does more *real* stuff.
      */
     public void testRandomTables() {
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 1000; i++) {
             VoltTable t1 = TableHelper.getTotallyRandomTable("foo", new Random());
             /*VoltTable t2 =*/ TableHelper.mutateTable(t1, new Random());
         }

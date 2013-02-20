@@ -144,11 +144,11 @@ public class TableHelper {
         Object defaultValue = null;
         if (r.nextBoolean()) {
             column.nullable = true;
-            defaultValue = VoltTypeUtil.getRandomValue(column.type, column.size % 128, 0.8, r);
+            defaultValue = VoltTypeUtil.getRandomValue(column.type, column.size % 127 + 1, 0.8, r);
         }
         else {
             column.nullable = false;
-            defaultValue = VoltTypeUtil.getRandomValue(column.type, column.size % 128, 0.0, r);
+            defaultValue = VoltTypeUtil.getRandomValue(column.type, column.size % 127 + 1, 0.0, r);
             // no uniques for now, as the random fill becomes too slow
             //column.unique = (r.nextDouble() > 0.3); // 30% of non-nullable cols unique (15% total)
         }
@@ -659,6 +659,11 @@ public class TableHelper {
     /**
      * Delete rows in a VoltDB table that has a bigint pkey where pkey values are odd.
      * Works best when pkey values are contiguous and start around 0.
+     *
+     * Exists mostly to force compaction on tables loaded with fillTableWithBigintPkey.
+     * Though if you have an even number of sites, this won't work. It'll need to be
+     * updated to delete some other pattern that's a bit more generic. Right now it
+     * works great for my one-site testing.
      *
      */
     public static void deleteOddRows(VoltTable t, Client client) throws Exception {
