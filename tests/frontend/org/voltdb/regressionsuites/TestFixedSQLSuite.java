@@ -1235,7 +1235,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
 
         // CONFIG #1: JNI
-        config = new LocalCluster("fixedsql-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("fixedsql-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

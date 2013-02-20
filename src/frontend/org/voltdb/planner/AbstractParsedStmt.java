@@ -443,16 +443,10 @@ public abstract class AbstractParsedStmt {
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported aggregation type '" + type + "'");
         }
-        AggregateExpression expr = new AggregateExpression(exprType);
 
         // Allow expressions to read expression-specific data from exprNode.
         // The design fully abstracts other volt classes from the XML serialization.
         // So, this goes here instead of in derived Expression implementations.
-
-        String node;
-        if ((node = exprNode.attributes.get("distinct")) != null && Boolean.parseBoolean(node)) {
-            expr.setDistinct();
-        }
 
         assert (exprNode.children.size() == 1);
 
@@ -463,8 +457,18 @@ public abstract class AbstractParsedStmt {
         // recursively parse the child subtree -- could (in theory) be an operator or
         // a constant, column, or param value operand or null in the specific case of "COUNT(*)".
         AbstractExpression childExpr = parseExpressionTree(paramsById, childExprNode);
-        assert((childExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
+        if (childExpr == null) {
+            assert(exprType == ExpressionType.AGGREGATE_COUNT);
+            exprType = ExpressionType.AGGREGATE_COUNT_STAR;
+        }
+
+        AggregateExpression expr = new AggregateExpression(exprType);
         expr.setLeft(childExpr);
+
+        String node;
+        if ((node = exprNode.attributes.get("distinct")) != null && Boolean.parseBoolean(node)) {
+            expr.setDistinct();
+        }
         return expr;
     }
 
