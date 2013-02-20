@@ -24,14 +24,9 @@
 
 package org.voltdb;
 
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Random;
 
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -39,19 +34,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
-@RunWith(value = Parameterized.class)
 public class TestMidRejoinDeath extends RejoinTestBase {
-
-    @Parameters
-    public static Collection<Object[]> useIv2() {
-        return Arrays.asList(new Object[][] {{false}, {true}});
-    }
-
-    protected final boolean m_useIv2;
-    public TestMidRejoinDeath(boolean useIv2)
-    {
-        m_useIv2 = useIv2 || VoltDB.checkTestEnvForIv2();
-    }
 
     @Test
     public void testMidRejoinDeath() throws Exception {
