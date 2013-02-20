@@ -45,7 +45,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
-    public void UNtestExplicitErrorUDF() throws Exception
+    public void testExplicitErrorUDF() throws Exception
     {
         System.out.println("STARTING testExplicitErrorUDF");
         Client client = getClient();
@@ -132,7 +132,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
-    public void UNtestOctetLength() throws NoConnectionsException, IOException, ProcCallException {
+    public void testOctetLength() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING OCTET_LENGTH");
         Client client = getClient();
         ClientResponse cr;
@@ -168,7 +168,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
     // a different null case standard with standard sql
-    public void UNtestPosition() throws NoConnectionsException, IOException, ProcCallException {
+    public void testPosition() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Position");
         Client client = getClient();
         ClientResponse cr;
@@ -211,7 +211,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
     // a different null case standard with standard sql
-    public void UNtestCharLength() throws NoConnectionsException, IOException, ProcCallException {
+    public void testCharLength() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Char length");
         Client client = getClient();
         ClientResponse cr;
@@ -245,7 +245,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
     }
 
-    public void UNtestDECODE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE");
         Client client = getClient();
         ClientResponse cr;
@@ -341,7 +341,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void UNtestDECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
+    public void testDECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
         ClientResponse cr;
@@ -361,7 +361,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(null,result.getString(1));
     }
 
-    public void UNtestDECODEVeryLong() throws NoConnectionsException, IOException, ProcCallException {
+    public void testDECODEVeryLong() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE Exceed Limit");
         Client client = getClient();
         ClientResponse cr;
@@ -381,7 +381,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
-    public void UNtestDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
+    public void testDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
         ClientResponse cr;
@@ -586,7 +586,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(3L,result.getLong(0));
     }
 
-    public void UNtestFIELDFunctionWithInvalidJSON() throws Exception {
+    public void testFIELDFunctionWithInvalidJSON() throws Exception {
 
         Client client = getClient();
         ClientResponse cr;
