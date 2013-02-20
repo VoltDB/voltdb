@@ -30,7 +30,9 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
@@ -152,6 +154,16 @@ public abstract class SubPlanAssembler {
 
         public AbstractExpression getFilter() { return m_filter; }
         public List<AbstractExpression> getBindings() { return m_bindings; }
+
+        public IndexableExpression extractStartFromPrefixLike() {
+            ComparisonExpression gteFilter = m_filter.getGteFilterFromPrefixLike();
+            return new IndexableExpression(gteFilter, m_bindings);
+        }
+
+        public IndexableExpression extractEndFromPrefixLike() {
+            ComparisonExpression ltFilter = m_filter.getLtFilterFromPrefixLike();
+            return new IndexableExpression(ltFilter, m_bindings);
+        }
     };
 
     /**
@@ -320,15 +332,35 @@ public abstract class SubPlanAssembler {
             // A scannable index allows inequality matches,
             // but only on the indexed expression that was found to be missing a usable equality comparator.
 
-            // Look for a lower bound on it.
-            startingBoundExpr = getIndexableExpressionFromFilters(
-                ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_GREATERTHANOREQUALTO,
+            // Look for a double-ended bound on it.
+            // This is always the result of an edge case:
+            // "indexed-general-expression LIKE prefix-constant".
+            // The simpler case "column LIKE prefix-constant" has already been re-written by the HSQL parser
+            // into separate upper and lower bound inequalities.
+            IndexableExpression doubleBoundExpr = getIndexableExpressionFromFilters(
+                ExpressionType.COMPARE_LIKE, ExpressionType.COMPARE_LIKE,
                 coveringExpr, coveringColId, table, filtersToCover);
 
-            // Look for an upper bound.
-            endingBoundExpr = getIndexableExpressionFromFilters(
-                ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                coveringExpr, coveringColId, table, filtersToCover);
+            // For simplicity of implementation:
+            // In some odd edge cases e.g.
+            // " FIELD(DOC, 'title') LIKE 'a%' AND FIELD(DOC, 'title') > 'az' ",
+            // arbitrarily choose to index-optimize the LIKE expression rather than the inequality ON THAT SAME COLUMN.
+            // This MIGHT not always provide the most selective filtering.
+            if (doubleBoundExpr != null) {
+                startingBoundExpr = doubleBoundExpr.extractStartFromPrefixLike();
+                endingBoundExpr = doubleBoundExpr.extractEndFromPrefixLike();
+            }
+            else {
+                // Look for a lower bound.
+                startingBoundExpr = getIndexableExpressionFromFilters(
+                    ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_GREATERTHANOREQUALTO,
+                    coveringExpr, coveringColId, table, filtersToCover);
+
+                // Look for an upper bound.
+                endingBoundExpr = getIndexableExpressionFromFilters(
+                    ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_LESSTHANOREQUALTO,
+                    coveringExpr, coveringColId, table, filtersToCover);
+            }
         }
 
         // Upper and lower bounds get handled differently for scans that produce descending order.
@@ -458,8 +490,42 @@ public abstract class SubPlanAssembler {
                 normalizedExpr = (ComparisonExpression) filter;
                 indexableExpr = filter.getLeft();
                 otherExpr = filter.getRight();
-                binding = bindingForIndexedFilterOperand(table, indexableExpr, otherExpr, coveringExpr, coveringColId);
+                binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
+                                                             coveringExpr, coveringColId);
                 if (binding != null) {
+                    // Additional restrictions apply to LIKE pattern arguments
+                    if (targetComparator == ExpressionType.COMPARE_LIKE) {
+                        if (otherExpr instanceof ParameterValueExpression) {
+                            ParameterValueExpression pve = (ParameterValueExpression)otherExpr;
+                            // Can't use an index for parameterized LIKE filters, e.g. "T1.column LIKE ?"
+                            // UNLESS the parameter was artificially substituted for a user-specified constant
+                            // AND that constant was a prefix pattern.
+                            // In that case, the parameter has to be added to the bound list for this index/statement.
+                            ConstantValueExpression cve = pve.getOriginalValue();
+                            if (cve == null || ! cve.isPrefixPatternString()) {
+                                binding = null; // the filter is not usable, so the binding is invalid
+                                continue;
+                            }
+                            // Remember that the binding list returned by bindingIfValidIndexedFilterOperand above
+                            // is often a "shared object" and is intended to be treated as immutable.
+                            // To add a parameter to it, first copy the List.
+                            List<AbstractExpression> moreBinding = new ArrayList<AbstractExpression>(binding);
+                            moreBinding.add(pve);
+                            binding = moreBinding;
+                        } else if (otherExpr instanceof ConstantValueExpression) {
+                            // Can't use an index for non-prefix LIKE filters, e.g. " T1.column LIKE '%ish' "
+                            ConstantValueExpression cve = (ConstantValueExpression)otherExpr;
+                            if ( ! cve.isPrefixPatternString()) {
+                                // The constant is not an index-friendly prefix pattern.
+                                binding = null; // the filter is not usable, so the binding is invalid
+                                continue;
+                            }
+                        } else {
+                            // Other cases are not indexable, e.g. " T1.column LIKE T2.column "
+                            binding = null; // the filter is not usable, so the binding is invalid
+                            continue;
+                        }
+                    }
                     filtersToCover.remove(filter);
                     break;
                 }
@@ -470,7 +536,8 @@ public abstract class SubPlanAssembler {
                 normalizedExpr = normalizedExpr.reverseOperator();
                 indexableExpr = filter.getRight();
                 otherExpr = filter.getLeft();
-                binding = bindingForIndexedFilterOperand(table, indexableExpr, otherExpr, coveringExpr, coveringColId);
+                binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
+                                                             coveringExpr, coveringColId);
                 if (binding != null) {
                     filtersToCover.remove(filter);
                     break;
@@ -497,7 +564,7 @@ public abstract class SubPlanAssembler {
         return false;
     }
 
-    private List<AbstractExpression> bindingForIndexedFilterOperand(Table table,
+    private List<AbstractExpression> bindingIfValidIndexedFilterOperand(Table table,
         AbstractExpression indexableExpr, AbstractExpression otherExpr,
         AbstractExpression coveringExpr, int coveringColId)
     {
