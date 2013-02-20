@@ -1595,7 +1595,8 @@ public class Expression {
         case OpTypes.VALUE:
             // Apparently at this stage, all valid non-NULL values must have a type determined by HSQL.
             // I'm not sure why this must be the case --paul.
-            if (dataType == null) {
+            // if the actual value is null, make sure the type is null as well
+            if ((dataType == null) || (valueData == null)) {
                 exp.attributes.put("valuetype", "NULL");
                 exp.attributes.put("value", "NULL");
                 return exp;
@@ -1618,10 +1619,6 @@ public class Expression {
             }
 
             exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
-            if (valueData == null) {
-                exp.attributes.put("value", "NULL");
-                return exp;
-            }
 
             if (valueData instanceof TimestampData) {
                 // When we get the default from the DDL,
@@ -1759,9 +1756,9 @@ public class Expression {
         case OpTypes.NOT_DISTINCT:
             opAsString = "sequences or subqueries"; break; // not yet supported ExpressionLogical
 
-        case OpTypes.MATCH_SIMPLE:       
-        case OpTypes.MATCH_PARTIAL:      
-        case OpTypes.MATCH_FULL:         
+        case OpTypes.MATCH_SIMPLE:
+        case OpTypes.MATCH_PARTIAL:
+        case OpTypes.MATCH_FULL:
         case OpTypes.MATCH_UNIQUE_SIMPLE:
         case OpTypes.MATCH_UNIQUE_PARTIAL:
         case OpTypes.MATCH_UNIQUE_FULL:
