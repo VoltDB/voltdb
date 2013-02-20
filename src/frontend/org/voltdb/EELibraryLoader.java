@@ -58,7 +58,7 @@ public class EELibraryLoader {
                         String msg = "Library VOLTDB JNI shared library loading failed. Library path " +
                                 System.getProperty("java.library.path") + "\n";
                         msg += "The library may have failed to load because it can't be found in your " +
-                                "load library path, or because it is not compatibile with the current " +
+                                "load library path, or because it is not compatible with the current " +
                                 "platform.\n";
                         msg +=  "VoltDB provides builds on our website for 64-bit OSX systems >= 10.6, " +
                                 "and 64-bit Linux systems with kernels >= 2.6.18.";
