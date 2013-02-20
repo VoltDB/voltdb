@@ -1453,7 +1453,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     }
 
-    private void validateLegacyParams(Object[] params) throws Exception {
+    private SnapshotInitiationInfo parseLegacyParams(Object[] params) throws Exception {
         if (params[0] == null) {
             throw new Exception("@SnapshotSave path is null");
         }
@@ -1482,9 +1482,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     params[0].getClass().getSimpleName() +
                     " and should be a java.lang.[Byte|Short|Integer|Long]");
         }
+
+        String path = (String)params[0];
+        String nonce = (String)params[1];
+        boolean blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
+        SnapshotFormat format = SnapshotFormat.NATIVE;
+        return new SnapshotInitiationInfo(path, nonce, blocking, format, null);
     }
 
-    private void validateJsonParams(Object[] params) throws Exception
+    private SnapshotInitiationInfo parseJsonParams(Object[] params) throws Exception
     {
         if (params[0] == null) {
             throw new Exception("@SnapshotSave JSON blob is null");
@@ -1494,92 +1500,83 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     params[0].getClass().getSimpleName() +
                     " and should be a java.lang.String");
         }
+        final JSONObject jsObj = new JSONObject((String)params[0]);
+
+        String path = jsObj.getString("uripath");
+        if (path.isEmpty()) {
+            throw new Exception("uripath cannot be empty");
+        }
+        URI pathURI = new URI(path);
+        String pathURIScheme = pathURI.getScheme();
+        if (pathURIScheme == null) {
+            throw new Exception("URI scheme cannot be null");
+        }
+        if (!pathURIScheme.equals("file")) {
+            throw new Exception("Unsupported URI scheme " + pathURIScheme +
+                    " if this is a file path then you must prepend file://");
+        }
+        path = pathURI.getPath();
+
+        String nonce = jsObj.getString("nonce");
+        if (nonce.isEmpty()) {
+            throw new Exception("nonce cannot be empty");
+        }
+
+        Object blockingObj = false;
+        if (jsObj.has("block")) {
+            blockingObj = jsObj.get("block");
+        }
+        boolean blocking;
+        if (blockingObj instanceof Number) {
+            blocking = ((Number)blockingObj).byteValue() == 0 ? false : true;
+        } else if (blockingObj instanceof Boolean) {
+            blocking = (Boolean)blockingObj;
+        } else if (blockingObj instanceof String) {
+            blocking = Boolean.valueOf((String)blockingObj);
+        } else {
+            throw new Exception(blockingObj.getClass().getName() + " is not supported as " +
+                    " type for the block parameter");
+        }
+
+        SnapshotFormat format = SnapshotFormat.NATIVE;
+        String formatString = jsObj.optString("format",SnapshotFormat.NATIVE.toString());
+        /*
+         * Try and be very flexible about what we will accept
+         * as the type of the block parameter.
+         */
+        try {
+            format = SnapshotFormat.getEnumIgnoreCase(formatString);
+        } catch (IllegalArgumentException argException) {
+            throw new Exception("@SnapshotSave format param is a " + format +
+                    " and should be one of [\"native\" | \"csv\"]");
+        }
+        return new SnapshotInitiationInfo(path, nonce, blocking, format, (String)params[0]);
     }
 
     private void submitUserSnapshotRequest(final StoredProcedureInvocation invocation, final Connection c) {
         Object params[] = invocation.getParams().toArray();
-        String path = null;
-        String nonce = null;
-        boolean blocking = false;
-        SnapshotFormat format = SnapshotFormat.NATIVE;
 
         try {
             /*
              * Dang it, have to parse the params here to validate
              */
+            SnapshotInitiationInfo snapInfo;
             if (params.length == 3) {
-                validateLegacyParams(params);
+                snapInfo = parseLegacyParams(params);
             }
             else if (params.length == 1) {
-                validateJsonParams(params);
+                snapInfo = parseJsonParams(params);
             }
             else {
                 throw new Exception("@SnapshotSave requires 3 parameters or alternatively a single JSON blob. " +
                         "Path, nonce, and blocking");
             }
 
-            if (params.length == 1) {
-                final JSONObject jsObj = new JSONObject((String)params[0]);
 
-                path = jsObj.getString("uripath");
-                if (path.isEmpty()) {
-                    throw new Exception("uripath cannot be empty");
-                }
-                URI pathURI = new URI(path);
-                String pathURIScheme = pathURI.getScheme();
-                if (pathURIScheme == null) {
-                    throw new Exception("URI scheme cannot be null");
-                }
-                if (!pathURIScheme.equals("file")) {
-                    throw new Exception("Unsupported URI scheme " + pathURIScheme +
-                            " if this is a file path then you must prepend file://");
-                }
-                path = pathURI.getPath();
-
-                nonce = jsObj.getString("nonce");
-                if (nonce.isEmpty()) {
-                    throw new Exception("nonce cannot be empty");
-                }
-
-                Object blockingObj = false;
-                if (jsObj.has("block")) {
-                    blockingObj = jsObj.get("block");
-                }
-                if (blockingObj instanceof Number) {
-                    blocking = ((Number)blockingObj).byteValue() == 0 ? false : true;
-                } else if (blockingObj instanceof Boolean) {
-                    blocking = (Boolean)blockingObj;
-                } else if (blockingObj instanceof String) {
-                    blocking = Boolean.valueOf((String)blockingObj);
-                } else {
-                    throw new Exception(blockingObj.getClass().getName() + " is not supported as " +
-                            " type for the block parameter");
-                }
-
-                String formatString = jsObj.optString("format",SnapshotFormat.NATIVE.toString());
-                /*
-                 * Try and be very flexible about what we will accept
-                 * as the type of the block parameter.
-                 */
-                try {
-                    format = SnapshotFormat.getEnumIgnoreCase(formatString);
-                } catch (IllegalArgumentException argException) {
-                    throw new Exception("@SnapshotSave format param is a " + format +
-                            " and should be one of [\"native\" | \"csv\"]");
-                }
-            } else {
-                path = (String)params[0];
-                nonce = (String)params[1];
-                blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
+            if (snapInfo.getNonce().contains("-") || snapInfo.getNonce().contains(",")) {
+                throw new Exception("Provided nonce " + snapInfo.getNonce() +
+                        " contains a prohibited character (- or ,)");
             }
-
-            if (nonce.contains("-") || nonce.contains(",")) {
-                throw new Exception("Provided nonce " + nonce + " contains a prohibited character (- or ,)");
-            }
-
-            // XXX-IZZY fill null with the JSON blob instead
-            SnapshotInitiationInfo snapInfo =
-                new SnapshotInitiationInfo(path, nonce, blocking, format, null);
 
             createAndWatchRequestNode(invocation.clientHandle, c, snapInfo,
                     false);
