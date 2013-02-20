@@ -1823,7 +1823,7 @@ TEST CASES
   </findbugs>
 </target>
 
-<property name="ptdefaultconfigs" value="voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549"
+<property name="ptdefaultconfigs" value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549"
   description = "default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
