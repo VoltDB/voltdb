@@ -1385,6 +1385,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         cloned.m_rowStart = m_rowStart;
 
         // copy this metadata if it's present for tests
+        // note the nullness of m_name implies nullness of other test-related metadata
         if (m_name != null) {
             cloned.m_name = m_name;
             if (m_originalColumnInfos != null) {
