@@ -1971,7 +1971,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // to keep the agent from choking.  ENG-2334
                 return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0],
-                        ClientResponseImpl.DUPE_TRANSACTION,
+                        ClientResponseImpl.IGNORED_TRANSACTION,
                         task.clientHandle);
             }
         }

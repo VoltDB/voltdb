@@ -1026,7 +1026,7 @@ public class PlanAssembler {
                 for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
                     AbstractExpression rootExpr = col.expression;
                     if (rootExpr instanceof AggregateExpression) {
-                        if (((AggregateExpression)rootExpr).m_distinct) {
+                        if (((AggregateExpression)rootExpr).isDistinct()) {
                             canPushDown = false;
                             break;
                         }
@@ -1184,7 +1184,7 @@ public class PlanAssembler {
                     tve.setColumnName("");
                     tve.setColumnAlias(col.alias);
                     tve.setTableName("VOLT_TEMP_TABLE");
-                    boolean is_distinct = ((AggregateExpression)rootExpr).m_distinct;
+                    boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct,
                                          outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE",

@@ -59,14 +59,7 @@ public class CompleteTransactionTask extends TransactionTask
             m_queue.flush();
 
             // Log invocation to DR
-            if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
-                FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
-                Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
-                assert(initiateTask != null);
-                StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
-                m_drGateway.onSuccessfulMPCall(m_txn.spHandle, m_txn.txnId, m_txn.uniqueId, m_msg.getHash(),
-                                               invocation, m_txn.getResults());
-            }
+            logToDR();
             hostLog.debug("COMPLETE: " + this);
         }
         else
@@ -112,9 +105,23 @@ public class CompleteTransactionTask extends TransactionTask
         }
         if (!m_msg.isRestart()) {
             m_txn.setDone();
+            logToDR();
         }
         else {
             m_txn.setBeginUndoToken(Site.kInvalidUndoToken);
+        }
+    }
+
+    private void logToDR()
+    {
+        // Log invocation to DR
+        if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
+            FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
+            Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
+            assert(initiateTask != null);
+            StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
+            m_drGateway.onSuccessfulMPCall(m_txn.spHandle, m_txn.txnId, m_txn.uniqueId, m_msg.getHash(),
+                    invocation, m_txn.getResults());
         }
     }
 

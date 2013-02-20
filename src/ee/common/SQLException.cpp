@@ -25,6 +25,7 @@ using namespace voltdb;
 // Please keep these ordered alphabetically.
 // Names and codes are standardized.
 const char* SQLException::data_exception_division_by_zero = "22012";
+const char* SQLException::data_exception_invalid_character_value_for_cast = "22018";
 const char* SQLException::data_exception_invalid_parameter = "22023";
 const char* SQLException::data_exception_most_specific_type_mismatch = "2200G";
 const char* SQLException::data_exception_numeric_value_out_of_range = "22003";
