@@ -1485,15 +1485,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     /**
      * Try to create the ZK request node and watch it if created successfully.
-     *
-     * @param clientHandle
-     * @param c
-     * @param path
-     * @param nonce
-     * @param blocking
-     * @param format
-     * @param data
-     * @throws ForwardClientException
      */
     public void createAndWatchRequestNode(final long clientHandle,
                                           final Connection c,
@@ -1504,10 +1495,31 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (requestId == null) {
             requestExists = true;
         } else {
-            try {
-                registerUserSnapshotResponseWatch(requestId, clientHandle, c, notifyChanges);
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to register ZK watch on snapshot response", true, e);
+            if (!snapInfo.isTruncationRequest()) {
+                try {
+                    registerUserSnapshotResponseWatch(requestId, clientHandle, c, notifyChanges);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Failed to register ZK watch on snapshot response", true, e);
+                }
+            }
+            else {
+                // need to construct a success response of some sort here to indicate the truncation attempt
+                // was successfully attempted
+                VoltTable result = SnapshotSave.constructNodeResultsTable();
+                result.addRow(-1,
+                        CoreUtils.getHostnameOrAddress(),
+                        "",
+                        "SUCCESS",
+                        "SNAPSHOT REQUEST QUEUED");
+                final ClientResponseImpl resp =
+                    new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                            new VoltTable[] {result},
+                            "User-requested truncation snapshot successfully queued for execution.",
+                            clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(resp.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                resp.flattenToBuffer(buf).flip();
+                c.writeStream().enqueue(buf);
             }
         }
 
@@ -1533,13 +1545,18 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         String requestId = null;
 
         try {
-            final JSONObject jsObj = snapInfo.getJSONObjectForZK();
             requestId = java.util.UUID.randomUUID().toString();
-            jsObj.put("requestId", requestId);
-            String zkString = jsObj.toString(4);
-            byte zkBytes[] = zkString.getBytes("UTF-8");
+            if (!snapInfo.isTruncationRequest()) {
+                final JSONObject jsObj = snapInfo.getJSONObjectForZK();
+                jsObj.put("requestId", requestId);
+                String zkString = jsObj.toString(4);
+                byte zkBytes[] = zkString.getBytes("UTF-8");
 
-            m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
+            else {
+                m_zk.create(VoltZK.request_truncation_snapshot, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
         } catch (KeeperException.NodeExistsException e) {
             return null;
         } catch (Exception e) {

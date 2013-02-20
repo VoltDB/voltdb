@@ -22,8 +22,23 @@ import java.net.URI;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
+/**
+ * Encapsulate the parameters provided to @SnapshotSave needed to initiate a snapshot.
+ * Handle parameter parsing, error generation, etc.
+ */
 public class SnapshotInitiationInfo
 {
+    private String m_path;
+    private String m_nonce;
+    private boolean m_blocking;
+    private SnapshotFormat m_format;
+    private String m_data;
+    private boolean m_truncationRequest;
+
+    /**
+     * Construct the object given the parameters directly.
+     * @param data any additional JSON blob params.  Currently only provided by VoltDB internals
+     */
     public SnapshotInitiationInfo(String path, String nonce, boolean blocking,
             SnapshotFormat format, String data)
     {
@@ -32,12 +47,21 @@ public class SnapshotInitiationInfo
         m_blocking = blocking;
         m_format = format;
         m_data = data;
+        m_truncationRequest = false;
     }
 
+    /**
+     * Construct the object based on the params from the stored procedure invocation.
+     */
     public SnapshotInitiationInfo(Object[] params) throws Exception
     {
+        m_path = null;
+        m_nonce = null;
+        m_blocking = true;
         m_format = SnapshotFormat.NATIVE;
         m_data = null;
+        m_truncationRequest = false;
+
         if (params.length == 3) {
             parseLegacyParams(params);
         }
@@ -45,11 +69,11 @@ public class SnapshotInitiationInfo
             parseJsonParams(params);
         }
         else {
-            throw new Exception("@SnapshotSave requires 3 parameters or alternatively a single JSON blob. " +
-                    "Path, nonce, and blocking");
+            throw new Exception("@SnapshotSave requires 3 parameters " +
+                    "(Path, nonce, and blocking) or alternatively a single JSON blob. ");
         }
 
-        if (m_nonce.contains("-") || m_nonce.contains(",")) {
+        if (m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(","))) {
             throw new Exception("Provided nonce " + m_nonce + " contains a prohibited character (- or ,)");
         }
     }
@@ -90,6 +114,24 @@ public class SnapshotInitiationInfo
         m_format = SnapshotFormat.NATIVE;
     }
 
+    /**
+     * Parse the JSON blob.  Schema is roughly:
+     * keys:
+     *   (optional) service: currently only 'log_truncation' is valid.  Will
+     *   induce a command log truncation snapshot if command logging is present
+     *   and enabled.  This will cause all other keys to be unnecessary and/or
+     *   ignored.
+     *
+     *   uripath: the URI where the snapshot should be written to.  Only file:// URIs are currently accepted.
+     *
+     *   nonce: the nonce to be used for the snapshot.  '-' and ',' are forbidden nonce characters
+     *
+     *   block: whether or not the snapshot should block the database or not
+     *   while it's being generated.  All non-zero numbers will be interpreted
+     *   as blocking.  true/false will be interpreted as you'd expect
+     *
+     *   format: one of 'native' or 'csv'.
+     */
     private void parseJsonParams(Object[] params) throws Exception
     {
         if (params[0] == null) {
@@ -101,6 +143,24 @@ public class SnapshotInitiationInfo
                     " and should be a java.lang.String");
         }
         final JSONObject jsObj = new JSONObject((String)params[0]);
+
+        // IZZY - Make service an enum and store it in the object if
+        // we every introduce another one
+        if (jsObj.has("service")) {
+            String service = jsObj.getString("service");
+            if (service.equalsIgnoreCase("log_truncation")) {
+                m_truncationRequest = true;
+                if (!VoltDB.instance().getCommandLog().isEnabled()) {
+                    throw new Exception("Cannot ask for a command log truncation snapshot when " +
+                            "command logging is not present or enabled.");
+                }
+                // for CL truncation, don't care about any of the rest of the blob.
+                return;
+            }
+            else {
+                throw new Exception("Unknown snapshot save service type: " + service);
+            }
+        }
 
         m_path = jsObj.getString("uripath");
         if (m_path.isEmpty()) {
@@ -172,11 +232,19 @@ public class SnapshotInitiationInfo
         return m_format;
     }
 
+    public boolean isTruncationRequest()
+    {
+        return m_truncationRequest;
+    }
+
     public String getJSONBlob()
     {
         return m_data;
     }
 
+    /**
+     * When we write to ZK to request the snapshot, generate the JSON which will be written to the node's data.
+     */
     public JSONObject getJSONObjectForZK() throws JSONException
     {
         final JSONObject jsObj = new JSONObject();
@@ -187,10 +255,4 @@ public class SnapshotInitiationInfo
         jsObj.putOpt("data", m_data);
         return jsObj;
     }
-
-    private String m_path;
-    private String m_nonce;
-    private boolean m_blocking;
-    private SnapshotFormat m_format;
-    private String m_data;
 }
