@@ -1094,9 +1094,9 @@ SHAREDLIB_JNIEXPORT jintArray JNICALL Java_org_voltdb_jni_ExecutionEngine_native
             voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
             std::vector<int> positions;
             if (engine->tableStreamSerializeMore(tableId, tst, serialize_in, positions)) {
-                result = env->NewIntArray(positions.size());
+                result = env->NewIntArray((int)positions.size());
                 // vector is guaranteed to have contiguous storage.
-                env->SetIntArrayRegion(result, 0, positions.size(), &positions[0]);
+                env->SetIntArrayRegion(result, 0, (int)positions.size(), &positions[0]);
                 env->ReleaseByteArrayElements(serialized_buffers, bytes, JNI_ABORT);
             } else {
                 result = (jintArray)env->NewGlobalRef(NULL);
