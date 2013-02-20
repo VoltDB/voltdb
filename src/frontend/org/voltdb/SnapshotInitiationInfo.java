@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.net.URI;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
@@ -30,6 +32,124 @@ public class SnapshotInitiationInfo
         m_blocking = blocking;
         m_format = format;
         m_data = data;
+    }
+
+    public SnapshotInitiationInfo(Object[] params) throws Exception
+    {
+        m_format = SnapshotFormat.NATIVE;
+        m_data = null;
+        if (params.length == 3) {
+            parseLegacyParams(params);
+        }
+        else if (params.length == 1) {
+            parseJsonParams(params);
+        }
+        else {
+            throw new Exception("@SnapshotSave requires 3 parameters or alternatively a single JSON blob. " +
+                    "Path, nonce, and blocking");
+        }
+
+        if (m_nonce.contains("-") || m_nonce.contains(",")) {
+            throw new Exception("Provided nonce " + m_nonce + " contains a prohibited character (- or ,)");
+        }
+    }
+
+    private void parseLegacyParams(Object[] params) throws Exception {
+        if (params[0] == null) {
+            throw new Exception("@SnapshotSave path is null");
+        }
+        if (params[1] == null) {
+            throw new Exception("@SnapshotSave nonce is null");
+        }
+        if (params[2] == null) {
+            throw new Exception("@SnapshotSave blocking is null");
+        }
+        if (!(params[0] instanceof String)) {
+            throw new Exception("@SnapshotSave path param is a " +
+                    params[0].getClass().getSimpleName() +
+                    " and should be a java.lang.String");
+        }
+        if (!(params[1] instanceof String)) {
+            throw new Exception("@SnapshotSave nonce param is a " +
+                    params[0].getClass().getSimpleName() +
+                    " and should be a java.lang.String");
+        }
+        if (!(params[2] instanceof Byte ||
+                    params[2] instanceof Short ||
+                    params[2] instanceof Integer ||
+                    params[2] instanceof Long))
+        {
+            throw new Exception("@SnapshotSave blocking param is a " +
+                    params[0].getClass().getSimpleName() +
+                    " and should be a java.lang.[Byte|Short|Integer|Long]");
+        }
+
+        m_path = (String)params[0];
+        m_nonce = (String)params[1];
+        m_blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
+        m_format = SnapshotFormat.NATIVE;
+    }
+
+    private void parseJsonParams(Object[] params) throws Exception
+    {
+        if (params[0] == null) {
+            throw new Exception("@SnapshotSave JSON blob is null");
+        }
+        if (!(params[0] instanceof String)) {
+            throw new Exception("@SnapshotSave JSON blob is a " +
+                    params[0].getClass().getSimpleName() +
+                    " and should be a java.lang.String");
+        }
+        final JSONObject jsObj = new JSONObject((String)params[0]);
+
+        m_path = jsObj.getString("uripath");
+        if (m_path.isEmpty()) {
+            throw new Exception("uripath cannot be empty");
+        }
+        URI pathURI = new URI(m_path);
+        String pathURIScheme = pathURI.getScheme();
+        if (pathURIScheme == null) {
+            throw new Exception("URI scheme cannot be null");
+        }
+        if (!pathURIScheme.equals("file")) {
+            throw new Exception("Unsupported URI scheme " + pathURIScheme +
+                    " if this is a file path then you must prepend file://");
+        }
+        m_path = pathURI.getPath();
+
+        m_nonce = jsObj.getString("nonce");
+        if (m_nonce.isEmpty()) {
+            throw new Exception("nonce cannot be empty");
+        }
+
+        Object blockingObj = false;
+        if (jsObj.has("block")) {
+            blockingObj = jsObj.get("block");
+        }
+        if (blockingObj instanceof Number) {
+            m_blocking = ((Number)blockingObj).byteValue() == 0 ? false : true;
+        } else if (blockingObj instanceof Boolean) {
+            m_blocking = (Boolean)blockingObj;
+        } else if (blockingObj instanceof String) {
+            m_blocking = Boolean.valueOf((String)blockingObj);
+        } else {
+            throw new Exception(blockingObj.getClass().getName() + " is not supported as " +
+                    " type for the block parameter");
+        }
+
+        m_format = SnapshotFormat.NATIVE;
+        String formatString = jsObj.optString("format",SnapshotFormat.NATIVE.toString());
+        /*
+         * Try and be very flexible about what we will accept
+         * as the type of the block parameter.
+         */
+        try {
+            m_format = SnapshotFormat.getEnumIgnoreCase(formatString);
+        } catch (IllegalArgumentException argException) {
+            throw new Exception("@SnapshotSave format param is a " + m_format +
+                    " and should be one of [\"native\" | \"csv\"]");
+        }
+        m_data = (String)params[0];
     }
 
     public String getPath()
