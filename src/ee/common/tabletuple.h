@@ -363,6 +363,38 @@ private:
     }
 };
 
+/**
+ * Convenience class for Tuples that get their (inline) storage from a pool.
+ * The pool is specified on initial allocation and retained for later reallocations.
+ * The tuples can be used like normal tuples except for allocation/reallocation.
+ * The caller takes responsibility for consistently using the specialized methods below for that.
+ */
+class PoolBackedTempTuple : public TableTuple {
+public:
+    PoolBackedTempTuple() : m_storage(NULL), m_pool(NULL) { }
+
+    void allocateTupleNoHeader(const TupleSchema* schema, Pool* pool)
+    {
+        m_schema = schema;
+        m_pool = pool;
+        assert(m_pool);
+        m_storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength()));
+        moveNoHeader(m_storage);
+    }
+
+    void reallocateTupleNoHeader()
+    {
+        assert(m_pool);
+        m_storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength()));
+        moveNoHeader(m_storage);
+    }
+private:
+    // Without this extant (though unused -- practically write only) pointer to the allocation,
+    // the offset tricks in moveNoHeader confuse valgrind into reporting a leak.
+    char* m_storage;
+    Pool* m_pool;
+};
+
 inline TableTuple::TableTuple() :
     m_schema(NULL), m_data(NULL) {
 }

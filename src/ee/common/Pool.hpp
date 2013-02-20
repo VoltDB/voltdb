@@ -217,6 +217,11 @@ public:
         return retval;
     }
 
+    /*
+     * Allocate a continous block of memory of the specified size conveniently initialized to 0s
+     */
+    inline void* allocateZeroes(std::size_t size) { return ::memset(allocate(size), 0, size); }
+
     inline void purge() {
         /*
          * Erase any oversize chunks that were allocated
@@ -318,6 +323,11 @@ public:
         m_memTotal += size;
         return retval;
     }
+
+    /*
+     * Allocate a continous block of memory of the specified size conveniently initialized to 0s
+     */
+    inline void* allocateZeroes(std::size_t size) { return ::memset(allocate(size), 0, size); }
 
     inline void purge() {
         for (std::size_t ii = 0; ii < m_allocations.size(); ii++) {
