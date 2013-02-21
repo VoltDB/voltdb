@@ -219,7 +219,7 @@ with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_
         get("voltdb-ent_%s-1_amd64.deb" % (versionVolt5f), releaseDir)
 
 # build rpm kit
-with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_filename=volt12c[0]):
+with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
     rpmbuilddir = "%s/rpm_build/" % builddir
     run("rm -rf " + rpmbuilddir)
     run("mkdir -p " + rpmbuilddir)
