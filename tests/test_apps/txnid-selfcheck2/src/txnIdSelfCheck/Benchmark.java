@@ -480,15 +480,11 @@ public class Benchmark {
 
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
 
-        long lastPermitResetTs = System.currentTimeMillis();
-        while (benchmarkEndTime > System.currentTimeMillis()) {
-            // Reset the permits roughly every second
-            if (System.currentTimeMillis() - lastPermitResetTs > 1000) {
-                rateLimiter.resetPermits();
-                lastPermitResetTs = System.currentTimeMillis();
-            }
-
+        long currentTs = System.currentTimeMillis();
+        while (benchmarkEndTime > currentTs) {
+            rateLimiter.updateActivePermits(currentTs);
             Thread.yield();
+            currentTs = System.currentTimeMillis();
         }
 
         replicatedLoader.shutdown();

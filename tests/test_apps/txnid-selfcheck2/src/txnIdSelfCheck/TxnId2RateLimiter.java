@@ -42,6 +42,9 @@ public class TxnId2RateLimiter {
         new HashMap<Integer, Integer>();
     private final long m_totalPermits;
 
+    // last time permits were reset
+    private long m_lastPermitResetTs = System.currentTimeMillis();
+
     public TxnId2RateLimiter(long totalPermits) {
         m_totalPermits = totalPermits;
     }
@@ -64,6 +67,20 @@ public class TxnId2RateLimiter {
 
             permits.drainPermits();
             permits.release(m_initialPermits.get(type));
+        }
+    }
+
+    /**
+     * Updates the permits every second.
+     *
+     * Caller can call this method many times in a second, it will only update
+     * the permits when a second has passed.
+     */
+    public void updateActivePermits(final long ts) {
+        // Reset the permits roughly every second
+        if (ts - m_lastPermitResetTs > 1000) {
+            resetPermits();
+            m_lastPermitResetTs = ts;
         }
     }
 }
