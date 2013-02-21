@@ -66,6 +66,10 @@ public class SiteMailbox implements Mailbox {
         public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
                 int partitionId, long spHandle) {
         }
+        @Override
+        public boolean isEnabled() {
+            return false;
+        }
         };
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
@@ -99,6 +103,7 @@ public class SiteMailbox implements Mailbox {
         /*
          * Doing delivery here so that the delivery thread is the one interacting with the
          * log instead of the receiver. This way only the network threads contend for the log.
+         * LEGACYPURGE - THIS ISN'T DONE IN IV2 AND WE COULD PURGE THIS AND THE WHOLE COMMANDLOG INTO VOLTCORE THING
          */
         if (message instanceof InitiateTaskMessage) {
             InitiateTaskMessage msg = (InitiateTaskMessage)message;
