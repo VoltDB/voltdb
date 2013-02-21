@@ -748,43 +748,91 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
                 @Override
-                public void clientCallback(ClientResponse clientResponse)
-                        throws Exception {
-                    /*
-                     * If there is an error then we are done.
-                     */
-                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                        m_zk.create(
-                                VoltZK.user_snapshot_response + requestId,
-                                rimpl.flattenToBuffer(buf).array(),
-                                Ids.OPEN_ACL_UNSAFE,
-                                CreateMode.PERSISTENT);
-                        //Reset the watch
-                        userSnapshotRequestExistenceCheck();
-                        return;
-                    }
+//<<<<<<< HEAD
+//                public void clientCallback(ClientResponse clientResponse)
+//                        throws Exception {
+//                    /*
+//                     * If there is an error then we are done.
+//                     */
+//                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+//                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+//                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+//                        m_zk.create(
+//                                VoltZK.user_snapshot_response + requestId,
+//                                rimpl.flattenToBuffer(buf).array(),
+//                                Ids.OPEN_ACL_UNSAFE,
+//                                CreateMode.PERSISTENT);
+//                        //Reset the watch
+//                        userSnapshotRequestExistenceCheck();
+//                        return;
+//                    }
+//
+//                    /*
+//                     * Now analyze the response. If a snapshot was in progress
+//                     * we have to reattempt it later, and send a response to the client
+//                     * saying it was queued. Otherwise, forward the response
+//                     * failure/success to the client.
+//                     */
+//                    if (isSnapshotInProgressResponse(clientResponse)) {
+//                        scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
+//                    } else {
+//                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+//                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+//                        m_zk.create(
+//                                VoltZK.user_snapshot_response + requestId,
+//                                rimpl.flattenToBuffer(buf).array(),
+//                                Ids.OPEN_ACL_UNSAFE,
+//                                CreateMode.PERSISTENT);
+//                        //Reset the watch
+//                        userSnapshotRequestExistenceCheck();
+//                        return;
+//=======
+                public void clientCallback(ClientResponse clientResponse) {
+                    try {
+                        /*
+                         * If there is an error then we are done.
+                         */
+                        if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                            ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                            ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                            m_zk.create(
+                                    VoltZK.user_snapshot_response + requestId,
+                                    rimpl.flattenToBuffer(buf).array(),
+                                    Ids.OPEN_ACL_UNSAFE,
+                                    CreateMode.PERSISTENT);
+                            //Reset the watch
+                            userSnapshotRequestExistenceCheck();
+                            return;
+                        }
 
-                    /*
-                     * Now analyze the response. If a snapshot was in progress
-                     * we have to reattempt it later, and send a response to the client
-                     * saying it was queued. Otherwise, forward the response
-                     * failure/success to the client.
-                     */
-                    if (isSnapshotInProgressResponse(clientResponse)) {
-                        scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
-                    } else {
-                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                        m_zk.create(
-                                VoltZK.user_snapshot_response + requestId,
-                                rimpl.flattenToBuffer(buf).array(),
-                                Ids.OPEN_ACL_UNSAFE,
-                                CreateMode.PERSISTENT);
-                        //Reset the watch
-                        userSnapshotRequestExistenceCheck();
-                        return;
+                        /*
+                         * Now analyze the response. If a snapshot was in progress
+                         * we have to reattempt it later, and send a response to the client
+                         * saying it was queued. Otherwise, forward the response
+                         * failure/success to the client.
+                         */
+                        if (isSnapshotInProgressResponse(clientResponse)) {
+                            scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
+                        } else {
+                            ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                            ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                            m_zk.create(
+                                    VoltZK.user_snapshot_response + requestId,
+                                    rimpl.flattenToBuffer(buf).array(),
+                                    Ids.OPEN_ACL_UNSAFE,
+                                    CreateMode.PERSISTENT);
+                            //Reset the watch
+                            userSnapshotRequestExistenceCheck();
+                            return;
+                        }
+                    } catch (Exception e) {
+                        hostLog.error("Error processing user snapshot request", e);
+                        try {
+                            userSnapshotRequestExistenceCheck();
+                        } catch (Exception e2) {
+                            VoltDB.crashLocalVoltDB("Error resetting watch for user snapshots", true, e2);
+                        }
+//>>>>>>> c534d60... For ENG-2927, Based on Ning's feedback, don't use crashLocalVoltDB, try and recover instead
                     }
                 }
             });
@@ -850,90 +898,99 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     final long handle = m_nextCallbackHandle++;
                     m_procedureCallbacks.put(handle, new ProcedureCallback() {
                         @Override
-                        public void clientCallback(ClientResponse clientResponse)
-                                throws Exception {
-                            /*
-                             * If there is an error then we are done
-                             * attempting this user snapshot. The params must be bad
-                             * or things are broken.
-                             */
-                            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                                hostLog.error(clientResponse.getStatusString());
-                                //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck();
-                                return;
-                            }
-
-                            VoltTable results[] = clientResponse.getResults();
-                            //Do this check to avoid an NPE
-                            if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
-                                hostLog.error("Queued user snapshot request reattempt received an unexpected response" +
-                                        " and will not be reattempted");
+                        public void clientCallback(ClientResponse clientResponse) {
+                            try {
                                 /*
-                                 * Don't think this should happen, reset the watch to allow later requests
+                                 * If there is an error then we are done
+                                 * attempting this user snapshot. The params must be bad
+                                 * or things are broken.
                                  */
-                                userSnapshotRequestExistenceCheck();
-                                return;
-                            }
+                                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                                    hostLog.error(clientResponse.getStatusString());
+                                    //Reset the watch, in case this is recoverable
+                                    userSnapshotRequestExistenceCheck();
+                                    return;
+                                }
 
-                            VoltTable result = results[0];
-                            boolean snapshotInProgress = false;
-                            boolean haveFailure = false;
-                            while (result.advanceRow()) {
-                                if (result.getString("RESULT").equals("FAILURE")) {
-                                    if (result.getString("ERR_MSG").equals("SNAPSHOT IN PROGRESS")) {
-                                        snapshotInProgress = true;
-                                    } else {
-                                        haveFailure = true;
+                                VoltTable results[] = clientResponse.getResults();
+                                //Do this check to avoid an NPE
+                                if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
+                                    hostLog.error("Queued user snapshot request reattempt received an unexpected response" +
+                                            " and will not be reattempted");
+                                    /*
+                                     * Don't think this should happen, reset the watch to allow later requests
+                                     */
+                                    userSnapshotRequestExistenceCheck();
+                                    return;
+                                }
+
+                                VoltTable result = results[0];
+                                boolean snapshotInProgress = false;
+                                boolean haveFailure = false;
+                                while (result.advanceRow()) {
+                                    if (result.getString("RESULT").equals("FAILURE")) {
+                                        if (result.getString("ERR_MSG").equals("SNAPSHOT IN PROGRESS")) {
+                                            snapshotInProgress = true;
+                                        } else {
+                                            haveFailure = true;
+                                        }
                                     }
                                 }
-                            }
 
-                            /*
-                             * If a snapshot was in progress, reattempt later, otherwise,
-                             * if there was a failure, abort the attempt and log.
-                             */
-                            if (snapshotInProgress) {
-                                hostLog.info("Queued user snapshot was reattempted, but a snapshot was " +
-                                        " still in progress. It will be reattempted.");
-                                //Turtles all the way down
-                                scheduleSnapshotForLater(
-                                        requestObj,
-                                        null,//null because it shouldn't be used, request already responded to
-                                        false);
-                            } else if (haveFailure) {
-                                hostLog.info("Queued user snapshot was attempted, but there was a failure.");
-                                if (requestId != null) {
-                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                    m_zk.create(
-                                            VoltZK.user_snapshot_response + requestId,
-                                            rimpl.flattenToBuffer(buf).array(),
-                                            Ids.OPEN_ACL_UNSAFE,
-                                            CreateMode.PERSISTENT);
+                                /*
+                                 * If a snapshot was in progress, reattempt later, otherwise,
+                                 * if there was a failure, abort the attempt and log.
+                                 */
+                                if (snapshotInProgress) {
+                                    hostLog.info("Queued user snapshot was reattempted, but a snapshot was " +
+                                            " still in progress. It will be reattempted.");
+                                    //Turtles all the way down
+                                    scheduleSnapshotForLater(
+                                            requestObj,
+                                            null,//null because it shouldn't be used, request already responded to
+                                            false);
+                                } else if (haveFailure) {
+                                    hostLog.info("Queued user snapshot was attempted, but there was a failure.");
+                                    if (requestId != null) {
+                                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                        m_zk.create(
+                                                VoltZK.user_snapshot_response + requestId,
+                                                rimpl.flattenToBuffer(buf).array(),
+                                                Ids.OPEN_ACL_UNSAFE,
+                                                CreateMode.PERSISTENT);
+                                    }
+                                    //Reset the watch, in case this is recoverable
+                                    userSnapshotRequestExistenceCheck();
+                                    //Log the details of the failure, after resetting the watch in case of some odd NPE
+                                    result.resetRowPosition();
+                                    hostLog.info(result);
+                                } else {
+                                    if (requestId != null) {
+                                        hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
+                                                VoltZK.user_snapshot_response + requestId);
+                                        /*
+                                         * Snapshot was started no problem, reset the watch for new requests
+                                         */
+                                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                        m_zk.create(
+                                                VoltZK.user_snapshot_response + requestId,
+                                                rimpl.flattenToBuffer(buf).array(),
+                                                Ids.OPEN_ACL_UNSAFE,
+                                                CreateMode.PERSISTENT);
+                                    }
+                                    userSnapshotRequestExistenceCheck();
+                                    return;
                                 }
-                                //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck();
-                                //Log the details of the failure, after resetting the watch in case of some odd NPE
-                                result.resetRowPosition();
-                                hostLog.info(result);
-                            } else {
-                                if (requestId != null) {
-                                    hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
-                                            VoltZK.user_snapshot_response + requestId);
-                                    /*
-                                     * Snapshot was started no problem, reset the watch for new requests
-                                     */
-                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                    m_zk.create(
-                                            VoltZK.user_snapshot_response + requestId,
-                                            rimpl.flattenToBuffer(buf).array(),
-                                            Ids.OPEN_ACL_UNSAFE,
-                                            CreateMode.PERSISTENT);
+                            } catch (Exception e) {
+                                hostLog.error("Error processing procedure callback for user snapshot", e);
+                                try {
+                                    userSnapshotRequestExistenceCheck();
+                                } catch (Exception e1) {
+                                    VoltDB.crashLocalVoltDB(
+                                            "Error resetting watch for user snapshot requests", true, e1);
                                 }
-                                userSnapshotRequestExistenceCheck();
-                                return;
                             }
                         }
                     });
@@ -941,7 +998,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle,
                             new Object[] { requestObj });
                 } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Exception initiating user snapshot request", true, e);
+                    try {
+                        userSnapshotRequestExistenceCheck();
+                    } catch (Exception e1) {
+                        VoltDB.crashLocalVoltDB("Error checking for existence of user snapshots", true, e1);
+                    }
                 }
             }
         };
@@ -1230,8 +1291,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     long handle = resp.getClientHandle();
                     m_procedureCallbacks.remove(handle).clientCallback(resp);
                 } catch (Exception e) {
+//<<<<<<< HEAD
+//                    hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
+//                    throw e;
+//=======
                     hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
-                    throw e;
+                    /*
+                     * Don't think it is productive to propagate any exceptions here, Ideally
+                     * they should be handled by the procedure callbacks
+                     */
+//>>>>>>> c534d60... For ENG-2927, Based on Ning's feedback, don't use crashLocalVoltDB, try and recover instead
                 }
                 return null;
             }
