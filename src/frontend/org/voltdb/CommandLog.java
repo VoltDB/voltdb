@@ -16,7 +16,6 @@
  */
 package org.voltdb;
 
-import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Set;
 import java.util.ArrayList;
@@ -90,4 +89,9 @@ public interface CommandLog {
     public interface DurabilityListener {
         public void onDurability(ArrayList<Object> durableThings);
     }
+
+    /**
+     * Is Command logging enabled?
+     */
+    public abstract boolean isEnabled();
 }

@@ -48,6 +48,7 @@ import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.RejoinMessage;
@@ -139,23 +140,15 @@ public class TestIv2RejoinCoordinatorLive {
     {
         ArgumentCaptor<Long> clientHandleCaptor = ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<Connection> connectionCaptor = ArgumentCaptor.forClass(Connection.class);
-        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> nonceCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Boolean> blockingCaptor = ArgumentCaptor.forClass(Boolean.class);
-        ArgumentCaptor<SnapshotFormat> formatCaptor = ArgumentCaptor.forClass(SnapshotFormat.class);
-        ArgumentCaptor<String> jsonCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<SnapshotInitiationInfo> infoCaptor = ArgumentCaptor.forClass(SnapshotInitiationInfo.class);
         ArgumentCaptor<Boolean> notifyCaptor = ArgumentCaptor.forClass(Boolean.class);
         if (expected) {
             // this gets called from a new thread.  Wait for a long time
             verify(m_snapshotDaemon, timeout(120000)).createAndWatchRequestNode(clientHandleCaptor.capture(),
                     connectionCaptor.capture(),
-                    pathCaptor.capture(),
-                    nonceCaptor.capture(),
-                    blockingCaptor.capture(),
-                    formatCaptor.capture(),
-                    jsonCaptor.capture(),
+                    infoCaptor.capture(),
                     notifyCaptor.capture());
-            System.out.println("JSON: " + jsonCaptor.getValue());
+            System.out.println("JSON: " + infoCaptor.getValue().getJSONBlob());
             VoltTable fake = new VoltTable(new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING),
                     new VoltTable.ColumnInfo("RESULT", VoltType.STRING));
             fake.addRow("", "SUCCESS");
@@ -170,11 +163,7 @@ public class TestIv2RejoinCoordinatorLive {
             Thread.sleep(1000);  // yes, ugh
             verify(m_snapshotDaemon, never()).createAndWatchRequestNode(clientHandleCaptor.capture(),
                     connectionCaptor.capture(),
-                    pathCaptor.capture(),
-                    nonceCaptor.capture(),
-                    blockingCaptor.capture(),
-                    formatCaptor.capture(),
-                    jsonCaptor.capture(),
+                    infoCaptor.capture(),
                     notifyCaptor.capture());
         }
     }
