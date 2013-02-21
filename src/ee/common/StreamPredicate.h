@@ -28,6 +28,8 @@ class StreamPredicate
 {
 public:
 
+    virtual ~StreamPredicate() {}
+
     /**
      * Accept or reject a tuple.
      * Return true if the predicate accepts the tuple.

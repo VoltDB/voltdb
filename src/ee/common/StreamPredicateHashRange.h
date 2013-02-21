@@ -37,6 +37,8 @@ class StreamPredicateHashRange : public StreamPredicate
 {
 public:
 
+    virtual ~StreamPredicateHashRange() {}
+
     /**
      * Required static method to parse predicates out of the strings provided.
      * Type-specific signature is resolved by the StreamPredicateList template.
