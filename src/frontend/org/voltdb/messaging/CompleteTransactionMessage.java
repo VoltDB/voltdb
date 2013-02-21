@@ -79,6 +79,13 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(ISRESTART, isRestart);
     }
 
+    public CompleteTransactionMessage(CompleteTransactionMessage msg)
+    {
+        super(msg.getInitiatorHSId(), msg.getCoordinatorHSId(), msg);
+        m_hash = msg.m_hash;
+        m_flags = msg.m_flags;
+    }
+
     public boolean isRollback()
     {
         return getBit(ISROLLBACK);
