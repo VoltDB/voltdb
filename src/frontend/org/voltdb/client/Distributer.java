@@ -620,19 +620,17 @@ class Distributer {
         cxn.m_connection = c;
         m_connections.add(cxn);
 
-        if (m_useClientAffinity) {
-            synchronized (this) {
+        synchronized (this) {
+            if (m_useClientAffinity) {
+                ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+                //The handle is specific to topology updates and has special cased handling
+                queue(spi, new TopoUpdateCallback(), true);
+
+                spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
+                //The handle is specific to procedure updates and has special cased handling
+                queue(spi, new ProcUpdateCallback(), true);
                 m_hostIdToConnection.put(hostId, cxn);
             }
-
-            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
-            //The handle is specific to topology updates and has special cased handling
-            queue(spi, new TopoUpdateCallback(), true);
-
-            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
-            //The handle is specific to procedure updates and has special cased handling
-            queue(spi, new ProcUpdateCallback(), true);
-
         }
     }
 
