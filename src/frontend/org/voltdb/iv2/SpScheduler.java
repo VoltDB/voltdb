@@ -833,10 +833,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        if (m_sendToHSIds.length > 0) {
-            CompleteTransactionMessage replmsg = message;
-            m_mailbox.send(m_sendToHSIds,
-                    replmsg);
+        if (m_isLeader) {
+            CompleteTransactionMessage replmsg = new CompleteTransactionMessage(message);
+            // Set the spHandle so that on repair the new master will set the max seen spHandle
+            // correctly
+            replmsg.setSpHandle(getCurrentTxnId());
+            if (m_sendToHSIds.length > 0) {
+                m_mailbox.send(m_sendToHSIds, replmsg);
+            }
+        } else {
+            setMaxSeenTxnId(message.getSpHandle());
         }
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
