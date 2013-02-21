@@ -21,7 +21,7 @@
 #include <vector>
 #include <utility>
 #include "common/TupleSerializer.h"
-#include "common/StreamPredicate.h"
+#include "common/COWStreamProcessor.h"
 #include "storage/persistenttable.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
@@ -113,7 +113,7 @@ private:
 
     const int32_t m_partitionId;
 
-    StreamPredicateList m_predicates;
+    boost::shared_ptr<COWPredicateList> m_predicates;
 
     int32_t m_totalPartitions;
 };

@@ -18,47 +18,21 @@
 #ifndef STREAMPREDICATE_H_
 #define STREAMPREDICATE_H_
 
-#include <string>
-#include <boost/ptr_container/ptr_vector.hpp>
-
-namespace voltdb {
-
+namespace voltdb
+{
 class TableTuple;
 class PersistentTable;
-class StreamPredicate;
-class StreamPredicateList;
 
-/** A predicate for filtering output streams. */
-class StreamPredicate {
-
+/** An abstract predicate for filtering output streams. */
+class StreamPredicate
+{
 public:
 
-    virtual ~StreamPredicate() {}
-
-    // Factory method to parse a bunch of predicate strings and return a vector
-    // of StreamPredicate objects. Sanity checks the sequence of predicates for
-    // completeness, etc..
-    static void parse(const std::vector<std::string> &predicate_strings,
-                      StreamPredicateList &predicates_out);
-
-    // Return true if the predicate accepts the tuple.
-    bool accept(PersistentTable &table,
-                const TableTuple &tuple,
-                int32_t totalPartitions) const;
-
-private:
-
-    // Should go through parse() factory method.
-    StreamPredicate(std::size_t minHash, std::size_t maxHash) : m_minHash(minHash), m_maxHash(maxHash) {}
-
-    //TODO: Abstract out what's stored here. Someday it won't be only ranges.
-    std::size_t m_minHash;
-    std::size_t m_maxHash;
-};
-
-/** A list (vector) of predicates. */
-class StreamPredicateList : public boost::ptr_vector<StreamPredicate>
-{
+    /**
+     * Accept or reject a tuple.
+     * Return true if the predicate accepts the tuple.
+     */
+    virtual bool accept(PersistentTable &table, const TableTuple &tuple, int32_t totalPartitions) const = 0;
 };
 
 }

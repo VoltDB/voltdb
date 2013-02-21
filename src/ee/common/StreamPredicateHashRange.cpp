@@ -15,27 +15,27 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "StreamPredicate.h"
-#include "tabletuple.h"
-#include "storage/persistenttable.h"
-#include "TheHashinator.h"
+#include <string>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include "tabletuple.h"
+#include "storage/persistenttable.h"
+#include "StreamPredicateHashRange.h"
 
-namespace voltdb {
+namespace voltdb
+{
 
-// Parse ("<min>-<max>") ranges out of the predicate_strings strings Capture
-// error messages in errmsg (separated by \n) and check at the end to see if an
-// exception must be thrown. predicates_out is cleared before parsing.
-void StreamPredicate::parse(
+/*
+ * Produce a list of StreamPredicateHashRange objects by parsing predicate range strings.
+ * Add error messages to errmsg.
+ * Return true on success.
+ */
+bool StreamPredicateHashRange::parse(
         const std::vector<std::string> &predicate_strings,
-        StreamPredicateList &predicates_out) {
-
-    // Collects error messages. Checked later to see if any errors occurred.
-    std::ostringstream errmsg;
-
-    predicates_out.clear();
-
+        StreamPredicateList<StreamPredicateHashRange>& predicates_out,
+        std::ostringstream& errmsg)
+{
+    bool success = true;
     for (std::vector<std::string>::const_iterator predi = predicate_strings.begin(),
                                                       e = predicate_strings.end();
          predi != e; ++predi) {
@@ -49,6 +49,7 @@ void StreamPredicate::parse(
                     if (minHash != 0) {
                         errmsg << "First min hash, " << minHash << ", is non-zero"
                         << " for range predicate '" << *predi << "'" << std::endl;
+                        success = false;
                     }
                 }
                 else {
@@ -57,42 +58,72 @@ void StreamPredicate::parse(
                         errmsg << "Min hash " << minHash
                         << " is not previous max (" << prevMaxHash << ") + 1"
                         << " for range predicate '" << *predi << "'" << std::endl;
+                        success = false;
                     }
                 }
                 if (maxHash <= minHash) {
                     errmsg << "Max <= min for range predicate '" << *predi << "'" << std::endl;
+                    success = false;
                 }
                 if (!errmsg.str().empty()) {
-                    predicates_out.push_back(new StreamPredicate(minHash, maxHash));
+                    predicates_out.push_back(new StreamPredicateHashRange(minHash, maxHash));
+                    success = false;
                 }
             }
             else {
                 errmsg << "Bad range predicate '" << *predi << std::endl;
+                success = false;
             }
         }
         catch(std::exception &exc) {
             errmsg << "Failed to parse range predicate '" << *predi
             << "': " << exc.what() << std::endl;
+            success = false;
         }
     }
-    // Handle failures with an exception.
-    if (!errmsg.str().empty()) {
-        // Clean up.
-        predicates_out.clear();
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg.str());
-    }
+    return success;
 }
 
-bool StreamPredicate::accept(
+/**
+ * Generate a hash code using modulus.
+ */
+static int modulusHash(const NValue& value, int32_t totalPartitions)
+{
+    // Default to partition 0, e.g. when value is null.
+    int hash = 0;
+    if (!value.isNull())
+    {
+        ValueType val_type = ValuePeeker::peekValueType(value);
+        switch (val_type)
+        {
+        case VALUE_TYPE_TINYINT:
+        case VALUE_TYPE_SMALLINT:
+        case VALUE_TYPE_INTEGER:
+        case VALUE_TYPE_BIGINT:
+        {
+            hash = ValuePeeker::peekAsRawInt64(value) % totalPartitions;
+        }
+        // varbinary and varchar are unsupported because they aren't currently needed for testing.
+        case VALUE_TYPE_VARBINARY:
+        case VALUE_TYPE_VARCHAR:
+        default:
+            throwDynamicSQLException("Attempted to calculate the modulus hash of an unsupported type: %s",
+                                     getTypeName(val_type).c_str());
+        }
+    }
+    return hash;
+}
+
+bool StreamPredicateHashRange::accept(
         PersistentTable &table,
         const TableTuple &tuple,
-        int32_t totalPartitions) const {
+        int32_t totalPartitions) const
+{
     int partitionColumn = table.partitionColumn();
     if (partitionColumn == -1) {
         return true;
     }
-    NValue value = tuple.getNValue(partitionColumn);
-    int hash = TheHashinator::hashinate(value, totalPartitions);
+    int hash = modulusHash(tuple.getNValue(partitionColumn), totalPartitions);
     return (hash >= m_minHash && hash <= m_maxHash);
 }
 

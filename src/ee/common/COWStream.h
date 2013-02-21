@@ -26,7 +26,6 @@ namespace voltdb {
 
 class TupleSerializer;
 class TableTuple;
-class StreamPredicateList;
 class PersistentTable;
 class TupleSerializer;
 

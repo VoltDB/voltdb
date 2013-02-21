@@ -580,6 +580,96 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     }
 }
 
+/*
+TEST_F(CopyOnWriteTest, MultiStreamTest) {
+    initTable(true);
+    int tupleCount = TUPLE_COUNT;
+    addRandomUniqueTuples( m_table, tupleCount);
+    DefaultTupleSerializer serializer;
+    for (int qq = 0; qq < 10; qq++) {
+        stx::btree_set<int64_t> originalTuples;
+        voltdb::TableIterator& iterator = m_table->iterator();
+        TableTuple tuple(m_table->schema());
+        while (iterator.next(tuple)) {
+            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
+                    originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            const bool inserted = p.second;
+            if (!inserted) {
+                    int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                    printf("Failed to insert %d\n", primaryKey);
+            }
+            ASSERT_TRUE(inserted);
+        }
+
+        const std::vector<std::string> predicates = ???;
+        int32_t npartitions = ???;
+
+        m_table->activateCopyOnWrite(&serializer, 0, predicates, npartitions);
+
+        stx::btree_set<int64_t> COWTuples;
+        char serializationBuffer[BUFFER_SIZE];
+        int totalInserted = 0;
+        while (true) {
+            COWStreamProcessor outs(serializationBuffer, sizeof(serializationBuffer));
+            COWStream &out = outs.at(0);
+            m_table->serializeMore(outs);
+            const int serialized = static_cast<int>(out.position());
+            if (out.position() == 0) {
+                break;
+            }
+            int ii = 12;//skip partition id and row count and first tuple length
+            while (ii < (serialized - 4)) {
+                int values[2];
+                values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
+                values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
+                const bool inserted =
+                        COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                if (!inserted) {
+                    printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
+                }
+                ASSERT_TRUE(inserted);
+                totalInserted++;
+                ii += 68;
+            }
+            for (int jj = 0; jj < 10; jj++) {
+                doRandomTableMutation(m_table);
+            }
+        }
+
+        std::vector<int64_t> diff;
+        std::insert_iterator<std::vector<int64_t> > ii( diff, diff.begin());
+        std::set_difference(originalTuples.begin(), originalTuples.end(), COWTuples.begin(), COWTuples.end(), ii);
+        for (int ii = 0; ii < diff.size(); ii++) {
+            int32_t *values = reinterpret_cast<int32_t*>(&diff[ii]);
+            printf("Tuple in original not in COW is %d and %d\n", values[0], values[1]);
+        }
+
+        diff.clear();
+        ii = std::insert_iterator<std::vector<int64_t> >(diff, diff.begin());
+        std::set_difference( COWTuples.begin(), COWTuples.end(), originalTuples.begin(), originalTuples.end(), ii);
+        for (int ii = 0; ii < diff.size(); ii++) {
+            int32_t *values = reinterpret_cast<int32_t*>(&diff[ii]);
+            printf("Tuple in COW not in original is %d and %d\n", values[0], values[1]);
+        }
+
+        int numTuples = 0;
+        iterator = m_table->iterator();
+        while (iterator.next(tuple)) {
+            if (tuple.isDirty()) {
+                printf("Found tuple %d is active and dirty at end of COW\n",
+                        ValuePeeker::peekAsInteger(tuple.getNValue(0)));
+            }
+            numTuples++;
+            ASSERT_FALSE(tuple.isDirty());
+        }
+        ASSERT_EQ(numTuples, tupleCount + (m_tuplesInserted - m_tuplesDeleted));
+
+        ASSERT_EQ(originalTuples.size(), COWTuples.size());
+        ASSERT_TRUE(originalTuples == COWTuples);
+    }
+}
+*/
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

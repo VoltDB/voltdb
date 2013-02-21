@@ -20,7 +20,6 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
 #include "common/COWStream.h"
-#include "common/COWStreamProcessor.h"
 #include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>
@@ -47,7 +46,7 @@ CopyOnWriteContext::CopyOnWriteContext(
 {
     // Parse ("<min>-<max>") ranges out of predicate_strings.
     // Throws an exception to be handled by caller on errors.
-    StreamPredicate::parse(predicate_strings, m_predicates);
+    m_predicates = COWPredicateList::parse(predicate_strings);
 }
 
 /*
@@ -71,8 +70,8 @@ bool CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
 
     // It has to be either one predicate per output stream or none at all.
     // Iterate both lists in parallel when predicates are supplied.
-    bool havePredicates = !m_predicates.empty();
-    if (havePredicates && m_predicates.size() != outputStreams.size()) {
+    bool havePredicates = !m_predicates->empty();
+    if (havePredicates && m_predicates->size() != outputStreams.size()) {
         throwFatalException("serializeMore() expects either no predicates or one per output stream.");
     }
 

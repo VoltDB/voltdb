@@ -100,7 +100,7 @@ bool COWStreamProcessor::writeRow(TupleSerializer &serializer,
     }
 
     // Predicates, if supplied, are one per output stream (previously asserted).
-    StreamPredicateList::const_iterator iterPredicate;
+    COWPredicateList::const_iterator iterPredicate;
     if (m_predicates != NULL) {
         iterPredicate = m_predicates->begin();
     }

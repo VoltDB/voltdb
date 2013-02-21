@@ -20,15 +20,18 @@
 
 #include <cstddef>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include "StreamPredicateList.h"
+#include "StreamPredicateHashRange.h"
 
 namespace voltdb {
 
 class TupleSerializer;
 class TableTuple;
-class StreamPredicateList;
 class PersistentTable;
 class TupleSerializer;
 class COWStream;
+
+typedef StreamPredicateList<StreamPredicateHashRange> COWPredicateList;
 
 /** COWStream processor. Manages and outputs to multiple COWStream's. */
 class COWStreamProcessor : public boost::ptr_vector<COWStream> {
@@ -70,7 +73,7 @@ private:
     std::size_t m_maxTupleLength;
 
     /** Predicates for filtering. */
-    StreamPredicateList *m_predicates;
+    COWPredicateList *m_predicates;
 
     /** Table receiving tuples. */
     PersistentTable *m_table;

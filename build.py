@@ -211,7 +211,7 @@ CTX.INPUT['common'] = """
  DefaultTupleSerializer.cpp
  executorcontext.cpp
  serializeio.cpp
- StreamPredicate.cpp
+ StreamPredicateHashRange.cpp
  COWStream.cpp
  COWStreamProcessor.cpp
 """
