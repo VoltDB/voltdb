@@ -18,15 +18,10 @@
 #ifndef THEHASHINATOR_H_
 #define THEHASHINATOR_H_
 
-#include "common/FatalException.hpp"
 #include "common/NValue.hpp"
-#include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
-
-#include <cstring>
-#include <string>
-#include <cassert>
-#include <stdlib.h>
+#include "common/FatalException.hpp"
+#include "common/types.h"
 
 namespace voltdb {
 
@@ -49,73 +44,47 @@ class TheHashinator {
      * However, since we currently have two matching implementations
      * of hashinate, it's nice to centralize and isolate the code here.
      */
-    static int32_t hashinate(NValue value, int32_t partitionCount)
-    {
-        // All null values hash to partition 0
-        if (value.isNull())
-        {
-            return 0;
-        }
-        ValueType val_type = ValuePeeker::peekValueType(value);
-        switch (val_type)
-        {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_BIGINT:
-        {
-            return hashinate(ValuePeeker::peekAsRawInt64(value),
-                             partitionCount);
-        }
-        case VALUE_TYPE_VARBINARY:
-        case VALUE_TYPE_VARCHAR:
-        {
-            return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
-                             ValuePeeker::peekObjectLength(value),
-                             partitionCount);
-        }
-        default:
-            throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
-                                     getTypeName(val_type).c_str());
-        }
-    }
+	 int32_t hashinate(NValue value)
+	  {
+		  // All null values hash to partition 0
+		  if (value.isNull())
+		  {
+			  return 0;
+		  }
+		  ValueType val_type = ValuePeeker::peekValueType(value);
+		  switch (val_type)
+		  {
+		  case VALUE_TYPE_TINYINT:
+		  case VALUE_TYPE_SMALLINT:
+		  case VALUE_TYPE_INTEGER:
+		  case VALUE_TYPE_BIGINT:
+		  {
+			  return hashinate(ValuePeeker::peekAsRawInt64(value));
+		  }
+		  case VALUE_TYPE_VARBINARY:
+		  case VALUE_TYPE_VARCHAR:
+		  {
+			  return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
+							   ValuePeeker::peekObjectLength(value));
+		  }
+		  default:
+			  throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
+									   getTypeName(val_type).c_str());
+			  break;
+		  }
+	  }
+    virtual ~TheHashinator() {}
 
- private:
-
+  protected:
     /**
      * Given a long value, pick a partition to store the data.
      *
      * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
      * @return A value between 0 and partitionCount-1, hopefully pretty evenly
      * distributed.
      */
-    static int32_t hashinate(int64_t value, int32_t partitionCount) {
-        // special case this hard to hash value to 0 (in both c++ and java)
-        if (value == INT64_MIN) return 0;
-
-        // hash the same way java does
-        int32_t index = static_cast<int32_t>(value^(static_cast<uint64_t>(value) >> 32));
-        return abs(index % partitionCount);
-    }
-
-    /**
-     * Designed to mimic Java string hashing where the hash function is defined as
-     * s[0]*31^(n-1) + s[1]*31^(n-2) + ... + s[n-1]
-     *
-     */
-    static int32_t hashinate(const char *string, int32_t length, int32_t partitionCount) {
-        int32_t hashCode = 0;
-        int32_t offset = 0;
-        if (length < 0) {
-            throwDynamicSQLException("Attempted to hashinate a value with length(%d) < 0", length);
-        }
-        for (int32_t ii = 0; ii < length; ii++) {
-           hashCode = 31 * hashCode + string[offset++];
-        }
-        return abs(hashCode % partitionCount);
-    }
-
+    virtual int32_t hashinate(int64_t value) = 0;
+    virtual int32_t hashinate(const char *string, int32_t length) = 0;
 };
 
 } // namespace voltdb

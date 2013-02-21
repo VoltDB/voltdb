@@ -160,7 +160,8 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int32_t partitionCount;
+    int32_t hashinatorType;
+    int32_t configLength;
     char data[0];
 }__attribute__((packed)) hashinate_msg;
 
@@ -384,7 +385,7 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
         if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
-    } catch (FatalException e) {
+    } catch (FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -406,9 +407,10 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t totalPartitions;
-        int16_t hostnameLength;
-        char hostname[0];
+        int32_t hashinatorType;
+        int32_t hashinatorConfigLength;
+        int32_t hostnameLength;
+        char data[0];
     }__attribute__((packed));
     struct initialize * cs = (struct initialize*) cmd;
 
@@ -418,11 +420,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
-    cs->hostnameLength = ntohs(cs->hostnameLength);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->totalPartitions = ntohl(cs->totalPartitions);
-    std::string hostname(cs->hostname, cs->hostnameLength);
+    cs->hashinatorType = ntohl(cs->hashinatorType);
+    cs->hashinatorConfigLength = ntohl(cs->hashinatorConfigLength);
+    cs->hostnameLength = ntohl(cs->hostnameLength);
+
+    std::string hostname(cs->data + cs->hashinatorConfigLength, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
@@ -435,10 +439,11 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->hostId,
                                  hostname,
                                  cs->tempTableMemory,
-                                 cs->totalPartitions) == true) {
+                                 (HashinatorType)cs->hashinatorType,
+                                 (char*)cs->data) == true) {
             return kErrorCode_Success;
         }
-    } catch (FatalException e) {
+    } catch (FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -994,8 +999,21 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     hashinate_msg* hash = (hashinate_msg*)cmd;
     NValueArray& params = m_engine->getParameterContainer();
 
-    int32_t partCount = ntohl(hash->partitionCount);
-    void* offset = hash->data;
+    int32_t hashinatorType = ntohl(hash->hashinatorType);
+    HashinatorType configLength = ntohl(hash->configLength);
+    boost::scoped_ptr<TheHashinator> hashinator;
+    switch (hashinatorType) {
+    case HASHINATOR_LEGACY:
+    	hashinator.reset(LegacyHashinator::newInstance(hash->data));
+    	break;
+    default:
+    	try {
+    		throwFatalException("Unrecognized hashinator type %d", hashinatorType);
+    	} catch (FatalException &e) {
+    		crashVoltDB(e);
+    	}
+    }
+    void* offset = hash->data + configLength;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(hash));
     ReferenceSerializeInput serialize_in(offset, sz);
 
@@ -1006,9 +1024,9 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         Pool *pool = m_engine->getStringPool();
         deserializeParameterSetCommon(cnt, serialize_in, params, pool);
         retval =
-            voltdb::TheHashinator::hashinate(params[0], partCount);
+            hashinator->hashinate(params[0]);
         pool->purge();
-    } catch (FatalException e) {
+    } catch (FatalException &e) {
         crashVoltDB(e);
     }
 

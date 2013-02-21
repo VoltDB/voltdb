@@ -58,6 +58,7 @@
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
+#include "common/LegacyHashinator.h"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
@@ -110,6 +111,7 @@ const int64_t AD_HOC_FRAG_ID = -1;
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentUndoQuantum(NULL),
+      m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
       m_currentOutputDepId(-1),
       m_currentInputDepId(-1),
@@ -160,7 +162,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t hostId,
                          string hostname,
                          int64_t tempTableMemoryLimit,
-                         int32_t totalPartitions)
+                         HashinatorType hashinatorType,
+                         char *hashinatorConfig)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -168,7 +171,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
-    m_totalPartitions = totalPartitions;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -210,6 +212,16 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
+
+    switch (hashinatorType) {
+    case HASHINATOR_LEGACY:
+    	m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
+    	break;
+    default:
+    	throwFatalException("Unknown hashinator type %d", hashinatorType);
+    	break;
+    }
+
     return true;
 }
 
@@ -1146,7 +1158,7 @@ void VoltDBEngine::printReport() {
 
 bool VoltDBEngine::isLocalSite(const NValue& value)
 {
-    int index = TheHashinator::hashinate(value, m_totalPartitions);
+    int index = m_hashinator->hashinate(value);
     return index == m_partitionId;
 }
 

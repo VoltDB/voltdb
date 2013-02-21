@@ -104,6 +104,7 @@
 #include "common/FatalException.hpp"
 #include "common/SegvException.hpp"
 #include "common/RecoveryProtoMessage.h"
+#include "common/LegacyHashinator.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
 #include "json_spirit/json_spirit.h"
@@ -256,7 +257,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint hostId,
     jbyteArray hostname,
     jlong tempTableMemory,
-    jint totalPartitions)
+    jint hashinatorType,
+    jbyteArray hashinatorConfig)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -271,6 +273,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         jbyte *hostChars = env->GetByteArrayElements( hostname, NULL);
         std::string hostString(reinterpret_cast<char*>(hostChars), env->GetArrayLength(hostname));
         env->ReleaseByteArrayElements( hostname, hostChars, JNI_ABORT);
+        jbyte *hashinatorConfigData = env->GetByteArrayElements(hashinatorConfig, NULL);
         // initialization is separated from constructor so that constructor
         // never fails.
         VOLT_DEBUG("calling initialize...");
@@ -281,8 +284,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    hostId,
                                    hostString,
                                    tempTableMemory,
-                                   totalPartitions);
-
+                                   (HashinatorType)hashinatorType,
+                                   (char*)hashinatorConfigData);
+        env->ReleaseByteArrayElements( hostname, hostChars, JNI_ABORT);
         if (success) {
             VOLT_DEBUG("initialize succeeded");
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
@@ -1092,7 +1096,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
         } catch (SQLException e) {
             throwFatalException("%s", e.message().c_str());
         }
-    } catch (FatalException e) {
+    } catch (FatalException &e) {
         topend->crashVoltDB(e);
     }
     return 0;
@@ -1123,7 +1127,7 @@ SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativ
         env->SetLongArrayRegion(retval, 0, 2, data);
         return retval;
     }
-    catch (FatalException e) {
+    catch (FatalException &e) {
         topend->crashVoltDB(e);
     }
     return NULL;
@@ -1148,7 +1152,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProce
         ReferenceSerializeInput input(data, remaining);
         RecoveryProtoMsg message(&input);
         return engine->processRecoveryMessage(&message);
-    } catch (FatalException e) {
+    } catch (FatalException &e) {
         topend->crashVoltDB(e);
     }
     //ProfilerDisable();
@@ -1159,7 +1163,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProce
  * Method:    nativeHashinate
  * Signature: (JI)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashinate(JNIEnv *env, jobject obj, jlong engine_ptr, jint partitionCount)
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashinate(JNIEnv *env, jobject obj, jlong engine_ptr)
 {
     VOLT_DEBUG("nativeHashinate in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1169,11 +1173,20 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
         NValueArray& params = engine->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
+        HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[1]));
+        boost::scoped_ptr<TheHashinator> hashinator;
+        switch (hashinatorType) {
+        case HASHINATOR_LEGACY:
+        	hashinator.reset(LegacyHashinator::newInstance((char*)voltdb::ValuePeeker::peekObjectValue(params[2])));
+        	break;
+        default:
+        	return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+        }
         int retval =
-            voltdb::TheHashinator::hashinate(params[0], partitionCount);
+            hashinator->hashinate(params[0]);
         stringPool->purge();
         return retval;
-    } catch (FatalException e) {
+    } catch (FatalException &e) {
         std::cout << "HASHINATE ERROR: " << e.m_reason << std::endl;
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
