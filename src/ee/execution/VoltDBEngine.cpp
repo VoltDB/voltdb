@@ -394,7 +394,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                 m_currentInputDepId = -1;
                 return ENGINE_ERRORCODE_ERROR;
             }
-        } catch (SerializableEEException &e) {
+        } catch (const SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
@@ -463,7 +463,7 @@ int VoltDBEngine::loadFragment(const char *plan, int32_t length, int64_t &fragId
                                               message);
             }
         }
-        catch (SerializableEEException &e)
+        catch (const SerializableEEException &e)
         {
             VOLT_TRACE("loadFragment: failed to initialize plan fragment");
             e.serialize(getExceptionOutputSerializer());
@@ -865,7 +865,7 @@ VoltDBEngine::loadTable(int32_t tableId,
 
     try {
         table->loadTuplesFrom(serializeIn);
-    } catch (SerializableEEException e) {
+    } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
     return true;
@@ -1276,7 +1276,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           message);
         }
-    } catch (SerializableEEException &e) {
+    } catch (const SerializableEEException &e) {
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
         return -1;

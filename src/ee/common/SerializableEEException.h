@@ -51,11 +51,11 @@ public:
     SerializableEEException(VoltEEExceptionType exceptionType, std::string message);
     virtual ~SerializableEEException();
 
-    void serialize(ReferenceSerializeOutput *output);
-    std::string message() { return m_message; }
-    VoltEEExceptionType getType() { return m_exceptionType; }
+    void serialize (ReferenceSerializeOutput *output) const;
+    const std::string message() const { return m_message; }
+    VoltEEExceptionType getType() const { return m_exceptionType; }
 protected:
-    virtual void p_serialize(ReferenceSerializeOutput *output) {};
+    virtual void p_serialize(ReferenceSerializeOutput *output) const {};
 
 private:
     const VoltEEExceptionType m_exceptionType;
