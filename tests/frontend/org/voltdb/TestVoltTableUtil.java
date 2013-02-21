@@ -66,7 +66,7 @@ public class TestVoltTableUtil {
         String[] values = captor.getValue();
         assertEquals(6, values.length);
         for (String v : values) {
-            assertEquals("\\N", v);
+            assertEquals(VoltTableUtil.CSV_NULL, v);
         }
     }
 

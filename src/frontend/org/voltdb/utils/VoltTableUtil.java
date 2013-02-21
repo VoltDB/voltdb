@@ -37,7 +37,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 public class VoltTableUtil {
 
     // String used to indicate NULL value in the output CSV file
-    private static final String CSV_NULL = "\\N";
+    public static final String CSV_NULL = "\\N";
 
     /*
      * Ugly hack to allow SnapshotConverter which
