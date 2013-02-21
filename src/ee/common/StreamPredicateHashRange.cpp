@@ -101,7 +101,7 @@ static int modulusHash(const NValue& value, int32_t totalPartitions)
         case VALUE_TYPE_INTEGER:
         case VALUE_TYPE_BIGINT:
         {
-            hash = ValuePeeker::peekAsRawInt64(value) % totalPartitions;
+            hash = (int)(ValuePeeker::peekAsRawInt64(value) % totalPartitions);
         }
         // varbinary and varchar are unsupported because they aren't currently needed for testing.
         case VALUE_TYPE_VARBINARY:
