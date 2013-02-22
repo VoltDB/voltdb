@@ -371,27 +371,15 @@ private:
  */
 class PoolBackedTempTuple : public TableTuple {
 public:
-    PoolBackedTempTuple() : m_storage(NULL), m_pool(NULL) { }
+    PoolBackedTempTuple(const TupleSchema* schema, Pool* pool) : TableTuple(schema), m_pool(pool) { }
 
-    void allocateTupleNoHeader(const TupleSchema* schema, Pool* pool)
+    void allocateActiveTuple()
     {
-        m_schema = schema;
-        m_pool = pool;
-        assert(m_pool);
-        m_storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength()));
-        moveNoHeader(m_storage);
-    }
-
-    void reallocateTupleNoHeader()
-    {
-        assert(m_pool);
-        m_storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength()));
-        moveNoHeader(m_storage);
+        char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength() + TUPLE_HEADER_SIZE));
+        move(storage);
+        setActiveTrue();
     }
 private:
-    // Without this extant (though unused -- practically write only) pointer to the allocation,
-    // the offset tricks in moveNoHeader confuse valgrind into reporting a leak.
-    char* m_storage;
     Pool* m_pool;
 };
 

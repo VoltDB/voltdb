@@ -1116,7 +1116,7 @@ public class PlanAssembler {
             // (unaggregated) is if they are also GROUP BY columns. So an index with a valid
             // sort direction indicates that all of the ORDER BY columns are grouped, but how
             // do we know that ALL of the GROUPED columns are ordered, so we can ditch the hash?
-            // There appears to be some usch test missing here.
+            // TODO: There appears to be some such test missing here.
 
             // The way that an index scan under-claims the sorted-ness of its output can lead to cases
             // where a hash is used needlessly -- it's possible that there is no ORDER BY or that
