@@ -36,9 +36,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
  */
 public class VoltTableUtil {
 
-    // String used to indicate NULL value in the output CSV file
-    public static final String CSV_NULL = "\\N";
-
     /*
      * Ugly hack to allow SnapshotConverter which
      * shares this code with the server to specify it's own time zone.
@@ -70,47 +67,43 @@ public class VoltTableUtil {
                         || type == VoltType.TINYINT) {
                     final long value = vt.getLong(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] =VoltTable. CSV_NULL;
                     } else {
                         fields[ii] = Long.toString(value);
                     }
                 } else if (type == VoltType.FLOAT) {
                     final double value = vt.getDouble(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] =VoltTable. CSV_NULL;
                     } else {
                         fields[ii] = Double.toString(value);
                     }
                 } else if (type == VoltType.DECIMAL) {
-                    final BigDecimal bd = vt
-                            .getDecimalAsBigDecimal(ii);
+                    final BigDecimal bd = vt.getDecimalAsBigDecimal(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] = VoltTable.CSV_NULL;
                     } else {
                         fields[ii] = bd.toString();
                     }
                 } else if (type == VoltType.STRING) {
                     final String str = vt.getString(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] = VoltTable.CSV_NULL;
                     } else {
                         fields[ii] = str;
                     }
                 } else if (type == VoltType.TIMESTAMP) {
-                    final TimestampType timestamp = vt
-                            .getTimestampAsTimestamp(ii);
+                    final TimestampType timestamp = vt.getTimestampAsTimestamp(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] = VoltTable.CSV_NULL;
                     } else {
-                        fields[ii] = sdf.format(timestamp
-                                .asApproximateJavaDate());
-                        fields[ii] += String.valueOf(timestamp
-                                .getUSec());
+                        fields[ii] = sdf.format(timestamp.asApproximateJavaDate());
+                        fields[ii] += String.valueOf(timestamp.getUSec());
                     }
                 } else if (type == VoltType.VARBINARY) {
                    byte bytes[] = vt.getVarbinary(ii);
                    if (vt.wasNull()) {
-                       fields[ii] = CSV_NULL;
+                       fields[ii] = VoltTable.CSV_NULL;
                    } else {
                        fields[ii] = Encoder.hexEncode(bytes);
                    }
