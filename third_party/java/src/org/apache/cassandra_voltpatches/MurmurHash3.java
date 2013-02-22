@@ -35,8 +35,9 @@ import com.google.common.primitives.UnsignedBytes;
  * <p>
  * This originally came from Cassandra, for Volt we had to modify it to match
  * the native and canonical implementation. The switch statement handling dangling
- * bytes at the wasn't converting the signed bytes from the ByteBuffer to signed ints,
- * it was casting them straight to long which means that you could end up with - numbers
+ * bytes at the end wasn't converting the signed bytes from the ByteBuffer to signed ints,
+ * it was casting them straight to long which means that you could end up with negative numbers when
+ * the canonical algorithm was working with them unsigned.
  */
 public class MurmurHash3
 {
