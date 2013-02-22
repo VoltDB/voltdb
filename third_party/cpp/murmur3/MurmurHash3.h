@@ -5,6 +5,8 @@
 #ifndef _MURMURHASH3_H_
 #define _MURMURHASH3_H_
 
+namespace voltdb {
+
 //-----------------------------------------------------------------------------
 // Platform-specific functions and macros
 
@@ -34,4 +36,5 @@ void MurmurHash3_x64_128 ( const void * key, int len, uint32_t seed, void * out 
 
 //-----------------------------------------------------------------------------
 
+}
 #endif // _MURMURHASH3_H_

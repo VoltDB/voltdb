@@ -19,6 +19,8 @@ package org.apache.cassandra_voltpatches;
 
 import java.nio.ByteBuffer;
 
+import com.google.common.primitives.UnsignedBytes;
+
 /**
  * This is a very fast, non-cryptographic hash suitable for general hash-based
  * lookup. See http://murmurhash.googlepages.com/ for more details.
@@ -29,6 +31,12 @@ import java.nio.ByteBuffer;
  * The C version of MurmurHash 2.0 found at that site was ported to Java by
  * Andrzej Bialecki (ab at getopt org).
  * </p>
+ *
+ * <p>
+ * This originally came from Cassandra, for Volt we had to modify it to match
+ * the native and canonical implementation. The switch statement handling dangling
+ * bytes at the wasn't converting the signed bytes from the ByteBuffer to signed ints,
+ * it was casting them straight to long which means that you could end up with - numbers
  */
 public class MurmurHash3
 {
@@ -36,10 +44,10 @@ public class MurmurHash3
     {
         int i_8 = index << 3;
         int blockOffset = offset + i_8;
-        return ((long) key.get(blockOffset + 0) & 0xff) + (((long) key.get(blockOffset + 1) & 0xff) << 8) +
-               (((long) key.get(blockOffset + 2) & 0xff) << 16) + (((long) key.get(blockOffset + 3) & 0xff) << 24) +
-               (((long) key.get(blockOffset + 4) & 0xff) << 32) + (((long) key.get(blockOffset + 5) & 0xff) << 40) +
-               (((long) key.get(blockOffset + 6) & 0xff) << 48) + (((long) key.get(blockOffset + 7) & 0xff) << 56);
+        return ((long) key.get(blockOffset + 0) & 0xFFL) + (((long) key.get(blockOffset + 1) & 0xFFL) << 8) +
+               (((long) key.get(blockOffset + 2) & 0xFFL) << 16) + (((long) key.get(blockOffset + 3) & 0xFFL) << 24) +
+               (((long) key.get(blockOffset + 4) & 0xFFL) << 32) + (((long) key.get(blockOffset + 5) & 0xFFL) << 40) +
+               (((long) key.get(blockOffset + 6) & 0xFFL) << 48) + (((long) key.get(blockOffset + 7) & 0xFFL) << 56);
     }
 
     protected static long rotl64(long v, int n)
@@ -58,7 +66,7 @@ public class MurmurHash3
         return k;
     }
 
-    public static long[] hash3_x64_128(ByteBuffer key, int offset, int length, long seed)
+    public static long hash3_x64_128(ByteBuffer key, int offset, int length, long seed)
     {
         final int nblocks = length >> 4; // Process as 128-bit blocks.
 
@@ -94,25 +102,29 @@ public class MurmurHash3
         long k1 = 0;
         long k2 = 0;
 
+        /*
+         * For Volt had to add UnsignedBytes.toInt to make the hash output
+         * match the native and canonical implementation of MurmurHash3
+         */
         switch(length & 15)
         {
-            case 15: k2 ^= ((long) key.get(offset+14)) << 48;
-            case 14: k2 ^= ((long) key.get(offset+13)) << 40;
-            case 13: k2 ^= ((long) key.get(offset+12)) << 32;
-            case 12: k2 ^= ((long) key.get(offset+11)) << 24;
-            case 11: k2 ^= ((long) key.get(offset+10)) << 16;
-            case 10: k2 ^= ((long) key.get(offset+9)) << 8;
-            case  9: k2 ^= ((long) key.get(offset+8)) << 0;
+            case 15: k2 ^= ((long) UnsignedBytes.toInt(key.get(offset+14))) << 48;
+            case 14: k2 ^= ((long) UnsignedBytes.toInt(key.get(offset+13))) << 40;
+            case 13: k2 ^= ((long) UnsignedBytes.toInt(key.get(offset+12))) << 32;
+            case 12: k2 ^= ((long) UnsignedBytes.toInt(key.get(offset+11))) << 24;
+            case 11: k2 ^= ((long) UnsignedBytes.toInt(key.get(offset+10))) << 16;
+            case 10: k2 ^= ((long) UnsignedBytes.toInt(key.get(offset+9))) << 8;
+            case  9: k2 ^= ((long) UnsignedBytes.toInt(key.get(offset+8))) << 0;
                 k2 *= c2; k2  = rotl64(k2,33); k2 *= c1; h2 ^= k2;
 
-            case  8: k1 ^= ((long) key.get(offset+7)) << 56;
-            case  7: k1 ^= ((long) key.get(offset+6)) << 48;
-            case  6: k1 ^= ((long) key.get(offset+5)) << 40;
-            case  5: k1 ^= ((long) key.get(offset+4)) << 32;
-            case  4: k1 ^= ((long) key.get(offset+3)) << 24;
-            case  3: k1 ^= ((long) key.get(offset+2)) << 16;
-            case  2: k1 ^= ((long) key.get(offset+1)) << 8;
-            case  1: k1 ^= ((long) key.get(offset));
+            case  8: k1 ^= ((long) UnsignedBytes.toInt(key.get(offset+7))) << 56;
+            case  7: k1 ^= ((long) UnsignedBytes.toInt(key.get(offset+6))) << 48;
+            case  6: k1 ^= ((long) UnsignedBytes.toInt(key.get(offset+5))) << 40;
+            case  5: k1 ^= ((long) UnsignedBytes.toInt(key.get(offset+4))) << 32;
+            case  4: k1 ^= ((long) UnsignedBytes.toInt(key.get(offset+3))) << 24;
+            case  3: k1 ^= ((long) UnsignedBytes.toInt(key.get(offset+2))) << 16;
+            case  2: k1 ^= ((long) UnsignedBytes.toInt(key.get(offset+1))) << 8;
+            case  1: k1 ^= ((long) UnsignedBytes.toInt(key.get(offset)));
                 k1 *= c1; k1  = rotl64(k1,31); k1 *= c2; h1 ^= k1;
         };
 
@@ -130,6 +142,6 @@ public class MurmurHash3
         h1 += h2;
         h2 += h1;
 
-        return(new long[] {h1, h2});
+        return h1;
     }
 }

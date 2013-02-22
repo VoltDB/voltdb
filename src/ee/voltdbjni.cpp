@@ -105,6 +105,7 @@
 #include "common/SegvException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
+#include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
 #include "json_spirit/json_spirit.h"
@@ -778,6 +779,18 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32C
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, address + offset, length);
     return static_cast<jint>(vdbcrc::crc32cFinish(crc));
+}
+
+/*
+ * Class:     org_voltcore_utils_DBBPool
+ * Method:    getMurmur3128
+ * Signature: (JII)J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128
+  (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
+    int64_t  retval[2];
+    MurmurHash3_x64_128( reinterpret_cast<char*>(ptr) + offset, length, 0, retval);
+    return retval[0];
 }
 
 /*

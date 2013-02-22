@@ -9,6 +9,7 @@
 
 #include "MurmurHash3.h"
 
+namespace voltdb {
 //-----------------------------------------------------------------------------
 // Platform-specific functions and macros
 
@@ -330,6 +331,6 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
   ((uint64_t*)out)[0] = h1;
   ((uint64_t*)out)[1] = h2;
 }
-
+}
 //-----------------------------------------------------------------------------
 
