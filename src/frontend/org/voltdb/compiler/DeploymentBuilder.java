@@ -18,6 +18,7 @@
 package org.voltdb.compiler;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.LinkedHashSet;
@@ -113,6 +114,56 @@ public class DeploymentBuilder {
 
     private boolean m_elenabled;      // true if enabled; false if disabled
 
+    public DeploymentBuilder() {
+        this(1, 1, 0);
+    }
+
+    public DeploymentBuilder(final int sitesPerHost,
+                             final int hostCount,
+                             final int replication)
+    {
+        this(sitesPerHost, hostCount, replication, 0, false);
+    }
+
+    public DeploymentBuilder(final int sitesPerHost,
+            final int hostCount, final int replication,
+            final int adminPort, final boolean adminOnStartup)
+    {
+        m_sitesPerHost = sitesPerHost;
+        m_hostCount = hostCount;
+        m_replication = replication;
+        m_adminPort = adminPort;
+        m_adminOnStartup = adminOnStartup;
+
+        // set default deployment stuff
+        String voltRootPath = "/tmp/" + System.getProperty("user.name");
+        java.io.File voltRootFile = new java.io.File(voltRootPath);
+        if (!voltRootFile.exists()) {
+            if (!voltRootFile.mkdir()) {
+                throw new RuntimeException("Unable to create voltdbroot \"" + voltRootPath + "\" for test");
+            }
+        }
+        if (!voltRootFile.isDirectory()) {
+            throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not a directory");
+        }
+        if (!voltRootFile.canRead()) {
+            throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not readable");
+        }
+        if (!voltRootFile.canWrite()) {
+            throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
+        }
+        if (!voltRootFile.canExecute()) {
+            throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
+        }
+        m_voltRootPath = voltRootPath;
+
+    }
+
+    public void setVoltRoot(String voltRoot) {
+        assert(voltRoot != null);
+        m_voltRootPath = voltRoot;
+    }
+
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
             Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
         m_internalSnapshotPath = internalSnapshotPath;
@@ -178,6 +229,22 @@ public class DeploymentBuilder {
         m_maxTempTableMemory = max;
     }
 
+    public void writeXML(String path) {
+        File file;
+        try {
+            file = new File(path);
+
+            final FileWriter writer = new FileWriter(file);
+            writer.write(getXML());
+            writer.flush();
+            writer.close();
+        }
+        catch (final Exception e) {
+            e.printStackTrace();
+            assert(false);
+        }
+    }
+
     /**
      * Writes deployment.xml file to a temporary file. It is constructed from the passed parameters and the m_users
      * field.
@@ -188,10 +255,10 @@ public class DeploymentBuilder {
      * @throws IOException
      * @throws JAXBException
      */
-    public String getXML(String voltRoot) throws IOException, JAXBException {
+    public String getXML() {
 
         // make sure voltroot exists
-        new File(voltRoot).mkdirs();
+        new File(m_voltRootPath).mkdirs();
 
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
@@ -212,7 +279,7 @@ public class DeploymentBuilder {
         deployment.setPaths(paths);
         Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
         paths.setVoltdbroot(voltdbroot);
-        voltdbroot.setPath(voltRoot);
+        voltdbroot.setPath(m_voltRootPath);
 
         if (m_snapshotPath != null) {
             PathEntry snapshotPathElement = factory.createPathEntry();
@@ -341,14 +408,21 @@ public class DeploymentBuilder {
         export.setEnabled(m_elenabled);
 
         // Have some yummy boilerplate!
-        JAXBContext context = JAXBContext.newInstance(DeploymentType.class);
+        String xml = null;
+        try {
+            JAXBContext context = JAXBContext.newInstance(DeploymentType.class);
 
-        Marshaller marshaller = context.createMarshaller();
-        marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT,
-                Boolean.TRUE);
-        StringWriter writer = new StringWriter();
-        marshaller.marshal(doc, writer);
-        String xml = writer.toString();
+            Marshaller marshaller = context.createMarshaller();
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT,
+                    Boolean.TRUE);
+            StringWriter writer = new StringWriter();
+            marshaller.marshal(doc, writer);
+            xml = writer.toString();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            assert(false);
+        }
 
         return xml;
     }
