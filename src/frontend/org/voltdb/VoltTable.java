@@ -165,7 +165,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * <p>Note: VoltDB current supports ASCII encoded column names only. Column values are
      * still UTF-8 encoded.</p>
      */
-    public static class ColumnInfo {
+    public static class ColumnInfo implements Cloneable {
 
         /**
          * Construct an immutable <tt>ColumnInfo</tt> instance.
@@ -187,6 +187,17 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         ColumnInfo(JSONObject jsonCol) throws JSONException {
             this.name = jsonCol.getString(JSON_NAME_KEY);
             this.type = VoltType.get((byte) jsonCol.getInt(JSON_TYPE_KEY));
+        }
+
+        @Override
+        public ColumnInfo clone() {
+            try {
+                return (ColumnInfo) super.clone();
+            } catch (CloneNotSupportedException e) {
+                e.printStackTrace();
+                assert(false);
+                return null;
+            }
         }
 
         // immutable actual data
@@ -1372,6 +1383,18 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         cloned.m_colCount = m_colCount;
         cloned.m_rowCount = 0;
         cloned.m_rowStart = m_rowStart;
+
+        // copy this metadata if it's present for tests
+        // note the nullness of m_name implies nullness of other test-related metadata
+        if (m_name != null) {
+            cloned.m_name = m_name;
+            if (m_originalColumnInfos != null) {
+                cloned.m_originalColumnInfos = new ColumnInfo[m_originalColumnInfos.length];
+                for (int i = 0; i < m_originalColumnInfos.length; i++) {
+                    cloned.m_originalColumnInfos[i] = m_originalColumnInfos[i].clone();
+                }
+            }
+        }
 
         final int pos = m_buffer.position();
         m_buffer.position(0);

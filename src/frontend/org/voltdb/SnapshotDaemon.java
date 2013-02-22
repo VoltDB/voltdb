@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -71,6 +70,7 @@ import com.google.common.util.concurrent.MoreExecutors;
  *
  */
 public class SnapshotDaemon implements SnapshotCompletionInterest {
+
     private class TruncationSnapshotAttempt {
         private String path;
         private String nonce;
@@ -1515,117 +1515,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private void submitUserSnapshotRequest(final StoredProcedureInvocation invocation, final Connection c) {
         Object params[] = invocation.getParams().toArray();
-        String path = null;
-        String nonce = null;
-        boolean blocking = false;
-        SnapshotFormat format = SnapshotFormat.NATIVE;
 
         try {
             /*
              * Dang it, have to parse the params here to validate
              */
-            if (params.length != 3 && params.length != 1) {
-                throw new Exception("@SnapshotSave requires 3 parameters or alternatively a single JSON blob. " +
-                        "Path, nonce, and blocking");
-            }
+            SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(params);
 
-            if (params[0] == null) {
-                throw new Exception("@SnapshotSave path is null");
-            }
-
-            if (params.length == 3) {
-                if (params[1] == null) {
-                    throw new Exception("@SnapshotSave nonce is null");
-                }
-
-                if (params[2] == null) {
-                    throw new Exception("@SnapshotSave blocking is null");
-                }
-            }
-
-            if (!(params[0] instanceof String)) {
-                throw new Exception("@SnapshotSave path param is a " +
-                        params[0].getClass().getSimpleName() +
-                        " and should be a java.lang.String");
-            }
-
-            if (params.length == 3) {
-                if (!(params[1] instanceof String)) {
-                    throw new Exception("@SnapshotSave nonce param is a " +
-                            params[0].getClass().getSimpleName() +
-                            " and should be a java.lang.String");
-                }
-
-                if (!(params[2] instanceof Byte ||
-                        params[2] instanceof Short ||
-                        params[2] instanceof Integer ||
-                        params[2] instanceof Long)) {
-                    throw new Exception("@SnapshotSave blocking param is a " +
-                            params[0].getClass().getSimpleName() +
-                            " and should be a java.lang.[Byte|Short|Integer|Long]");
-                }
-            }
-
-            if (params.length == 1) {
-                final JSONObject jsObj = new JSONObject((String)params[0]);
-
-                path = jsObj.getString("uripath");
-                if (path.isEmpty()) {
-                    throw new Exception("uripath cannot be empty");
-                }
-                URI pathURI = new URI(path);
-                String pathURIScheme = pathURI.getScheme();
-                if (pathURIScheme == null) {
-                    throw new Exception("URI scheme cannot be null");
-                }
-                if (!pathURIScheme.equals("file")) {
-                    throw new Exception("Unsupported URI scheme " + pathURIScheme +
-                            " if this is a file path then you must prepend file://");
-                }
-                path = pathURI.getPath();
-
-                nonce = jsObj.getString("nonce");
-                if (nonce.isEmpty()) {
-                    throw new Exception("nonce cannot be empty");
-                }
-
-                Object blockingObj = false;
-                if (jsObj.has("block")) {
-                    blockingObj = jsObj.get("block");
-                }
-                if (blockingObj instanceof Number) {
-                    blocking = ((Number)blockingObj).byteValue() == 0 ? false : true;
-                } else if (blockingObj instanceof Boolean) {
-                    blocking = (Boolean)blockingObj;
-                } else if (blockingObj instanceof String) {
-                    blocking = Boolean.valueOf((String)blockingObj);
-                } else {
-                    throw new Exception(blockingObj.getClass().getName() + " is not supported as " +
-                            " type for the block parameter");
-                }
-
-                String formatString = jsObj.optString("format",SnapshotFormat.NATIVE.toString());
-                /*
-                 * Try and be very flexible about what we will accept
-                 * as the type of the block parameter.
-                 */
-                try {
-                    format = SnapshotFormat.getEnumIgnoreCase(formatString);
-                } catch (IllegalArgumentException argException) {
-                    throw new Exception("@SnapshotSave format param is a " + format +
-                            " and should be one of [\"native\" | \"csv\"]");
-                }
-            } else {
-                path = (String)params[0];
-                nonce = (String)params[1];
-                blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
-            }
-
-            if (nonce.contains("-") || nonce.contains(",")) {
-                throw new Exception("Provided nonce " + nonce + " contains a prohibited character (- or ,)");
-            }
-
-            createAndWatchRequestNode(invocation.clientHandle, c, path, nonce, blocking, format, null, false);
+            createAndWatchRequestNode(invocation.clientHandle, c, snapInfo,
+                    false);
         } catch (Exception e) {
             VoltTable tables[] = new VoltTable[0];
             byte status = ClientResponseImpl.GRACEFUL_FAILURE;
@@ -1648,33 +1546,41 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     /**
      * Try to create the ZK request node and watch it if created successfully.
-     *
-     * @param clientHandle
-     * @param c
-     * @param path
-     * @param nonce
-     * @param blocking
-     * @param format
-     * @param data
-     * @throws ForwardClientException
      */
     public void createAndWatchRequestNode(final long clientHandle,
                                           final Connection c,
-                                          String path,
-                                          String nonce,
-                                          boolean blocking,
-                                          SnapshotFormat format,
-                                          String data,
+                                          SnapshotInitiationInfo snapInfo,
                                           boolean notifyChanges) throws ForwardClientException {
         boolean requestExists = false;
-        final String requestId = createRequestNode(path, nonce, blocking, format, data);
+        final String requestId = createRequestNode(snapInfo);
         if (requestId == null) {
             requestExists = true;
         } else {
-            try {
-                registerUserSnapshotResponseWatch(requestId, clientHandle, c, notifyChanges);
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to register ZK watch on snapshot response", true, e);
+            if (!snapInfo.isTruncationRequest()) {
+                try {
+                    registerUserSnapshotResponseWatch(requestId, clientHandle, c, notifyChanges);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Failed to register ZK watch on snapshot response", true, e);
+                }
+            }
+            else {
+                // need to construct a success response of some sort here to indicate the truncation attempt
+                // was successfully attempted
+                VoltTable result = SnapshotSave.constructNodeResultsTable();
+                result.addRow(-1,
+                        CoreUtils.getHostnameOrAddress(),
+                        "",
+                        "SUCCESS",
+                        "SNAPSHOT REQUEST QUEUED");
+                final ClientResponseImpl resp =
+                    new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                            new VoltTable[] {result},
+                            "User-requested truncation snapshot successfully queued for execution.",
+                            clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(resp.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                resp.flattenToBuffer(buf).flip();
+                c.writeStream().enqueue(buf);
             }
         }
 
@@ -1692,31 +1598,26 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     /**
      * Try to create the ZK node to request the snapshot.
      *
-     * @param path can be null if the target is not a file target
-     * @param nonce
-     * @param blocking
-     * @param format
-     * @param data Any data to pass to the snapshot target
+     * @param snapInfo SnapshotInitiationInfo object with the requested snapshot initiation settings
      * @return The request ID if succeeded, otherwise null.
      */
-    private String createRequestNode(String path, String nonce,
-                                     boolean blocking, SnapshotFormat format,
-                                     String data) {
+    private String createRequestNode(SnapshotInitiationInfo snapInfo)
+    {
         String requestId = null;
 
         try {
-            final JSONObject jsObj = new JSONObject();
-            jsObj.put("path", path);
-            jsObj.put("nonce", nonce);
-            jsObj.put("block", blocking);
-            jsObj.put("format", format.toString());
             requestId = java.util.UUID.randomUUID().toString();
-            jsObj.put("requestId", requestId);
-            jsObj.putOpt("data", data);
-            String zkString = jsObj.toString(4);
-            byte zkBytes[] = zkString.getBytes("UTF-8");
+            if (!snapInfo.isTruncationRequest()) {
+                final JSONObject jsObj = snapInfo.getJSONObjectForZK();
+                jsObj.put("requestId", requestId);
+                String zkString = jsObj.toString(4);
+                byte zkBytes[] = zkString.getBytes("UTF-8");
 
-            m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
+            else {
+                m_zk.create(VoltZK.request_truncation_snapshot, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
         } catch (KeeperException.NodeExistsException e) {
             return null;
         } catch (Exception e) {

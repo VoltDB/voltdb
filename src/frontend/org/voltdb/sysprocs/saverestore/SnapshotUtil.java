@@ -62,6 +62,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -1017,7 +1018,9 @@ public class SnapshotUtil {
                                        final SnapshotFormat format,
                                        final String data,
                                        final SnapshotResponseHandler handler,
-                                       final boolean notifyChanges) {
+                                       final boolean notifyChanges)
+    {
+        final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
         final Connection c = new Connection() {
             @Override
@@ -1122,8 +1125,7 @@ public class SnapshotUtil {
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
                     try {
                         if (!hasRequested) {
-                            sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking,
-                                                         format, data, notifyChanges);
+                            sd.createAndWatchRequestNode(clientHandle, c, snapInfo, notifyChanges);
                             hasRequested = true;
                         }
 

@@ -18,7 +18,7 @@
 
 HOUR=`date +%H`
 if [ $USER = "test" ] && ( [ $HOUR -ge 22 ] || [ $HOUR -le 7 ] ); then
-   for H in volt{3{a,b,c,d,e,f},7{b,c,d},5{b,c,d},12{b,c,d,e,f}}
+   for H in volt{3{a,b,c,d,e,f,g,h,i},7{b,c,d},5{b,c,d},12{b,c,d,e,f}}
    do
       if [ $HOSTNAME = $H ]; then
         SUDO=sudo
