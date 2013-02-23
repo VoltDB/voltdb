@@ -50,7 +50,7 @@ public class TestClientFeatures extends TestCase {
     {
         try {
             CatalogBuilder catBuilder = new CatalogBuilder();
-            catBuilder.addSchema(getClass().getResource("clientfeatures.ddl"));
+            catBuilder.addSchema(getClass().getResource("clientfeatures.sql"));
             catBuilder.addProcedures(ArbitraryDurationProc.class);
 
             boolean success = catBuilder.compile(Configuration.getPathToCatalogForTest("timeouts.jar"));
@@ -124,14 +124,14 @@ public class TestClientFeatures extends TestCase {
 
         // build a catalog with a ton of indexes so catalog update will be slow
         CatalogBuilder builder = new CatalogBuilder();
-        builder.addSchema(getClass().getResource("clientfeatures-wellindexed.ddl"));
+        builder.addSchema(getClass().getResource("clientfeatures-wellindexed.sql"));
         builder.addProcedures(ArbitraryDurationProc.class);
         byte[] catalogToUpdate = builder.compileToBytes();
         assert(catalogToUpdate != null);
 
         // make a copy of the table from ddl for loading (shouldn't have to do this)
         VoltTable t = TableHelper.quickTable("indexme (pkey:bigint, " +
-        		                                      "c01:varchar63, " +
+                                                      "c01:varchar63, " +
                                                       "c02:varchar63, " +
                                                       "c03:varchar63, " +
                                                       "c04:varchar63, " +
