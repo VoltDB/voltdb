@@ -133,7 +133,6 @@ class ChDir(object):
             debug('Changing back to directory "%s"...' % self.olddir)
             os.chdir(self.olddir)
 
-# http://code.activestate.com/recipes/208993-compute-relative-path-from-one-directory-to-anothe
 def relpath(p1, p2):
     '''Calculate the relative path between two directories.'''
     (common, l1, l2) = commonpath(os.path.realpath(p1).split(os.path.sep),
@@ -261,7 +260,8 @@ Description: %(description)s
             pkgrelease  = 1,
             arch        = 'x86_64',
             summary     = self.summary,
-            license     = self.license
+            license     = self.license,
+            prefix      = '/usr/share'
             )
 
         self.rpm_control_template = '''\
@@ -281,6 +281,7 @@ Provides: voltdb
 Conflicts: voltdb
 Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
 Requires: java >= 1.6_25, java-devel >= 1.6_25
+Prefix: %(prefix)s
 
 BuildRoot: %%{_tmppath}/%%{name}-%%{version}-%%{release}
 
@@ -311,27 +312,17 @@ drives business value.
 %%include myfiles
 
 %%post
-ln -s /usr/share/%%{name}-%%{version}/bin/dragent       /usr/bin
-ln -s /usr/share/%%{name}-%%{version}/bin/voltadmin     /usr/bin
-ln -s /usr/share/%%{name}-%%{version}/bin/sqlcmd        /usr/bin
-ln -s /usr/share/%%{name}-%%{version}/bin/exporttofile  /usr/bin
-ln -s /usr/share/%%{name}-%%{version}/bin/voltdb        /usr/bin
-ln -s /usr/share/%%{name}-%%{version}/bin/csvloader     /usr/bin
-ln -s /usr/share/%%{name}-%%{version}/bin/voltcompiler  /usr/bin
+%%include postcmd
+ln -sf %%{prefix}/%%{name}-%%{version} %%{prefix}/voltdb
 
 %%preun
-rm -f /usr/bin/dragent
-rm -f /usr/bin/voltadmin
-rm -f /usr/bin/sqlcmd
-rm -f /usr/bin/exporttofile
-rm -f /usr/bin/voltdb
-rm -f /usr/bin/csvloader
-rm -f /usr/bin/voltcompiler
+unlink %%{prefix}/voltdb
+%%include preuncmd
 
 %%postun
 # remove voltdb directory tree
 if [ -n "%%{name}-%%{version}" ]; then
-    rm -rf /usr/share/%%{name}-%%{version}
+    rm -rf %%{prefix}/%%{name}-%%{version}
 fi
 
 %%changelog
@@ -566,6 +557,9 @@ def debian():
 
 def rpm():
 
+    installdir = os.path.join("usr","share")
+    installbin = os.path.join(os.sep, "usr","bin")
+
     blddir = os.path.join(meta.build_root, 'rpmbuild')
     meta.options.prefix = blddir
     if os.path.exists(meta.build_root):
@@ -595,16 +589,24 @@ def rpm():
 
     # stage the voltdb distribution files where rpmbuild needs them
     buildroot = os.path.join(blddir, "tmp", voltdb_build)
-    #shutil.copytree(volt_root+"/..", os.path.join(buildroot, "usr", "share"), symlinks=False, ignore=None)
-    shutil.copytree(volt_root, os.path.join(buildroot, "usr", "share", voltdb_dist), symlinks=False, ignore=None)
+    voltdb_prefix = os.path.join(buildroot, installdir, voltdb_dist)
+    shutil.copytree(volt_root, voltdb_prefix, symlinks=False, ignore=None)
 
     # make a list of the files that rpmbuild will package
     # only FILES that go into the rpm should be listed
     # watch out for spaces and special characters in the filenames, hence the quotes
+    # also spit out command lists for the %post and %preun sections
+    # that will link/unlink the binaries from /usr/bin
     with ChDir(buildroot):
         with open(os.path.join(blddir, "SPECS", "myfiles"), 'w') as fout:
-            for l in pipe_cmd("find", ".", "-type", "f"):
-                fout.write("\"%s\"\n" % string.lstrip(l, '.'))
+            with open(os.path.join(blddir, "SPECS", "postcmd"), 'w') as pout:
+                with open(os.path.join(blddir, "SPECS", "preuncmd"), 'w') as uout:
+                    for l in pipe_cmd("find", ".", "-type", "f"):
+                        fout.write("\"%s\"\n" % string.lstrip(l, '.'))
+                        if l.startswith(os.path.join(installdir, voltdb_dist, 'bin'), 2):
+                            pout.write("ln -sf /%s %s\n" % (os.path.relpath(l, buildroot), installbin))
+                            uout.write("unlink %s\n" % os.path.join(installbin,
+                                os.path.relpath(l, os.path.join(buildroot, installdir, voltdb_dist, 'bin'))))
 
     # make an empty SOURCE tarball to satisfy rpmbuild's need to build something from source
     rpm_sources = os.path.join(blddir, "SOURCES")
@@ -670,14 +672,14 @@ def get_distribution_version(dist_dir):
         info('Reading buildstring.txt from "%s"...' % jars[0])
         # see http://bugs.python.org/issue5511 Zipfile() with "with" fixed in python 2.7
         # changed so it will work with python2.6 only for convenience
-        # with ZipFile(jars[0]) as zip:
-        #    with zip.open('buildstring.txt') as f:
         zip = ZipFile(jars[0])
         f = zip.open('buildstring.txt')
         version = f.readline().strip().split()[0]
         assert version is not None
     except (IOError, OSError, KeyError), e:
         abort('Error reading buildstring.txt from "%s".' % jars[0], e)
+    finally:
+        f.close()
     return version
 
 #### Get the version number from a source tree
