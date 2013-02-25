@@ -48,7 +48,7 @@ public class ParameterConverter {
         if (param == null ||
             param == VoltType.NULL_STRING_OR_VARBINARY ||
             param == VoltType.NULL_DECIMAL ||
-            (param instanceof String && ((String)param).equals("\\N") )) {
+            (param instanceof String && ((String)param).equals(VoltTable.CSV_NULL) )) {
             if (isPrimitive) {
                 VoltType type = VoltType.typeFromClass(paramType);
                 switch (type) {
@@ -94,7 +94,8 @@ public class ParameterConverter {
         }
 
         if (isArray != pclass.isArray()) {
-            throw new Exception("Array / Scalar parameter mismatch");
+            throw new Exception(String.format("Array / Scalar parameter mismatch (%s to %s)",
+                    pclass.getName(), paramType.getName()));
         }
 
         if (isArray) {
