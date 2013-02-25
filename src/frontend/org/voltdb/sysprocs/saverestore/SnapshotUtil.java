@@ -30,6 +30,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -61,6 +62,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -91,7 +93,8 @@ public class SnapshotUtil {
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
-        InstanceId instanceId)
+        InstanceId instanceId,
+        long timestamp)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -109,6 +112,8 @@ public class SnapshotUtil {
                 stringer.object();
                 stringer.key("version").value(1);
                 stringer.key("txnId").value(txnId);
+                stringer.key("timestamp").value(timestamp);
+                stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -1013,7 +1018,9 @@ public class SnapshotUtil {
                                        final SnapshotFormat format,
                                        final String data,
                                        final SnapshotResponseHandler handler,
-                                       final boolean notifyChanges) {
+                                       final boolean notifyChanges)
+    {
+        final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
         final Connection c = new Connection() {
             @Override
@@ -1118,8 +1125,7 @@ public class SnapshotUtil {
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
                     try {
                         if (!hasRequested) {
-                            sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking,
-                                                         format, data, notifyChanges);
+                            sd.createAndWatchRequestNode(clientHandle, c, snapInfo, notifyChanges);
                             hasRequested = true;
                         }
 
@@ -1148,8 +1154,8 @@ public class SnapshotUtil {
                         try {
                             Thread.sleep(5000);
                         } catch (InterruptedException e1) {}
-                        new VoltLogger("HOST").warn("Partition detection was unable to submit a snapshot request" +
-                                                     "because one already existed. Retrying.");
+                        new VoltLogger("SNAPSHOT").warn("Partition detection was unable to submit a snapshot request" +
+                                "because one already existed. Retrying.");
                         continue;
                     } catch (InterruptedException ignore) {}
                 }
@@ -1162,5 +1168,11 @@ public class SnapshotUtil {
         ThreadFactory factory = CoreUtils.getThreadFactory("Snapshot Request - " + nonce);
         Thread workThread = factory.newThread(work);
         workThread.start();
+    }
+
+    public static String formatHumanReadableDate(long timestamp) {
+        SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING + "z");
+        sdf.setTimeZone(VoltDB.VOLT_TIMEZONE);
+        return sdf.format(new Date(timestamp));
     }
 }

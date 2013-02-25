@@ -52,10 +52,6 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="JOIN">
-        <level value="INFO"/>
-    </logger -->
-
     <!-- logger name="COMPILER">
         <level value="INFO"/>
     </logger -->
@@ -81,6 +77,14 @@
     </logger -->
 
     <!-- logger name="REJOIN">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="SNAPSHOT">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="GC">
         <level value="INFO"/>
     </logger -->
 

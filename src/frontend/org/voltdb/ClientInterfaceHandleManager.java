@@ -159,6 +159,10 @@ public class ClientInterfaceHandleManager
                 return super.findHandle(ciHandle);
             }
             @Override
+            synchronized Iv2InFlight removeHandle(long ciHandle) {
+                return super.removeHandle(ciHandle);
+            }
+            @Override
             synchronized long getOutstandingTxns() {
                 return super.getOutstandingTxns();
             }
@@ -301,7 +305,7 @@ public class ClientInterfaceHandleManager
             Iv2InFlight inFlight = perPartDeque.pollFirst();
             if (inFlight.m_ciHandle < ciHandle) {
                 // lost txn, do something eventually
-                tmLog.info("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
+                tmLog.debug("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
                         " for partition: " + partitionId + " while searching for handle " +
                         ciHandle);
                 ClientResponseImpl errorResponse =
@@ -319,7 +323,7 @@ public class ClientInterfaceHandleManager
             }
             else if (inFlight.m_ciHandle > ciHandle) {
                 // we've gone too far, need to jam this back into the front of the deque and run away.
-                tmLog.error("CI clientData lookup missing handle: " + ciHandle
+                tmLog.debug("CI clientData lookup missing handle: " + ciHandle
                         + ". Next expected client data handle is: " + inFlight.m_ciHandle);
                 perPartDeque.addFirst(inFlight);
                 break;
@@ -330,7 +334,59 @@ public class ClientInterfaceHandleManager
                 return inFlight;
             }
         }
-        tmLog.error("Unable to find Client data for client interface handle: " + ciHandle);
+        tmLog.debug("Unable to find Client data for client interface handle: " + ciHandle);
+        return null;
+    }
+
+    /** Remove a specific handle without destroying any handles ordered before it */
+    Iv2InFlight removeHandle(long ciHandle)
+    {
+        assert(!shouldCheckThreadIdAssertion() || m_expectedThreadId == Thread.currentThread().getId());
+        //Check read only encoded bit
+        final boolean readOnly = getReadBit(ciHandle);
+        //Remove read only encoding so comparison works
+        ciHandle = unsetReadBit(ciHandle);
+
+        // Shouldn't see any reads in this path, since the whole point of this
+        // method is to remove writes during replay which aren't going to get
+        // done.  However, this is logically correct, so go ahead and allow it.
+        Iv2InFlight inflight = m_shortCircuitReads.remove(ciHandle);
+        if (inflight != null) {
+            m_acg.reduceBackpressure(inflight.m_messageSize);
+            m_outstandingTxns--;
+            return inflight;
+        }
+
+        /*
+         * Not a short circuit read, check the partition specific
+         * queue of handles
+         */
+        int partitionId = getPartIdFromHandle(ciHandle);
+        PartitionData partitionStuff = m_partitionStuff.get(partitionId);
+        if (partitionStuff == null) {
+            // whoa, bad
+            tmLog.error("Unable to find handle list for partition: " + partitionId);
+            return null;
+        }
+
+        final Deque<Iv2InFlight> perPartDeque = readOnly ? partitionStuff.m_reads : partitionStuff.m_writes;
+        Iterator<Iv2InFlight> iter = perPartDeque.iterator();
+        while (iter.hasNext()) {
+            Iv2InFlight inFlight = iter.next();
+            if (inFlight.m_ciHandle > ciHandle) {
+                // we've gone too far, this handle doesn't exist
+                tmLog.error("CI clientData lookup for remove missing handle: " + ciHandle
+                        + ". Next expected client data handle is: " + inFlight.m_ciHandle);
+                break;
+            }
+            else if (inFlight.m_ciHandle == ciHandle) {
+                m_acg.reduceBackpressure(inFlight.m_messageSize);
+                m_outstandingTxns--;
+                iter.remove();
+                return inFlight;
+            }
+        }
+        tmLog.error("Unable to find Client data to remove client interface handle: " + ciHandle);
         return null;
     }
 

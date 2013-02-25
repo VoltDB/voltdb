@@ -11,10 +11,14 @@ _value[int64] _value[int64] _value[int64] _value[int64]
 
 -- alias fun
 -- ticket 231
-SELECT -3, @optional_fn(_variable + 5) AS NUMSUM FROM @from_tables WHERE NUMSUM > @cmp_type
-SELECT -2, @optional_fn(_variable) + 5 AS NUMSUM FROM @from_tables WHERE NUMSUM > @cmp_type
-SELECT -1, @optional_fn(_variable + 5) AS NUMSUM FROM @from_tables ORDER BY NUMSUM
-SELECT 0, @optional_fn(_variable) + 5 AS NUMSUM FROM @from_tables ORDER BY NUMSUM
+SELECT -8, _variable[@arg] FROM @from_tables WHERE @optional_fn(__[@arg] + 5   )        > @cmp_type
+SELECT -7, _variable[@arg] FROM @from_tables WHERE @optional_fn(__[@arg]       ) + 5    > @cmp_type
+SELECT -6, @optional_fn(_variable + 5   )        NUMSUM FROM @from_tables ORDER BY NUMSUM
+SELECT -5, @optional_fn(_variable       ) + 5    NUMSUM FROM @from_tables ORDER BY NUMSUM
+SELECT -4, _variable[@arg] FROM @from_tables WHERE @optional_fn(__[@arg] + 5.25)        > @cmp_type
+SELECT -3, _variable[@arg] FROM @from_tables WHERE @optional_fn(__[@arg]       ) + 5.25 > @cmp_type
+SELECT -2, @optional_fn(_variable + 5.25)        NUMSUM FROM @from_tables ORDER BY NUMSUM
+SELECT -1, @optional_fn(_variable       ) + 5.25 NUMSUM FROM @from_tables ORDER BY NUMSUM
 
 -- cover some select WHERE expressions not covered by the basic templates
 SELECT 1, * FROM @from_tables WHERE @optional_fn(_variable) _cmp _value[float]
@@ -80,8 +84,9 @@ SELECT 19, @optional_fn(_variable[@GB]), _agg(@optional_fn2(_variable)) FROM @fr
 SELECT _agg[@OP](_variable[@VA]) AS Q20, _agg[@OP](_variable[@VB]), __[@OP](@optional_fn(__[@VA]) _math @optional_fn2(__[@VB])) FROM @from_tables
 SELECT SUM(DISTINCT @optional_fn(_variable) _math @optional_fn2(_variable)) AS Q21 FROM @from_tables
 -- Can't use this statement because HSQL gets ridiculous answers for cases like impossible positive values for "SELECT SUM(DISTINCT (NUM - ABS(NUM))) AS Q22 FROM P1;"
---SELECT SUM(DISTINCT @optional_fn(_variable _math @optional_fn2(_variable))) AS Q22 FROM @from_tables, so simplify
-  SELECT SUM(DISTINCT @optional_fn(_variable _math              (_variable))) AS Q22 FROM @from_tables
+--SELECT SUM(DISTINCT @optional_fn(_variable _math                @optional_fn2(_variable))) AS Q22 FROM @from_tables, so simplify
+-- ALSO avoid multiplication-induced overflows and division-induced discrepencies with HSQL -- which does floating point math for integer division!
+  SELECT SUM(DISTINCT @optional_fn(_variable _pick[<options=+,->]                 _variable )) AS Q22 FROM @from_tables
 
 -- ENG-199.  Substituting this generic version
 -- with a few specific dual aggregates that will be different
@@ -110,7 +115,7 @@ SELECT @optional_fn(_variable / 0.0) AS Q31 FROM @from_tables
 -- compare two cols
 -- UPDATE @from_tables SET @assign_col = @assign_type WHERE @optional_fn(_variable) _cmp @optional_fn(_variable)
 -- comparison with set expression
-UPDATE @from_tables SET @assign_col = @assign_col _math _value[int:0,5] WHERE @optional_fn(_variable) _cmp @cmp_type
+UPDATE @from_tables SET @assign_col = @assign_col _math _value[int:1,3] WHERE @optional_fn(_variable) _cmp @cmp_type
 
 -- Save more exhaustive LIKE testing for advanced-strings.sql.
 -- This is mostly just to catch the error of applying different forms of LIKE to non-strings.

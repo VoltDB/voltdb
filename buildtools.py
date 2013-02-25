@@ -27,6 +27,8 @@ class BuildContext:
         self.NMFLAGS = "-n"    # specialized by platform in build.py
         self.COVERAGE = False
         self.PROFILE = False
+        self.CC = "gcc"
+        self.CXX = "g++"
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -36,6 +38,14 @@ class BuildContext:
                 self.COVERAGE = True
             if arg in ["PROFILE"]:
                 self.PROFILE = True
+        # Exec build.local if available, a python script provided with this
+        # BuildContext object as the update-able symbol BUILD.  These example
+        # build.local lines force the use of clang instead of gcc/g++.
+        #   BUILD.CC = "clang"
+        #   BUILD.CXX = "clang"
+        buildLocal = os.path.join(os.path.dirname(__file__), "build.local")
+        if os.path.exists(buildLocal):
+            execfile(buildLocal, dict(BUILD = self))
 
 def readFile(filename):
     "read a file into a string"
@@ -157,8 +167,8 @@ def buildMakefile(CTX):
         tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
 
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
-    makefile.write("CC = gcc\n")
-    makefile.write("CXX = g++\n")
+    makefile.write("CC = %s\n" % CTX.CC)
+    makefile.write("CXX = %s\n" % CTX.CXX)
     makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))

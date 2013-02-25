@@ -243,7 +243,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return getPlanNodeType() + "[" + m_id + "]";
     }
 
-    public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         assert(estimates != null);
 
         m_outputColumnHints.clear();
@@ -251,15 +251,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // recursively compute and collect stats from children
         for (AbstractPlanNode child : m_children) {
-            boolean result = child.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
-            assert(result);
+            child.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
             m_outputColumnHints.addAll(child.m_outputColumnHints);
             m_estimatedOutputTupleCount += child.m_estimatedOutputTupleCount;
 
             stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedOutputTupleCount);
         }
-
-        return true;
     }
 
     /**

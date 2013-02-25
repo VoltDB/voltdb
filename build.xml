@@ -264,6 +264,9 @@ PRIMARY ENTRY POINTS
     <!-- add tools and support files -->
     <dist_tools_macro distlabel="-tools" />
 
+    <!-- add README.voltadmin -->
+    <copy todir="${dist.dir}-tools" file="${base.dir}/README.voltadmin"/>
+
     <!-- LICENSE isn't handled by dist_tools_macro -->
     <copy todir="${dist.dir}-tools" file="${dist.dir}/LICENSE"/>
 
@@ -673,9 +676,6 @@ DISTRIBUTION
             <fileset dir="${base.dir}">
                 <include name="version.txt" />
             </fileset>
-            <fileset dir="${base.dir}">
-                <include name="README.voltadmin" />
-            </fileset>
         </copy>
         <copy todir="${dist.dir}@{distlabel}/bin">
             <fileset dir="${base.dir}/bin">
@@ -891,10 +891,8 @@ JAR BUILDING
             <include name="org/opencsv_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
-            <include name="org/apache/jute_voltpatches/**" />
+            <include name="org/apache/**" />
             <include name="vanilla/**" />
-            <include name="org/apache/zookeeper_voltpatches/**" />
-            <include name="org/apache/spearce_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
             <include name="org/voltdb/**" />
@@ -1825,18 +1823,59 @@ TEST CASES
   </findbugs>
 </target>
 
+<property name="ptdefaultconfigs" value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549"
+  description = "default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
     <property name="plannertester.dir" value="tests/scripts/plannertester"/>
-    <fileset id="plannertester.configs" dir="${plannertester.dir}/config" includes="**"/>
     <echo message="Running from ${plannertester.dir}"/>
+
+    <condition property="user" value="${env.USER}" else="anonymous">
+        <isset property="env.USER"/>
+    </condition>
+    <condition property="config" value="${config}" else="${ptdefaultconfigs}">
+        <isset property="config"/>
+    </condition>
+    <condition property="workpath" value="${workpath}" else="/tmp/${user}/plannertester/">
+        <isset property="workpath"/>
+    </condition>
+    <condition property="reportpath" value="${reportpath}" else="reports/">
+        <isset property="reportpath"/>
+    </condition>
 
     <java classname="org.voltdb.planner.plannerTester"
           classpathref="project.classpath"
           dir="${plannertester.dir}"
           failonerror="true"
           fork="true">
-        <arg line="-C=config/voter,config/voltkv,config/voltcache -d -s -e -cs -r=reports -sp=plan-voter,plan-voltkv,plan-voltcache"/>
+        <arg line="-C=${config} -dv -r=${reportpath} -sp=${workpath}"/>
+    </java>
+</target>
+
+<target name="plannertestrefresh" description="Run plannertester baseline refresh">
+    <property name="plannertester.dir" value="tests/scripts/plannertester"/>
+    <fileset id="plannertester.configs" dir="${plannertester.dir}/config" includes="**"/>
+    <echo message="Running from ${plannertester.dir}"/>
+
+    <condition property="user" value="${env.USER}" else="anonymous">
+        <isset property="env.USER"/>
+    </condition>
+    <condition property="config" value="${config}" else="${ptdefaultconfigs}">
+        <isset property="config"/>
+    </condition>
+    <condition property="workpath" value="${workpath}" else="/tmp/${user}/plannertester/">
+        <isset property="workpath"/>
+    </condition>
+    <condition property="reportpath" value="${reportpath}" else="reports/">
+        <isset property="reportpath"/>
+    </condition>
+
+    <java classname="org.voltdb.planner.plannerTester"
+          classpathref="project.classpath"
+          dir="${plannertester.dir}"
+          failonerror="true"
+          fork="true">
+        <arg line="-C=${config} -sv -r=${reportpath} -sp=${workpath} "/>
     </java>
 </target>
 

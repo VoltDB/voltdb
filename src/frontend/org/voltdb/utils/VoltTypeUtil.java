@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -45,7 +46,7 @@ public abstract class VoltTypeUtil {
 
     public static Object getRandomValue(VoltType type, int maxSize, double nullFraction, Random r) {
         assert(type != null);
-        assert(maxSize > 0);
+        assert(maxSize >= 0);
         assert(nullFraction >= 0.0);
         assert(nullFraction <= 1.0);
         assert(r != null);
@@ -82,6 +83,7 @@ public abstract class VoltTypeUtil {
             // STRINGS
             // --------------------------------
             case STRING: {
+                assert(maxSize > 0);
                 int size = r.nextInt(maxSize) + 1;
                 char[] str = new char[size];
                 for (int ctr = 0; ctr < size; ctr++) {
@@ -102,6 +104,7 @@ public abstract class VoltTypeUtil {
             // VARBINARY
             // --------------------------------
             case VARBINARY: {
+                assert(maxSize > 0);
                 int size = r.nextInt(maxSize) + 1;
                 byte[] bytestr = new byte[size];
                 r.nextBytes(bytestr);
@@ -114,6 +117,14 @@ public abstract class VoltTypeUtil {
             case TIMESTAMP: {
                 long timestamp = r.nextInt((int)(VoltTypeUtil.DATE_STOP - VoltTypeUtil.DATE_START)) + VoltTypeUtil.DATE_START;
                 ret = new TimestampType(Long.valueOf(timestamp * 1000));
+                break;
+            }
+            // --------------------------------
+            // DECIMAL
+            // --------------------------------
+            case DECIMAL: {
+                BigDecimal bd = new BigDecimal(r.nextDouble());
+                ret = bd.setScale(12, BigDecimal.ROUND_HALF_EVEN);
                 break;
             }
             // --------------------------------

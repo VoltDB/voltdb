@@ -23,32 +23,19 @@
 
 package org.voltdb.planner;
 
-import junit.framework.TestCase;
+import org.voltdb.compiler.DeterminismMode;
 
-public class TestDeterminism extends TestCase {
-
-    private PlannerTestAideDeCamp aide;
+public class TestDeterminism extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestDeterminism.class.getResource("testplans-determinism-ddl.sql"),
-                                         "testdeterminism");
-
-/* It makes little sense to force tables to be non-replicated but specify no partitioning column.
- * It breaks join planning, anyway.
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
- */
+        final boolean planForSinglePartitionFalse = false;
+        setupSchema(TestDeterminism.class.getResource("testplans-determinism-ddl.sql"), "testdeterminism", planForSinglePartitionFalse);
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     /**
@@ -59,33 +46,28 @@ public class TestDeterminism extends TestCase {
      */
     private void assertPlanDeterminism(String sql, boolean order, boolean content)
     {
-        CompiledPlan cp = null;
-        try {
-            cp = aide.compileAdHocPlan(sql);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(cp != null);
+        assertPlanDeterminism(sql, order, content, DeterminismMode.SAFER);
+    }
+
+    private void assertPlanDeterminism(String sql, boolean order, boolean content, DeterminismMode detMode)
+    {
+        CompiledPlan cp = compileAdHocPlan(sql, detMode);
         assertTrue(order == cp.isOrderDeterministic());
         assertTrue(content == cp.isContentDeterministic());
         assertTrue(cp.isContentDeterministic() || ! cp.isOrderDeterministic());
         assertTrue(cp.isOrderDeterministic() || (null != cp.nondeterminismDetail()));
     }
 
-    private void assertPlanDeterminism(String sql, boolean order, boolean content, boolean alsoTryWithLimit) {
-        assertPlanDeterminism(sql, order, content);
+    private void assertPlanDeterminism(String sql, boolean order, boolean content, boolean alsoTryWithLimit, DeterminismMode detMode) {
+        assertPlanDeterminism(sql, order, content, detMode);
         if (alsoTryWithLimit) {
             String limitedStatement = sql.replaceAll(";", " LIMIT 2;");
-            assertPlanDeterminism(limitedStatement, order, order);
+            assertPlanDeterminism(limitedStatement, order, order, detMode);
         }
+    }
 
+    private void assertPlanDeterminism(String sql, boolean order, boolean content, boolean alsoTryWithLimit) {
+        assertPlanDeterminism(sql, order, content, alsoTryWithLimit, DeterminismMode.SAFER);
     }
 
     // TODO: Replace w/ true when/if indexscan is forced, and forced to order results.
@@ -101,8 +83,11 @@ public class TestDeterminism extends TestCase {
     // TODO replace references to these with opposite constants as cases get support
     public void testDeterminismOfSelectStar() {
         assertPlanDeterminism("select * from ttree;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select * from tunique;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select * from tpk;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // if a table has a unique index... it can be used to scan in a r/w transaction
+        assertPlanDeterminism("select * from tunique;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select * from tpk;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select * from tunique;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
+        assertPlanDeterminism("select * from tpk;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
     }
 
     public void testDeterminismOfJoin() {
@@ -163,8 +148,11 @@ public class TestDeterminism extends TestCase {
         assertPlanDeterminism("select a, b, c from ttree;", LATER_TO_BE_ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
         // non-prefix keys don't help
         assertPlanDeterminism("select b, c from ttree;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select a from tunique;", LATER_TO_BE_ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
-        assertPlanDeterminism("select a from tpk;", LATER_TO_BE_ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // if a table has a unique index... it can be used to scan in a r/w transaction
+        assertPlanDeterminism("select a from tunique;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select a from tpk;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.SAFER);
+        assertPlanDeterminism("select a from tunique;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
+        assertPlanDeterminism("select a from tpk;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT, DeterminismMode.FASTER);
         // hashes don't help, here
         assertPlanDeterminism("select a, b from thash;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
         assertPlanDeterminism("select a, b, c from thash;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);

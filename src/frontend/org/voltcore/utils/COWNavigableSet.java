@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.NavigableSet;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ForwardingNavigableSet;
 import com.google.common.collect.ImmutableSortedSet;
 
@@ -32,6 +33,15 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
         m_set = new AtomicReference<ImmutableSortedSet<E>>(ImmutableSortedSet.<E>of());
     }
 
+    public COWNavigableSet(Collection<E> c) {
+        Preconditions.checkNotNull(c);
+        ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
+        for (E e : c) {
+            builder.add(e);
+        }
+        m_set = new AtomicReference<ImmutableSortedSet<E>>(builder.build());
+    }
+
     @Override
     protected NavigableSet<E> delegate() {
         return m_set.get();
@@ -41,8 +51,12 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
     public E pollFirst() {
         while (true) {
             ImmutableSortedSet<E> snapshot = m_set.get();
-            E first = snapshot.first();
-            if (first == null) return null;
+            E first = null;
+            if (snapshot.size() > 0) {
+               first = snapshot.first();
+            } else {
+                return null;
+            }
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
             builder.addAll(snapshot.tailSet(first, false));
             if (m_set.compareAndSet(snapshot, builder.build())) {
@@ -55,8 +69,12 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
     public E pollLast() {
         while (true) {
             ImmutableSortedSet<E> snapshot = m_set.get();
-            E last = snapshot.last();
-            if (last == null) return null;
+            E last = null;
+            if (snapshot.size() > 0) {
+                last = snapshot.last();
+            } else {
+                return null;
+            }
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
             builder.addAll(snapshot.headSet(last, false));
             if (m_set.compareAndSet(snapshot, builder.build())) {

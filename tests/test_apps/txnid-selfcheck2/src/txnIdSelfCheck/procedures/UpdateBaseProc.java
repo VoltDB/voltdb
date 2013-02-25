@@ -51,7 +51,7 @@ public class UpdateBaseProc extends VoltProcedure {
     }
 
     protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt getAdHocData,
-                                 byte cid, long rid, byte[] value)
+                                 byte cid, long rid, byte[] value, byte shouldRollback)
     {
         voltQueueSQL(getCIDData, cid);
         voltQueueSQL(getAdHocData);
@@ -66,8 +66,8 @@ public class UpdateBaseProc extends VoltProcedure {
         long cnt = 0;
 
         // read data modified by AdHocMayhemThread for later insertion
-        final long adhocInc = adhoc.fetchRow(0).getLong("inc");
-        final long adhocJmp = adhoc.fetchRow(0).getLong("jmp");
+        final long adhocInc = adhoc.getRowCount() > 0 ? adhoc.fetchRow(0).getLong("inc") : 0;
+        final long adhocJmp = adhoc.getRowCount() > 0 ? adhoc.fetchRow(0).getLong("jmp") : 0;
 
         // compute the cheesy checksum of all of the table's contents based on
         // this cid to subsequently store in the new row
@@ -78,7 +78,7 @@ public class UpdateBaseProc extends VoltProcedure {
         if (rowCount != 0) {
             VoltTableRow row = data.fetchRow(0);
             cnt = row.getLong("cnt") + 1;
-            prevtxnid = row.getLong("prevtxnid");
+            prevtxnid = row.getLong("txnid");
             prevrid = row.getLong("rid");
         }
 
@@ -95,11 +95,21 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
         voltQueueSQL(cleanUp, cid, cnt - 10);
         voltQueueSQL(getCIDData, cid);
-        return voltExecuteSQL();
+        VoltTable[] retval = voltExecuteSQL();
+        // Verify that our update happened.  The client is reporting data errors on this validation
+        // not seen by the server, hopefully this will bisect where they're occuring.
+        data = retval[2];
+        validateCIDData(data, getClass().getName());
+
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+
+        return retval;
     }
 
     @SuppressWarnings("deprecation")
-    protected VoltTable[] doWorkInProcAdHoc(byte cid, long rid, byte[] value) {
+    protected VoltTable[] doWorkInProcAdHoc(byte cid, long rid, byte[] value, byte shouldRollback) {
         voltQueueSQLExperimental("SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;", cid);
         voltQueueSQLExperimental("SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
         VoltTable[] results = voltExecuteSQL();
@@ -113,8 +123,8 @@ public class UpdateBaseProc extends VoltProcedure {
         long cnt = 0;
 
         // read data modified by AdHocMayhemThread for later insertion
-        final long adhocInc = adhoc.fetchRow(0).getLong("inc");
-        final long adhocJmp = adhoc.fetchRow(0).getLong("jmp");
+        final long adhocInc = adhoc.getRowCount() > 0 ? adhoc.fetchRow(0).getLong("inc") : 0;
+        final long adhocJmp = adhoc.getRowCount() > 0 ? adhoc.fetchRow(0).getLong("jmp") : 0;
 
         // compute the cheesy checksum of all of the table's contents based on
         // this cid to subsequently store in the new row
@@ -125,7 +135,7 @@ public class UpdateBaseProc extends VoltProcedure {
         if (rowCount != 0) {
             VoltTableRow row = data.fetchRow(0);
             cnt = row.getLong("cnt") + 1;
-            prevtxnid = row.getLong("prevtxnid");
+            prevtxnid = row.getLong("txnid");
             prevrid = row.getLong("rid");
         }
 
@@ -142,7 +152,17 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQLExperimental("INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, new byte[0]);
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
         voltQueueSQLExperimental("SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;", cid);
-        return voltExecuteSQL();
+        VoltTable[] retval = voltExecuteSQL();
+        // Verify that our update happened.  The client is reporting data errors on this validation
+        // not seen by the server, hopefully this will bisect where they're occuring.
+        data = retval[2];
+        validateCIDData(data, getClass().getName());
+
+        if (shouldRollback != 0) {
+            throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
+
+        return retval;
     }
 
     public static void validateCIDData(VoltTable data, String callerId) {
@@ -159,7 +179,8 @@ public class UpdateBaseProc extends VoltProcedure {
             if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
                 throw new VoltAbortException(callerId +
                         " cnt values are not consecutive" +
-                        " for cid " + cid);
+                        " for cid " + cid + ". Got " + cntValue +
+                        ", prev was: " + prevCnt);
             }
             prevCnt = cntValue;
         }

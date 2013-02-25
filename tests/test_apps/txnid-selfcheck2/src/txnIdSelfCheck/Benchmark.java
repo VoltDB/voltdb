@@ -34,10 +34,13 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.io.FileWriter;
+import java.io.IOException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -46,6 +49,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcCallException;
@@ -68,6 +72,10 @@ public class Benchmark {
     Timer timer;
     // Benchmark start time
     long benchmarkStartTS;
+    // Timer for writing the checkpoint count for apprunner
+    Timer checkpointTimer;
+
+    final TxnId2RateLimiter rateLimiter;
 
     final TxnId2PayloadProcessor processor;
 
@@ -135,6 +143,12 @@ public class Benchmark {
         @Option(desc = "Timeout that kills the client if progress is not made.")
         int progresstimeout = 120;
 
+        @Option(desc = "Whether or not to disable adhoc writes.")
+        boolean disableadhoc = false;
+
+        @Option(desc = "Maximum TPS rate for benchmark.")
+        int ratelimit = 100000;
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -146,6 +160,7 @@ public class Benchmark {
             if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
             if (threadoffset > 127) exitWithMessageAndUsage("threadoffset must be within [0, 127]");
             if (threadoffset + threads > 128) exitWithMessageAndUsage("max thread offset must be <= 127");
+            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
 
             if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
             if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
@@ -217,6 +232,12 @@ public class Benchmark {
 
             activeConnections.decrementAndGet();
 
+            // reset the connection id so the client will connect to a recovered cluster
+            // this is a bit of a hack
+            if (connectionsLeft == 0) {
+                ((ClientImpl) client).resetInstanceId();
+            }
+
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
                 log.warn(String.format("Connection to %s:%d was lost.", hostname, port));
@@ -242,6 +263,7 @@ public class Benchmark {
     Benchmark(Config config) {
         this.config = config;
 
+        rateLimiter = new TxnId2RateLimiter(config.ratelimit);
         processor = new TxnId2PayloadProcessor(4, config.minvaluesize, config.maxvaluesize,
                                          config.entropy, Integer.MAX_VALUE, config.usecompression);
 
@@ -305,6 +327,31 @@ public class Benchmark {
     }
 
     /**
+     * Create a Timer task to write the value of the txnCount to
+     * disk to make it available to apprunner
+     */
+    private void schedulePeriodicCheckpoint() throws IOException {
+        checkpointTimer = new Timer();
+        TimerTask checkpointTask = new TimerTask() {
+            @Override
+            public void run() {
+                String count = String.valueOf(txnCount.get()) + "\n";
+                try {
+                    FileWriter writer = new FileWriter(".checkpoint", false);
+                    writer.write(count);
+                    writer.close();
+                }
+                catch (Exception e) {
+                    System.err.println("Caught exception writing checkpoint file.");
+               }
+            }
+        };
+        checkpointTimer.scheduleAtFixedRate(checkpointTask,
+                                  1 * 1000,
+                                  1 * 1000);
+    }
+
+    /**
      * Create a Timer task to display performance data on the Vote procedure
      * It calls printStatistics() every displayInterval seconds
      */
@@ -356,6 +403,9 @@ public class Benchmark {
         log.info(" Setup & Initialization");
         log.info(HORIZONTAL_RULE);
 
+        // Only rate limit the ClientThread for now. Share the same permits for all type of invocations.
+        Semaphore permits = rateLimiter.addType(0, 1);
+
         final int cidCount = 128;
         final long[] lastRid = new long[cidCount];
         for (int i = 0; i < lastRid.length; i++) {
@@ -400,6 +450,7 @@ public class Benchmark {
         // reset progress tracker
         lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();
+        schedulePeriodicCheckpoint();
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -416,19 +467,24 @@ public class Benchmark {
         readThread.start();
 
         AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client);
-        adHocMayhemThread.start();
+        if (!config.disableadhoc) {
+            adHocMayhemThread.start();
+        }
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
-            ClientThread clientThread = new ClientThread(cid, txnCount, client, processor);
+            ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits);
             clientThread.start();
             clientThreads.add(clientThread);
         }
 
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
 
-        while (benchmarkEndTime > System.currentTimeMillis()) {
+        long currentTs = System.currentTimeMillis();
+        while (benchmarkEndTime > currentTs) {
+            rateLimiter.updateActivePermits(currentTs);
             Thread.yield();
+            currentTs = System.currentTimeMillis();
         }
 
         replicatedLoader.shutdown();
@@ -448,6 +504,7 @@ public class Benchmark {
 
         // cancel periodic stats printing
         timer.cancel();
+        checkpointTimer.cancel();
 
         shutdown.set(true);
         es.shutdownNow();

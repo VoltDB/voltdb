@@ -26,15 +26,10 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -42,25 +37,13 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 
-@RunWith(value = Parameterized.class)
 public class TestAdHocQueries extends AdHocQueryTester {
-
-
-    @Parameters
-    public static Collection<Object[]> useIv2() {
-        return Arrays.asList(new Object[][] {{false}, {true}});
-    }
 
     Client m_client;
     private final static boolean m_debug = false;
-
-    protected final boolean m_useIv2;
-    public TestAdHocQueries(boolean useIv2)
-    {
-        m_useIv2 = useIv2;
-    }
 
     // IMPORTANT SAFETY TIP
     // The use of junit parameters to toggle between iv2 and non-iv2 cases
@@ -68,7 +51,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testProcedureAdhoc() throws Exception {
-        VoltDB.Configuration config = setUpSPDB(m_useIv2);
+        VoltDB.Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
 
         try {
@@ -81,10 +64,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             m_client.callProcedure("@AdHoc", "insert into PARTED1 values ( 23, 3 )");
 
-            /*
-             * Test that a basic multipartition select works as well as a parameterized
-             * query (it's in the procedure)
-             */
+            //
+            // Test that a basic multipartition select works as well as a parameterized
+            // query (it's in the procedure)
+            //
             VoltTable results[] = m_client.callProcedure(
                     "executeSQLSP",
                     23,
@@ -101,9 +84,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     results[0].advanceRow());
             assertTrue(results[1].advanceRow());
 
-            /*
-             * Validate that doing an insert from a RO procedure fails
-             */
+            //
+            // Validate that doing an insert from a RO procedure fails
+            //
             try {
                 m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5)");
                 fail("Procedure call should not have succeded");
@@ -114,9 +97,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("Procedure call should not have succeded");
             } catch (ProcCallException e) {}
 
-            /*
-             * Validate one sql statement per
-             */
+            //
+            // Validate one sql statement per
+            //
             try {
                 m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5); select * from parted1;");
                 fail("Procedure call should not have succeded");
@@ -128,15 +111,15 @@ public class TestAdHocQueries extends AdHocQueryTester {
             } catch (ProcCallException e) {}
 
 
-            /*
-             * Validate that an insert does work from a write procedure
-             */
+            //
+            // Validate that an insert does work from a write procedure
+            //
             m_client.callProcedure("executeSQLSPWRITE", 24, "insert into parted1 values (24, 4);");
             m_client.callProcedure("executeSQLMPWRITE", 25, "insert into parted1 values (25, 5);");
 
-            /*
-             * Query the inserts and all the rest do it once for singe and once for multi
-             */
+            //
+            // Query the inserts and all the rest do it once for singe and once for multi
+            //
             results = m_client.callProcedure("executeSQLMP", 24, "select * from parted1 order by partval").getResults();
 
             assertEquals( 3, results[0].getRowCount());
@@ -211,7 +194,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testSP() throws Exception {
-        VoltDB.Configuration config = setUpSPDB(m_useIv2);
+        VoltDB.Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
 
         try {
@@ -318,7 +301,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testSimple() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1, m_useIv2);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
         try {
             env.setUp();
 
@@ -392,7 +375,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testAdHocBatches() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, m_useIv2);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
         try {
             env.setUp();
             Batcher batcher = new Batcher(env);
@@ -463,7 +446,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testXopenSubSelectQueries() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, m_useIv2);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
         String adHocQuery;
         try {
             env.setUp();
@@ -479,7 +462,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on subquery");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support subqueries") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
             }
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
                     "           FROM STAFF \n" +
@@ -491,7 +474,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on exists clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support EXISTS clause") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
             }
             adHocQuery = "   SELECT STAFF.EMPNAME \n" +
                     "          FROM STAFF \n" +
@@ -508,7 +491,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on subquery");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support subqueries") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
             }
             adHocQuery = "SELECT FIRST1.EMPNUM, SECOND2.EMPNUM \n" +
                     "          FROM STAFF FIRST1, STAFF SECOND2 \n" +
@@ -519,7 +502,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on selfjoin");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support self joins") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support self joins") > 0);
             }
             adHocQuery = "SELECT PNAME \n" +
                     "         FROM PROJ \n" +
@@ -530,7 +513,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on static clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("does not yet support where clauses containing only constants") > 0);
+                assertTrue(pcex.getMessage().indexOf("does not support WHERE clauses containing only constants") > 0);
             }
             adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
             try {
@@ -598,7 +581,45 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on having clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support the HAVING clause") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support the HAVING clause") > 0);
+            }
+        }
+        finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
+    // ENG-4151 a bad string timestamp insert causes various errors when a constraint
+    // violation occurs because the bad timestamp column is serialized as a string
+    // instead of a timestamp. It was mis-handling the timestamp datatype during planning.
+    // Testing with ad hoc because that's how it was discovered.
+    public void testTimestampInsert() throws Exception {
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 1, 1, 0);
+        try {
+            env.setUp();
+            // bad timestamp should result in a clean compiler error.
+            try {
+                String sql = "INSERT INTO TS_CONSTRAINT_EXCEPTION VALUES ('aaa','{}');";
+                env.m_client.callProcedure("@AdHoc", sql).getResults();
+                fail("Compilation should have failed.");
+            }
+            catch(ProcCallException e) {
+                assertTrue(e.getMessage().contains("Error compiling"));
+            }
+            // double insert should cause a clean constraint violation, not a crash
+            try {
+                String sql = String.format("INSERT INTO TS_CONSTRAINT_EXCEPTION VALUES ('%s','{}');",
+                                           new TimestampType().toString());
+                VoltTable modCount = env.m_client.callProcedure("@AdHoc", sql).getResults()[0];
+                assertEquals(1, modCount.getRowCount());
+                assertEquals(1, modCount.asScalarLong());
+                modCount = env.m_client.callProcedure("@AdHoc", sql).getResults()[0];
+                assertEquals(1, modCount.getRowCount());
+                assertEquals(1, modCount.asScalarLong());
+            }
+            catch(ProcCallException e) {
+                assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
             }
         }
         finally {
@@ -685,7 +706,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         Client m_client = null;
 
         TestEnv(String pathToCatalog, String pathToDeployment,
-                     int siteCount, int hostCount, int kFactor, boolean enableIv2) {
+                     int siteCount, int hostCount, int kFactor) {
             m_builder = new VoltProjectBuilder();
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +
@@ -755,6 +776,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                            "CREATE PROCEDURE Insert AS INSERT into BLAH values (?, ?, ?);\n" +
                                            "CREATE PROCEDURE InsertWithDate AS \n" +
                                            "  INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);\n" +
+                                           "\n" +
+                                           "CREATE TABLE TS_CONSTRAINT_EXCEPTION\n" +
+                                           "  (TS TIMESTAMP UNIQUE NOT NULL,\n" +
+                                           "   COL1 VARCHAR(2048)); \n" +
                                            "");
 
                 // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
@@ -768,7 +793,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
                                          BackendTarget.NATIVE_EE_JNI,
                                          LocalCluster.FailureState.ALL_RUNNING,
-                                         m_debug, false, enableIv2);
+                                         m_debug);
             m_cluster.setHasLocalServer(false);
             boolean success = m_cluster.compile(m_builder);
             assert(success);

@@ -155,9 +155,6 @@ public enum ExpressionType {
                                        ExpressionType.OPERATOR_MINUS);
         ExpressionType.name_lookup.put("subtract".intern(),
                                        ExpressionType.OPERATOR_MINUS);
-        // Let's try this and see what happens
-        ExpressionType.name_lookup.put("simplecolumn".intern(),
-                                       ExpressionType.VALUE_TUPLE);
     }
 
     public int getValue() {

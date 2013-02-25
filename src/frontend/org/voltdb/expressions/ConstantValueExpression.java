@@ -232,6 +232,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (m_valueType != VoltType.NUMERIC) {
             return;
         }
+        if (columnType == null || columnType == VoltType.NUMERIC) {
+            return;
+        }
         if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL)) {
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
@@ -259,6 +262,30 @@ public class ConstantValueExpression extends AbstractValueExpression {
         }
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+    }
+
+    /**
+     * Tests if the value is a string that would represent a prefix if used as a LIKE pattern.
+     * The value must end in a '%' and contain no other wildcards ('_' or '%').
+     **/
+    public boolean isPrefixPatternString() {
+        String patternString = getValue();
+        int length = patternString.length();
+        if (length == 0) {
+            return false;
+        }
+        // '_' is not allowed.
+        int disallowedWildcardPos = patternString.indexOf('_');
+        if (disallowedWildcardPos != -1) {
+            return false;
+        }
+        int firstWildcardPos = patternString.  indexOf('%');
+        // Indexable filters have only a trailing '%'.
+        // NOTE: not bothering to check for silly synonym patterns with multiple trailing '%'s.
+        if (firstWildcardPos != length-1) {
+            return false;
+        }
+        return true;
     }
 
 }

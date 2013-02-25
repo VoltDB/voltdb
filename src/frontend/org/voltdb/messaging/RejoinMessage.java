@@ -31,6 +31,8 @@ public class RejoinMessage extends VoltMessage {
     public static enum Type {
         INITIATION,           // start live rejoin.
         INITIATION_COMMUNITY, // start community rejoin.
+        INITIATION_RESPONSE,  // For IV2, the site must return the HSId of
+                              // the SnapshotDataSink mailbox
 
         // The following are response types
         REQUEST_RESPONSE, // sent from the rejoining site to itself
@@ -40,6 +42,9 @@ public class RejoinMessage extends VoltMessage {
 
     private Type m_type;
     private long m_snapshotTxnId = -1; // snapshot txnId
+    private long m_snapshotSinkHSId = -1;
+    private long m_masterHSId = -1;
+    private String m_snapshotNonce = null;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -58,12 +63,46 @@ public class RejoinMessage extends VoltMessage {
         m_type = type;
     }
 
+    /**
+     * For IV2, INITIATION and INITIATION_COMMUNITY pass the nonce used by the
+     * Iv2RejoinCoordinator to the site.
+     */
+    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce)
+    {
+        this(sourceHSId, type);
+        assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
+        m_snapshotNonce = snapshotNonce;
+    }
+
+    /**
+     * For IV2, INITIATION_RESPONSE is used by the local site to inform the
+     * Iv2RejoinCoordinator of the HSId of the SnapshotDataSink is has created
+     */
+    public RejoinMessage(long sourceHSId, long masterHSId, long sinkHSId)
+    {
+        this(sourceHSId, Type.INITIATION_RESPONSE);
+        m_masterHSId = masterHSId;
+        m_snapshotSinkHSId = sinkHSId;
+    }
+
     public Type getType() {
         return m_type;
     }
 
     public long getSnapshotTxnId() {
         return m_snapshotTxnId;
+    }
+
+    public String getSnapshotNonce() {
+        return m_snapshotNonce;
+    }
+
+    public long getMasterHSId() {
+        return m_masterHSId;
+    }
+
+    public long getSnapshotSinkHSId() {
+        return m_snapshotSinkHSId;
     }
 
     @Override
@@ -78,21 +117,11 @@ public class RejoinMessage extends VoltMessage {
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
-        m_sourceHSId = buf.getLong();
-        m_type = Type.values()[buf.get()];
-        m_snapshotTxnId = buf.getLong();
-
-        assert(buf.capacity() == buf.position());
+        throw new RuntimeException("RejoinMessage: Attempted to deserialize a message which should never need it.");
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(VoltDbMessageFactory.REJOIN_RESPONSE_ID);
-        buf.putLong(m_sourceHSId);
-        buf.put((byte) m_type.ordinal());
-        buf.putLong(m_snapshotTxnId);
-
-        assert(buf.capacity() == buf.position());
-        buf.limit(buf.position());
+        throw new RuntimeException("RejoinMessage: Attempted to serialize a message which should never need it.");
     }
 }

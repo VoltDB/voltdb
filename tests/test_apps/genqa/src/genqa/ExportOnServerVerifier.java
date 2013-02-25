@@ -24,7 +24,6 @@ package genqa;
 
 import genqa.procedures.SampleRecord;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -34,7 +33,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -66,8 +64,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.types.TimestampType;
-
-import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 import com.google.common.base.Throwables;
 import com.jcraft.jsch.ChannelSftp;
@@ -314,18 +310,20 @@ public class ExportOnServerVerifier {
 
         long ttlVerified = 0;
 
-        //checkForMoreExportFiles();
-        Pair<CSVReader, Runnable> csvPair = openNextExportFile();
-        CSVReader csv = csvPair.getFirst();
+        Pair<BufferedReader, Runnable> csvPair = openNextExportFile();
+        BufferedReader csv = csvPair.getFirst();
 
-        //checkForMoreClientFiles();
         BufferedReader txnIdReader = openNextClientFile();
+        String exportLine;
         String[] row;
         boolean quit = false;
         boolean more_rows = true;
         boolean more_txnids = true;
-        boolean expect_export_eof = false;
+        ValidationErr expect_export_eof = null;
         int emptyRemovalCycles = 0;
+
+        PrintWriter txout = gzipWriterTo("read-exported-transactions.gz");
+        PrintWriter vfout = gzipWriterTo("verified-exported-transactions.gz");
 
         while (!quit)
         {
@@ -333,10 +331,10 @@ public class ExportOnServerVerifier {
             int dcount = 0;
             while ((dcount < 10000 || !more_txnids) && more_rows)
             {
-                row = csv.readNext();
-                if (row == null)
+                exportLine = csv.readLine();
+                if (exportLine == null)
                 {
-                    expect_export_eof = false;
+                    expect_export_eof = null;
                     csvPair.getSecond().run();
                     csvPair = openNextExportFile();
                     if (csvPair == null)
@@ -348,16 +346,20 @@ public class ExportOnServerVerifier {
                     else
                     {
                         csv = csvPair.getFirst();
-                        row = csv.readNext();
+                        exportLine = csv.readLine();
                     }
                 }
-                else if (expect_export_eof)
+                else if (expect_export_eof != null)
                 {
-                    throw new ValidationErr("previously logged row had unexpected number of columns");
+                    throw expect_export_eof;
                 }
 
-                verifyRow(row);
-                expect_export_eof = row.length < 29;
+                row = RoughCSVTokenizer.tokenize(exportLine);
+
+                expect_export_eof = verifyRow(row);
+
+                if (row.length < 8) continue; // row[6] txnId row[7] rowId
+
                 dcount++;
                 /*
                  * client dude has only confirmed tx id, on asynch writer exceptions we
@@ -368,18 +370,16 @@ public class ExportOnServerVerifier {
                     System.out.println("Verified " + ttlVerified + " rows.");
                 }
 
-                Integer partition = Integer.parseInt(row[3]);
-                Long rowTxnId = Long.parseLong(row[6]);
-                Long rowId = Long.parseLong(row[7]);
+                Integer partition = Integer.parseInt(row[3].trim());
+                Long rowTxnId = Long.parseLong(row[6].trim());
+                Long rowId = Long.parseLong(row[7].trim());
+
+                txout.printf("%d:%d\n", rowTxnId, rowId);
 
                 Long previous = m_rowTxnIds.get(partition).put(rowTxnId,rowId);
                 if (previous != null)
                 {
                     System.out.println("WARN Duplicate TXN ID in export stream: " + rowTxnId);
-                }
-                else
-                {
-                    //System.out.println("Added txnId: " + rowTxnId + " to outstanding export");
                 }
             }
 
@@ -437,7 +437,7 @@ public class ExportOnServerVerifier {
 
             System.out.println("!_!_! DEBUG !_!_! read " + dcount + " client txid records");
 
-            if (matchClientTxnIds(null))
+            if (matchClientTxnIds(vfout))
             {
                 emptyRemovalCycles = 0;
             }
@@ -480,13 +480,28 @@ public class ExportOnServerVerifier {
         }
     }
 
+    private PrintWriter gzipWriterTo( String fileName) throws IOException
+    {
+        File fh = new File(fileName);
+        if (fh.exists() && fh.isFile() && fh.canRead() && fh.canWrite())
+        {
+            fh.delete();
+        }
+        PrintWriter out =
+                new PrintWriter(
+                        new OutputStreamWriter(
+                                new GZIPOutputStream(
+                                        new FileOutputStream(fh), 16384)));
+        return out;
+    }
+
     void verifySkinny() throws Exception
     {
 
         long ttlVerified = 0;
 
         //checkForMoreExportFiles();
-        Pair<BufferedReader, Runnable> csvPair = openNextSkinnyExportFile();
+        Pair<BufferedReader, Runnable> csvPair = openNextExportFile();
         BufferedReader csv = csvPair.getFirst();
 
         //checkForMoreClientFiles();
@@ -499,35 +514,8 @@ public class ExportOnServerVerifier {
         boolean expect_export_eof = false;
         int emptyRemovalCycles = 0;
 
-        File transactionsReadFH = new File("read-exported-transactions.gz");
-        if (   transactionsReadFH.exists()
-            && transactionsReadFH.isFile()
-            && transactionsReadFH.canRead()
-            && transactionsReadFH.canWrite()
-            )
-        {
-            transactionsReadFH.delete();
-        }
-        File verifiedTransactionsdFH = new File("verified-exported-transactions.gz");
-        if (   verifiedTransactionsdFH.exists()
-                && verifiedTransactionsdFH.isFile()
-                && verifiedTransactionsdFH.canRead()
-                && verifiedTransactionsdFH.canWrite()
-                )
-        {
-            verifiedTransactionsdFH.delete();
-        }
-
-        PrintWriter txout =
-                new PrintWriter(
-                        new OutputStreamWriter(
-                                new GZIPOutputStream(
-                                        new FileOutputStream(transactionsReadFH), 16384)));
-        PrintWriter vfout =
-                new PrintWriter(
-                        new OutputStreamWriter(
-                                new GZIPOutputStream(
-                                        new FileOutputStream(verifiedTransactionsdFH), 16384)));
+        PrintWriter txout = gzipWriterTo("read-exported-transactions.gz");
+        PrintWriter vfout = gzipWriterTo("verified-exported-transactions.gz");
 
         while (!quit)
         {
@@ -540,7 +528,7 @@ public class ExportOnServerVerifier {
                 {
                     expect_export_eof = false;
                     csvPair.getSecond().run();
-                    csvPair = openNextSkinnyExportFile();
+                    csvPair = openNextExportFile();
                     if (csvPair == null)
                     {
                         System.out.println("No more export rows");
@@ -601,7 +589,7 @@ public class ExportOnServerVerifier {
                             ", while export record says " + partition);
                 }
 
-                txout.printf("%d:%d\n", rowValues[0], rowValues[1]);
+                txout.printf("%d:%d\n", rowTxnId, rowId);
 
                 if (! m_rowTxnIds.containsKey(partition)) {
                     System.err.println("ERROR: unknow partition " + partition + " in txnid " + rowTxnId);
@@ -1034,37 +1022,7 @@ public class ExportOnServerVerifier {
         m_clientFiles = checkForMoreFiles(m_clientPath, m_clientFiles, acceptor, comparator);
     }
 
-    private Pair<CSVReader, Runnable> openNextExportFile() throws Exception
-    {
-        if (m_exportFiles.isEmpty())
-        {
-            checkForMoreExportFiles();
-        }
-        Pair<ChannelSftp, String> remotePair = m_exportFiles.poll();
-        if (remotePair == null) return null;
-        final ChannelSftp channel = remotePair.getFirst();
-        final String path = remotePair.getSecond();
-        System.out.println(
-                "Opening export file: " + channel.getSession().getHost() + "@" + path);
-        InputStream dataIs = channel.get(path);
-        BufferedInputStream bis = new BufferedInputStream(dataIs, 4096 * 32);
-        Reader reader = new InputStreamReader(bis);
-        final CSVReader exportreader = new CSVReader(reader);
-        Runnable r = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    exportreader.close();
-                    channel.rm(path);
-                } catch (Exception e) {
-                    Throwables.propagate(e);
-                }
-            }
-        };
-        return Pair.of( exportreader, r);
-    }
-
-    Pair<BufferedReader,Runnable> openNextSkinnyExportFile() throws Exception
+    Pair<BufferedReader,Runnable> openNextExportFile() throws Exception
     {
         if (m_exportFiles.isEmpty())
         {
@@ -1269,15 +1227,12 @@ public class ExportOnServerVerifier {
         }
     }
 
-    private void verifyRow(String[] row) throws ValidationErr {
-
+    ValidationErr verifyRow(String[] row) throws ValidationErr
+    {
         if (row.length < 29)
         {
             System.err.println("ERROR: Unexpected number of columns for the following row:\n\t" + Arrays.toString(row));
-            if (row.length < 8) {
-                error("row column count", row.length, 29);
-            }
-            return;
+            return new ValidationErr("number of columns", row.length, 29);
         }
 
         int col = 5; // col offset is always pre-incremented.
@@ -1290,51 +1245,51 @@ public class ExportOnServerVerifier {
         // col 8
         Byte rowid_group = Byte.parseByte(row[++col]);
         if (rowid_group != valid.rowid_group)
-            error("rowid_group invalid", rowid_group, valid.rowid_group);
+            return error("rowid_group invalid", rowid_group, valid.rowid_group);
 
         // col 9
         Byte type_null_tinyint = row[++col].equals("NULL") ? null : Byte.valueOf(row[col]);
         if ( (!(type_null_tinyint == null && valid.type_null_tinyint == null)) &&
              (!type_null_tinyint.equals(valid.type_null_tinyint)) )
-            error("type_not_null_tinyint", type_null_tinyint, valid.type_null_tinyint);
+            return error("type_not_null_tinyint", type_null_tinyint, valid.type_null_tinyint);
 
         // col 10
         Byte type_not_null_tinyint = Byte.valueOf(row[++col]);
         if (!type_not_null_tinyint.equals(valid.type_not_null_tinyint))
-            error("type_not_null_tinyint", type_not_null_tinyint, valid.type_not_null_tinyint);
+            return error("type_not_null_tinyint", type_not_null_tinyint, valid.type_not_null_tinyint);
 
         // col 11
         Short type_null_smallint = row[++col].equals("NULL") ? null : Short.valueOf(row[col]);
         if ( (!(type_null_smallint == null && valid.type_null_smallint == null)) &&
              (!type_null_smallint.equals(valid.type_null_smallint)) )
-            error("type_null_smallint", type_null_smallint, valid.type_null_smallint);
+            return error("type_null_smallint", type_null_smallint, valid.type_null_smallint);
 
         // col 12
         Short type_not_null_smallint = Short.valueOf(row[++col]);
         if (!type_not_null_smallint.equals(valid.type_not_null_smallint))
-            error("type_null_smallint", type_not_null_smallint, valid.type_not_null_smallint);
+            return error("type_null_smallint", type_not_null_smallint, valid.type_not_null_smallint);
 
         // col 13
         Integer type_null_integer = row[++col].equals("NULL") ? null : Integer.valueOf(row[col]);
         if ( (!(type_null_integer == null && valid.type_null_integer == null)) &&
              (!type_null_integer.equals(valid.type_null_integer)) )
-            error("type_null_integer", type_null_integer, valid.type_null_integer);
+            return error("type_null_integer", type_null_integer, valid.type_null_integer);
 
         // col 14
         Integer type_not_null_integer = Integer.valueOf(row[++col]);
         if (!type_not_null_integer.equals(valid.type_not_null_integer))
-            error("type_not_null_integer", type_not_null_integer, valid.type_not_null_integer);
+            return error("type_not_null_integer", type_not_null_integer, valid.type_not_null_integer);
 
         // col 15
         Long type_null_bigint = row[++col].equals("NULL") ? null : Long.valueOf(row[col]);
         if ( (!(type_null_bigint == null && valid.type_null_bigint == null)) &&
              (!type_null_bigint.equals(valid.type_null_bigint)) )
-            error("type_null_bigint", type_null_bigint, valid.type_null_bigint);
+            return error("type_null_bigint", type_null_bigint, valid.type_null_bigint);
 
         // col 16
         Long type_not_null_bigint = Long.valueOf(row[++col]);
         if (!type_not_null_bigint.equals(valid.type_not_null_bigint))
-            error("type_not_null_bigint", type_not_null_bigint, valid.type_not_null_bigint);
+            return error("type_not_null_bigint", type_not_null_bigint, valid.type_not_null_bigint);
 
         // The ExportToFileClient truncates microseconds. Construct a TimestampType here
         // that also truncates microseconds.
@@ -1352,24 +1307,24 @@ public class ExportOnServerVerifier {
             System.out.println("CSV value: " + row[col]);
             System.out.println("EXP value: " + valid.type_null_timestamp.toString());
             System.out.println("ACT value: " + type_null_timestamp.toString());
-            error("type_null_timestamp", type_null_timestamp, valid.type_null_timestamp);
+            return error("type_null_timestamp", type_null_timestamp, valid.type_null_timestamp);
         }
 
         // col 18
         TimestampType type_not_null_timestamp = new TimestampType(row[++col]);
         if (!type_not_null_timestamp.equals(valid.type_not_null_timestamp))
-            error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
+            return error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
 
         // col 19
         BigDecimal type_null_decimal = row[++col].equals("NULL") ? null : new BigDecimal(row[col]);
         if ( (!(type_null_decimal == null && valid.type_null_decimal == null)) &&
              (!type_null_decimal.equals(valid.type_null_decimal)) )
-            error("type_null_decimal", type_null_decimal, valid.type_null_decimal);
+            return error("type_null_decimal", type_null_decimal, valid.type_null_decimal);
 
         // col 20
         BigDecimal type_not_null_decimal = new BigDecimal(row[++col]);
         if (!type_not_null_decimal.equals(valid.type_not_null_decimal))
-            error("type_not_null_decimal", type_not_null_decimal, valid.type_not_null_decimal);
+            return error("type_not_null_decimal", type_not_null_decimal, valid.type_not_null_decimal);
 
         // col 21
         Double type_null_float = row[++col].equals("NULL") ? null : Double.valueOf(row[col]);
@@ -1381,51 +1336,53 @@ public class ExportOnServerVerifier {
             System.out.println("ACT value: " + type_null_float);
             System.out.println("valueOf():" + Double.valueOf("-2155882919525625344.000000000000"));
             System.out.flush();
-            error("type_null_float", type_null_float, valid.type_null_float);
+            return error("type_null_float", type_null_float, valid.type_null_float);
         }
 
         // col 22
         Double type_not_null_float = Double.valueOf(row[++col]);
         if (!type_not_null_float.equals(valid.type_not_null_float))
-            error("type_not_null_float", type_not_null_float, valid.type_not_null_float);
+            return error("type_not_null_float", type_not_null_float, valid.type_not_null_float);
 
         // col 23
         String type_null_varchar25 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar25 == valid.type_null_varchar25 ||
               type_null_varchar25.equals(valid.type_null_varchar25)))
-            error("type_null_varchar25", type_null_varchar25, valid.type_null_varchar25);
+            return error("type_null_varchar25", type_null_varchar25, valid.type_null_varchar25);
 
         // col 24
         String type_not_null_varchar25 = row[++col];
         if (!type_not_null_varchar25.equals(valid.type_not_null_varchar25))
-            error("type_not_null_varchar25", type_not_null_varchar25, valid.type_not_null_varchar25);
+            return error("type_not_null_varchar25", type_not_null_varchar25, valid.type_not_null_varchar25);
 
         // col 25
         String type_null_varchar128 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar128 == valid.type_null_varchar128 ||
               type_null_varchar128.equals(valid.type_null_varchar128)))
-            error("type_null_varchar128", type_null_varchar128, valid.type_null_varchar128);
+            return error("type_null_varchar128", type_null_varchar128, valid.type_null_varchar128);
 
         // col 26
         String type_not_null_varchar128 = row[++col];
         if (!type_not_null_varchar128.equals(valid.type_not_null_varchar128))
-            error("type_not_null_varchar128", type_not_null_varchar128, valid.type_not_null_varchar128);
+            return error("type_not_null_varchar128", type_not_null_varchar128, valid.type_not_null_varchar128);
 
         // col 27
         String type_null_varchar1024 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar1024 == valid.type_null_varchar1024 ||
               type_null_varchar1024.equals(valid.type_null_varchar1024)))
-            error("type_null_varchar1024", type_null_varchar1024, valid.type_null_varchar1024);
+            return error("type_null_varchar1024", type_null_varchar1024, valid.type_null_varchar1024);
 
         // col 28
         String type_not_null_varchar1024 = row[++col];
         if (!type_not_null_varchar1024.equals(valid.type_not_null_varchar1024))
-            error("type_not_null_varchar1024", type_not_null_varchar1024, valid.type_not_null_varchar1024);
+            return error("type_not_null_varchar1024", type_not_null_varchar1024, valid.type_not_null_varchar1024);
+
+        return null;
     }
 
-    private void error(String msg, Object val, Object exp) throws ValidationErr {
+    private ValidationErr error(String msg, Object val, Object exp) throws ValidationErr {
         System.err.println("ERROR: " + msg + " " + val + " " + exp);
-        throw new ValidationErr(msg, val, exp);
+        return new ValidationErr(msg, val, exp);
     }
 
     int m_partitions = 0;
@@ -1476,5 +1433,73 @@ public class ExportOnServerVerifier {
             System.exit(-1);
         }
         System.exit(0);
+    }
+
+    public static class RoughCSVTokenizer {
+
+        private RoughCSVTokenizer() {
+        }
+
+        private static void moveToBuffer(List<String> resultBuffer, StringBuilder buf) {
+            resultBuffer.add(buf.toString());
+            buf.delete(0, buf.length());
+        }
+
+        public static String[] tokenize(String csv) {
+            List<String> resultBuffer = new java.util.ArrayList<String>();
+
+            if (csv != null) {
+                int z = csv.length();
+                Character openingQuote = null;
+                boolean trimSpace = false;
+                StringBuilder buf = new StringBuilder();
+
+                for (int i = 0; i < z; ++i) {
+                    char c = csv.charAt(i);
+                    trimSpace = trimSpace && Character.isWhitespace(c);
+                    if (c == '"' || c == '\'') {
+                        if (openingQuote == null) {
+                            openingQuote = c;
+                            int bi = 0;
+                            while (bi < buf.length()) {
+                                if (Character.isWhitespace(buf.charAt(bi))) {
+                                    buf.deleteCharAt(bi);
+                                } else {
+                                    bi++;
+                                }
+                            }
+                        }
+                        else if (openingQuote == c ) {
+                            openingQuote = null;
+                            trimSpace = true;
+                        }
+                    }
+                    else if (c == '\\') {
+                        if ((z > i + 1)
+                            && ((csv.charAt(i + 1) == '"')
+                                || (csv.charAt(i + 1) == '\\'))) {
+                            buf.append(csv.charAt(i + 1));
+                            ++i;
+                        } else {
+                            buf.append("\\");
+                        }
+                    } else {
+                        if (openingQuote != null) {
+                            buf.append(c);
+                        } else {
+                            if (c == ',') {
+                                moveToBuffer(resultBuffer, buf);
+                            } else {
+                                if (!trimSpace) buf.append(c);
+                            }
+                        }
+                    }
+                }
+                moveToBuffer(resultBuffer, buf);
+            }
+
+            String[] result = new String[resultBuffer.size()];
+            return resultBuffer.toArray(result);
+        }
     }
 }

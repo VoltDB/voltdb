@@ -23,6 +23,8 @@
 
 package txnIdSelfCheck;
 
+import java.util.Random;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -33,6 +35,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.VoltProcedure.VoltAbortException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
@@ -66,8 +69,10 @@ public class ClientThread extends Thread {
     final TxnId2PayloadProcessor m_processor;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicLong m_txnsRun;
+    final Random m_random = new Random();
+    final Semaphore m_permits;
 
-    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor) throws Exception {
+    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits) throws Exception {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
 
         m_type = Type.typeFromId(cid);
@@ -75,6 +80,7 @@ public class ClientThread extends Thread {
         m_client = client;
         m_processor = processor;
         m_txnsRun = txnsRun;
+        m_permits = permits;
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
         String sql2 = String.format("select * from replicated  where cid = %d order by rid desc limit 1", cid);
@@ -96,6 +102,9 @@ public class ClientThread extends Thread {
     }
 
     void runOne() throws Exception {
+        // 1/10th of txns roll back
+        byte shouldRollback = (byte) (m_random.nextInt(10) == 0 ? 1 : 0);
+
         try {
             String procName = null;
             switch (m_type) {
@@ -118,10 +127,23 @@ public class ClientThread extends Thread {
 
             byte[] payload = m_processor.generateForStore().getStoreValue();
 
-            ClientResponse response = m_client.callProcedure(procName,
-                    m_cid,
-                    m_nextRid,
-                    payload);
+            ClientResponse response;
+            try {
+                response = m_client.callProcedure(procName,
+                        m_cid,
+                        m_nextRid,
+                        payload,
+                        shouldRollback);
+            } catch (Exception e) {
+                if (shouldRollback == 0) {
+                    log.warn("ClientThread threw after " + m_txnsRun.get() +
+                            " calls while calling procedure: " + procName +
+                            " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
+                            ", payload: " + payload +
+                            ", shouldRollback: " + shouldRollback);
+                }
+                throw e;
+            }
 
             // fake a proc call exception if we think one should be thrown
             if (response.getStatus() != ClientResponse.SUCCESS) {
@@ -141,11 +163,20 @@ public class ClientThread extends Thread {
                 System.exit(-1);
             }
             VoltTable data = results[2];
-            UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+            try {
+                UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+            }
+            catch (VoltAbortException vae) {
+                log.error("validateCIDData failed on: " + procName + ", shouldRollback: " +
+                        shouldRollback + " data: " + data);
+                throw vae;
+            }
         }
         finally {
-            // ensure rid is incremented no matter what
-            m_nextRid++;
+            // ensure rid is incremented (if not rolled back intentionally)
+            if (shouldRollback == 0) {
+                m_nextRid++;
+            }
         }
     }
 
@@ -154,6 +185,12 @@ public class ClientThread extends Thread {
     }
 
     void handleException(ClientResponseImpl cri, Exception e) {
+        // this is not an error
+        if ((cri.getStatus() == ClientResponse.USER_ABORT) &&
+                cri.getStatusString().contains("EXPECTED ROLLBACK")) {
+            return;
+        }
+        // this implies bad data and is fatal
         if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                 (cri.getStatus() == ClientResponse.USER_ABORT)) {
             log.error("ClientThread had a proc-call exception that indicated bad data", e);
@@ -161,8 +198,8 @@ public class ClientThread extends Thread {
             Benchmark.printJStack();
             System.exit(-1);
         }
+        // other proc call exceptions are logged, but don't stop the thread
         else {
-            // other proc call exceptions are logged, but don't stop the thread
             log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
             log.warn(cri.toJSONString());
 
@@ -183,6 +220,7 @@ public class ClientThread extends Thread {
     public void run() {
         while (m_shouldContinue.get()) {
             try {
+                m_permits.acquire();
                 runOne();
             }
             catch (NoConnectionsException e) {

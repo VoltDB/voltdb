@@ -43,9 +43,11 @@ import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.StatsAgent;
@@ -136,6 +138,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Currently available procedure
     volatile LoadedProcedureSet m_loadedProcedures;
+
+    // Cache the DR gateway here so that we can pass it to tasks as they are reconstructed from
+    // the task log
+    private final PartitionDRGateway m_drGateway;
 
     // Current topology
     int m_partitionId;
@@ -317,7 +323,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
             MemoryStats memStats,
-            String coreBindIds)
+            String coreBindIds,
+            PartitionDRGateway drGateway)
     {
         m_siteId = siteId;
         m_context = context;
@@ -335,6 +342,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
+        m_drGateway = drGateway;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -564,7 +572,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
-                        null, m, null);
+                        null, m, m_drGateway);
                 if (!filter(tibm)) {
                     t.runFromTaskLog(this);
                 }
@@ -588,7 +596,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 // Only complete transactions that are open...
                 if (global_replay_mpTxn != null) {
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
+                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn,
+                            null, m, m_drGateway);
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
@@ -668,10 +677,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void initiateSnapshots(
             Deque<SnapshotTableTask> tasks,
+            List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(m_ee, tasks, targets, txnId, numLiveHosts, exportSequenceNumbers);
     }
 
     /*
@@ -911,7 +921,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void exportAction(boolean syncAction,
-                             int ackOffset,
+                             long ackOffset,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
@@ -963,7 +973,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             exportAction(
                     true,
-                    sequenceNumbers.getFirst().intValue(),
+                    sequenceNumbers.getFirst().longValue(),
                     sequenceNumbers.getSecond(),
                     m_partitionId,
                     catalogTable.getSignature());

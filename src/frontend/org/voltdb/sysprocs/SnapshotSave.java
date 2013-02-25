@@ -51,7 +51,7 @@ import com.google.common.primitives.Longs;
 public class SnapshotSave extends VoltSystemProcedure
 {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSave.class.getName());
-    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     private static final int DEP_saveTest = (int)
         SysProcFragmentId.PF_saveTest | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -139,6 +139,7 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[4] != null);
             assert(params.toArray()[5] != null);
             assert(params.toArray()[6] != null);
+            assert(params.toArray()[7] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
@@ -162,12 +163,13 @@ public class SnapshotSave extends VoltSystemProcedure
             }
 
             String data = (String) params.toArray()[6];
+            final long timestamp = (Long)params.toArray()[7];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
                                                          context.getLastCommittedSpHandle(),
                                                          Longs.toArray(perPartitionTransactionIdsToKeep),
-                                                         data, context, hostname);
+                                                         data, context, hostname, timestamp);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -237,7 +239,7 @@ public class SnapshotSave extends VoltSystemProcedure
                                 + file_path + ", " + file_nonce);
                 final int numSitesSnapshotting = SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.size();
                 if (numSitesSnapshotting > 0) {
-                    HOST_LOG.debug("Snapshot in progress, " +
+                    SNAP_LOG.debug("Snapshot in progress, " +
                             numSitesSnapshotting +
                             " sites are still snapshotting");
                     result.addRow(
@@ -346,7 +348,7 @@ public class SnapshotSave extends VoltSystemProcedure
              * Not going to make this fatal because I don't want people to
              * be blocked from getting their data out via snapshots.
              */
-            HOST_LOG.error(
+            SNAP_LOG.error(
                     "Failed to retrieve per partition transaction ids array from SnapshotDaemon." +
                     "This shouldn't happen and it prevents the snapshot from including transaction ids " +
                     "for partitions that are no longer active in the cluster. Those ids are necessary " +
@@ -359,9 +361,9 @@ public class SnapshotSave extends VoltSystemProcedure
         }
 
         if (format == SnapshotFormat.STREAM) {
-            HOST_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
+            SNAP_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
         } else {
-            HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
+            SNAP_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
         }
 
         ColumnInfo[] error_result_columns = new ColumnInfo[2];
@@ -415,12 +417,12 @@ public class SnapshotSave extends VoltSystemProcedure
             stringer.endObject();
             setAppStatusString(stringer.toString());
         } catch (Exception e) {
-            HOST_LOG.warn(e);
+            SNAP_LOG.warn(e);
         }
 
         final long finishTime = System.currentTimeMillis();
         final long duration = finishTime - startTime;
-        HOST_LOG.info("Snapshot initiation took " + duration + " milliseconds");
+        SNAP_LOG.info("Snapshot initiation took " + duration + " milliseconds");
         return results;
     }
 
@@ -473,7 +475,8 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data);
+        params.setParameters(
+                filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data, System.currentTimeMillis());
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files

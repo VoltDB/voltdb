@@ -1495,6 +1495,9 @@ public class VoltCompiler {
 
             outputStream.println();
 
+            // memoize non-det procs for a warning at the end of the compile
+            ArrayList<Procedure> nonDetProcs = new ArrayList<Procedure>();
+
             for (Procedure p : database.getProcedures()) {
                 if (p.getSystemproc()) {
                     continue;
@@ -1510,12 +1513,20 @@ public class VoltCompiler {
                         seqScanTag = "[Seq] ";
                     }
                     String determinismTag = "";
-                    if (s.getIscontentdeterministic() == false) {
-                        determinismTag = "[NDC] ";
+
+                    // if the proc is a java stored proc that is read&write,
+                    // output determinism warnings
+                    if (p.getHasjava() && (!p.getReadonly())) {
+                        if (s.getIscontentdeterministic() == false) {
+                            determinismTag = "[NDC] ";
+                            nonDetProcs.add(p);
+                        }
+                        else if (s.getIsorderdeterministic() == false) {
+                            determinismTag = "[NDO] ";
+                            nonDetProcs.add(p);
+                        }
                     }
-                    else if (s.getIsorderdeterministic() == false) {
-                        determinismTag = "[NDO] ";
-                    }
+
                     String statementLine;
                     String sqlText = s.getSqltext();
                     sqlText = squeezeWhitespace(sqlText);
@@ -1529,6 +1540,33 @@ public class VoltCompiler {
                 outputStream.println();
             }
             outputStream.println("------------------------------------------");
+
+            //
+            // post-compile determinism warning
+            //
+            if (!nonDetProcs.isEmpty()) {
+
+                outputStream.println(
+                        "\nNON-DETERMINISM WARNING:\n\n" +
+                        "The procedures listed below contain non-deterministic queries.\n");
+
+                for (Procedure p : nonDetProcs) {
+                    outputStream.println("    " + p.getClassname());
+                }
+
+                outputStream.println(
+                        "\nUsing the output of these queries as input to subsequent\n" +
+                        "write queries can result in differences between replicated\n" +
+                        "partitions at runtime, forcing VoltDB to shutdown the cluster.\n" +
+                        "Review the compiler messages above to identify the offending\n" +
+                        "SQL statements (marked as \"[NDO] or [NDC]\").  Add a unique\n" +
+                        "index to the schema or an explicit ORDER BY clause to the\n" +
+                        "query to make these queries deterministic.\n");
+
+                outputStream.println("------------------------------------------");
+            }
+
+
         }
         if (feedbackStream != null) {
             for (Feedback fb : m_warnings) {

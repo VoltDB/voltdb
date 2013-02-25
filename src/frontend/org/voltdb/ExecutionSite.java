@@ -120,7 +120,7 @@ public class ExecutionSite
 implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSnapshotConnection
 {
     private VoltLogger m_txnlog;
-    private final VoltLogger m_rejoinLog = new VoltLogger("JOIN");
+    private final VoltLogger m_rejoinLog = new VoltLogger("REJOIN");
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -864,7 +864,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         // initialize the DR gateway
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -1355,11 +1355,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-            jsStringer.key("hsId").value(hsId);
+            jsStringer.key("streamPairs");
+            jsStringer.object();
+            jsStringer.key(Long.toString(sourceSite)).value(Long.toString(hsId));
+            jsStringer.endObject();
             // make this snapshot only contain data from this site
             m_rejoinLog.info("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
                                " is " + CoreUtils.hsIdToString(sourceSite));
-            jsStringer.key("target_hsid").value(sourceSite);
             jsStringer.endObject();
             data = jsStringer.toString();
         } catch (Exception e) {
@@ -1798,7 +1800,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       new long[0],//this param not used pre-iv2
                                       null,
                                       m_systemProcedureContext,
-                                      CoreUtils.getHostnameOrAddress());
+                                      CoreUtils.getHostnameOrAddress(),
+                                      TransactionIdManager
+                                          .getTimestampFromTransactionId(snapshotMsg.m_roadblockTransactionId));
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty() &&
                 snapshotMsg.crash) {
                 String msg = "Partition detection snapshot completed. Shutting down. " +
@@ -2382,10 +2386,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     @Override
     public void initiateSnapshots(
             Deque<SnapshotTableTask> tasks,
+            List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(ee, tasks, targets, txnId, numLiveHosts, exportSequenceNumbers);
     }
 
     /*
@@ -2914,7 +2919,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public void exportAction(boolean syncAction,
-                             int ackOffset,
+                             long ackOffset,
                              Long sequenceNumber,
                              Integer partitionId,
                              String tableSignature)

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -943,29 +944,47 @@ public class PlanAssembler {
             Table table = m_parsedSelect.tableList.get(0);
 
             // get all of the columns in the sort
-            ArrayList<String> orderColNames = new ArrayList<String>();
-            for (AbstractExpression e : orderByNode.getSortExpressions()) {
-                if (e instanceof TupleValueExpression) {
-                    TupleValueExpression tve = (TupleValueExpression) e;
-                    orderColNames.add(tve.getColumnName());
-                }
-            }
+            List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
 
             // search indexes for one that makes the order by deterministic
             for (Index index : table.getIndexes()) {
-                // skip unique indexes
+                // skip non-unique indexes
                 if (!index.getUnique()) {
                     continue;
                 }
 
-                // get the list of columns in this unique index
-                ArrayList<String> indexColNames = new ArrayList<String>();
-                for (ColumnRef cref : index.getColumns()) {
-                    indexColNames.add(cref.getColumn().getTypeName());
+                // get the list of expressions for the index
+                List<AbstractExpression> indexExpressions = new ArrayList<AbstractExpression>();
+
+                String jsonExpr = index.getExpressionsjson();
+                // if this is a pure-column index...
+                if (jsonExpr.isEmpty()) {
+                    for (ColumnRef cref : index.getColumns()) {
+                        Column col = cref.getColumn();
+                        TupleValueExpression tve = new TupleValueExpression();
+                        tve.setColumnIndex(col.getIndex());
+                        tve.setColumnName(col.getName());
+                        tve.setExpressionType(ExpressionType.VALUE_TUPLE);
+                        tve.setHasAggregate(false);
+                        tve.setTableName(table.getTypeName());
+                        tve.setValueSize(col.getSize());
+                        tve.setValueType(VoltType.get((byte) col.getType()));
+                        indexExpressions.add(tve);
+                    }
+                }
+                // if this is a fancy expression-based index...
+                else {
+                    try {
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                    } catch (JSONException e) {
+                        e.printStackTrace(); // danger will robinson
+                        assert(false);
+                        return null;
+                    }
                 }
 
                 // if the sort covers the index, then it's a unique sort
-                if (orderColNames.containsAll(indexColNames)) {
+                if (orderExpressions.containsAll(indexExpressions)) {
                     orderByNode.setOrderingByUniqueColumns();
                 }
             }
@@ -1007,7 +1026,7 @@ public class PlanAssembler {
                 for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
                     AbstractExpression rootExpr = col.expression;
                     if (rootExpr instanceof AggregateExpression) {
-                        if (((AggregateExpression)rootExpr).m_distinct) {
+                        if (((AggregateExpression)rootExpr).isDistinct()) {
                             canPushDown = false;
                             break;
                         }
@@ -1085,7 +1104,7 @@ public class PlanAssembler {
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        if (containsAggregateExpression || m_parsedSelect.grouped) {
+        if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
             AggregatePlanNode topAggNode;
             //TODO: add "m_parsedSelect.grouped &&" to the preconditions for HashAggregate.
             // Otherwise, a runtime hash is built for nothing -- just to hold a single entry.
@@ -1165,7 +1184,7 @@ public class PlanAssembler {
                     tve.setColumnName("");
                     tve.setColumnAlias(col.alias);
                     tve.setTableName("VOLT_TEMP_TABLE");
-                    boolean is_distinct = ((AggregateExpression)rootExpr).m_distinct;
+                    boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct,
                                          outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE",

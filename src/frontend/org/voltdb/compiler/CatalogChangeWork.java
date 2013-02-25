@@ -17,17 +17,22 @@
 
 package org.voltdb.compiler;
 
+import org.voltdb.client.ProcedureInvocationType;
 
 public class CatalogChangeWork extends AsyncCompilerWork {
     private static final long serialVersionUID = -5257248292283453286L;
 
     final byte[] catalogBytes;
     final String deploymentString;
+    final long originalTxnId;
+    final long originalUniqueId;
+    final ProcedureInvocationType invocationType;
 
     public CatalogChangeWork(
             long replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
             Object clientData, byte[] catalogBytes, String deploymentString,
+            ProcedureInvocationType type, long originalTxnId, long originalUniqueId,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
@@ -35,6 +40,9 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               completionHandler);
         this.catalogBytes = catalogBytes.clone();
         this.deploymentString = deploymentString;
+        this.invocationType = type;
+        this.originalTxnId = originalTxnId;
+        this.originalUniqueId = originalUniqueId;
     }
 
 }

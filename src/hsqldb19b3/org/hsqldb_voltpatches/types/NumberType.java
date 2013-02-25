@@ -37,6 +37,7 @@ import java.math.BigInteger;
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.OpTypes;
+import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.Types;
@@ -58,6 +59,9 @@ public final class NumberType extends Type {
     static final int bigintPrecision              = 8;
     static final int doublePrecision              = 8;
     static final int defaultNumericPrecision      = 26;
+    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    public static final int defaultNumericScale          = 32;
+    // END Cherry-picked code change from hsqldb-2.2.8
     static final int bigintSquareNumericPrecision = 40;
 
     //
@@ -816,6 +820,9 @@ public final class NumberType extends Type {
             } else if (a instanceof Double) {
                 otherType = Type.SQL_DOUBLE;
             } else if (a instanceof BigDecimal) {
+                // BEGIN Cherry-picked code change from hsqldb-2.2.8
+                otherType = Type.SQL_DECIMAL_DEFAULT;
+/*
                 if (typeCode == Types.SQL_DECIMAL
                         || typeCode == Types.SQL_NUMERIC) {
                     return convertToTypeLimits(session, a);
@@ -825,9 +832,44 @@ public final class NumberType extends Type {
 
                 otherType = getNumberType(Types.SQL_DECIMAL,
                                           JavaSystem.precision(val), scale);
+*/
+                // END Cherry-picked code change from hsqldb-2.2.8
             } else {
                 throw Error.error(ErrorCode.X_42561);
             }
+
+            // BEGIN Cherry-picked code change from hsqldb-2.2.8
+            switch (typeCode) {
+
+                case Types.TINYINT :
+                case Types.SQL_SMALLINT :
+                case Types.SQL_INTEGER :
+                    return convertToInt(session, a, Types.INTEGER);
+
+                case Types.SQL_BIGINT :
+                    return convertToLong(session, a);
+
+                case Types.SQL_REAL :
+                case Types.SQL_FLOAT :
+                case Types.SQL_DOUBLE :
+                    return convertToDouble(a);
+
+                case Types.SQL_NUMERIC :
+                case Types.SQL_DECIMAL : {
+                    a = convertToDecimal(a);
+
+                    BigDecimal dec = (BigDecimal) a;
+
+                    if (scale != dec.scale()) {
+                        dec = dec.setScale(scale, BigDecimal.ROUND_HALF_DOWN);
+                    }
+
+                    return dec;
+                }
+                default :
+                    throw Error.error(ErrorCode.X_42561);
+            }
+            // END Cherry-picked code change from hsqldb-2.2.8
         } else if (a instanceof String) {
             otherType = Type.SQL_VARCHAR;
         } else {
@@ -932,6 +974,116 @@ public final class NumberType extends Type {
             throw Error.error(ErrorCode.X_42561);
         }
     }
+
+    // BEGIN Cherry-picked code change from hsqldb-2.2.8
+    /**
+     * Type narrowing from DOUBLE/DECIMAL/NUMERIC to BIGINT / INT / SMALLINT / TINYINT
+     * following SQL rules. When conversion is from a non-integral type,
+     * digits to the right of the decimal point are lost.
+     */
+
+    /**
+     * Converter from a numeric object to Integer. Input is checked to be
+     * within range represented by the given number type.
+     */
+    static Integer convertToInt(SessionInterface session, Object a, int type) {
+
+        int value;
+
+        if (a instanceof Integer) {
+            if (type == Types.SQL_INTEGER) {
+                return (Integer) a;
+            }
+
+            value = ((Integer) a).intValue();
+        } else if (a instanceof Long) {
+            long temp = ((Long) a).longValue();
+
+            if (Integer.MAX_VALUE < temp || temp < Integer.MIN_VALUE) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            value = (int) temp;
+        } else if (a instanceof BigDecimal) {
+            BigDecimal bd = ((BigDecimal) a);
+
+            if (bd.compareTo(MAX_INT) > 0 || bd.compareTo(MIN_INT) < 0) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            value = bd.intValue();
+        } else if (a instanceof Double || a instanceof Float) {
+            double d = ((Number) a).doubleValue();
+
+            if (session instanceof Session) {
+                if (!((Session) session).database.sqlConvertTruncate) {
+                    d = java.lang.Math.rint(d);
+                }
+            }
+
+            if (Double.isInfinite(d) || Double.isNaN(d)
+                    || d >= (double) Integer.MAX_VALUE + 1
+                    || d <= (double) Integer.MIN_VALUE - 1) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            value = (int) d;
+        } else {
+            throw Error.error(ErrorCode.X_42561);
+        }
+
+        if (type == Types.TINYINT) {
+            if (Byte.MAX_VALUE < value || value < Byte.MIN_VALUE) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+        } else if (type == Types.SQL_SMALLINT) {
+            if (Short.MAX_VALUE < value || value < Short.MIN_VALUE) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+        }
+
+        return Integer.valueOf(value);
+    }
+
+    /**
+     * Converter from a numeric object to Long. Input is checked to be
+     * within range represented by Long.
+     */
+    static Long convertToLong(SessionInterface session, Object a) {
+
+        if (a instanceof Integer) {
+            return ValuePool.getLong(((Integer) a).intValue());
+        } else if (a instanceof Long) {
+            return (Long) a;
+        } else if (a instanceof BigDecimal) {
+            BigDecimal bd = (BigDecimal) a;
+
+            if (bd.compareTo(MAX_LONG) > 0 || bd.compareTo(MIN_LONG) < 0) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            return ValuePool.getLong(bd.longValue());
+        } else if (a instanceof Double || a instanceof Float) {
+            double d = ((Number) a).doubleValue();
+
+            if (session instanceof Session) {
+                if (!((Session) session).database.sqlConvertTruncate) {
+                    d = java.lang.Math.rint(d);
+                }
+            }
+
+            if (Double.isInfinite(d) || Double.isNaN(d)
+                    || d >= (double) Long.MAX_VALUE + 1
+                    || d <= (double) Long.MIN_VALUE - 1) {
+                throw Error.error(ErrorCode.X_22003);
+            }
+
+            return ValuePool.getLong((long) d);
+        } else {
+            throw Error.error(ErrorCode.X_42561);
+        }
+    }
+    // END Cherry-picked code change from hsqldb-2.2.8
 
     /**
      * Converter from a numeric object to Double. Input is checked to be
@@ -1038,11 +1190,77 @@ public final class NumberType extends Type {
                     return "0E0/0E0";
                 }
 
+                // START of VoltDB patch to comply literally with the SQL standard requirement
+                // that 0.0 be represented as a special cased "0E0"
+                // and NOT "0.0E0" as HSQL had been giving.
+                if (value == 0.0) {
+                    return "0E0";
+                }
+                // END of VoltDB patch.
+
                 String s = Double.toString(value);
 
                 // ensure the engine treats the value as a DOUBLE, not DECIMAL
                 if (s.indexOf('E') < 0) {
-                    s = s.concat("E0");
+                    // START of VoltDB patch to ALWAYS use proper E notation,
+                    // with a proper single-non-zero-digit integer part.
+                    // HSQL originally just had: s = s.concat("E0");
+                    int decimalOffset = s.indexOf('.');
+                    String optionalSign = (value < 0.0 ? "-" : "");
+                    int leadingNonZeroOffset;
+                    String decimalPart;
+                    int exponent;
+                    if (value > -10.0 && value < 10.0) {
+                        if (value <= -1.0 || value >= 1.0) {
+                            // OK -- exactly 1 leading digit. Done.
+                            s = s.concat("E0");
+                            return s;
+                        }
+
+                        // A zero leading digit, and maybe more zeros after the decimal.
+                        // Search for a significant digit past the decimal point.
+                        for(leadingNonZeroOffset = decimalOffset+1;
+                                leadingNonZeroOffset < s.length();
+                                    ++leadingNonZeroOffset) {
+                            if (s.charAt(leadingNonZeroOffset) != '0') {
+                                break;
+                            }
+                        }
+                        // Count 1 for the leading 0 but not for the decimal point.
+                        exponent = decimalOffset - leadingNonZeroOffset;
+                        // Since exact 0.0 was eliminated earlier,
+                        // s.charAt(leadingNonZeroOffset) must be our leading non-zero digit.
+                        // Rewrite 0.[0]*nn* as n.n*E-x where x is the number of leading zeros found
+                        // BUT rewrite 0.[0]*n as n.0E-x where x is the number of leading zeros found.
+                        if (leadingNonZeroOffset + 1 == s.length()) {
+                            decimalPart = "0";
+                        }
+                        else {
+                            decimalPart = s.substring(leadingNonZeroOffset+1);
+                        }
+                    }
+                    else {
+                        // Too many leading digits.
+                        leadingNonZeroOffset = optionalSign.length();
+                        // Set the exponent to how far the original decimal point was from its target
+                        // position, just after the leading digit. This is also the length of the
+                        // string of extra integer part digits that need to be moved into the decimal part.
+                        exponent = decimalOffset - (leadingNonZeroOffset + 1);
+
+                        decimalPart = s.substring(leadingNonZeroOffset+1, exponent) + s.substring(decimalOffset+1);
+                        // Trim any trailing zeros from the result.
+                        int lastIndex;
+                        for (lastIndex = decimalPart.length() - 1; lastIndex > 0; --lastIndex) {
+                            if (decimalPart.charAt(lastIndex) != '0') {
+                                break;
+                            }
+                        }
+                        if (lastIndex > 0 && decimalPart.charAt(lastIndex) == '0') {
+                            decimalPart = decimalPart.substring(lastIndex);
+                        }
+                    }
+                    s = optionalSign + s.charAt(leadingNonZeroOffset) + "." + decimalPart + "E" + exponent;
+                    // END of VoltDB patch to use proper E notation,
                 }
 
                 return s;
@@ -1591,9 +1809,7 @@ public final class NumberType extends Type {
                 BigDecimal value = ((BigDecimal) a).setScale(0,
                     BigDecimal.ROUND_CEILING);
 
-                if (JavaSystem.precision(value) > precision) {
-                    throw Error.error(ErrorCode.X_22003);
-                }
+                return value;
             }
 
             // fall through
@@ -1626,9 +1842,7 @@ public final class NumberType extends Type {
                 BigDecimal value = ((BigDecimal) a).setScale(0,
                     BigDecimal.ROUND_FLOOR);
 
-                if (JavaSystem.precision(value) > precision) {
-                    throw Error.error(ErrorCode.X_22003);
-                }
+                return value;
             }
 
             // fall through

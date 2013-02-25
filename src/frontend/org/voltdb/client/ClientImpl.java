@@ -38,7 +38,8 @@ import org.voltdb.utils.CatalogUtil;
  */
 public final class ClientImpl implements Client, ReplicaProcCaller {
 
-    private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
+    // call initiated by the user use positive handles
+    private final AtomicLong m_handle = new AtomicLong(0);
 
     /*
      * Username and password as set by createConnection. Used
@@ -352,7 +353,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     throws IOException {
         Object[] params = new Object[2];
         params[0] = CatalogUtil.toBytes(catalogPath);
-        params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+        if (deploymentPath != null) {
+            params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+        }
+        else {
+            params[1] = null;
+        }
         return params;
     }
 
@@ -476,6 +482,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public Object[] getInstanceId() {
         return m_distributer.getInstanceId();
+    }
+
+    /**
+     * Not exposed to users for the moment.
+     */
+    public void resetInstanceId() {
+        m_distributer.resetInstanceId();
     }
 
     @Override

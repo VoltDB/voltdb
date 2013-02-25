@@ -311,7 +311,7 @@ public class MpTransactionState extends TransactionState
         FragmentResponseMessage msg = null;
         try {
             while (msg == null) {
-                msg = m_newDeps.poll(60L, TimeUnit.SECONDS);
+                msg = m_newDeps.poll(60L * 5, TimeUnit.SECONDS);
                 if (msg == null) {
                     tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_task);
                     if (m_remoteWork == null) {

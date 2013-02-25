@@ -138,6 +138,55 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
+    public void testUpdateWithNoDeploymentFile() throws Exception {
+        System.out.println("\n\n-----\n testUpdateWithNoDeploymentFile \n-----\n\n");
+        Client client = getClient();
+        String newCatalogURL;
+        CatTestCallback callback;
+
+        loadSomeData(client, 0, 25);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        negativeTests(client);
+        assertTrue(callbackSuccess);
+
+        // asynchronously call some random inserts
+        loadSomeData(client, 25, 25);
+        assertTrue(callbackSuccess);
+
+        // add a procedure "InsertOrderLineBatched"
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
+        callback = new CatTestCallback(ClientResponse.SUCCESS);
+        client.updateApplicationCatalog(callback, new File(newCatalogURL), null);
+
+        // don't care if this succeeds or fails.
+        // calling the new proc before the cat change returns is not guaranteed to work
+        // we just hope it doesn't crash anything
+        int x = 3;
+        SyncCallback cb = new SyncCallback();
+        client.callProcedure(cb,
+                org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                new long[] {x}, new long[] {x}, x, new long[] {x},
+                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
+                new double[] {x}, new String[] {"a"});
+        cb.waitForResponse();
+
+        // make sure the previous catalog change has completed
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // now calling the new proc better work
+        x = 2;
+        client.callProcedure(org.voltdb.benchmark.tpcc.procedures.InsertOrderLineBatched.class.getSimpleName(),
+                new long[] {x}, new long[] {x}, (short)x, new long[] {x},
+                new long[] {x}, new long[] {x}, new TimestampType[] { new TimestampType() }, new long[] {x},
+                new double[] {x}, new String[] {"a"});
+
+        loadSomeData(client, 50, 5);
+        assertTrue(callbackSuccess);
+    }
+
     /**
      * Start with snapshots disabled. Enable them to one directory, check that the snapshot files are created
      * with the correct prefix. Update the catalog to do the snapshots in a different directory with a
