@@ -129,7 +129,10 @@ public class TestClientFeatures extends TestCase {
         byte[] catalogToUpdate = builder.compileToBytes();
         assert(catalogToUpdate != null);
 
-        // make a copy of the table from ddl for loading (shouldn't have to do this)
+        // make a copy of the table from ddl for loading
+        // (shouldn't have to do this, but for now, the table loader requires
+        //  a VoltTable, and can't read schema. Could fix by using this VoltTable
+        //  to generate schema or by teaching to loader how to discover tables)
         VoltTable t = TableHelper.quickTable("indexme (pkey:bigint, " +
                                                       "c01:varchar63, " +
                                                       "c02:varchar63, " +
