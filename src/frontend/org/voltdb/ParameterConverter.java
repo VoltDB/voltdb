@@ -48,7 +48,7 @@ public class ParameterConverter {
         if (param == null ||
             param == VoltType.NULL_STRING_OR_VARBINARY ||
             param == VoltType.NULL_DECIMAL ||
-            (param instanceof String && ((String)param).equals("\\N") )) {
+            (param instanceof String && ((String)param).equals(VoltTable.CSV_NULL) )) {
             if (isPrimitive) {
                 VoltType type = VoltType.typeFromClass(paramType);
                 switch (type) {
