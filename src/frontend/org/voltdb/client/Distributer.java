@@ -100,6 +100,7 @@ class Distributer {
 
     // timeout for individual procedure calls
     private final long m_procedureCallTimeoutMS;
+    private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
@@ -202,6 +203,18 @@ class Distributer {
                             // if the timeout is expired, call the callback and remove the
                             // bookeeping data
                             if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
+
+                                // make the minimum timeout for certain long running system procedures
+                                //  higher than the default 2m.
+                                // you can still set the default timeout higher than even this value
+                                boolean isLongOp = false;
+                                // this form allows you to list ops to treat specially
+                                isLongOp |= cb.name.equals("@UpdateApplicationCatalog");
+                                isLongOp |= cb.name.equals("@SnapshotSave");
+                                if (isLongOp && ((now - cb.timestamp) < MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS)) {
+                                    continue;
+                                }
+
                                 ClientResponseImpl r = new ClientResponseImpl(
                                         ClientResponse.CONNECTION_TIMEOUT,
                                         ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
