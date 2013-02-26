@@ -211,6 +211,27 @@ public class Cartographer extends StatsSource
         rowValues[columnNameToIndex.get("Leader")] = CoreUtils.hsIdToString(leader);
     }
 
+    /**
+     * Convenience method: Get the HSID of the master for the specified partition ID, SP or MP
+     */
+    public long getHSIdForMaster(int partitionId)
+    {
+        if (partitionId == MpInitiator.MP_INIT_PID) {
+            return getHSIdForMultiPartitionInitiator();
+        }
+        else {
+            return getHSIdForSinglePartitionMaster(partitionId);
+        }
+    }
+
+    /**
+     * Get the HSID of the single partition master for the specified partition ID
+     */
+    public long getHSIdForSinglePartitionMaster(int partitionId)
+    {
+        return m_iv2Masters.get(partitionId);
+    }
+
     // This used to be the method to get this on SiteTracker
     public long getHSIdForMultiPartitionInitiator()
     {
