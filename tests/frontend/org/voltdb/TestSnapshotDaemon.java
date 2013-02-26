@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -382,7 +383,8 @@ public class TestSnapshotDaemon {
         } catch (Throwable t) {
             threwException = true;
         }
-        assertTrue(threwException);
+        //Changed behavior to not throw ever, log instead
+        assertFalse(threwException);
 
 
         final SnapshotSchedule schedule = new SnapshotSchedule();
@@ -413,7 +415,8 @@ public class TestSnapshotDaemon {
         } catch (Throwable t) {
             threwException = true;
         }
-        assertTrue(threwException);
+        //Changed behavior to not throw ever, log instead
+        assertFalse(threwException);
     }
 
     public SnapshotDaemon getBasicDaemon() throws Exception {
