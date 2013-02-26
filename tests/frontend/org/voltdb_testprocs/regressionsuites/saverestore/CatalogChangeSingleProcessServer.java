@@ -79,7 +79,9 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
 
     public boolean revertCompile()
     {
-        m_siteCount = m_originalSiteCount;
+        if (m_originalSiteCount > 0) {
+            m_siteCount = m_originalSiteCount;
+        }
         boolean compiled = m_origBuilder.compile(m_jarFileName, m_siteCount, 0);
         m_pathToDeployment = m_origBuilder.getPathToDeployment();
         return compiled;
