@@ -430,16 +430,16 @@ inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
     }
 }
 
-inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTempTuple &groupByKeyTuple, const TableTuple& nxtTuple)
+inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTempTuple &nextGroupByKeyTuple, const TableTuple& nxtTuple)
 {
-    if (groupByKeyTuple.isNullTuple()) {
-        groupByKeyTuple.allocateActiveTuple();
+    if (nextGroupByKeyTuple.isNullTuple()) {
+        nextGroupByKeyTuple.allocateActiveTuple();
     }
     // TODO: Here is where an inline projection executor could be used to initialize both a group key tuple
     // and an agg input tuple from the same raw input tuple.
     // configure a tuple
     for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
-        groupByKeyTuple.setNValue(ii, m_groupByExpressions[ii]->eval(&nxtTuple));
+        nextGroupByKeyTuple.setNValue(ii, m_groupByExpressions[ii]->eval(&nxtTuple));
     }
 }
 
@@ -509,24 +509,24 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iterator();
     TableTuple nxtTuple(input_table->schema());
-    PoolBackedTempTuple groupByKeyTuple(m_groupByKeySchema, &m_memoryPool);
+    PoolBackedTempTuple nextGroupByKeyTuple(m_groupByKeySchema, &m_memoryPool);
     while (it.next(nxtTuple)) {
-        initGroupByKeyTuple(groupByKeyTuple, nxtTuple);
+        initGroupByKeyTuple(nextGroupByKeyTuple, nxtTuple);
         AggregateRow *aggregateRow;
         // Search for the matching group.
-        HashAggregateMapType::const_iterator keyIter = hash.find(groupByKeyTuple);
+        HashAggregateMapType::const_iterator keyIter = hash.find(nextGroupByKeyTuple);
 
         // Group not found. Make a new entry in the hash for this new group.
         if (keyIter == hash.end()) {
             aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
-            hash.insert(HashAggregateMapType::value_type(groupByKeyTuple, aggregateRow));
+            hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
             initAggInstances(aggregateRow);
             aggregateRow->m_passThroughTuple = nxtTuple;
             // The map is referencing the current key tuple for use by the new group,
             // so force a new tuple allocation to hold the next candidate key.
-            groupByKeyTuple.move(NULL);
+            nextGroupByKeyTuple.move(NULL);
         } else {
-            // otherwise, the list is the second item of the pair...
+            // otherwise, the agg row is the second item of the pair...
             aggregateRow = keyIter->second;
         }
         // update the aggregation calculation.
@@ -559,11 +559,11 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iterator();
     TableTuple nxtTuple(input_table->schema());
-    PoolBackedTempTuple groupByKeyTuple(m_groupByKeySchema, &m_memoryPool);
+    PoolBackedTempTuple nextGroupByKeyTuple(m_groupByKeySchema, &m_memoryPool);
     VOLT_TRACE("looping..");
     // Use the first input tuple to "prime" the system.
     if (it.next(nxtTuple)) {
-        initGroupByKeyTuple(groupByKeyTuple, nxtTuple);
+        initGroupByKeyTuple(nextGroupByKeyTuple, nxtTuple);
         // Start the aggregation calculation.
         initAggInstances(aggregateRow);
         aggregateRow->m_passThroughTuple = nxtTuple;
@@ -582,15 +582,29 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
         return true;
     }
 
+    TableTuple inProgressGroupByKeyTuple(m_groupByKeySchema);
     while (it.next(nxtTuple)) {
-        TableTuple prevGroupByKeyTuple(groupByKeyTuple);
-        initGroupByKeyTuple(groupByKeyTuple, nxtTuple);
+        // The nextGroupByKeyTuple now stores the key(s) of the current group in progress.
+        // Swap its storage with that of the inProgressGroupByKeyTuple.
+        // The inProgressGroupByKeyTuple will be null initially, until the first call to initGroupByKeyTuple below
+        // (as opposed to the initial call, above).
+        // But in the steady state, there will be exactly two allocations, one for the "in progress" group key
+        // and the other for the "next" candidate group key. These get "bank switched" with each iteration.
+        // The previous candidate group key ALWAYS becomes the new "in progress" group key.
+        // The previous "in progress" group key ALWAYS gets recycled for use by the "next" candidate group key.
+        // "ALWAYS" means regardless of whether any key values matched.
+        void* recycledStorage = inProgressGroupByKeyTuple.address();
+        void* inProgressStorage = nextGroupByKeyTuple.address();
+        inProgressGroupByKeyTuple.move(inProgressStorage);
+        nextGroupByKeyTuple.move(recycledStorage);
+        initGroupByKeyTuple(nextGroupByKeyTuple, nxtTuple);
+
         // Test for repetition of equal GROUP BY keys.
         // Testing keys from last to first will typically be faster --
         // if the GROUP BY keys are listed in major-to-minor sort order,
         // the last one will be the most likely to have changed.
         for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
-            if (groupByKeyTuple.getNValue(ii).compare(prevGroupByKeyTuple.getNValue(ii)) != 0) {
+            if (nextGroupByKeyTuple.getNValue(ii).compare(inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
                 VOLT_TRACE("new group!");
                 // Output old row.
                 insertOutputTuple(aggregateRow);
