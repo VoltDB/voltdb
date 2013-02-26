@@ -717,7 +717,9 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
              */
             if (tcd->exportEnabled()) {
                 table->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                continue;
             }
+            assert(!table->isExport());
 
             //////////////////////////////////////////
             // if the table schema has changed, build a new
@@ -726,6 +728,9 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             //////////////////////////////////////////
 
             if (!hasSameSchema(catalogTable, table)) {
+                printf("processing schema changes for %s\n", catalogTable->name().c_str());
+                fflush(stdout);
+
                 tcd->processSchemaChanges(*m_database, *catalogTable);
 
                 // don't continue on to modify/add/remove indexes, because the
