@@ -18,9 +18,10 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
@@ -45,7 +46,7 @@ public class ElasticHashinator extends TheHashinator {
                         "Duplicate token " + token + " partition "
                         + partitionId + " and " + buildMap.get(token));
             }
-            buildMap.put(buf.getLong(), buf.getInt());
+            buildMap.put( token, partitionId);
         }
         ImmutableSortedMap.Builder<Long, Integer> builder = ImmutableSortedMap.naturalOrder();
         for (Map.Entry<Long, Integer> e : buildMap.entrySet()) {
@@ -58,15 +59,15 @@ public class ElasticHashinator extends TheHashinator {
         Preconditions.checkArgument(partitionCount > 0);
         Preconditions.checkArgument(tokensPerPartition > 0);
         Random r = new Random(0);
-        ByteBuffer buf = ByteBuffer.allocate(4 *(partitionCount * tokensPerPartition * 12));//long and an int per
+        ByteBuffer buf = ByteBuffer.allocate(4 + (partitionCount * tokensPerPartition * 12));//long and an int per
         buf.putInt(partitionCount * tokensPerPartition);
 
-        HashMap<Long, Integer> checkMap = new HashMap<Long, Integer>();
+        Set<Long> checkSet = new HashSet<Long>();
         for (int ii = 0; ii < partitionCount; ii++) {
             for (int zz = 0; zz < tokensPerPartition; zz++) {
                 while (true) {
                     long candidateToken = r.nextLong();
-                    if (checkMap.containsKey(candidateToken)) {
+                    if (!checkSet.add(candidateToken)) {
                         continue;
                     }
                     buf.putLong(candidateToken);
@@ -80,6 +81,8 @@ public class ElasticHashinator extends TheHashinator {
 
     @Override
     protected int pHashinateLong(long value) {
+        if (value == Long.MIN_VALUE) return 0;
+
         ByteBuffer buf = ByteBuffer.allocate(8);
         buf.order(ByteOrder.nativeOrder());
         buf.putLong(value);
@@ -89,15 +92,17 @@ public class ElasticHashinator extends TheHashinator {
 
     private int partitionForToken(long token) {
         Map.Entry<Long, Integer> entry = tokens.floorEntry(token);
-
+        //System.out.println("Finding partition for token " + token);
         /*
          * Because the tokens are randomly distributed it is likely there is a range
          * near Long.MIN_VALUE that isn't covered by a token. Conceptually this is a ring
          * so the correct token is the one near Long.MAX_VALUE.
          */
         if (entry != null) {
+            //System.out.println("Floor token was " + entry.getKey());
             return entry.getValue();
         } else {
+            //System.out.println("Last entry token " + tokens.lastEntry().getKey());
             return tokens.lastEntry().getValue();
         }
     }

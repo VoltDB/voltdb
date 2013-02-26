@@ -23,6 +23,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
+#include "boost_ext/FastAllocator.hpp"
 
 #include <cstring>
 #include <string>
@@ -37,7 +38,7 @@ public:
 	static ElasticHashinator* newInstance(const char *config) {
 		ReferenceSerializeInput countInput(config, 4);
 		int numEntries = countInput.readInt();
-		ReferenceSerializeInput entryInput(&config[sizeof(int32_t)], numEntries * sizeof(int32_t) * sizeof(int64_t));
+		ReferenceSerializeInput entryInput(&config[sizeof(int32_t)], numEntries * (sizeof(int32_t) * sizeof(int64_t)));
 		TokenMap tokens;
 		for (int ii = 0; ii < numEntries; ii++) {
 			const int64_t token = entryInput.readLong();
@@ -82,10 +83,24 @@ private:
    ElasticHashinator(TokenMap tokenMap) : tokens(tokenMap) {}
 
    int32_t partitionForToken(int64_t token) const {
-	   TokenMap::const_iterator i = tokens.lower_bound(token);
-	   if (i == tokens.end()) {
-		   return (tokens.end()--).data();
+       /*
+        * C++ doesn't have the NavigableMap equivalent of floor,
+        * so we use upper_bound and step back, except if upper bound
+        * returns tokens.begin()
+        */
+	   TokenMap::const_iterator i = tokens.upper_bound(token);
+	   //std::cout << "EE finding partition for token " << token << std::endl;
+	   i--;
+	   if (i == tokens.begin()) {
+	       if (i.key() <= token) {
+	           //std::cout << "EE upper_bound token was equals to begin " << i.key() << std::endl;
+	           return i.data();
+	       } else {
+	           //std::cout << "EE upper_bound token wrapped back to end " << tokens.rbegin().key() << std::endl;
+	           return tokens.rbegin().data();
+	       }
 	   }
+	   //std::cout << "EE upper_bound token was " << i.key() << std::endl;
 	   return i.data();
    }
 
