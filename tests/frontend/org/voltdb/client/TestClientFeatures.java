@@ -27,37 +27,37 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
 
 import org.voltdb.ServerThread;
+import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.VoltTable;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestClientFeatures extends TestCase {
 
-    static final String SCHEMA =
-            "create table kv (" +
-            "key bigint default 0 not null, " +
-            "PRIMARY KEY(key));";
-
     ServerThread localServer;
+    DeploymentBuilder depBuilder;
 
     @Override
     public void setUp()
     {
         try {
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addLiteralSchema(SCHEMA);
-            builder.addPartitionInfo("kv", "key");
-            builder.addProcedures(ArbitraryDurationProc.class);
+            CatalogBuilder catBuilder = new CatalogBuilder();
+            catBuilder.addSchema(getClass().getResource("clientfeatures.sql"));
+            catBuilder.addProcedures(ArbitraryDurationProc.class);
 
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("timeouts.jar"), 1, 1, 0);
+            boolean success = catBuilder.compile(Configuration.getPathToCatalogForTest("timeouts.jar"));
             assert(success);
-            MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("timeouts.xml"));
+
+            depBuilder = new DeploymentBuilder(1, 1, 0);
+            depBuilder.writeXML(Configuration.getPathToCatalogForTest("timeouts.xml"));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("timeouts.jar");
@@ -97,7 +97,7 @@ public class TestClientFeatures extends TestCase {
         }
     }
 
-    public void testPerCallTimeout() throws NoConnectionsException, IOException, ProcCallException {
+    public void testPerCallTimeout() throws Exception {
         CSL csl = new CSL();
 
         ClientConfig config = new ClientConfig(null, null, csl);
@@ -117,6 +117,52 @@ public class TestClientFeatures extends TestCase {
         }
         // make sure the callback gets called
         assertTrue(csl.waitForCall(6000));
+
+        //
+        // From here down test special exception for slow snapshots or catalogs updates
+        //
+
+        // build a catalog with a ton of indexes so catalog update will be slow
+        CatalogBuilder builder = new CatalogBuilder();
+        builder.addSchema(getClass().getResource("clientfeatures-wellindexed.sql"));
+        builder.addProcedures(ArbitraryDurationProc.class);
+        byte[] catalogToUpdate = builder.compileToBytes();
+        assert(catalogToUpdate != null);
+
+        // make a copy of the table from ddl for loading
+        // (shouldn't have to do this, but for now, the table loader requires
+        //  a VoltTable, and can't read schema. Could fix by using this VoltTable
+        //  to generate schema or by teaching to loader how to discover tables)
+        VoltTable t = TableHelper.quickTable("indexme (pkey:bigint, " +
+                                                      "c01:varchar63, " +
+                                                      "c02:varchar63, " +
+                                                      "c03:varchar63, " +
+                                                      "c04:varchar63, " +
+                                                      "c05:varchar63, " +
+                                                      "c06:varchar63, " +
+                                                      "c07:varchar63, " +
+                                                      "c08:varchar63, " +
+                                                      "c09:varchar63, " +
+                                                      "c10:varchar63) " +
+                                                      "PKEY(pkey)");
+        // get a client with a normal timout
+        Client client2 = ClientFactory.createClient();
+        client2.createConnection("localhost");
+        TableHelper.fillTableWithBigintPkey(t, 400, client2, new Random(), 0, 1);
+
+        // run a catalog update that *might* normally timeout
+        long start = System.nanoTime();
+        response = client.callProcedure("@UpdateApplicationCatalog", catalogToUpdate, depBuilder.getXML());
+        double duration = (System.nanoTime() - start) / 1000000000.0;
+        System.out.printf("Catalog update duration in seconds: %.2f\n", duration);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        // run a blocking snapshot that *might* normally timeout
+        start = System.nanoTime();
+        response = client.callProcedure("@SnapshotSave", Configuration.getPathToCatalogForTest(""), "slow", 1);
+        duration = (System.nanoTime() - start) / 1000000000.0;
+        System.out.printf("Snapshot save duration in seconds: %.2f\n", duration);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 
     public void testMaxTimeout() throws NoConnectionsException, IOException, ProcCallException {

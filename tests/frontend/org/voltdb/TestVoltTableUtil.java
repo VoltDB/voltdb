@@ -23,11 +23,13 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.ArrayList;
+
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -66,7 +68,7 @@ public class TestVoltTableUtil {
         String[] values = captor.getValue();
         assertEquals(6, values.length);
         for (String v : values) {
-            assertEquals("\\N", v);
+            assertEquals(VoltTable.CSV_NULL, v);
         }
     }
 

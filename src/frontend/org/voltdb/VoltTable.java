@@ -128,6 +128,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     public static final String MAX_SERIALIZED_TABLE_LENGTH_STR =
             String.valueOf(MAX_SERIALIZED_TABLE_LENGTH / 1024) + "k";
 
+    // Strings used to indicate NULL value in CSV files
+    public static final String CSV_NULL = "\\N";
+    public static final String QUOTED_CSV_NULL = "\"\\N\"";
+
     static final int NULL_STRING_INDICATOR = -1;
     static final String METADATA_ENCODING = "US-ASCII";
     static final String ROWDATA_ENCODING = "UTF-8";

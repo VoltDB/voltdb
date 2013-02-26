@@ -266,14 +266,18 @@ public class MyTPCC
 
         try
         {
-            if ((int)(m_clientCon.execute(LoadStatus.class.getSimpleName()).getResults()[0].fetchRow(0).getLong(0)) == 0)
+            try {
+                m_clientCon.execute("@AdHoc", "INSERT INTO LOADER_PERMIT VALUES ( 42 );");
                 (new MyLoader(args, m_clientCon)).run();
-            else
-                while ((int)(m_clientCon.execute(LoadStatus.class.getSimpleName()).getResults()[0].fetchRow(0).getLong(0)) < warehouses)
+                m_clientCon.execute("@AdHoc", "INSERT INTO RUN_PERMIT VALUES ( 42 );");
+            } catch (ProcCallException e) {
+                while ((int)(m_clientCon.execute("@AdHoc", "SELECT COUNT(*) FROM RUN_PERMIT").getResults()[0].fetchRow(0).getLong(0)) < 1)
                     ;
+            }
         }
         catch (Exception e)
         {
+            e.printStackTrace();
             System.exit(-1);
         }
 
