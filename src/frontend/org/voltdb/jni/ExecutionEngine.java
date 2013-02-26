@@ -410,6 +410,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract int hashinate(Object value, int partitionCount);
 
+    /**
+     * Changes the partition count in the hashinator.
+     * @param partitionCount
+     */
+    public abstract void setNumberOfPartitions(int partitionCount);
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
@@ -574,6 +580,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return
      */
     protected native int nativeHashinate(long pointer, int partitionCount);
+
+    /**
+     * Sets the partition count in EE's hashinator
+     * @param partitionCount
+     */
+    protected native void nativeSetNumberOfPartitions(long pointer, int partitionCount);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated

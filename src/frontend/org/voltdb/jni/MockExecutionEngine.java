@@ -208,6 +208,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public void setNumberOfPartitions(int partitionCount)
+    {
+
+    }
+
+    @Override
     public long getThreadLocalPoolAllocations() {
         return 0L;
     }

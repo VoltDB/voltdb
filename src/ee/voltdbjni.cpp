@@ -1182,6 +1182,19 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeSetNumberOfPartitions
+ * Signature: (JI)I
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetNumberOfPartitions(JNIEnv *env, jobject obj, jlong engine_ptr, jint partitionCount)
+{
+    VOLT_DEBUG("nativeSetNumberOfPartitions in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    engine->setNumberOfPartitions(partitionCount);
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeGetThreadLocalPoolAllocations
  * Signature: ()J
  */

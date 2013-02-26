@@ -121,6 +121,8 @@ private:
 
     void hashinate(struct ipc_command* cmd);
 
+    void setNumberOfPartitions(struct ipc_command *cmd);
+
     void threadLocalPoolAllocations();
 
     void sendException( int8_t errorCode);

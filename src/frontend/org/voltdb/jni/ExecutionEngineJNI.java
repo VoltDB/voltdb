@@ -528,6 +528,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
+    public void setNumberOfPartitions(int partitionCount)
+    {
+        nativeSetNumberOfPartitions(pointer, partitionCount);
+    }
+
+    @Override
     public long getThreadLocalPoolAllocations() {
         return nativeGetThreadLocalPoolAllocations();
     }

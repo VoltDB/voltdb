@@ -1480,4 +1480,9 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     }
     return table->hashCode();
 }
+
+void VoltDBEngine::setNumberOfPartitions(int32_t partitionCount) {
+    m_totalPartitions = partitionCount;
+}
+
 }

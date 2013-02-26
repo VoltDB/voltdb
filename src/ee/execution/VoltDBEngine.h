@@ -388,6 +388,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         size_t tableHashCode(int32_t tableId);
 
+        void setNumberOfPartitions(int32_t partitionCount);
+
     private:
 
         void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);

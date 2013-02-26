@@ -164,6 +164,11 @@ typedef struct {
     char data[0];
 }__attribute__((packed)) hashinate_msg;
 
+typedef struct {
+    struct ipc_command cmd;
+    int32_t partitionCount;
+}__attribute__((packed)) set_number_of_partitions_msg;
+
 /*
  * Header for an Export action.
  */
@@ -320,6 +325,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 26:
           loadFragment(cmd);
+          result = kErrorCode_None;
+          break;
+      case 27:
+          setNumberOfPartitions(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -1016,6 +1025,12 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     response[0] = kErrorCode_Success;
     *reinterpret_cast<int32_t*>(&response[1]) = htonl(retval);
     writeOrDie(m_fd, (unsigned char*)response, 5);
+}
+
+void VolDBIPC::setNumberOfPartitions(struct ipc_command *cmd) {
+    set_number_of_partitions_msg *msg = (set_number_of_partitions_msg *)cmd;
+    int32_t partCount = ntohl(msg->partitionCount);
+    m_engine->setNumberOfPartitions(partCount);
 }
 
 void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {
