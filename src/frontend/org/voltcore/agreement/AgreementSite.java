@@ -318,8 +318,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     }
                 }
             }
-        } catch (Exception e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Error in agreement site", false, e);
+        } catch (Throwable e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Error in agreement site", true, e);
         } finally {
             try {
                 shutdownInternal();

@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  * Syntax is:
  * [TABLENAME] (COLUMN1, COLUMN2, .. COLUMNN) [P(PKEYCOL1, PKEYCOL2, .. PKEYCOLN)]
  * Where COLUMNX is of the form:
- * [NAME]:TYPE[SIZE]-[U][N][/'default value']
+ * [NAME:]TYPE[SIZE]-[U][N][/'default value']
  * And PKEYCOLX is either the column index or name.
  *
  * Unnamed tables are named "T". Unnamed columns are named "CX" where X is their 0-based-index.

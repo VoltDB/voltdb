@@ -23,7 +23,10 @@
 
 package txnIdSelfCheck;
 
+import java.io.InterruptedIOException;
+
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -69,8 +72,9 @@ public class ClientThread extends Thread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicLong m_txnsRun;
     final Random m_random = new Random();
+    final Semaphore m_permits;
 
-    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor) throws Exception {
+    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits) throws Exception {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
 
         m_type = Type.typeFromId(cid);
@@ -78,6 +82,7 @@ public class ClientThread extends Thread {
         m_client = client;
         m_processor = processor;
         m_txnsRun = txnsRun;
+        m_permits = permits;
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
         String sql2 = String.format("select * from replicated  where cid = %d order by rid desc limit 1", cid);
@@ -179,6 +184,7 @@ public class ClientThread extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     void handleException(ClientResponseImpl cri, Exception e) {
@@ -217,6 +223,7 @@ public class ClientThread extends Thread {
     public void run() {
         while (m_shouldContinue.get()) {
             try {
+                m_permits.acquire();
                 runOne();
             }
             catch (NoConnectionsException e) {
@@ -238,6 +245,12 @@ public class ClientThread extends Thread {
             catch (UserProcCallException e) {
                 ClientResponseImpl cri = e.cri;
                 handleException(cri, e);
+            }
+            catch (InterruptedException e) {
+                // just need to fall through and get out
+            }
+            catch (InterruptedIOException e) {
+                // just need to fall through and get out
             }
             catch (Exception e) {
                 log.error("ClientThread had a non proc-call exception", e);
