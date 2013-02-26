@@ -32,12 +32,12 @@
 namespace voltdb {
 class LegacyHashinator : public TheHashinator {
 public:
-	static LegacyHashinator* newInstance(const char *config) {
-		ReferenceSerializeInput input(config, 4);
-		return new LegacyHashinator(input.readInt());
-	}
+    static LegacyHashinator* newInstance(const char *config) {
+        ReferenceSerializeInput input(config, 4);
+        return new LegacyHashinator(input.readInt());
+    }
 
-	~LegacyHashinator() {}
+    ~LegacyHashinator() {}
 protected:
 
    /**

@@ -1192,13 +1192,13 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
         const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[2]));
         switch (hashinatorType) {
         case HASHINATOR_LEGACY:
-        	hashinator.reset(LegacyHashinator::newInstance(configValue));
-        	break;
+            hashinator.reset(LegacyHashinator::newInstance(configValue));
+            break;
         case HASHINATOR_ELASTIC:
-        	hashinator.reset(ElasticHashinator::newInstance(configValue));
-        	break;
+            hashinator.reset(ElasticHashinator::newInstance(configValue));
+            break;
         default:
-        	return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
         }
         int retval =
             hashinator->hashinate(params[0]);

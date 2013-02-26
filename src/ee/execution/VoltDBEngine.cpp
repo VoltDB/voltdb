@@ -216,14 +216,14 @@ VoltDBEngine::initialize(int32_t clusterIndex,
 
     switch (hashinatorType) {
     case HASHINATOR_LEGACY:
-    	m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
-    	break;
+        m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
+        break;
     case HASHINATOR_ELASTIC:
-    	m_hashinator.reset(ElasticHashinator::newInstance(hashinatorConfig));
-    	break;
+        m_hashinator.reset(ElasticHashinator::newInstance(hashinatorConfig));
+        break;
     default:
-    	throwFatalException("Unknown hashinator type %d", hashinatorType);
-    	break;
+        throwFatalException("Unknown hashinator type %d", hashinatorType);
+        break;
     }
 
     return true;

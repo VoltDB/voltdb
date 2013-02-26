@@ -53,8 +53,8 @@ namespace voltdb {
 class NValue;
 
 enum HashinatorType {
-	HASHINATOR_LEGACY = 0
-	, HASHINATOR_ELASTIC = 1
+    HASHINATOR_LEGACY = 0
+    , HASHINATOR_ELASTIC = 1
 };
 
 // ------------------------------------------------------------------

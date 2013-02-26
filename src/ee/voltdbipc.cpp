@@ -1006,17 +1006,17 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     boost::scoped_ptr<TheHashinator> hashinator;
     switch (hashinatorType) {
     case HASHINATOR_LEGACY:
-    	hashinator.reset(LegacyHashinator::newInstance(hash->data));
-    	break;
+        hashinator.reset(LegacyHashinator::newInstance(hash->data));
+        break;
     case HASHINATOR_ELASTIC:
-    	hashinator.reset(ElasticHashinator::newInstance(hash->data));
-    	break;
+        hashinator.reset(ElasticHashinator::newInstance(hash->data));
+        break;
     default:
-    	try {
-    		throwFatalException("Unrecognized hashinator type %d", hashinatorType);
-    	} catch (const FatalException &e) {
-    		crashVoltDB(e);
-    	}
+        try {
+            throwFatalException("Unrecognized hashinator type %d", hashinatorType);
+        } catch (const FatalException &e) {
+            crashVoltDB(e);
+        }
     }
     void* offset = hash->data + configLength;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(hash));

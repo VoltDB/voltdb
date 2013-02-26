@@ -44,35 +44,35 @@ class TheHashinator {
      * However, since we currently have two matching implementations
      * of hashinate, it's nice to centralize and isolate the code here.
      */
-	 int32_t hashinate(NValue value) const
-	  {
-		  // All null values hash to partition 0
-		  if (value.isNull())
-		  {
-			  return 0;
-		  }
-		  ValueType val_type = ValuePeeker::peekValueType(value);
-		  switch (val_type)
-		  {
-		  case VALUE_TYPE_TINYINT:
-		  case VALUE_TYPE_SMALLINT:
-		  case VALUE_TYPE_INTEGER:
-		  case VALUE_TYPE_BIGINT:
-		  {
-			  return hashinate(ValuePeeker::peekAsRawInt64(value));
-		  }
-		  case VALUE_TYPE_VARBINARY:
-		  case VALUE_TYPE_VARCHAR:
-		  {
-			  return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
-							   ValuePeeker::peekObjectLength(value));
-		  }
-		  default:
-			  throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
-									   getTypeName(val_type).c_str());
-			  break;
-		  }
-	  }
+    int32_t hashinate(NValue value) const
+    {
+        // All null values hash to partition 0
+        if (value.isNull())
+        {
+            return 0;
+        }
+        ValueType val_type = ValuePeeker::peekValueType(value);
+        switch (val_type)
+        {
+        case VALUE_TYPE_TINYINT:
+        case VALUE_TYPE_SMALLINT:
+        case VALUE_TYPE_INTEGER:
+        case VALUE_TYPE_BIGINT:
+        {
+            return hashinate(ValuePeeker::peekAsRawInt64(value));
+        }
+        case VALUE_TYPE_VARBINARY:
+        case VALUE_TYPE_VARCHAR:
+        {
+            return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
+                    ValuePeeker::peekObjectLength(value));
+        }
+        default:
+            throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
+                    getTypeName(val_type).c_str());
+            break;
+        }
+    }
     virtual ~TheHashinator() {}
 
   protected:
