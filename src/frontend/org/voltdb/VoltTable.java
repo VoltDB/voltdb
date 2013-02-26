@@ -1107,13 +1107,17 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * @return A string containing a pretty-print formatted representation of this table.
      */
     public String toFormattedString() {
+
+        final int MAX_PRINTABLE_CHARS = 30;
+        final String ELIPSIS = "...";
+
         StringBuffer sb = new StringBuffer();
 
         int columnCount = this.getColumnCount();
         int[] padding = new int[columnCount];
         String[] fmt = new String[columnCount];
         for (int i = 0; i < columnCount; i++) {
-            padding[i] = this.getColumnName(i).length();
+            padding[i] = 0; // min value to be increased later
         }
         this.resetRowPosition();
 
@@ -1126,14 +1130,18 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                     v = "NULL";
                 }
                 int len = 0; // length
-                if (this.getColumnType(i) == VoltType.VARBINARY
-                        && !this.wasNull()) {
+                if (this.getColumnType(i) == VoltType.VARBINARY && !this.wasNull()) {
                     len = ((byte[]) v).length * 2;
                 } else {
                     len = v.toString().length();
                 }
+                // crop long strings and such
+                if (len > MAX_PRINTABLE_CHARS) {
+                    len = MAX_PRINTABLE_CHARS;
+                }
 
-                if (padding[i] < len) {
+                // compute the max for each column
+                if (len > padding[i]) {
                     padding[i] = len;
                 }
             }
@@ -1175,16 +1183,21 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         while (this.advanceRow()) {
             for (int i = 0; i < columnCount; i++) {
                 Object value = this.get(i, this.getColumnType(i));
+                String valueStr;
                 if (this.wasNull()) {
-                    value = "NULL";
+                    valueStr = "NULL";
                 }
                 else if (this.getColumnType(i) == VoltType.VARBINARY) {
-                    value = Encoder.hexEncode((byte[]) value);
+                    valueStr = Encoder.hexEncode((byte[]) value);
                 }
                 else {
-                    value = value.toString();
+                    valueStr = value.toString();
                 }
-                sb.append(String.format(fmt[i], value));
+                // truncate long values
+                if (valueStr.length() > MAX_PRINTABLE_CHARS) {
+                    valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELIPSIS.length()) + ELIPSIS;
+                }
+                sb.append(String.format(fmt[i], valueStr));
                 if (i < columnCount - 1) {
                     sb.append(" ");
                 }
@@ -1342,6 +1355,69 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         boolean checksum = (checksum1 == checksum2);
         assert(verifyTableInvariants());
         return checksum;
+    }
+
+    public void deepAssertEquals(VoltTable other) {
+        if (getRowCount() != other.getRowCount()) {
+            System.out.printf("Row count %d != %d\n", getRowCount(), other.getRowCount());
+            assert(false);
+        }
+        if (getColumnCount() != other.getColumnCount()) {
+            System.out.printf("Col count %d != %d\n", getColumnCount(), other.getColumnCount());
+            assert(false);
+        }
+        for (int col = 0; col < getColumnCount(); col++) {
+            if (other.getColumnType(col) != getColumnType(col)) {
+                System.out.printf("Col %d: type %s != %s\n", col,
+                        getColumnType(col).toString(), other.getColumnType(col).toString());
+                assert(false);
+            }
+            if (other.getColumnName(col).equals(getColumnName(col)) == false) {
+                System.out.printf("Col %d: name %s != %s\n", col,
+                        getColumnName(col), other.getColumnName(col));
+                assert(false);
+            }
+        }
+
+        resetRowPosition();
+        other.resetRowPosition();
+        for (int row = 0; row < getRowCount(); row++) {
+            advanceRow();
+            other.advanceRow();
+
+            for (int col = 0; col < getColumnCount(); col++) {
+                Object obj1 = get(col, getColumnType(col));
+                Object obj2 = other.get(col, getColumnType(col));
+                if ((obj1 == null) && (obj2 == null)) {
+                    continue;
+                }
+
+                if ((obj1 == null) || (obj2 == null)) {
+                    System.out.printf("Row,Col-%d,%d of type %s: %s != %s\n", row, col,
+                            getColumnType(col).toString(), String.valueOf(obj1), String.valueOf(obj2));
+                    assert(false);
+                }
+
+                if (getColumnType(col) == VoltType.VARBINARY) {
+                    byte[] array1 = (byte[]) obj1;
+                    byte[] array2 = (byte[]) obj2;
+                    if (Arrays.equals(array1, array2) == false) {
+                        System.out.printf("Row,Col-%d,%d of type %s: %s != %s\n", row, col,
+                                getColumnType(col).toString(),
+                                Encoder.hexEncode(array1),
+                                Encoder.hexEncode(array2));
+                        assert(false);
+                    }
+                }
+                else {
+                    if (obj1.equals(obj2) == false) {
+                        System.out.printf("Row,Col-%d,%d of type %s: %s != %s\n", row, col,
+                                getColumnType(col).toString(), obj1.toString(), obj2.toString());
+                        assert(false);
+                    }
+                }
+            }
+        }
     }
 
     /**

@@ -154,14 +154,36 @@ public class TestCRUDSuite extends RegressionSuite {
 
     public void testReplicatedTable() throws Exception
     {
-        Client client = getClient();
+        final Client client = this.getClient();
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("R1.insert", i, Integer.toHexString(i));
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
         try {
-            client.callProcedure("R1.delete", 0, "ABC");
+            client.callProcedure("R1.select", 0, "ABC");
+            fail();
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("was not found"));
             return;
         }
-        fail();
+
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("R1.update", i, "STR" + Integer.toHexString(i), i);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("R1.delete", i);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+
+        ClientResponse resp = client.callProcedure("CountR1");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(0, resp.getResults()[0].asScalarLong());
     }
 
 
@@ -171,8 +193,8 @@ public class TestCRUDSuite extends RegressionSuite {
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
 
-        // necessary because at least one procedure is required
         project.addStmtProcedure("CountP1", "select count(*) from p1;");
+        project.addStmtProcedure("CountR1", "select count(*) from r1;");
 
         try {
             // a table that should generate procedures

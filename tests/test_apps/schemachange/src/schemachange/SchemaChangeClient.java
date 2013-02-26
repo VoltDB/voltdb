@@ -32,7 +32,6 @@ import org.voltdb.CLIConfig;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -92,8 +91,11 @@ public class SchemaChangeClient {
         System.out.printf("New Schema:\n%s\n", TableHelper.ddlForTable(t2));
 
         builder.addLiteralSchema(TableHelper.ddlForTable(t2));
-        int pkeyIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(t2);
-        builder.addPartitionInfo(newName, t2.getColumnName(pkeyIndex));
+        // make tables name A partitioned and tables named B replicated
+        if (newName.equalsIgnoreCase("A")) {
+            int pkeyIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(t2);
+            builder.addPartitionInfo(newName, t2.getColumnName(pkeyIndex));
+        }
         byte[] catalogData = builder.compileToBytes();
         assert(catalogData != null);
 
@@ -148,12 +150,8 @@ public class SchemaChangeClient {
             return 0;
         }
         VoltTable result = client.callProcedure("@AdHoc",
-                String.format("select max(pkey) from %s;", TableHelper.getTableName(t))).getResults()[0];
-        long max = result.asScalarLong();
-        if (max == VoltType.NULL_BIGINT) {
-            return 0;
-        }
-        return max;
+                String.format("select pkey from %s order by pkey desc limit 1;", TableHelper.getTableName(t))).getResults()[0];
+        return result.getRowCount() > 0 ? result.asScalarLong() : 0;
     }
 
     /**
@@ -211,7 +209,8 @@ public class SchemaChangeClient {
         catch (Exception e) {
             deploymentString = "<?xml version=\"1.0\"?><deployment>" +
                     "<cluster hostcount=\"1\" sitesperhost=\"1\" kfactor=\"0\" />" +
-                    "<httpd enabled=\"true\"><jsonapi enabled=\"true\" /></httpd></deployment>";
+                    "<httpd enabled=\"true\"><jsonapi enabled=\"true\" /></httpd>" +
+                    "<snapshot prefix=\"schemachange\" frequency=\"1s\" retain=\"2\"/></deployment>";
         }
 
         ClientConfig clientConfig = new ClientConfig();
@@ -252,6 +251,7 @@ public class SchemaChangeClient {
 
                 postT.resetRowPosition();
                 preT.resetRowPosition();
+                postT.deepAssertEquals(guessT);
                 assert(postT.hasSameContents(guessT));
             }
         }

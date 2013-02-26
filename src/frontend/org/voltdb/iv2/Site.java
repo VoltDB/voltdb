@@ -1029,12 +1029,33 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
-        if (!isMPI) {
-            //Necessary to quiesce before updating the catalog
-            //so export data for the old generation is pushed to Java.
-            m_ee.quiesce(m_lastCommittedTxnId);
-            m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
+        if (isMPI) {
+            // the rest of the work applies to sites with real EEs
+            return true;
         }
+
+        // if a snapshot is in process, wait for it to finish
+        //
+        // TODO: this currently will wait even if the catalog change wouldn't
+        // interfere with the snapshot at all. Needs that refinement before
+        // shipping.
+        if (m_snapshotter.isEESnapshotting()) {
+            hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
+                    CoreUtils.getSiteIdFromHSId(m_siteId)));
+            try {
+                m_snapshotter.completeSnapshotWork(m_ee);
+                hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
+                        CoreUtils.getSiteIdFromHSId(m_siteId)));
+            }
+            catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB("Unexpected Interrupted Exception while finishing a snapshot for a catalog update.", true, e);
+            }
+        }
+
+        //Necessary to quiesce before updating the catalog
+        //so export data for the old generation is pushed to Java.
+        m_ee.quiesce(m_lastCommittedTxnId);
+        m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
 
         return true;
     }

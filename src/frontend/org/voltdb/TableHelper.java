@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -144,11 +145,11 @@ public class TableHelper {
         Object defaultValue = null;
         if (rand.nextBoolean()) {
             column.nullable = true;
-            defaultValue = VoltTypeUtil.getRandomValue(column.type, column.size % 127 + 1, 0.8, rand);
+            defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.8, rand);
         }
         else {
             column.nullable = false;
-            defaultValue = VoltTypeUtil.getRandomValue(column.type, column.size % 127 + 1, 0.0, rand);
+            defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.0, rand);
             // no uniques for now, as the random fill becomes too slow
             //column.unique = (r.nextDouble() > 0.3); // 30% of non-nullable cols unique (15% total)
         }
@@ -616,12 +617,13 @@ public class TableHelper {
         };
 
         // update the rss value asynchronously
+        final AtomicBoolean rssThreadShouldStop = new AtomicBoolean(false);
         Thread rssThread = new Thread() {
             @Override
             public void run() {
                 long tempRss = rss.get();
                 long rssPrev = tempRss;
-                while (true) {
+                while (!rssThreadShouldStop.get()) {
                     tempRss = MiscUtils.getMBRss(client);
                     if (tempRss != rssPrev) {
                         rssPrev = tempRss;
@@ -652,6 +654,7 @@ public class TableHelper {
             }
             i += jump;
         }
+        rssThreadShouldStop.set(true);
         client.drain();
         rssThread.join();
 
@@ -676,10 +679,12 @@ public class TableHelper {
             pkeyColIndex = 0;
             assert(table.getColumnType(0).isInteger());
         }
+        String pkeyColName = table.getColumnName(pkeyColIndex);
 
         VoltTable result = client.callProcedure("@AdHoc",
-                String.format("select max(pkey) from %s;", TableHelper.getTableName(table))).getResults()[0];
-        long maxId = result.asScalarLong();
+                String.format("select %s from %s order by %s desc limit 1;",
+                        pkeyColName, TableHelper.getTableName(table), pkeyColName)).getResults()[0];
+        long maxId = result.getRowCount() > 0 ? result.asScalarLong() : 0;
         System.out.printf("Deleting odd rows with pkey ids in the range 0-%d\n", maxId);
 
         // track outstanding responses so 10k can be out at a time
