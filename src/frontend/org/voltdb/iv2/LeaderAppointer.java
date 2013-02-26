@@ -231,6 +231,11 @@ public class LeaderAppointer implements Promotable
                 if (missingHSIds.contains(m_currentLeader)) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
                 }
+                // If this partition doesn't have a leader yet, and we have new replicas added,
+                // elect a leader.
+                if (m_currentLeader == Long.MAX_VALUE && !updatedHSIds.isEmpty()) {
+                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                }
             }
             m_replicas.clear();
             m_replicas.addAll(updatedHSIds);
