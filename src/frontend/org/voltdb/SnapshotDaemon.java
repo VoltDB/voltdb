@@ -748,45 +748,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
                 @Override
-//<<<<<<< HEAD
-//                public void clientCallback(ClientResponse clientResponse)
-//                        throws Exception {
-//                    /*
-//                     * If there is an error then we are done.
-//                     */
-//                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-//                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-//                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-//                        m_zk.create(
-//                                VoltZK.user_snapshot_response + requestId,
-//                                rimpl.flattenToBuffer(buf).array(),
-//                                Ids.OPEN_ACL_UNSAFE,
-//                                CreateMode.PERSISTENT);
-//                        //Reset the watch
-//                        userSnapshotRequestExistenceCheck();
-//                        return;
-//                    }
-//
-//                    /*
-//                     * Now analyze the response. If a snapshot was in progress
-//                     * we have to reattempt it later, and send a response to the client
-//                     * saying it was queued. Otherwise, forward the response
-//                     * failure/success to the client.
-//                     */
-//                    if (isSnapshotInProgressResponse(clientResponse)) {
-//                        scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
-//                    } else {
-//                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-//                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-//                        m_zk.create(
-//                                VoltZK.user_snapshot_response + requestId,
-//                                rimpl.flattenToBuffer(buf).array(),
-//                                Ids.OPEN_ACL_UNSAFE,
-//                                CreateMode.PERSISTENT);
-//                        //Reset the watch
-//                        userSnapshotRequestExistenceCheck();
-//                        return;
-//=======
                 public void clientCallback(ClientResponse clientResponse) {
                     try {
                         /*
@@ -832,7 +793,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         } catch (Exception e2) {
                             VoltDB.crashLocalVoltDB("Error resetting watch for user snapshots", true, e2);
                         }
-//>>>>>>> c534d60... For ENG-2927, Based on Ning's feedback, don't use crashLocalVoltDB, try and recover instead
                     }
                 }
             });
@@ -1291,16 +1251,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     long handle = resp.getClientHandle();
                     m_procedureCallbacks.remove(handle).clientCallback(resp);
                 } catch (Exception e) {
-//<<<<<<< HEAD
-//                    hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
-//                    throw e;
-//=======
                     hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
                     /*
                      * Don't think it is productive to propagate any exceptions here, Ideally
                      * they should be handled by the procedure callbacks
                      */
-//>>>>>>> c534d60... For ENG-2927, Based on Ning's feedback, don't use crashLocalVoltDB, try and recover instead
                 }
                 return null;
             }
