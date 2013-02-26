@@ -427,7 +427,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testFIELDFunction() throws Exception {
+    /**
+     * @return
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    private void loadJS1(Client client) throws IOException, NoConnectionsException, ProcCallException
+    {
 
         final String jstemplate = "{\n" +
                 "    \"id\": %d,\n" +
@@ -437,29 +444,41 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "        \"贾鑫Vo\": \"wakarimasen\"\n" +
                 "    },\n" +
                 "    \"arr\": [\n" +
-                "        1,\n" +
-                "        2,\n" +
-                "        3,\n" +
-                "        4\n" +
+                "        0,\n" +
+                "        %d,\n" +
+                "        100\n" +
                 "    ],\n" +
                 "    \"tag\": \"%s\"\n" +
                 "}";
 
-        Client client = getClient();
+        ClientResponse cr;
+        cr = client.callProcedure("JS1.insert",1,String.format(jstemplate, 1, 1, "one"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert",2,String.format(jstemplate, 2, 2, "two"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert",3,String.format(jstemplate, 3, 3, "three"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert",4,"{\"id\":4,\"bool\": false}");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert",5,"{}");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert",6,"[]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert",7,"{\"id\":7,\"funky\": null}");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert",8, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("JS1.insert",9, "{\"id\":9, \"贾鑫Vo\":\"分かりません\"}");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    public void testFIELDFunction() throws Exception {
         ClientResponse cr;
         VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
 
-        cr = client.callProcedure("JS1.insert",1,String.format(jstemplate, 1, "one"));
-        cr = client.callProcedure("JS1.insert",2,String.format(jstemplate, 2, "two"));
-        cr = client.callProcedure("JS1.insert",3,String.format(jstemplate, 3, "three"));
-        cr = client.callProcedure("JS1.insert",4,"{\"id\":4,\"bool\": false}");
-        cr = client.callProcedure("JS1.insert",5,"{}");
-        cr = client.callProcedure("JS1.insert",6,"[]");
-        cr = client.callProcedure("JS1.insert",7,"{\"id\":7,\"funky\": null}");
-        cr = client.callProcedure("JS1.insert",8, null);
-        cr = client.callProcedure("JS1.insert",9, "{\"id\":9, \"贾鑫Vo\":\"分かりません\"}");
-
-        cr = client.callProcedure("IdFieldProc", "id","1");
+        cr = client.callProcedure("IdFieldProc", "id", "1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -503,50 +522,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(9L,result.getLong(0));
 
-        cr = client.callProcedure("LikeFieldProc", "tag");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(2, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        cr = client.callProcedure("LikeNoParamFieldProc");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(2, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        // Try the last query as an ad hoc -- this gets different constant/parameter handling.
-        cr = client.callProcedure("@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') LIKE 't%' ORDER BY 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(2, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        // Try some variants that would return the wrong answer if mistaken for a prefix case.
-        // This was missed in an earlier development version of the code and this test suite.
-        cr = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM JS1 WHERE FIELD(DOC, 'tag') LIKE '_%'");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        cr = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM JS1 WHERE FIELD(DOC, 'tag') LIKE 't_%'");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-
         cr = client.callProcedure("NullFieldProc", "funky");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -574,7 +549,138 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(3L,result.getLong(0));
 
-        cr = client.callProcedure("IdFieldProc", "arr" ,"[1,2,3,4]");
+        cr = client.callProcedure("IdFieldProc", "arr" ,"[0,2,100]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(2L,result.getLong(0));
+
+        cr = client.callProcedure("@AdHoc", // test scalar not an object
+                                  "SELECT FIELD(FIELD(DOC, 'id'), 'value') FROM JS1 WHERE ID = 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getString(0);
+        assertTrue(result.wasNull());
+
+        cr = client.callProcedure("@AdHoc", // test array not an object
+                                  "SELECT FIELD(FIELD(DOC, 'arr'), 'value') FROM JS1 WHERE ID = 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getString(0);
+        assertTrue(result.wasNull());
+    }
+
+    public void testARRAY_ELEMENTFunction() throws Exception {
+        ClientResponse cr;
+        VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
+
+        cr = client.callProcedure("IdArrayProc", "arr", 1, "1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1L,result.getLong(0));
+
+        try {
+            cr = client.callProcedure("IdArrayProc", "arr", "NotNumeric", "1");
+            fail("parameter check failed");
+        }
+        catch ( ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 1"));
+        }
+
+        try {
+            cr = client.callProcedure("IdArrayProc", 1, 1, "1");
+            fail("parameter check failed");
+        }
+        catch ( ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 0"));
+        }
+
+        cr = client.callProcedure("NullArrayProc", "funky", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(9, result.getRowCount());
+
+        cr = client.callProcedure("IdArrayProc", "id", 1, "1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(0, result.getRowCount());
+
+        cr = client.callProcedure("@AdHoc", // test index out of bounds
+                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'arr'), 99) FROM JS1 WHERE ID = 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getString(0);
+        assertTrue(result.wasNull());
+
+        cr = client.callProcedure("@AdHoc", // test negative index
+                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'arr'), -1) FROM JS1 WHERE ID = 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getString(0);
+        assertTrue(result.wasNull());
+
+        cr = client.callProcedure("@AdHoc", // test scalar not an array
+                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'id'), 1) FROM JS1 WHERE ID = 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getString(0);
+        assertTrue(result.wasNull());
+
+        cr = client.callProcedure("@AdHoc", // test object not an array
+                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'inner'), 1) FROM JS1 WHERE ID = 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getString(0);
+        assertTrue(result.wasNull());
+
+        // Test top-level json array.
+        cr = client.callProcedure("JS1.insert", 10, "[0, 10, 100]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc",
+                                  "SELECT ARRAY_ELEMENT(DOC, 1) FROM JS1 WHERE ID = 10");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("10",result.getString(0));
+
+        // Test empty json array.
+        cr = client.callProcedure("JS1.insert", 11, "[]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc",
+                                  "SELECT ARRAY_ELEMENT(DOC, 0) FROM JS1 WHERE ID = 11");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getString(0);
+        assertTrue(result.wasNull());
+    }
+
+    public void testARRAY_LENGTHFunction() throws Exception {
+        ClientResponse cr;
+        VoltTable result;
+        Client client = getClient();
+        loadJS1(client);
+
+        cr = client.callProcedure("IdArrayLengthProc", "arr", 3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(3, result.getRowCount());
@@ -584,42 +690,179 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(2L,result.getLong(0));
         assertTrue(result.advanceRow());
         assertEquals(3L,result.getLong(0));
+
+        try {
+            cr = client.callProcedure("IdArrayLengthProc", "arr", "NoNumber");
+            fail("parameter check failed");
+        }
+        catch ( ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 1"));
+        }
+
+        try {
+            cr = client.callProcedure("IdArrayLengthProc", 1, 3);
+            fail("parameter check failed");
+        }
+        catch ( ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 0"));
+        }
+
+        cr = client.callProcedure("NullFieldProc", "funky");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(9, result.getRowCount());
+
+        cr = client.callProcedure("NullArrayLengthProc", "arr");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(6, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(4L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(5L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(6L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(7L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(8L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(9L,result.getLong(0));
+
+        cr = client.callProcedure("LargeArrayLengthProc", "arr", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(0, result.getRowCount());
+
+        cr = client.callProcedure("LargeArrayLengthProc", "arr", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(3, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(2L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+
+        cr = client.callProcedure("SmallArrayLengthProc", "arr", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(0, result.getRowCount());
+
+        cr = client.callProcedure("SmallArrayLengthProc", "arr", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(3, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(2L,result.getLong(0));
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+
+        cr = client.callProcedure("@AdHoc", // test scalar not an array
+                                  "SELECT ARRAY_LENGTH(FIELD(DOC, 'id')) FROM JS1 WHERE ID = 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getLong(0);
+        assertTrue(result.wasNull());
+
+        cr = client.callProcedure("@AdHoc", // test object not an array
+                                  "SELECT ARRAY_LENGTH(FIELD(DOC, 'inner')) FROM JS1 WHERE ID = 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        result.getLong(0);
+        assertTrue(result.wasNull());
+
+        // Test top-level json array.
+        cr = client.callProcedure("JS1.insert", 10, "[0, 10, 100]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", // test object not an array
+                                  "SELECT ARRAY_LENGTH(DOC) FROM JS1 WHERE ID = 10");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(3L,result.getLong(0));
+
+        // Test empty json array.
+        cr = client.callProcedure("JS1.insert", 11, "[]");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc",
+                                  "SELECT ARRAY_LENGTH(DOC) FROM JS1 WHERE ID = 11");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(0L,result.getLong(0));
     }
 
-    public void testFIELDFunctionWithInvalidJSON() throws Exception {
+    public void testFunctionsWithInvalidJSON() throws Exception {
 
         Client client = getClient();
         ClientResponse cr;
 
         cr = client.callProcedure(
-                "JSBAD.insert",1,
+                "JSBAD.insert", 1, // OOPS. skipped comma before "bool"
                 "{\"id\":1 \"bool\": false}"
                 );
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure(
-                "JSBAD.insert",2,
+                "JSBAD.insert", 2, // OOPS. semi-colon in place of colon before "bool"
                 "{\"id\":2, \"bool\"; false, \"贾鑫Vo\":\"分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません分かりません\"}"
                 );
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        try {
-            cr = client.callProcedure("BadIdFieldProc", 1, "id", "1");
-            fail("document validity check failed");
-        }
-        catch(ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains(
-                    "Invalid JSON * Line 1, Column 9"
-                    ));
-        }
-        try {
-            cr = client.callProcedure("BadIdFieldProc", 2, "id", "2");
-            fail("document validity check failed");
-        }
-        catch(ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains(
-                    "Invalid JSON * Line 1, Column 16"
-                    ));
+        final String jsTrailingCommaArray = "[ 0, 100, ]"; // OOPS. trailing comma in array
+        final String jsWithTrailingCommaArray = "{\"id\":3, \"trailer\":" + jsTrailingCommaArray + "}";
+
+        cr = client.callProcedure("JSBAD.insert", 3, jsWithTrailingCommaArray);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("JSBAD.insert", 4, jsTrailingCommaArray);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+
+        String[] jsonProcs = { "BadIdFieldProc", "BadIdArrayProc", "BadIdArrayLengthProc" };
+
+        for (String procname : jsonProcs) {
+            try {
+                cr = client.callProcedure(procname, 1, "id", "1");
+                fail("document validity check failed for " + procname);
+            }
+            catch(ProcCallException pcex) {
+                assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 9"));
+            }
+
+            try {
+                cr = client.callProcedure(procname, 2, "id", "2");
+                fail("document validity check failed for " + procname);
+            }
+            catch(ProcCallException pcex) {
+                assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 16"));
+            }
+
+            try {
+                cr = client.callProcedure(procname, 3, "id", "3");
+                fail("document validity check failed for " + procname);
+            }
+            catch(ProcCallException pcex) {
+                assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 30"));
+            }
+
+            try {
+                cr = client.callProcedure(procname, 4, "id", "4");
+                fail("document validity check failed for " + procname);
+            }
+            catch(ProcCallException pcex) {
+                assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 11"));
+            }
         }
     }
 
@@ -650,11 +893,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "  DOC VARCHAR(8192),\n" +
                 "  PRIMARY KEY(ID))\n" +
                 ";\n" +
-                "CREATE INDEX TAGS1 ON JS1 ( FIELD(DOC, 'tag') )\n" +
-                ";\n" +
-                "CREATE PROCEDURE FieldProc AS\n" +
-                "   SELECT FIELD(DOC, ?) AS JFIELD FROM JS1 WHERE FIELD(DOC, ?) = ?\n" +
-                ";\n" +
                 "CREATE PROCEDURE IdFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
                 ";\n" +
@@ -664,12 +902,25 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "CREATE PROCEDURE NullFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) IS NULL ORDER BY ID\n" +
                 ";\n" +
-                "CREATE PROCEDURE LikeFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) LIKE 't%' ORDER BY 1\n" +
+                "CREATE PROCEDURE IdArrayProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) = ? ORDER BY ID\n" +
                 ";\n" +
-                "CREATE PROCEDURE LikeNoParamFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(DOC, 'tag') LIKE 't%' ORDER BY 1\n" +
+                "CREATE PROCEDURE NullArrayProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) IS NULL ORDER BY ID\n" +
                 ";\n" +
+                "CREATE PROCEDURE IdArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE SmallArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) BETWEEN 0 AND ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE LargeArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) > ? ORDER BY ID\n" +
+                ";\n" +
+
                 "CREATE TABLE JSBAD (\n" +
                 "  ID INTEGER NOT NULL,\n" +
                 "  DOC VARCHAR(8192),\n" +
@@ -677,6 +928,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 ";\n" +
                 "CREATE PROCEDURE BadIdFieldProc AS\n" +
                 "  SELECT ID FROM JSBAD WHERE ID = ? AND FIELD(DOC, ?) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdArrayProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_ELEMENT(FIELD(DOC, ?), 1) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdArrayLengthProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
                 ";\n" +
                 "";
         try {
