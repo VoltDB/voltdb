@@ -283,6 +283,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_SQRT:
             ret = new UnaryFunctionExpression<FUNC_SQRT>((*arguments)[0]);
             break;
+        case FUNC_VOLT_ARRAY_LENGTH:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_ARRAY_LENGTH>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
@@ -317,6 +320,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_SUBSTRING_CHAR:
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
+            break;
+        case FUNC_VOLT_ARRAY_ELEMENT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
             break;
         case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
