@@ -20,9 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
@@ -46,9 +44,6 @@ import org.voltdb.VoltDB;
 public abstract class BaseInitiator implements Initiator
 {
     VoltLogger tmLog = new VoltLogger("TM");
-
-    public static final String JSON_PARTITION_ID = "partitionId";
-    public static final String JSON_INITIATOR_HSID = "initiatorHSId";
 
     // External references/config
     protected final HostMessenger m_messenger;
@@ -202,19 +197,5 @@ public abstract class BaseInitiator implements Initiator
         return m_initiatorMailbox.getHSId();
     }
 
-    protected void acceptPromotion() throws Exception {
-        /*
-         * Notify all known client interfaces that the mastership has changed
-         * for the specified partition and that no responses from previous masters will be forthcoming
-         */
-        JSONStringer stringer = new JSONStringer();
-        stringer.object();
-        stringer.key(JSON_PARTITION_ID).value(m_partitionId);
-        stringer.key(JSON_INITIATOR_HSID).value(m_initiatorMailbox.getHSId());
-        stringer.endObject();
-        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
-        for (Integer hostId : m_messenger.getLiveHostIds()) {
-            m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), bpm);
-        }
-    }
+    abstract protected void acceptPromotion() throws Exception;
 }

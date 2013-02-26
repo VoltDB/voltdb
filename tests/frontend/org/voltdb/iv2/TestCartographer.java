@@ -27,9 +27,42 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.TestCase;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 
-public class TestCartographer extends TestCase {
+import org.json_voltpatches.JSONObject;
+
+import org.mockito.ArgumentCaptor;
+
+import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.VoltMessage;
+
+import org.voltcore.zk.ZKTestBase;
+
+import static org.junit.Assert.*;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.mockito.Mockito.*;
+
+import org.voltdb.VoltZK;
+
+public class TestCartographer extends ZKTestBase {
+
+    @Before
+    public void setUp() throws Exception
+    {
+        setUpZK(1);
+    }
+
+    @After
+    public void tearDown() throws Exception
+    {
+        tearDownZK();
+    }
+
+    @Test
     public void testSortByValue()
     {
         Map<Integer, Integer> unsorted = new HashMap<Integer, Integer>();
@@ -46,6 +79,7 @@ public class TestCartographer extends TestCase {
         assertEquals((Integer)0, sorted.get(4));
     }
 
+    @Test
     public void testReplicateLeastReplicated()
     {
         // Gin up our fake replication counts to leave the last partition needing two replicas
@@ -81,6 +115,7 @@ public class TestCartographer extends TestCase {
         assertEquals((Integer)4, secondRejoin.get(2));
     }
 
+    @Test
     public void testNoOverReplication()
     {
         // We'll set things up to only require one more replica and then offer up a host with more sites
@@ -101,5 +136,68 @@ public class TestCartographer extends TestCase {
             Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost, numberOfPartitions);
         assertEquals(1, firstRejoin.size());
         assertEquals((Integer)4, firstRejoin.get(0));
+    }
+
+    @Test
+    public void testSPMasterChange() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        VoltZK.createPersistentZKNodes(zk);
+        LeaderCache spwriter = new LeaderCache(zk, VoltZK.iv2masters);
+        HostMessenger hm = mock(HostMessenger.class);
+        when(hm.getZK()).thenReturn(m_messengers.get(0).getZK());
+        Cartographer dut = new Cartographer(hm, 3);
+        // Startup partitions
+        spwriter.start(true);
+        spwriter.put(0, 0l);
+        verify(hm, timeout(10000)).send(anyLong(), any(VoltMessage.class));
+        reset(hm);
+        spwriter.put(1, 1l);
+        verify(hm, timeout(10000)).send(anyLong(), any(VoltMessage.class));
+        reset(hm);
+        spwriter.put(2, 2l);
+        verify(hm, timeout(10000)).send(anyLong(), any(VoltMessage.class));
+        reset(hm);
+
+        // now change master for part 0
+        spwriter.put(0, 3l);
+        ArgumentCaptor<Long> hsIdCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<BinaryPayloadMessage> bpmCaptor = ArgumentCaptor.forClass(BinaryPayloadMessage.class);
+        verify(hm, timeout(10000)).send(hsIdCaptor.capture(), bpmCaptor.capture());
+        JSONObject jsObj = new JSONObject(new String(bpmCaptor.getValue().m_payload, "UTF-8"));
+        System.out.println("BPM: " + jsObj.toString());
+        final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
+        final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
+        assertEquals(0, partitionId);
+        assertEquals(3, initiatorHSId);
+        spwriter.shutdown();
+    }
+
+    @Test
+    public void testMPIChange() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        VoltZK.createPersistentZKNodes(zk);
+        LeaderCache mpwriter = new LeaderCache(zk, VoltZK.iv2mpi);
+        HostMessenger hm = mock(HostMessenger.class);
+        when(hm.getZK()).thenReturn(m_messengers.get(0).getZK());
+        Cartographer dut = new Cartographer(hm, 3);
+        mpwriter.start(true);
+        // initial master
+        mpwriter.put(MpInitiator.MP_INIT_PID, 0l);
+        verify(hm, timeout(10000)).send(anyLong(), any(VoltMessage.class));
+        reset(hm);
+
+        // Now change the master
+        mpwriter.put(MpInitiator.MP_INIT_PID, 3l);
+        ArgumentCaptor<Long> hsIdCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<BinaryPayloadMessage> bpmCaptor = ArgumentCaptor.forClass(BinaryPayloadMessage.class);
+        verify(hm, timeout(10000)).send(hsIdCaptor.capture(), bpmCaptor.capture());
+        JSONObject jsObj = new JSONObject(new String(bpmCaptor.getValue().m_payload, "UTF-8"));
+        final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
+        final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
+        assertEquals(MpInitiator.MP_INIT_PID, partitionId);
+        assertEquals(3, initiatorHSId);
+        mpwriter.shutdown();
     }
 }

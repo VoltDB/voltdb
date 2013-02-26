@@ -1224,8 +1224,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private void handlePartitionFailOver(BinaryPayloadMessage message) {
         try {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
-            final int partitionId = jsObj.getInt(BaseInitiator.JSON_PARTITION_ID);
-            final long initiatorHSId = jsObj.getLong(BaseInitiator.JSON_INITIATOR_HSID);
+            final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
+            final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
             for (final Connection c : m_connections) {
                 c.queueTask(new Runnable() {
                     @Override
