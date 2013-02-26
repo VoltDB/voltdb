@@ -687,18 +687,20 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        // for test code
+        wasCrashCalled = true;
+        crashMessage = errMsg;
+        if (ignoreCrash) {
+            throw new AssertionError("Faux crash of VoltDB successful.");
+        }
+        // end test code
+
         // try/finally block does its best to ensure death, no matter what context this
         // is called in
         try {
             // slightly less important than death, this try/finally block protects code that
             // prints a message to stdout
             try {
-
-                wasCrashCalled = true;
-                crashMessage = errMsg;
-                if (ignoreCrash) {
-                    throw new AssertionError("Faux crash of VoltDB successful.");
-                }
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
@@ -804,24 +806,28 @@ public class VoltDB {
      * Also notify all connected peers that the node is going down.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
-        // try block does its best to ensure death, no matter what context this
-        // is called in
-        try {
-            wasCrashCalled = true;
-            crashMessage = errMsg;
-            if (ignoreCrash) {
-                throw new AssertionError("Faux crash of VoltDB successful.");
-            }
-            try {
-                instance().getHostMessenger().sendPoisonPill(errMsg);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            try { Thread.sleep(500); } catch (InterruptedException e) {}
-            crashLocalVoltDB(errMsg, stackTrace, t);
+        // for test code
+        wasCrashCalled = true;
+        crashMessage = errMsg;
+        if (ignoreCrash) {
+            throw new AssertionError("Faux crash of VoltDB successful.");
         }
+        // end test code
+
+        try {
+            // instruct the rest of the cluster to die
+            instance().getHostMessenger().sendPoisonPill(errMsg);
+            // give the pill a chance to make it through the network buffer
+            Thread.sleep(500);
+        } catch (Exception e) {
+            e.printStackTrace();
+            // sleep even on exception in case the pill got sent before the exception
+            try { Thread.sleep(500); } catch (InterruptedException e2) {}
+        }
+        // finally block does its best to ensure death, no matter what context this
+        // is called in
         finally {
-            System.exit(-1);
+            crashLocalVoltDB(errMsg, stackTrace, t);
         }
     }
 
