@@ -59,6 +59,7 @@
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
+#include "common/ElasticHashinator.h"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
@@ -216,6 +217,9 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     switch (hashinatorType) {
     case HASHINATOR_LEGACY:
     	m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
+    	break;
+    case HASHINATOR_ELASTIC:
+    	m_hashinator.reset(ElasticHashinator::newInstance(hashinatorConfig));
     	break;
     default:
     	throwFatalException("Unknown hashinator type %d", hashinatorType);

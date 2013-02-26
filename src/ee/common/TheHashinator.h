@@ -44,7 +44,7 @@ class TheHashinator {
      * However, since we currently have two matching implementations
      * of hashinate, it's nice to centralize and isolate the code here.
      */
-	 int32_t hashinate(NValue value)
+	 int32_t hashinate(NValue value) const
 	  {
 		  // All null values hash to partition 0
 		  if (value.isNull())
@@ -83,8 +83,8 @@ class TheHashinator {
      * @return A value between 0 and partitionCount-1, hopefully pretty evenly
      * distributed.
      */
-    virtual int32_t hashinate(int64_t value) = 0;
-    virtual int32_t hashinate(const char *string, int32_t length) = 0;
+    virtual int32_t hashinate(int64_t value) const = 0;
+    virtual int32_t hashinate(const char *string, int32_t length) const = 0;
 };
 
 } // namespace voltdb

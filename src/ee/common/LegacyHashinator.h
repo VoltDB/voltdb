@@ -32,7 +32,7 @@
 namespace voltdb {
 class LegacyHashinator : public TheHashinator {
 public:
-	static LegacyHashinator* newInstance(char *config) {
+	static LegacyHashinator* newInstance(const char *config) {
 		ReferenceSerializeInput input(config, 4);
 		return new LegacyHashinator(input.readInt());
 	}
@@ -48,7 +48,7 @@ protected:
     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
     * distributed.
     */
-   int32_t hashinate(int64_t value) {
+   int32_t hashinate(int64_t value) const {
        // special case this hard to hash value to 0 (in both c++ and java)
        if (value == INT64_MIN) return 0;
 
@@ -62,7 +62,7 @@ protected:
     * s[0]*31^(n-1) + s[1]*31^(n-2) + ... + s[n-1]
     *
     */
-   int32_t hashinate(const char *string, int32_t length) {
+   int32_t hashinate(const char *string, int32_t length) const {
        int32_t hashCode = 0;
        int32_t offset = 0;
        if (length < 0) {

@@ -105,6 +105,7 @@
 #include "common/SegvException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
+#include "common/ElasticHashinator.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
@@ -1188,9 +1189,13 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
         HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[1]));
         boost::scoped_ptr<TheHashinator> hashinator;
+        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[2]));
         switch (hashinatorType) {
         case HASHINATOR_LEGACY:
-        	hashinator.reset(LegacyHashinator::newInstance((char*)voltdb::ValuePeeker::peekObjectValue(params[2])));
+        	hashinator.reset(LegacyHashinator::newInstance(configValue));
+        	break;
+        case HASHINATOR_ELASTIC:
+        	hashinator.reset(ElasticHashinator::newInstance(configValue));
         	break;
         default:
         	return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;

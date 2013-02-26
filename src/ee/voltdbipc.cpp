@@ -32,6 +32,8 @@
 #include "common/SegvException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/TheHashinator.h"
+#include "common/LegacyHashinator.h"
+#include "common/ElasticHashinator.h"
 #include "execution/IPCTopend.h"
 #include "execution/VoltDBEngine.h"
 #include "common/ThreadLocalPool.h"
@@ -1005,6 +1007,9 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     switch (hashinatorType) {
     case HASHINATOR_LEGACY:
     	hashinator.reset(LegacyHashinator::newInstance(hash->data));
+    	break;
+    case HASHINATOR_ELASTIC:
+    	hashinator.reset(ElasticHashinator::newInstance(hash->data));
     	break;
     default:
     	try {
