@@ -170,15 +170,18 @@ def main():
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
+    ndays = 1000
+    if len(sys.argv) >=4:
+        ndays = int(sys.argv[3])
     width = None
     height = None
-    if len(sys.argv) >= 4:
-        width = int(sys.argv[3])
     if len(sys.argv) >= 5:
-        height = int(sys.argv[4])
+        width = int(sys.argv[4])
+    if len(sys.argv) >= 6:
+        height = int(sys.argv[5])
 
     # show all the history
-    stats = get_stats(STATS_SERVER, 21212, 1000)
+    stats = get_stats(STATS_SERVER, 21212, ndays)
 
     # Plot single node stats for all apps
     filenames = []              # (appname, latency, throughput)
