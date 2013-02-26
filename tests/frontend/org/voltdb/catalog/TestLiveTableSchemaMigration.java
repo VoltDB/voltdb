@@ -74,7 +74,8 @@ public class TestLiveTableSchemaMigration extends TestCase {
             byte[] catBytes2 = CatalogUtil.toBytes(new File(catPath2));
 
             DeploymentBuilder depBuilder = new DeploymentBuilder();
-            String deployment = depBuilder.getXML("/tmp/jhugg/foobar");
+            depBuilder.setVoltRoot("/tmp/jhugg/foobar");
+            String deployment = depBuilder.getXML();
             File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
 
             VoltDB.Configuration config = new VoltDB.Configuration();
