@@ -1331,7 +1331,6 @@ TEST CASES
                 <include name='org/voltdb/network/**/*Test.class'/>
                 <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
-                <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
                 <!-- Excluded pro tests -->
@@ -1345,11 +1344,11 @@ TEST CASES
                 <exclude name="**/TestSecondaryRejoin.class" />
                 <exclude name="**/TestSnapshotSaveTruncation.class" />
                 <!-- Exclude community tests -->
+                <!-- Recorded as ENG-4423 -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
                 <exclude name="**/TestNonDetermisticSeppuku.class" />
-                <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
             </fileset>
