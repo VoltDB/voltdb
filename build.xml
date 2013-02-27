@@ -1342,7 +1342,6 @@ TEST CASES
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
                 <exclude name="**/TestSecondaryRejoin.class" />
-                <exclude name="**/TestSnapshotSaveTruncation.class" />
                 <!-- Exclude community tests -->
                 <!-- Recorded as ENG-4423 -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
