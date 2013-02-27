@@ -199,6 +199,7 @@ with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key
     buildPro()
     copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
 
+# build debian kit
 with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_filename=volt12c[0]):
     debbuilddir = "%s/deb_build/" % builddir
     run("rm -rf " + debbuilddir)
@@ -216,6 +217,25 @@ with settings(user=username,host_string=volt12c[1],disable_known_hosts=True,key_
         put("%s/%s" % (releaseDir, entbld),".")
         run ("sudo python voltdb-install.py -D " + entbld)
         get("voltdb-ent_%s-1_amd64.deb" % (versionVolt5f), releaseDir)
+
+# build rpm kit
+with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
+    rpmbuilddir = "%s/rpm_build/" % builddir
+    run("rm -rf " + rpmbuilddir)
+    run("mkdir -p " + rpmbuilddir)
+
+    with cd(rpmbuilddir):
+        put ("tools/voltdb-install.py",".")
+
+        commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionVolt5f)
+        put("%s/%s" % (releaseDir, commbld),".")
+        run ("python voltdb-install.py -R " + commbld)
+        get("voltdb-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
+
+        entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionVolt5f)
+        put("%s/%s" % (releaseDir, entbld),".")
+        run ("python voltdb-install.py -R " + entbld)
+        get("voltdb-ent-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
 
 computeChecksums(releaseDir)
 archiveDir = os.path.join(os.getenv('HOME'), "releases", "archive", voltdbTreeish, versionVolt5f)
