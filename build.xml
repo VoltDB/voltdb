@@ -1338,7 +1338,6 @@ TEST CASES
                 <exclude name="**/TestCommandLogReinitiator.class"/>
                 <exclude name="**/TestCommandLog.class"/>
                 <exclude name="**/TestLogReader.class"/>
-                <exclude name="**/TestResponseSampler.class" />  <!-- fails legacy -->
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
                 <!-- Exclude community tests -->
@@ -1410,7 +1409,6 @@ TEST CASES
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
-                <exclude name="**/TestResponseSampler.class" />  <!-- regressed during 3.0 bugfix? -->
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- regressed during 3.0 bugfix? -->
             </fileset>
         </tests>

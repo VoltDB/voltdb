@@ -115,7 +115,6 @@ import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
-import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
@@ -371,10 +370,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
-
-            // start up the response sampler if asked to by setting the env var
-            // VOLTDB_RESPONSE_SAMPLE_PATH to a valid path
-            ResponseSampler.initializeIfEnabled();
 
             buildClusterMesh(isRejoin);
 
