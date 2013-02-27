@@ -1348,7 +1348,6 @@ TEST CASES
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
-                <exclude name="**/TestSneakyExecutionOrderSuite.class" />
             </fileset>
         </tests>
     </run_junit>
