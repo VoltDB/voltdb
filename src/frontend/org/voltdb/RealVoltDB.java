@@ -474,7 +474,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         Integer partition = partitions.get(ii);
                         m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
                     }
-                    m_iv2Initiators = createIv2Initiators(partitions, isRejoin);
+                    m_iv2Initiators = createIv2Initiators(partitions,
+                            m_catalogContext.cluster.getVoltroot(), m_config.m_startAction);
                     m_iv2InitiatorStartingTxnIds.put(
                             MpInitiator.MP_INIT_PID,
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
@@ -1120,13 +1121,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return topo;
     }
 
-    private List<Initiator> createIv2Initiators(Collection<Integer> partitions, boolean forRejoin)
+    private List<Initiator> createIv2Initiators(Collection<Integer> partitions, String voltroot,
+                                                START_ACTION startAction)
     {
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent,
-                    m_snapshotCompletionMonitor, forRejoin);
+                    m_snapshotCompletionMonitor, voltroot, startAction);
             initiators.add(initiator);
         }
         return initiators;

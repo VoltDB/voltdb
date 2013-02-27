@@ -64,14 +64,16 @@ public abstract class BaseInitiator implements Initiator
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, boolean forRejoin)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, String voltroot,
+            VoltDB.START_ACTION startAction)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        RejoinProducer rejoinProducer = forRejoin ?
-            new RejoinProducer(m_partitionId, scheduler.m_tasks) :
+        boolean isLiveRejoin = startAction == VoltDB.START_ACTION.LIVE_REJOIN;
+        JoinProducerBase rejoinProducer = VoltDB.createForRejoin(startAction) ?
+            new RejoinProducer(m_partitionId, scheduler.m_tasks, voltroot, isLiveRejoin) :
             null;
         if (m_partitionId == MpInitiator.MP_INIT_PID) {
             m_initiatorMailbox = new MpInitiatorMailbox(
@@ -133,6 +135,11 @@ public abstract class BaseInitiator implements Initiator
                 startAction = VoltDB.START_ACTION.CREATE;
             }
 
+            TaskLog taskLog = null;
+            if (m_initiatorMailbox.getJoinProducer() != null) {
+                taskLog = m_initiatorMailbox.getJoinProducer().getTaskLog();
+            }
+
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -146,6 +153,7 @@ public abstract class BaseInitiator implements Initiator
                                        agent,
                                        memStats,
                                        coreBindIds,
+                                       taskLog,
                                        drGateway);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);

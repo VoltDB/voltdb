@@ -85,6 +85,7 @@ import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -2945,7 +2946,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public void setRejoinComplete(
-            org.voltdb.iv2.RejoinProducer.ReplayCompletionAction ignored,
+            JoinProducerBase.JoinCompletionAction ignored,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
