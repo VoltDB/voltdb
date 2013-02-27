@@ -2511,4 +2511,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             return m_periodicPriorityWorkThread.schedule(work, initialDelay, unit);
         }
     }
+
+    @Override
+    public LeaderAppointer getLeaderAppointer() {
+        return m_leaderAppointer;
+    }
 }

@@ -52,6 +52,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -552,6 +553,12 @@ public class MockVoltDB implements VoltDBInterface
             voltconfig = new VoltDB.Configuration();
         }
         return voltconfig.m_enableIV2;
+    }
+
+    @Override
+    public LeaderAppointer getLeaderAppointer()
+    {
+        return null;
     }
 
     @Override
