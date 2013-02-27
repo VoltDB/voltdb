@@ -229,12 +229,12 @@ with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_f
 
         commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionVolt5f)
         put("%s/%s" % (releaseDir, commbld),".")
-        run ("python voltdb-install.py -R " + commbld)
+        run ("python2.6 voltdb-install.py -R " + commbld)
         get("voltdb-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
 
         entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionVolt5f)
         put("%s/%s" % (releaseDir, entbld),".")
-        run ("python voltdb-install.py -R " + entbld)
+        run ("python2.6 voltdb-install.py -R " + entbld)
         get("voltdb-ent-%s-1.x86_64.rpm" % (versionVolt5f), releaseDir)
 
 computeChecksums(releaseDir)
