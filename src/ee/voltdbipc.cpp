@@ -1002,7 +1002,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     NValueArray& params = m_engine->getParameterContainer();
 
     int32_t hashinatorType = ntohl(hash->hashinatorType);
-    HashinatorType configLength = ntohl(hash->configLength);
+    HashinatorType configLength = static_cast<HashinatorType>(ntohl(hash->configLength));
     boost::scoped_ptr<TheHashinator> hashinator;
     switch (hashinatorType) {
     case HASHINATOR_LEGACY:

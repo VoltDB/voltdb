@@ -288,7 +288,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    tempTableMemory,
                                    (HashinatorType)hashinatorType,
                                    (char*)hashinatorConfigData);
-        env->ReleaseByteArrayElements( hostname, hostChars, JNI_ABORT);
         env->ReleaseByteArrayElements( hashinatorConfig, hashinatorConfigData, JNI_ABORT);
         if (success) {
             VOLT_DEBUG("initialize succeeded");
