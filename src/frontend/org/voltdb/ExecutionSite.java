@@ -776,6 +776,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }
         @Override
         public int getNumberOfPartitions()                      { return m_tracker.m_numberOfPartitions; }
+
+        @Override
+        public void setNumberOfPartitions(int partitionCount)
+        {
+            throw new UnsupportedOperationException("Changing partition count in legacy is not " +
+                    "supported");
+        }
+
         @Override
         public SiteProcedureConnection getSiteProcedureConnection()
         {

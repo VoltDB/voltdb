@@ -92,7 +92,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     final int m_snapshotPriority;
 
     // Partition count is important for some reason.
-    final int m_numberOfPartitions;
+    int m_numberOfPartitions;
 
     // What type of EE is controlled
     final BackendTarget m_backend;
@@ -283,6 +283,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public int getNumberOfPartitions() {
             return m_numberOfPartitions;
+        }
+
+        @Override
+        public void setNumberOfPartitions(int partitionCount) {
+            Site.this.setNumberOfPartitions(partitionCount);
         }
 
         @Override
@@ -1064,5 +1069,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (!foundMultipartTxnId) {
             VoltDB.crashLocalVoltDB("Didn't find a multipart txnid on restore", false, null);
         }
+    }
+
+    public void setNumberOfPartitions(int partitionCount)
+    {
+        m_numberOfPartitions = partitionCount;
+        m_ee.setNumberOfPartitions(m_numberOfPartitions);
     }
 }
