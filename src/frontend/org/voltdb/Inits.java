@@ -642,7 +642,7 @@ public class Inits {
 
         @Override
         public void run() {
-            if (!m_isRejoin && !m_config.m_isRejoinTest) {
+            if (!m_isRejoin && !m_config.m_isRejoinTest && !m_rvdb.m_joining) {
                 String snapshotPath = null;
                 if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();

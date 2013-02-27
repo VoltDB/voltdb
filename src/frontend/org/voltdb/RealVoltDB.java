@@ -63,6 +63,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -207,6 +208,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     // some rejoining state enum at some point.
     volatile boolean m_rejoinDataPending = false;
     String m_rejoinTruncationReqId = null;
+
+    // Are we adding the node to the cluster instead of rejoining?
+    volatile boolean m_joining = false;
+    Joiner m_joiner = null;
 
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
@@ -359,6 +364,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_rejoining = isRejoin;
             m_rejoinDataPending = isRejoin;
 
+            m_joining = config.m_startAction == START_ACTION.JOIN;
+
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
                 System.setOut(new PrintStream(System.out, true, "UTF-8"));
@@ -376,14 +383,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // VOLTDB_RESPONSE_SAMPLE_PATH to a valid path
             ResponseSampler.initializeIfEnabled();
 
-            buildClusterMesh(isRejoin);
+            buildClusterMesh(isRejoin || m_joining);
 
             //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
 
             m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes + "/" + m_messenger.getHostId());
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!isRejoin) {
+            if (!isRejoin && !m_joining) {
                 m_messenger.waitForGroupJoin(numberOfNodes);
             }
 
@@ -414,6 +421,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
 
+            if (m_joining) {
+                Class<?> joinerClass = MiscUtils.loadProClass("org.voltdb.JoinerImpl", "Elastic", false);
+                try {
+                    Constructor<?> constructor = joinerClass.getConstructor(ZooKeeper.class);
+                    m_joiner = (Joiner) constructor.newInstance(m_messenger.getZK());
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Failed to instantiate joiner", true, e);
+                }
+            }
+
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
              * in one atomic shot.
@@ -430,7 +447,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
-            JSONObject topo = getTopology(isRejoin);
+            JSONObject topo = getTopology(isRejoin || m_joining);
             try {
                 // IV2 mailbox stuff
                 if (isIV2Enabled()) {
@@ -445,6 +462,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                     iv2config.getReplicationFactor() + ".\n" +
                                     "No more nodes can join.", false, null);
                         }
+                    }
+                    if (m_joining) {
+                        // Ask the joiner for the new partitions to create on this node.
+                        partitions = m_joiner.getPartitionsToAdd();
                     }
                     else {
                         partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
@@ -831,7 +852,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             try {
                 final Class<?> statsManagerClass =
                         MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
-                if (statsManagerClass != null) {
+                if (statsManagerClass != null && m_MPI != null) {
                     ArrayList<Long> localHSIds;
                     Long MPHSId;
                     if (isIV2Enabled()) {
@@ -872,7 +893,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 VoltDB.crashLocalVoltDB("Failed to validate cluster build string", false, e);
             }
 
-            if (!isRejoin) {
+            if (!isRejoin && !m_joining) {
                 try {
                     m_messenger.waitForAllHostsToBeReady(m_deployment.getCluster().getHostcount());
                 } catch (Exception e) {
@@ -881,7 +902,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 }
             }
             m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = true;
-            if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
+            if (!m_joining && m_siteTracker.m_numberOfPartitions !=
+                    m_configuredNumberOfPartitions) {
                 for (Map.Entry<Integer, ImmutableList<Long>> entry :
                     m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
                     hostLog.info(entry.getKey() + " -- "
@@ -1638,6 +1660,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // start the separate EE threads
             for (ExecutionSiteRunner r : m_runners) {
                 r.m_shouldStartRunning.countDown();
+            }
+        }
+
+        // Start join
+        if (m_joiner != null) {
+            try {
+               if (!m_joiner.startJoin(m_clientInterfaces.get(0), m_myHostId)) {
+                   VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
+               }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to join the cluster", true, e);
             }
         }
 
