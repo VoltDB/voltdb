@@ -611,10 +611,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
+     * @param totalTuples total tuple count to be streamed
      * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte[] data);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, int totalTuples, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type
@@ -622,8 +623,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param tableId Catalog ID of the table to serialize
      * @param streamType type of stream to pull data from
      * @param data Serialized buffer count and array
-     * @return array of per-buffer byte counts with -1 for the first indicating that streaming
-     *         is complete and null indicating an error (such as the table not being COW mode).
+     * @return array of per-buffer byte counts with an extra leading int that is set to
+     *         the count of unstreamed tuples, 0 when done, or -1 indicating an error
+     *         (such as the table not being COW mode).
      */
     protected native int[] nativeTableStreamSerializeMore(long pointer, int tableId, int streamType, byte[] data);
 

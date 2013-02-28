@@ -1061,6 +1061,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
+        m_data.putInt(-1);      //TODO: Tuples remaining
         m_data.putInt(0);       // Predicate count
 
         try {
@@ -1119,6 +1120,18 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             if (count == -1 || count == 0) {
                 return count;
             }
+
+            // Get the remaining tuple count.
+            ByteBuffer remainingBuffer = ByteBuffer.allocate(8);
+            while (remainingBuffer.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(remainingBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            remainingBuffer.flip();
+            //TODO: Do something useful with the remaining count.
+            final long remaining = remainingBuffer.getLong();
 
             // Get the first length.
             ByteBuffer lengthBuffer = ByteBuffer.allocate(4);

@@ -21,7 +21,7 @@
 #include <cstddef>
 #include <boost/ptr_container/ptr_vector.hpp>
 #include "StreamPredicateList.h"
-#include "StreamPredicateHashRange.h"
+#include "StreamPredicate.h"
 
 namespace voltdb {
 
@@ -30,8 +30,7 @@ class TableTuple;
 class PersistentTable;
 class TupleSerializer;
 class COWStream;
-
-typedef StreamPredicateList<StreamPredicateHashRange> COWPredicateList;
+class StreamPredicateList;
 
 /** COWStream processor. Manages and outputs to multiple COWStream's. */
 class COWStreamProcessor : public boost::ptr_vector<COWStream> {
@@ -54,6 +53,7 @@ public:
     void open(PersistentTable &table,
               std::size_t maxTupleLength,
               int32_t partitionId,
+              StreamPredicateList &predicates,
               int32_t totalPartitions);
 
     /** Stop serializing. */
@@ -65,21 +65,23 @@ public:
      * Maintains the total byte counter provided by the caller.
      * Returns true when one of the output buffers fills.
      */
-    bool writeRow(TupleSerializer &serializer, TableTuple &tuple, std::size_t &totalBytesSerialized);
+    bool writeRow(TupleSerializer &serializer,
+                  TableTuple &tuple,
+                  std::size_t &totalBytesSerialized);
 
 private:
 
     /** The maximum tuple length. */
     std::size_t m_maxTupleLength;
 
-    /** Predicates for filtering. */
-    COWPredicateList *m_predicates;
-
     /** Table receiving tuples. */
     PersistentTable *m_table;
 
     /** Total number of partitions (for hashing). */
     int32_t m_totalPartitions;
+
+    /** Predicates for filtering. May remain non-NULL after open() if empty. */
+    StreamPredicateList *m_predicates;
 
     /** Private method used by constructors, etc. to clear state. */
     void clearState();

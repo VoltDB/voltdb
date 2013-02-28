@@ -475,7 +475,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return nativeActivateTableStream( pointer, tableId, streamType.ordinal(), fs.getBytes());
+        //TODO: Provide the total tuple count.
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), -1, fs.getBytes());
     }
 
     @Override
@@ -491,15 +492,17 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(e);
         }
         int[] positions = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
-        if (positions == null) {
+        // Position zero is the remaining tuple count, 0 if done, or -1 on error.
+        if (positions == null || positions.length == 0 || positions[0] < 0) {
             return -1;
         }
         // TODO: Change the interface to really support multiple streams.
+        // TODO: Take advantage of the remaining tuple count in position 0.
         assert(positions.length == 1);
-        if (positions[0] == -1) {
+        if (positions[0] == 0) {
             return 0;
         }
-        return positions[0];
+        return positions[1];
     }
 
     /**

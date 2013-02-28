@@ -351,16 +351,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool activateTableStream(
                 const CatalogId tableId,
                 const TableStreamType streamType,
-                ReferenceSerializeInput &serializeIn);
+                ReferenceSerializeInput &serializeIn,
+                int64_t totalTuples);
 
         /**
          * Serialize tuples to output streams from a table in COW mode.
          * Position vector smart pointer argument is populated here.
          * Array element zero is set to -1 when no tuple data was streamed and
          * the COW context was deleted.
-         * Returns true on success or false on error, e.g. when not in COW mode.
+         * Returns remaining tuple count, 0 when done, or -1 on error (e.g. when not in COW mode).
          */
-        bool tableStreamSerializeMore(
+        int64_t tableStreamSerializeMore(
                 const CatalogId tableId,
                 const TableStreamType streamType,
                 ReferenceSerializeInput &serializeIn,

@@ -22,6 +22,7 @@
 #include <utility>
 #include "common/TupleSerializer.h"
 #include "common/COWStreamProcessor.h"
+#include "common/StreamPredicateList.h"
 #include "storage/persistenttable.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
@@ -44,14 +45,15 @@ public:
       CopyOnWriteContext(PersistentTable &table,
                          TupleSerializer &serializer,
                          int32_t partitionId,
-                         const std::vector<std::string> &predicate_strings,
-                         int32_t totalPartitions);
+                         const std::vector<std::string> &predicateStrings,
+                         int32_t totalPartitions,
+                         int64_t totalTuples);
 
     /**
-     * Serialize tuples to the provided output until no more tuples can be serialized. Returns true
-     * if there are more tuples to serialize and false otherwise.
+     * Serialize tuples to the provided output until no more tuples can be serialized.
+     * Return remaining tuple count, 0 if done, or -1 on error.
      */
-    bool serializeMore(COWStreamProcessor &output_targets);
+    int64_t serializeMore(COWStreamProcessor &output_targets);
 
     /**
      * Mark a tuple as dirty and make a copy if necessary. The new tuple param indicates
@@ -113,9 +115,12 @@ private:
 
     const int32_t m_partitionId;
 
-    boost::shared_ptr<COWPredicateList> m_predicates;
+    StreamPredicateList m_predicates;
 
     int32_t m_totalPartitions;
+
+    int64_t m_totalTuples;
+    int64_t m_tuplesRemaining;
 };
 
 }

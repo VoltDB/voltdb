@@ -58,6 +58,8 @@
 #include "common/FatalException.hpp"
 #include "common/types.h"
 #include "common/RecoveryProtoMessage.h"
+#include "common/StreamPredicate.h"
+#include "common/StreamPredicateList.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
@@ -724,7 +726,7 @@ TableStats* PersistentTable::getTableStats() {
  */
 bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
                                           const std::vector<std::string> &predicate_strings,
-                                          int32_t totalPartitions) {
+                                          int32_t totalPartitions, int64_t totalTuples) {
     if (m_COWContext != NULL) {
         return true;
     }
@@ -743,8 +745,9 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
     try {
         // Constructor can throw exception when it parses the predicates.
         assert(serializer != NULL);
-        m_COWContext.reset(new CopyOnWriteContext(*this, *serializer, partitionId,
-                                                  predicate_strings, totalPartitions));
+        m_COWContext.reset(
+                new CopyOnWriteContext(*this, *serializer, partitionId,
+                                       predicate_strings, totalPartitions, totalTuples));
     }
     catch(SerializableEEException &e) {
         VOLT_ERROR("SerializableEEException: %s", e.message().c_str());
@@ -755,20 +758,19 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
 
 /**
  * Attempt to serialize more tuples from the table to the provided output streams.
- * Returns true if there are more tuples and false if there are no more tuples waiting to be
- * serialized.
+ * Return remaining tuple count, 0 if done, or -1 on error.
  */
-bool PersistentTable::serializeMore(COWStreamProcessor &outputStreams) {
+int64_t PersistentTable::serializeMore(COWStreamProcessor &outputStreams) {
     if (m_COWContext == NULL) {
-        return false;
+        return -1;
     }
 
-    const bool hasMore = m_COWContext->serializeMore(outputStreams);
-    if (!hasMore) {
+    int64_t remaining = m_COWContext->serializeMore(outputStreams);
+    if (remaining <= 0) {
         m_COWContext.reset(NULL);
     }
 
-    return hasMore;
+    return remaining;
 }
 
 /**

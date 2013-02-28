@@ -66,10 +66,17 @@ COWStream &COWStreamProcessor::add(void *data, std::size_t length)
 void COWStreamProcessor::open(PersistentTable &table,
                               std::size_t maxTupleLength,
                               int32_t partitionId,
+                              StreamPredicateList &predicates,
                               int32_t totalPartitions)
 {
     m_table = &table;
     m_maxTupleLength = maxTupleLength;
+    // It must be either one predicate per output stream or none at all.
+    bool havePredicates = !predicates.empty();
+    if (havePredicates && predicates.size() != size()) {
+        throwFatalException("serializeMore() expects either no predicates or one per output stream.");
+    }
+    m_predicates = &predicates;
     m_totalPartitions = totalPartitions;
     for (COWStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         iter->startRows(partitionId);
@@ -100,18 +107,24 @@ bool COWStreamProcessor::writeRow(TupleSerializer &serializer,
     }
 
     // Predicates, if supplied, are one per output stream (previously asserted).
-    COWPredicateList::const_iterator iterPredicate;
-    if (m_predicates != NULL) {
-        iterPredicate = m_predicates->begin();
+    StreamPredicateList::iterator ipredicate;
+    assert(m_predicates != NULL);
+
+    if (!m_predicates->empty()) {
+        ipredicate = m_predicates->begin();
     }
+
     bool aBufferIsFull = false;
     for (COWStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         // Get approval from corresponding output stream predicate, if provided.
         bool accepted = true;
-        if (m_predicates != NULL) {
-            accepted = iterPredicate->accept(*m_table, tuple, m_totalPartitions);
+        if (!m_predicates->empty()) {
+            accepted = ipredicate->accept(*m_table, tuple, m_totalPartitions);
             // Keep walking through predicates in lock-step with the streams.
-            ++iterPredicate;
+            // As with first() we expect a predicate to be available for each and every stream.
+            // It was already checked, so just assert here.
+            assert(ipredicate != m_predicates->end());
+            ++ipredicate;
         }
         if (accepted) {
             if (!iter->canFit(m_maxTupleLength)) {

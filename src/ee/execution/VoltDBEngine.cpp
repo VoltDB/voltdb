@@ -1319,7 +1319,8 @@ int64_t VoltDBEngine::uniqueIdForFragment(catalog::PlanFragment *frag) {
 bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
-        ReferenceSerializeInput &serializeIn) {
+        ReferenceSerializeInput &serializeIn,
+        int64_t totalTuples) {
     map<int32_t, Table*>::iterator it = m_tables.find(tableId);
     if (it == m_tables.end()) {
         return false;
@@ -1342,7 +1343,8 @@ bool VoltDBEngine::activateTableStream(
                 predicate_strings.push_back(spred);
             }
         }
-        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings, m_totalPartitions)) {
+        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings,
+                                       m_totalPartitions, totalTuples)) {
             return false;
         }
 
@@ -1374,9 +1376,9 @@ bool VoltDBEngine::activateTableStream(
  * Position vector smart pointer argument is populated here.
  * Array element zero is set to -1 when no tuple data was streamed and
  * the COW context was deleted.
- * Returns true on success or false on error, e.g. when not in COW mode.
+ * Returns remaining tuple count, 0 when done, or -1 on error (e.g. when not in COW mode).
  */
-bool VoltDBEngine::tableStreamSerializeMore(
+int64_t VoltDBEngine::tableStreamSerializeMore(
         const CatalogId tableId,
         const TableStreamType streamType,
         ReferenceSerializeInput &serializeIn,
@@ -1404,21 +1406,23 @@ bool VoltDBEngine::tableStreamSerializeMore(
         // Java engine will always poll a fully serialized table one more
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
-       map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
+        map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
         if (pos == m_snapshottingTables.end()) {
-            // Sentinel value in element zero of -1 flags the end of stream.
-            retPositions.push_back(-1);
             // Success
-            return true;
-        } else {
-            PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-            bool hasMore = table->serializeMore(outputStreams);
-            if (!hasMore) {
-                m_snapshottingTables.erase(tableId);
-                table->decrementRefcount();
-            }
+            return 0;
         }
-        break;
+        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+        int64_t tuplesRemaining = table->serializeMore(outputStreams);
+        if (!tuplesRemaining <= 0) {
+            m_snapshottingTables.erase(tableId);
+            table->decrementRefcount();
+        }
+        // If more was streamed copy current positions for return.
+        // Can this copy be avoided?
+        for (size_t i = 0; i < nBuffers; i++) {
+            retPositions.push_back((int)outputStreams.at(i).position());
+        }
+        return tuplesRemaining;
     }
 
     case TABLE_STREAM_RECOVERY: {
@@ -1433,29 +1437,21 @@ bool VoltDBEngine::tableStreamSerializeMore(
         }
         map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
         if (pos == m_tables.end()) {
-            // Sentinel value in element zero of -1 flags the end of stream.
-            retPositions.push_back(-1);
             // Success
-            return true;
+            return 0;
         }
         PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
         table->nextRecoveryMessage(&outputStreams[0]);
-        break;
+        return 1;
     }
 
     default:
         // Failure
-        return false;
-    }
-
-    // If more was streamed copy current positions for return.
-    // Can this copy be avoided?
-    for (size_t i = 0; i < nBuffers; i++) {
-        retPositions.push_back((int)outputStreams.at(i).position());
+        return -1;
     }
 
     // Success
-    return true;
+    return 0;
 }
 
 /*

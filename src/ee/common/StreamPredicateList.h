@@ -20,49 +20,34 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include "SerializableEEException.h"
 
 namespace voltdb
 {
 
+class StreamPredicate;
+
 /**
- * A templated list (vector) of predicates. The template assures homogeneity of
- * predicate class so that the predicates can be checked for consistency and
- * completeness.
+ * A list (vector) of predicates.
  */
-template <typename TStreamPredicate>
-class StreamPredicateList : public boost::ptr_vector<TStreamPredicate>
+class StreamPredicateList : public boost::ptr_vector<StreamPredicate>
 {
 public:
 
     /** Default vconstructor. */
-    StreamPredicateList() : boost::ptr_vector<TStreamPredicate>()
+    StreamPredicateList() : boost::ptr_vector<StreamPredicate>()
     {}
 
     /** Constructor with reserved size. */
-    StreamPredicateList(std::size_t size) : boost::ptr_vector<TStreamPredicate>(size)
+    StreamPredicateList(std::size_t size) : boost::ptr_vector<StreamPredicate>(size)
     {}
 
     /** Destructor. */
     virtual ~StreamPredicateList()
     {}
 
-    /**
-     * Factory method to parse a bunch of predicate strings and return a vector
-     * of TStreamPredicate objects. Also sanity checks the sequence of
-     * predicates for completeness, etc..
-     */
-    static boost::shared_ptr<StreamPredicateList<TStreamPredicate> > parse(
-            const std::vector<std::string>& predicate_strings)
-    {
-        std::ostringstream errmsg;
-        boost::shared_ptr<StreamPredicateList<TStreamPredicate> > predicates_out(
-                new StreamPredicateList<TStreamPredicate>(predicate_strings.size()));
-        if (!TStreamPredicate::parse(predicate_strings, *predicates_out, errmsg)) {
-            predicates_out->clear();
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg.str());
-        }
-        return predicates_out;
-    }
+    /** Parse expression strings and add generated predicate objects to list. */
+    bool parseStrings(const std::vector<std::string> &predicateStrings, std::ostringstream& errmsg);
 };
 
 } // namespace voltdb

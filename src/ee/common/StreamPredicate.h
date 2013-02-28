@@ -22,10 +22,13 @@ namespace voltdb
 {
 class TableTuple;
 class PersistentTable;
+class StreamPredicateList;
 
-/** An abstract predicate for filtering output streams. */
+/** A predicate for filtering output streams. */
 class StreamPredicate
 {
+    friend class StreamPredicateList;
+
 public:
 
     virtual ~StreamPredicate() {}
@@ -34,7 +37,17 @@ public:
      * Accept or reject a tuple.
      * Return true if the predicate accepts the tuple.
      */
-    virtual bool accept(PersistentTable &table, const TableTuple &tuple, int32_t totalPartitions) const = 0;
+    bool accept(PersistentTable &table, const TableTuple &tuple, int32_t totalPartitions) const;
+
+private:
+
+    // Should go through parse() factory method to construct a predicate.
+    //TODO: min/max hash is temporary pending full expression support.
+    StreamPredicate(int32_t minHash, int32_t maxHash)
+      : m_minHash(minHash), m_maxHash(maxHash) {}
+
+    int32_t m_minHash;
+    int32_t m_maxHash;
 };
 
 }

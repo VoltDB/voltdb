@@ -984,11 +984,11 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeActivateTableStream
- * Signature: (JII[B)Z
+ * Signature: (JIII[B)Z
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
         JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType,
-        jbyteArray serialized_predicates)
+        jlong totalTuples, jbyteArray serialized_predicates)
 {
     VOLT_DEBUG("nativeActivateTableStream in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1002,7 +1002,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
     try {
         try {
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            bool success = engine->activateTableStream(tableId, tableStreamType, serialize_in);
+            bool success = engine->activateTableStream(tableId, tableStreamType, serialize_in, totalTuples);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
             return success;
@@ -1093,13 +1093,17 @@ SHAREDLIB_JNIEXPORT jintArray JNICALL Java_org_voltdb_jni_ExecutionEngine_native
             jintArray result;
             voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
             std::vector<int> positions;
-            if (engine->tableStreamSerializeMore(tableId, tst, serialize_in, positions)) {
-                result = env->NewIntArray((int)positions.size());
+            jint tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in, positions);
+            if (tuplesRemaining > 0) {
+                result = env->NewIntArray((int)positions.size()+1);
                 // vector is guaranteed to have contiguous storage.
-                env->SetIntArrayRegion(result, 0, (int)positions.size(), &positions[0]);
+                env->SetIntArrayRegion(result, 0, 1, &tuplesRemaining);
+                env->SetIntArrayRegion(result, 1, (int)positions.size(), &positions[0]);
                 env->ReleaseByteArrayElements(serialized_buffers, bytes, JNI_ABORT);
             } else {
-                result = (jintArray)env->NewGlobalRef(NULL);
+                // Done or error.
+                result = env->NewIntArray(1);
+                env->SetIntArrayRegion(result, 0, 1, &tuplesRemaining);
             }
             VOLT_DEBUG("deserialized %d buffers", (int)positions.size());
             return result;

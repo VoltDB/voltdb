@@ -207,15 +207,16 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      */
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
                              const std::vector<std::string> &predicate_strings,
-                             int32_t totalPartitions);
+                             int32_t totalPartitions, int64_t totalTuples);
 
     /**
      * COW activation wrapper for backward compatibility with some tests.
      * It's okay for totalPartitions to be zero because it only feeds into hashing for predicates.
+     * Total tuple count is not used when it's set to -1.
      */
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
         std::vector<std::string> predicate_strings;
-        return activateCopyOnWrite(serializer, partitionId, predicate_strings, 0);
+        return activateCopyOnWrite(serializer, partitionId, predicate_strings, 0, -1);
     }
 
     /**
@@ -236,10 +237,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     /**
      * Attempt to serialize more tuples from the table to the provided
-     * output stream.  Returns true if there are more tuples and false
-     * if there are no more tuples waiting to be serialized.
+     * output stream.
+     * Return remaining tuple count, 0 if done, or -1 on error.
      */
-    bool serializeMore(COWStreamProcessor &outputStreams);
+    int64_t serializeMore(COWStreamProcessor &outputStreams);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash

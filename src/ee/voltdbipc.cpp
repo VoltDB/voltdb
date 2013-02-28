@@ -129,6 +129,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    int64_t tuplesRemaining;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
 
@@ -896,6 +897,7 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     const voltdb::CatalogId tableId = ntohl(activateTableStreamCommand->tableId);
     const voltdb::TableStreamType streamType =
             static_cast<voltdb::TableStreamType>(ntohl(activateTableStreamCommand->streamType));
+    const int64_t tuplesRemaining = static_cast<int64_t>(ntohll(activateTableStreamCommand->tuplesRemaining));
 
     // Provide access to the serialized message data, i.e. the predicates.
     void* offset = activateTableStreamCommand->data;
@@ -903,7 +905,7 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     ReferenceSerializeInput serialize_in(offset, sz);
 
     try {
-        if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
+        if (m_engine->activateTableStream(tableId, streamType, serialize_in, tuplesRemaining)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
@@ -975,32 +977,28 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         // Perform table stream serialization.
         ReferenceSerializeInput out2(m_reusedResultBuffer, MAX_MSG_SZ);
         std::vector<int> positions;
-        bool success = m_engine->tableStreamSerializeMore(tableId, streamType, out2, positions);
+        int64_t remaining = m_engine->tableStreamSerializeMore(tableId, streamType, out2, positions);
 
-        // Finalize the tuple buffer by adding the status code and count, and
-        // by injecting positions (lengths) into previously skipped int-size
-        // gaps. If we failed just set the count to -1.
+        // Finalize the tuple buffer by adding the status code, buffer count,
+        // and remaining tuple count.
+        // Inject positions (lengths) into previously skipped int-size gaps.
         m_tupleBuffer[0] = kErrorCode_Success;
-        if (success) {
-            // -1 for the first position indicates streaming is complete.
-            // Set the count to zero and stop right there.
-            if (positions[0] == -1) {
-                *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(0);
-                outputSize = 5;
-            } else {
-                *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
-                offset = 5;
-                std::vector<int>::const_iterator ipos;
-                for (ipos = positions.begin(); ipos != positions.end(); ++ipos) {
-                    int length = *ipos;
-                    *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
-                    offset += length + 4;
-                }
+        if (remaining > 0) {
+            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
+            offset = 1 + sizeof(int32_t);
+            *reinterpret_cast<int64_t*>(&m_tupleBuffer[offset]) = htonll(remaining);
+            offset += sizeof(int64_t);
+            std::vector<int>::const_iterator ipos;
+            for (ipos = positions.begin(); ipos != positions.end(); ++ipos) {
+                int length = *ipos;
+                *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
+                offset += length + sizeof(int32_t);
             }
         } else {
-            // If we failed just set the count to -1 and stop right there.
-            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(-1);
-            outputSize = 5;
+            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
+            // If we failed or finished just set the count and stop right there.
+            *reinterpret_cast<int64_t*>(&m_tupleBuffer[5]) = htonll(remaining);
+            outputSize = 1 + sizeof(int32_t) + sizeof(int64_t);
         }
 
         // Ship it.

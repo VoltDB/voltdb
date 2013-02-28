@@ -21,6 +21,8 @@
 #include "storage/tableiterator.h"
 #include "common/COWStream.h"
 #include "common/FatalException.hpp"
+#include "common/StreamPredicate.h"
+#include "common/StreamPredicateList.h"
 #include <algorithm>
 #include <cassert>
 #include <iostream>
@@ -32,8 +34,9 @@ CopyOnWriteContext::CopyOnWriteContext(
         PersistentTable &table,
         TupleSerializer &serializer,
         int32_t partitionId,
-        const std::vector<std::string> &predicate_strings,
-        int32_t totalPartitions) :
+        const std::vector<std::string> &predicateStrings,
+        int32_t totalPartitions,
+        int64_t totalTuples) :
              m_table(table),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
                                                                "COW of " + table.name(),
@@ -42,17 +45,29 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_iterator(new CopyOnWriteIterator(&table, m_blocks.begin(), m_blocks.end())),
              m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
              m_tuple(table.schema()), m_finishedTableScan(false), m_partitionId(partitionId),
-             m_totalPartitions(totalPartitions)
+             m_totalPartitions(totalPartitions),
+             m_totalTuples(totalTuples),
+             m_tuplesRemaining(totalTuples)
 {
-    // Parse ("<min>-<max>") ranges out of predicate_strings.
+    // Parse predicate strings. The factory type determines the kind of
+    // predicates that get generated.
     // Throws an exception to be handled by caller on errors.
-    m_predicates = COWPredicateList::parse(predicate_strings);
+    std::ostringstream errmsg;
+    if (!m_predicates.parseStrings(predicateStrings, errmsg)) {
+        throwFatalException("CopyOnWriteContext() failed to parse predicate strings.");
+    }
 }
 
 /*
  * Serialize to multiple output streams.
+ * Return remaining tuple count, 0 if done, or -1 on error.
  */
-bool CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
+int64_t CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
+
+    // Don't expect to be re-called after streaming all the tuples.
+    if (m_tuplesRemaining == 0) {
+        throwFatalException("serializeMore() was called again after streaming completed.")
+    }
 
     // Count the total number of bytes serialized to allow throttling.
     std::size_t totalBytesSerialized = 0;
@@ -60,41 +75,32 @@ bool CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
     const std::size_t bytesSerializedThreshold = 512 * 1024;
 
     // Need to initialize the output stream list.
-    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_totalPartitions);
-
-    // It has to be either one predicate per output stream or none at all.
-    // Iterate both lists in parallel when predicates are supplied.
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
     }
-
-    // It has to be either one predicate per output stream or none at all.
-    // Iterate both lists in parallel when predicates are supplied.
-    bool havePredicates = !m_predicates->empty();
-    if (havePredicates && m_predicates->size() != outputStreams.size()) {
-        throwFatalException("serializeMore() expects either no predicates or one per output stream.");
-    }
+    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates, m_totalPartitions);
 
     //=== Tuple processing loop
 
     TableTuple tuple(m_table.schema());
 
-    // hasMore is returned to the caller to indicate whether we're finished or not.
-    bool hasMore = true;
     // Set to true to break out of the loop after the tuples dry up
     // or the byte count threshold is hit.
-    bool done = false;
-    while (!done) {
+    bool yield = false;
+    while (!yield && m_tuplesRemaining != 0) {
 
         // Next tuple?
-        hasMore = m_iterator->next(tuple);
-        if (hasMore) {
+        if (m_iterator->next(tuple)) {
+
+            if (m_tuplesRemaining > 0) {
+                m_tuplesRemaining--;
+            }
 
             /*
              * Write the tuple to all the output streams.
              * Done if any of the buffers filled up.
              */
-            done = outputStreams.writeRow(m_serializer, tuple, totalBytesSerialized);
+            yield = outputStreams.writeRow(m_serializer, tuple, totalBytesSerialized);
 
             /*
              * If this is the table scan, check to see if the tuple is pending
@@ -117,8 +123,8 @@ bool CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
              * Yield control when the bytes threshold is hit to allow other work.
              * Check per tuple to avoid per-stream state for resuming.
              */
-            if (!done && totalBytesSerialized >= bytesSerializedThreshold) {
-                done = true;
+            if (!yield && totalBytesSerialized >= bytesSerializedThreshold) {
+                yield = true;
             }
 
         } else if (!m_finishedTableScan) {
@@ -128,12 +134,17 @@ bool CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
              */
             m_finishedTableScan = true;
             m_iterator.reset(m_backedUpTuples.get()->makeIterator());
+
         } else {
             /*
              * No more tuples in the temp table and had previously finished the
              * persistent table.
              */
-            done = true;
+            if (m_tuplesRemaining > 0) {
+                throwFatalException("serializeMore() expected remaining tuple count to go to zero.")
+            }
+            m_tuplesRemaining = 0;
+            yield = true;
         }
 
     }
@@ -143,7 +154,7 @@ bool CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
     outputStreams.close();
 
     // Done when the table scan is finished and iteration is complete.
-    return hasMore;
+    return (m_tuplesRemaining >= 0 ? m_tuplesRemaining : std::numeric_limits<int32_t>::max());
 }
 
 bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
