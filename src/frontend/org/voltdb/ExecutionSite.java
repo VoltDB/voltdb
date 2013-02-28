@@ -58,7 +58,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
@@ -977,8 +976,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        HashinatorType.LEGACY,
-                        LegacyHashinator.getConfigureBytes(configuredNumberOfPartitions));
+                        TheHashinator.getConfiguredHashinatorType(),
+                        TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, txnId);
@@ -996,8 +995,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             target,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            HashinatorType.LEGACY,
-                            LegacyHashinator.getConfigureBytes(m_tracker.m_numberOfPartitions));
+                            TheHashinator.getConfiguredHashinatorType(),
+                            TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);

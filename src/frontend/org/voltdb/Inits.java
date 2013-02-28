@@ -611,8 +611,8 @@ public class Inits {
 
             // Initialize the complex partitioning scheme
             TheHashinator.initialize(
-                    LegacyHashinator.class,
-                    LegacyHashinator.getConfigureBytes((hostCount * sitesPerHost) / (kFactor + 1)));
+                    TheHashinator.getConfiguredHashinatorClass(),
+                    TheHashinator.getConfigureBytes((hostCount * sitesPerHost) / (kFactor + 1)));
         }
     }
 

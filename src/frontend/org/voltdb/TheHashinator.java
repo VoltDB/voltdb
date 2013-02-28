@@ -18,8 +18,10 @@
 package org.voltdb;
 
 import java.lang.reflect.Constructor;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 
 import com.google.common.base.Throwables;
 
@@ -44,18 +46,30 @@ public abstract class TheHashinator {
 
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
-    static volatile TheHashinator instance;
+    /*
+     * Stamped instance, version associated with hash function, only update for newer versions
+     */
+    private static final AtomicReference<Pair<Long, ? extends TheHashinator>> instance =
+            new AtomicReference<Pair<Long, ? extends TheHashinator>>();
 
     /**
      * Initialize TheHashinator
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
+        instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config)));
+    }
+
+    private static TheHashinator
+        constructHashinator(
+                Class<? extends TheHashinator> hashinatorImplementation,
+                byte config[]) {
         try {
             Constructor<? extends TheHashinator> constructor = hashinatorImplementation.getConstructor(byte[].class);
-            instance = constructor.newInstance(config);
+            return constructor.newInstance(config);
         } catch (Exception e) {
             Throwables.propagate(e);
         }
+        return null;
     }
 
     abstract protected int pHashinateLong(long value);
@@ -71,7 +85,7 @@ public abstract class TheHashinator {
      * distributed.
      */
     static int hashinateLong(long value) {
-        return instance.pHashinateLong(value);
+        return instance.get().getSecond().pHashinateLong(value);
     }
 
     /**
@@ -83,7 +97,7 @@ public abstract class TheHashinator {
      * distributed.
      */
     static int hashinateBytes(byte[] bytes) {
-        return instance.pHashinateBytes(bytes);
+        return instance.get().getSecond().pHashinateBytes(bytes);
     }
 
     /**
@@ -95,7 +109,7 @@ public abstract class TheHashinator {
      * distributed.
      */
     static int hashinateString(String value) {
-        return instance.pHashinateString(value);
+        return instance.get().getSecond().pHashinateString(value);
     }
 
     /**
@@ -127,5 +141,51 @@ public abstract class TheHashinator {
             index = hashinateBytes((byte[]) obj );
         }
         return index;
+    }
+
+    public static void updateHashinator(
+            Class<? extends TheHashinator> hashinatorImplementation, long version, byte config[]) {
+        while (true) {
+            final Pair<Long, ? extends TheHashinator> snapshot = instance.get();
+            if (version > snapshot.getFirst()) {
+                Pair<Long, ? extends TheHashinator> update =
+                        Pair.of(version, constructHashinator(hashinatorImplementation, config));
+                if (instance.compareAndSet(snapshot, update)) return;
+            } else {
+                return;
+            }
+        }
+    }
+
+    public static Class<? extends TheHashinator> getConfiguredHashinatorClass() {
+        HashinatorType type = getConfiguredHashinatorType();
+        switch (type) {
+        case LEGACY:
+            return LegacyHashinator.class;
+        case ELASTIC:
+            return ElasticHashinator.class;
+        }
+        throw new RuntimeException("Should not reach here");
+    }
+
+    public static HashinatorType getConfiguredHashinatorType() {
+        String hashinatorType = System.getenv("HASHINATOR");
+        if (hashinatorType == null) {
+            return HashinatorType.LEGACY;
+        } else {
+            hostLogger.info("Overriding hashinator to use " + hashinatorType);
+            return HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
+        }
+    }
+
+    public static byte[] getConfigureBytes(int partitionCount) {
+        HashinatorType type = getConfiguredHashinatorType();
+        switch (type) {
+        case LEGACY:
+            return LegacyHashinator.getConfigureBytes(partitionCount);
+        case ELASTIC:
+            return ElasticHashinator.getConfigureBytes(partitionCount, 8);
+        }
+        throw new RuntimeException("Should not reach here");
     }
 }
