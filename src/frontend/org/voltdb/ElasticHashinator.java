@@ -26,14 +26,27 @@ import java.util.TreeMap;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedMap;
 
+/**
+ * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
+ * to pick what partition to route a particular value.
+ */
 public class ElasticHashinator extends TheHashinator {
 
+    /**
+     * Tokens on the ring. A value hashes to a token if the token is the first value <=
+     * the value's hash
+     */
     private final ImmutableSortedMap<Long, Integer> tokens;
 
+    /**
+     * Initialize the hashinator from a binary description of the ring.
+     * The serialization format is big-endian and the first value is the number of tokens
+     * followed by the token values where each token value consists of the 8-byte position on the ring
+     * and and the 4-byte partition id. All values are signed.
+     */
     public ElasticHashinator(byte configureBytes[]) {
         ByteBuffer buf = ByteBuffer.wrap(configureBytes);
         int numEntries = buf.getInt();
@@ -55,6 +68,11 @@ public class ElasticHashinator extends TheHashinator {
         tokens = builder.build();
     }
 
+    /**
+     * Convenience method for generating a deterministic token distribution for the ring based
+     * on a given partition count and tokens per partition. Each partition will have N tokens
+     * placed randomly on the ring.
+     */
     public static byte[] getConfigureBytes(int partitionCount, int tokensPerPartition) {
         Preconditions.checkArgument(partitionCount > 0);
         Preconditions.checkArgument(tokensPerPartition > 0);
@@ -86,12 +104,17 @@ public class ElasticHashinator extends TheHashinator {
         ByteBuffer buf = ByteBuffer.allocate(8);
         buf.order(ByteOrder.nativeOrder());
         buf.putLong(value);
-        final long token = MurmurHash3.hash3_x64_128(buf, 0, 8, 0);
-        return partitionForToken(token);
+        final long hash = MurmurHash3.hash3_x64_128(buf, 0, 8, 0);
+        return partitionForToken(hash);
     }
 
-    private int partitionForToken(long token) {
-        Map.Entry<Long, Integer> entry = tokens.floorEntry(token);
+    /**
+     * For a given a value hash, find the token that corresponds to it. This will
+     * be the first token <= the value hash, or if the value hash is < the first token in the ring,
+     * it wraps around to the last token in the ring closest to Long.MAX_VALUE
+     */
+    private int partitionForToken(long hash) {
+        Map.Entry<Long, Integer> entry = tokens.floorEntry(hash);
         //System.out.println("Finding partition for token " + token);
         /*
          * Because the tokens are randomly distributed it is likely there is a range
@@ -113,10 +136,4 @@ public class ElasticHashinator extends TheHashinator {
         final long token = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
         return partitionForToken(token);
     }
-
-    @Override
-    protected int pHashinateString(String value) {
-        return pHashinateBytes(value.getBytes(Charsets.UTF_8));
-    }
-
 }

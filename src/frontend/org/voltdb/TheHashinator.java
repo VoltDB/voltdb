@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
 
 /**
@@ -53,12 +54,17 @@ public abstract class TheHashinator {
             new AtomicReference<Pair<Long, ? extends TheHashinator>>();
 
     /**
-     * Initialize TheHashinator
+     * Initialize TheHashinator with the specified implementation class and configuration.
+     * The starting version number will be 0.
      */
     public static void initialize(Class<? extends TheHashinator> hashinatorImplementation, byte config[]) {
         instance.set(Pair.of(0L, constructHashinator( hashinatorImplementation, config)));
     }
 
+    /**
+     * Helper method to do the reflection boilerplate to call the constructor
+     * of the selected hashinator and convert the exceptions to runtime excetions.
+     */
     private static TheHashinator
         constructHashinator(
                 Class<? extends TheHashinator> hashinatorImplementation,
@@ -72,9 +78,17 @@ public abstract class TheHashinator {
         return null;
     }
 
+    /**
+     * Protected methods that implement hashination of specific data types.
+     * Only string/varbinary and integer hashination is supported. String/varbinary
+     * get the same handling once they the string is converted to UTF-8 binary
+     * so there is only one protected method for bytes.
+     *
+     * The same trick can't be done for longs because modulus is used by the legacy
+     * hashinator
+     */
     abstract protected int pHashinateLong(long value);
     abstract protected int pHashinateBytes(byte[] bytes);
-    abstract protected int pHashinateString(String value);
 
     /**
      * Given a long value, pick a partition to store the data.
@@ -109,7 +123,7 @@ public abstract class TheHashinator {
      * distributed.
      */
     static int hashinateString(String value) {
-        return instance.get().getSecond().pHashinateString(value);
+        return instance.get().getSecond().pHashinateBytes(value.getBytes(Charsets.UTF_8));
     }
 
     /**
@@ -143,6 +157,11 @@ public abstract class TheHashinator {
         return index;
     }
 
+    /**
+     * Update the hashinator in a thread safe manner with a newer version of the hash function.
+     * A version number must be provided and the new config will only be used if it is greater than
+     * the current version of the hash function.
+     */
     public static void updateHashinator(
             Class<? extends TheHashinator> hashinatorImplementation, long version, byte config[]) {
         while (true) {
@@ -157,6 +176,10 @@ public abstract class TheHashinator {
         }
     }
 
+    /**
+     * By default returns LegacyHashinator.class, but for development another hashinator
+     * can be specified using the environment variable HASHINATOR
+     */
     public static Class<? extends TheHashinator> getConfiguredHashinatorClass() {
         HashinatorType type = getConfiguredHashinatorType();
         switch (type) {
@@ -168,6 +191,10 @@ public abstract class TheHashinator {
         throw new RuntimeException("Should not reach here");
     }
 
+    /**
+     * By default returns HashinatorType.LEGACY, but for development another hashinator
+     * can be specified using the environment variable HASHINATOR
+     */
     public static HashinatorType getConfiguredHashinatorType() {
         String hashinatorType = System.getenv("HASHINATOR");
         if (hashinatorType == null) {
@@ -178,6 +205,10 @@ public abstract class TheHashinator {
         }
     }
 
+    /**
+     * Get a basic configuration for the currently selected hashinator type based
+     * on the current partition count. If Elastic is in play
+     */
     public static byte[] getConfigureBytes(int partitionCount) {
         HashinatorType type = getConfiguredHashinatorType();
         switch (type) {

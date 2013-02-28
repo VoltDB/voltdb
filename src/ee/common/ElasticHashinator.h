@@ -31,10 +31,21 @@
 #include <stdlib.h>
 #include <stx/btree_map>
 #include <murmur3/MurmurHash3.h>
+#include <limits>
+
 namespace voltdb {
 
+/*
+ * Concrete implementation of TheHashinator that uses MurmurHash3_x64_128 to has values
+ * onto a consistent hash ring.
+ */
 class ElasticHashinator : public TheHashinator {
 public:
+    /*
+     * Factory method that constructs an ElasticHashinator from a binary configuration.
+     * The format is described in ElasticHashinator.java and basically describes the tokens
+     * on the ring.
+     */
     static ElasticHashinator* newInstance(const char *config) {
         ReferenceSerializeInput countInput(config, 4);
         int numEntries = countInput.readInt();
@@ -72,6 +83,10 @@ protected:
         return partitionForToken(out[0]);
     }
 
+    /*
+     * Given a piece of UTF-8 encoded character data OR binary data
+     * pick a partition to store the data
+     */
     int32_t hashinate(const char *string, int32_t length) const {
         int64_t out[2];
         MurmurHash3_x64_128(string, length, 0, out);
@@ -82,25 +97,35 @@ private:
     typedef stx::btree_map<int64_t, int32_t> TokenMap;
     ElasticHashinator(TokenMap tokenMap) : tokens(tokenMap) {}
 
-    int32_t partitionForToken(int64_t token) const {
+    int32_t partitionForToken(int64_t hash) const {
         /*
          * C++ doesn't have the NavigableMap equivalent of floor,
          * so we use upper_bound and step back, except if upper bound
          * returns tokens.begin()
          */
-        TokenMap::const_iterator i = tokens.upper_bound(token);
+        TokenMap::const_iterator i = tokens.upper_bound(hash);
         //std::cout << "EE finding partition for token " << token << std::endl;
-        i--;
-        if (i == tokens.begin()) {
-            if (i.key() <= token) {
-                //std::cout << "EE upper_bound token was equals to begin " << i.key() << std::endl;
-                return i.data();
-            } else {
-                //std::cout << "EE upper_bound token wrapped back to end " << tokens.rbegin().key() << std::endl;
-                return tokens.rbegin().data();
-            }
+
+        /*
+         * Hash value is > then the largest token (nothing comes after hash value)
+         * Or it is also possible that the hash value is < the smallest token (tokens.begin()) in which
+         * case it actually maps to the last/largest token since conceptually this is a ring.
+         */
+        if (i == tokens.end() || i == tokens.begin()) {
+            return tokens.rbegin().data();
         }
-        //std::cout << "EE upper_bound token was " << i.key() << std::endl;
+
+        /*
+         * Move the iterator back one, this is upper bound, so to find the floor we have to find the first
+         * value that did not come after the hash value. This is safe because we check for tokens.end()
+         * and tokens.begin() and the explanation for why those can happen is above.
+         */
+        i--;
+
+        /*
+         * At this point we will have the right value, and bounds should not be an issue
+         * due to the checks for tokens.end and tokens.begin.
+         */
         return i.data();
     }
 

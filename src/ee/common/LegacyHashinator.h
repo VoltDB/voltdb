@@ -30,8 +30,16 @@
 #include <stdlib.h>
 
 namespace voltdb {
+/*
+ * Hashinator implementation of the original hash function that does modulus partition count
+ * for integer types and mimics Java for character/binary types
+ */
 class LegacyHashinator : public TheHashinator {
 public:
+    /*
+     * Static factory method that does most constructor work so fields can
+     * be const
+     */
     static LegacyHashinator* newInstance(const char *config) {
         ReferenceSerializeInput input(config, 4);
         return new LegacyHashinator(input.readInt());

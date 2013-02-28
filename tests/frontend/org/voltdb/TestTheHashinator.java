@@ -386,6 +386,7 @@ public class TestTheHashinator extends TestCase {
         NavigableMap<Long, Integer> tokenToPartition = new TreeMap<Long, Integer>();
         Map<Long, Long> tokenToKeys = new HashMap<Long, Long>();
         long keyLessThanFirstToken;
+        long keyGreaterThanLastToken;
     }
 
     /*
@@ -437,6 +438,23 @@ public class TestTheHashinator extends TestCase {
                 break;
             }
         }
+
+        /*
+         * Generate a key that hashes to a value > the last token
+         */
+        final long lastToken = holder.tokenToPartition.lastKey();
+        while (true) {
+            long candidateKey = r.nextLong();
+            ByteBuffer buf2 = ByteBuffer.allocate(8);
+            buf2.order(ByteOrder.nativeOrder());
+            buf2.putLong(candidateKey);
+            long candidateToken = MurmurHash3.hash3_x64_128(buf2, 0, 8, 0);
+
+            if (candidateToken > lastToken) {
+                holder.keyGreaterThanLastToken = candidateKey;
+                break;
+            }
+        }
         return holder;
     }
     /*
@@ -465,6 +483,12 @@ public class TestTheHashinator extends TestCase {
         final int lastPartition = holder.tokenToPartition.lastEntry().getValue();
         assertEquals(lastPartition, TheHashinator.hashToPartition(holder.keyLessThanFirstToken));
         assertEquals(lastPartition, ee.hashinate(holder.keyLessThanFirstToken, hashinatorType, holder.configBytes));
+
+        /*
+         * Check that hashing to the region beyond the last token also works
+         */
+        assertEquals(lastPartition, TheHashinator.hashToPartition(holder.keyGreaterThanLastToken));
+        assertEquals(lastPartition, ee.hashinate(holder.keyGreaterThanLastToken, hashinatorType, holder.configBytes));
 
         /*
          * Check that keys that fall on tokens map to the token

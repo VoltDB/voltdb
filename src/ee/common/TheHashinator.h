@@ -26,8 +26,7 @@
 namespace voltdb {
 
 /**
- * Class that maps values to partitions. It's rather simple
- * really. It'll get more complicated if you give it time.
+ *  Abstract base class for hashing SQL values to partition ids
  */
 class TheHashinator {
   public:
@@ -76,6 +75,8 @@ class TheHashinator {
     virtual ~TheHashinator() {}
 
   protected:
+    TheHashinator() {}
+
     /**
      * Given a long value, pick a partition to store the data.
      *
@@ -84,6 +85,11 @@ class TheHashinator {
      * distributed.
      */
     virtual int32_t hashinate(int64_t value) const = 0;
+
+    /*
+     * Given a piece of UTF-8 encoded character data OR binary data
+     * pick a partition to store the data
+     */
     virtual int32_t hashinate(const char *string, int32_t length) const = 0;
 };
 

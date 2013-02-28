@@ -20,8 +20,6 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.logging.VoltLogger;
 
-import com.google.common.base.Charsets;
-
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
@@ -44,12 +42,6 @@ public class LegacyHashinator extends TheHashinator {
             hashCode = 31 * hashCode + bytes[offset++];
         }
         return java.lang.Math.abs(hashCode % catalogPartitionCount);
-    }
-
-    @Override
-    protected int pHashinateString(String value) {
-        byte bytes[] = value.getBytes(Charsets.UTF_8);
-        return hashinateBytes(bytes);
     }
 
     public LegacyHashinator(byte config[]) {
