@@ -23,12 +23,19 @@
 
 package org.voltdb;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Random;
+import java.util.TreeMap;
 
 import junit.framework.TestCase;
 
+import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -355,7 +362,7 @@ public class TestTheHashinator extends TestCase {
                         "",
                         100,
                         hashinatorType,
-                        getConfigBytes(2));
+                        getConfigBytes(6));
         for (int i = 0; i < 2500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             byte[] valueToHash = new byte[r.nextInt(1000)];
@@ -372,6 +379,105 @@ public class TestTheHashinator extends TestCase {
             assertEquals(eehash, javahash);
         }
         try { ee.release(); } catch (Exception e) {}
+    }
+
+    private static class ConfigHolder {
+        byte configBytes[];
+        NavigableMap<Long, Integer> tokenToPartition = new TreeMap<Long, Integer>();
+        Map<Long, Long> tokenToKeys = new HashMap<Long, Long>();
+        long keyLessThanFirstToken;
+    }
+
+    /*
+     * Generate a config where the key that hashes to the token is known
+     * so we can check that the key maps to the partition at the token/key in
+     * Java/C++
+     */
+    public ConfigHolder getConfigForElastic(int partitions) {
+        ConfigHolder holder = new ConfigHolder();
+        final int tokensPerPartition = 8;
+        Random r = new Random();
+        ByteBuffer buf = ByteBuffer.allocate(4 + (12 * partitions * tokensPerPartition));
+        holder.configBytes = buf.array();
+        buf.putInt(partitions * tokensPerPartition);
+
+        for (int ii = 0; ii < partitions; ii++) {
+            for (int zz = 0; zz < tokensPerPartition; zz++) {
+                while (true) {
+                    long candidateKey = r.nextLong();
+                    ByteBuffer buf2 = ByteBuffer.allocate(8);
+                    buf2.order(ByteOrder.nativeOrder());
+                    buf2.putLong(candidateKey);
+                    long candidateToken = MurmurHash3.hash3_x64_128(buf2, 0, 8, 0);
+                    if (holder.tokenToPartition.containsKey(candidateToken)) {
+                        continue;
+                    }
+                    buf.putLong(candidateToken);
+                    buf.putInt(ii);
+                    holder.tokenToPartition.put(candidateToken, ii);
+                    holder.tokenToKeys.put(candidateToken, candidateKey);
+                    break;
+                }
+            }
+        }
+
+        /*
+         * Now generate a key that hashes to a value < the first token
+         */
+        final long firstToken = holder.tokenToPartition.firstKey();
+        while (true) {
+            long candidateKey = r.nextLong();
+            ByteBuffer buf2 = ByteBuffer.allocate(8);
+            buf2.order(ByteOrder.nativeOrder());
+            buf2.putLong(candidateKey);
+            long candidateToken = MurmurHash3.hash3_x64_128(buf2, 0, 8, 0);
+
+            if (candidateToken < firstToken) {
+                holder.keyLessThanFirstToken = candidateKey;
+                break;
+            }
+        }
+        return holder;
+    }
+    /*
+     * Test that a value that hashes to a token is placed at the partition of that token,
+     * and that a value < the first token maps to the last token
+     */
+    @Test
+    public void testHashOfToken() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+        ConfigHolder holder = getConfigForElastic(6);
+        ExecutionEngine ee = new ExecutionEngineJNI(
+                1,
+                1,
+                0,
+                0,
+                "",
+                100,
+                hashinatorType,
+                holder.configBytes);
+
+        TheHashinator.initialize(getHashinatorClass(), holder.configBytes);
+
+        /*
+         * Check that the first token - 1 hashes to the last token (wraps around)
+         */
+        final int lastPartition = holder.tokenToPartition.lastEntry().getValue();
+        assertEquals(lastPartition, TheHashinator.hashToPartition(holder.keyLessThanFirstToken));
+        assertEquals(lastPartition, ee.hashinate(holder.keyLessThanFirstToken, hashinatorType, holder.configBytes));
+
+        /*
+         * Check that keys that fall on tokens map to the token
+         */
+        for (Map.Entry<Long, Integer> e : holder.tokenToPartition.entrySet()) {
+            final int partition = e.getValue();
+            final long key = holder.tokenToKeys.get(e.getKey());
+            assertEquals(partition, TheHashinator.hashToPartition(key));
+            assertEquals(partition, ee.hashinate(key, hashinatorType, holder.configBytes));
+        }
+
+        try { ee.release(); } catch (Exception e) {}
+
     }
 }
 
