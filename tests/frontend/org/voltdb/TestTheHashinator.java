@@ -503,5 +503,52 @@ public class TestTheHashinator extends TestCase {
         try { ee.release(); } catch (Exception e) {}
 
     }
+
+    @Test
+    public void testElasticHashinatorPartitionMapping() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ByteBuffer buf = ByteBuffer.allocate(4 + (12 * 3));
+
+        buf.putInt(3);
+        buf.putLong(Long.MIN_VALUE);
+        buf.putInt(0);
+        buf.putLong(0);
+        buf.putInt(1);
+        buf.putLong(Long.MAX_VALUE);
+        buf.putInt(2);
+
+        ElasticHashinator hashinator = new ElasticHashinator(buf.array());
+
+        assertEquals( 0, hashinator.partitionForToken(Long.MIN_VALUE));
+        assertEquals( 0, hashinator.partitionForToken(Long.MIN_VALUE + 1));
+
+        assertEquals( 1, hashinator.partitionForToken(0));
+        assertEquals( 1, hashinator.partitionForToken(1));
+
+        assertEquals( 2, hashinator.partitionForToken(Long.MAX_VALUE));
+        assertEquals( 1, hashinator.partitionForToken(Long.MAX_VALUE - 1));
+
+        buf.clear();
+        buf.putInt(3);
+        buf.putLong(Long.MIN_VALUE + 1);
+        buf.putInt(0);
+        buf.putLong(0);
+        buf.putInt(1);
+        buf.putLong(Long.MAX_VALUE - 1);
+        buf.putInt(2);
+
+        hashinator = new ElasticHashinator(buf.array());
+
+        assertEquals( 2, hashinator.partitionForToken(Long.MIN_VALUE));
+        assertEquals( 0, hashinator.partitionForToken(Long.MIN_VALUE + 1));
+
+        assertEquals( 1, hashinator.partitionForToken(0));
+        assertEquals( 1, hashinator.partitionForToken(1));
+
+        assertEquals( 2, hashinator.partitionForToken(Long.MAX_VALUE));
+        assertEquals( 2, hashinator.partitionForToken(Long.MAX_VALUE - 1));
+    }
+
 }
 

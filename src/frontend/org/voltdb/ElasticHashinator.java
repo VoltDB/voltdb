@@ -113,7 +113,7 @@ public class ElasticHashinator extends TheHashinator {
      * be the first token <= the value hash, or if the value hash is < the first token in the ring,
      * it wraps around to the last token in the ring closest to Long.MAX_VALUE
      */
-    private int partitionForToken(long hash) {
+    int partitionForToken(long hash) {
         Map.Entry<Long, Integer> entry = tokens.floorEntry(hash);
         //System.out.println("Finding partition for token " + token);
         /*
