@@ -370,6 +370,7 @@ if whichtests in ("${eetestsuite}", "common"):
      nvalue_test
      pool_test
      tabletuple_test
+     elastic_hashinator_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):

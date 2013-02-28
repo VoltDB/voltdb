@@ -23,6 +23,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
+#include "common/TheHashinator.h"
 #include "boost_ext/FastAllocator.hpp"
 
 #include <cstring>
@@ -33,14 +34,22 @@
 #include <murmur3/MurmurHash3.h>
 #include <limits>
 
+/*
+ * Forward declaration for test friendship
+ */
+class ElasticHashinatorTest_TestMinMaxToken;
+
 namespace voltdb {
 
+
 /*
- * Concrete implementation of TheHashinator that uses MurmurHash3_x64_128 to has values
+ * Concrete implementation of TheHashinator that uses MurmurHash3_x64_128 to hash values
  * onto a consistent hash ring.
  */
 class ElasticHashinator : public TheHashinator {
+    friend class ::ElasticHashinatorTest_TestMinMaxToken;
 public:
+
     /*
      * Factory method that constructs an ElasticHashinator from a binary configuration.
      * The format is described in ElasticHashinator.java and basically describes the tokens
@@ -107,24 +116,23 @@ private:
         //std::cout << "EE finding partition for token " << token << std::endl;
 
         /*
-         * Hash value is > then the largest token (nothing comes after hash value)
-         * Or it is also possible that the hash value is < the smallest token (tokens.begin()) in which
+         * Hash value is < the smallest token (tokens.begin()) in which
          * case it actually maps to the last/largest token since conceptually this is a ring.
          */
-        if (i == tokens.end() || i == tokens.begin()) {
+        if (i == tokens.begin()) {
             return tokens.rbegin().data();
         }
 
         /*
          * Move the iterator back one, this is upper bound, so to find the floor we have to find the first
-         * value that did not come after the hash value. This is safe because we check for tokens.end()
-         * and tokens.begin() and the explanation for why those can happen is above.
+         * value that did not come after the hash value. There are test cases that show if upper_bound
+         * returns tokens.end() that it moves back to tokens.rbegin() on its own.
          */
         i--;
 
         /*
          * At this point we will have the right value, and bounds should not be an issue
-         * due to the checks for tokens.end and tokens.begin.
+         * due to the checks for tokens.begin. tokens.end is handled by always moving the iterator back one
          */
         return i.data();
     }
