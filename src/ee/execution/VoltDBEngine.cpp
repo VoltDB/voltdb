@@ -58,6 +58,8 @@
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
+#include "common/LegacyHashinator.h"
+#include "common/ElasticHashinator.h"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
@@ -110,6 +112,7 @@ const int64_t AD_HOC_FRAG_ID = -1;
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentUndoQuantum(NULL),
+      m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
       m_currentOutputDepId(-1),
       m_currentInputDepId(-1),
@@ -160,7 +163,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t hostId,
                          string hostname,
                          int64_t tempTableMemoryLimit,
-                         int32_t totalPartitions)
+                         HashinatorType hashinatorType,
+                         char *hashinatorConfig)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -168,7 +172,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
-    m_totalPartitions = totalPartitions;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -210,6 +213,19 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
+
+    switch (hashinatorType) {
+    case HASHINATOR_LEGACY:
+        m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
+        break;
+    case HASHINATOR_ELASTIC:
+        m_hashinator.reset(ElasticHashinator::newInstance(hashinatorConfig));
+        break;
+    default:
+        throwFatalException("Unknown hashinator type %d", hashinatorType);
+        break;
+    }
+
     return true;
 }
 
@@ -382,7 +398,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                 m_currentInputDepId = -1;
                 return ENGINE_ERRORCODE_ERROR;
             }
-        } catch (SerializableEEException &e) {
+        } catch (const SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
@@ -451,7 +467,7 @@ int VoltDBEngine::loadFragment(const char *plan, int32_t length, int64_t &fragId
                                               message);
             }
         }
-        catch (SerializableEEException &e)
+        catch (const SerializableEEException &e)
         {
             VOLT_TRACE("loadFragment: failed to initialize plan fragment");
             e.serialize(getExceptionOutputSerializer());
@@ -853,7 +869,7 @@ VoltDBEngine::loadTable(int32_t tableId,
 
     try {
         table->loadTuplesFrom(serializeIn);
-    } catch (SerializableEEException e) {
+    } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
     return true;
@@ -1146,7 +1162,7 @@ void VoltDBEngine::printReport() {
 
 bool VoltDBEngine::isLocalSite(const NValue& value)
 {
-    int index = TheHashinator::hashinate(value, m_totalPartitions);
+    int index = m_hashinator->hashinate(value);
     return index == m_partitionId;
 }
 
@@ -1264,7 +1280,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           message);
         }
-    } catch (SerializableEEException &e) {
+    } catch (const SerializableEEException &e) {
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
         return -1;

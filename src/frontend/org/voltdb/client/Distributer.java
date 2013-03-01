@@ -50,6 +50,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.JdbcDatabaseMetaDataGenerator;
+import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
@@ -875,7 +876,7 @@ class Distributer {
     private void updateAffinityTopology(VoltTable vt) {
         // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
         int numPartitions = vt.getRowCount() - 1;
-        TheHashinator.initialize(numPartitions);
+        TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
         m_hashinatorInitialized = true;
         m_partitionMasters.clear();
         m_partitionReplicas.clear();

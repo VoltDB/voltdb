@@ -495,7 +495,7 @@ struct GenericPersistentKey : public GenericKey<keySize>
             NValue indexedValue;
             try {
                 indexedValue = ae->eval(tuple, NULL);
-            } catch (SQLException& ignoredDuringIndexing) {
+            } catch (const SQLException& ignoredDuringIndexing) {
                 // For the sake of keeping non-unique index upkeep as a non-failable operation,
                 // all exception-throwing expression evaluations get treated as NULL for index
                 // purposes.

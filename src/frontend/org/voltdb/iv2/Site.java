@@ -54,6 +54,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -469,7 +470,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        m_numberOfPartitions);
+                        TheHashinator.getConfiguredHashinatorType(),
+                        TheHashinator.getConfigureBytes(m_numberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
@@ -485,7 +487,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            m_numberOfPartitions);
+                            TheHashinator.getConfiguredHashinatorType(),
+                            TheHashinator.getConfigureBytes(m_numberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
         }
