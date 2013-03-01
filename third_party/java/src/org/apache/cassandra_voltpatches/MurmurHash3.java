@@ -74,7 +74,7 @@ public class MurmurHash3
 
     public static long hash3_x64_128(long value, long seed) {
         ByteBuffer buf = ByteBuffer.allocate(8);
-        buf.order(ByteOrder.nativeOrder());
+        buf.order(ByteOrder.LITTLE_ENDIAN);
         buf.putLong(value);
         return hash3_x64_128(buf, 0, 8, seed);
     }
