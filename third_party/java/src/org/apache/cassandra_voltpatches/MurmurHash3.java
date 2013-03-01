@@ -18,6 +18,7 @@
 package org.apache.cassandra_voltpatches;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import com.google.common.primitives.UnsignedBytes;
 
@@ -65,6 +66,17 @@ public class MurmurHash3
         k ^= k >>> 33;
 
         return k;
+    }
+
+    public static long hash3_x64_128(long value) {
+        return hash3_x64_128(value, 0);
+    }
+
+    public static long hash3_x64_128(long value, long seed) {
+        ByteBuffer buf = ByteBuffer.allocate(8);
+        buf.order(ByteOrder.nativeOrder());
+        buf.putLong(value);
+        return hash3_x64_128(buf, 0, 8, seed);
     }
 
     public static long hash3_x64_128(ByteBuffer key, int offset, int length, long seed)
