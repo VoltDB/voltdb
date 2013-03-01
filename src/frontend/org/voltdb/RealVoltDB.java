@@ -115,7 +115,6 @@ import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
-import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
@@ -372,10 +371,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
 
-            // start up the response sampler if asked to by setting the env var
-            // VOLTDB_RESPONSE_SAMPLE_PATH to a valid path
-            ResponseSampler.initializeIfEnabled();
-
             buildClusterMesh(isRejoin);
 
             //Start validating the build string in the background
@@ -435,7 +430,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 // IV2 mailbox stuff
                 if (isIV2Enabled()) {
                     ClusterConfig iv2config = new ClusterConfig(topo);
-                    m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
+                    m_cartographer = new Cartographer(m_messenger, iv2config.getPartitionCount());
                     List<Integer> partitions = null;
                     if (isRejoin) {
                         partitions = m_cartographer.getIv2PartitionsToReplace(topo);
