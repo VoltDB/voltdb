@@ -17,7 +17,6 @@
 package org.voltdb;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
@@ -84,7 +83,7 @@ public class ElasticHashinator extends TheHashinator {
         for (int ii = 0; ii < partitionCount; ii++) {
             for (int zz = 0; zz < tokensPerPartition; zz++) {
                 while (true) {
-                    long candidateToken = r.nextLong();
+                    long candidateToken = MurmurHash3.hash3_x64_128(r.nextLong());
                     if (!checkSet.add(candidateToken)) {
                         continue;
                     }
@@ -101,11 +100,7 @@ public class ElasticHashinator extends TheHashinator {
     protected int pHashinateLong(long value) {
         if (value == Long.MIN_VALUE) return 0;
 
-        ByteBuffer buf = ByteBuffer.allocate(8);
-        buf.order(ByteOrder.nativeOrder());
-        buf.putLong(value);
-        final long hash = MurmurHash3.hash3_x64_128(buf, 0, 8, 0);
-        return partitionForToken(hash);
+        return partitionForToken(MurmurHash3.hash3_x64_128(value));
     }
 
     /**
