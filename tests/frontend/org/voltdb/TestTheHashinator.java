@@ -406,10 +406,7 @@ public class TestTheHashinator extends TestCase {
             for (int zz = 0; zz < tokensPerPartition; zz++) {
                 while (true) {
                     long candidateKey = r.nextLong();
-                    ByteBuffer buf2 = ByteBuffer.allocate(8);
-                    buf2.order(ByteOrder.nativeOrder());
-                    buf2.putLong(candidateKey);
-                    long candidateToken = MurmurHash3.hash3_x64_128(buf2, 0, 8, 0);
+                    long candidateToken = MurmurHash3.hash3_x64_128(candidateKey);
                     if (holder.tokenToPartition.containsKey(candidateToken)) {
                         continue;
                     }
