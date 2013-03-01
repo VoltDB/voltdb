@@ -55,18 +55,6 @@ using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
-AggregatePlanNode::AggregatePlanNode(CatalogId id)
-  : AbstractPlanNode(id)
-{
-    // Do nothing
-}
-
-AggregatePlanNode::AggregatePlanNode(PlanNodeType type)
-  : AbstractPlanNode(), m_type(type)
-{
-    // Do nothing
-}
-
 AggregatePlanNode::~AggregatePlanNode()
 {
     if (!isInline())
@@ -84,36 +72,6 @@ AggregatePlanNode::~AggregatePlanNode()
     }
 }
 
-PlanNodeType
-AggregatePlanNode::getPlanNodeType() const
-{
-    return m_type;
-}
-
-vector<ExpressionType>
-AggregatePlanNode::getAggregates()
-{
-    return m_aggregates;
-}
-
-const vector<ExpressionType>
-AggregatePlanNode::getAggregates() const
-{
-    return m_aggregates;
-}
-
-const vector<bool>&
-AggregatePlanNode::getDistinctAggregates() const
-{
-    return m_distinctAggregates;
-}
-
-const vector<AbstractExpression*>&
-AggregatePlanNode::getGroupByExpressions() const
-{
-    return m_groupByExpressions;
-}
-
 string AggregatePlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;
     buffer << spacer << "\nAggregates["
@@ -128,7 +86,10 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
         buffer << spacer << "outcol="
                << m_aggregateOutputColumns[ctr] << "\n";
         buffer << spacer << "expr="
-               << m_aggregateInputExpressions[ctr]->debug(spacer) << "\n";
+               << (m_aggregateInputExpressions[ctr] ?
+                   m_aggregateInputExpressions[ctr]->debug(spacer) :
+                   "null")
+               << "\n";
     }
     buffer << spacer << "}";
 
@@ -197,10 +158,13 @@ AggregatePlanNode::loadFromJSONObject(Object &obj)
                     push_back(AbstractExpression::buildExpressionTree(aggregateColumn[zz].value_.get_obj()));
             }
         }
-        if(!(containsType && containsDistinct && containsOutputColumn && containsExpression)) {
+        if(!(containsType && containsDistinct && containsOutputColumn)) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "AggregatePlanNode::loadFromJSONObject:"
-                                      " Missing type,distinct, outputcolumn or expression.");
+                                      " Missing type, distinct, or outputcolumn.");
+        }
+        if ( ! containsExpression) {
+            m_aggregateInputExpressions.push_back(NULL);
         }
     }
 
@@ -213,6 +177,17 @@ AggregatePlanNode::loadFromJSONObject(Object &obj)
             Value groupByExpressionValue = groupByExpressionsArray[ii];
             m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionValue.get_obj()));
         }
+    }
+}
+
+void AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
+{
+    const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    size_t size = outputSchema.size();
+    outputColumnExpressions.resize(size);
+    for (int ii = 0; ii < size; ii++) {
+        SchemaColumn* outputColumn = outputSchema[ii];
+        outputColumnExpressions[ii] = outputColumn->getExpression();
     }
 }
 

@@ -363,6 +363,26 @@ private:
     }
 };
 
+/**
+ * Convenience class for Tuples that get their (inline) storage from a pool.
+ * The pool is specified on initial allocation and retained for later reallocations.
+ * The tuples can be used like normal tuples except for allocation/reallocation.
+ * The caller takes responsibility for consistently using the specialized methods below for that.
+ */
+class PoolBackedTempTuple : public TableTuple {
+public:
+    PoolBackedTempTuple(const TupleSchema* schema, Pool* pool) : TableTuple(schema), m_pool(pool) { }
+
+    void allocateActiveTuple()
+    {
+        char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength() + TUPLE_HEADER_SIZE));
+        move(storage);
+        setActiveTrue();
+    }
+private:
+    Pool* m_pool;
+};
+
 inline TableTuple::TableTuple() :
     m_schema(NULL), m_data(NULL) {
 }

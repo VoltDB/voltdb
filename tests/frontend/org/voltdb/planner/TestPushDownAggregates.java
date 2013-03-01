@@ -135,7 +135,10 @@ public class TestPushDownAggregates extends PlannerTestCase {
     public void testGroupByWithoutAggregates() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT A1 FROM T1 GROUP BY A1");
         assertFalse(pn.get(0).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
-        assertTrue(pn.get(1).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
+        // We used to be careful to send raw rows to the coordinator instead of first
+        // de-duping them into groups -- solely because there were no aggregation functions
+        // requested. What did that have to do with anything? Assert that we're past that phase.
+        assertFalse(pn.get(1).findAllNodesOfType(PlanNodeType.HASHAGGREGATE).isEmpty());
     }
 
     public void testCountDistinct() {

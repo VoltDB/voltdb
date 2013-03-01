@@ -1106,10 +1106,29 @@ public class PlanAssembler {
          */
         if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
             AggregatePlanNode topAggNode;
-            //TODO: add "m_parsedSelect.grouped &&" to the preconditions for HashAggregate.
-            // Otherwise, a runtime hash is built for nothing -- just to hold a single entry.
-            if (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID) {
+            // A hash is required to build up per-group aggregates in parallel vs.
+            // when there is only one aggregation over the entire table OR when the
+            // per-group aggregates are being built serially from the ordered output
+            // of an index scan.
+            // Currently, an index scan only claims to have a sort direction when its output
+            // matches the order demanded by the ORDER BY clause.
+            // The only way these ordered indexed columns could survive the aggregation process
+            // (unaggregated) is if they are also GROUP BY columns. So an index with a valid
+            // sort direction indicates that all of the ORDER BY columns are grouped, but how
+            // do we know that ALL of the GROUPED columns are ordered, so we can ditch the hash?
+            // TODO: There appears to be some such test missing here.
+
+            // The way that an index scan under-claims the sorted-ness of its output can lead to cases
+            // where a hash is used needlessly -- it's possible that there is no ORDER BY or that
+            // the indexed columns come out sorted in some wrong direction WRT the order by.
+            // In that case, we could miss the possibility that the index produces sufficient sorted-ness
+            // not to interleave groups, and so we would needlessly use a hash.
+            // This is the less ambitious aspect of issue ENG-4096. The more ambitious aspect
+            // is that the ability to by-pass use of the hash could actually motivate selection of
+            // a compatible index scan, even when one would not be motivated by a WHERE or ORDER BY clause.
+            if (m_parsedSelect.isGrouped() &&
+                (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
+                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
                 aggNode = new HashAggregatePlanNode();
                 topAggNode = new HashAggregatePlanNode();
             } else {
@@ -1118,56 +1137,15 @@ public class PlanAssembler {
             }
 
             int outputColumnIndex = 0;
-            int topOutputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
-            NodeSchema topAggSchema = new NodeSchema();
-            boolean hasAggregates = false;
-            boolean isPushDownAgg = true;
             // TODO: Aggregates could theoretically ONLY appear in the ORDER BY clause but not the display columns, but we don't support that yet.
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns)
-            {
+            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
-                SchemaColumn topSchemaCol = null;
-                ExpressionType agg_expression_type = rootExpr.getExpressionType();
-                if (rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    // If the rootExpr is not itself an AggregateExpression but simply contains one (or more)
-                    // like "MAX(counter)+1" or "MAX(col)/MIN(col)",
-                    // it gets classified as a non-push-down-able aggregate.
-                    // That beats getting it confused with a pass-through column.
-                    // TODO: support expressions of aggregates by greater differentiation of display columns between the top-level
-                    // aggregate (potentially containing aggregate functions and expressions of aggregate functions) and the pushed-down
-                    // aggregate (potentially containing aggregate functions and aggregate functions of expressions).
+                if (rootExpr instanceof AggregateExpression) {
+                    ExpressionType agg_expression_type = rootExpr.getExpressionType();
                     agg_input_expr = rootExpr.getLeft();
-                    hasAggregates = true;
-
-                    // count(*) hack.  we're not getting AGGREGATE_COUNT_STAR
-                    // expression types from the parsing, so we have
-                    // to detect the null inner expression case and do the
-                    // switcharoo ourselves.
-                    if (rootExpr.getExpressionType() == ExpressionType.AGGREGATE_COUNT &&
-                             rootExpr.getLeft() == null)
-                    {
-                        agg_expression_type = ExpressionType.AGGREGATE_COUNT_STAR;
-
-                        // Just need a random input column for now.
-                        // The EE won't actually evaluate this, so we
-                        // just pick something innocuous
-                        // At some point we should special-case count-star so
-                        // we don't go digging for TVEs
-                        // XXX: Danger: according to standard SQL, if first_col has nulls, COUNT(first_col) < COUNT(*)
-                        // -- consider using something non-nullable like TupleAddressExpression?
-                        SchemaColumn first_col = root.getOutputSchema().getColumns().get(0);
-                        TupleValueExpression tve = new TupleValueExpression();
-                        tve.setValueType(first_col.getType());
-                        tve.setValueSize(first_col.getSize());
-                        tve.setColumnIndex(0);
-                        tve.setColumnName(first_col.getColumnName());
-                        tve.setColumnAlias(first_col.getColumnName());
-                        tve.setTableName(first_col.getTableName());
-                        agg_input_expr = tve;
-                    }
 
                     // A bit of a hack: ProjectionNodes after the
                     // aggregate node need the output columns here to
@@ -1185,12 +1163,8 @@ public class PlanAssembler {
                     tve.setColumnAlias(col.alias);
                     tve.setTableName("VOLT_TEMP_TABLE");
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
-                    aggNode.addAggregate(agg_expression_type, is_distinct,
-                                         outputColumnIndex, agg_input_expr);
-                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE",
-                                                  "",
-                                                  col.alias,
-                                                  tve);
+                    aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
+                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -1200,11 +1174,8 @@ public class PlanAssembler {
                      * select columns includes any other aggregates, it will not
                      * do the push-down. - nshi
                      */
-                    if (!is_distinct &&
-                        (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
-                         agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
-                         agg_expression_type == ExpressionType.AGGREGATE_SUM))
-                    {
+                    if (topAggNode != null) {
+                        ExpressionType top_expression_type = agg_expression_type;
                         /*
                          * For count(*), count() and sum(), the pushed-down
                          * aggregate node doesn't change. An extra sum()
@@ -1217,32 +1188,16 @@ public class PlanAssembler {
                          * If DISTINCT is specified, don't do push-down for
                          * count() and sum()
                          */
-
-                        // Output column for the sum() aggregate node
-                        TupleValueExpression topOutputExpr = new TupleValueExpression();
-                        topOutputExpr.setValueType(rootExpr.getValueType());
-                        topOutputExpr.setValueSize(rootExpr.getValueSize());
-                        topOutputExpr.setColumnIndex(topOutputColumnIndex);
-                        topOutputExpr.setColumnName("");
-                        topOutputExpr.setColumnAlias(col.alias);
-                        topOutputExpr.setTableName("VOLT_TEMP_TABLE");
-
-                        /*
-                         * Input column of the sum() aggregate node is the
-                         * output column of the push-down aggregate node
-                         */
-                        topAggNode.addAggregate(ExpressionType.AGGREGATE_SUM,
-                                                false,
-                                                outputColumnIndex,
-                                                tve);
-                        topSchemaCol = new SchemaColumn("VOLT_TEMP_TABLE",
-                                                        "",
-                                                        col.alias,
-                                                        topOutputExpr);
-                    }
-                    else if (agg_expression_type == ExpressionType.AGGREGATE_MIN ||
-                             agg_expression_type == ExpressionType.AGGREGATE_MAX)
-                    {
+                        if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
+                            agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
+                            agg_expression_type == ExpressionType.AGGREGATE_SUM) {
+                            if (is_distinct) {
+                                topAggNode = null;
+                            }
+                            else {
+                                top_expression_type = ExpressionType.AGGREGATE_SUM;
+                            }
+                        }
                         /*
                          * For min() and max(), the pushed-down aggregate node
                          * doesn't change. An extra aggregate node of the same
@@ -1251,20 +1206,31 @@ public class PlanAssembler {
                          * the same as the output schema of the pushed-down
                          * aggregate node.
                          */
-                        topAggNode.addAggregate(agg_expression_type,
-                                                is_distinct,
-                                                outputColumnIndex,
-                                                tve);
-                        topSchemaCol = schema_col;
+                        else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
+                                 agg_expression_type != ExpressionType.AGGREGATE_MAX) {
+                            /*
+                             * Unsupported aggregate for push-down (AVG for example).
+                             */
+                            topAggNode = null;
+                        }
+
+                        if (topAggNode != null) {
+                            /*
+                             * Input column of the top aggregate node is the output column of the push-down aggregate node
+                             */
+                            topAggNode.addAggregate(top_expression_type, is_distinct, outputColumnIndex, tve);
+                        }
                     }
-                    else
-                    {
-                        /*
-                         * Unsupported aggregate (AVG for example)
-                         * or some expression of aggregates.
-                         */
-                        isPushDownAgg = false;
-                    }
+                }
+
+                // If the rootExpr is not itself an AggregateExpression but simply contains one (or more)
+                // like "MAX(counter)+1" or "MAX(col)/MIN(col)" the assumptions about matching input and output
+                // columns break down.
+                // TODO: support expressions of aggregates by greater differentiation of display columns between the top-level
+                // aggregate (potentially containing aggregate functions and expressions of aggregate functions) and the pushed-down
+                // aggregate (potentially containing aggregate functions and aggregate functions of expressions).
+                else if (rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    throw new PlanningErrorException("Unsupported operation on the result of an aggregate function in a column expression");
                 }
                 else
                 {
@@ -1280,29 +1246,12 @@ public class PlanAssembler {
                                                   col.expression);
                 }
 
-                if (topSchemaCol == null)
-                {
-                    /*
-                     * If we didn't set the column schema for the top node, it
-                     * means either it's not a count(*) aggregate or it's a
-                     * pass-through column. So just copy it.
-                     */
-                    topSchemaCol = new SchemaColumn(schema_col.getTableName(),
-                                                    schema_col.getColumnName(),
-                                                    schema_col.getColumnAlias(),
-                                                    schema_col.getExpression());
-                }
-
                 agg_schema.addColumn(schema_col);
-                topAggSchema.addColumn(topSchemaCol);
                 outputColumnIndex++;
-                topOutputColumnIndex++;
             }
 
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns)
-            {
-                if (agg_schema.find(col.tableName, col.columnName, col.alias) == null)
-                {
+            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns) {
+                if (agg_schema.find(col.tableName, col.columnName, col.alias) == null) {
                     throw new PlanningErrorException("GROUP BY column " + col.alias +
                                                      " is not in the display columns." +
                                                      " Please specify " + col.alias +
@@ -1310,30 +1259,37 @@ public class PlanAssembler {
                 }
 
                 aggNode.addGroupByExpression(col.expression);
-                topAggNode.addGroupByExpression(col.expression);
+                if (topAggNode != null) {
+                    // This assumes that the group keys are simple columns in a fixed order as presented as input to aggNode,
+                    // as projected out of aggNode as input to topAggNode, and as projected out of topAggNode.
+                    // This is not likely to hold up in more general cases involving expressions.
+                    topAggNode.addGroupByExpression(col.expression);
+                }
             }
 
             aggNode.setOutputSchema(agg_schema);
-            topAggNode.setOutputSchema(agg_schema);
             /*
              * Is there a necessary coordinator-aggregate node...
              */
-            if (!hasAggregates || !isPushDownAgg)
-            {
-                topAggNode = null;
+            if (topAggNode != null) {
+                topAggNode.setOutputSchema(agg_schema);
             }
             root = pushDownAggregate(root, aggNode, topAggNode);
         }
-        else
-        {
-            /*
-             * Handle DISTINCT only when there is no aggregate operator
-             * expression
-             */
-            root = handleDistinct(root);
+
+        if (m_parsedSelect.isGrouped()) {
+            // DISTINCT is redundant with GROUP BY IFF all of the grouping columns are present in the display columns. Return early.
+            if (m_parsedSelect.displayColumnsContainAllGroupByColumns()) {
+                return root;
+            }
+        }
+        // DISTINCT is redundant on a single-row result. Return early.
+        else if (containsAggregateExpression) {
+            return root;
         }
 
-        return root;
+        // Handle DISTINCT if it is not redundant with aggregation/grouping.
+        return handleDistinct(root);
     }
 
     /**

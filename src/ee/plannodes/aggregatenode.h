@@ -54,16 +54,14 @@ namespace voltdb
 class AggregatePlanNode : public AbstractPlanNode
 {
 public:
-    AggregatePlanNode(CatalogId id);
-    AggregatePlanNode(PlanNodeType type);
+    AggregatePlanNode(PlanNodeType type) : m_type(type) { }
     ~AggregatePlanNode();
 
-    virtual PlanNodeType getPlanNodeType() const;
+    virtual PlanNodeType getPlanNodeType() const { return m_type; }
 
-    std::vector<ExpressionType> getAggregates();
-    const std::vector<ExpressionType> getAggregates() const;
+    const std::vector<ExpressionType> getAggregates() const { return m_aggregates; }
 
-    const std::vector<bool>& getDistinctAggregates() const;
+    const std::vector<bool>& getDistinctAggregates() const { return m_distinctAggregates; }
 
     /*
      * Returns a list of output column indices that map from each
@@ -71,17 +69,16 @@ public:
      * integers and not by name as is usually done to make the plan
      * node format more human readable.
      */
-    inline std::vector<int>& getAggregateOutputColumns()
-    {
-        return m_aggregateOutputColumns;
-    }
+    const std::vector<int>& getAggregateOutputColumns() const
+    { return m_aggregateOutputColumns; }
 
-    std::vector<AbstractExpression*>& getAggregateInputExpressions()
-    {
-        return m_aggregateInputExpressions;
-    }
+    const std::vector<AbstractExpression*>& getAggregateInputExpressions() const
+    { return m_aggregateInputExpressions; }
 
-    const std::vector<AbstractExpression*>& getGroupByExpressions() const;
+    const std::vector<AbstractExpression*>& getGroupByExpressions() const
+    { return m_groupByExpressions; }
+
+    void collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const;
 
     std::string debugInfo(const std::string &spacer) const;
 
@@ -98,6 +95,7 @@ protected:
     std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
     std::vector<AbstractExpression*> m_aggregateInputExpressions;
+    std::vector<AbstractExpression*> m_outputColumnExpressions;
 
     //
     // What columns to group by on
