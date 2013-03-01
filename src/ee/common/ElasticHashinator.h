@@ -87,9 +87,7 @@ protected:
         // special case this hard to hash value to 0 (in both c++ and java)
         if (value == INT64_MIN) return 0;
 
-        int64_t out[2];
-        MurmurHash3_x64_128(&value, 8, 0, out);
-        return partitionForToken(out[0]);
+        return partitionForToken(MurmurHash3_x64_128(value));
     }
 
     /*

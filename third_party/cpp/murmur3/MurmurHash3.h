@@ -34,6 +34,16 @@ void MurmurHash3_x86_128 ( const void * key, int len, uint32_t seed, void * out 
 
 void MurmurHash3_x64_128 ( const void * key, int len, uint32_t seed, void * out );
 
+inline int64_t MurmurHash3_x64_128 ( int64_t value, uint32_t seed) {
+    int64_t out[2];
+    MurmurHash3_x86_128( &value, 8, seed, out);
+    return out[0];
+}
+
+inline int64_t MurmurHash3_x64_128 ( int64_t value) {
+    return MurmurHash3_x64_128(value, 0);
+}
+
 //-----------------------------------------------------------------------------
 
 }
