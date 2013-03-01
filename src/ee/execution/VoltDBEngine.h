@@ -65,6 +65,7 @@
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
+#include "common/TheHashinator.h"
 #include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
@@ -122,12 +123,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** Constructor for test code: this does not enable JNI callbacks. */
         VoltDBEngine() :
           m_currentUndoQuantum(NULL),
+          m_hashinator(NULL),
           m_staticParams(MAX_PARAM_COUNT),
           m_currentOutputDepId(-1),
           m_currentInputDepId(-1),
           m_isELEnabled(false),
           m_numResultDependencies(0),
           m_logManager(new StdoutLogProxy()), m_templateSingleLongTable(NULL), m_topend(NULL)
+
         {
             m_currentUndoQuantum = new DummyUndoQuantum();
         }
@@ -139,7 +142,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t hostId,
                         std::string hostname,
                         int64_t tempTableMemoryLimit,
-                        int32_t totalPartitions);
+                        HashinatorType type,
+                        char *hashinatorConfig);
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }
@@ -435,7 +439,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int64_t m_siteId;
         int32_t m_partitionId;
         int32_t m_clusterIndex;
-        int m_totalPartitions;
+        boost::scoped_ptr<TheHashinator> m_hashinator;
         size_t m_startOfResultBuffer;
         int64_t m_tempTableMemoryLimit;
 

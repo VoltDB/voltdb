@@ -28,6 +28,7 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -92,7 +93,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
-            final int totalPartitions)
+            final TheHashinator.HashinatorType hashinatorType,
+            final byte hashinatorConfig[])
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -117,7 +119,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     hostId,
                     getStringBytes(hostname),
                     tempTableMemory * 1024 * 1024,
-                    totalPartitions);
+                    hashinatorType.typeId(), hashinatorConfig);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
             @Override
@@ -511,10 +513,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, int partitionCount)
+    public int hashinate(Object value, TheHashinator.HashinatorType hashinatorType, byte hashinatorConfig[])
     {
         ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        parameterSet.setParameters(value, hashinatorType.typeId(), hashinatorConfig);
 
         // serialize the param set
         fsForParameterSet.clear();
@@ -524,7 +526,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(exception); // can't happen
         }
 
-        return nativeHashinate(pointer, partitionCount);
+        return nativeHashinate(pointer);
     }
 
     @Override

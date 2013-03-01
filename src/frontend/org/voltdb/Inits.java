@@ -610,7 +610,9 @@ public class Inits {
             int sitesPerHost = m_deployment.getCluster().getSitesperhost();
 
             // Initialize the complex partitioning scheme
-            TheHashinator.initialize((hostCount * sitesPerHost) / (kFactor + 1));
+            TheHashinator.initialize(
+                    TheHashinator.getConfiguredHashinatorClass(),
+                    TheHashinator.getConfigureBytes((hostCount * sitesPerHost) / (kFactor + 1)));
         }
     }
 

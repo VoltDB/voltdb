@@ -976,7 +976,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        configuredNumberOfPartitions);
+                        TheHashinator.getConfiguredHashinatorType(),
+                        TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, txnId);
@@ -994,7 +995,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             target,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            m_tracker.m_numberOfPartitions);
+                            TheHashinator.getConfiguredHashinatorType(),
+                            TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);

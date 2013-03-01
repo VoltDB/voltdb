@@ -297,7 +297,7 @@ AbstractPlanNode::fromJSONObject(Object &obj) {
             Object obj = inlineNodes[ii].get_obj();
             newNode = AbstractPlanNode::fromJSONObject(obj);
         }
-        catch (SerializableEEException &ex) {
+        catch (const SerializableEEException &ex) {
             delete newNode;
             delete node;
             throw;
@@ -361,7 +361,7 @@ AbstractPlanNode::fromJSONObject(Object &obj) {
     try {
         node->loadFromJSONObject(obj);
     }
-    catch (SerializableEEException &ex) {
+    catch (const SerializableEEException &ex) {
         delete node;
         throw;
     }
