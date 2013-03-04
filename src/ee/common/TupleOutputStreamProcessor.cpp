@@ -52,6 +52,7 @@ void TupleOutputStreamProcessor::clearState()
     m_maxTupleLength = 0;
     m_predicates = NULL;
     m_table = NULL;
+    m_totalBytesSerialized = 0;
 }
 
 /** Convenience method to create and add a new TupleOutputStream. */
@@ -81,6 +82,14 @@ void TupleOutputStreamProcessor::open(PersistentTable &table,
     for (TupleOutputStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         iter->startRows(partitionId);
     }
+    m_totalBytesSerialized = 0;
+    // Recalculate the serialization throttle threshold based on the number of partitions.
+    if (m_totalPartitions > 0) {
+        m_bytesSerializedThreshold = m_bytesSerializedThresholdPerPartition * m_totalPartitions;
+    }
+    else {
+        m_bytesSerializedThreshold = m_bytesSerializedThresholdPerPartition;
+    }
 }
 
 /** Stop serializing. */
@@ -95,12 +104,9 @@ void TupleOutputStreamProcessor::close()
 /**
  * Write a tuple to the output streams.
  * Expects buffer space was already checked.
- * Maintains the total byte counter provided by the caller.
- * Returns true when one of the output buffers fills.
+ * Returns true when the caller should yield to allow other work to proceed.
  */
-bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer,
-                                  TableTuple &tuple,
-                                  std::size_t &totalBytesSerialized)
+bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTuple &tuple)
 {
     if (m_table == NULL) {
         throwFatalException("TupleOutputStreamProcessor::writeRow() was called before initialize().");
@@ -114,7 +120,7 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer,
         ipredicate = m_predicates->begin();
     }
 
-    bool aBufferIsFull = false;
+    bool yield = false;
     for (TupleOutputStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         // Get approval from corresponding output stream predicate, if provided.
         bool accepted = true;
@@ -131,14 +137,18 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer,
                 throwFatalException(
                     "TupleOutputStreamProcessor::writeRow() failed because buffer has no space.");
             }
-            totalBytesSerialized += iter->writeRow(serializer, tuple);
+            m_totalBytesSerialized += iter->writeRow(serializer, tuple);
             // Is this buffer capable of handling another tuple after this one is done?
-            if (!aBufferIsFull && !iter->canFit(m_maxTupleLength)) {
-                aBufferIsFull = true;
+            if (!yield && !iter->canFit(m_maxTupleLength)) {
+                yield = true;
             }
         }
     }
-    return aBufferIsFull;
+    // Yield control when the bytes threshold is hit to allow other work.
+    if (!yield && m_totalBytesSerialized >= m_bytesSerializedThreshold) {
+        yield = true;
+    }
+    return yield;
 }
 
 } // namespace voltdb

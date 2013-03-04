@@ -73,11 +73,6 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
         throwFatalException("serializeMore() was called again after streaming completed.")
     }
 
-    // Count the total number of bytes serialized to allow throttling.
-    std::size_t totalBytesSerialized = 0;
-    // Stop after serializing this many bytes.
-    const std::size_t bytesSerializedThreshold = 512 * 1024;
-
     // Need to initialize the output stream list.
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
@@ -104,7 +99,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * Write the tuple to all the output streams.
              * Done if any of the buffers filled up.
              */
-            yield = outputStreams.writeRow(m_serializer, tuple, totalBytesSerialized);
+            yield = outputStreams.writeRow(m_serializer, tuple);
 
             /*
              * If this is the table scan, check to see if the tuple is pending
@@ -121,14 +116,6 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                 CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
                 //Save the extra lookup if possible
                 m_table.deleteTupleStorage(tuple, iter->m_currentBlock);
-            }
-
-            /*
-             * Yield control when the bytes threshold is hit to allow other work.
-             * Check per tuple to avoid per-stream state for resuming.
-             */
-            if (!yield && totalBytesSerialized >= bytesSerializedThreshold) {
-                yield = true;
             }
 
         } else if (!m_finishedTableScan) {

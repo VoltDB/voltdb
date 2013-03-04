@@ -62,17 +62,18 @@ public:
     /**
      * Write a tuple to the output streams.
      * Expects buffer space was already checked.
-     * Maintains the total byte counter provided by the caller.
-     * Returns true when one of the output buffers fills.
+     * Returns true when the caller should yield to allow other work to proceed.
      */
-    bool writeRow(TupleSerializer &serializer,
-                  TableTuple &tuple,
-                  std::size_t &totalBytesSerialized);
+    bool writeRow(TupleSerializer &serializer, TableTuple &tuple);
 
 private:
 
     /** The maximum tuple length. */
     std::size_t m_maxTupleLength;
+
+    /** Pause serialization after this many bytes per partition. */
+    static const std::size_t m_bytesSerializedThresholdPerPartition = 512 * 1024;
+    std::size_t m_bytesSerializedThreshold;
 
     /** Table receiving tuples. */
     PersistentTable *m_table;
@@ -82,6 +83,9 @@ private:
 
     /** Predicates for filtering. May remain non-NULL after open() if empty. */
     StreamPredicateList *m_predicates;
+
+    /** Keep track of bytes written for throttling to yield control. */
+    std::size_t m_totalBytesSerialized;
 
     /** Private method used by constructors, etc. to clear state. */
     void clearState();
