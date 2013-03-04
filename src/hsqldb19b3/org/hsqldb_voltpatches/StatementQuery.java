@@ -497,6 +497,11 @@ public class StatementQuery extends StatementDMQL {
         for (RangeVariable rangeVariable : select.rangeVariables)
             scans.children.add(rangeVariable.voltGetXML(session));
 
+        // Columns from USING expression in join are not qualified.
+        // if join is INNER then the column from USING expression can be from any table
+        // participating in join. In case of OUTER join, it must be the outer column
+        resolveUsingColumns(cols, select.rangeVariables);
+
         // conditions
         if (select.queryCondition != null) {
             VoltXMLElement condition = new VoltXMLElement("querycondition");
@@ -529,4 +534,49 @@ public class StatementQuery extends StatementDMQL {
 
         return query;
     }
+    
+    /**
+     * Columns from USING expression are unqualified. In case of INNER join, it doesn't matter
+     * we can pick the first table which contains the input column. In case of OUTER joins, we must
+     * the OUTER table - if it's a null-able column the outer join must return them.
+     * @param columnName
+     * @return table name this column belongs to
+     */
+    protected void resolveUsingColumns(VoltXMLElement columns, RangeVariable[] rvs) throws HSQLParseException {
+        // Only one OUTER join for a whole select is supported so far
+        for (VoltXMLElement columnElmt : columns.children) {
+            boolean innerJoin = true;
+            String table = null;
+            if (columnElmt.attributes.get("table") == null) {
+                for (RangeVariable rv : rvs) {
+                    if (rv.isLeftJoin || rv.isRightJoin) {
+                        if (innerJoin == false) {
+                            throw new HSQLParseException("VoltDB does not support outer joins with more than two tables involved");
+                        }
+                        innerJoin = false;
+                    }
+
+                    if (!rv.getTable().columnList.containsKey(columnElmt.attributes.get("column"))) {
+                        // The column is not from this table. Skip it
+                        continue;
+                    }
+
+                    // If there is an OUTER join we need to pick the outer table
+                    if (rv.isRightJoin == true) {
+                        // this is the outer table. no need to search further.
+                        table = rv.getTable().getName().name;
+                        break;
+                    } else if (rv.isLeftJoin == false) {
+                        // it's the inner join. we found the table but still need to iterate
+                        // just in case there is an outer table we haven't seen yet.
+                        table = rv.getTable().getName().name;
+                    }
+                }
+                if (table != null) {
+                    columnElmt.attributes.put("table", table);
+                }
+            }
+        }
+    }
+
 }

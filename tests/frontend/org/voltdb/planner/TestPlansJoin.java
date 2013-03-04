@@ -74,7 +74,7 @@ public class TestPlansJoin extends TestCase {
 
         // select * with USING clause should contain only one column for each column from the USING expression
         pn = compile("select * FROM R1 JOIN R2 USING(C)", 0, false, null);
-        assertTrue(n instanceof NestLoopPlanNode);
+        assertTrue(pn.getChild(0).getChild(0) instanceof NestLoopPlanNode);
         assertTrue(pn.getOutputSchema().getColumns().size() == 4);
 
         pn = compile("select A,C,D FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);
@@ -231,6 +231,35 @@ public class TestPlansJoin extends TestCase {
         p = ((AbstractScanPlanNode) n).getPredicate();
         assertTrue(p.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
 
+        pn = compile("select * FROM R1 JOIN R2 on R1.A = R2.A AND R1.C = R2.C where R1.A > 0", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.CONJUNCTION_AND);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        n = n.getChild(0);
+        assertTrue(n instanceof AbstractScanPlanNode);
+        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
+        p = ((AbstractScanPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
+
+        pn = compile("select A,C FROM R1 RIGHT JOIN R2 USING (A, C)", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.CONJUNCTION_AND);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+
+        pn = compile("select A,C FROM R1 JOIN R2 USING (A, C)", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p.getExpressionType() == ExpressionType.CONJUNCTION_AND);
+        assertTrue(p.getLeft().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        assertTrue(p.getRight().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+
         pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.A JOIN R3 ON R1.C = R3.C WHERE R1.A > 0", 0, false, null);
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof AbstractJoinPlanNode);
@@ -262,12 +291,17 @@ public class TestPlansJoin extends TestCase {
         assertTrue(p.getLeft().getExpressionType() == ExpressionType.FUNCTION);
         assertTrue(p.getRight().getExpressionType() == ExpressionType.FUNCTION);
 
+        pn = compile("select * FROM R1 ,R2", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getPredicate();
+        assertTrue(p == null);
+
         // USING expression can have only comma separated list of column names
         try {
             List<AbstractPlanNode> pnl = aide.compile("select * FROM R1 JOIN R2 USING (ABS(A))", 0, false, null);
             fail();
         } catch (PlanningErrorException ex) {
-            System.out.println(ex.getMessage());
             assertTrue("user lacks privilege or object not found: ABS".equalsIgnoreCase(ex.getMessage()));
         }
     }
@@ -413,10 +447,11 @@ public class TestPlansJoin extends TestCase {
 
        // Two Distributed tables join on non-partitioned column
        try {
-           List<AbstractPlanNode> pnl = aide.compile("select * FROM P1 JOIN P2 ON P1.C = P2.A", 0, false, null);
+           List<AbstractPlanNode> pnl = aide.compile("select * FROM P1 JOIN P2 ON P1.C = P2.E", 0, false, null);
+           assert(pnl != null);
+           fail();
        } catch (NullPointerException ex) {
            System.out.println(ex.getMessage());
-           fail();
        }
    }
 
@@ -440,26 +475,26 @@ public class TestPlansJoin extends TestCase {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 FULL JOIN R2 ON R1.C = R2.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           assertTrue("VoltDB does not yet support full outer joins".equalsIgnoreCase(ex.getMessage()));
+           assertTrue("VoltDB does not support full outer joins".equalsIgnoreCase(ex.getMessage()));
        }
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 FULL OUTER JOIN R2 ON R1.C = R2.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           assertTrue("VoltDB does not yet support full outer joins".equalsIgnoreCase(ex.getMessage()));
+           assertTrue("VoltDB does not support full outer joins".equalsIgnoreCase(ex.getMessage()));
        }
        // OUTER JOIN with more then two tables. Temporary restriction
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           assertTrue("VoltDB does not yet support outer joins with more than two tables involved".equalsIgnoreCase(ex.getMessage()));
+           assertTrue("VoltDB does not support outer joins with more than two tables involved".equalsIgnoreCase(ex.getMessage()));
        }
        try {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           assertTrue("VoltDB does not yet support outer joins with more than two tables involved".equalsIgnoreCase(ex.getMessage()));
+           assertTrue("VoltDB does not support outer joins with more than two tables involved".equalsIgnoreCase(ex.getMessage()));
        }
 
        // Self JOIN . Temporary restriction
@@ -467,7 +502,7 @@ public class TestPlansJoin extends TestCase {
            List<AbstractPlanNode> pn = aide.compile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C", 0, false, null);
            fail();
        } catch (PlanningErrorException ex) {
-           assertTrue("VoltDB does not yet support self joins, consider using views instead".equalsIgnoreCase(ex.getMessage()));
+           assertTrue("VoltDB does not support self joins, consider using views instead".equalsIgnoreCase(ex.getMessage()));
        }
    }
 

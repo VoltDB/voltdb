@@ -60,11 +60,15 @@ class ReadWriteSet;
  */
 class NestLoopExecutor : public AbstractExecutor {
     public:
-        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) { }
+        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+            AbstractExecutor(engine, abstract_node), m_null_tuple() {
+        }
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
+
+        StandaloneTuple m_null_tuple;
 };
 
 }

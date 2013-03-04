@@ -170,6 +170,13 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
+    // NULL tuple for outer join
+    if (node->getJoinType() == JOIN_TYPE_LEFT) {
+        Table* inner_table = node->getInputTables()[1];
+        assert(inner_table);
+        m_null_tuple = StandaloneTuple(inner_table->schema());
+    }
+
     // for each tuple value expression in the predicate, determine
     // which tuple is being represented. Tuple could come from outer
     // table or inner table. Configure the predicate to use the correct
@@ -224,30 +231,23 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple inner_tuple(node->getInputTables()[1]->schema());
     TableTuple &joined = output_table->tempTuple();
 
-    // NULL tuple for outer join
-    StandaloneTuple null_tuple(outer_table->schema());
-
     TableIterator iterator0 = outer_table->iterator();
     while (iterator0.next(outer_tuple)) {
 
-         // did this loop body find at least one match for this tuple?
+        // did this loop body find at least one match for this tuple?
         bool match = false;
 
-       // populate output table's temp tuple with outer table's values
+        // populate output table's temp tuple with outer table's values
         // probably have to do this at least once - avoid doing it many
         // times per outer tuple
-        for (int col_ctr = 0; col_ctr < outer_cols; col_ctr++) {
-            joined.setNValue(col_ctr, outer_tuple.getNValue(col_ctr));
-        }
+        joined.setNValues(0, outer_tuple, 0, outer_cols);
 
         TableIterator iterator1 = inner_table->iterator();
         while (iterator1.next(inner_tuple)) {
             if (predicate == NULL || predicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
                 match = true;
                 // Matched! Complete the joined tuple with the inner column values.
-                for (int col_ctr = 0; col_ctr < inner_cols; col_ctr++) {
-                    joined.setNValue(col_ctr + outer_cols, inner_tuple.getNValue(col_ctr));
-                }
+                joined.setNValues(outer_cols, inner_tuple, 0, inner_cols);
                 output_table->insertTupleNonVirtual(joined);
             }
         }
@@ -255,7 +255,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         // Left Outer Join
         //
         if (!match && join_type == JOIN_TYPE_LEFT) {
-            joined.setNValues(null_tuple.getTuple(), outer_cols, joined.sizeInValues());
+            joined.setNValues(outer_cols, m_null_tuple, 0, inner_cols);
             output_table->insertTupleNonVirtual(joined);
         }
     }

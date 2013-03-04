@@ -212,9 +212,9 @@ public:
 
     void setNValue(const int idx, voltdb::NValue value);
     /*
-     * Copies NValues from one tuple to another for a given range.
+     * Copies range of NValues from aone tuple to another.
      */
-    void setNValues(const TableTuple &rhs, const int beginIdx, const int endIdx);
+    void setNValues(int beginIdx, TableTuple lhs, int begin, int end);
 
     /*
      * Version of setNValue that will allocate space to copy
@@ -370,7 +370,7 @@ private:
 };
 
 // A small class to hold together a standalone tuple (not backed by any table)
-// and the associated memory tokeep the actual data.
+// and the associated memory to keep the actual data.
 class StandaloneTuple {
     public:
         StandaloneTuple() :
@@ -384,23 +384,24 @@ class StandaloneTuple {
             m_tuple.setActiveTrue();
         }
 
-        StandaloneTuple(const TableTuple& rhs) :
+        StandaloneTuple(const StandaloneTuple& rhs) :
             m_tupleMemory(),m_tuple() {
             initFrom(rhs);
         }
 
-        StandaloneTuple& operator=(const TableTuple& rhs)  {
+        StandaloneTuple& operator=(const StandaloneTuple& rhs)  {
             initFrom(rhs);
             return *this;
         }
 
-        TableTuple getTuple() const {
+        operator TableTuple () {
             return m_tuple;
         }
 
-        TableTuple& getTuple() {
+        operator TableTuple () const {
             return m_tuple;
         }
+
     private:
         void initFrom(const StandaloneTuple& rhs) {
             assert(rhs.m_tuple.getSchema() != NULL);
@@ -454,12 +455,13 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }
 /** Multi column version. */
-inline void TableTuple::setNValues(const TableTuple &rhs, const int beginIdx, const int endIdx) {
-    assert(m_schema && rhs.m_schema);
-    assert(m_schema->equals(rhs.m_schema));
-    assert(beginIdx <= endIdx && endIdx <= sizeInValues());
-    for (int idx = beginIdx; idx < endIdx; ++ idx) {
-        setNValue(idx, rhs.getNValue(idx));
+inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) {
+    assert(m_schema);
+    assert(lhs.getSchema());
+    assert(beginIdx + end - begin <= sizeInValues());
+    while (begin != end) {
+        assert(m_schema->columnType(beginIdx) == lhs.getSchema()->columnType(begin));
+        setNValue(beginIdx++, lhs.getNValue(begin++));
     }
 }
 

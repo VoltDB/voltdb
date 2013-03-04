@@ -66,10 +66,10 @@
 
 package org.hsqldb_voltpatches;
 
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -1507,40 +1507,30 @@ public class Expression {
      * @throws HSQLParseException
      */
     public Expression eliminateDuplicates(final Session session) {
-        // First build the list of child expressions joined by logical AND 
-        List<Expression> subExprList = new ArrayList<Expression>();
-        extractAndSubExpressions(this, subExprList);
-        // Eliminate duplicates
-        HashSet<String> uniqueIds = new HashSet<String>();
-        Iterator<Expression> it = subExprList.iterator();
-        while (it.hasNext()) {
-            Expression expr = it.next();
-            String id = expr.getUniqueId(session);
-            if (uniqueIds.contains(id)) {
-                it.remove();
-            } else {
-                uniqueIds.add(id);
-            }
-        }
+        // First build the map of child expressions joined by the logical AND 
+        // The key is the expression id and the value is the expression itself
+        Map<String, Expression> subExprMap = new HashMap<String, Expression>();
+        extractAndSubExpressions(session, this, subExprMap);
         // Reconstruct the expression
-        if (!subExprList.isEmpty()) {
-            Iterator<Expression> itExpr = subExprList.iterator();
-            Expression finalExpr = itExpr.next();
+        if (!subExprMap.isEmpty()) {
+            Iterator<Map.Entry<String, Expression>> itExpr = subExprMap.entrySet().iterator();
+            Expression finalExpr = itExpr.next().getValue();
             while (itExpr.hasNext()) {
-                finalExpr = new ExpressionLogical(OpTypes.AND, finalExpr, itExpr.next());
+                finalExpr = new ExpressionLogical(OpTypes.AND, finalExpr, itExpr.next().getValue());
             }
             return finalExpr; 
         }
         return this;
     }
     
-    protected void extractAndSubExpressions(Expression expr, List<Expression> subExprList) {
+    protected void extractAndSubExpressions(final Session session, Expression expr, Map<String, Expression> subExprMap) {
         // If it is a logical expression AND then traverse down the tree
         if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
-            extractAndSubExpressions(expr.nodes[LEFT], subExprList);
-            extractAndSubExpressions(expr.nodes[RIGHT], subExprList);
+            extractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
+            extractAndSubExpressions(session, expr.nodes[RIGHT], subExprMap);
         } else {
-            subExprList.add(expr);
+            String id = expr.getUniqueId(session);
+            subExprMap.put(id, expr);
        }
     }
 

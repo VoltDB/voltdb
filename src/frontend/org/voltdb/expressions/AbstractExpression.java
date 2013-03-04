@@ -18,8 +18,6 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
@@ -276,50 +274,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         return true;
-    }
-
-    /**
-     * Method to simplify an expression by eliminating identical subexpressions (same id)
-     * If the original expression is a logical conjunction of form e1 AND e2 AND e3 AND e4,
-     * and subexpression e1 is identical to the subexpression e2 the simplified expression would be
-     * e1 AND e3 AND e4.
-     * @return simplified expression.
-     */
-    public AbstractExpression eliminateDuplicates() {
-        // First build the list of child expressions joined by logical AND
-        List<AbstractExpression> subExprList = new ArrayList<AbstractExpression>();
-        extractAndSubExpressions(this, subExprList);
-        // Eliminate duplicates
-        HashSet<String> uniqueIds = new HashSet<String>();
-        Iterator<AbstractExpression> it = subExprList.iterator();
-        while (it.hasNext()) {
-            AbstractExpression expr = it.next();
-            if (uniqueIds.contains(expr.m_id)) {
-                it.remove();
-            } else {
-                uniqueIds.add(expr.m_id);
-            }
-        }
-        // Reconstruct the expression
-        if (!subExprList.isEmpty()) {
-            Iterator<AbstractExpression> itExpr = subExprList.iterator();
-            AbstractExpression finalExpr = itExpr.next();
-            while (itExpr.hasNext()) {
-                finalExpr = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, finalExpr, itExpr.next());
-            }
-            return finalExpr;
-        }
-        return this;
-    }
-
-    protected void extractAndSubExpressions(AbstractExpression expr, List<AbstractExpression> subExprList) {
-        // If it is a logical expression AND then traverse down the tree
-        if (expr instanceof ConjunctionExpression && ((ConjunctionExpression) expr).m_type == ExpressionType.CONJUNCTION_AND) {
-            extractAndSubExpressions(expr.getLeft(), subExprList);
-            extractAndSubExpressions(expr.getRight(), subExprList);
-        } else {
-            subExprList.add(expr);
-       }
     }
 
     // Derived classes that define attributes should compare them in their refinements of this method.

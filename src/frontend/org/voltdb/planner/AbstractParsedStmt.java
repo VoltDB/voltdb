@@ -32,7 +32,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
-import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
@@ -195,11 +194,13 @@ public abstract class AbstractParsedStmt {
     void parseTablesAndParams(VoltXMLElement root) {
         for (VoltXMLElement node : root.children) {
             if (node.name.equalsIgnoreCase("parameters")) {
-                this.parseParameters(node);
-            } else if (node.name.equalsIgnoreCase("tablescans") || node.name.equalsIgnoreCase("tablescan")) {
-                this.parseTables(node);
+                parseParameters(node);
+            } else if (node.name.equalsIgnoreCase("tablescan")) {
+                parseTable(node);
+            } else if (node.name.equalsIgnoreCase("tablescans")) {
+                parseTables(node);
             } else if (node.name.equalsIgnoreCase("scan_columns")) {
-                this.parseScanColumns(node);
+                parseScanColumns(node);
             }
         }
     }
@@ -228,17 +229,6 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseExpressionTree(VoltXMLElement root) {
         AbstractExpression exprTree = parseExpressionTree(m_paramsById, root);
-        // Columns from USING expression in join are not qualified.
-        // if join is INNER then the column in question can be from any table
-        // participating in join. In case of OUTER join, it must be the outer column
-        if (exprTree instanceof TupleValueExpression) {
-            TupleValueExpression e = (TupleValueExpression) exprTree;
-            if (e.getTableName() == null && e.getColumnName() != null) {
-                e.setTableName(getTableForUsingColumn(e.getColumnName()));
-                root.attributes.put("table", e.getTableName());
-            }
-        }
-
         exprTree.resolveForDB(m_db);
 
         if (m_paramValues != null) {
@@ -253,39 +243,6 @@ public abstract class AbstractParsedStmt {
 
         }
         return exprTree;
-    }
-
-    /**
-     * Columns from USING expression are unqualified. In case of INNER join, it doesn't matter
-     * we can pick the first table which contains the input column. In case of OUTER joins, we must
-     * the OUTER table - if it's a null-able column the outer join must return them.
-     * @param columnName
-     * @return table name this column belongs to
-     */
-    private String getTableForUsingColumn(String columnName) {
-        // Only one OUTER join for a whole select is supported so far
-        JoinType joinType = JoinType.INNER;
-        for (Map.Entry<Table, JoinInfo> entry : tableJoinList.entrySet()) {
-            if (entry.getValue().joinType != JoinType.INNER) {
-                assert(joinType == JoinType.INNER);
-                joinType = entry.getValue().joinType;
-            }
-        }
-
-        for (Map.Entry<Table, JoinInfo> entry : this.tableJoinList.entrySet()) {
-            Table table = entry.getKey();
-            JoinType tableJoinType = entry.getValue().joinType;
-            if (table.getColumns().get(columnName) != null) {
-                // If there are no OUTER joins we can take the first table which has this column
-                // If there is an OUTER join we need to pick the outer table
-                if (joinType == JoinType.INNER ||
-                        tableJoinType == JoinType.RIGHT ||
-                        joinType == JoinType.LEFT && tableJoinType == JoinType.INNER) {
-                        return table.getTypeName();
-                }
-            }
-        }
-        return null;
     }
 
     // TODO: This static function and the functions (below) that it calls to deal with various Expression types
@@ -543,27 +500,20 @@ public abstract class AbstractParsedStmt {
     /**
      * Build a combined WHERE expressions for the entire statement.
      */
-    public AbstractExpression  getCombinedExpression() {
-        AbstractExpression where = null;
+    public AbstractExpression  getCombinedFilterExpression() {
+        ArrayList<AbstractExpression> exprList = new ArrayList<AbstractExpression>();
         for (Map.Entry<Table, JoinInfo> joinEntry : tableJoinList.entrySet()) {
             JoinInfo joinInfo = joinEntry.getValue();
             if (joinInfo.joinExpr != null) {
-                if (where == null) {
-                    where = joinInfo.joinExpr;
-                } else {
-                    where = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, where, joinInfo.joinExpr);
-                }
+                exprList.add(joinInfo.joinExpr);
             }
             if (joinInfo.whereExpr != null) {
-                if (where == null) {
-                    where = joinInfo.whereExpr;
-                } else {
-                    where = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, where, joinInfo.whereExpr);
-                }
+                exprList.add(joinInfo.whereExpr);
             }
         }
+        AbstractExpression where = ExpressionUtil.combine(exprList);
         if (where != null) {
-            where = where.eliminateDuplicates();
+            where = ExpressionUtil.eliminateDuplicates(where);
         }
         return where;
     }
@@ -603,57 +553,59 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
+    *
+    * @param tableNode
+    */
+   private void parseTable(VoltXMLElement tableNode) {
+       String tableName = tableNode.attributes.get("table");
+       Table table = getTableFromDB(tableName);
+       assert(table != null);
+       JoinInfo joinInfo = parseTableConditions(tableNode);
+       tableList.add(table);
+       tableJoinList.put(table, joinInfo);
+   }
+
+    /**
      *
      * @param tablesNode
      */
     private void parseTables(VoltXMLElement tablesNode) {
-        if (tablesNode.name.equalsIgnoreCase("tablescans")) {
-            Set<Table> visited = new HashSet<Table>(tableList);
+        Set<Table> visited = new HashSet<Table>(tableList);
 
-            // temp restriction on number of outer joins
-            int tableCount = 0;
-            boolean hasOuter = false;
-            for (VoltXMLElement node : tablesNode.children) {
-                if (node.name.equalsIgnoreCase("tablescan")) {
+        // temp restriction on number of outer joins
+        int tableCount = 0;
+        boolean hasOuter = false;
+        for (VoltXMLElement node : tablesNode.children) {
+            if (node.name.equalsIgnoreCase("tablescan")) {
 
-                    String tableName = node.attributes.get("table");
-                    Table table = getTableFromDB(tableName);
+                String tableName = node.attributes.get("table");
+                Table table = getTableFromDB(tableName);
 
-                    assert(table != null);
+                assert(table != null);
 
-                    if( visited.contains( table)) {
-                        throw new PlanningErrorException("VoltDB does not yet support self joins, consider using views instead");
-                    }
-
-                    String joinTypeStr = node.attributes.get("jointype");
-                    assert(joinTypeStr != null);
-                    JoinType joinType = JoinType.get(joinTypeStr);
-                    assert(joinType != JoinType.INVALID);
-                    if (joinType == JoinType.FULL) {
-                        throw new PlanningErrorException("VoltDB does not yet support full outer joins");
-                    }
-                    if (joinType != JoinType.INNER) {
-                        hasOuter = true;
-                    }
-                    ++tableCount;
-                    if (hasOuter && tableCount > 2) {
-                        throw new PlanningErrorException("VoltDB does not yet support outer joins with more than two tables involved");
-                    }
-
-                    JoinInfo joinInfo = parseTableConditions(node);
-
+                if( visited.contains( table)) {
+                    throw new PlanningErrorException("VoltDB does not support self joins, consider using views instead");
+                } else {
                     visited.add(table);
-                    tableList.add(table);
-                    tableJoinList.put(table, joinInfo);
                 }
+
+                String joinTypeStr = node.attributes.get("jointype");
+                assert(joinTypeStr != null);
+                JoinType joinType = JoinType.get(joinTypeStr);
+                assert(joinType != JoinType.INVALID);
+                if (joinType == JoinType.FULL) {
+                    throw new PlanningErrorException("VoltDB does not support full outer joins");
+                }
+                if (joinType != JoinType.INNER) {
+                    hasOuter = true;
+                }
+                ++tableCount;
+                if (hasOuter && tableCount > 2) {
+                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved");
+                }
+
+                parseTable(node);
             }
-        } else {
-            String tableName = tablesNode.attributes.get("table");
-            Table table = getTableFromDB(tableName);
-            assert(table != null);
-            JoinInfo joinInfo = parseTableConditions(tablesNode);
-            tableList.add(table);
-            tableJoinList.put(table, joinInfo);
         }
     }
 

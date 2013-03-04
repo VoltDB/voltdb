@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
@@ -339,4 +340,29 @@ public abstract class ExpressionUtil {
             setOutputTypeForInsertExpressionRecursively(input.getRight(), neededType, neededSize, paramTypeOverrideMap);
         }
     }
+
+    /**
+     * Method to simplify an expression by eliminating identical subexpressions (same id)
+     * If the expression is a logical conjunction of the form e1 AND e2 AND e3 AND e4,
+     * and subexpression e1 is identical to the subexpression e2 the simplified expression is
+     * e1 AND e3 AND e4.
+     *
+     * @param expr to simplify
+     * @return simplified expression.
+     */
+    public static AbstractExpression eliminateDuplicates(AbstractExpression expr) {
+        // First, decompose the original expression into the subexpressions joined by AND
+        List<AbstractExpression> subExprList = ExpressionUtil.uncombine(expr);
+
+        // Second, eliminate duplicates by building the map of expression's ids, values.
+        Map<String, AbstractExpression> subExprMap = new HashMap<String, AbstractExpression>();
+        for (AbstractExpression subExpr : subExprList) {
+            subExprMap.put(subExpr.m_id, subExpr);
+        }
+        subExprList.clear();
+        // Now reconstruct the expression
+        subExprList.addAll(subExprMap.values());
+        return ExpressionUtil.combine(subExprList);
+    }
+
 }

@@ -53,6 +53,7 @@
 #include "execution/VoltDBEngine.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
+#include "expressions/expressionutil.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/indexscannode.h"
 #include "storage/table.h"
@@ -240,6 +241,13 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
         return false;
     }
 
+    // NULL tuple for outer join
+    if (node->getJoinType() == JOIN_TYPE_LEFT) {
+        Table* inner_out_table = inline_node->getOutputTable();
+        assert(inner_out_table);
+        m_nullTuple = StandaloneTuple(inner_out_table->schema());
+    }
+
     index_values = TableTuple(index->getKeySchema());
     index_values_backing_store = new char[index->getKeySchema()->tupleLength()];
     index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
@@ -331,8 +339,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = output_table->tempTuple();
 
-    // NULL tuple for outer join
-    StandaloneTuple null_tuple(outer_table->schema());
+    Table* inner_out_table = inline_node->getOutputTable();
+    int num_of_inner_cols = inner_out_table->columnCount();
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while (outer_iterator.next(outer_tuple)) {
@@ -496,30 +504,13 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     //
                     // Try to put the tuple into our output table
                     //
-                    // This is a bit hacky.  It duplicates the non-eval
-                    // world that was here before.  Could fold these two
-                    // loops together if we assign table indexes in p_init
-                    for (int col_ctr = 0; col_ctr < num_of_outer_cols;
-                         ++col_ctr)
-                    {
-                        join_tuple.setNValue(col_ctr,
-                                             m_outputExpressions[col_ctr]->
-                                             eval(&outer_tuple, NULL));
-                    }
+                    join_tuple.setNValues(0, outer_tuple, 0, num_of_outer_cols);
                     //
                     // Append the inner values to the end of our join tuple
                     //
-                    for (int col_ctr = num_of_outer_cols;
-                         col_ctr < join_tuple.sizeInValues();
-                         ++col_ctr)
-                    {
-                        // For the sake of consistency, we don't try to do
-                        // output expressions here with columns from both tables.
-                        join_tuple.
-                        setNValue(col_ctr,
-                                  m_outputExpressions[col_ctr]->
-                                  eval(&inner_tuple, NULL));
-                    }
+                    ExpressionUtil::evalExpressions(join_tuple, num_of_outer_cols,
+                        m_outputExpressions.begin() + num_of_outer_cols,
+                        m_outputExpressions.end(), inner_tuple);
                     VOLT_TRACE("join_tuple tuple: %s",
                                join_tuple.debug(output_table->name()).c_str());
 
@@ -534,7 +525,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         // Left Outer Join
         //
         if (!match && join_type == JOIN_TYPE_LEFT) {
-            join_tuple.setNValues(null_tuple.getTuple(), num_of_outer_cols, join_tuple.sizeInValues());
+            join_tuple.setNValues(num_of_outer_cols, m_nullTuple, 0, num_of_inner_cols);
             output_table->insertTupleNonVirtual(join_tuple);
         }
     }

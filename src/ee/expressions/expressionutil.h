@@ -51,6 +51,7 @@
 #include "boost/shared_array.hpp"
 
 #include "common/common.h"
+#include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
 
 #include "json_spirit/json_spirit.h"
@@ -83,7 +84,21 @@ public:
     // Implemented in functionexpression.cpp because function expression handling is a system unto itself.
     static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);
 
+    // Sets the dstTuple column values from the srcTuple
+    template <typename ExprPtrIter>
+    void static evalExpressions(TableTuple dstTuple, int beginIdx,  ExprPtrIter beginExpr, ExprPtrIter endExpr, TableTuple srcTuple);
 };
+
+template <typename ExprPtrIter>
+void ExpressionUtil:: evalExpressions(TableTuple dstTuple, int beginIdx,  ExprPtrIter beginExpr, ExprPtrIter endExpr, TableTuple srcTuple) {
+    assert(beginIdx + std::distance(endExpr, beginExpr) <= dstTuple.sizeInValues());
+    assert(std::distance(endExpr, beginExpr) <= srcTuple.sizeInValues());
+    while (beginExpr != endExpr) {
+        dstTuple.setNValue(beginIdx++, (*beginExpr)->eval(&srcTuple, NULL));
+        ++beginExpr;
+    }
+}
+
 
 }
 

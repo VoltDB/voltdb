@@ -1162,20 +1162,10 @@ final class RangeVariable {
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
         // output metadata
-        if (isSeqScan)
-            scan.attributes.put("type", "sequential");
-        else
-            scan.attributes.put("type", "index");
-
         scan.attributes.put("table", rangeTable.getName().name);
 
-        if ((index != null) && (isSeqScan == false)) {
-            String indexName = (index.getName() == null ? "UNNAMED" : index.getName().name);
-            scan.attributes.put("index", indexName);
-        }
-
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
-            scan.attributes.put("alias", tableAlias.name);
+            scan.attributes.put("tablealias", tableAlias.name);
         }
 
         // note if this is an outer join
