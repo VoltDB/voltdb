@@ -345,7 +345,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             @Override
             public boolean accept(File pathname) {
                 String[] name = pathname.getName().split("\\.");
-                if (name.length > 0 && name[0].equals(nonce) && name[name.length - 1].equals(".pbd")) {
+                if (name.length > 0 && name[0].equals(nonce) && name[name.length - 1].equals("pbd")) {
                     if (pathname.length() == 4) {
                         //Doesn't have any objects, just the object count
                         pathname.delete();
