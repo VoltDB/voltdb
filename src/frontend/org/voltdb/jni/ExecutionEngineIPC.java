@@ -121,7 +121,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         GetPoolAllocations(24),
         GetUSOs(25),
         LoadFragment(26),
-        SetNumberOfPartitions(27);
+        updateHashinator(27);
         Commands(final int id) {
             m_id = id;
         }
@@ -1294,11 +1294,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void setNumberOfPartitions(int partitionCount)
+    public void updateHashinator(HashinatorType type, byte[] config)
     {
         m_data.clear();
-        m_data.putInt(Commands.SetNumberOfPartitions.m_id);
-        m_data.putInt(partitionCount);
+        m_data.putInt(Commands.updateHashinator.m_id);
+        m_data.putInt(type.typeId());
+        m_data.putInt(config.length);
+        m_data.put(config);
         try {
             m_data.flip();
             m_connection.write();

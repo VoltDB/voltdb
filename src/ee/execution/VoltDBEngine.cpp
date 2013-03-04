@@ -1497,8 +1497,18 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     return table->hashCode();
 }
 
-void VoltDBEngine::setNumberOfPartitions(int32_t partitionCount) {
-    m_totalPartitions = partitionCount;
+void VoltDBEngine::updateHashinator(HashinatorType type, const char *config) {
+    switch (type) {
+    case HASHINATOR_LEGACY:
+        m_hashinator.reset(LegacyHashinator::newInstance(config));
+        break;
+    case HASHINATOR_ELASTIC:
+        m_hashinator.reset(ElasticHashinator::newInstance(config));
+        break;
+    default:
+        throwFatalException("Unknown hashinator type %d", type);
+        break;
+    }
 }
 
 }

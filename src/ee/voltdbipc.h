@@ -121,7 +121,7 @@ private:
 
     void hashinate(struct ipc_command* cmd);
 
-    void setNumberOfPartitions(struct ipc_command *cmd);
+    void updateHashinator(struct ipc_command *cmd);
 
     void threadLocalPoolAllocations();
 

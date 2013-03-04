@@ -209,7 +209,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void setNumberOfPartitions(int partitionCount)
+    public void updateHashinator(HashinatorType type, byte[] config)
     {
 
     }

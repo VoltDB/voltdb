@@ -530,9 +530,20 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void setNumberOfPartitions(int partitionCount)
+    public void updateHashinator(TheHashinator.HashinatorType type, byte[] config)
     {
-        nativeSetNumberOfPartitions(pointer, partitionCount);
+        ParameterSet parameterSet = new ParameterSet();
+        parameterSet.setParameters(type.typeId(), config);
+
+        // serialize the param set
+        fsForParameterSet.clear();
+        try {
+            parameterSet.writeExternal(fsForParameterSet);
+        } catch (final IOException exception) {
+            throw new RuntimeException(exception); // can't happen
+        }
+
+        nativeUpdateHashinator(pointer);
     }
 
     @Override

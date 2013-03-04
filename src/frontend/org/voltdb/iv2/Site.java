@@ -1022,6 +1022,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void setNumberOfPartitions(int partitionCount)
     {
         m_numberOfPartitions = partitionCount;
-        m_ee.setNumberOfPartitions(m_numberOfPartitions);
+        m_ee.updateHashinator(TheHashinator.getConfiguredHashinatorType(),
+                TheHashinator.getConfigureBytes(m_numberOfPartitions));
     }
 }

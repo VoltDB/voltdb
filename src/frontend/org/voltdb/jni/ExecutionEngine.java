@@ -412,10 +412,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract int hashinate(Object value, TheHashinator.HashinatorType type, byte config[]);
 
     /**
-     * Changes the partition count in the hashinator.
-     * @param partitionCount
+     * Updates the hashinator with new config
+     * @param type hashinator type
+     * @param config new hashinator config
      */
-    public abstract void setNumberOfPartitions(int partitionCount);
+    public abstract void updateHashinator(TheHashinator.HashinatorType type, byte[] config);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -583,10 +584,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native int nativeHashinate(long pointer);
 
     /**
-     * Sets the partition count in EE's hashinator
-     * @param partitionCount
+     * Updates the EE's hashinator
      */
-    protected native void nativeSetNumberOfPartitions(long pointer, int partitionCount);
+    protected native void nativeUpdateHashinator(long pointer);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated
