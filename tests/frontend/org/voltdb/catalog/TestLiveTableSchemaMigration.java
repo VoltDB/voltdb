@@ -103,12 +103,13 @@ public class TestLiveTableSchemaMigration extends TestCase {
 
             VoltTable t3 = client.callProcedure("@AdHoc", "select * from FOO").getResults()[0];
 
-            t3.deepAssertEquals(t2);
-
-            if (!t3.hasSameContents(t2)) {
+            // compare the tables
+            StringBuilder sb = new StringBuilder();
+            if (!TableHelper.deepEqualsWithErrorMsg(t2, t3, sb)) {
                 System.out.println("Table Mismatch");
-                System.out.printf("PRE:  %s\n", t2.toFormattedString());
-                System.out.printf("POST: %s\n", t3.toFormattedString());
+                //System.out.printf("PRE:  %s\n", t2.toFormattedString());
+                //System.out.printf("POST: %s\n", t3.toFormattedString());
+                System.out.println(sb.toString());
                 fail();
             }
         }

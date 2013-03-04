@@ -26,13 +26,15 @@ import org.voltdb.types.ConstraintType;
 public class CatalogDiffEngine {
 
     // contains the text of the difference
-    private final StringBuilder m_sb;
+    private final StringBuilder m_sb = new StringBuilder();
 
     // true if the difference is allowed in a running system
     private boolean m_supported;
 
+    private boolean m_requiresSnapshotIsolation = false;
+
     // collection of reasons why a diff is not supported
-    private final StringBuilder m_errors;
+    private final StringBuilder m_errors = new StringBuilder();
 
     // original tables/indexes kept to check whether a new unique index is possible
     private final Map<String, CatalogMap<Index>> m_originalIndexesByTable = new HashMap<String, CatalogMap<Index>>();
@@ -45,8 +47,6 @@ public class CatalogDiffEngine {
      * @param next Tip of the new catalog.
      */
     public CatalogDiffEngine(final Catalog prev, final Catalog next) {
-        m_sb = new StringBuilder();
-        m_errors = new StringBuilder();
         m_supported = true;
 
         // store the original tables so some extra checking can be done with
@@ -66,6 +66,10 @@ public class CatalogDiffEngine {
 
     public boolean supported() {
         return m_supported;
+    }
+
+    public boolean requiresSnapshotIsolation() {
+        return m_requiresSnapshotIsolation;
     }
 
     public String errors() {
@@ -280,10 +284,12 @@ public class CatalogDiffEngine {
                     (! col.getNullable()) &&
                     (col.getDefaultvalue() == null))
                 {
-                    m_errors.append("May not dynamically add non-nullable lue.\n");
+                    m_errors.append("May not dynamically add non-nullable column.\n");
                     m_supported = false;
                     return false;
                 }
+                // adding/dropping a column requires isolation from snapshots
+                m_requiresSnapshotIsolation = true;
                 return true;
             }
 
@@ -341,6 +347,8 @@ public class CatalogDiffEngine {
                 VoltType newType = VoltType.get((byte) newTypeInt);
 
                 if (checkIfColumnTypeChangeIsSupported(oldType, oldSize, newType, newSize)) {
+                    // changing the type of a column requires isolation from snapshots
+                    m_requiresSnapshotIsolation = true;
                     return true;
                 }
             }

@@ -31,13 +31,12 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-
-import org.voltdb.VoltZK;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 
@@ -252,6 +251,7 @@ public class AsyncCompilerAgent {
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
+            retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
         }
         catch (Exception e) {
             e.printStackTrace();

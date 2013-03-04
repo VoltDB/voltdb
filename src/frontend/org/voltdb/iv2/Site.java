@@ -303,8 +303,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp) {
-            return Site.this.updateCatalog(diffCmds, context, csp, false);
+        public boolean updateCatalog(String diffCmds, CatalogContext context,
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+        {
+            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false);
         }
     };
 
@@ -1024,7 +1026,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean isMPI)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         m_context = context;
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
@@ -1035,11 +1037,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         // if a snapshot is in process, wait for it to finish
+        // don't bother if this isn't a schema change
         //
-        // TODO: this currently will wait even if the catalog change wouldn't
-        // interfere with the snapshot at all. Needs that refinement before
-        // shipping.
-        if (m_snapshotter.isEESnapshotting()) {
+        if (requiresSnapshotIsolationboolean && m_snapshotter.isEESnapshotting()) {
             hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
                     CoreUtils.getSiteIdFromHSId(m_siteId)));
             try {

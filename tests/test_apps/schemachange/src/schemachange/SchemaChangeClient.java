@@ -251,8 +251,11 @@ public class SchemaChangeClient {
 
                 postT.resetRowPosition();
                 preT.resetRowPosition();
-                postT.deepAssertEquals(guessT);
-                assert(postT.hasSameContents(guessT));
+                StringBuilder sb = new StringBuilder();
+                if (!TableHelper.deepEqualsWithErrorMsg(postT, guessT, sb)) {
+                    System.err.println(sb.toString());
+                    assert(false);
+                }
             }
         }
 

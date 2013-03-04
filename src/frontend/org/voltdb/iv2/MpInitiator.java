@@ -172,7 +172,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
      */
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
-        m_executionSite.updateCatalog(diffCmds, context, csp, true);
+        m_executionSite.updateCatalog(diffCmds, context, csp, false, true);
     }
 
     @Override
