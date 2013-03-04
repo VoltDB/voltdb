@@ -94,8 +94,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
-import org.voltdb.iv2.LeaderCache;
-import org.voltdb.iv2.LeaderCacheReader;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
@@ -156,11 +154,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
      */
     private final AtomicInteger m_numConnections = new AtomicInteger(0);
-
-    /**
-     * IV2 stuff
-     */
-    private final LeaderCacheReader m_iv2Masters;
 
     /**
      * ZooKeeper is used for @Promote to trigger a truncation snapshot.
@@ -1029,7 +1022,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (initiatorHSId != null) {
                     isShortCircuitRead = true;
                 } else {
-                    initiatorHSId = m_iv2Masters.get(partitions[0]);
+                    initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
                 }
             }
             else {
@@ -1217,16 +1210,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         registerMailbox(m_zk);
         m_siteId = m_mailbox.getHSId();
-        m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters);
-        m_iv2Masters.start(true);
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {
         try {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
-            final int partitionId = jsObj.getInt(BaseInitiator.JSON_PARTITION_ID);
-            final long initiatorHSId = jsObj.getLong(BaseInitiator.JSON_INITIATOR_HSID);
+            final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
+            final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
             for (final Connection c : m_connections) {
                 c.queueTask(new Runnable() {
                     @Override
@@ -1671,7 +1662,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void sendSentinelsToAllPartitions(long txnId)
     {
         for (int partition : m_allPartitions) {
-            final long initiatorHSId = m_iv2Masters.get(partition);
+            final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             /*
              * HACK! DR LoadMultipartitionTable generates sentinels here,
              * they pretend to be for replay so that the SPIs won't generate responses for them.
@@ -1695,7 +1686,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         // First parameter of the invocation is the partition ID
         int pid = (Integer) invocation.getParameterAtIndex(0);
-        final long initiatorHSId = m_iv2Masters.get(pid);
+        final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(pid);
         long handle = cihm.getHandle(true, pid, invocation.getClientHandle(), size, now,
                 invocation.getProcName(), initiatorHSId, true, false);
 
@@ -2287,9 +2278,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_snapshotDaemon != null) {
             m_snapshotDaemon.shutdown();
         }
-        if (m_iv2Masters != null) {
-            m_iv2Masters.shutdown();
-        }
         if (m_localReplicasBuilder != null) {
             m_localReplicasBuilder.join(10000);
             if (m_localReplicasBuilder.isAlive()) {
@@ -2589,7 +2577,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param partitionId
      */
     public void sendSentinel(long txnId, int partitionId) {
-        final long initiatorHSId = m_iv2Masters.get(partitionId);
+        final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
         sendSentinel(txnId, initiatorHSId, -1, -1, true);
     }
 
@@ -2618,12 +2606,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void sendEOLMessage(int partitionId) {
         assert(m_isIV2Enabled);
-        final long initiatorHSId;
-        if (partitionId == MpInitiator.MP_INIT_PID) {
-            initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
-        } else {
-            initiatorHSId = m_iv2Masters.get(partitionId);
-        }
+        final long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
         Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(false);
         m_mailbox.send(initiatorHSId, message);
     }

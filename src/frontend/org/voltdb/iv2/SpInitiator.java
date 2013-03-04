@@ -173,7 +173,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + "trying. Retrying.");
                 }
             }
-            super.acceptPromotion();
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
         } catch (Exception e) {

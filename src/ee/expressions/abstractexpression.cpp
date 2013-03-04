@@ -260,7 +260,7 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
         return ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
                                                  left_child, right_child, argsVector);
     }
-    catch (SerializableEEException &ex) {
+    catch (const SerializableEEException &ex) {
         delete left_child;
         delete right_child;
         delete argsVector;

@@ -606,7 +606,9 @@ public class Inits {
         @Override
         public void run() {
             // Initialize the complex partitioning scheme
-            TheHashinator.initialize(m_rvdb.m_configuredNumberOfPartitions);
+            TheHashinator.initialize(
+                    TheHashinator.getConfiguredHashinatorClass(),
+                    TheHashinator.getConfigureBytes(m_rvdb.m_configuredNumberOfPartitions));
         }
     }
 

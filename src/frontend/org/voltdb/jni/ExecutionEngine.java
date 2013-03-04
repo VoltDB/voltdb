@@ -35,6 +35,7 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
@@ -408,7 +409,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * THIS METHOD IS CURRENTLY ONLY USED FOR TESTING
      */
-    public abstract int hashinate(Object value, int partitionCount);
+    public abstract int hashinate(Object value, TheHashinator.HashinatorType type, byte config[]);
 
     /**
      * Changes the partition count in the hashinator.
@@ -459,7 +460,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int hostId,
             byte hostname[],
             long tempTableMemory,
-            int totalPartitions);
+            int hashinatorType,
+            byte hashinatorConfig[]);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.
@@ -574,12 +576,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Use the EE's hashinator to compute the partition to which the
      * value provided in the input parameter buffer maps.  This is
-     * currently a test-only method.
-     * @param pointer
-     * @param partitionCount
+     * currently a test-only method. Hashinator type and config are also
+     * in the parameter buffer
      * @return
      */
-    protected native int nativeHashinate(long pointer, int partitionCount);
+    protected native int nativeHashinate(long pointer);
 
     /**
      * Sets the partition count in EE's hashinator
