@@ -41,10 +41,14 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
                                                                "COW of " + table.name(),
                                                                &table, NULL)),
-             m_serializer(serializer), m_pool(2097152, 320), m_blocks(m_table.m_data),
+             m_serializer(serializer),
+             m_pool(2097152, 320),
+             m_blocks(m_table.m_data),
              m_iterator(new CopyOnWriteIterator(&table, m_blocks.begin(), m_blocks.end())),
              m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
-             m_tuple(table.schema()), m_finishedTableScan(false), m_partitionId(partitionId),
+             m_tuple(table.schema()),
+             m_finishedTableScan(false),
+             m_partitionId(partitionId),
              m_totalPartitions(totalPartitions),
              m_totalTuples(totalTuples),
              m_tuplesRemaining(totalTuples)
@@ -87,7 +91,7 @@ int64_t CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
     // Set to true to break out of the loop after the tuples dry up
     // or the byte count threshold is hit.
     bool yield = false;
-    while (!yield && m_tuplesRemaining != 0) {
+    while (!yield) {
 
         // Next tuple?
         if (m_iterator->next(tuple)) {

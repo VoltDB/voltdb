@@ -57,21 +57,29 @@ static int32_t m_primaryKeyIndex = 0;
 // Remember to comment out before checking in.
 //#define EXTRA_SMALL
 
-#ifdef EXTRA_SMALL
+#if defined(EXTRA_SMALL)
 
+// Extra small quantities for quick debugging runs.
 const size_t TUPLE_COUNT = 10;
 const size_t BUFFER_SIZE = 1024;
+const size_t NUM_REPETITIONS = 2;
+const size_t NUM_MUTATIONS = 5;
 
-#else
+#elif defined(MEMCHECK)
 
 // The smaller quantity is used for memcheck runs.
-#ifdef MEMCHECK
 const size_t TUPLE_COUNT = 1000;
-#else
-const size_t TUPLE_COUNT = 174762;
-#endif
-
 const size_t BUFFER_SIZE = 131072;
+const size_t NUM_REPETITIONS = 10;
+const size_t NUM_MUTATIONS = 10;
+
+#else
+
+// Normal/full run quantities.
+const size_t TUPLE_COUNT = 174762;
+const size_t BUFFER_SIZE = 131072;
+const size_t NUM_REPETITIONS = 10;
+const size_t NUM_MUTATIONS = 10;
 
 #endif
 
@@ -342,7 +350,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     DefaultTupleSerializer serializer;
-    for (int qq = 0; qq < 10; qq++) {
+    for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
@@ -384,7 +392,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 totalInserted++;
                 ii += m_tupleWidth + sizeof(int32_t);
             }
-            for (int jj = 0; jj < 10; jj++) {
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
             }
         }
@@ -429,7 +437,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
     DefaultTupleSerializer serializer;
-    for (int qq = 0; qq < 10; qq++) {
+    for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
@@ -471,7 +479,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 totalInserted++;
                 ii += m_tupleWidth + sizeof(int32_t);
             }
-            for (int jj = 0; jj < 10; jj++) {
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
             }
             doRandomUndo();
@@ -520,7 +528,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
     DefaultTupleSerializer serializer;
-    for (int qq = 0; qq < 10; qq++) {
+    for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
@@ -562,7 +570,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 totalInserted++;
                 ii += m_tupleWidth + sizeof(int32_t);
             }
-            for (int jj = 0; jj < 10; jj++) {
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
             }
             m_engine->undoUndoToken(m_undoToken);
@@ -612,8 +620,13 @@ const int32_t MAX_HASH = std::numeric_limits<int32_t>::max();
 /** Tool object holds test state and conveniently displays errors. */
 class MultiStreamTestTool {
 public:
-    MultiStreamTestTool(PersistentTable& table, size_t npartitions)
-    : table(table), npartitions(npartitions), iteration(-1), nerrors(0) {
+    MultiStreamTestTool(PersistentTable& table, size_t npartitions) :
+        table(table),
+        npartitions(npartitions),
+        iteration(-1),
+        nerrors(0),
+        showTuples(TUPLE_COUNT <= MAX_DETAIL_COUNT)
+    {
         strcpy(stage, "Initialize");
         TableTuple tuple(table.schema());
         size_t i = 0;
@@ -639,8 +652,10 @@ public:
     void verror(const std::string& msg, va_list args) {
         char buffer[256];
         vsnprintf(buffer, sizeof buffer, msg.c_str(), args);
-        nerrors++;
-        std::cerr << "ERROR(iter " << iteration << ": " << stage << "): " << buffer << std::endl;
+        if (nerrors++ == 0) {
+            std::cerr << std::endl;
+        }
+        std::cerr << "ERROR(iteration=" << iteration << ": " << stage << "): " << buffer << std::endl;
     }
 
     void error(const std::string& msg, ...) {
@@ -651,15 +666,14 @@ public:
     }
 
     void valueError(int32_t* pvalues, const std::string& msg, ...) {
-        if (nerrors == 0) {
-            if (TUPLE_COUNT <= MAX_DETAIL_COUNT) {
-                std::cerr << std::endl << "=== Tuples ===" << std::endl;
-                size_t n = 0;
-                for (std::vector<int64_t>::iterator i = values.begin(); i != values.end(); ++i) {
-                    std::cerr << ++n << " " << *i << std::endl;
-                }
+        if (showTuples) {
+            std::cerr << std::endl << "=== Tuples ===" << std::endl;
+            size_t n = 0;
+            for (std::vector<int64_t>::iterator i = values.begin(); i != values.end(); ++i) {
+                std::cerr << ++n << " " << *i << std::endl;
             }
             std::cerr << std::endl;
+            showTuples = false;
         }
         int64_t value = *reinterpret_cast<int64_t*>(pvalues);
         std::ostringstream os;
@@ -700,6 +714,7 @@ public:
     size_t nerrors;
     std::vector<int64_t> values;
     std::map<int64_t,size_t> valueSet;
+    bool showTuples;
 };
 
 /**
@@ -709,8 +724,6 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
     // Constants
     const int32_t npartitions = 7;
-    const size_t niterations = 10;
-    const size_t nmutations = 10;
     const int tupleCount = TUPLE_COUNT;
 
     DefaultTupleSerializer serializer;
@@ -720,12 +733,11 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
     MultiStreamTestTool tool(*m_table, npartitions);
 
-    for (size_t iteration = 0; iteration < niterations; iteration++) {
+    for (size_t iteration = 0; iteration < NUM_REPETITIONS; iteration++) {
 
         tool.iterate();
 
         int totalInserted = 0;              // Total tuple counter.
-        COWStreamProcessor outputStreams;   // The COW streams.
         boost::scoped_ptr<char> buffers[npartitions];   // Stream buffers.
         std::vector<std::string> strings(npartitions);  // Range strings.
         HashRange ranges[npartitions];  // Raw ranges.
@@ -743,8 +755,6 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             std::ostringstream os;
             os << i << ':' << i;
             strings[i] = os.str();
-            // Add each buffer to the COW stream processor.
-            outputStreams.add((void*)buffers[i].get(), BUFFER_SIZE);
         }
 
         tool.context("precalculate");
@@ -752,28 +762,22 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         // Map original tuples to expected partitions using a simple
         // modulus hash and the ranges generated above.
         voltdb::TableIterator& iterator = m_table->iterator();
+        int partCol = m_table->partitionColumn();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             int64_t value = *reinterpret_cast<int64_t*>(tuple.address() + 1);
-            int32_t hash = value % npartitions;
-            size_t ipart = 0;
-            for (; ipart < npartitions - 1; ipart++) {
-                if (hash <= ranges[ipart].second) {
-                    break;
-                }
-            }
+            int32_t ipart = ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions;
             bool inserted = before[ipart].insert(value).second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                tool.error("Duplicate primary key %d", primaryKey);
+                tool.error("Duplicate primary key %d iteration=%lu", primaryKey, iteration);
             }
             ASSERT_TRUE(inserted);
         }
 
         tool.context("activate");
 
-        bool alreadyActivated =
-                m_table->activateCopyOnWrite(&serializer, 0, strings, npartitions, tupleCount);
+        bool alreadyActivated = m_table->activateCopyOnWrite(&serializer, 0, strings, npartitions);
         if (alreadyActivated) {
             tool.error("COW was previously activated");
         }
@@ -781,6 +785,12 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
         int64_t remaining = tupleCount;
         while (remaining > 0) {
+
+            // Prepare output streams and their buffers.
+            COWStreamProcessor outputStreams;
+            for (int32_t i = 0; i < npartitions; i++) {
+                outputStreams.add((void*)buffers[i].get(), BUFFER_SIZE);
+            }
 
             remaining = m_table->serializeMore(outputStreams);
 
@@ -803,8 +813,8 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
                         int64_t value = *reinterpret_cast<int64_t*>(values);
                         const bool inserted = after[ipart].insert(value).second;
                         if (!inserted) {
-                            tool.valueError(values, "Duplicate: inserted=%d",
-                                            ipart, totalInserted);
+                            tool.valueError(values, "Buffer duplicate: ipart=%lu totalInserted=%d ibuf=%d",
+                                            ipart, totalInserted, ibuf);
                         }
                         ASSERT_TRUE(inserted);
 
@@ -822,7 +832,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             }
 
             // Mutate the table.
-            for (size_t imutation = 0; imutation < nmutations; imutation++) {
+            for (size_t imutation = 0; imutation < NUM_MUTATIONS; imutation++) {
                 doRandomTableMutation(m_table);
             }
         }

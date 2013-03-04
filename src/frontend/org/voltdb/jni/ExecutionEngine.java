@@ -611,11 +611,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
-     * @param totalTuples total tuple count to be streamed
      * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, int totalTuples, byte[] data);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type

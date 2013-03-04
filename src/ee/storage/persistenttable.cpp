@@ -726,7 +726,7 @@ TableStats* PersistentTable::getTableStats() {
  */
 bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
                                           const std::vector<std::string> &predicate_strings,
-                                          int32_t totalPartitions, int64_t totalTuples) {
+                                          int32_t totalPartitions) {
     if (m_COWContext != NULL) {
         return true;
     }
@@ -745,9 +745,10 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
     try {
         // Constructor can throw exception when it parses the predicates.
         assert(serializer != NULL);
-        m_COWContext.reset(
-                new CopyOnWriteContext(*this, *serializer, partitionId,
-                                       predicate_strings, totalPartitions, totalTuples));
+        CopyOnWriteContext *newCOW =
+            new CopyOnWriteContext(*this, *serializer, partitionId,
+                                   predicate_strings, totalPartitions, activeTupleCount());
+        m_COWContext.reset(newCOW);
     }
     catch(SerializableEEException &e) {
         VOLT_ERROR("SerializableEEException: %s", e.message().c_str());

@@ -351,8 +351,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool activateTableStream(
                 const CatalogId tableId,
                 const TableStreamType streamType,
-                ReferenceSerializeInput &serializeIn,
-                int64_t totalTuples);
+                ReferenceSerializeInput &serializeIn);
 
         /**
          * Serialize tuples to output streams from a table in COW mode.

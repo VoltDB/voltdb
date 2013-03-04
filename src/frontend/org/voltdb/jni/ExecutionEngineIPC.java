@@ -1061,7 +1061,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
-        m_data.putInt(-1);      //TODO: Tuples remaining
         m_data.putInt(0);       // Predicate count
 
         try {

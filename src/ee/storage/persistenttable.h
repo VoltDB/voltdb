@@ -207,7 +207,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      */
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
                              const std::vector<std::string> &predicate_strings,
-                             int32_t totalPartitions, int64_t totalTuples);
+                             int32_t totalPartitions);
 
     /**
      * COW activation wrapper for backward compatibility with some tests.
@@ -216,7 +216,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      */
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
         std::vector<std::string> predicate_strings;
-        return activateCopyOnWrite(serializer, partitionId, predicate_strings, 0, -1);
+        return activateCopyOnWrite(serializer, partitionId, predicate_strings, 0);
     }
 
     /**

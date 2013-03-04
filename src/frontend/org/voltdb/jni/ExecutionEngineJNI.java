@@ -475,8 +475,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         catch (IOException e) {
             throw new RuntimeException(e);
         }
-        //TODO: Provide the total tuple count.
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), -1, fs.getBytes());
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), fs.getBytes());
     }
 
     @Override

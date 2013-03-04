@@ -1319,8 +1319,7 @@ int64_t VoltDBEngine::uniqueIdForFragment(catalog::PlanFragment *frag) {
 bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
-        ReferenceSerializeInput &serializeIn,
-        int64_t totalTuples) {
+        ReferenceSerializeInput &serializeIn) {
     map<int32_t, Table*>::iterator it = m_tables.find(tableId);
     if (it == m_tables.end()) {
         return false;
@@ -1344,7 +1343,7 @@ bool VoltDBEngine::activateTableStream(
             }
         }
         if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings,
-                                       m_totalPartitions, totalTuples)) {
+                                       m_totalPartitions)) {
             return false;
         }
 

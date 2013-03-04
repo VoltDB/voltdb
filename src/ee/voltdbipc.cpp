@@ -129,7 +129,6 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
-    int64_t tuplesRemaining;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
 
@@ -897,7 +896,6 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     const voltdb::CatalogId tableId = ntohl(activateTableStreamCommand->tableId);
     const voltdb::TableStreamType streamType =
             static_cast<voltdb::TableStreamType>(ntohl(activateTableStreamCommand->streamType));
-    const int64_t tuplesRemaining = static_cast<int64_t>(ntohll(activateTableStreamCommand->tuplesRemaining));
 
     // Provide access to the serialized message data, i.e. the predicates.
     void* offset = activateTableStreamCommand->data;
@@ -905,7 +903,7 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     ReferenceSerializeInput serialize_in(offset, sz);
 
     try {
-        if (m_engine->activateTableStream(tableId, streamType, serialize_in, tuplesRemaining)) {
+        if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;

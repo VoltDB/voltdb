@@ -28,13 +28,13 @@ namespace voltdb
 /**
  * Generate a hash code using modulus.
  */
-static int modulusHash(const NValue& value, int32_t totalPartitions)
+static int32_t modulusHash(const NValue& nvalue, int32_t totalPartitions)
 {
     // Default to partition 0, e.g. when value is null.
     int hash = 0;
-    if (!value.isNull())
+    if (!nvalue.isNull())
     {
-        ValueType val_type = ValuePeeker::peekValueType(value);
+        ValueType val_type = ValuePeeker::peekValueType(nvalue);
         switch (val_type)
         {
         case VALUE_TYPE_TINYINT:
@@ -42,7 +42,8 @@ static int modulusHash(const NValue& value, int32_t totalPartitions)
         case VALUE_TYPE_INTEGER:
         case VALUE_TYPE_BIGINT:
         {
-            hash = (int)(ValuePeeker::peekAsRawInt64(value) % totalPartitions);
+            int64_t ivalue = ValuePeeker::peekAsRawInt64(nvalue);
+            hash = (int32_t)(ivalue % totalPartitions);
             break;
         }
         // varbinary and varchar are unsupported because they aren't currently needed for testing.
@@ -66,7 +67,7 @@ bool StreamPredicate::accept(
     if (partitionColumn == -1) {
         return true;
     }
-    int hash = modulusHash(tuple.getNValue(partitionColumn), totalPartitions);
+    int32_t hash = modulusHash(tuple.getNValue(partitionColumn), totalPartitions);
     return (hash >= m_minHash && hash <= m_maxHash);
 }
 
