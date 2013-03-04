@@ -36,14 +36,13 @@
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Using Terminal</td></tr></table>
         <ul>
-            <li>Each sample app includes instructions for running commands in terminal mode. Simply open a terminal window, copy and paste the provided command string and hit &lt;enter&gt;</li>
-            <li>The provided command will take care of running your sample.  However, note that the samples will kill any running VoltDB database<b> - do not run the samples on a production server.</b></li>
+            <li>Each sample app includes instructions for running commands in terminal mode.</li>
         </ul>
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">3</td><td class="nbrtitle">Questions?</td></tr></table>
         <ul>
-            <li>Check out the VoltDB <a href="http://community.voltdb.com/forum" target="content">community forums</a> for answers.</li>
-            <li>You can also find detailed documentation and white papers on VoltDB <a href="http://community.voltdb.com/documentation" target="content">here</a>.</li>
+            <li>Check out the VoltDB <a href="https://forum.voltdb.com/forum.php" target="forum">forums</a> for answers.</li>
+            <li>You can also find detailed documentation on VoltDB <a href="http://voltdb.com/community/documentation.php" target="docs">here</a>.</li>
         </ul>
 
         <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
@@ -54,23 +53,28 @@
 	</div>
 
 	<div id="sec_1" class="sec" style="display:none;">
-    	<h2>Instructions</h2>
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Running the sample</td></tr></table>
-        <br/>
-        Open Terminal, and run:<br/>
-        <pre><script>document.write(root)</script>launch voter</pre>
-        This will open two Terminal windows:
-        <ul>
-            <li>A VoltDB database process.</li>
-            <li>A simulated call center client capturing phone calls.</li>
-        </ul>
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Monitor Performance</td></tr></table>
-        <p>Next, <a href="../../examples/voter/LiveStats.html" target="content">click here</a> to launch the real-time dashboard and see who's winning the vote.</p>
-        <hr />
-        <p>Or, <a href="../studio.web/index.htm?oe=0&ms=nor&startup=monitor" target="content">click here</a> to launch VoltDB Studio.</p>
-        <p>The performance monitor will show you how fast VoltDB is processing phone calls.</p>
+    	<h2>Voter Instructions</h2>
 
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">3</td><td class="nbrtitle">What is happening?</td></tr></table>
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Start the database</td></tr></table>
+        <br/>
+        Open a Terminal window, and run:<br/>
+        <pre><script>document.write(root.replace('/tools/demo/','/examples/voter/run.sh'));</script></pre>
+        This will start the VoltDB database process.
+
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Run the voter client</td></tr></table>
+        <br/>
+        Open another Terminal window, and run:<br/>
+        <pre><script>document.write(root.replace('/tools/demo/','/examples/voter/run.sh client'));</script></pre>
+
+        This will run a benchmark application that connects to the database and generates transactions that simulate a call center capturing text message votes.
+
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">3</td><td class="nbrtitle">Monitor Performance</td></tr></table>
+        <p>Next, <a href="../../examples/voter/LiveStats.html" target="livestats">click here</a> to launch the real-time dashboard and see who's winning the vote.</p>
+        <hr />
+        <p>Or, <a href="../studio.web/index.htm?oe=0&ms=nor&startup=monitor" target="studio">click here</a> to launch VoltDB Studio.  Then click on the <i><Performance Monitor/i> toolbar button to view real-time performance statistics.</p>
+
+
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">4</td><td class="nbrtitle">What is happening?</td></tr></table>
         <ul>
             <li>The call center is randomly posting real-time votes.</li>
             <li>VoltDB validates each vote, blocking fraud.</li>
@@ -79,20 +83,26 @@
         <p>The obvious goal: high transaction throughput with low latency (more votes, faster!)</p>
         <hr />
 		<p>At the end of the benchmark, the call center simulator reports the contest winner (in the Terminal window), a query that takes a mere fraction of a second, despite millions of votes having been processed!</p>
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">4</td><td class="nbrtitle">Explore...</td></tr></table>
-        <p>You can open a New Query in VoltDB Studio to run requests against the database even as the Voter application is running. Click the Execute Query button after typing in your query.</p>
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">5</td><td class="nbrtitle">Explore...</td></tr></table>
+        <p>You can click on the New Query toolbar button in VoltDB Studio to open a new query window and run requests against the database as the Voter application is running.  Click the Execute Query button after typing in your query.</p>
         Follow live voting results:<br/>
         <pre>exec Results</pre>
         Get the total number of votes:<br/>
         <pre>select count(*) from votes;</pre>
-        <p>To close VoltDB Studio, <a href="intro.htm?s=1" target="content">click here</a></p>
+        <!--<p>To close VoltDB Studio, <a href="intro.htm?s=1" target="content">click here</a></p> -->
+        <p>You can also query the database using the <i>sqlcmd</i> command-line interface from:</p>
+        <pre><script>var sqlcmdpath = root.replace('/tools/demo/', '/bin/sqlcmd');document.write(sqlcmdpath)</script></pre>
 
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">5</td><td class="nbrtitle">Get hands-on with Voter</td></tr></table>
+
+
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">6</td><td class="nbrtitle">Get hands-on with Voter</td></tr></table>
         <p>You can customize the Voter sample by editing:</p>
         <pre><script>document.write(root.replace('/tools/demo/','/examples/voter/run.sh'));</script></pre>
+        <p>Find the <i>function client</i> section and edit the parameters to:</p>
         <ul>
             <li>Change the number of contestants</li>
             <li>Change the voting duration</li>
+            <li>To observe lower latency, set autotune=false and ratelimit to 90-95% of the throughput observed with autotune=true.</li>
         </ul>
 
         <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
@@ -103,21 +113,27 @@
 	</div>
 
 	<div id="sec_2" class="sec" style="display:none;">
-    	<h2>Instructions</h2>
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Running the sample</td></tr></table>
+    	<h2>K/V Store Instructions</h2>
+
+
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Start the database</td></tr></table>
         <br/>
-        Open Terminal, and run:<br/>
-        <pre><script>document.write(root)</script>launch voltkv</pre>
-        This will open two Terminal windows:
-        <ul>
-            <li>A VoltDB database process.</li>
-            <li>A client benchmark application.</li>
-        </ul>
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Monitor Performance</td></tr></table>
-        <p>Next, <a href="../studio.web/index.htm?oe=0&ms=nor&startup=monitor" target="content">click here</a> to launch VoltDB Studio.</p>
+        Open a Terminal window, and run:<br/>
+        <pre><script>document.write(root.replace('/tools/demo/','/examples/voltkv/run.sh'));</script></pre>
+        This will start the VoltDB database process.
+
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Run the voltkv client</td></tr></table>
+        <br/>
+        Open another Terminal window, and run:<br/>
+        <pre><script>document.write(root.replace('/tools/demo/','/examples/voltkv/run.sh client'));</script></pre>
+
+        This will run a benchmark application that connects to the database and generates transactions that simulate a Key/Value Store workload.
+
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">3</td><td class="nbrtitle">Monitor Performance</td></tr></table>
+        <p>Next, <a href="../studio.web/index.htm?oe=0&ms=nor&startup=monitor" target="studio">click here</a> to launch VoltDB Studio.  Then click on the <i><Performance Monitor/i> toolbar button to view real-time performance statistics.</p>
         <p>The performance monitor will show you how fast VoltDB is processing GET/PUT calls.</p>
 
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">3</td><td class="nbrtitle">What is happening?</td></tr></table>
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">4</td><td class="nbrtitle">What is happening?</td></tr></table>
         <ul>
             <li>The client runs various PUT/GET operations (12K payload).</li>
             <li>VoltDB serves as a simple high-speed data store.</li>
@@ -127,15 +143,17 @@
         <hr />
 		<p>At the end of the benchmark, the client application reports performance results (in the Terminal window)</p>
 
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">4</td><td class="nbrtitle">Explore...</td></tr></table>
-        <p>You can open a New Query in VoltDB Studio to run requests against the database even as the application is running. Click the Execute Query button after typing in your query.</p>
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">5</td><td class="nbrtitle">Explore...</td></tr></table>
+        <p>You can click on the New Query toolbar button in VoltDB Studio to open a new query window and run requests against the database as the application is running. Click the Execute Query button after typing in your query.</p>
         Sample stored data:<br/>
-        <pre>select top 10 * from store;</pre>
+        <pre>select * from store limit 10;</pre>
         Get the total number of stored values:<br/>
         <pre>select count(*) from store;</pre>
-        <p>To close VoltDB Studio, <a href="intro.htm?s=2" target="content">click here</a></p>
+        <!-- <p>To close VoltDB Studio, <a href="intro.htm?s=2" target="content">click here</a></p> -->
+        <p>You can also query the database using the <i>sqlcmd</i> command-line interface from:</p>
+        <pre><script>var sqlcmdpath = root.replace('/tools/demo/', '/bin/sqlcmd');document.write(sqlcmdpath)</script></pre>
 
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">5</td><td class="nbrtitle">Get hands-on with K/V Store</td></tr></table>
+        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">6</td><td class="nbrtitle">Get hands-on with K/V Store</td></tr></table>
         <p>You can customize the key-value store sample by editing:</p>
         <pre><script>document.write(root.replace('/tools/demo/','/examples/voltkv/run.sh'));</script></pre>
         <ul>
@@ -154,46 +172,48 @@
 	<div id="sec_3" class="sec" style="display:none;">
     	<h2>Next Steps</h2>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">More samples...</td></tr></table>
-		<p>More sample applications are available to help you explore VoltDB's amazing performance. Simply browse:</p>
+	<p>More sample applications are available to help you explore VoltDB's amazing performance. Simply browse:</p>
         <pre><script>document.write(root.replace('/tools/demo/','/examples/'));</script></pre>
-        <p>For each of the samples, simply go to the appropriate folder and...</p>
+        <p>For each of the samples, go to the appropriate folder and...</p>
         <p>To compile and run the VoltDB server, type:</p>
         <pre>./run.sh</pre>
         <p>To run the sample application, type:</p>
         <pre>./run.sh client</pre>
         <p>(other options might be available as well for specific samples - explore the README file)</p>
 
+	<p>VoltDB has even more sample applications available at <a href="http://voltdb.com/community/volt-labs.php" target="labs">Volt Labs</a></p>
+
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Documentation</td></tr></table>
-        <p>When you are ready to move forward and code your own application, make sure you check out our documentations at:</p>
-        <pre><a href="http://community.voltdb.com/documentation" target="content">http://community.voltdb.com/documentation</a></pre>
+        <p>When you are ready to move forward and code your own application, make sure you check out our documentation at:</p>
+        <pre><a href="http://voltdb.com/community/documentation.php" target="doc">http://voltdb.com/community/documentation.php</a></pre>
 
         <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
             <div id="plnk_2" class="pnb prev">Prev</div>
-            <div id="nlnk_4" class="pnb next">Next</div>
+            <!-- <div id="nlnk_4" class="pnb next">Next</div> -->
         </div>
 
 	</div>
-
+<!--
 	<div id="sec_4" class="sec" style="display:none;">
-        <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Development Tools</td></tr></table>
+    	<h2>Development Tools</h2>
         <p>You can launch VoltDB's Web Studio from:</p>
         <pre><script>document.write(root.replace('/demo/','/studio.web/index.htm'));</script></pre>
         <p>You can launch a simple Command-Line Interface from:</p>
-        <pre><script>var sqlcmdpath = root.replace('/tools/demo/', '/bin/sqlcmd');document.write(sqlcmdpath)
-        </script></pre>
+        <pre><script>var sqlcmdpath = root.replace('/tools/demo/', '/bin/sqlcmd');document.write(sqlcmdpath)</script></pre>
+
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Windows Tools</td></tr></table>
-        <p>If you work on Window, get VoltDB's Windows Studio from:</p>
+        <p>If you work on Windows, get VoltDB's Windows Studio from:</p>
         <pre><a href="http://voltdb.com/downloads" target="content">http://voltdb.com/downloads</a></pre>
 
         <div style="border-top:1px solid #ccc;padding:10px;margin-top:20px;margin-bottom:20px;">
             <div id="plnk_3" class="pnb prev">Prev</div>
-<!--            <div id="nlnk_5" class="pnb next">Next</div>-->
+
+            <div id="nlnk_5" class="pnb next">Next</div>
         </div>
 
 	</div>
 
-<!--
 	<div id="sec_5" class="sec" style="display:none;">
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Resources</td></tr></table>
         <p>Check out our webinar for training on VoltDB</p>
