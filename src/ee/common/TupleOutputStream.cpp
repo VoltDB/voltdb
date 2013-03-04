@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "COWStream.h"
+#include "TupleOutputStream.h"
 #include "StreamPredicate.h"
 #include "TupleSerializer.h"
 #include "tabletuple.h"
@@ -23,16 +23,16 @@
 
 namespace voltdb {
 
-COWStream::COWStream(void *data, std::size_t length)
+TupleOutputStream::TupleOutputStream(void *data, std::size_t length)
   : ReferenceSerializeOutput(data, length), m_rowCount(0), m_rowCountPosition(0)
 {
 }
 
-COWStream::~COWStream()
+TupleOutputStream::~TupleOutputStream()
 {
 }
 
-std::size_t COWStream::startRows(int32_t partitionId)
+std::size_t TupleOutputStream::startRows(int32_t partitionId)
 {
     writeInt(partitionId);
     m_rowCount = 0;
@@ -40,7 +40,7 @@ std::size_t COWStream::startRows(int32_t partitionId)
     return m_rowCountPosition;
 }
 
-std::size_t COWStream::writeRow(TupleSerializer &serializer, const TableTuple &tuple)
+std::size_t TupleOutputStream::writeRow(TupleSerializer &serializer, const TableTuple &tuple)
 {
     const std::size_t startPos = position();
     serializer.serializeTo(tuple, this);
@@ -49,12 +49,12 @@ std::size_t COWStream::writeRow(TupleSerializer &serializer, const TableTuple &t
     return endPos - startPos;
 }
 
-bool COWStream::canFit(std::size_t nbytes) const
+bool TupleOutputStream::canFit(std::size_t nbytes) const
 {
     return (remaining() >= nbytes + sizeof(int32_t));
 }
 
-void COWStream::endRows()
+void TupleOutputStream::endRows()
 {
     writeIntAt(m_rowCountPosition, m_rowCount);
 }

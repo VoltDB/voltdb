@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "COWStream.h"
-#include "COWStreamProcessor.h"
+#include "TupleOutputStream.h"
+#include "TupleOutputStreamProcessor.h"
 #include "StreamPredicate.h"
 #include "TupleSerializer.h"
 #include "tabletuple.h"
@@ -25,49 +25,49 @@
 namespace voltdb {
 
 /** Default constructor. */
-COWStreamProcessor::COWStreamProcessor()
-    : boost::ptr_vector<COWStream>()
+TupleOutputStreamProcessor::TupleOutputStreamProcessor()
+    : boost::ptr_vector<TupleOutputStream>()
 {
     clearState();
 }
 
 /** Constructor with initial size. */
-COWStreamProcessor::COWStreamProcessor(std::size_t nBuffers)
-    : boost::ptr_vector<COWStream>(nBuffers)
+TupleOutputStreamProcessor::TupleOutputStreamProcessor(std::size_t nBuffers)
+    : boost::ptr_vector<TupleOutputStream>(nBuffers)
 {
     clearState();
 }
 
 /** Constructor for a single stream. Convenient for backward compatibility in tests. */
-COWStreamProcessor::COWStreamProcessor(void *data, std::size_t length)
-    : boost::ptr_vector<COWStream>(1)
+TupleOutputStreamProcessor::TupleOutputStreamProcessor(void *data, std::size_t length)
+    : boost::ptr_vector<TupleOutputStream>(1)
 {
     clearState();
     add(data, length);
 }
 
 /** Private method used by constructors, etc. to clear state. */
-void COWStreamProcessor::clearState()
+void TupleOutputStreamProcessor::clearState()
 {
     m_maxTupleLength = 0;
     m_predicates = NULL;
     m_table = NULL;
 }
 
-/** Convenience method to create and add a new COWStream. */
-COWStream &COWStreamProcessor::add(void *data, std::size_t length)
+/** Convenience method to create and add a new TupleOutputStream. */
+TupleOutputStream &TupleOutputStreamProcessor::add(void *data, std::size_t length)
 {
-    std::auto_ptr<COWStream> out(new COWStream(data, length));
+    std::auto_ptr<TupleOutputStream> out(new TupleOutputStream(data, length));
     push_back(out);
     return *out;
 }
 
 /** Start serializing. */
-void COWStreamProcessor::open(PersistentTable &table,
-                              std::size_t maxTupleLength,
-                              int32_t partitionId,
-                              StreamPredicateList &predicates,
-                              int32_t totalPartitions)
+void TupleOutputStreamProcessor::open(PersistentTable &table,
+                                      std::size_t maxTupleLength,
+                                      int32_t partitionId,
+                                      StreamPredicateList &predicates,
+                                      int32_t totalPartitions)
 {
     m_table = &table;
     m_maxTupleLength = maxTupleLength;
@@ -78,15 +78,15 @@ void COWStreamProcessor::open(PersistentTable &table,
     }
     m_predicates = &predicates;
     m_totalPartitions = totalPartitions;
-    for (COWStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
+    for (TupleOutputStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         iter->startRows(partitionId);
     }
 }
 
 /** Stop serializing. */
-void COWStreamProcessor::close()
+void TupleOutputStreamProcessor::close()
 {
-    for (COWStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
+    for (TupleOutputStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         iter->endRows();
     }
     clearState();
@@ -98,12 +98,12 @@ void COWStreamProcessor::close()
  * Maintains the total byte counter provided by the caller.
  * Returns true when one of the output buffers fills.
  */
-bool COWStreamProcessor::writeRow(TupleSerializer &serializer,
+bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer,
                                   TableTuple &tuple,
                                   std::size_t &totalBytesSerialized)
 {
     if (m_table == NULL) {
-        throwFatalException("COWStreamProcessor::writeRow() was called before initialize().");
+        throwFatalException("TupleOutputStreamProcessor::writeRow() was called before initialize().");
     }
 
     // Predicates, if supplied, are one per output stream (previously asserted).
@@ -115,7 +115,7 @@ bool COWStreamProcessor::writeRow(TupleSerializer &serializer,
     }
 
     bool aBufferIsFull = false;
-    for (COWStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
+    for (TupleOutputStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         // Get approval from corresponding output stream predicate, if provided.
         bool accepted = true;
         if (!m_predicates->empty()) {
@@ -128,7 +128,8 @@ bool COWStreamProcessor::writeRow(TupleSerializer &serializer,
         }
         if (accepted) {
             if (!iter->canFit(m_maxTupleLength)) {
-                throwFatalException("COWStreamProcessor::writeRow() failed because buffer has no space.");
+                throwFatalException(
+                    "TupleOutputStreamProcessor::writeRow() failed because buffer has no space.");
             }
             totalBytesSerialized += iter->writeRow(serializer, tuple);
             // Is this buffer capable of handling another tuple after this one is done?

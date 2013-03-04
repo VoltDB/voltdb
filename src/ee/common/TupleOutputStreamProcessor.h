@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef COWSTREAMPROCESSOR_H_
-#define COWSTREAMPROCESSOR_H_
+#ifndef TUPLEOUTPUTSTREAMPROCESSOR_H_
+#define TUPLEOUTPUTSTREAMPROCESSOR_H_
 
 #include <cstddef>
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -29,25 +29,25 @@ class TupleSerializer;
 class TableTuple;
 class PersistentTable;
 class TupleSerializer;
-class COWStream;
+class TupleOutputStream;
 class StreamPredicateList;
 
-/** COWStream processor. Manages and outputs to multiple COWStream's. */
-class COWStreamProcessor : public boost::ptr_vector<COWStream> {
+/** TupleOutputStream processor. Manages and outputs to multiple TupleOutputStream's. */
+class TupleOutputStreamProcessor : public boost::ptr_vector<TupleOutputStream> {
 
 public:
 
     /** Default constructor. */
-    COWStreamProcessor();
+    TupleOutputStreamProcessor();
 
     /** Constructor with initial size. */
-    COWStreamProcessor(std::size_t nBuffers);
+    TupleOutputStreamProcessor(std::size_t nBuffers);
 
     /** Constructor for a single stream. Convenient for backward compatibility in tests. */
-    COWStreamProcessor(void *data, std::size_t length);
+    TupleOutputStreamProcessor(void *data, std::size_t length);
 
-    /** Convenience method to create and add a new COWStream. */
-    COWStream &add(void *data, std::size_t length);
+    /** Convenience method to create and add a new TupleOutputStream. */
+    TupleOutputStream &add(void *data, std::size_t length);
 
     /** Start serializing. */
     void open(PersistentTable &table,
@@ -89,4 +89,4 @@ private:
 
 } // namespace voltdb
 
-#endif // COWSTREAMPROCESSOR_H_
+#endif // TUPLEOUTPUTSTREAMPROCESSOR_H_

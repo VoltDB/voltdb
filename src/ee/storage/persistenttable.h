@@ -75,7 +75,7 @@ class Topend;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class PersistentTableUndoDeleteAction;
-class COWStreamProcessor;
+class TupleOutputStreamProcessor;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -240,7 +240,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * output stream.
      * Return remaining tuple count, 0 if done, or -1 on error.
      */
-    int64_t serializeMore(COWStreamProcessor &outputStreams);
+    int64_t serializeMore(TupleOutputStreamProcessor &outputStreams);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash

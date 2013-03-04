@@ -27,8 +27,8 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
-#include "common/COWStream.h"
-#include "common/COWStreamProcessor.h"
+#include "common/TupleOutputStream.h"
+#include "common/TupleOutputStreamProcessor.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
@@ -400,8 +400,8 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
 #endif
         char serializationBuffer[serializationBufferSize];
         while (true) {
-            COWStreamProcessor outs( serializationBuffer, serializationBufferSize);
-            COWStream &out = outs.at(0);
+            TupleOutputStreamProcessor outs( serializationBuffer, serializationBufferSize);
+            TupleOutputStream &out = outs.at(0);
             m_table->serializeMore(outs);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
@@ -542,8 +542,8 @@ TEST_F(CompactionTest, TestENG897) {
     //std::cout << "Starting snapshot serialization" << std::endl;
     char serializationBuffer[2097152];
     while (true) {
-        COWStreamProcessor outs( serializationBuffer, 2097152);
-        COWStream &out = outs.at(0);
+        TupleOutputStreamProcessor outs( serializationBuffer, 2097152);
+        TupleOutputStream &out = outs.at(0);
         m_table->serializeMore(outs);
         if (out.position() == 0) {
             break;

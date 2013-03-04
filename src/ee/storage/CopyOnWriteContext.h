@@ -21,7 +21,7 @@
 #include <vector>
 #include <utility>
 #include "common/TupleSerializer.h"
-#include "common/COWStreamProcessor.h"
+#include "common/TupleOutputStreamProcessor.h"
 #include "common/StreamPredicateList.h"
 #include "storage/persistenttable.h"
 #include "common/Pool.hpp"
@@ -33,7 +33,7 @@ namespace voltdb {
 class TupleIterator;
 class TempTable;
 class ParsedPredicate;
-class COWStreamProcessor;
+class TupleOutputStreamProcessor;
 
 class CopyOnWriteContext {
 
@@ -53,7 +53,7 @@ public:
      * Serialize tuples to the provided output until no more tuples can be serialized.
      * Return remaining tuple count, 0 if done, or -1 on error.
      */
-    int64_t serializeMore(COWStreamProcessor &output_targets);
+    int64_t serializeMore(TupleOutputStreamProcessor &output_targets);
 
     /**
      * Mark a tuple as dirty and make a copy if necessary. The new tuple param indicates

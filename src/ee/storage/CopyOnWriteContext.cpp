@@ -19,7 +19,7 @@
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
-#include "common/COWStream.h"
+#include "common/TupleOutputStream.h"
 #include "common/FatalException.hpp"
 #include "common/StreamPredicate.h"
 #include "common/StreamPredicateList.h"
@@ -66,7 +66,7 @@ CopyOnWriteContext::CopyOnWriteContext(
  * Serialize to multiple output streams.
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
-int64_t CopyOnWriteContext::serializeMore(COWStreamProcessor &outputStreams) {
+int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStreams) {
 
     // Don't expect to be re-called after streaming all the tuples.
     if (m_tuplesRemaining == 0) {

@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef COWSTREAM_H_
-#define COWSTREAM_H_
+#ifndef TUPLEOUTPUTSTREAM_H_
+#define TUPLEOUTPUTSTREAM_H_
 
 #include <cstddef>
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -33,19 +33,19 @@ class TupleSerializer;
  * Serialization output class with some additional data that allows the
  * filtered COW processing to manage the stream.
  */
-class COWStream : public ReferenceSerializeOutput {
+class TupleOutputStream : public ReferenceSerializeOutput {
 
 public:
 
     /**
      * Constructor.
      */
-    COWStream(void *data, std::size_t length);
+    TupleOutputStream(void *data, std::size_t length);
 
     /**
      * Destructor.
      */
-    virtual ~COWStream();
+    virtual ~TupleOutputStream();
 
     /**
      * Write the header and save space for the row count.
@@ -75,4 +75,4 @@ private:
 
 } // namespace voltdb
 
-#endif // COWSTREAM_H_
+#endif // TUPLEOUTPUTSTREAM_H_

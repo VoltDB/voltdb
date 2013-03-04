@@ -27,8 +27,8 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
-#include "common/COWStream.h"
-#include "common/COWStreamProcessor.h"
+#include "common/TupleOutputStream.h"
+#include "common/TupleOutputStreamProcessor.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
@@ -371,8 +371,8 @@ TEST_F(CopyOnWriteTest, BigTest) {
         char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            COWStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
-            COWStream &outputStream = outputStreams.at(0);
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
             m_table->serializeMore(outputStreams);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
@@ -458,8 +458,8 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            COWStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
-            COWStream &outputStream = outputStreams.at(0);
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
             m_table->serializeMore(outputStreams);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
@@ -549,8 +549,8 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            COWStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
-            COWStream &outputStream = outputStreams.at(0);
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
             m_table->serializeMore(outputStreams);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
@@ -787,7 +787,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         while (remaining > 0) {
 
             // Prepare output streams and their buffers.
-            COWStreamProcessor outputStreams;
+            TupleOutputStreamProcessor outputStreams;
             for (int32_t i = 0; i < npartitions; i++) {
                 outputStreams.add((void*)buffers[i].get(), BUFFER_SIZE);
             }
@@ -795,7 +795,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             remaining = m_table->serializeMore(outputStreams);
 
             // Per-predicate iterators.
-            COWStreamProcessor::iterator outputStream = outputStreams.begin();
+            TupleOutputStreamProcessor::iterator outputStream = outputStreams.begin();
 
             // Record the final result of streaming to each partition/predicate.
             for (size_t ipart = 0; ipart < npartitions; ipart++) {

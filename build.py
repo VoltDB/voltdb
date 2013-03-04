@@ -213,8 +213,8 @@ CTX.INPUT['common'] = """
  serializeio.cpp
  StreamPredicate.cpp
  StreamPredicateList.cpp
- COWStream.cpp
- COWStreamProcessor.cpp
+ TupleOutputStream.cpp
+ TupleOutputStreamProcessor.cpp
 """
 
 CTX.INPUT['execution'] = """

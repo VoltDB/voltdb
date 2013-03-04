@@ -66,7 +66,7 @@
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
-#include "common/COWStream.h"
+#include "common/TupleOutputStream.h"
 #include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"

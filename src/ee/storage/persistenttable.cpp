@@ -761,7 +761,7 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
  * Attempt to serialize more tuples from the table to the provided output streams.
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
-int64_t PersistentTable::serializeMore(COWStreamProcessor &outputStreams) {
+int64_t PersistentTable::serializeMore(TupleOutputStreamProcessor &outputStreams) {
     if (m_COWContext == NULL) {
         return -1;
     }

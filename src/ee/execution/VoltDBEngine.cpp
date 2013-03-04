@@ -58,7 +58,7 @@
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
-#include "common/COWStreamProcessor.h"
+#include "common/TupleOutputStreamProcessor.h"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
@@ -1390,7 +1390,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                 "Expected at least one output stream in tableStreamSerializeMore(), received %d",
                 nBuffers);
     }
-    COWStreamProcessor outputStreams(nBuffers);
+    TupleOutputStreamProcessor outputStreams(nBuffers);
     for (int iBuffer = 0; iBuffer < nBuffers; iBuffer++) {
         char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
         int offset = serializeIn.readInt();
