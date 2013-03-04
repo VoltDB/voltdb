@@ -605,12 +605,8 @@ public class Inits {
 
         @Override
         public void run() {
-            int hostCount = m_deployment.getCluster().getHostcount();
-            int kFactor = m_deployment.getCluster().getKfactor();
-            int sitesPerHost = m_deployment.getCluster().getSitesperhost();
-
             // Initialize the complex partitioning scheme
-            TheHashinator.initialize((hostCount * sitesPerHost) / (kFactor + 1));
+            TheHashinator.initialize(m_rvdb.m_configuredNumberOfPartitions);
         }
     }
 
