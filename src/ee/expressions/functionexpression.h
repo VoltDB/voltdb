@@ -204,6 +204,8 @@ static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
 static const int FUNC_VOLT_SQL_ERROR                   = 20000;
 static const int FUNC_DECODE                           = 20001;
 static const int FUNC_VOLT_FIELD                       = 20002;
+static const int FUNC_VOLT_ARRAY_ELEMENT               = 20003;
+static const int FUNC_VOLT_ARRAY_LENGTH                = 20004;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

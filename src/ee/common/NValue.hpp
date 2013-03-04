@@ -896,6 +896,43 @@ class NValue {
         }
     }
 
+    int32_t castAsIntegerAndGetValue() const {
+        const ValueType type = getValueType();
+        if (isNull()) {
+            return INT32_NULL;
+        }
+
+        switch (type) {
+        case VALUE_TYPE_NULL:
+            return INT32_NULL;
+        case VALUE_TYPE_TINYINT:
+            return static_cast<int32_t>(getTinyInt());
+        case VALUE_TYPE_SMALLINT:
+            return static_cast<int32_t>(getSmallInt());
+        case VALUE_TYPE_INTEGER:
+            return getInteger();
+        case VALUE_TYPE_BIGINT:
+        {
+            const int64_t value = getBigInt();
+            if (value > (int64_t)INT32_MAX || value < (int64_t)VOLT_INT32_MIN) {
+                throwCastSQLValueOutOfRangeException<int64_t>(value, VALUE_TYPE_BIGINT, VALUE_TYPE_INTEGER);
+            }
+            return static_cast<int32_t>(value);
+        }
+        case VALUE_TYPE_DOUBLE:
+        {
+            const double value = getDouble();
+            if (value > (double)INT32_MAX || value < (double)VOLT_INT32_MIN) {
+                throwCastSQLValueOutOfRangeException(value, VALUE_TYPE_DOUBLE, VALUE_TYPE_INTEGER);
+            }
+            return static_cast<int32_t>(value);
+        }
+        default:
+            throwCastSQLException(type, VALUE_TYPE_INTEGER);
+            return 0; // NOT REACHED
+        }
+    }
+
     double castAsDoubleAndGetValue() const {
         const ValueType type = getValueType();
         if (isNull()) {
