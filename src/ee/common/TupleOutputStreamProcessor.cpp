@@ -109,7 +109,7 @@ void TupleOutputStreamProcessor::close()
 bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTuple &tuple)
 {
     if (m_table == NULL) {
-        throwFatalException("TupleOutputStreamProcessor::writeRow() was called before initialize().");
+        throwFatalException("TupleOutputStreamProcessor::writeRow() was called before open().");
     }
 
     // Predicates, if supplied, are one per output stream (previously asserted).
