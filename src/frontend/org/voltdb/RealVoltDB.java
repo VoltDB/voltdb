@@ -153,7 +153,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     private volatile boolean m_validateConfiguredNumberOfPartitionsOnMailboxUpdate;
-    private int m_configuredNumberOfPartitions;
+    int m_configuredNumberOfPartitions;
     CatalogContext m_catalogContext;
     volatile SiteTracker m_siteTracker;
     MailboxPublisher m_mailboxPublisher;
@@ -449,11 +449,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
-            JSONObject topo = getTopology(isRejoin || m_joining);
+            JSONObject topo = getTopology(isRejoin, m_joining);
             try {
+                clusterConfig = new ClusterConfig(topo);
+                m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
+
                 // IV2 mailbox stuff
                 if (isIV2Enabled()) {
-                    ClusterConfig iv2config = new ClusterConfig(topo);
                     m_cartographer = new Cartographer(m_messenger.getZK());
                     List<Integer> partitions = null;
                     if (isRejoin) {
@@ -461,13 +463,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         if (partitions.size() == 0) {
                             VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                     "the requested k-safety factor of " +
-                                    iv2config.getReplicationFactor() + ".\n" +
+                                    clusterConfig.getReplicationFactor() + ".\n" +
                                     "No more nodes can join.", false, null);
                         }
                     }
-                    if (m_joining) {
+                    else if (m_joining) {
                         // Ask the joiner for the new partitions to create on this node.
-                        partitions = m_joiner.getPartitionsToAdd();
+                        partitions = joinCoordinator.getPartitionsToAdd();
                     }
                     else {
                         partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
@@ -520,14 +522,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 hostLog.info("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
-                if (isRejoin && isIV2Enabled()) {
-                    // Make a list of HDIds to rejoin
-                    List<Long> hsidsToRejoin = new ArrayList<Long>();
-                    for (Initiator init : m_iv2Initiators) {
-                        if (init.isRejoinable()) {
-                            hsidsToRejoin.add(init.getInitiatorHSId());
-                        }
+                // Make a list of HDIds to join
+                List<Long> hsidsToRejoin = new ArrayList<Long>();
+                for (Initiator init : m_iv2Initiators) {
+                    if (init.isRejoinable()) {
+                        hsidsToRejoin.add(init.getInitiatorHSId());
                     }
+                }
+
+                if (isRejoin && isIV2Enabled()) {
                     SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
                     hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
 
@@ -559,6 +562,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                                        new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
                 } else if (isRejoin) {
                     SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
+                } else if (m_joining) {
+                    ((Joiner) m_rejoinCoordinator).setSites(hsidsToRejoin);
                 }
 
                 // All mailboxes should be set up, publish it
@@ -1060,7 +1065,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         zk.setData(VoltZK.topology, topology.toString(4).getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
         final int sites_per_host = topology.getInt("sites_per_host");
         ClusterConfig clusterConfig = new ClusterConfig(topology);
-        m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
         assert(partitionsToReplicate.size() == sites_per_host);
         for (Integer partition : partitionsToReplicate)
         {
@@ -1083,7 +1087,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         List<Integer> partitions =
             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
 
-        m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
         assert(partitions.size() == clusterConfig.getSitesPerHost());
         for (Integer partition : partitions)
         {
@@ -1097,10 +1100,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(boolean isRejoin)
+    private JSONObject getTopology(boolean isRejoin, boolean isJoin)
     {
         JSONObject topo = null;
-        if (!isRejoin) {
+        if (isJoin) {
+            assert(m_rejoinCoordinator != null);
+            topo = ((Joiner) m_rejoinCoordinator).getTopology();
+        }
+        else if (!isRejoin) {
             int sitesperhost = m_deployment.getCluster().getSitesperhost();
             int hostcount = m_deployment.getCluster().getHostcount();
             int kfactor = m_deployment.getCluster().getKfactor();
@@ -1667,17 +1674,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
         }
 
-        // Start join
-        if (m_joiner != null) {
-            try {
-               if (!m_joiner.startJoin(m_clientInterfaces.get(0), m_myHostId)) {
-                   VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
-               }
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to join the cluster", true, e);
-            }
-        }
-
         if (m_restoreAgent != null) {
             // start restore process
             m_restoreAgent.restore();
@@ -1688,7 +1684,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
         // Start the rejoin coordinator
         if (m_rejoinCoordinator != null) {
-            m_rejoinCoordinator.startRejoin();
+            try {
+                if (m_joining) {
+                    ((Joiner) m_rejoinCoordinator).setClientInterface(m_clientInterfaces.get(0));
+                }
+
+                if (!m_rejoinCoordinator.startJoin()) {
+                    VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
+                }
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to join the cluster", true, e);
+            }
         }
 
         // start one site in the current thread
@@ -2138,6 +2144,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             if (logRecoveryCompleted) {
                 m_rejoining = false;
+                m_joining = false;
                 consoleLog.info("Node rejoin completed");
             }
         } catch (Exception e) {
@@ -2245,7 +2252,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             dtxn.setSendHeartbeats(true);
         }
 
-        if (!m_rejoining) {
+        if (!m_rejoining && !m_joining) {
             for (ClientInterface ci : m_clientInterfaces) {
                 try {
                     ci.startAcceptingConnections();
