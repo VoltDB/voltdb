@@ -23,6 +23,8 @@
 
 package txnIdSelfCheck;
 
+import java.io.InterruptedIOException;
+
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -182,6 +184,7 @@ public class ClientThread extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     void handleException(ClientResponseImpl cri, Exception e) {
@@ -242,6 +245,12 @@ public class ClientThread extends Thread {
             catch (UserProcCallException e) {
                 ClientResponseImpl cri = e.cri;
                 handleException(cri, e);
+            }
+            catch (InterruptedException e) {
+                // just need to fall through and get out
+            }
+            catch (InterruptedIOException e) {
+                // just need to fall through and get out
             }
             catch (Exception e) {
                 log.error("ClientThread had a non proc-call exception", e);
