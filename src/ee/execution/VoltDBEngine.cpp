@@ -72,6 +72,7 @@
 #include "catalog/constraint.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/connector.h"
+#include "logging/LogManager.h"
 #include "plannodes/abstractplannode.h"
 #include "plannodes/abstractscannode.h"
 #include "plannodes/nodes.h"
@@ -728,8 +729,10 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             //////////////////////////////////////////
 
             if (!hasSameSchema(catalogTable, table)) {
-                printf("processing schema changes for %s\n", catalogTable->name().c_str());
-                fflush(stdout);
+                char msg[512];
+                snprintf(msg, sizeof(msg), "Processing schema changes for %s\n",
+                         catalogTable->name().c_str());
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
 
                 tcd->processSchemaChanges(*m_database, *catalogTable);
 
