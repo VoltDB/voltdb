@@ -1061,18 +1061,13 @@ static bool getArrayElements(
 
 /*
  * Serialize more tuples to one or more output streams.
- * Returns an array of positions as follows:
- *  - one position per stream if streaming is in progress
- *  - a single element with -1 as the position for end of stream
- *  - NULL when an error occurs
- * IMPORTANT: Don't blindly assume it returns as many positions as streams.
- * Check for NULL and then check for -1 in the first element.  JNI limitations
- * motivate this awkward interface.
+ * Returns a long for the remaining tuple count, 0 when done, or -1 for an error.
+ * Streams an int position array through the reused result buffer.
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeTableStreamSerializeMore
- * Signature: (JII[B)[I;
+ * Signature: (JII[B)J;
  */
-SHAREDLIB_JNIEXPORT jintArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableStreamSerializeMore
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableStreamSerializeMore
   (JNIEnv *env,
    jobject obj,
    jlong engine_ptr,
@@ -1085,28 +1080,33 @@ SHAREDLIB_JNIEXPORT jintArray JNICALL Java_org_voltdb_jni_ExecutionEngine_native
 
     // deserialize buffers.
     jsize length = env->GetArrayLength(serialized_buffers);
-    VOLT_DEBUG("deserializing %d buffer bytes ...", (int) length);
+    VOLT_DEBUG("nativeTableStreamSerializeMore: deserializing %d buffer bytes ...", (int) length);
     jbyte *bytes = env->GetByteArrayElements(serialized_buffers, NULL);
     ReferenceSerializeInput serialize_in(bytes, length);
     try {
         try {
-            jintArray result;
             voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
             std::vector<int> positions;
-            jint tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in, positions);
+            jlong tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in, positions);
             if (tuplesRemaining > 0) {
-                result = env->NewIntArray((int)positions.size()+1);
-                // vector is guaranteed to have contiguous storage.
-                env->SetIntArrayRegion(result, 0, 1, &tuplesRemaining);
-                env->SetIntArrayRegion(result, 1, (int)positions.size(), &positions[0]);
-                env->ReleaseByteArrayElements(serialized_buffers, bytes, JNI_ABORT);
-            } else {
-                // Done or error.
-                result = env->NewIntArray(1);
-                env->SetIntArrayRegion(result, 0, 1, &tuplesRemaining);
+                char *resultBuffer = engine->getReusedResultBuffer();
+                assert(resultBuffer != NULL);
+                int resultBufferCapacity = engine->getReusedResultBufferCapacity();
+                if (resultBufferCapacity < sizeof(jint) * positions.size()) {
+                    throwFatalException("nativeTableStreamSerializeMore: result buffer not large enough");
+                }
+                ReferenceSerializeOutput results(resultBuffer, resultBufferCapacity);
+                // Write the array size as a regular integer.
+                assert(positions.size() <= std::numeric_limits<int32_t>::max());
+                results.writeInt((int32_t)positions.size());
+                // Copy the position vector's contiguous storage to the returned results buffer.
+                for (std::vector<int>::const_iterator ipos; ipos != positions.end(); ++ipos) {
+                    results.writeInt(*ipos);
+                }
             }
-            VOLT_DEBUG("deserialized %d buffers", (int)positions.size());
-            return result;
+            VOLT_DEBUG("nativeTableStreamSerializeMore: deserialized %d buffers, %ld remaining",
+                       (int)positions.size(), tuplesRemaining);
+            return tuplesRemaining;
         } catch (SerializableEEException &e) {
             engine->resetReusedResultOutputBuffer();
             e.serialize(engine->getExceptionOutputSerializer());
@@ -1115,8 +1115,8 @@ SHAREDLIB_JNIEXPORT jintArray JNICALL Java_org_voltdb_jni_ExecutionEngine_native
         topend->crashVoltDB(e);
     }
 
-    // Return NULL reference if we weren't able to handle the request.
-    return (jintArray)env->NewGlobalRef(NULL);
+    // Return -1 if we weren't able to handle the request.
+    return -1;
 }
 
 /*

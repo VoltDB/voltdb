@@ -490,18 +490,32 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         catch (IOException e) {
             throw new RuntimeException(e);
         }
-        int[] positions = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
-        // Position zero is the remaining tuple count, 0 if done, or -1 on error.
-        if (positions == null || positions.length == 0 || positions[0] < 0) {
-            return -1;
+        long remaining = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
+        int[] positions = null;
+        //TODO: Provide remaining to caller.
+        if (remaining <= 0) {
+            return (int)remaining;  // 0 or -1
         }
-        // TODO: Change the interface to really support multiple streams.
-        // TODO: Take advantage of the remaining tuple count in position 0.
-        assert(positions.length == 1);
-        if (positions[0] == 0) {
-            return 0;
+        if (deserializer != null) {
+            int count;
+            try {
+                count = deserializer.readInt();
+                if (count > 0) {
+                    positions = new int[count];
+                    for (int i = 0; i < count; i++) {
+                        positions[i] = deserializer.readInt();
+                    }
+                    //TODO: Support multiple streams.
+                    assert(positions.length == 1);
+                    return positions[0];
+                }
+            } catch (final IOException ex) {
+                LOG.error("Failed to deserialze position array" + ex);
+                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+            }
         }
-        return positions[1];
+
+        return 0;
     }
 
     /**

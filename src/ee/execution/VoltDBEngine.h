@@ -356,8 +356,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Serialize tuples to output streams from a table in COW mode.
          * Position vector smart pointer argument is populated here.
-         * Array element zero is set to -1 when no tuple data was streamed and
-         * the COW context was deleted.
          * Returns remaining tuple count, 0 when done, or -1 on error (e.g. when not in COW mode).
          */
         int64_t tableStreamSerializeMore(

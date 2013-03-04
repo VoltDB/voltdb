@@ -622,11 +622,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param tableId Catalog ID of the table to serialize
      * @param streamType type of stream to pull data from
      * @param data Serialized buffer count and array
-     * @return array of per-buffer byte counts with an extra leading int that is set to
+     * @return remaining tuple count, 0 when done, or -1 for an error.
+     * array of per-buffer byte counts with an extra leading int that is set to
      *         the count of unstreamed tuples, 0 when done, or -1 indicating an error
      *         (such as the table not being COW mode).
      */
-    protected native int[] nativeTableStreamSerializeMore(long pointer, int tableId, int streamType, byte[] data);
+    protected native long nativeTableStreamSerializeMore(long pointer, int tableId, int streamType, byte[] data);
 
     /**
      * Process a recovery message and load the data it contains.
