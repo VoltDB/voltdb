@@ -28,6 +28,8 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 
 import org.voltcore.logging.VoltLogger;
@@ -166,7 +168,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
     }
 
     @Override
-    public void startRejoin() {
+    public boolean startJoin() {
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
@@ -188,6 +190,8 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
             initiateRejoinOnSites(firstSites);
         }
+
+        return true;
     }
 
     private void onSnapshotStreamFinished(long HSId) {

@@ -211,7 +211,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     // Are we adding the node to the cluster instead of rejoining?
     volatile boolean m_joining = false;
-    Joiner m_joiner = null;
 
     boolean m_replicationActive = false;
     private NodeDRGateway m_nodeDRGateway = null;
@@ -421,11 +420,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
 
+            Joiner joinCoordinator = null;
             if (m_joining) {
                 Class<?> joinerClass = MiscUtils.loadProClass("org.voltdb.JoinerImpl", "Elastic", false);
                 try {
-                    Constructor<?> constructor = joinerClass.getConstructor(ZooKeeper.class);
-                    m_joiner = (Joiner) constructor.newInstance(m_messenger.getZK());
+                    Constructor<?> constructor = joinerClass.getConstructor(HostMessenger.class);
+                    joinCoordinator = (Joiner) constructor.newInstance(m_messenger);
+                    m_rejoinCoordinator = joinCoordinator;
+                    m_messenger.registerMailbox(m_rejoinCoordinator);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate joiner", true, e);
                 }
