@@ -17,7 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -34,6 +36,8 @@ import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
@@ -267,6 +271,34 @@ public class LeaderAppointer implements Promotable
         }
     };
 
+
+    Watcher m_partitionCallback = new Watcher() {
+        @Override
+        public void process(WatchedEvent event)
+        {
+            VoltDB.instance().scheduleWork(new Runnable() {
+                @Override
+                public void run()
+                {
+                    try {
+                        List<String> children = m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
+                        tmLog.info("Noticed partition change " + children + ", " +
+                                "currenctly watching " + m_partitionWatchers.keySet());
+                        for (String child : children) {
+                            int pid = LeaderElector.getPartitionFromElectionDir(child);
+                            if (!m_partitionWatchers.containsKey(pid) && pid != MpInitiator.MP_INIT_PID) {
+                                watchPartition(pid);
+                            }
+                        }
+                        tmLog.info("Done " + m_partitionWatchers.keySet());
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Cannot read leader initiator directory", false, e);
+                    }
+                }
+            }, 0, -1, TimeUnit.DAYS);
+        }
+    };
+
     public LeaderAppointer(HostMessenger hm, int numberOfPartitions,
             int kfactor, boolean partitionDetectionEnabled,
             SnapshotSchedule partitionSnapshotSchedule,
@@ -335,6 +367,8 @@ public class LeaderAppointer implements Promotable
                 VoltDB.crashLocalVoltDB("Failed to get partition count on startup", true, e);
             }
             m_startupLatch.await();
+
+            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
         }
         else {
             // If we're taking over for a failed LeaderAppointer, we know when
@@ -384,16 +418,18 @@ public class LeaderAppointer implements Promotable
      *
      * This should be called on the elected leader appointer only. m_callbacks and
      * m_partitionWatchers are only accessed on initialization, promotion,
-     * or elastic add node. These three phases are mutually exclusive,
-     * so it should be safe to modify them here.
+     * or elastic add node.
+     *
+     * This method is synchronized because multiple partitions can be added at the same time.
      *
      * @param pid The partition ID
      * @throws KeeperException
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    public void watchPartition(int pid) throws InterruptedException, ExecutionException
+    synchronized void watchPartition(int pid) throws InterruptedException, ExecutionException
     {
+        tmLog.info("Start watching partition " + pid);
         String dir = LeaderElector.electionDirForPartition(pid);
         m_callbacks.put(pid, new PartitionCallback(pid));
         Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk,
