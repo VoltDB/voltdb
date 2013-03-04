@@ -74,7 +74,7 @@ class AbstractExpression {
     /** destroy this node and all children */
     virtual ~AbstractExpression();
 
-    virtual NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const = 0;
+    virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
 
     /** set parameter values for this node and its descendents */
     virtual void substitute(const NValueArray &params);
