@@ -29,7 +29,7 @@ import org.voltcore.messaging.VoltMessage;
  */
 public class RejoinMessage extends VoltMessage {
     public static enum Type {
-        INITIATION,           // start live rejoin.
+        INITIATION,           // start live rejoin or join.
         INITIATION_COMMUNITY, // start community rejoin.
         INITIATION_RESPONSE,  // For IV2, the site must return the HSId of
                               // the SnapshotDataSink mailbox
@@ -38,6 +38,9 @@ public class RejoinMessage extends VoltMessage {
         REQUEST_RESPONSE, // sent from the rejoining site to itself
         SNAPSHOT_FINISHED, // sent from a local site to the coordinator
         REPLAY_FINISHED, // sent from a local site to the coordinator
+
+        // Join specific message types
+        FIRST_FRAGMENT_RECEIVED, // sent from a local site to the coordinator
     }
 
     private Type m_type;

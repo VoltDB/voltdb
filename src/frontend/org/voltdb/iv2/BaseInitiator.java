@@ -37,6 +37,7 @@ import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.rejoin.TaskLog;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -72,29 +73,37 @@ public abstract class BaseInitiator implements Initiator
         m_partitionId = partition;
         m_scheduler = scheduler;
         boolean isLiveRejoin = startAction == VoltDB.START_ACTION.LIVE_REJOIN;
-        JoinProducerBase rejoinProducer = VoltDB.createForRejoin(startAction) ?
-            new RejoinProducer(m_partitionId, scheduler.m_tasks, voltroot, isLiveRejoin) :
-            null;
+        JoinProducerBase joinProducer;
+
+        if (startAction == VoltDB.START_ACTION.JOIN) {
+            joinProducer = new JoinProducer(m_partitionId, scheduler.m_tasks);
+        } else if (VoltDB.createForRejoin(startAction)) {
+            joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, voltroot,
+                    isLiveRejoin);
+        } else {
+            joinProducer = null;
+        }
+
         if (m_partitionId == MpInitiator.MP_INIT_PID) {
             m_initiatorMailbox = new MpInitiatorMailbox(
                     m_partitionId,
                     m_scheduler,
                     m_messenger,
                     m_repairLog,
-                    rejoinProducer);
+                    joinProducer);
         } else {
             m_initiatorMailbox = new InitiatorMailbox(
                     m_partitionId,
                     m_scheduler,
                     m_messenger,
                     m_repairLog,
-                    rejoinProducer);
+                    joinProducer);
         }
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
-        if (rejoinProducer != null) {
-            rejoinProducer.setMailbox(m_initiatorMailbox);
+        if (joinProducer != null) {
+            joinProducer.setMailbox(m_initiatorMailbox);
         }
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
