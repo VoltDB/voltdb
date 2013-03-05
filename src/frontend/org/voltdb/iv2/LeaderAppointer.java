@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -276,7 +277,7 @@ public class LeaderAppointer implements Promotable
         @Override
         public void process(WatchedEvent event)
         {
-            VoltDB.instance().scheduleWork(new Runnable() {
+            m_es.submit(new Runnable() {
                 @Override
                 public void run()
                 {
@@ -287,7 +288,7 @@ public class LeaderAppointer implements Promotable
                         for (String child : children) {
                             int pid = LeaderElector.getPartitionFromElectionDir(child);
                             if (!m_partitionWatchers.containsKey(pid) && pid != MpInitiator.MP_INIT_PID) {
-                                watchPartition(pid);
+                                watchPartition(pid, MoreExecutors.sameThreadExecutor());
                             }
                         }
                         tmLog.info("Done " + m_partitionWatchers.keySet());
@@ -295,7 +296,7 @@ public class LeaderAppointer implements Promotable
                         VoltDB.crashLocalVoltDB("Cannot read leader initiator directory", false, e);
                     }
                 }
-            }, 0, -1, TimeUnit.DAYS);
+            });
         }
     };
 
@@ -360,7 +361,7 @@ public class LeaderAppointer implements Promotable
             try {
                 for (int i = 0; i < getInitialPartitionCount(); i++) {
                     addPartitionZKNode(m_zk, i);
-                    watchPartition(i);
+                    watchPartition(i, m_es);
                 }
             } catch (IllegalAccessException e) {
                 // This should never happen
@@ -420,20 +421,20 @@ public class LeaderAppointer implements Promotable
      * m_partitionWatchers are only accessed on initialization, promotion,
      * or elastic add node.
      *
-     * This method is synchronized because multiple partitions can be added at the same time.
-     *
      * @param pid The partition ID
+     * @param es The executor service to use to construct the baby sitter
      * @throws KeeperException
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    synchronized void watchPartition(int pid) throws InterruptedException, ExecutionException
+    void watchPartition(int pid, ExecutorService es) throws InterruptedException,
+            ExecutionException
     {
         tmLog.info("Start watching partition " + pid);
         String dir = LeaderElector.electionDirForPartition(pid);
         m_callbacks.put(pid, new PartitionCallback(pid));
         Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk,
-                dir, m_callbacks.get(pid), m_es);
+                dir, m_callbacks.get(pid), es);
         m_partitionWatchers.put(pid, sitterstuff.getFirst());
     }
 
