@@ -101,24 +101,31 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * Utility to aggregate a list of tables sharing a schema. Common for
      * sysprocs to do this, to aggregate results.
      */
-    protected VoltTable unionTables(List<VoltTable> operands) {
+    protected static VoltTable unionTables(List<VoltTable> operands) {
         VoltTable result = null;
-        VoltTable vt = operands.get(0);
-        if (vt != null) {
-            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt
-                                                                        .getColumnCount()];
-            for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
-                                                       vt.getColumnType(ii));
+
+        // Locate the first non-null table to get the schema
+        for (VoltTable vt : operands) {
+            if (vt != null) {
+                ColumnInfo[] columns = new ColumnInfo[vt.getColumnCount()];
+                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
+                            vt.getColumnType(ii));
+                }
+                result = new VoltTable(columns);
+                break;
             }
-            result = new VoltTable(columns);
-            for (Object table : operands) {
-                vt = (VoltTable) (table);
-                while (vt.advanceRow()) {
+        }
+
+        if (result != null) {
+            for (VoltTable vt : operands) {
+                // elastic joining nodes will return null tables
+                while (vt != null && vt.advanceRow()) {
                     result.add(vt);
                 }
             }
         }
+
         return result;
     }
 
