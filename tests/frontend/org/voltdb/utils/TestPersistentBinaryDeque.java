@@ -528,6 +528,19 @@ public class TestPersistentBinaryDeque {
         pbd.close();
     }
 
+    @Test
+    public void testNonceWithDots() throws Exception {
+        PersistentBinaryDeque pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR);
+        pbd.offer(defaultContainer);
+        pbd.close();
+
+        pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR);
+        BBContainer bb = pbd.poll();
+        defaultBuffer.clear();
+        assertEquals(defaultBuffer, bb.b);
+        pbd.close();
+    }
+
     @Before
     public void setUp() throws Exception {
         if (TEST_DIR.exists()) {

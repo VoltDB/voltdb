@@ -26,11 +26,13 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
 import java.util.Iterator;
 
+import com.google.common.base.Joiner;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -344,14 +346,27 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             @Override
             public boolean accept(File pathname) {
-                String[] name = pathname.getName().split("\\.");
-                if (name.length > 0 && name[0].equals(nonce) && name[name.length - 1].equals("pbd")) {
+                // PBD file names have three parts: nonce.seq.pbd
+                // nonce may contain '.', seq is a sequence number.
+                String[] parts = pathname.getName().split("\\.");
+
+                // If more than 3 parts, it means nonce contains '.', assemble them.
+                if (parts.length > 3) {
+                    String[] joinedParts = new String[3];
+                    Joiner joiner = Joiner.on('.').skipNulls();
+                    joinedParts[0] = joiner.join(Arrays.asList(parts).subList(0, parts.length - 2));
+                    joinedParts[1] = parts[parts.length - 2];
+                    joinedParts[2] = parts[parts.length - 1];
+                    parts = joinedParts;
+                }
+
+                if (parts.length > 0 && parts[0].equals(nonce) && parts[parts.length - 1].equals("pbd")) {
                     if (pathname.length() == 4) {
                         //Doesn't have any objects, just the object count
                         pathname.delete();
                         return false;
                     }
-                    Long index = Long.valueOf(name[name.length - 2]);
+                    Long index = Long.valueOf(parts[parts.length - 2]);
                     DequeSegment ds = new DequeSegment( index, pathname);
                     m_finishedSegments.put( index, ds);
                     m_sizeInBytes.addAndGet(ds.sizeInBytes());
