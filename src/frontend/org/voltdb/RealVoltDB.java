@@ -855,7 +855,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             try {
                 final Class<?> statsManagerClass =
                         MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
-                if (statsManagerClass != null && m_MPI != null) {
+                if (statsManagerClass != null) {
                     ArrayList<Long> localHSIds;
                     Long MPHSId;
                     if (isIV2Enabled()) {
