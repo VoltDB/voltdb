@@ -47,7 +47,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
-import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -119,6 +118,7 @@ public class TestIv2RejoinCoordinatorLive {
         m_coordinator = null;
         m_snapshotDaemon = null;
         m_clientInterface = null;
+        m_cis.clear();
         reset(m_volt);
         VoltDB.wasCrashCalled = false;
     }
