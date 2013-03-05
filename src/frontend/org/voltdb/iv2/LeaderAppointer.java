@@ -333,7 +333,7 @@ public class LeaderAppointer implements Promotable
             tmLog.debug("LeaderAppointer in startup");
             m_state.set(AppointerState.CLUSTER_START);
         }
-        else if (m_state.get() == AppointerState.CLUSTER_START) {
+        else if (m_state.get() == AppointerState.INIT) {
             try {
                 if ((m_iv2appointees.pointInTimeCache().size() != getInitialPartitionCount()) ||
                         (m_iv2masters.pointInTimeCache().size() != getInitialPartitionCount())) {
