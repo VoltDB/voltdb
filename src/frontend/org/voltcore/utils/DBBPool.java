@@ -154,6 +154,13 @@ public final class DBBPool {
     public static native long getMurmur3128( long ptr, int offset, int length);
 
     /**
+     * Retrieve the first 8 bytes of the Murmur hash3_x64_128 of long value
+     * @param long value to hash
+     * @return First 8 bytes of  Murmur hash3_x64_128 of value
+     */
+    public static native long getMurmur3128( long value);
+
+    /**
      * Static factory method to wrap a ByteBuffer in a BBContainer that is not
      * associated with any pool
      * @param b

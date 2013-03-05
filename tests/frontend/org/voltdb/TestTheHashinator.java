@@ -110,7 +110,7 @@ public class TestTheHashinator extends TestCase {
                         configBytes);
 
         int partitionCount = 3;
-        long valueToHash = hashinatorType == HashinatorType.ELASTIC ? 45 : 2;
+        long valueToHash = hashinatorType == HashinatorType.ELASTIC ? 41 : 2;
         TheHashinator.initialize(getHashinatorClass(), configBytes);
 
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);

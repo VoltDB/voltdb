@@ -787,11 +787,21 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32C
  * Method:    getMurmur3128
  * Signature: (JII)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128__JII
   (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
     int64_t  retval[2];
     MurmurHash3_x64_128( reinterpret_cast<char*>(ptr) + offset, length, 0, retval);
     return retval[0];
+}
+
+/*
+ * Class:     org_voltcore_utils_DBBPool
+ * Method:    getMurmur3128
+ * Signature: (JII)J
+ */
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128__J
+  (JNIEnv *env, jclass clazz, jlong value) {
+    return MurmurHash3_x64_128( value );
 }
 
 /*

@@ -42,7 +42,27 @@ public class TestMurmur3 extends TestCase {
     final int maxLength = 4096;
 
     @Test
-    public void testMatchesNative() throws Exception {
+    public void testMatchesNativeLongs() throws Exception {
+        final long seed = ByteBuffer.wrap(SecureRandom.getSeed(8)).getInt();
+        Random r = new Random(seed);
+        System.out.println("Seed is " + seed);
+        EELibraryLoader.loadExecutionEngineLibrary(true);
+
+        for (int ii = 0; ii < iterations; ii++) {
+            final long nextValue = r.nextLong();
+
+            long nativeHash = DBBPool.getMurmur3128(nextValue);
+            long javaHash =  MurmurHash3.hash3_x64_128(nextValue);
+
+            if (nativeHash != javaHash) {
+                fail("Failed in iteration " + ii + " native hash " + Long.toHexString(nativeHash) +
+                        " java hash " + Long.toHexString(javaHash) +" with value " + nextValue);
+            }
+        }
+    }
+
+    @Test
+    public void testMatchesNativeBytes() throws Exception {
         final long seed = ByteBuffer.wrap(SecureRandom.getSeed(8)).getInt();
         Random r = new Random(seed);
         System.out.println("Seed is " + seed);
