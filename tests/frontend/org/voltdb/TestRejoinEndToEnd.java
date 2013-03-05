@@ -51,7 +51,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     @Parameters
     public static Collection<Object[]> useIv2() {
-        return Arrays.asList(new Object[][] {{false}, {true}});
+        return Arrays.asList(new Object[][] {{true}});
     }
 
     protected final boolean m_useIv2;
