@@ -516,6 +516,31 @@ public class TestPersistentBinaryDeque {
         fail();
     }
 
+    @Test
+    public void testOverlappingNonces() throws Exception {
+        for (int i = 0; i < 20; i++) {
+            PersistentBinaryDeque pbd = new PersistentBinaryDeque(Integer.toString(i), TEST_DIR);
+            pbd.offer(defaultContainer);
+            pbd.close();
+        }
+
+        PersistentBinaryDeque pbd = new PersistentBinaryDeque("1", TEST_DIR);
+        pbd.close();
+    }
+
+    @Test
+    public void testNonceWithDots() throws Exception {
+        PersistentBinaryDeque pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR);
+        pbd.offer(defaultContainer);
+        pbd.close();
+
+        pbd = new PersistentBinaryDeque("ha.ha", TEST_DIR);
+        BBContainer bb = pbd.poll();
+        defaultBuffer.clear();
+        assertEquals(defaultBuffer, bb.b);
+        pbd.close();
+    }
+
     @Before
     public void setUp() throws Exception {
         if (TEST_DIR.exists()) {
