@@ -349,24 +349,29 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 // PBD file names have three parts: nonce.seq.pbd
                 // nonce may contain '.', seq is a sequence number.
                 String[] parts = pathname.getName().split("\\.");
+                String parsedNonce = null;
+                String seqNum = null;
+                String extension = null;
 
                 // If more than 3 parts, it means nonce contains '.', assemble them.
                 if (parts.length > 3) {
-                    String[] joinedParts = new String[3];
                     Joiner joiner = Joiner.on('.').skipNulls();
-                    joinedParts[0] = joiner.join(Arrays.asList(parts).subList(0, parts.length - 2));
-                    joinedParts[1] = parts[parts.length - 2];
-                    joinedParts[2] = parts[parts.length - 1];
-                    parts = joinedParts;
+                    parsedNonce = joiner.join(Arrays.asList(parts).subList(0, parts.length - 2));
+                    seqNum = parts[parts.length - 2];
+                    extension = parts[parts.length - 1];
+                } else if (parts.length == 3) {
+                    parsedNonce = parts[0];
+                    seqNum = parts[1];
+                    extension = parts[2];
                 }
 
-                if (parts.length > 0 && parts[0].equals(nonce) && parts[parts.length - 1].equals("pbd")) {
+                if (nonce.equals(parsedNonce) && "pbd".equals(extension)) {
                     if (pathname.length() == 4) {
                         //Doesn't have any objects, just the object count
                         pathname.delete();
                         return false;
                     }
-                    Long index = Long.valueOf(parts[parts.length - 2]);
+                    Long index = Long.valueOf(seqNum);
                     DequeSegment ds = new DequeSegment( index, pathname);
                     m_finishedSegments.put( index, ds);
                     m_sizeInBytes.addAndGet(ds.sizeInBytes());
