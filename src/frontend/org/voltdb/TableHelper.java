@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,6 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTypeUtil;
 
@@ -116,6 +118,115 @@ public class TableHelper {
     }
 
     /**
+     * Compare two tables using the data inside them, rather than simply comparing the underlying
+     * buffers. This is slightly more tolerant of floating point issues than {@link VoltTable#hasSameContents(VoltTable)}.
+     * It's also much slower than comparing buffers.
+     *
+     * Note, this will reset the row position of both tables.
+     *
+     * @param t1 {@link VoltTable} 1
+     * @param t2 {@link VoltTable} 2
+     * @return true if the tables are equal.
+     * @see TableHelper#deepEquals(VoltTable, VoltTable) deepEquals
+     */
+    public static boolean deepEquals(VoltTable t1, VoltTable t2) {
+        return deepEqualsWithErrorMsg(t1, t2, null);
+    }
+
+    /**
+     * <p>Compare two tables using the data inside them, rather than simply comparing the underlying
+     * buffers. This is slightly more tolerant of floating point issues than {@link VoltTable#hasSameContents(VoltTable)}.
+     * It's also much slower than comparing buffers.</p>
+     *
+     * <p>This will also add a specific error message to the provided {@link StringBuilder} that explains how
+     * the tables are different, printing out values if needed.</p>
+     *
+     * @param t1 {@link VoltTable} 1
+     * @param t2 {@link VoltTable} 2
+     * @param sb A {@link StringBuilder} to append the error message to.
+     * @return true if the tables are equal.
+     * @see TableHelper#deepEquals(VoltTable, VoltTable) deepEquals
+     */
+    public static boolean deepEqualsWithErrorMsg(VoltTable t1, VoltTable t2, StringBuilder sb) {
+        // allow people to pass null without guarding everything with if statements
+        if (sb == null) {
+            sb = new StringBuilder();
+        }
+
+        if (t1.getRowCount() != t2.getRowCount()) {
+            sb.append(String.format("Row count %d != %d\n", t1.getRowCount(), t2.getRowCount()));
+            return false;
+        }
+        if (t1.getColumnCount() != t2.getColumnCount()) {
+            sb.append(String.format("Col count %d != %d\n", t1.getColumnCount(), t2.getColumnCount()));
+            return false;
+        }
+        for (int col = 0; col < t1.getColumnCount(); col++) {
+            if (t1.getColumnType(col) != t2.getColumnType(col)) {
+                sb.append(String.format("Col %d: type %s != %s\n", col,
+                        t1.getColumnType(col).toString(), t2.getColumnType(col).toString()));
+                return false;
+            }
+            if (t1.getColumnName(col).equals(t2.getColumnName(col)) == false) {
+                sb.append(String.format("Col %d: name %s != %s\n", col,
+                        t1.getColumnName(col), t2.getColumnName(col)));
+                return false;
+            }
+        }
+
+        t1.resetRowPosition();
+        t2.resetRowPosition();
+        for (int row = 0; row < t1.getRowCount(); row++) {
+            t1.advanceRow();
+            t2.advanceRow();
+
+            for (int col = 0; col < t1.getColumnCount(); col++) {
+                Object obj1 = t1.get(col, t1.getColumnType(col));
+                if (t1.wasNull()) {
+                    obj1 = null;
+                }
+
+                Object obj2 = t2.get(col, t2.getColumnType(col));
+                if (t2.wasNull()) {
+                    obj2 = null;
+                }
+
+                if ((obj1 == null) && (obj2 == null)) {
+                    continue;
+                }
+
+                if ((obj1 == null) || (obj2 == null)) {
+                    sb.append(String.format("Row,Col-%d,%d of type %s: %s != %s\n", row, col,
+                            t1.getColumnType(col).toString(), String.valueOf(obj1), String.valueOf(obj2)));
+                    return false;
+                }
+
+                if (t1.getColumnType(col) == VoltType.VARBINARY) {
+                    byte[] array1 = (byte[]) obj1;
+                    byte[] array2 = (byte[]) obj2;
+                    if (Arrays.equals(array1, array2) == false) {
+                        sb.append(String.format("Row,Col-%d,%d of type %s: %s != %s\n", row, col,
+                                t1.getColumnType(col).toString(),
+                                Encoder.hexEncode(array1),
+                                Encoder.hexEncode(array2)));
+                        return false;
+                    }
+                }
+                else {
+                    if (obj1.equals(obj2) == false) {
+                        sb.append(String.format("Row,Col-%d,%d of type %s: %s != %s\n", row, col,
+                                t1.getColumnType(col).toString(), obj1.toString(), obj2.toString()));
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // true means we made it through the gaundlet and the tables are, fwiw, identical
+        return true;
+    }
+
+    /**
      * Helper function for getTotallyRandomTable that makes random columns.
      */
     protected static VoltTable.ColumnInfo getRandomColumn(String name, Random rand) {
@@ -144,11 +255,11 @@ public class TableHelper {
         Object defaultValue = null;
         if (rand.nextBoolean()) {
             column.nullable = true;
-            defaultValue = VoltTypeUtil.getRandomValue(column.type, column.size % 127 + 1, 0.8, rand);
+            defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.8, rand);
         }
         else {
             column.nullable = false;
-            defaultValue = VoltTypeUtil.getRandomValue(column.type, column.size % 127 + 1, 0.0, rand);
+            defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.0, rand);
             // no uniques for now, as the random fill becomes too slow
             //column.unique = (r.nextDouble() > 0.3); // 30% of non-nullable cols unique (15% total)
         }
@@ -616,12 +727,13 @@ public class TableHelper {
         };
 
         // update the rss value asynchronously
+        final AtomicBoolean rssThreadShouldStop = new AtomicBoolean(false);
         Thread rssThread = new Thread() {
             @Override
             public void run() {
                 long tempRss = rss.get();
                 long rssPrev = tempRss;
-                while (true) {
+                while (!rssThreadShouldStop.get()) {
                     tempRss = MiscUtils.getMBRss(client);
                     if (tempRss != rssPrev) {
                         rssPrev = tempRss;
@@ -652,6 +764,7 @@ public class TableHelper {
             }
             i += jump;
         }
+        rssThreadShouldStop.set(true);
         client.drain();
         rssThread.join();
 
@@ -676,10 +789,12 @@ public class TableHelper {
             pkeyColIndex = 0;
             assert(table.getColumnType(0).isInteger());
         }
+        String pkeyColName = table.getColumnName(pkeyColIndex);
 
         VoltTable result = client.callProcedure("@AdHoc",
-                String.format("select max(pkey) from %s;", TableHelper.getTableName(table))).getResults()[0];
-        long maxId = result.asScalarLong();
+                String.format("select %s from %s order by %s desc limit 1;",
+                        pkeyColName, TableHelper.getTableName(table), pkeyColName)).getResults()[0];
+        long maxId = result.getRowCount() > 0 ? result.asScalarLong() : 0;
         System.out.printf("Deleting odd rows with pkey ids in the range 0-%d\n", maxId);
 
         // track outstanding responses so 10k can be out at a time
