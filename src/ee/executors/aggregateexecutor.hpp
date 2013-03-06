@@ -854,11 +854,11 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
     assert(node->getInputTables().size() == 1);
 
     assert(node->getChildren()[0] != NULL);
-    /*for (int i = 0; i < node->getAggregateInputExpressions().size(); i++)
+    for (int i = 0; i < node->getAggregateInputExpressions().size(); i++)
     {
         VOLT_DEBUG("\nAGG INPUT EXPRESSIONS: %s\n",
                    node->getAggregateInputExpressions()[i]->debug().c_str());
-    }*/
+    }
 
     /*
      * Find the difference between the set of aggregate output columns
@@ -883,7 +883,8 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
      * Now collect the indices in the output table of the pass
      * through columns.
      */
-    for (int ii = 0; ii < outputColumnsResultingFromAggregates.size(); ii++)
+    for (int ii = 0; ii < outputColumnsResultingFromAggregates.size();
+         ii++)
     {
         if (outputColumnsResultingFromAggregates[ii] == false)
         {
