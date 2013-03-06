@@ -17,21 +17,161 @@
 
 package org.voltdb.catalog;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
+import org.voltdb.VoltType;
 import org.voltdb.types.ConstraintType;
 
 public class CatalogDiffEngine {
 
     // contains the text of the difference
-    private final StringBuilder m_sb;
+    private final StringBuilder m_sb = new StringBuilder();
 
     // true if the difference is allowed in a running system
     private boolean m_supported;
 
+    // true if table changes require the catalog change runs
+    // while no snapshot is running
+    private boolean m_requiresSnapshotIsolation = false;
+
+    /**
+     * Given a type present in both catalogs, list the fields
+     * that have changed between them. Together with the types
+     * themselves, you can get the values of the fields before
+     * and after.
+     */
+    private static class FieldChange {
+        final CatalogType newType;
+        final CatalogType prevType;
+        final List<String> changedFields = new ArrayList<String>();
+        FieldChange(CatalogType newType, CatalogType prevType) {
+            this.newType = newType; this.prevType = prevType;
+        }
+    }
+
+    /**
+     * Enum used to break up the catalog tree into sub-roots based on CatalogType
+     * class. This is purely used for printing human readable summaries.
+     */
+    private enum DiffClass {
+        PROC (Procedure.class),
+        TABLE (Table.class),
+        OTHER (Catalog.class);
+
+        final Class<?> clz;
+
+        DiffClass(Class<?> clz) {
+            this.clz = clz;
+        }
+
+        static DiffClass get(CatalogType type) {
+            while (true) {
+                if (type instanceof Catalog) {
+                    return OTHER;
+                }
+                if (type instanceof Procedure) {
+                    return PROC;
+                }
+                if (type instanceof Table) {
+                    return TABLE;
+                }
+                type = type.getParent();
+            }
+        }
+    }
+
+    /**
+     * Describes the set of changes to a subtree of the catalog. For example, a {@link ChangeGroup}
+     * could describe all of the changes to procedures in a catalog. This is purely used for
+     * printing human readable summaries.
+     */
+    class ChangeGroup {
+        // the class of the base item in the subtree
+        // for example, procedure
+        final Class<?> clz;
+
+        // nodes of type clz added
+        List<CatalogType> additions = new ArrayList<CatalogType>();
+        // nodes of type clz dropped
+        List<CatalogType> deletions = new ArrayList<CatalogType>();
+        // nodes added under a clz instance, mapped from their parent
+        Map<CatalogType, List<CatalogType>> childAdditions = new TreeMap<CatalogType, List<CatalogType>>();
+        // nodes dropped from under a clz instance, mapped from their parent
+        Map<CatalogType, List<CatalogType>> childDeletions = new TreeMap<CatalogType, List<CatalogType>>();
+        // all fields changed for a clz instance and any fields changed by children
+        // map from base clz instance to node to the field changes to the FieldChange instance
+        Map<CatalogType, Map<CatalogType, FieldChange>> childChanges = new TreeMap<CatalogType, Map<CatalogType, FieldChange>>();
+
+        ChangeGroup(DiffClass diffClass) {
+            clz = diffClass.clz;
+        }
+
+        void processAddition(CatalogType type) {
+            if (type.getClass().equals(clz)) {
+                additions.add(type);
+                return;
+            }
+            CatalogType parent = type.getParent();
+            while (parent.getClass().equals(clz) == false) {
+                parent = parent.getParent();
+            }
+
+            List<CatalogType> localAdds = childAdditions.get(parent);
+            if (localAdds == null) {
+                localAdds = new ArrayList<CatalogType>();
+                childAdditions.put(parent, localAdds);
+            }
+            localAdds.add(type);
+        }
+
+        void processDeletion(CatalogType type) {
+            if (type.getClass().equals(clz)) {
+                deletions.add(type);
+                return;
+            }
+            CatalogType parent = type.getParent();
+            while (parent.getClass().equals(clz) == false) {
+                parent = parent.getParent();
+            }
+
+            List<CatalogType> localAdds = childDeletions.get(parent);
+            if (localAdds == null) {
+                localAdds = new ArrayList<CatalogType>();
+                childDeletions.put(parent, localAdds);
+            }
+            localAdds.add(type);
+        }
+
+        void processChange(CatalogType newType, CatalogType prevType, String field) {
+            CatalogType parent = newType;
+            while (parent.getClass().equals(clz) == false) {
+                parent = parent.getParent();
+            }
+
+            Map<CatalogType, FieldChange> changes = childChanges.get(parent);
+            if (changes == null) {
+                changes = new TreeMap<CatalogType, FieldChange>();
+                childChanges.put(parent, changes);
+            }
+            FieldChange fc = changes.get(newType);
+            if (fc == null) {
+                fc = new FieldChange(newType, prevType);
+                changes.put(newType, fc);
+            }
+            fc.changedFields.add(field);
+        }
+    }
+
+    // track adds/drops/modifies in a secondary structure to make human readable descriptions
+    private final Map<DiffClass, ChangeGroup> m_changes = new TreeMap<DiffClass, ChangeGroup>();
+
     // collection of reasons why a diff is not supported
-    private final StringBuilder m_errors;
+    private final StringBuilder m_errors = new StringBuilder();
 
     // original tables/indexes kept to check whether a new unique index is possible
     private final Map<String, CatalogMap<Index>> m_originalIndexesByTable = new HashMap<String, CatalogMap<Index>>();
@@ -44,9 +184,12 @@ public class CatalogDiffEngine {
      * @param next Tip of the new catalog.
      */
     public CatalogDiffEngine(final Catalog prev, final Catalog next) {
-        m_sb = new StringBuilder();
-        m_errors = new StringBuilder();
         m_supported = true;
+
+        // make sure this map has an entry for each value
+        for (DiffClass dc : DiffClass.values()) {
+            m_changes.put(dc, new ChangeGroup(dc));
+        }
 
         // store the original tables so some extra checking can be done with
         // constraints and unique indexes
@@ -65,6 +208,14 @@ public class CatalogDiffEngine {
 
     public boolean supported() {
         return m_supported;
+    }
+
+    /**
+     * @return true if table changes require the catalog change runs
+     * while no snapshot is running.
+     */
+    public boolean requiresSnapshotIsolation() {
+        return m_requiresSnapshotIsolation;
     }
 
     public String errors() {
@@ -112,9 +263,9 @@ public class CatalogDiffEngine {
             // see if the current column is also in the candidate index
             // for now, assume the tables in question have the same schema
             for (ColumnRef colRef : newIndex.getColumns()) {
-                int index1 = colRef.getColumn().getIndex();
-                int index2 = existingColRef.getColumn().getIndex();
-                if (index1 == index2) {
+                String colName1 = colRef.getColumn().getName();
+                String colName2 = existingColRef.getColumn().getName();
+                if (colName1.equals(colName2)) {
                     foundMatch = true;
                     break;
                 }
@@ -145,6 +296,67 @@ public class CatalogDiffEngine {
                 return true;
             }
         }
+        return false;
+    }
+
+    /**
+     * @param oldType The old type of the column.
+     * @param oldSize The old size of the column.
+     * @param newType The new type of the column.
+     * @param newSize The new size of the column.
+     *
+     * @return True if the change from one column type to another is possible
+     * to do live without failing or truncating any data.
+     */
+    private boolean checkIfColumnTypeChangeIsSupported(VoltType oldType, int oldSize,
+                                                       VoltType newType, int newSize)
+    {
+        // increases in size are cool; shrinks not so much
+        if (oldType == newType) {
+            // don't allow inline types to be made out-of-line types
+            if ((oldType == VoltType.VARBINARY) || (oldType == VoltType.STRING)) {
+                if (oldSize < 64 && newSize >= 64) {
+                    return false;
+                }
+            }
+            return oldSize <= newSize;
+        }
+
+        // allow people to convert timestamps to longs
+        // (this is useful if they accidentally put millis instead of micros in there)
+        if ((oldType == VoltType.TIMESTAMP) && (newType == VoltType.BIGINT)) {
+            return true;
+        }
+
+        // allow integer size increased
+        if (oldType == VoltType.INTEGER) {
+            if (newType == VoltType.BIGINT) {
+                return true;
+            }
+        }
+        if (oldType == VoltType.SMALLINT) {
+            if ((newType == VoltType.BIGINT) ||
+                (newType == VoltType.INTEGER)) {
+                return true;
+            }
+        }
+        if (oldType == VoltType.TINYINT) {
+            if ((newType == VoltType.BIGINT) ||
+                (newType == VoltType.INTEGER) ||
+                (newType == VoltType.SMALLINT)) {
+                return true;
+            }
+        }
+
+        // allow lossless conversion to double from ints < mantissa size
+        if (newType == VoltType.FLOAT) {
+            if ((newType == VoltType.INTEGER) ||
+                (newType == VoltType.SMALLINT) ||
+                (newType == VoltType.TINYINT)) {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -200,7 +412,7 @@ public class CatalogDiffEngine {
             return true;
         }
 
-        // Support add/drop anywhere in these sub-trees
+        // Support add/drop anywhere in these sub-trees, except for a weird column case
         do {
             if (suspect instanceof User)
                 return true;
@@ -212,6 +424,20 @@ public class CatalogDiffEngine {
                 return true;
             if (suspect instanceof SnapshotSchedule)
                 return true;
+            if (suspect instanceof Column) {
+                Column col = (Column) suspect;
+                if ((changeType == ChangeType.ADDITION) &&
+                    (! col.getNullable()) &&
+                    (col.getDefaultvalue() == null))
+                {
+                    m_errors.append("May not dynamically add non-nullable column.\n");
+                    m_supported = false;
+                    return false;
+                }
+                // adding/dropping a column requires isolation from snapshots
+                m_requiresSnapshotIsolation = true;
+                return true;
+            }
 
             // refs are safe to add drop if the thing they reference is
             if (suspect instanceof ConstraintRef)
@@ -230,7 +456,7 @@ public class CatalogDiffEngine {
      * @return true if CatalogType can be dynamically modified
      * in a running system.
      */
-    boolean checkModifyWhitelist(CatalogType suspect, String field) {
+    boolean checkModifyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
         // should generate this from spec.txt
         CatalogType orig = suspect;
 
@@ -241,6 +467,38 @@ public class CatalogDiffEngine {
             return true;
         if (suspect instanceof Constraint && field.equals("index"))
             return true;
+        if (suspect instanceof Table && field.equals("signature"))
+            return true;
+
+        // whitelist certain column changes
+        if (suspect instanceof Column) {
+            if (field.equals("index"))
+                return true;
+            if (field.equals("defaultvalue"))
+                return true;
+            if (field.equals("defaulttype"))
+                return true;
+            if (field.equals("nullable")) {
+                Boolean nullable = (Boolean) suspect.getField(field);
+                assert(nullable != null);
+                if (nullable) return true;
+            }
+            if (field.equals("type") || field.equals("size")) {
+                int oldTypeInt = (Integer) prevType.getField("type");
+                int newTypeInt = (Integer) suspect.getField("type");
+                int oldSize = (Integer) prevType.getField("size");
+                int newSize = (Integer) suspect.getField("size");
+
+                VoltType oldType = VoltType.get((byte) oldTypeInt);
+                VoltType newType = VoltType.get((byte) newTypeInt);
+
+                if (checkIfColumnTypeChangeIsSupported(oldType, oldSize, newType, newSize)) {
+                    // changing the type of a column requires isolation from snapshots
+                    m_requiresSnapshotIsolation = true;
+                    return true;
+                }
+            }
+        }
 
         // Support modification of these entire sub-trees
         do {
@@ -262,10 +520,18 @@ public class CatalogDiffEngine {
     /**
      * Add a modification
      */
-    private void writeModification(CatalogType newType, String field)
+    private void writeModification(CatalogType newType, CatalogType prevType, String field)
     {
-        checkModifyWhitelist(newType, field);
+        // verify this is possible, write an error and mark return code false if so
+        checkModifyWhitelist(newType, prevType, field);
+
+        // write the commands to make it so
+        // they will be ignored if the change is unsupported
         newType.writeCommandForField(m_sb, field, true);
+
+        // record the field change for later generation of descriptive text
+        ChangeGroup cgrp = m_changes.get(DiffClass.get(newType));
+        cgrp.processChange(newType, prevType, field);
     }
 
     /**
@@ -273,19 +539,35 @@ public class CatalogDiffEngine {
      */
     private void writeDeletion(CatalogType prevType, String mapName, String name)
     {
+        // verify this is possible, write an error and mark return code false if so
         checkAddDropWhitelist(prevType, ChangeType.DELETION);
+
+        // write the commands to make it so
+        // they will be ignored if the change is unsupported
         m_sb.append("delete ").append(prevType.getParent().getPath()).append(" ");
         m_sb.append(mapName).append(" ").append(name).append("\n");
+
+        // add it to the set of deletions to later compute descriptive text
+        ChangeGroup cgrp = m_changes.get(DiffClass.get(prevType));
+        cgrp.processDeletion(prevType);
     }
 
     /**
      * Add an addition
      */
     private void writeAddition(CatalogType newType) {
+        // verify this is possible, write an error and mark return code false if so
         checkAddDropWhitelist(newType, ChangeType.ADDITION);
+
+        // write the commands to make it so
+        // they will be ignored if the change is unsupported
         newType.writeCreationCommand(m_sb);
         newType.writeFieldCommands(m_sb);
         newType.writeChildCommands(m_sb);
+
+        // add it to the set of additions to later compute descriptive text
+        ChangeGroup cgrp = m_changes.get(DiffClass.get(newType));
+        cgrp.processAddition(newType);
     }
 
 
@@ -302,6 +584,7 @@ public class CatalogDiffEngine {
 
         // diff local fields
         for (String field : prevType.getFields()) {
+            // this field is (or was) set at runtime, so ignore it for diff purposes
             if (field.equals("isUp"))
             {
                 continue;
@@ -313,7 +596,7 @@ public class CatalogDiffEngine {
             Object prevValue = prevType.getField(field);
             Object newValue = newType.getField(field);
             if ((prevValue == null) != (newValue == null)) {
-                writeModification(newType, field);
+                writeModification(newType, prevType, field);
             }
             // if they're both not null (above/below ifs implies this)
             else if (prevValue != null) {
@@ -323,13 +606,13 @@ public class CatalogDiffEngine {
                     String prevPath = ((CatalogType) prevValue).getPath();
                     String newPath = ((CatalogType) newValue).getPath();
                     if (prevPath.compareTo(newPath) != 0) {
-                        writeModification(newType, field);
+                        writeModification(newType, prevType, field);
                     }
                 }
                 // if scalar types
                 else {
                     if (prevValue.equals(newValue) == false) {
-                        writeModification(newType, field);
+                        writeModification(newType, prevType, field);
                     }
                 }
             }
@@ -376,5 +659,95 @@ public class CatalogDiffEngine {
             if (prevType != null) continue;
             writeAddition(newType);
         }
+    }
+
+    private boolean isCRUDProc(Procedure proc) {
+        if (proc.getTypeName().endsWith(".select")) return true;
+        if (proc.getTypeName().endsWith(".insert")) return true;
+        if (proc.getTypeName().endsWith(".delete")) return true;
+        if (proc.getTypeName().endsWith(".update")) return true;
+        return false;
+    }
+
+    /**
+     * Get a human readable list of changes between two catalogs.
+     *
+     * This currently handles just the basics, but much of the plumbing is
+     * in place to give a lot more detail, with a bit more work.
+     */
+    public String getDescriptionOfChanges() {
+        StringBuilder sb = new StringBuilder();
+
+        // DESCRIBE TABLE CHANGES
+        ChangeGroup group = m_changes.get(DiffClass.TABLE);
+
+        for (CatalogType type : group.deletions) {
+            sb.append(String.format("Table %s dropped.\n", type.getTypeName()));
+        }
+
+        for (CatalogType type : group.additions) {
+            sb.append(String.format("Table %s added.\n", type.getTypeName()));
+        }
+
+        TreeSet<CatalogType> changedTables = new TreeSet<CatalogType>();
+        changedTables.addAll(group.childAdditions.keySet());
+        changedTables.addAll(group.childDeletions.keySet());
+        changedTables.addAll(group.childChanges.keySet());
+        for (CatalogType type : changedTables) {
+            sb.append(String.format("Table %s has been modified.\n", type.getTypeName()));
+        }
+
+        // DESCRIBE PROCEDURE CHANGES
+        group = m_changes.get(DiffClass.PROC);
+
+        for (CatalogType type : group.deletions) {
+            if (isCRUDProc((Procedure) type)) continue;
+            sb.append(String.format("Procedure %s dropped.\n", type.getTypeName()));
+        }
+
+        for (CatalogType type : group.additions) {
+            if (isCRUDProc((Procedure) type)) continue;
+            sb.append(String.format("Procedure %s added.\n", type.getTypeName()));
+        }
+
+        TreeSet<CatalogType> changedProcs = new TreeSet<CatalogType>();
+        changedProcs.addAll(group.childAdditions.keySet());
+        changedProcs.addAll(group.childDeletions.keySet());
+        changedProcs.addAll(group.childChanges.keySet());
+        for (CatalogType type : changedProcs) {
+            if (isCRUDProc((Procedure) type)) continue;
+            sb.append(String.format("Procedure %s has been modified.\n", type.getTypeName()));
+        }
+
+        // DESCRIBE OTHER CHANGES
+        group = m_changes.get(DiffClass.OTHER);
+
+        assert(group.additions.size() == 0);
+        assert(group.deletions.size() == 0);
+
+        for (List<CatalogType> types : group.childAdditions.values()) {
+            for (CatalogType type : types) {
+                sb.append(String.format("Catalog node %s of type %s has been added.\n",
+                        type.getTypeName(), type.getClass().getSimpleName()));
+            }
+        }
+        for (List<CatalogType> types : group.childDeletions.values()) {
+            for (CatalogType type : types) {
+                sb.append(String.format("Catalog node %s of type %s has been removed.\n",
+                        type.getTypeName(), type.getClass().getSimpleName()));
+            }
+        }
+        for (Map<CatalogType, FieldChange> changes : group.childChanges.values()) {
+            for (FieldChange fc : changes.values()) {
+                // skip the database node which has a schema field that changes, but is covered elsewhere
+                if (fc.newType instanceof Database) {
+                    continue;
+                }
+                sb.append(String.format("Catalog node %s of type %s has modified metadata.\n",
+                        fc.newType.getTypeName(), fc.newType.getClass().getSimpleName()));
+            }
+        }
+
+        return sb.toString();
     }
 }
