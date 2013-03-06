@@ -58,6 +58,8 @@ public interface SystemProcedureExecutionContext {
 
     public int getNumberOfPartitions();
 
+    public void setNumberOfPartitions(int partitionCount);
+
     public SiteProcedureConnection getSiteProcedureConnection();
 
     public SiteSnapshotConnection getSiteSnapshotConnection();

@@ -1223,6 +1223,30 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeUpdateHashinator
+ * Signature: (JI)I
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdateHashinator(JNIEnv *env, jobject obj, jlong engine_ptr)
+{
+    VOLT_DEBUG("nativeUpdateHashinator in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    try {
+        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
+        NValueArray& params = engine->getParameterContainer();
+        Pool *stringPool = engine->getStringPool();
+        deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
+        HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[0]));
+        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[1]));
+        engine->updateHashinator(hashinatorType, configValue);
+        stringPool->purge();
+    } catch (const FatalException &e) {
+        std::cout << "HASHINATE ERROR: " << e.m_reason << std::endl;
+    }
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeGetThreadLocalPoolAllocations
  * Signature: ()J
  */

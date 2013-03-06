@@ -325,6 +325,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           loadFragment(cmd);
           result = kErrorCode_None;
           break;
+      case 27:
+          updateHashinator(cmd);
+          result = kErrorCode_None;
+          break;
       default:
         result = stub(cmd);
     }
@@ -1039,6 +1043,18 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     response[0] = kErrorCode_Success;
     *reinterpret_cast<int32_t*>(&response[1]) = htonl(retval);
     writeOrDie(m_fd, (unsigned char*)response, 5);
+}
+
+void VolDBIPC::updateHashinator(struct ipc_command *cmd) {
+    hashinate_msg* hash = (hashinate_msg*)cmd;
+    NValueArray& params = m_engine->getParameterContainer();
+
+    HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
+    try {
+        m_engine->updateHashinator(hashinatorType, hash->data);
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
 }
 
 void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {

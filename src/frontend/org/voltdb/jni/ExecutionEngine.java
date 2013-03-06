@@ -411,6 +411,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract int hashinate(Object value, TheHashinator.HashinatorType type, byte config[]);
 
+    /**
+     * Updates the hashinator with new config
+     * @param type hashinator type
+     * @param config new hashinator config
+     */
+    public abstract void updateHashinator(TheHashinator.HashinatorType type, byte[] config);
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
@@ -575,6 +582,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return
      */
     protected native int nativeHashinate(long pointer);
+
+    /**
+     * Updates the EE's hashinator
+     */
+    protected native void nativeUpdateHashinator(long pointer);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated

@@ -26,6 +26,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
+import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -206,4 +207,6 @@ public interface VoltDBInterface
      public LicenseApi getLicenseApi();
 
      public boolean isIV2Enabled();
+
+    public LeaderAppointer getLeaderAppointer();
 }

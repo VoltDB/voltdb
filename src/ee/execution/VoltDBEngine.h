@@ -392,6 +392,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         size_t tableHashCode(int32_t tableId);
 
+        void updateHashinator(HashinatorType type, const char *config);
+
     private:
 
         void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);

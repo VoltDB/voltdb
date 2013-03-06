@@ -17,7 +17,10 @@
 
 package org.voltdb.iv2;
 
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -28,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.PrivateVoltTableFactory;
@@ -44,23 +48,20 @@ import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 
 import com.google.common.util.concurrent.SettableFuture;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
  * for the purposes of rejoin.
  */
-public class RejoinProducer extends SiteTasker
-{
+public class RejoinProducer extends JoinProducerBase {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait;
-    private final SiteTaskerQueue m_taskQueue;
-    private final int m_partitionId;
     private String m_snapshotNonce;
     private final String m_whoami;
     private final AtomicBoolean m_currentlyRejoining;
     private ScheduledFuture<?> m_timeFuture;
-    private InitiatorMailbox m_mailbox;
     private long m_rejoinCoordinatorHsId;
     private RejoinSiteProcessor m_rejoinSiteProcessor;
     private AtomicReference<ReplayCompletionAction> m_replayCompleteAction
@@ -68,6 +69,7 @@ public class RejoinProducer extends SiteTasker
 
     // True: use live rejoin; false use community blocking implementation.
     private boolean m_liveRejoin;
+    private final TaskLog m_rejoinTaskLog;
 
     boolean useLiveRejoin()
     {
@@ -174,20 +176,14 @@ public class RejoinProducer extends SiteTasker
      * rejoin state with the rejoin coordinator once the site has
      * concluded rejoin.
      */
-    public static class ReplayCompletionAction implements Runnable
+    public static class ReplayCompletionAction extends JoinCompletionAction
     {
-        private final long m_snapshotTxnId;
         private final Runnable m_action;
 
         ReplayCompletionAction(long snapshotTxnId, Runnable action)
         {
-            m_snapshotTxnId = snapshotTxnId;
+            super(snapshotTxnId);
             m_action = action;
-        }
-
-        long getSnapshotTxnId()
-        {
-            return m_snapshotTxnId;
         }
 
         @Override
@@ -220,27 +216,78 @@ public class RejoinProducer extends SiteTasker
     // m_currentlyRejoining gates promotion to master. If the rejoin producer
     // is instantiated, it must complete its execution and set currentlyRejoining
     // to false.
-    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
+    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue, String voltroot,
+                          boolean isLiveRejoin)
     {
-        m_partitionId = partitionId;
-        m_taskQueue = taskQueue;
+        super(partitionId, taskQueue);
         m_completionMonitorAwait = SettableFuture.create();
         m_whoami = "Rejoin producer:" + m_partitionId + " ";
         m_currentlyRejoining = new AtomicBoolean(true);
+
+        if (isLiveRejoin) {
+            m_rejoinTaskLog = initializeForLiveRejoin(voltroot, m_partitionId);
+        } else {
+            m_rejoinTaskLog = initializeForCommunityRejoin();
+        }
         REJOINLOG.debug(m_whoami + "created.");
     }
 
-    public void setMailbox(InitiatorMailbox mailbox)
+    private static TaskLog initializeForLiveRejoin(String voltroot, int pid)
     {
-        m_mailbox = mailbox;
+        // Construct task log and start logging task messages
+        File overflowDir = new File(voltroot, "rejoin_overflow");
+        Class<?> taskLogKlass =
+                MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Rejoin", false);
+        if (taskLogKlass != null) {
+            Constructor<?> taskLogConstructor;
+            try {
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir, true);
+            } catch (InvocationTargetException e) {
+                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e);
+            }
+        }
+        return null;
     }
 
+    private static TaskLog initializeForCommunityRejoin()
+    {
+        return new TaskLog() {
+            @Override
+            public void logTask(TransactionInfoBaseMessage message)
+                    throws IOException {
+            }
 
+            @Override
+            public TransactionInfoBaseMessage getNextMessage()
+                    throws IOException {
+                return null;
+            }
+
+            @Override
+            public void setEarliestTxnId(long txnId) {
+            }
+
+            @Override
+            public boolean isEmpty() throws IOException {
+                return true;
+            }
+
+            @Override
+            public void close() throws IOException {
+            }
+        };
+    }
+
+    @Override
     public boolean acceptPromotion()
     {
         return !m_currentlyRejoining.get();
     }
 
+    @Override
     public void deliver(RejoinMessage message)
     {
         if (message.getType() == RejoinMessage.Type.INITIATION) {
@@ -254,6 +301,12 @@ public class RejoinProducer extends SiteTasker
                     "Unknown rejoin message type: " + message.getType(), false,
                     null);
         }
+    }
+
+    @Override
+    public TaskLog getTaskLog()
+    {
+        return m_rejoinTaskLog;
     }
 
     // cancel and maybe rearm the snapshot data-segment watchdog.
