@@ -24,6 +24,7 @@
 package txnIdSelfCheck.procedures;
 
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltTable;
 
 public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
 
@@ -39,8 +40,34 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
     public final SQLStmt r_insert = new SQLStmt(
             "INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
+    // This is for DR. Make sure that the MP transaction gets inserted into the same place in the txn stream
+    // at the master and replica.  If they differ, we should get a hash mismatch at the Doctor Agent since we've
+    // jammed this into the returned results.
+    public final SQLStmt r_getPartitionedSummary = new SQLStmt(
+            "SELECT cid, max(txnid), max(ts), max(rid), max(cnt) FROM PARTITIONED GROUP BY cid ORDER BY cid DESC;");
+
     @Override
     public long run() {
         return 0; // never called in base procedure
+    }
+
+    public VoltTable[] doSummaryAndCombineResults(VoltTable[] workResults)
+    {
+        // Now get the partitioned table summary.
+        voltQueueSQL(r_getPartitionedSummary);
+        VoltTable[] results = voltExecuteSQL();
+
+        VoltTable[] combined = new VoltTable[workResults.length + results.length];
+        int combi = 0;
+        for (int i = 0; i < workResults.length; i++) {
+            combined[combi] = workResults[i];
+            combi++;
+        }
+        for (int i = 0; i < results.length; i++) {
+            combined[combi] = results[i];
+            combi++;
+        }
+
+        return combined;
     }
 }
