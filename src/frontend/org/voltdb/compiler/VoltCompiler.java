@@ -902,12 +902,17 @@ public class VoltCompiler {
             }
 
             if (table.getIsreplicated()) {
-                compilerLog.debug("Creating multi-partition insert/delete procedures for replicated table " +
-                        table.getTypeName());
-                crudprocs.add(generateCrudReplicatedInsert(table));
                 if (pkey != null) {
+                    compilerLog.debug("Creating multi-partition insert/delete/update procedures for replicated table " +
+                            table.getTypeName());
+                    crudprocs.add(generateCrudReplicatedInsert(table));
                     crudprocs.add(generateCrudReplicatedDelete(table, pkey));
                     crudprocs.add(generateCrudReplicatedUpdate(table, pkey));
+                }
+                else {
+                    compilerLog.debug("Creating multi-partition insert procedures for replicated table " +
+                            table.getTypeName());
+                    crudprocs.add(generateCrudReplicatedInsert(table));
                 }
                 continue;
             }
@@ -1080,10 +1085,6 @@ public class VoltCompiler {
                     partitioninfo,            // table.column:offset
                     true);                    // builtin statement
 
-        compilerLog.info("Synthesized built-in DELETE procedure: " +
-                sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
-                partitioninfo);
-
         return pd;
     }
 
@@ -1111,10 +1112,6 @@ public class VoltCompiler {
                     null,                     // joinOrder
                     partitioninfo,            // table.column:offset
                     true);                    // builtin statement
-
-        compilerLog.info("Synthesized built-in UPDATE procedure: " +
-                sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
-                partitioninfo);
 
         return pd;
     }
@@ -1144,10 +1141,6 @@ public class VoltCompiler {
                     partitioninfo,            // table.column:offset
                     true);                    // builtin statement
 
-        compilerLog.info("Synthesized built-in INSERT procedure: " +
-                sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
-                partitioninfo);
-
         return pd;
     }
 
@@ -1171,9 +1164,6 @@ public class VoltCompiler {
                     null,                     // joinOrder
                     null,                     // table.column:offset
                     true);                    // builtin statement
-
-        compilerLog.info("Synthesized built-in INSERT multi-partition procedure: " +
-                sb.toString() + " for " + table.getTypeName());
 
         return pd;
     }
@@ -1201,9 +1191,6 @@ public class VoltCompiler {
                     null,                     // table.column:offset
                     true);                    // builtin statement
 
-        compilerLog.info("Synthesized built-in UPDATE procedure: " +
-                sb.toString() + " for " + table.getTypeName());
-
         return pd;
     }
 
@@ -1218,9 +1205,6 @@ public class VoltCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("DELETE FROM " + table.getTypeName());
 
-        int partitionOffset =
-            generateCrudPKeyWhereClause(null, pkey, sb);
-
         ProcedureDescriptor pd =
             new ProcedureDescriptor(
                     new ArrayList<String>(),  // groups
@@ -1229,9 +1213,6 @@ public class VoltCompiler {
                     null,                     // joinOrder
                     null,                     // table.column:offset
                     true);                    // builtin statement
-
-        compilerLog.info("Synthesized built-in DELETE procedure: " +
-                sb.toString() + " for " + table.getTypeName());
 
         return pd;
     }
@@ -1260,10 +1241,6 @@ public class VoltCompiler {
                     null,                     // joinOrder
                     partitioninfo,            // table.column:offset
                     true);                    // builtin statement
-
-        compilerLog.info("Synthesized built-in SELECT procedure: " +
-                sb.toString() + " for " + table.getTypeName() + " with partitioning: " +
-                partitioninfo);
 
         return pd;
     }

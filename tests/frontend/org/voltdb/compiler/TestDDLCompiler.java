@@ -161,8 +161,6 @@ public class TestDDLCompiler extends TestCase {
 
         // similar schema with not null and unique constraints (should have no warnings)
         String schema2 =  "create table t0 (id bigint not null, primary key (id));\n";
-               //schema2 += "create table t1 (name varchar(32), user varchar(32), " +
-               //                  "id bigint, primary key (name, user);";
 
         // boilerplate for making a project
         final String simpleProject =
