@@ -209,6 +209,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
+    public void updateHashinator(HashinatorType type, byte[] config)
+    {
+
+    }
+
+    @Override
     public long getThreadLocalPoolAllocations() {
         return 0L;
     }

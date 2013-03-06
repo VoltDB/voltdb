@@ -120,7 +120,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        LoadFragment(26);
+        LoadFragment(26),
+        updateHashinator(27);
         Commands(final int id) {
             m_id = id;
         }
@@ -1286,6 +1287,23 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             part.flip();
             return part.getInt();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void updateHashinator(HashinatorType type, byte[] config)
+    {
+        m_data.clear();
+        m_data.putInt(Commands.updateHashinator.m_id);
+        m_data.putInt(type.typeId());
+        m_data.putInt(config.length);
+        m_data.put(config);
+        try {
+            m_data.flip();
+            m_connection.write();
         } catch (final Exception e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);

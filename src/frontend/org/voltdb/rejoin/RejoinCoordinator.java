@@ -17,7 +17,10 @@
 
 package org.voltdb.rejoin;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONException;
 import org.voltcore.messaging.HostMessenger;
+import org.voltdb.ClientInterface;
 import org.voltdb.messaging.LocalMailbox;
 
 /**
@@ -34,7 +37,7 @@ public abstract class RejoinCoordinator extends LocalMailbox {
     /**
      * Starts the rejoin process.
      */
-    public abstract void startRejoin();
+    public abstract boolean startJoin() throws KeeperException, InterruptedException, JSONException;
 
     /**
      * Discard the mailbox.
