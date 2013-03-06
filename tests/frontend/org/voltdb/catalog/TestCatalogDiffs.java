@@ -87,11 +87,26 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catOriginal,
             Catalog catUpdated)
     {
+        verifyDiff(catOriginal, catUpdated, null);
+    }
+
+    private void verifyDiff(
+            Catalog catOriginal,
+            Catalog catUpdated,
+            Boolean expectSnapshotIsolation)
+    {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
         catOriginal.execute(diff.commands());
         assertTrue(diff.supported());
+        if (expectSnapshotIsolation != null) {
+            assertEquals((boolean) expectSnapshotIsolation, diff.requiresSnapshotIsolation());
+        }
         String updatedOriginalSerialized = catOriginal.serialize();
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+
+        System.out.println("========================");
+        System.out.println(diff.getDescriptionOfChanges());
+        System.out.println("========================");
     }
 
     private void verifyDiffRejected(
@@ -363,7 +378,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testaddtable2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testaddtable2.jar");
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testDropTable() throws IOException {
@@ -382,20 +397,20 @@ public class TestCatalogDiffs extends TestCase {
         // Create a catalog with just table A
         Catalog catUpdated = getCatalogForTable("A", "droptable2");
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
 
     public void testAddTableColumn() throws IOException {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, true);
     }
 
     public void testRemoveTableColumn() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, true);
     }
 
     public void testModifyTableColumn() throws IOException {
@@ -404,7 +419,7 @@ public class TestCatalogDiffs extends TestCase {
         VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
         Catalog catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         Catalog catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, true);
 
         // fail integer contraction
         t1 = TableHelper.quickTable("(BIGINT)");
@@ -444,7 +459,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testAddUniqueNonCoveringTableIndexRejected() throws IOException {

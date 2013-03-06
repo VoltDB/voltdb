@@ -246,7 +246,8 @@ public class AsyncCompilerAgent {
             // compute the diff in StringBuilder
             CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
             if (!diff.supported()) {
-                throw new Exception("The requested catalog change is not a supported change at this time. " + diff.errors());
+                retval.errorMsg = "The requested catalog change is not a supported change at this time. " + diff.errors();
+                return retval;
             }
 
             // since diff commands can be stupidly big, compress them here
