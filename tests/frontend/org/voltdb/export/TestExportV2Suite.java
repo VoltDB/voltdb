@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -100,7 +101,7 @@ public class TestExportV2Suite extends TestExportBase {
 
     // Test Export of an ADDED table.
     //
-    /*public void testExportAndAddedTable() throws Exception {
+    public void testExportAndAddedTable() throws Exception {
         System.out.println("testExportAndAddedTable");
         final Client client = getClient();
 
@@ -147,7 +148,7 @@ public class TestExportV2Suite extends TestExportBase {
 
         // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);
-    }*/
+    }
 
     public TestExportV2Suite(final String name) {
         super(name);
