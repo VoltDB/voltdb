@@ -33,12 +33,14 @@ import com.google.common.base.Throwables;
 public abstract class TheHashinator {
 
     public static enum HashinatorType {
-        LEGACY(0)
-        , ELASTIC(1);
+        LEGACY(0, LegacyHashinator.class)
+        , ELASTIC(1, ElasticHashinator.class);
 
-        private final int typeId;
-        private HashinatorType(int typeId) {
+        public final int typeId;
+        public final Class<? extends TheHashinator> hashinatorClass;
+        private HashinatorType(int typeId, Class<? extends TheHashinator> hashinatorClass) {
             this.typeId = typeId;
+            this.hashinatorClass = hashinatorClass;
         }
         public int typeId() {
             return typeId;
@@ -89,6 +91,7 @@ public abstract class TheHashinator {
      */
     abstract protected int pHashinateLong(long value);
     abstract protected int pHashinateBytes(byte[] bytes);
+    abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
 
     /**
      * Given a long value, pick a partition to store the data.
@@ -218,5 +221,9 @@ public abstract class TheHashinator {
             return ElasticHashinator.getConfigureBytes(partitionCount, 8);
         }
         throw new RuntimeException("Should not reach here");
+    }
+
+    public static Pair<HashinatorType, byte[]> getCurrentConfig() {
+        return instance.get().getSecond().pGetCurrentConfig();
     }
 }
