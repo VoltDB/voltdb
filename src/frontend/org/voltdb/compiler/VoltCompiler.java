@@ -889,19 +889,6 @@ public class VoltCompiler {
                 continue;
             }
 
-            if (table.getIsreplicated()) {
-                compilerLog.debug("Creating multi-partition insert procedure for replicated table " +
-                        table.getTypeName());
-                crudprocs.add(generateCrudReplicatedInsert(table));
-                continue;
-            }
-
-            // get the partition column
-            final Column partitioncolumn = table.getPartitioncolumn();
-
-            // all partitioned tables get insert crud procs
-            crudprocs.add(generateCrudInsert(table, partitioncolumn));
-
             // select/delete/update crud requires pkey. Pkeys are stored as constraints.
             final CatalogMap<Constraint> constraints = table.getConstraints();
             final Iterator<Constraint> it = constraints.iterator();
@@ -913,6 +900,23 @@ public class VoltCompiler {
                     break;
                 }
             }
+
+            if (table.getIsreplicated()) {
+                compilerLog.debug("Creating multi-partition insert/delete procedures for replicated table " +
+                        table.getTypeName());
+                crudprocs.add(generateCrudReplicatedInsert(table));
+                if (pkey != null) {
+                    crudprocs.add(generateCrudReplicatedDelete(table, pkey));
+                    crudprocs.add(generateCrudReplicatedUpdate(table, pkey));
+                }
+                continue;
+            }
+
+            // get the partition column
+            final Column partitioncolumn = table.getPartitioncolumn();
+
+            // all partitioned tables get insert crud procs
+            crudprocs.add(generateCrudInsert(table, partitioncolumn));
 
             if (pkey == null) {
                 compilerLog.debug("Skipping creation of CRUD select/delete/update for partitioned table " +
@@ -1169,6 +1173,64 @@ public class VoltCompiler {
                     true);                    // builtin statement
 
         compilerLog.info("Synthesized built-in INSERT multi-partition procedure: " +
+                sb.toString() + " for " + table.getTypeName());
+
+        return pd;
+    }
+
+    /**
+     * Create a statement like:
+     *  "update <table> set {<each-column = ?>...} where {<pkey-column = ?>...}
+     *  for a replicated table.
+     */
+    private ProcedureDescriptor generateCrudReplicatedUpdate(Table table,
+            Constraint pkey)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("UPDATE " + table.getTypeName() + " SET ");
+
+        generateCrudExpressionColumns(table, sb);
+        generateCrudPKeyWhereClause(null, pkey, sb);
+
+        ProcedureDescriptor pd =
+            new ProcedureDescriptor(
+                    new ArrayList<String>(),  // groups
+                    table.getTypeName() + ".update",        // className
+                    sb.toString(),            // singleStmt
+                    null,                     // joinOrder
+                    null,                     // table.column:offset
+                    true);                    // builtin statement
+
+        compilerLog.info("Synthesized built-in UPDATE procedure: " +
+                sb.toString() + " for " + table.getTypeName());
+
+        return pd;
+    }
+
+    /**
+     * Create a statement like:
+     *  "delete from <table> where {<pkey-column =?>...}"
+     * for a replicated table.
+     */
+    private ProcedureDescriptor generateCrudReplicatedDelete(Table table,
+            Constraint pkey)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("DELETE FROM " + table.getTypeName());
+
+        int partitionOffset =
+            generateCrudPKeyWhereClause(null, pkey, sb);
+
+        ProcedureDescriptor pd =
+            new ProcedureDescriptor(
+                    new ArrayList<String>(),  // groups
+                    table.getTypeName() + ".delete",        // className
+                    sb.toString(),            // singleStmt
+                    null,                     // joinOrder
+                    null,                     // table.column:offset
+                    true);                    // builtin statement
+
+        compilerLog.info("Synthesized built-in DELETE procedure: " +
                 sb.toString() + " for " + table.getTypeName());
 
         return pd;
