@@ -49,9 +49,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -94,7 +93,6 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.BaseInitiator;
@@ -1797,30 +1795,46 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // Trigger a truncation snapshot and then promote the replica.
         void truncateAndPromote() {
-            try {
-                // Use the current time as an identifier (nonce) that can be
-                // recognized below by the monitor so that the promote doesn't
-                // happen until our snapshot completes.
-                final String reqId = java.util.UUID.randomUUID().toString();
-                SnapshotCompletionMonitor completionMonitor =
-                        VoltDB.instance().getSnapshotCompletionMonitor();
-                completionMonitor.addInterest(new SnapshotCompletionInterest() {
-                    @Override
-                    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
-                            long[] partitionTxnIds, boolean truncationSnapshot, String reqIdCmp) {
-                        // Is this our snapshot?
-                        if (truncationSnapshot && reqId.equals(reqIdCmp)) {
-                            promote();
+            new Thread(
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                // Use the current time as an identifier (nonce) that can be
+                                // recognized below by the monitor so that the promote doesn't
+                                // happen until our snapshot completes.
+                                final String reqId = java.util.UUID.randomUUID().toString();
+                                SnapshotCompletionMonitor completionMonitor =
+                                        VoltDB.instance().getSnapshotCompletionMonitor();
+                                completionMonitor.addInterest(new SnapshotCompletionInterest() {
+                                    @Override
+                                    public CountDownLatch snapshotCompleted(String nonce, long multipartTxnId,
+                                            long[] partitionTxnIds, boolean truncationSnapshot, String reqIdCmp) {
+                                        // Is this our snapshot?
+                                        if (truncationSnapshot && reqId.equals(reqIdCmp)) {
+                                            /*
+                                             * Need to create the transaction from the right network thread
+                                             */
+                                            m_ccxn.queueTask(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    promote();
+                                                }
+                                            });
+                                        }
+                                        return null;
+                                    }
+                                });
+                                m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
+                                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                            }
+                            catch (Exception e) {
+                                VoltDB.crashGlobalVoltDB("ZK truncation snapshot request failed", false, e);
+                            }
                         }
-                        return null;
-                    }
-                });
-                m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            }
-            catch (Exception e) {
-                VoltDB.crashGlobalVoltDB("ZK truncation snapshot request failed", false, e);
-            }
+                    },
+                    "Truncate and promote"
+                ).start();
         }
     }
 
