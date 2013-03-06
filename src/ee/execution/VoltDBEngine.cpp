@@ -78,7 +78,6 @@
 #include "plannodes/nodes.h"
 #include "plannodes/plannodeutil.h"
 #include "plannodes/plannodefragment.h"
-#include "executors/executors.h"
 #include "executors/executorutil.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
