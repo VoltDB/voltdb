@@ -90,19 +90,14 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException
     {
-        // TODO: setting join as complete now because the MPI doesn't know how to handle dummy
-        // responses yet
-        setJoinComplete(siteConnection);
-        log.info("P" + m_partitionId + " finished join");
-
-//        if (m_receivedFirstFragment) {
-//            log.info("P" + m_partitionId + " run for rejoin is complete");
-//            // TODO: now set join as completed. Should wait for replicated table snapshot
-//            // transfer to finish.
-//            setJoinComplete(siteConnection);
-//        } else {
-//            m_taskQueue.offer(this);
-//        }
+        if (m_receivedFirstFragment) {
+            log.info("P" + m_partitionId + " run for rejoin is complete");
+            // TODO: now set join as completed. Should wait for replicated table snapshot
+            // transfer to finish.
+            setJoinComplete(siteConnection);
+        } else {
+            m_taskQueue.offer(this);
+        }
     }
 
     @Override
