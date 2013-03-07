@@ -132,49 +132,41 @@ public class SnapshotSaveAPI
                 @Override
                 public void run() {
                     Map<Integer, Long>  partitionTransactionIds = new HashMap<Integer, Long>();
-                    if (VoltDB.instance().isIV2Enabled()) {
-                        partitionTransactionIds = m_partitionLastSeenTransactionIds;
-                        SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
-                        m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
-                        partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
+                    partitionTransactionIds = m_partitionLastSeenTransactionIds;
+                    SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
+                    m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
+                    partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
 
 
-                        /*
-                         * Do a quick sanity check that the provided IDs
-                         * don't conflict with currently active partitions. If they do
-                         * it isn't fatal we can just skip it.
-                         */
-                        for (long txnId : legacyPerPartitionTxnIds) {
-                            final int legacyPartition = TxnEgo.getPartitionId(txnId);
-                            if (partitionTransactionIds.containsKey(legacyPartition)) {
-                                SNAP_LOG.warn("While saving a snapshot and propagating legacy " +
-                                        "transaction ids found an id that matches currently active partition" +
-                                        partitionTransactionIds.get(legacyPartition));
-                            } else {
-                                partitionTransactionIds.put( legacyPartition, txnId);
-                            }
+                    /*
+                     * Do a quick sanity check that the provided IDs
+                     * don't conflict with currently active partitions. If they do
+                     * it isn't fatal we can just skip it.
+                     */
+                    for (long txnId : legacyPerPartitionTxnIds) {
+                        final int legacyPartition = TxnEgo.getPartitionId(txnId);
+                        if (partitionTransactionIds.containsKey(legacyPartition)) {
+                            SNAP_LOG.warn("While saving a snapshot and propagating legacy " +
+                                "transaction ids found an id that matches currently active partition" +
+                                partitionTransactionIds.get(legacyPartition));
+                        } else {
+                            partitionTransactionIds.put( legacyPartition, txnId);
                         }
                     }
                     exportSequenceNumbers = SnapshotSiteProcessor.getExportSequenceNumbers();
-                    if (VoltDB.instance().isIV2Enabled()) {
-                        createSetupIv2(
-                                file_path,
-                                file_nonce,
-                                format,
-                                multiPartTxnId,
-                                partitionTransactionIds,
-                                data,
-                                context,
-                                hostname,
-                                result,
-                                exportSequenceNumbers,
-                                st,
-                                timestamp);
-                    }
-                    else {
-                        throw new RuntimeException("Snapshots no longer possible under legacy world. " +
-                                "Welcome to Sadville, population: you.");
-                    }
+                    createSetupIv2(
+                            file_path,
+                            file_nonce,
+                            format,
+                            multiPartTxnId,
+                            partitionTransactionIds,
+                            data,
+                            context,
+                            hostname,
+                            result,
+                            exportSequenceNumbers,
+                            st,
+                            timestamp);
                 }
             });
 
@@ -185,66 +177,58 @@ public class SnapshotSaveAPI
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
-            if (VoltDB.instance().isIV2Enabled()) {
-                SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
-                        TxnEgo.getPartitionId(partitionTxnId));
-                m_partitionLastSeenTransactionIds.put(TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
-            }
+            SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
+                    TxnEgo.getPartitionId(partitionTxnId));
+            m_partitionLastSeenTransactionIds.put(TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
         }
 
         try {
             SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
             try {
-                if (VoltDB.instance().isIV2Enabled()) {
-                    synchronized (m_createLock) {
-                        SNAP_LOG.debug("Found tasks for HSIds: " +
-                                CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
-                        SNAP_LOG.debug("Looking for local HSID: " +
-                                CoreUtils.hsIdToString(context.getSiteId()));
-                        Deque<SnapshotTableTask> taskList = m_taskListsForHSIds.remove(context.getSiteId());
-                        List<SnapshotDataTarget> targetList = new ArrayList<SnapshotDataTarget>(m_snapshotDataTargets);
-                        // If createSetup failed, then the first site to reach here is going
-                        // to send the results table generated by createSetup, and then empty out the table.
-                        // All other sites to reach here will send the appropriate empty table.
-                        // If createSetup was a success but the taskList is null, then we'll use the block
-                        // switch to figure out what flavor of empty SnapshotSave result table to return.
-                        if (!m_createSuccess.get()) {
-                            // There shouldn't be any work for any site if we failed
-                            assert(m_taskListsForHSIds.isEmpty());
-                            VoltTable finalresult = m_createResult.get();
-                            if (finalresult != null) {
-                                m_createResult.set(null);
-                                return finalresult;
-                            }
-                            else {
-                                // We returned a non-empty NodeResultsTable with the failures in it,
-                                // every other site needs to return a NodeResultsTable as well.
-                                return SnapshotSave.constructNodeResultsTable();
-                            }
-                        }
-                        else if (taskList == null) {
-                            // This node is participating in the snapshot but this site has nothing to do.
-                            // Send back an appropriate empty table based on the block flag
-                            if (block != 0) {
-                                return SnapshotSave.constructPartitionResultsTable();
-                            }
-                            else {
-                                return SnapshotSave.constructNodeResultsTable();
-                            }
+                synchronized (m_createLock) {
+                    SNAP_LOG.debug("Found tasks for HSIds: " +
+                            CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
+                    SNAP_LOG.debug("Looking for local HSID: " +
+                            CoreUtils.hsIdToString(context.getSiteId()));
+                    Deque<SnapshotTableTask> taskList = m_taskListsForHSIds.remove(context.getSiteId());
+                    List<SnapshotDataTarget> targetList = new ArrayList<SnapshotDataTarget>(m_snapshotDataTargets);
+                    // If createSetup failed, then the first site to reach here is going
+                    // to send the results table generated by createSetup, and then empty out the table.
+                    // All other sites to reach here will send the appropriate empty table.
+                    // If createSetup was a success but the taskList is null, then we'll use the block
+                    // switch to figure out what flavor of empty SnapshotSave result table to return.
+                    if (!m_createSuccess.get()) {
+                        // There shouldn't be any work for any site if we failed
+                        assert(m_taskListsForHSIds.isEmpty());
+                        VoltTable finalresult = m_createResult.get();
+                        if (finalresult != null) {
+                            m_createResult.set(null);
+                            return finalresult;
                         }
                         else {
-                            context.getSiteSnapshotConnection().initiateSnapshots(
-                                    taskList,
-                                    targetList,
-                                    multiPartTxnId,
-                                    context.getSiteTrackerForSnapshot().getAllHosts().size(),
-                                    exportSequenceNumbers);
+                            // We returned a non-empty NodeResultsTable with the failures in it,
+                            // every other site needs to return a NodeResultsTable as well.
+                            return SnapshotSave.constructNodeResultsTable();
                         }
                     }
-                }
-                else {
-                    throw new RuntimeException("Snapshots no longer possible under legacy world. " +
-                            "Welcome to Sadville, population: you.");
+                    else if (taskList == null) {
+                        // This node is participating in the snapshot but this site has nothing to do.
+                        // Send back an appropriate empty table based on the block flag
+                        if (block != 0) {
+                            return SnapshotSave.constructPartitionResultsTable();
+                        }
+                        else {
+                            return SnapshotSave.constructNodeResultsTable();
+                        }
+                    }
+                    else {
+                        context.getSiteSnapshotConnection().initiateSnapshots(
+                                taskList,
+                                targetList,
+                                multiPartTxnId,
+                                context.getSiteTrackerForSnapshot().getAllHosts().size(),
+                                exportSequenceNumbers);
+                    }
                 }
             } finally {
                 SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await(120, TimeUnit.SECONDS);
