@@ -897,20 +897,26 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     const voltdb::TableStreamType streamType =
             static_cast<voltdb::TableStreamType>(ntohl(activateTableStreamCommand->streamType));
 
+std::cerr << "VoltDBIPC::activateTableStream 1" << std::endl;
     // Provide access to the serialized message data, i.e. the predicates.
     void* offset = activateTableStreamCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(activate_tablestream));
     ReferenceSerializeInput serialize_in(offset, sz);
 
     try {
+std::cerr << "VoltDBIPC::activateTableStream 2" << std::endl;
         if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
+std::cerr << "VoltDBIPC::activateTableStream SUCCESS" << std::endl;
             return kErrorCode_Success;
         } else {
+std::cerr << "VoltDBIPC::activateTableStream ERROR 1" << std::endl;
             return kErrorCode_Error;
         }
     } catch (FatalException e) {
+std::cerr << "VoltDBIPC::activateTableStream CRASH!" << std::endl;
         crashVoltDB(e);
     }
+std::cerr << "VoltDBIPC::activateTableStream ERROR 2" << std::endl;
     return kErrorCode_Error;
 }
 
@@ -924,6 +930,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
     // is an array of buffer lengths. The outgoing data must be an array of
     // ptr/offset/length triplets referencing segments of m_tupleBuffer, which
     // is reallocated as needed.
+std::cerr << "VoltDBIPC::tableStreamSerializeMore 0" << std::endl;
     const int bufferCount = ntohl(tableStreamSerializeMore->bufferCount);
     try {
 
@@ -940,6 +947,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(tablestream_serialize_more));
         ReferenceSerializeInput in1(inptr, sz);
 
+std::cerr << "VoltDBIPC::tableStreamSerializeMore 1" << std::endl;
         // Pass 1 - calculate size and allow for status code byte and count length integers.
         size_t outputSize = 1;
         for (size_t i = 0; i < bufferCount; i++) {
@@ -956,6 +964,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
             m_tupleBuffer = new char[m_tupleBufferSize];
         }
 
+std::cerr << "VoltDBIPC::tableStreamSerializeMore 3" << std::endl;
         // Pass 2 - rescan input stream and generate final buffer data.
         ReferenceSerializeInput in2(inptr, sz);
         // 1 byte status and 4 byte count
@@ -972,6 +981,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
             offset += length;
         }
 
+std::cerr << "VoltDBIPC::tableStreamSerializeMore 4" << std::endl;
         // Perform table stream serialization.
         ReferenceSerializeInput out2(m_reusedResultBuffer, MAX_MSG_SZ);
         std::vector<int> positions;
@@ -985,12 +995,12 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
             *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
             offset = 1 + sizeof(int32_t);
             *reinterpret_cast<int64_t*>(&m_tupleBuffer[offset]) = htonll(remaining);
-            offset += sizeof(int64_t);
+            offset += static_cast<int>(sizeof(int64_t));
             std::vector<int>::const_iterator ipos;
             for (ipos = positions.begin(); ipos != positions.end(); ++ipos) {
                 int length = *ipos;
                 *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
-                offset += length + sizeof(int32_t);
+                offset += length + static_cast<int>(sizeof(int32_t));
             }
         } else {
             *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
@@ -999,10 +1009,13 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
             outputSize = 1 + sizeof(int32_t) + sizeof(int64_t);
         }
 
+std::cerr << "VoltDBIPC::tableStreamSerializeMore 5" << std::endl;
         // Ship it.
         writeOrDie(m_fd, (unsigned char*)m_tupleBuffer, outputSize);
+std::cerr << "VoltDBIPC::tableStreamSerializeMore 6" << std::endl;
 
     } catch (FatalException e) {
+std::cerr << "VoltDBIPC::tableStreamSerializeMore CRASH!" << std::endl;
         crashVoltDB(e);
     }
 }
