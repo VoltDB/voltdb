@@ -444,7 +444,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
-            JSONObject topo = getTopology(isRejoin, m_joining);
+            JSONObject topo = getTopology(config.m_startAction, joinCoordinator);
             try {
                 clusterConfig = new ClusterConfig(topo);
                 m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
@@ -558,7 +558,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 } else if (isRejoin) {
                     SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
                 } else if (m_joining) {
-                    ((Joiner) m_rejoinCoordinator).setSites(hsidsToRejoin);
+                    joinCoordinator.setSites(hsidsToRejoin);
                 }
 
                 // All mailboxes should be set up, publish it
@@ -1095,14 +1095,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(boolean isRejoin, boolean isJoin)
+    private JSONObject getTopology(START_ACTION startAction, Joiner joinCoordinator)
     {
         JSONObject topo = null;
-        if (isJoin) {
-            assert(m_rejoinCoordinator != null);
-            topo = ((Joiner) m_rejoinCoordinator).getTopology();
+        if (startAction == START_ACTION.JOIN) {
+            assert(joinCoordinator != null);
+            topo = joinCoordinator.getTopology();
         }
-        else if (!isRejoin) {
+        else if (!VoltDB.createForRejoin(startAction)) {
             int sitesperhost = m_deployment.getCluster().getSitesperhost();
             int hostcount = m_deployment.getCluster().getHostcount();
             int kfactor = m_deployment.getCluster().getKfactor();
