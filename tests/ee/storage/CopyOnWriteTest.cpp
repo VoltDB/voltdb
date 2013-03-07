@@ -390,7 +390,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += m_tupleWidth + sizeof(int32_t);
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
             for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
@@ -477,7 +477,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += m_tupleWidth + sizeof(int32_t);
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
             for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
@@ -568,7 +568,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += m_tupleWidth + sizeof(int32_t);
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
             for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
@@ -819,7 +819,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
                         totalInserted++;
 
                         // Account for tuple data and second tuple length.
-                        ibuf += m_tupleWidth + sizeof(int32_t);
+                        ibuf += static_cast<int>(m_tupleWidth + sizeof(int32_t));
                     }
                 }
 
