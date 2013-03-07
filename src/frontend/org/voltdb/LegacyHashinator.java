@@ -17,11 +17,14 @@
 package org.voltdb;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
+    private final byte m_configBytes[];
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
     @Override
@@ -46,11 +49,17 @@ public class LegacyHashinator extends TheHashinator {
 
     public LegacyHashinator(byte config[]) {
         catalogPartitionCount = ByteBuffer.wrap(config).getInt();
+        m_configBytes = Arrays.copyOf(config, config.length);
     }
 
     public static byte[] getConfigureBytes(int catalogPartitionCount) {
         ByteBuffer buf = ByteBuffer.allocate(4);
         buf.putInt(catalogPartitionCount);
         return buf.array();
+    }
+
+    @Override
+    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
+        return Pair.of(HashinatorType.LEGACY, m_configBytes);
     }
 }

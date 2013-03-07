@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
@@ -24,6 +25,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
+import org.voltcore.utils.Pair;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedMap;
@@ -39,6 +41,7 @@ public class ElasticHashinator extends TheHashinator {
      * the value's hash
      */
     private final ImmutableSortedMap<Long, Integer> tokens;
+    private final byte m_configBytes[];
 
     /**
      * Initialize the hashinator from a binary description of the ring.
@@ -47,6 +50,7 @@ public class ElasticHashinator extends TheHashinator {
      * and and the 4-byte partition id. All values are signed.
      */
     public ElasticHashinator(byte configureBytes[]) {
+        m_configBytes = Arrays.copyOf(configureBytes, configureBytes.length);
         ByteBuffer buf = ByteBuffer.wrap(configureBytes);
         int numEntries = buf.getInt();
         TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
@@ -130,5 +134,10 @@ public class ElasticHashinator extends TheHashinator {
         ByteBuffer buf = ByteBuffer.wrap(bytes);
         final long token = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
         return partitionForToken(token);
+    }
+
+    @Override
+    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
+        return Pair.of(HashinatorType.ELASTIC, m_configBytes);
     }
 }
