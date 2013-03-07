@@ -24,6 +24,7 @@
 package org.voltdb;
 
 import org.junit.Test;
+import org.voltdb.utils.VoltTableUtil;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -44,7 +45,7 @@ public class TestVoltSystemProcedure {
         VoltTable table2 = new VoltTable(columns);
         table2.addRow(2);
 
-        VoltTable result = VoltSystemProcedure.unionTables(Arrays.asList(null, table1,
+        VoltTable result = VoltTableUtil.unionTables(Arrays.asList(null, table1,
                 null, table2));
         assertNotNull(result);
 
