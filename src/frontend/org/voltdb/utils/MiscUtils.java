@@ -150,6 +150,7 @@ public class MiscUtils {
         File licenseFile = new File(pathToLicense);
         if (licenseFile.exists() == false) {
             hostLog.fatal("Unable to open license file: " + pathToLicense);
+            hostLog.fatal("Please contact sales@voltdb.com to request a license.");
             return null;
         }
 
@@ -190,6 +191,7 @@ public class MiscUtils {
         if (now.after(licenseApi.expires())) {
             if (licenseApi.isTrial()) {
                 hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
+                hostLog.fatal("Please contact sales@voltdb.com to request a new license.");
                 return false;
             }
             else {
