@@ -31,6 +31,5 @@ public abstract class Joiner extends RejoinCoordinator {
 
     public abstract List<Integer> getPartitionsToAdd();
     public abstract JSONObject getTopology();
-    public abstract void setClientInterface(ClientInterface ci);
     public abstract void setSites(List<Long> sites);
 }
