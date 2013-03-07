@@ -789,15 +789,16 @@ bool PersistentTable::activateRecoveryStream(int32_t tableId) {
  * Serialize the next message in the stream of recovery messages. Returns true if there are
  * more messages and false otherwise.
  */
-void PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
+bool PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
     if (m_recoveryContext == NULL) {
-        return;
+        return false;
     }
 
     const bool hasMore = m_recoveryContext->nextMessage(out);
     if (!hasMore) {
         m_recoveryContext.reset(NULL);
     }
+    return hasMore;
 }
 
 /**

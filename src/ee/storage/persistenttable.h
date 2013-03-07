@@ -228,7 +228,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * Serialize the next message in the stream of recovery messages. Returns true if there are
      * more messages and false otherwise.
      */
-    void nextRecoveryMessage(ReferenceSerializeOutput *out);
+    bool nextRecoveryMessage(ReferenceSerializeOutput *out);
 
     /**
      * Process the updates from a recovery message

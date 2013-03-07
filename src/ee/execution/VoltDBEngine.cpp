@@ -1372,8 +1372,59 @@ bool VoltDBEngine::activateTableStream(
 
 /**
  * Serialize tuples to output streams from a table in COW mode.
- * Position vector smart pointer argument is populated here.
- * Returns remaining tuple count, 0 when done, or -1 on error (e.g. when not in COW mode).
+ * Overload that serializes a stream position array.
+ * Returns:
+ *  0-n: remaining tuple count
+ *  -1: streaming was completed by the previous call
+ *  -2: error, e.g. when no longer in COW mode.
+ * Note that -1 is only returned once after the previous call serialized all
+ * remaining tuples. Further calls are considered errors and will return -2.
+ */
+int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
+                                               const TableStreamType streamType,
+                                               ReferenceSerializeInput &serialize_in)
+{
+    int64_t remaining = -2;
+    try {
+        std::vector<int> positions;
+        remaining = tableStreamSerializeMore(tableId, streamType, serialize_in, positions);
+        if (remaining >= 0) {
+            char *resultBuffer = getReusedResultBuffer();
+            assert(resultBuffer != NULL);
+            int resultBufferCapacity = getReusedResultBufferCapacity();
+            if (resultBufferCapacity < sizeof(jint) * positions.size()) {
+                throwFatalException("tableStreamSerializeMore: result buffer not large enough");
+            }
+            ReferenceSerializeOutput results(resultBuffer, resultBufferCapacity);
+            // Write the array size as a regular integer.
+            assert(positions.size() <= std::numeric_limits<int32_t>::max());
+            results.writeInt((int32_t)positions.size());
+            // Copy the position vector's contiguous storage to the returned results buffer.
+            for (std::vector<int>::const_iterator ipos = positions.begin();
+                 ipos != positions.end(); ++ipos) {
+                results.writeInt(*ipos);
+            }
+        }
+        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
+                   (int)positions.size(), remaining);
+    }
+    catch (SerializableEEException &e) {
+        resetReusedResultOutputBuffer();
+        e.serialize(getExceptionOutputSerializer());
+        remaining = -2; // error
+    }
+    return remaining;
+}
+
+/**
+ * Serialize tuples to output streams from a table in COW mode.
+ * Overload that populates a position vector provided by the caller.
+ * Returns:
+ *  0-n: remaining tuple count
+ *  -1: streaming was completed by the previous call
+ *  -2: error, e.g. when no longer in COW mode.
+ * Note that -1 is only returned once after the previous call serialized all
+ * remaining tuples. Further calls are considered errors and will return -2.
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(
         const CatalogId tableId,
@@ -1397,6 +1448,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     }
     retPositions.reserve(nBuffers);
 
+    int64_t remaining = -2;
     switch (streamType) {
     case TABLE_STREAM_SNAPSHOT: {
         // If a completed table is polled, return 0 bytes serialized. The
@@ -1405,21 +1457,22 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         // dynamic cast was already verified in activateCopyOnWrite.
         map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
         if (pos == m_snapshottingTables.end()) {
-            // Success
-            return 0;
+            remaining = -1; // done
         }
-        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-        int64_t tuplesRemaining = table->serializeMore(outputStreams);
-        if (!tuplesRemaining <= 0) {
-            m_snapshottingTables.erase(tableId);
-            table->decrementRefcount();
+        else {
+            PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+            remaining = table->serializeMore(outputStreams);
+            if (!remaining == 0) {
+                m_snapshottingTables.erase(tableId);
+                table->decrementRefcount();
+            }
+            // If more was streamed copy current positions for return.
+            // Can this copy be avoided?
+            for (size_t i = 0; i < nBuffers; i++) {
+                retPositions.push_back((int)outputStreams.at(i).position());
+            }
         }
-        // If more was streamed copy current positions for return.
-        // Can this copy be avoided?
-        for (size_t i = 0; i < nBuffers; i++) {
-            retPositions.push_back((int)outputStreams.at(i).position());
-        }
-        return tuplesRemaining;
+        break;
     }
 
     case TABLE_STREAM_RECOVERY: {
@@ -1432,23 +1485,30 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
                     "Expected exactly one output stream for recovery, received %ld",
                     outputStreams.size());
         }
-        map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
-        if (pos == m_tables.end()) {
-            // Success
-            return 0;
+        else {
+            map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
+            if (pos == m_tables.end()) {
+                remaining = -1; // done
+            }
+            else {
+                PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+                bool hasMore = table->nextRecoveryMessage(&outputStreams[0]);
+                // Non-zero if some tuples remain, we're just not sure how many.
+                remaining = (hasMore ? 1 : 0);
+                for (size_t i = 0; i < nBuffers; i++) {
+                    retPositions.push_back((int)outputStreams.at(i).position());
+                }
+            }
         }
-        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-        table->nextRecoveryMessage(&outputStreams[0]);
-        return 1;
+        break;
     }
 
     default:
         // Failure
-        return -1;
+        remaining = -2;
     }
 
-    // Success
-    return 0;
+    return remaining;
 }
 
 /*

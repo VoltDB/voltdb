@@ -291,7 +291,7 @@ void doRandomTableMutation(Table *table) {
 
     int64_t m_undoToken;
 
-    size_t m_tupleWidth;
+    int32_t m_tupleWidth;
 };
 
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
@@ -614,8 +614,6 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 // Handy types and values.
 typedef std::pair<int32_t, int32_t> HashRange;
 typedef stx::btree_set<int64_t> TupleSet;
-const int32_t MIN_HASH = std::numeric_limits<int32_t>::min();
-const int32_t MAX_HASH = std::numeric_limits<int32_t>::max();
 
 /** Tool object holds test state and conveniently displays errors. */
 class MultiStreamTestTool {
@@ -766,7 +764,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             int64_t value = *reinterpret_cast<int64_t*>(tuple.address() + 1);
-            int32_t ipart = ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions;
+            int32_t ipart = (int32_t)(ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions);
             bool inserted = before[ipart].insert(value).second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));

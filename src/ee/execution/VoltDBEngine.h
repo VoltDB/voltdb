@@ -355,14 +355,32 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         /**
          * Serialize tuples to output streams from a table in COW mode.
-         * Position vector smart pointer argument is populated here.
-         * Returns remaining tuple count, 0 when done, or -1 on error (e.g. when not in COW mode).
+         * Overload that serializes a stream position array.
+         * Returns:
+         *  0-n: remaining tuple count
+         *  -1: streaming was completed by the previous call
+         *  -2: error, e.g. when no longer in COW mode.
+         * Note that -1 is only returned once after the previous call serialized all
+         * remaining tuples. Further calls are considered errors and will return -2.
          */
-        int64_t tableStreamSerializeMore(
-                const CatalogId tableId,
-                const TableStreamType streamType,
-                ReferenceSerializeInput &serializeIn,
-                std::vector<int> &retPositions);
+        int64_t tableStreamSerializeMore(const CatalogId tableId,
+                                         const TableStreamType streamType,
+                                         ReferenceSerializeInput &serializeIn);
+
+        /**
+         * Serialize tuples to output streams from a table in COW mode.
+         * Overload that populates a position vector provided by the caller.
+         * Returns:
+         *  0-n: remaining tuple count
+         *  -1: streaming was completed by the previous call
+         *  -2: error, e.g. when no longer in COW mode.
+         * Note that -1 is only returned once after the previous call serialized all
+         * remaining tuples. Further calls are considered errors and will return -2.
+         */
+        int64_t tableStreamSerializeMore(const CatalogId tableId,
+                                         const TableStreamType streamType,
+                                         ReferenceSerializeInput &serializeIn,
+                                         std::vector<int> &retPositions);
 
         /*
          * Apply the updates in a recovery message.
@@ -405,7 +423,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool updateCatalogDatabaseReference();
 
         void printReport();
-
 
         /**
          * Keep a list of executors for runtime - intentionally near the top of VoltDBEngine

@@ -492,27 +492,32 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
         long remaining = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
         int[] positions = null;
-        //TODO: Provide remaining to caller.
-        if (remaining <= 0) {
-            return (int)remaining;  // 0 or -1
+        //TODO: Pass remaining count back to caller.
+        // -1 is end of stream.
+        if (remaining == -1) {
+            return 0;
         }
-        if (deserializer != null) {
-            int count;
-            try {
-                count = deserializer.readInt();
-                if (count > 0) {
-                    positions = new int[count];
-                    for (int i = 0; i < count; i++) {
-                        positions[i] = deserializer.readInt();
-                    }
-                    //TODO: Support multiple streams.
-                    assert(positions.length == 1);
-                    return positions[0];
+        // -2 is an error.
+        if (remaining == -2) {
+            return -1;
+        }
+        assert(deserializer != null);
+        deserializer.clear();
+        int count;
+        try {
+            count = deserializer.readInt();
+            if (count > 0) {
+                positions = new int[count];
+                for (int i = 0; i < count; i++) {
+                    positions[i] = deserializer.readInt();
                 }
-            } catch (final IOException ex) {
-                LOG.error("Failed to deserialze position array" + ex);
-                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+                //TODO: Support multiple streams.
+                assert(positions.length == 1);
+                return positions[0];
             }
+        } catch (final IOException ex) {
+            LOG.error("Failed to deserialize position array" + ex);
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
         }
 
         return 0;

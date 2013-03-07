@@ -136,30 +136,42 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         private Socket m_socket = null;
         private SocketChannel m_socketChannel = null;
         Connection(BackendTarget target, int port) {
-            if (target == BackendTarget.NATIVE_EE_IPC) {
-                System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
-                System.out
-                        .println("Press enter after you have started the EE process to initiate the connection to the EE");
+            boolean connected = false;
+            int retries = 0;
+            while (!connected) {
                 try {
-                    System.in.read();
-                } catch (final IOException e1) {
-                    e1.printStackTrace();
+                    System.out.println("Connecting to localhost:" + port);
+                    m_socketChannel = SocketChannel.open(new InetSocketAddress(
+                            "localhost", port));
+                    m_socketChannel.configureBlocking(true);
+                    m_socket = m_socketChannel.socket();
+                    m_socket.setTcpNoDelay(true);
+                    connected = true;
+                } catch (final Exception e) {
+                    System.out.println(e.getMessage());
+                    if (retries++ <= 10) {
+                        if (retries > 1) {
+                            System.out.printf("Failed to connect to IPC EE on port %d. Retry #%d of 10\n", port, retries-1);
+                            try {
+                                Thread.sleep(10000);
+                            }
+                            catch (InterruptedException e1) {}
+                        }
+                    }
+                    else {
+                        System.out.printf("Failed to initialize IPC EE connection on port %d. Quitting.\n", port);
+                        System.exit(-1);
+                    }
                 }
-            }
-            try {
-                System.out.println("Connecting to localhost:" + port);
-                m_socketChannel = SocketChannel.open(new InetSocketAddress(
-                        "localhost", port));
-                m_socketChannel.configureBlocking(true);
-                m_socket = m_socketChannel.socket();
-                m_socket.setTcpNoDelay(true);
-            } catch (final Exception e) {
-                System.out.println(e.getMessage());
-                System.out
-                        .println("Failed to initialize IPC EE connection. Quitting.");
-                while (true) {}
-
-                //System.exit(-1);
+                if (!connected && retries == 1 && target == BackendTarget.NATIVE_EE_IPC) {
+                    System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
+                    System.out.println("Press Enter after you have started the EE process to initiate the connection to the EE");
+                    try {
+                        System.in.read();
+                    } catch (final IOException e1) {
+                        e1.printStackTrace();
+                    }
+                }
             }
             System.out.println("Created IPC connection for site.");
         }
@@ -1130,7 +1142,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             remainingBuffer.flip();
             //TODO: Do something useful with the remaining count.
-            final long remaining = remainingBuffer.getLong();
+            /*final long remaining = */ remainingBuffer.getLong();
 
             // Get the first length.
             ByteBuffer lengthBuffer = ByteBuffer.allocate(4);

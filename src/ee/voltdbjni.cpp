@@ -1061,62 +1061,36 @@ static bool getArrayElements(
 
 /*
  * Serialize more tuples to one or more output streams.
- * Returns a long for the remaining tuple count, 0 when done, or -1 for an error.
+ * Returns a long for the remaining tuple count, -1 when done, or -2 for an error.
  * Streams an int position array through the reused result buffer.
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeTableStreamSerializeMore
  * Signature: (JII[B)J;
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableStreamSerializeMore
-  (JNIEnv *env,
-   jobject obj,
-   jlong engine_ptr,
-   jint tableId,
-   jint streamType,
-   jbyteArray serialized_buffers) {
+(JNIEnv *env,
+ jobject obj,
+ jlong engine_ptr,
+ jint tableId,
+ jint streamType,
+ jbyteArray serialized_buffers) {
     VOLT_DEBUG("nativeTableStreamSerializeMore in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-
-    // deserialize buffers.
     jsize length = env->GetArrayLength(serialized_buffers);
     VOLT_DEBUG("nativeTableStreamSerializeMore: deserializing %d buffer bytes ...", (int) length);
     jbyte *bytes = env->GetByteArrayElements(serialized_buffers, NULL);
     ReferenceSerializeInput serialize_in(bytes, length);
     try {
-        try {
-            voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
-            std::vector<int> positions;
-            jlong tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in, positions);
-            if (tuplesRemaining > 0) {
-                char *resultBuffer = engine->getReusedResultBuffer();
-                assert(resultBuffer != NULL);
-                int resultBufferCapacity = engine->getReusedResultBufferCapacity();
-                if (resultBufferCapacity < sizeof(jint) * positions.size()) {
-                    throwFatalException("nativeTableStreamSerializeMore: result buffer not large enough");
-                }
-                ReferenceSerializeOutput results(resultBuffer, resultBufferCapacity);
-                // Write the array size as a regular integer.
-                assert(positions.size() <= std::numeric_limits<int32_t>::max());
-                results.writeInt((int32_t)positions.size());
-                // Copy the position vector's contiguous storage to the returned results buffer.
-                for (std::vector<int>::const_iterator ipos; ipos != positions.end(); ++ipos) {
-                    results.writeInt(*ipos);
-                }
-            }
-            VOLT_DEBUG("nativeTableStreamSerializeMore: deserialized %d buffers, %ld remaining",
-                       (int)positions.size(), tuplesRemaining);
-            return tuplesRemaining;
-        } catch (SerializableEEException &e) {
-            engine->resetReusedResultOutputBuffer();
-            e.serialize(engine->getExceptionOutputSerializer());
-        }
-    } catch (FatalException e) {
+        voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
+        jlong tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in);
+        return tuplesRemaining;
+    }
+    catch (FatalException e) {
         topend->crashVoltDB(e);
     }
-
-    // Return -1 if we weren't able to handle the request.
-    return -1;
+    // Won't get here, but -2 is an error.
+    return -2;
 }
 
 /*
