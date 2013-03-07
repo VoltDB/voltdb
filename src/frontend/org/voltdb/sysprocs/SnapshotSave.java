@@ -46,6 +46,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.primitives.Longs;
+import org.voltdb.utils.VoltTableUtil;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotSave extends VoltSystemProcedure
@@ -128,7 +129,8 @@ public class SnapshotSave extends VoltSystemProcedure
         }
         else if (fragmentId == SysProcFragmentId.PF_saveTestResults)
         {
-            return saveTestResults(dependencies);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_saveTest));
+            return new DependencyPair( DEP_saveTestResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargets)
         {
@@ -174,7 +176,8 @@ public class SnapshotSave extends VoltSystemProcedure
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
         {
-            return createSnapshotTargetsResults(dependencies);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_createSnapshotTargets));
+            return new DependencyPair(DEP_createSnapshotTargetsResults, result);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesce) {
             // tell each site to quiesce
             context.getSiteProcedureConnection().quiesce();
@@ -189,39 +192,6 @@ public class SnapshotSave extends VoltSystemProcedure
         }
         assert (false);
         return null;
-    }
-
-    private DependencyPair createSnapshotTargetsResults(
-            Map<Integer, List<VoltTable>> dependencies) {
-        {
-            TRACE_LOG.trace("Aggregating create snapshot target results");
-            assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_createSnapshotTargets);
-            VoltTable result = null;
-            for (VoltTable table : dep)
-            {
-                /**
-                 * XXX Ning: There are two different tables here. We have to
-                 * detect which table we are looking at in order to create the
-                 * result table with the proper schema. Maybe we should make the
-                 * result table consistent?
-                 */
-                if (result == null) {
-                    if (table.getColumnType(2).equals(VoltType.INTEGER))
-                        result = constructPartitionResultsTable();
-                    else
-                        result = constructNodeResultsTable();
-                }
-
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    result.add(table);
-                }
-            }
-            return new
-                DependencyPair( DEP_createSnapshotTargetsResults, result);
-        }
     }
 
     private DependencyPair saveTest(String file_path, String file_nonce,
@@ -307,25 +277,6 @@ public class SnapshotSave extends VoltSystemProcedure
                 }
             }
             return new DependencyPair(DEP_saveTest, result);
-        }
-    }
-
-    private DependencyPair saveTestResults(
-            Map<Integer, List<VoltTable>> dependencies) {
-        {
-            TRACE_LOG.trace("Aggregating save feasiblity results");
-            assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_saveTest);
-            VoltTable result = constructNodeResultsTable();
-            for (VoltTable table : dep)
-            {
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    result.add(table);
-                }
-            }
-            return new DependencyPair( DEP_saveTestResults, result);
         }
     }
 
