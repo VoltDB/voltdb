@@ -611,7 +611,7 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
         return false;
     }
 
-    // make sure widths are the same
+    // make sure each column has same metadata
     map<string, catalog::Column*>::const_iterator outerIter;
     for (outerIter = t1->columns().begin();
          outerIter != t1->columns().end();
@@ -717,6 +717,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
              */
             if (tcd->exportEnabled()) {
                 table->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                // note, this is the end of the line for export tables for now,
+                // don't allow them to change schema yet
                 continue;
             }
             assert(!table->isExport());

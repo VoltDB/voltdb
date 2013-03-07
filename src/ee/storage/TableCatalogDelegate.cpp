@@ -417,6 +417,12 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
 
     PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
 
+    // remove all indexes from the current table
+    vector<TableIndex*> currentIndexes = existingTable->allIndexes();
+    for (int i = 0; i < currentIndexes.size(); i++) {
+        existingTable->removeIndex(currentIndexes[i]);
+    }
+
     // figure out what goes in each columns of the new table
 
     // set default values once in the temp tuple
@@ -483,10 +489,12 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
                     // check if the column is widening so it was inline and now is out of line
                     if (scannedTuple.getSchema()->columnIsInlined(columnSourceMap[i])) {
                         if (!tupleToInsert.getSchema()->columnIsInlined(i)) {
-                            value = ValueFactory::convertToOutOfLine(value);
-                            if (!value.isNull()) {
-                                requiresFree.push_back(value);
-                            }
+                            // This path is blocked by CatalogDiffEngine for now
+                            // need ENG-4325 to make work
+                            //value = ValueFactory::convertToOutOfLine(value);
+                            //if (!value.isNull()) {
+                            //    requiresFree.push_back(value);
+                            //}
                         }
                     }
 

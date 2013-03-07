@@ -103,10 +103,6 @@ public class TestCatalogDiffs extends TestCase {
         }
         String updatedOriginalSerialized = catOriginal.serialize();
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
-
-        System.out.println("========================");
-        System.out.println(diff.getDescriptionOfChanges());
-        System.out.println("========================");
     }
 
     private void verifyDiffRejected(
@@ -625,6 +621,54 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "remmatview2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "remmatview2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testModifyMaterializedViewRejected() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // with a view
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "remmatview1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "remmatview1.jar");
+
+        // without a view
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C2, NUM) AS SELECT C2, COUNT(*) FROM A GROUP BY C2;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "remmatview2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "remmatview2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testModifyMaterializedViewSourceRejected() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // with a view
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "remmatview1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "remmatview1.jar");
+
+        // without a view
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         builder.compile(testDir + File.separator + "remmatview2.jar");

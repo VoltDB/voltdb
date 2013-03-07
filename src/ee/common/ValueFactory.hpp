@@ -98,28 +98,6 @@ public:
         return NValue::getAddressValue(address);
     }
 
-    static inline NValue convertToOutOfLine(NValue &inlineValue) {
-        if (inlineValue.getValueType() == VALUE_TYPE_VARCHAR) {
-            if (inlineValue.isNull()) {
-                return ValueFactory::getNullStringValue();
-            }
-            return ValueFactory::getStringValue((const char*)inlineValue.getObjectValue());
-        }
-        else if (inlineValue.getValueType() == VALUE_TYPE_VARBINARY) {
-            if (inlineValue.isNull()) {
-                return ValueFactory::getNullBinaryValue();
-            }
-            return ValueFactory::getBinaryValue((const unsigned char* )inlineValue.getObjectValue(),
-                                                inlineValue.getObjectLength());
-        }
-        else {
-            assert(false); // only two types can be out of line
-        }
-        // should never get here
-        return NValue(VALUE_TYPE_INVALID);
-
-    }
-
     // What follows exists for test only!
 
     static inline NValue castAsBigInt(NValue value) {
