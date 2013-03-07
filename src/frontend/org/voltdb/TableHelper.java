@@ -153,6 +153,21 @@ public class TableHelper {
             sb = new StringBuilder();
         }
 
+        // this behaves like an equals method should, but feels wrong here... alas...
+        if ((t1 == null) && (t2 == null)) {
+            return true;
+        }
+
+        // handle when one side is null
+        if (t1 == null) {
+            sb.append("t1 == NULL\n");
+            return false;
+        }
+        if (t2 == null) {
+            sb.append("t2 == NULL\n");
+            return false;
+        }
+
         if (t1.getRowCount() != t2.getRowCount()) {
             sb.append(String.format("Row count %d != %d\n", t1.getRowCount(), t2.getRowCount()));
             return false;
@@ -163,12 +178,12 @@ public class TableHelper {
         }
         for (int col = 0; col < t1.getColumnCount(); col++) {
             if (t1.getColumnType(col) != t2.getColumnType(col)) {
-                sb.append(String.format("Col %d: type %s != %s\n", col,
+                sb.append(String.format("Column %d: type %s != %s\n", col,
                         t1.getColumnType(col).toString(), t2.getColumnType(col).toString()));
                 return false;
             }
             if (t1.getColumnName(col).equals(t2.getColumnName(col)) == false) {
-                sb.append(String.format("Col %d: name %s != %s\n", col,
+                sb.append(String.format("Column %d: name %s != %s\n", col,
                         t1.getColumnName(col), t2.getColumnName(col)));
                 return false;
             }
