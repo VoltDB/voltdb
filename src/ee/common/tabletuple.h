@@ -69,7 +69,7 @@ namespace voltdb {
 #define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
 
 class TableColumn;
-class StandaloneTuple;
+class StandAloneTupleStorage;
 
 class TableTuple {
     friend class TableFactory;
@@ -81,7 +81,7 @@ class TableTuple {
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
-    friend class StandaloneTuple;
+    friend class StandAloneTupleStorage;
     template<std::size_t keySize> friend class IntsKey;
     template<std::size_t keySize> friend class GenericKey;
 
@@ -369,31 +369,39 @@ private:
     }
 };
 
-// A small class to hold together a standalone tuple (not backed by any table)
-// and the associated memory to keep the actual data.
-class StandaloneTuple {
+// A small class to hold together a tuple (not associated with any table)
+// and an allocated memory backing the tuple's values.
+class StandAloneTupleStorage {
     public:
-        StandaloneTuple() :
-            m_tupleMemory(),m_tuple() {
+        /** Creates an uninitialized tuple */
+        StandAloneTupleStorage() :
+            m_tupleStorage(),m_tuple() {
         }
 
-        explicit StandaloneTuple(const TupleSchema* schema) :
-            m_tupleMemory(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]),
-            m_tuple(m_tupleMemory.get(), schema) {
+        /** Allocates enough memory for a given schema
+         * and initialies tuple to point to this memory
+         */
+        explicit StandAloneTupleStorage(const TupleSchema* schema) :
+            m_tupleStorage(), m_tuple() {
+            init(schema);
+        }
+
+        /** Allocates enough memory for a given schema
+         * and initialies tuple to point to this memory
+         */
+        void init(const TupleSchema* schema) {
+            assert(schema != NULL);
+            m_tupleStorage.reset(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
+            m_tuple.m_schema = schema;
+            m_tuple.move(m_tupleStorage.get());
             m_tuple.setAllNulls();
             m_tuple.setActiveTrue();
         }
 
-        StandaloneTuple(const StandaloneTuple& rhs) :
-            m_tupleMemory(),m_tuple() {
-            initFrom(rhs);
-        }
-
-        StandaloneTuple& operator=(const StandaloneTuple& rhs)  {
-            initFrom(rhs);
-            return *this;
-        }
-
+        /** Operator conversion to get an access to the underline tuple.
+         * To prevent clients from repointing the tuple to some other backing
+         * storage via move()or address() calls the tuple is returned by value
+         */
         operator TableTuple () {
             return m_tuple;
         }
@@ -403,14 +411,8 @@ class StandaloneTuple {
         }
 
     private:
-        void initFrom(const StandaloneTuple& rhs) {
-            assert(rhs.m_tuple.getSchema() != NULL);
-            assert(rhs.m_tuple.m_data != NULL);
-            m_tupleMemory.reset(new char[rhs.m_tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE]);
-            m_tuple = rhs.m_tuple;
-        }
 
-        boost::scoped_array<char> m_tupleMemory;
+        boost::scoped_array<char> m_tupleStorage;
         TableTuple m_tuple;
 
 };
