@@ -792,9 +792,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             ExecutionSite.this.updateBackendLogLevels();
         }
         @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
         {
-            return ExecutionSite.this.updateCatalog(diffCmds, context, csp);
+            return ExecutionSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation);
         }
     }
 
@@ -1013,7 +1013,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         return true;
     }
 
-    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context, CatalogSpecificPlanner csp) {
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
+            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+    {
         m_context = context;
         m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType(), csp);
 
