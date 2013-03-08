@@ -112,21 +112,26 @@ public class ClientThread extends Thread {
 
         try {
             String procName = null;
+            int expectedTables = 3;
             switch (m_type) {
             case PARTITIONED_SP:
                 procName = "UpdatePartitionedSP";
                 break;
             case PARTITIONED_MP:
                 procName = "UpdatePartitionedMP";
+                expectedTables = 4;
                 break;
             case REPLICATED:
                 procName = "UpdateReplicatedMP";
+                expectedTables = 4;
                 break;
             case HYBRID:
                 procName = "UpdateBothMP";
+                expectedTables = 4;
                 break;
             case ADHOC_MP:
                 procName = "UpdateReplicatedMPInProcAdHoc";
+                expectedTables = 4;
                 break;
             }
 
@@ -159,10 +164,10 @@ public class ClientThread extends Thread {
 
             m_txnsRun.incrementAndGet();
 
-            if (results.length != 3) {
+            if (results.length != expectedTables) {
                 log.error(String.format(
-                        "Client cid %d procedure %s returned %d results instead of 3",
-                        m_cid, procName, results.length));
+                        "Client cid %d procedure %s returned %d results instead of %d",
+                        m_cid, procName, results.length, expectedTables));
                 log.error(((ClientResponseImpl) response).toJSONString());
                 Benchmark.printJStack();
                 System.exit(-1);
