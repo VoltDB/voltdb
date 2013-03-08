@@ -24,14 +24,13 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.ClientInterface;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Database;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.utils.VoltFile;
