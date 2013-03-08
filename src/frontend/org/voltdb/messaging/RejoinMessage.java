@@ -40,6 +40,7 @@ public class RejoinMessage extends VoltMessage {
         REPLAY_FINISHED, // sent from a local site to the coordinator
 
         // Join specific message types
+        SNAPSHOT_DATA, // sent from the coordinator to local sites
         FIRST_FRAGMENT_RECEIVED, // sent from a local site to the coordinator
     }
 
@@ -48,6 +49,8 @@ public class RejoinMessage extends VoltMessage {
     private long m_snapshotSinkHSId = -1;
     private long m_masterHSId = -1;
     private String m_snapshotNonce = null;
+    private int m_tableId = -1;
+    private ByteBuffer m_tableBlock = null;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -88,6 +91,16 @@ public class RejoinMessage extends VoltMessage {
         m_snapshotSinkHSId = sinkHSId;
     }
 
+    /**
+     * For IV2, tee replicated table blocks from the coordinator to each site's producer
+     */
+    public RejoinMessage(long sourceHSId, int tableId, ByteBuffer tableBlock)
+    {
+        this(sourceHSId, Type.SNAPSHOT_DATA);
+        m_tableId = tableId;
+        m_tableBlock = tableBlock;
+    }
+
     public Type getType() {
         return m_type;
     }
@@ -106,6 +119,14 @@ public class RejoinMessage extends VoltMessage {
 
     public long getSnapshotSinkHSId() {
         return m_snapshotSinkHSId;
+    }
+
+    public int getTableId() {
+        return m_tableId;
+    }
+
+    public ByteBuffer getTableBlock() {
+        return m_tableBlock.duplicate();
     }
 
     @Override
