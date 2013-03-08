@@ -156,7 +156,7 @@ public:
             }
             case VALUE_TYPE_VARCHAR:
             {
-                return NValue::getTempStringValue(value.c_str(), value.length());
+                return getStringValue(value.c_str());
             }
             case VALUE_TYPE_VARBINARY:
             {

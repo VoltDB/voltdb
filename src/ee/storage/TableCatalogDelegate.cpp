@@ -433,8 +433,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     NValue *defaults = defaults_array.get();
 
     // map from existing table
-    boost::scoped_array<int> columnSourceMap_array(new int[columnCount]);
-    int *columnSourceMap = columnSourceMap_array.get();
+    int columnSourceMap[columnCount];
 
     vector<std::string> oldColumnNames = existingTable->getColumnNames();
 
@@ -462,6 +461,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         for (int j = 0; j < oldColumnNames.size(); j++) {
             if (oldColumnNames[j].compare(colName) == 0) {
                 columnSourceMap[index] = j;
+                break;
             }
         }
     }
@@ -474,9 +474,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         TableTuple &tupleToInsert = newTable->tempTuple();
         TableTuple scannedTuple(m_table->schema());
 
-        // list of columns in a tuple that require explicit memory management
-        std::vector<NValue> requiresFree;
-
         while (iterator.next(scannedTuple)) {
 
             //printf("tuple: %s\n", scannedTuple.debug(existingTable->name()).c_str());
@@ -485,19 +482,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
             for (int i = 0; i < columnCount; i++) {
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
-
-                    // check if the column is widening so it was inline and now is out of line
-                    if (scannedTuple.getSchema()->columnIsInlined(columnSourceMap[i])) {
-                        if (!tupleToInsert.getSchema()->columnIsInlined(i)) {
-                            // This path is blocked by CatalogDiffEngine for now
-                            // need ENG-4325 to make work
-                            //value = ValueFactory::convertToOutOfLine(value);
-                            //if (!value.isNull()) {
-                            //    requiresFree.push_back(value);
-                            //}
-                        }
-                    }
-
                     tupleToInsert.setNValue(i, value);
                 }
                 else {
@@ -510,11 +494,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
 
             // delete from the old table
             existingTable->deleteTupleForSchemaChange(scannedTuple);
-
-            while (requiresFree.size()) {
-                requiresFree.back().free();
-                requiresFree.pop_back();
-            }
 
             // if a block was just deleted, start the iterator again on the next block
             // this avoids using the block iterator over a changing set of blocks

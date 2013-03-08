@@ -212,9 +212,9 @@ public class CatalogDiffEngine {
 
         // allow lossless conversion to double from ints < mantissa size
         if (newType == VoltType.FLOAT) {
-            if ((newType == VoltType.INTEGER) ||
-                (newType == VoltType.SMALLINT) ||
-                (newType == VoltType.TINYINT)) {
+            if ((oldType == VoltType.INTEGER) ||
+                (oldType == VoltType.SMALLINT) ||
+                (oldType == VoltType.TINYINT)) {
                 return true;
             }
         }
@@ -292,7 +292,7 @@ public class CatalogDiffEngine {
                     (! col.getNullable()) &&
                     (col.getDefaultvalue() == null))
                 {
-                    m_errors.append("May not dynamically add non-nullable column.\n");
+                    m_errors.append("May not dynamically add non-nullable column without default value.\n");
                     m_supported = false;
                     return false;
                 }
@@ -336,7 +336,7 @@ public class CatalogDiffEngine {
         for (Connector connector : db.getConnectors()) {
             for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
                 if (tinfo.getTable() == table) {
-                    m_errors.append("May not change the columns of materialized view " +
+                    m_errors.append("May not change the columns of export table " +
                             table.getTypeName() + ".\n");
                     m_supported = false;
                     return false;
