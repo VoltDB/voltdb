@@ -17,46 +17,44 @@
 
 package org.voltdb.iv2;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.TaskLog;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingDeque;
 
 public class JoinProducer extends JoinProducerBase implements TaskLog {
-    private static final VoltLogger log = new VoltLogger("HOST");
-
-    private final AtomicBoolean m_currentlyJoining = new AtomicBoolean(true);
-    private long m_joinCoordinatorHSId = Long.MIN_VALUE;
+    private final LinkedBlockingDeque<Pair<Integer, ByteBuffer>> m_snapshotData =
+            new LinkedBlockingDeque<Pair<Integer, ByteBuffer>>(3);
     private boolean m_receivedFirstFragment = false;
 
-    private static class CompletionAction extends JoinCompletionAction {
-        CompletionAction(long snapshotTxnId)
-        {
-            super(snapshotTxnId);
-        }
-
+    private class CompletionAction extends JoinCompletionAction {
         @Override
         public void run()
         {
-            //To change body of implemented methods use File | Settings | File Templates.
+            // TODO: no-op for now
         }
     }
 
     JoinProducer(int partitionId, SiteTaskerQueue taskQueue)
     {
-        super(partitionId, taskQueue);
+        super(partitionId, "Join producer:" + partitionId + " ", taskQueue);
+        m_completionAction = new CompletionAction();
+    }
+
+    @Override
+    protected void kickWatchdog(boolean rearm)
+    {
+
     }
 
     @Override
@@ -69,9 +67,17 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     public void deliver(RejoinMessage message)
     {
         if (message.getType() == RejoinMessage.Type.INITIATION) {
-            m_joinCoordinatorHSId = message.m_sourceHSId;
+            m_coordinatorHsId = message.m_sourceHSId;
+            String snapshotNonce = message.getSnapshotNonce();
+            SnapshotCompletionAction interest = new SnapshotCompletionAction(snapshotNonce);
+            interest.register();
             m_taskQueue.offer(this);
-            log.info("P" + m_partitionId + " received initiation");
+            JOINLOG.info("P" + m_partitionId + " received initiation");
+        } else if (message.getType() == RejoinMessage.Type.SNAPSHOT_DATA) {
+            if (JOINLOG.isTraceEnabled()) {
+                JOINLOG.trace("P" + m_partitionId + " received snapshot data block");
+            }
+            m_snapshotData.offer(Pair.of(message.getTableId(), message.getTableBlock()));
         }
     }
 
@@ -90,26 +96,47 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException
     {
-        if (m_receivedFirstFragment) {
-            log.info("P" + m_partitionId + " run for rejoin is complete");
-            // TODO: now set join as completed. Should wait for replicated table snapshot
-            // transfer to finish.
-            setJoinComplete(siteConnection);
+        if (!m_receivedFirstFragment) {
+            // no-op, wait for the first fragment
+        } else if (m_completionMonitorAwait.isDone()) {
+            JOINLOG.info("P" + m_partitionId + " run for rejoin is complete");
+            SnapshotCompletionInterest.SnapshotCompletionEvent event = null;
+            try {
+                event = m_completionMonitorAwait.get();
+            } catch (InterruptedException e) {
+                // isDone() already returned true, this shouldn't happen
+                VoltDB.crashLocalVoltDB("Impossible interruption happend", true, e);
+            } catch (ExecutionException e) {
+                VoltDB.crashLocalVoltDB("Error waiting for snapshot to finish", true, e);
+            }
+            RejoinMessage rm = new RejoinMessage(m_mailbox.getHSId(),
+                    RejoinMessage.Type.SNAPSHOT_FINISHED);
+            m_mailbox.send(m_coordinatorHsId, rm);
+            setJoinComplete(siteConnection, event.exportSequenceNumbers);
+            return;
         } else {
-            m_taskQueue.offer(this);
+            Pair<Integer, ByteBuffer> dataPair = m_snapshotData.poll();
+            if (dataPair != null) {
+                JOINLOG.info("P" + m_partitionId + " restoring table " + dataPair.getFirst() +
+                        " block of (" + dataPair.getSecond().position() + "," +
+                        dataPair.getSecond().limit() + ")");
+                restoreBlock(dataPair, siteConnection);
+            }
         }
+
+        m_taskQueue.offer(this);
     }
 
     @Override
     public void logTask(TransactionInfoBaseMessage message) throws IOException
     {
         if (message instanceof FragmentTaskMessage) {
-            log.info("P" + m_partitionId + " received first fragment, " +
-                    "sending to mailbox " + CoreUtils.hsIdToString(m_joinCoordinatorHSId));
+            JOINLOG.info("P" + m_partitionId + " received first fragment, " +
+                    "sending to mailbox " + CoreUtils.hsIdToString(m_coordinatorHsId));
             if (!m_receivedFirstFragment) {
                 RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(),
                         RejoinMessage.Type.FIRST_FRAGMENT_RECEIVED);
-                m_mailbox.send(m_joinCoordinatorHSId, msg);
+                m_mailbox.send(m_coordinatorHsId, msg);
                 m_receivedFirstFragment = true;
             }
         }
@@ -137,12 +164,5 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     public void close() throws IOException
     {
 
-    }
-
-    private void setJoinComplete(SiteProcedureConnection siteConnection)
-    {
-        m_currentlyJoining.set(false);
-        // TODO: need to provide a rejoin complete action and export sequence numbers
-        siteConnection.setRejoinComplete(new CompletionAction(0), new HashMap<String, Map<Integer, Pair<Long, Long>>>());
     }
 }
