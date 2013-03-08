@@ -29,20 +29,29 @@
 
 namespace voltdb {
 
+/*
+ * Recalculate how many tuples are remaining and compare to the countdown value.
+ * This method does not work once we're in the middle of the temp table.
+ * Only call it while m_finishedTableScan==false.
+ */
 void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
-    int64_t count = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
-    if (!m_finishedTableScan) {
-        TableTuple tuple(m_table.schema());
-        boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples.get()->makeIterator());
-        while (iter->next(tuple)) {
-            count++;
-        }
+    assert(!m_finishedTableScan);
+    intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
+    TableTuple tuple(m_table.schema());
+    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples.get()->makeIterator());
+    intmax_t count2 = 0;
+    while (iter->next(tuple)) {
+        count2++;
     }
-    if (m_tuplesRemaining != count) {
+    if (m_tuplesRemaining != count1 + count2) {
         VOLT_ERROR("CopyOnWriteContext::%s remaining tuple count mismatch: "
-                   "table=%s partcol=%d counted=%jd recalculated=%jd compacted=%jd",
+                   "table=%s partcol=%d count=%jd count1=%jd count2=%jd "
+                   "expected=%jd compacted=%jd batch=%jd "
+                   "inserts=%jd updates=%jd",
                    label.c_str(), m_table.name().c_str(), m_table.partitionColumn(),
-                   (intmax_t)m_tuplesRemaining, (intmax_t)count, (intmax_t)m_blocksCompacted);
+                   count1 + count2, count1, count2, (intmax_t)m_tuplesRemaining,
+                   (intmax_t)m_blocksCompacted, (intmax_t)m_serializationBatches,
+                   (intmax_t)m_inserts, (intmax_t)m_updates);
     }
 }
 
@@ -68,7 +77,10 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_totalPartitions(totalPartitions),
              m_totalTuples(totalTuples),
              m_tuplesRemaining(totalTuples),
-             m_blocksCompacted(0)
+             m_blocksCompacted(0),
+             m_serializationBatches(0),
+             m_inserts(0),
+             m_updates(0)
 {
     // Parse predicate strings. The factory type determines the kind of
     // predicates that get generated.
@@ -84,7 +96,9 @@ CopyOnWriteContext::CopyOnWriteContext(
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
 int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStreams) {
-    checkRemainingTuples("serializeMore");
+    if (!m_finishedTableScan) {
+        checkRemainingTuples("serializeMore(start)");
+    }
 
     // Don't expect to be re-called after streaming all the tuples.
     if (m_tuplesRemaining == 0) {
@@ -141,6 +155,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * After scanning the persistent table switch to scanning the temp
              * table with the tuples that were backed up.
              */
+            checkRemainingTuples("serializeMore(start temp)");
             m_finishedTableScan = true;
             m_iterator.reset(m_backedUpTuples.get()->makeIterator());
 
@@ -150,20 +165,24 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * persistent table.
              */
             if (m_tuplesRemaining > 0) {
-                throwFatalException("serializeMore():\n"
+                throwFatalException("serializeMore(): tuple count > 0 after streaming:\n"
                                     "Table name: %s\n"
                                     "Table type: %s\n"
                                     "Original tuple count: %jd\n"
                                     "Active tuple count: %jd\n"
                                     "Remaining tuple count: %jd\n"
                                     "Compacted block count: %jd\n"
-                                    "Partition column: %d",
+                                    "Dirty insert count: %jd\n"
+                                    "Dirty update count: %jd\n"
+                                    "Partition column: %d\n",
                                     m_table.name().c_str(),
                                     m_table.tableType().c_str(),
                                     (intmax_t)m_totalTuples,
                                     (intmax_t)m_table.activeTupleCount(),
                                     (intmax_t)m_tuplesRemaining,
                                     (intmax_t)m_blocksCompacted,
+                                    (intmax_t)m_inserts,
+                                    (intmax_t)m_updates,
                                     m_table.partitionColumn());
             }
             m_tuplesRemaining = 0;
@@ -175,6 +194,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
 
     // Need to close the output streams and insert row counts.
     outputStreams.close();
+
+    m_serializationBatches++;
 
     // Done when the table scan is finished and iteration is complete.
     return (m_tuplesRemaining >= 0 ? m_tuplesRemaining : std::numeric_limits<int32_t>::max());
@@ -222,6 +243,13 @@ bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
+    if (newTuple) {
+        m_inserts++;
+    }
+    else {
+        m_updates++;
+    }
+
     /**
      * If this an update or a delete of a tuple that is already dirty then no further action is
      * required.

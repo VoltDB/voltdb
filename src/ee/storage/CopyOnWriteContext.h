@@ -122,6 +122,9 @@ private:
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;
     int64_t m_blocksCompacted;
+    int64_t m_serializationBatches;
+    int64_t m_inserts;
+    int64_t m_updates;
 
     void checkRemainingTuples(const std::string &label);
 

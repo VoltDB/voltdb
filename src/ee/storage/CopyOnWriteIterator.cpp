@@ -81,7 +81,8 @@ int64_t CopyOnWriteIterator::countRemaining() const {
     TableTuple out(m_table->schema());
     uint32_t blockOffset = m_blockOffset;
     char *location = m_location;
-    TBPtr currentBlock = m_currentBlock;
+    TupleBlock *pcurrentBlock = m_currentBlock.get();
+    TBPtr currentBlock(pcurrentBlock);
     TBMapI blockIterator = m_blockIterator;
     int64_t count = 0;
     while (true) {
