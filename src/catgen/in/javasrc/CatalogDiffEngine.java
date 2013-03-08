@@ -367,7 +367,14 @@ public class CatalogDiffEngine {
 
         // whitelist certain column changes
         if (suspect instanceof Column) {
-            if (!areTableColumnsMutable((Table) suspect.getParent())) {
+            CatalogType parent = suspect.getParent();
+            // can change statements
+            if (parent instanceof Statement) {
+                return true;
+            }
+
+            // now assume parent is a Table
+            if (!areTableColumnsMutable((Table) parent)) {
                 return false; // error msg already appended
             }
 
