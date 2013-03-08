@@ -39,7 +39,8 @@ public abstract class RejoinCoordinator extends LocalMailbox {
     /**
      * Starts the rejoin process.
      */
-    public abstract boolean startJoin() throws KeeperException, InterruptedException, JSONException;
+    public abstract boolean startJoin(Database catalog, Cartographer cartographer)
+            throws KeeperException, InterruptedException, JSONException;
 
     /**
      * Discard the mailbox.

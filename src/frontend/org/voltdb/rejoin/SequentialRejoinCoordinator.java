@@ -107,7 +107,7 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
     }
 
     @Override
-    public boolean startJoin() {
+    public boolean startJoin(Database catalog, Cartographer cartographer) {
         long firstSite;
         synchronized (m_lock) {
             firstSite = m_pendingSites.poll();

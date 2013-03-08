@@ -1682,7 +1682,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             try {
                 m_rejoinCoordinator.setClientInterface(m_clientInterfaces.get(0));
 
-                if (!m_rejoinCoordinator.startJoin()) {
+                if (!m_rejoinCoordinator.startJoin(m_catalogContext.database, m_cartographer)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {
