@@ -207,6 +207,4 @@ public interface VoltDBInterface
      public LicenseApi getLicenseApi();
 
      public boolean isIV2Enabled();
-
-    public LeaderAppointer getLeaderAppointer();
 }

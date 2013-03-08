@@ -34,6 +34,8 @@ public abstract class RejoinCoordinator extends LocalMailbox {
         m_messenger = hostMessenger;
     }
 
+    public void setClientInterface(ClientInterface ci) {}
+
     /**
      * Starts the rejoin process.
      */
