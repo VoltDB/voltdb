@@ -44,7 +44,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.Terminal;
 import jline.console.CursorBuffer;
 import jline.console.KeyMap;
 import jline.console.completer.Completer;
@@ -58,9 +57,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-
-import sun.misc.Signal;
-import sun.misc.SignalHandler;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -88,16 +84,29 @@ public class SQLCommand
         if (query == null)
             return null;
 
-        String[] command = new String[] {"exec", "execute", "explain", "explainproc"};
-        String[] keyword = new String[] {"select", "insert", "update", "delete"};
-        for(int i = 0;i<command.length;i++)
-        {
-            for(int j = 0;j<keyword.length;j++)
-            {
-                Pattern r = Pattern.compile("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-                query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-            }
-        }
+//        String[] command = new String[] {"exec", "execute", "explain", "explainproc"};
+//        String[] keyword = new String[] {"select", "insert", "update", "delete"};
+//        for(int i = 0;i<command.length;i++)
+//        {
+//            for(int j = 0;j<keyword.length;j++)
+//            {
+//                Pattern r = Pattern.compile("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+//                query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
+//            }
+//        }
+        Pattern r = Pattern.compile(
+                "\\s*" + // 0 or more spaces
+                "(" + // start group 1
+                  "exec|execute|explain|explainproc" + // command
+                ")" +  // end group 1
+                "\\s+" + // one or more spaces
+                "(" + // start group 2
+                  "select|insert|update|delete" + // SQL keyword
+                ")" + // end group 2
+                "\\s+", // one or more spaces
+                Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
+        );
+        query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
 
         query = SingleLineComments.matcher(query).replaceAll("");
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
