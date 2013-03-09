@@ -91,10 +91,8 @@ import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
-import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
-import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -2130,7 +2128,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         task.procName = "@UpdateApplicationCatalog";
                         task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
                                        changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                       changeResult.deploymentCRC);
+                                       changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0);
                         task.clientHandle = changeResult.clientHandle;
                         // DR stuff
                         task.type = changeResult.invocationType;
@@ -2171,7 +2169,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else {
                     ClientResponseImpl errorResponse =
                         new ClientResponseImpl(
-                                ClientResponseImpl.UNEXPECTED_FAILURE,
+                                ClientResponseImpl.GRACEFUL_FAILURE,
                                 new VoltTable[0], result.errorMsg,
                                 result.clientHandle);
                     ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);

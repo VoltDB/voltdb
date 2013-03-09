@@ -759,7 +759,18 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    /*
+    /**
+     * Is the EE associated with this SnapshotSiteProcessor currently
+     * snapshotting?
+     *
+     * No thread safety here, but assuming single-threaded access from
+     * the IV2 site.
+     */
+    public boolean isEESnapshotting() {
+        return m_snapshotTableTasks != null;
+    }
+
+    /**
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the fsync() and close() of snapshot data targets has completed.
      */
