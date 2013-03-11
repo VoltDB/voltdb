@@ -446,9 +446,11 @@ public class TestSqlCmdInterface
     //     with SQL keywords
     @Test
     public void testSneakyNamedProcedure() {
-        String query = "exec    selectMasterDonner, 0, 1        ";
+        String query = "exec selectMasterDonner, 0, 1";
         ID = 27;
-        String expected = query.replace("exec", "");
+        String expected = trimKeyWordsLeadingSpaces(query);
+        assertThis(query, expected, 1, ID);
+        expected = query.replace("exec", "");
         expected = expected.replaceAll(",", "");
         expected = expected.replaceAll("\\s+", "");
         assertThis2(query, expected, 3, ID);

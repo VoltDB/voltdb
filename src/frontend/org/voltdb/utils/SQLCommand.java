@@ -69,6 +69,18 @@ public class SQLCommand
     private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
+    private static final Pattern PaserStringKeywords = Pattern.compile(
+            "\\s*" + // 0 or more spaces
+            "(" + // start group 1
+              "exec|execute|explain|explainproc" + // command
+            ")" +  // end group 1
+            "\\s+" + // one or more spaces
+            "(" + // start group 2
+              "select|insert|update|delete" + // SQL keyword
+            ")" + // end group 2
+            "\\s+", // one or more spaces
+            Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
+    );
     private static final String readme = "SQLCommandReadme.txt";
 
     public static String getReadme() {
@@ -84,29 +96,7 @@ public class SQLCommand
         if (query == null)
             return null;
 
-//        String[] command = new String[] {"exec", "execute", "explain", "explainproc"};
-//        String[] keyword = new String[] {"select", "insert", "update", "delete"};
-//        for(int i = 0;i<command.length;i++)
-//        {
-//            for(int j = 0;j<keyword.length;j++)
-//            {
-//                Pattern r = Pattern.compile("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-//                query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-//            }
-//        }
-        Pattern r = Pattern.compile(
-                "\\s*" + // 0 or more spaces
-                "(" + // start group 1
-                  "exec|execute|explain|explainproc" + // command
-                ")" +  // end group 1
-                "\\s+" + // one or more spaces
-                "(" + // start group 2
-                  "select|insert|update|delete" + // SQL keyword
-                ")" + // end group 2
-                "\\s+", // one or more spaces
-                Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
-        );
-        query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
+        query = PaserStringKeywords.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
 
         query = SingleLineComments.matcher(query).replaceAll("");
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
