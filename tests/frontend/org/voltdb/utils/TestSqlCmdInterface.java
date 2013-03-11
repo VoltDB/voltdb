@@ -442,6 +442,20 @@ public class TestSqlCmdInterface
         assertNotSame(msg+err2, 0, cnt);
     }
 
+    // 27) Make sure we don't get fooled by store procedures that with names that start
+    //     with SQL keywords
+    @Test
+    public void testSneakyNamedProcedure() {
+        String query = "exec selectMasterDonner, 0, 1";
+        ID = 27;
+        String expected = trimKeyWordsLeadingSpaces(query);
+        assertThis(query, expected, 1, ID);
+        expected = query.replace("exec", "");
+        expected = expected.replaceAll(",", "");
+        expected = expected.replaceAll("\\s+", "");
+        assertThis2(query, expected, 3, ID);
+    }
+
     private static void setQryString(File QryFileHandle) throws FileNotFoundException {
         // Prepare a Scanner that will "scan" the document
         Scanner opnScanner = new Scanner(QryFileHandle);
