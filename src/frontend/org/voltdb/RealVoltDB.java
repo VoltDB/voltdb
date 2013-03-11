@@ -63,7 +63,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -1682,7 +1681,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             try {
                 m_rejoinCoordinator.setClientInterface(m_clientInterfaces.get(0));
 
-                if (!m_rejoinCoordinator.startJoin()) {
+                if (!m_rejoinCoordinator.startJoin(m_catalogContext.database, m_cartographer)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {
