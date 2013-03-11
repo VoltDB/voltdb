@@ -69,14 +69,17 @@ public class SQLCommand
     private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
-    private static final Pattern PaserStringKeywords = Pattern.compile(
+    /**
+     * Matches a command followed by and SQL CRUD statement verb
+     */
+    private static final Pattern ParserStringKeywords = Pattern.compile(
             "\\s*" + // 0 or more spaces
             "(" + // start group 1
               "exec|execute|explain|explainproc" + // command
             ")" +  // end group 1
             "\\s+" + // one or more spaces
             "(" + // start group 2
-              "select|insert|update|delete" + // SQL keyword
+              "select|insert|update|delete" + // SQL CRUD statement verb
             ")" + // end group 2
             "\\s+", // one or more spaces
             Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
@@ -96,10 +99,33 @@ public class SQLCommand
         if (query == null)
             return null;
 
-        query = PaserStringKeywords.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-
+        /*
+         * Mark any parser string keyword matches by interposing the #SQL_PARDER_STRING_KEYWORD#
+         * tag. Which is later stripped at the end of this procedure. This tag is here to
+         * aide the evaluation of SetOp and AutoSplit REGEXPs, meaning that an
+         * 'explain select foo from bar will cause SetOp and AutoSplit match on the select as
+         * is prefixed with the #SQL_PARDER_STRING_KEYWORD#
+         *
+         * For example
+         *     'explain select foo from bar'
+         *  becomes
+         *     'explain #SQL_PARSER_STRING_KEYWORD#select foo from bar'
+         */
+        query = ParserStringKeywords.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
+        /*
+         * strip out single line comments
+         */
         query = SingleLineComments.matcher(query).replaceAll("");
+        /*
+         * replace all escaped single quotes with the #(SQL_PARSER_ESCAPE_SINGLE_QUOTE) tag
+         */
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
+
+        /*
+         * move all single quoted strings into the string fragments list, and do in place
+         * replacements with numbered instances of the #(SQL_PARSER_STRING_FRAGMENT#[n]) tag
+         *
+         */
         Matcher stringFragmentMatcher = Extract.matcher(query);
         ArrayList<String> stringFragments = new ArrayList<String>();
         int i = 0;
@@ -111,8 +137,11 @@ public class SQLCommand
             i++;
         }
 
+        /*
+         * Mark all subsequent set portions of a query with SQL_PARSER_SETOP_SELECT tag
+         */
         query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_SETOP_SELECT");
-        query = AutoSplit.matcher(query).replaceAll(";$2$4 ");
+        query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
         query = query.replaceAll("SQL_PARSER_SETOP_SELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
