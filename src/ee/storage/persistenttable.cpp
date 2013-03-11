@@ -728,6 +728,7 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
                                           const std::vector<std::string> &predicate_strings,
                                           int32_t totalPartitions) {
     if (m_COWContext != NULL) {
+        // true => COW already active
         return true;
     }
     if (m_tupleCount == 0) {
