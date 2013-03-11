@@ -1205,6 +1205,8 @@ public class VoltCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("DELETE FROM " + table.getTypeName());
 
+        generateCrudPKeyWhereClause(null, pkey, sb);
+
         ProcedureDescriptor pd =
             new ProcedureDescriptor(
                     new ArrayList<String>(),  // groups

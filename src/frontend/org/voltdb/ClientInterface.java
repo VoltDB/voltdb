@@ -2123,43 +2123,59 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                     else if (result instanceof CatalogChangeResult) {
                         final CatalogChangeResult changeResult = (CatalogChangeResult) result;
-                        // create the execution site task
-                        StoredProcedureInvocation task = new StoredProcedureInvocation();
-                        task.procName = "@UpdateApplicationCatalog";
-                        task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
-                                       changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                       changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0);
-                        task.clientHandle = changeResult.clientHandle;
-                        // DR stuff
-                        task.type = changeResult.invocationType;
-                        task.originalTxnId = changeResult.originalTxnId;
-                        task.originalUniqueId = changeResult.originalUniqueId;
 
-                        /*
-                         * Round trip the invocation to initialize it for command logging
-                         */
-                        FastSerializer fs = new FastSerializer();
-                        try {
-                            fs.writeObject(task);
-                            ByteBuffer source = fs.getBuffer();
-                            ByteBuffer copy = ByteBuffer.allocate(source.remaining());
-                            copy.put(source);
-                            copy.flip();
-                            FastDeserializer fds = new FastDeserializer(copy);
-                            task = new StoredProcedureInvocation();
-                            task.readExternal(fds);
-                        } catch (Exception e) {
-                            hostLog.fatal(e);
-                            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                        // if the catalog change is a null change
+                        if (changeResult.encodedDiffCommands.trim().length() == 0) {
+                            ClientResponseImpl shortcutResponse =
+                                    new ClientResponseImpl(
+                                            ClientResponseImpl.SUCCESS,
+                                            new VoltTable[0], "Catalog update with no changes was skipped.",
+                                            result.clientHandle);
+                            ByteBuffer buf = ByteBuffer.allocate(shortcutResponse.getSerializedSize() + 4);
+                            buf.putInt(buf.capacity() - 4);
+                            shortcutResponse.flattenToBuffer(buf);
+                            buf.flip();
+                            c.writeStream().enqueue(buf);
                         }
+                        else {
+                            // create the execution site task
+                            StoredProcedureInvocation task = new StoredProcedureInvocation();
+                            task.procName = "@UpdateApplicationCatalog";
+                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
+                                           changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                                           changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0);
+                            task.clientHandle = changeResult.clientHandle;
+                            // DR stuff
+                            task.type = changeResult.invocationType;
+                            task.originalTxnId = changeResult.originalTxnId;
+                            task.originalUniqueId = changeResult.originalUniqueId;
 
-                        // initiate the transaction. These hard-coded values from catalog
-                        // procedure are horrible, horrible, horrible.
-                        createTransaction(changeResult.connectionId, changeResult.hostname,
-                                changeResult.adminConnection,
-                                task, false, false, false, m_allPartitions,
-                                m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
-                                EstTime.currentTimeMillis(), false);
+                            /*
+                             * Round trip the invocation to initialize it for command logging
+                             */
+                            FastSerializer fs = new FastSerializer();
+                            try {
+                                fs.writeObject(task);
+                                ByteBuffer source = fs.getBuffer();
+                                ByteBuffer copy = ByteBuffer.allocate(source.remaining());
+                                copy.put(source);
+                                copy.flip();
+                                FastDeserializer fds = new FastDeserializer(copy);
+                                task = new StoredProcedureInvocation();
+                                task.readExternal(fds);
+                            } catch (Exception e) {
+                                hostLog.fatal(e);
+                                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                            }
+
+                            // initiate the transaction. These hard-coded values from catalog
+                            // procedure are horrible, horrible, horrible.
+                            createTransaction(changeResult.connectionId, changeResult.hostname,
+                                    changeResult.adminConnection,
+                                    task, false, false, false, m_allPartitions,
+                                    m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
+                                    EstTime.currentTimeMillis(), false);
+                        }
                     }
                     else {
                         throw new RuntimeException(

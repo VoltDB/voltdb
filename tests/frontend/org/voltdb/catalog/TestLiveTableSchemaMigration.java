@@ -30,6 +30,7 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.ServerThread;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
@@ -99,7 +100,9 @@ public class TestLiveTableSchemaMigration extends TestCase {
 
             client.callProcedure("@LoadMultipartitionTable", "FOO", t1);
 
-            client.callProcedure("@UpdateApplicationCatalog", catBytes2, deployment);
+            ClientResponseImpl response = (ClientResponseImpl) client.callProcedure(
+                    "@UpdateApplicationCatalog", catBytes2, deployment);
+            System.out.println(response.toJSONString());
 
             VoltTable t3 = client.callProcedure("@AdHoc", "select * from FOO").getResults()[0];
 
@@ -141,6 +144,14 @@ public class TestLiveTableSchemaMigration extends TestCase {
     public void testFixedSchemas() throws Exception {
         // do nada
         migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:INTEGER, B:TINYINT)");
+
+        // do nada with more schema
+        migrateSchema("FOO (A:INTEGER-N/'28154', B:TINYINT/NULL, C:VARCHAR1690/NULL, " +
+                      "CX:VARCHAR563-N/'mbZyuwvBzhMDvajcrmOFKeGOxgFm', D:FLOAT, E:TIMESTAMP, " +
+                      "PKEY:BIGINT-N, F:VARCHAR24, G:DECIMAL, C4:TIMESTAMP-N/'1970-01-15 22:52:29.508000') P(PKEY)",
+                      "FOO (A:INTEGER-N/'28154', B:TINYINT/NULL, C:VARCHAR1690/NULL, " +
+                      "CX:VARCHAR563-N/'mbZyuwvBzhMDvajcrmOFKeGOxgFm', D:FLOAT, E:TIMESTAMP, " +
+                      "PKEY:BIGINT-N, F:VARCHAR24, G:DECIMAL, C4:TIMESTAMP-N/'1970-01-15 22:52:29.508000') P(PKEY)");
 
         // try to add a column in front of a pkey
         migrateSchema("FOO (A:INTEGER) P(0)", "FOO (X:INTEGER, A:INTEGER) P(1)");
