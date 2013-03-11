@@ -156,13 +156,11 @@ public class TestDDLCompiler extends TestCase {
 
         // schema with a foreign key constraint and a check constraint
         String schema1 =  "create table t0 (id bigint not null, primary key (id));\n";
-               schema1 += "create table t1 (name varchar(32), user varchar(32), " +
-                          "id bigint references t0, primary key (name, user), CHECK (id>0));";
+               schema1 += "create table t1 (name varchar(32), username varchar(32), " +
+                          "id bigint references t0, primary key (name, username), CHECK (id>0));";
 
         // similar schema with not null and unique constraints (should have no warnings)
         String schema2 =  "create table t0 (id bigint not null, primary key (id));\n";
-               //schema2 += "create table t1 (name varchar(32), user varchar(32), " +
-               //                  "id bigint, primary key (name, user);";
 
         // boilerplate for making a project
         final String simpleProject =

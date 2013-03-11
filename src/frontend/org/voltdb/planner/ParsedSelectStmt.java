@@ -533,4 +533,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public boolean isGrouped() { return ! groupByColumns.isEmpty(); }
+
+    public boolean displayColumnsContainAllGroupByColumns() {
+        for (ParsedColInfo groupedCol : groupByColumns) {
+            boolean missing = true;
+            for (ParsedColInfo displayCol : displayColumns) {
+                if (displayCol.groupBy) {
+                    if (groupedCol.equals(displayCol)) {
+                        missing = false;
+                        break;
+                    }
+                }
+            }
+            if (missing) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
