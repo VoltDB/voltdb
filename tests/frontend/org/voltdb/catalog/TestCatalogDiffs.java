@@ -28,7 +28,10 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
+import org.voltdb.TableHelper;
+import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
@@ -84,9 +87,20 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catOriginal,
             Catalog catUpdated)
     {
+        verifyDiff(catOriginal, catUpdated, null);
+    }
+
+    private void verifyDiff(
+            Catalog catOriginal,
+            Catalog catUpdated,
+            Boolean expectSnapshotIsolation)
+    {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
         catOriginal.execute(diff.commands());
         assertTrue(diff.supported());
+        if (expectSnapshotIsolation != null) {
+            assertEquals((boolean) expectSnapshotIsolation, diff.requiresSnapshotIsolation());
+        }
         String updatedOriginalSerialized = catOriginal.serialize();
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
     }
@@ -315,12 +329,22 @@ public class TestCatalogDiffs extends TestCase {
         return cat;
     }
 
+    Catalog getCatalogForTable(String tableName, String catname, VoltTable t) throws IOException {
+        CatalogBuilder builder = new CatalogBuilder();
+        builder.addLiteralSchema(TableHelper.ddlForTable(t));
+
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        builder.compile(testDir + File.separator + "test-" + catname + ".jar");
+        Catalog cat = catalogForJar(testDir + File.separator + "test-" + catname + ".jar");
+        return cat;
+    }
+
 
     // N.B. Some of the testcases assume this exact table structure .. if you change it,
     // check the callers...
     Catalog get2ColumnCatalogForTable(String tableName, String catname) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
+        builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, C2 BIGINT DEFAULT 0 NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo(tableName, "C1");
         if (tableName.equals("A"))
             builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
@@ -350,7 +374,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testaddtable2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testaddtable2.jar");
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testDropTable() throws IOException {
@@ -369,19 +393,49 @@ public class TestCatalogDiffs extends TestCase {
         // Create a catalog with just table A
         Catalog catUpdated = getCatalogForTable("A", "droptable2");
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
 
-    public void testAddTableColumnRejected() throws IOException {
+    public void testAddTableColumn() throws IOException {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, true);
     }
 
-    public void testRemoveTableColumnRejected() throws IOException {
-        Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumnrejected2");
-        Catalog catUpdated = getCatalogForTable("A", "removetablecolumnrejected1");
+    public void testRemoveTableColumn() throws IOException {
+        Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumn2");
+        Catalog catUpdated = getCatalogForTable("A", "removetablecolumn1");
+        verifyDiff(catOriginal, catUpdated, true);
+    }
+
+    public void testModifyTableColumn() throws IOException {
+        // should pass
+        VoltTable t1 = TableHelper.quickTable("(SMALLINT, VARCHAR30, VARCHAR80)");
+        VoltTable t2 = TableHelper.quickTable("(INTEGER, VARCHAR40, VARCHAR120)");
+        Catalog catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        Catalog catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
+        verifyDiff(catOriginal, catUpdated, true);
+
+        // fail integer contraction
+        t1 = TableHelper.quickTable("(BIGINT)");
+        t2 = TableHelper.quickTable("(INTEGER)");
+        catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
+
+        // fail string contraction
+        t1 = TableHelper.quickTable("(VARCHAR35)");
+        t2 = TableHelper.quickTable("(VARCHAR34)");
+        catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
+        verifyDiffRejected(catOriginal, catUpdated);
+
+        // fail crossing inline - out-of-line boundary
+        t1 = TableHelper.quickTable("(VARBINARY30)");
+        t2 = TableHelper.quickTable("(VARBINARY70)");
+        catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
@@ -401,7 +455,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueCoveringTableIndex2.jar");
 
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated, false);
     }
 
     public void testAddUniqueNonCoveringTableIndexRejected() throws IOException {
@@ -518,7 +572,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testRemoveTableConstraintRejected() throws IOException {
+    public void testRemoveTableConstraint() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with the primary key
@@ -526,13 +580,13 @@ public class TestCatalogDiffs extends TestCase {
 
         // without the primary key
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT DEFAULT 0 NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         builder.compile(testDir + File.separator + "dropconstraint2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dropconstraint2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testAddMaterializedViewRejected() throws IOException {
@@ -567,6 +621,54 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "remmatview2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "remmatview2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testModifyMaterializedViewRejected() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // with a view
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "remmatview1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "remmatview1.jar");
+
+        // without a view
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C2, NUM) AS SELECT C2, COUNT(*) FROM A GROUP BY C2;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "remmatview2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "remmatview2.jar");
+
+        verifyDiffRejected(catOriginal, catUpdated);
+    }
+
+    public void testModifyMaterializedViewSourceRejected() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // with a view
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addPartitionInfo("A", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
+        builder.compile(testDir + File.separator + "remmatview1.jar");
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "remmatview1.jar");
+
+        // without a view
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         builder.compile(testDir + File.separator + "remmatview2.jar");

@@ -102,7 +102,7 @@ public class TableShorthand {
             String defaultValue = VoltTable.ColumnInfo.NO_DEFAULT_VALUE; // stupid reserved work
 
             try {
-                String[] parts = colShorthand.trim().split(":");
+                String[] parts = colShorthand.trim().split(":", 2);
                 if (parts.length > 2) throw new Exception();
 
                 // name

@@ -406,6 +406,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool initMaterializedViews(bool addAll);
         bool updateCatalogDatabaseReference();
 
+        bool hasSameSchema(catalog::Table *t1, voltdb::Table *t2);
+
         void printReport();
 
 

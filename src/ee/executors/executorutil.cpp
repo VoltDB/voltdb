@@ -47,7 +47,26 @@
 
 #include "common/debuglog.h"
 #include "common/FatalException.hpp"
-#include "executors/executors.h"
+
+#include "executors/aggregateexecutor.h"
+#include "executors/deleteexecutor.h"
+#include "executors/distinctexecutor.h"
+#include "executors/indexscanexecutor.h"
+#include "executors/indexcountexecutor.h"
+#include "executors/tablecountexecutor.h"
+#include "executors/insertexecutor.h"
+#include "executors/limitexecutor.h"
+#include "executors/materializeexecutor.h"
+#include "executors/nestloopexecutor.h"
+#include "executors/nestloopindexexecutor.h"
+#include "executors/orderbyexecutor.h"
+#include "executors/projectionexecutor.h"
+#include "executors/receiveexecutor.h"
+#include "executors/sendexecutor.h"
+#include "executors/seqscanexecutor.h"
+#include "executors/unionexecutor.h"
+#include "executors/updateexecutor.h"
+
 #include <cassert>
 
 namespace voltdb {
@@ -56,8 +75,8 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
                                  AbstractPlanNode* abstract_node) {
     PlanNodeType type = abstract_node->getPlanNodeType();
     switch (type) {
-    case PLAN_NODE_TYPE_AGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>(engine, abstract_node);
-    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>(engine, abstract_node);
+    case PLAN_NODE_TYPE_AGGREGATE: return new AggregateSerialExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
