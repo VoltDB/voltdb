@@ -34,7 +34,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 public class JoinProducer extends JoinProducerBase implements TaskLog {
     private final LinkedBlockingDeque<Pair<Integer, ByteBuffer>> m_snapshotData =
-            new LinkedBlockingDeque<Pair<Integer, ByteBuffer>>(3);
+            new LinkedBlockingDeque<Pair<Integer, ByteBuffer>>();
     private boolean m_receivedFirstFragment = false;
 
     private class CompletionAction extends JoinCompletionAction {
