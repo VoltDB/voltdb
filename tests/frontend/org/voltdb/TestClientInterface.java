@@ -37,11 +37,11 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,8 +50,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -521,6 +521,7 @@ public class TestClientInterface {
         try {
             final ByteBuffer msg = createMsg("@Promote");
             m_ci.handleRead(msg, m_handler, null);
+            Thread.sleep(1500);
             // Verify that the truncation request node was created.
             verify(m_zk).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
                                 eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
