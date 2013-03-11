@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME="txnid"
+APPNAME="schemachange"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -28,31 +28,21 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
-        src/txnIdSelfCheck/*.java \
-        src/txnIdSelfCheck/procedures/*.java
+    javac -classpath $CLASSPATH -d obj \
+        src/schemachange/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
 
 # build an application catalog
 function catalog() {
-    srccompile
-
-    # primary catalog
-    $VOLTDB compile --classpath obj -o $APPNAME.jar src/txnIdSelfCheck/ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-
-    # alternate catalog that adds an index
-    $VOLTDB compile --classpath obj -o $APPNAME-alt.jar \
-        src/txnIdSelfCheck/ddl.sql src/txnIdSelfCheck/ddl-annex.sql
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -68,38 +58,16 @@ function server() {
 
 # run the client that drives the example
 function client() {
-    benchmark
-}
-
-# Asynchronous benchmark sample
-# Use this target for argument help
-function benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
-}
-
-function benchmark() {
     srccompile
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
-        txnIdSelfCheck.Benchmark \
-        --displayinterval=1 \
-        --duration=120 \
+        schemachange.SchemaChangeClient \
         --servers=localhost \
-        --threads=20 \
-        --threadoffset=0 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
-        --entropy=127 \
-        --fillerrowsize=10240 \
-        --replfillerrowmb=32 \
-        --partfillerrowmb=128 \
-        --progresstimeout=120 \
-        --usecompression=false \
-        --allowinprocadhoc=false
+        --targetrssmb=2048 \
+        --pathtodeployment=`pwd`/deployment.xml
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|catalog|server|client}"
 }
 
 # Run the target passed as the first arg on the command line

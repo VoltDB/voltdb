@@ -304,8 +304,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp) {
-            return Site.this.updateCatalog(diffCmds, context, csp, false);
+        public boolean updateCatalog(String diffCmds, CatalogContext context,
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+        {
+            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false);
         }
     };
 
@@ -977,17 +979,36 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean isMPI)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         m_context = context;
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
-        if (!isMPI) {
-            //Necessary to quiesce before updating the catalog
-            //so export data for the old generation is pushed to Java.
-            m_ee.quiesce(m_lastCommittedTxnId);
-            m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
+        if (isMPI) {
+            // the rest of the work applies to sites with real EEs
+            return true;
         }
+
+        // if a snapshot is in process, wait for it to finish
+        // don't bother if this isn't a schema change
+        //
+        if (requiresSnapshotIsolationboolean && m_snapshotter.isEESnapshotting()) {
+            hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
+                    CoreUtils.getSiteIdFromHSId(m_siteId)));
+            try {
+                m_snapshotter.completeSnapshotWork(m_ee);
+                hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
+                        CoreUtils.getSiteIdFromHSId(m_siteId)));
+            }
+            catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB("Unexpected Interrupted Exception while finishing a snapshot for a catalog update.", true, e);
+            }
+        }
+
+        //Necessary to quiesce before updating the catalog
+        //so export data for the old generation is pushed to Java.
+        m_ee.quiesce(m_lastCommittedTxnId);
+        m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
 
         return true;
     }

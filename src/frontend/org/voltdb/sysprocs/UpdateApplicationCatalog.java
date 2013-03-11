@@ -67,6 +67,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
             int expectedCatalogVersion = (Integer)params.toArray()[1];
             long deploymentCRC = (Long)params.toArray()[2];
+            boolean requiresSnapshotIsolation = ((Byte) params.toArray()[3]) != 0;
 
             byte catalogBytes[] = null;
             try {
@@ -84,7 +85,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                             getVoltPrivateRealTransactionIdDontUseMe(),
                             getUniqueId(),
                             deploymentCRC);
-            context.updateCatalog(commands, p.getFirst(), p.getSecond());
+            context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
 
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
@@ -119,7 +120,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     private final VoltTable[] performCatalogUpdateWork(
             String catalogDiffCommands,
             int expectedCatalogVersion,
-            long deploymentCRC)
+            long deploymentCRC,
+            byte requiresSnapshotIsolation)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -128,7 +130,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_updateCatalog;
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(catalogDiffCommands, expectedCatalogVersion, deploymentCRC);
+        params.setParameters(catalogDiffCommands, expectedCatalogVersion, deploymentCRC, requiresSnapshotIsolation);
         pfs[0].parameters = params;
 
         pfs[1] = new SynthesizedPlanFragment();
@@ -156,7 +158,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String catalogDiffCommands, byte[] catalogBytes,
             int expectedCatalogVersion, String deploymentString,
-            long deploymentCRC) throws Exception
+            long deploymentCRC, byte requiresSnapshotIsolation) throws Exception
     {
         // TODO: compute CRC for catalog vs. a crc provided by the initiator.
         // validateCRC(catalogURL, initiatorsCRC);
@@ -179,7 +181,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         performCatalogUpdateWork(
                 catalogDiffCommands,
                 expectedCatalogVersion,
-                deploymentCRC);
+                deploymentCRC,
+                requiresSnapshotIsolation);
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);

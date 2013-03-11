@@ -690,94 +690,108 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        // for test code
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
+        // end test code
 
-        // Even if the logger is null, don't stop.  We want to log the stack trace and
-        // any other pertinent information to a .dmp file for crash diagnosis
-        List<String> currentStacktrace = new ArrayList<String>();
-        currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
+        // try/finally block does its best to ensure death, no matter what context this
+        // is called in
+        try {
+            // slightly less important than death, this try/finally block protects code that
+            // prints a message to stdout
+            try {
 
-        // Create a special dump file to hold the stack trace
-        try
-        {
-            TimestampType ts = new TimestampType(new java.util.Date());
-            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-            String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
-            PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
-            writer.println("Time: " + ts);
-            writer.println("Message: " + errMsg);
+                // Even if the logger is null, don't stop.  We want to log the stack trace and
+                // any other pertinent information to a .dmp file for crash diagnosis
+                List<String> currentStacktrace = new ArrayList<String>();
+                currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
 
-            writer.println();
-            writer.println("Platform Properties:");
-            PlatformProperties pp = PlatformProperties.getPlatformProperties();
-            String[] lines = pp.toLogLines().split("\n");
-            for (String line : lines) {
-                writer.println(line.trim());
-            }
+                // Create a special dump file to hold the stack trace
+                try
+                {
+                    TimestampType ts = new TimestampType(new java.util.Date());
+                    CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+                    String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+                    PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
+                    writer.println("Time: " + ts);
+                    writer.println("Message: " + errMsg);
 
-            if (thrown != null) {
-                writer.println();
-                writer.println("****** Exception Thread ****** ");
-                thrown.printStackTrace(writer);
-            }
+                    writer.println();
+                    writer.println("Platform Properties:");
+                    PlatformProperties pp = PlatformProperties.getPlatformProperties();
+                    String[] lines = pp.toLogLines().split("\n");
+                    for (String line : lines) {
+                        writer.println(line.trim());
+                    }
 
-            printStackTraces(writer, currentStacktrace);
-            writer.close();
-        }
-        catch (Throwable err)
-        {
-            // shouldn't fail, but..
-            err.printStackTrace();
-        }
+                    if (thrown != null) {
+                        writer.println();
+                        writer.println("****** Exception Thread ****** ");
+                        thrown.printStackTrace(writer);
+                    }
 
-        VoltLogger log = null;
-        try
-        {
-            log = new VoltLogger("HOST");
-        }
-        catch (RuntimeException rt_ex)
-        { /* ignore */ }
-
-        if (log != null)
-        {
-            log.fatal(errMsg);
-            if (thrown != null) {
-                if (stackTrace) {
-                    log.fatal("Fatal exception", thrown);
-                } else {
-                    log.fatal(thrown.toString());
+                    printStackTraces(writer, currentStacktrace);
+                    writer.close();
                 }
-            } else {
-                if (stackTrace) {
-                    for (String currentStackElem : currentStacktrace) {
-                        log.fatal(currentStackElem);
+                catch (Throwable err)
+                {
+                    // shouldn't fail, but..
+                    err.printStackTrace();
+                }
+
+                VoltLogger log = null;
+                try
+                {
+                    log = new VoltLogger("HOST");
+                }
+                catch (RuntimeException rt_ex)
+                { /* ignore */ }
+
+                if (log != null)
+                {
+                    log.fatal(errMsg);
+                    if (thrown != null) {
+                        if (stackTrace) {
+                            log.fatal("Fatal exception", thrown);
+                        } else {
+                            log.fatal(thrown.toString());
+                        }
+                    } else {
+                        if (stackTrace) {
+                            for (String currentStackElem : currentStacktrace) {
+                                log.fatal(currentStackElem);
+                            }
+                        }
+                    }
+                } else {
+                    System.err.println(errMsg);
+                    if (thrown != null) {
+                        if (stackTrace) {
+                            thrown.printStackTrace();
+                        } else {
+                            System.err.println(thrown.toString());
+                        }
+                    } else {
+                        if (stackTrace) {
+                            for (String currentStackElem : currentStacktrace) {
+                                System.err.println(currentStackElem);
+                            }
+                        }
                     }
                 }
             }
-        } else {
-            System.err.println(errMsg);
-            if (thrown != null) {
-                if (stackTrace) {
-                    thrown.printStackTrace();
-                } else {
-                    System.err.println(thrown.toString());
-                }
-            } else {
-                if (stackTrace) {
-                    for (String currentStackElem : currentStacktrace) {
-                        System.err.println(currentStackElem);
-                    }
-                }
+            finally {
+                System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
+                System.err.println("The log may contain additional information.");
             }
         }
-
-        System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
-        System.err.println("The log may contain additional information.");
-        System.exit(-1);
+        finally {
+            System.exit(-1);
+        }
     }
 
     /*
@@ -795,18 +809,29 @@ public class VoltDB {
      * Also notify all connected peers that the node is going down.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
+        // for test code
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
+        // end test code
+
         try {
+            // instruct the rest of the cluster to die
             instance().getHostMessenger().sendPoisonPill(errMsg);
+            // give the pill a chance to make it through the network buffer
+            Thread.sleep(500);
         } catch (Exception e) {
             e.printStackTrace();
+            // sleep even on exception in case the pill got sent before the exception
+            try { Thread.sleep(500); } catch (InterruptedException e2) {}
         }
-        try { Thread.sleep(500); } catch (InterruptedException e) {}
-        crashLocalVoltDB(errMsg, stackTrace, t);
+        // finally block does its best to ensure death, no matter what context this
+        // is called in
+        finally {
+            crashLocalVoltDB(errMsg, stackTrace, t);
+        }
     }
 
     /**

@@ -26,11 +26,13 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
 import java.util.Iterator;
 
+import com.google.common.base.Joiner;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -344,14 +346,32 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
             @Override
             public boolean accept(File pathname) {
-                String name = pathname.getName();
-                if (name.startsWith(nonce) && name.endsWith(".pbd")) {
+                // PBD file names have three parts: nonce.seq.pbd
+                // nonce may contain '.', seq is a sequence number.
+                String[] parts = pathname.getName().split("\\.");
+                String parsedNonce = null;
+                String seqNum = null;
+                String extension = null;
+
+                // If more than 3 parts, it means nonce contains '.', assemble them.
+                if (parts.length > 3) {
+                    Joiner joiner = Joiner.on('.').skipNulls();
+                    parsedNonce = joiner.join(Arrays.asList(parts).subList(0, parts.length - 2));
+                    seqNum = parts[parts.length - 2];
+                    extension = parts[parts.length - 1];
+                } else if (parts.length == 3) {
+                    parsedNonce = parts[0];
+                    seqNum = parts[1];
+                    extension = parts[2];
+                }
+
+                if (nonce.equals(parsedNonce) && "pbd".equals(extension)) {
                     if (pathname.length() == 4) {
                         //Doesn't have any objects, just the object count
                         pathname.delete();
                         return false;
                     }
-                    Long index = Long.valueOf(name.substring( nonce.length() + 1, name.length() - 4));
+                    Long index = Long.valueOf(seqNum);
                     DequeSegment ds = new DequeSegment( index, pathname);
                     m_finishedSegments.put( index, ds);
                     m_sizeInBytes.addAndGet(ds.sizeInBytes());

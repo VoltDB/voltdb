@@ -172,7 +172,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
      */
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
-        m_executionSite.updateCatalog(diffCmds, context, csp, true);
+        // note this will never require snapshot isolation because the MPI has no snapshot funtionality
+        m_executionSite.updateCatalog(diffCmds, context, csp, false, true);
     }
 
     @Override

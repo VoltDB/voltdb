@@ -211,6 +211,10 @@ void setSearchKeyFromTuple(TableTuple &source) {
  * uninlined strings and creates and registers an UndoAction.
  */
 bool PersistentTable::insertTuple(TableTuple &source) {
+    return insertTuple(source, true);
+}
+
+bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
 
     // not null checks at first
     FAIL_IF(!checkNulls(source)) {
@@ -261,17 +265,21 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     {
         increaseStringMemCount(m_tmpTarget1.getNonInlinedMemorySize());
     }
-    /*
-     * Create and register an undo action.
-     */
-    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
-    assert(undoQuantum);
-    Pool *pool = undoQuantum->getDataPool();
-    assert(pool);
-    PersistentTableUndoInsertAction *ptuia =
-      new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
-      PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
-    undoQuantum->registerUndoAction(ptuia);
+
+    // this is skipped for schema changes for now
+    if (createUndoQuantum) {
+        /*
+         * Create and register an undo action.
+         */
+        UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
+        assert(undoQuantum);
+        Pool *pool = undoQuantum->getDataPool();
+        assert(pool);
+        PersistentTableUndoInsertAction *ptuia =
+            new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
+            PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
+        undoQuantum->registerUndoAction(ptuia);
+    }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
@@ -506,6 +514,25 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
 
     undoQuantum->registerUndoAction(ptuda, this);
     return true;
+}
+
+/**
+ * Assumptions:
+ *  All tuples will be deleted in storage order.
+ *  Indexes and views have been destroyed first.
+ */
+void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
+    // May not delete an already deleted tuple.
+    assert(target.isActive());
+
+    // The tempTuple is forever!
+    assert(&target != &m_tempTuple);
+
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        decreaseStringMemCount(target.getNonInlinedMemorySize());
+    }
+    target.freeObjectColumns();
+    deleteTupleStorage(target);
 }
 
 /*

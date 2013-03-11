@@ -1702,7 +1702,7 @@ TEST CASES
         <arg line="-c 'rm -rf ${sqlcov.dir}'"/>
     </exec>
     <mkdir dir="${sqlcov.dir}" />
-    <condition property="enableiv2" value="${enableiv2}" else="false">
+    <condition property="enableiv2" value="${enableiv2}" else="true">
         <isset property="enableiv2"/>
     </condition>
     <condition property="" value="${env.VOLTBUILD}" else='release'>

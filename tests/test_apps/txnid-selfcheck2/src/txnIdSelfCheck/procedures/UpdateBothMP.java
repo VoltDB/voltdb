@@ -25,6 +25,7 @@ package txnIdSelfCheck.procedures;
 
 import org.voltdb.VoltTable;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.VoltProcedure;
 
 public class UpdateBothMP extends ReplicatedUpdateBaseProc {
 
@@ -51,7 +52,9 @@ public class UpdateBothMP extends ReplicatedUpdateBaseProc {
         assert(checksumR1b == checksumR2b);
         assert(checksumR1c == checksumR2c);
 
-        return results2;
+        VoltTable[] combined = doSummaryAndCombineResults(results2);
+
+        return combined;
     }
 
 }

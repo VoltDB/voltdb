@@ -66,5 +66,6 @@ public interface SystemProcedureExecutionContext {
 
     public void updateBackendLogLevels();
 
-    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context, CatalogSpecificPlanner csp);
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
+            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation);
 }
