@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
@@ -115,6 +116,92 @@ public class TableHelper {
     /** Get a table from shorthand using TableShorthand */
     public static VoltTable quickTable(String shorthand) {
         return TableShorthand.tableFromShorthand(shorthand);
+    }
+
+    /**
+     * Get a sorted copy of a VoltTable. This is not guaranteed to be in any
+     * particular order. It's also rather slow, as implementations go. The constraint
+     * is that if you sort two tables with the same rows, but in different orders,
+     * the two sorted tables will have identical contents. Useful for tests
+     * more than for production.
+     *
+     * @param table Input table.
+     * @return A new table containing the data from the old table in sorted order.
+     */
+    public static VoltTable sortTable(VoltTable table) {
+        // get all of the rows of the source table as a giant array
+        Object[][] rows = new Object[table.getRowCount()][];
+        table.resetRowPosition();
+        int row = 0;
+        while (table.advanceRow()) {
+            rows[row] = new Object[table.getColumnCount()];
+            for (int column = 0; column < table.getColumnCount(); column++) {
+                rows[row][column] = table.get(column, table.getColumnType(column));
+                if (table.wasNull()) {
+                    rows[row][column] = null;
+                }
+            }
+            row++;
+        }
+
+        // sort the rows of the table
+        Arrays.sort(rows, new Comparator<Object[]>() {
+            @Override
+            public int compare(Object[] o1, Object[] o2) {
+                for (int i = 0; i < o1.length; i++) {
+                    // normally bad, but here this should be true
+                    assert(o1.length == o2.length);
+
+                    // handle both null or very lucky otherwise
+                    if (o1[i] == o2[i]) {
+                        continue;
+                    }
+
+                    // handle one is null
+                    if (o1[i] == null) {
+                        return -1;
+                    }
+                    if (o2[i] == null) {
+                        return 1;
+                    }
+                    // assume neither null
+                    int cmp;
+
+                    // handle varbinary comparisons
+                    if (o1[i] instanceof byte[]) {
+                        assert(o2[i] instanceof byte[]);
+                        String hex1 = Encoder.hexEncode((byte[]) o1[i]);
+                        String hex2 = Encoder.hexEncode((byte[]) o2[i]);
+                        cmp = hex1.compareTo(hex2);
+                    }
+                    // generic case
+                    else {
+                        cmp = o1[i].toString().compareTo(o2[i].toString());
+                    }
+
+                    if (cmp != 0) {
+                        return cmp;
+                    }
+                }
+
+                // they're equal
+                return 0;
+            }
+        });
+
+        // clone the table
+        VoltTable.ColumnInfo columns[] = new VoltTable.ColumnInfo[table.getColumnCount()];
+        for (int column = 0; column < table.getColumnCount(); column++) {
+            columns[column] = new VoltTable.ColumnInfo(table.getColumnName(column),
+                    table.getColumnType(column));
+        }
+        VoltTable retval = new VoltTable(columns);
+
+        // add the sorted rows to the new table
+        for (Object[] rowArray : rows) {
+            retval.addRow(rowArray);
+        }
+        return retval;
     }
 
     /**
