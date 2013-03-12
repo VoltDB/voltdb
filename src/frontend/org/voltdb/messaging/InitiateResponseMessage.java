@@ -24,6 +24,7 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.StoredProcedureInvocation;
 
 /**
  * Message from an execution site to initiator with the final response for
@@ -39,9 +40,12 @@ public class InitiateResponseMessage extends VoltMessage {
     private long m_connectionId;
     private boolean m_commit;
     private boolean m_recovering;
-    private boolean m_mispartitioned;
     private boolean m_readOnly;
     private ClientResponseImpl m_response;
+
+    // Mis-partitioned invocation needs to send the invocation back to ClientInterface for restart
+    private boolean m_mispartitioned;
+    private StoredProcedureInvocation m_invocation;
 
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
@@ -140,8 +144,15 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_mispartitioned;
     }
 
-    public void setMispartitioned(boolean mispartitioned) {
+    public StoredProcedureInvocation getInvocation() {
+        return m_invocation;
+    }
+
+    public void setMispartitioned(boolean mispartitioned, StoredProcedureInvocation invocation) {
         m_mispartitioned = mispartitioned;
+        m_invocation = invocation;
+        m_commit = false;
+        m_response = null;
     }
 
     public ClientResponseImpl getClientResponseData() {
@@ -171,13 +182,17 @@ public class InitiateResponseMessage extends VoltMessage {
             + 1 // node recovering indication
             + 1; // mispartitioned invocation
 
-        msgsize += m_response.getSerializedSize();
+        if (m_mispartitioned) {
+            msgsize += m_invocation.getSerializedSize();
+        } else {
+            msgsize += m_response.getSerializedSize();
+        }
 
         return msgsize;
     }
 
     @Override
-    public void flattenToBuffer(ByteBuffer buf)
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.INITIATE_RESPONSE_ID);
         buf.putLong(m_txnId);
@@ -189,7 +204,11 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
-        m_response.flattenToBuffer(buf);
+        if (m_mispartitioned) {
+            m_invocation.flattenToBuffer(buf);
+        } else {
+            m_response.flattenToBuffer(buf);
+        }
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -206,9 +225,15 @@ public class InitiateResponseMessage extends VoltMessage {
         m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
-        m_response = new ClientResponseImpl();
-        m_response.initFromBuffer(buf);
-        m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
+        if (m_mispartitioned) {
+            m_invocation = new StoredProcedureInvocation();
+            m_invocation.initFromBuffer(buf);
+            m_commit = false;
+        } else {
+            m_response = new ClientResponseImpl();
+            m_response.initFromBuffer(buf);
+            m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
+        }
         assert(buf.capacity() == buf.position());
     }
 

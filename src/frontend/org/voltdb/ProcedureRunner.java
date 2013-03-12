@@ -353,6 +353,25 @@ public class ProcedureRunner {
         return retval;
     }
 
+    /**
+     * Check if the txn hashes to this partition. If not, it should be restarted.
+     * @param txnState
+     * @return true if the txn hashes to the current partition, false otherwise
+     */
+    public boolean checkPartition(TransactionState txnState) {
+        // TODO: only checks user procs now, AdHocs need to be handled slightly differently
+        if (m_catProc.getSinglepartition() && !m_isSysProc) {
+            int partitionparameter = m_catProc.getPartitionparameter();
+            Object parameterAtIndex = txnState.getInvocation().getParameterAtIndex(partitionparameter);
+            int partition = TheHashinator.hashToPartition(parameterAtIndex);
+            if (partition != m_site.getCorrespondingPartitionId()) {
+                // Wrong partition, should restart the txn
+                return false;
+            }
+        }
+        return true;
+    }
+
     public void setupTransaction(TransactionState txnState) {
         m_txnState = txnState;
     }
