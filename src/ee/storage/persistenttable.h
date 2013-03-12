@@ -148,6 +148,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // ------------------------------------------------------------------
     void deleteAllTuples(bool freeAllocatedStrings);
     bool insertTuple(TableTuple &source);
+    bool insertTuple(TableTuple &source, bool createUndoQuantum);
 
     /*
      * Inserts a Tuple without performing an allocation for the
@@ -179,6 +180,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      */
     bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
     void deleteTupleForUndo(voltdb::TableTuple &tupleCopy);
+    void deleteTupleForSchemaChange(TableTuple &target);
 
     /*
      * Lookup the address of the tuple that is identical to the specified tuple.
@@ -264,11 +266,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         m_nonInlinedMemorySize -= bytes;
     }
 
-  private:
-
     size_t allocatedBlockCount() const {
         return m_data.size();
     }
+
+  private:
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {

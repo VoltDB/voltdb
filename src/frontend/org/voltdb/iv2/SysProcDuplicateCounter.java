@@ -29,6 +29,7 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.utils.MiscUtils;
 
 import org.voltdb.VoltTable;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * A special subclass of DuplicateCounter for multi-part
@@ -77,30 +78,9 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             new FragmentResponseMessage((FragmentResponseMessage)m_lastResponse);
         // union up all the deps we've collected and jam them in
         for (Entry<Integer, List<VoltTable>> dep : m_alldeps.entrySet()) {
-            VoltTable grouped = unionTables(dep.getValue());
+            VoltTable grouped = VoltTableUtil.unionTables(dep.getValue());
             unioned.addDependency(dep.getKey(), grouped);
         }
         return unioned;
-    }
-
-    protected VoltTable unionTables(List<VoltTable> operands) {
-        VoltTable result = null;
-        VoltTable vt = operands.get(0);
-        if (vt != null) {
-            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt
-                                                                        .getColumnCount()];
-            for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
-                                                       vt.getColumnType(ii));
-            }
-            result = new VoltTable(columns);
-            for (Object table : operands) {
-                vt = (VoltTable) (table);
-                while (vt.advanceRow()) {
-                    result.add(vt);
-                }
-            }
-        }
-        return result;
     }
 }

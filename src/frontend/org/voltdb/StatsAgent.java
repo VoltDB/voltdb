@@ -36,6 +36,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.LocalMailbox;
@@ -243,7 +245,7 @@ public class StatsAgent {
                 selector,
                 c,
                 clientHandle,
-                new VoltTable[1],
+                new VoltTable[2],
                 System.currentTimeMillis());
             collectTopoStats(psr);
             return;
@@ -339,6 +341,13 @@ public class StatsAgent {
     {
         List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
         psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, catalogIds, false, psr.startTime);
+        VoltTable vt =
+                new VoltTable(
+                new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
+                new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
+        psr.aggregateTables[1] = vt;
+        Pair<HashinatorType, byte[]> hashConfig = TheHashinator.getCurrentConfig();
+        vt.addRow(hashConfig.getFirst().toString(), hashConfig.getSecond());
         try {
             sendStatsResponse(psr);
         } catch (Exception e) {

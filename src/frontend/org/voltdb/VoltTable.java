@@ -1111,13 +1111,17 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * @return A string containing a pretty-print formatted representation of this table.
      */
     public String toFormattedString() {
+
+        final int MAX_PRINTABLE_CHARS = 30;
+        final String ELIPSIS = "...";
+
         StringBuffer sb = new StringBuffer();
 
         int columnCount = this.getColumnCount();
         int[] padding = new int[columnCount];
         String[] fmt = new String[columnCount];
         for (int i = 0; i < columnCount; i++) {
-            padding[i] = this.getColumnName(i).length();
+            padding[i] = this.getColumnName(i).length(); // min value to be increased later
         }
         this.resetRowPosition();
 
@@ -1130,14 +1134,18 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                     v = "NULL";
                 }
                 int len = 0; // length
-                if (this.getColumnType(i) == VoltType.VARBINARY
-                        && !this.wasNull()) {
+                if (this.getColumnType(i) == VoltType.VARBINARY && !this.wasNull()) {
                     len = ((byte[]) v).length * 2;
                 } else {
                     len = v.toString().length();
                 }
+                // crop long strings and such
+                if (len > MAX_PRINTABLE_CHARS) {
+                    len = MAX_PRINTABLE_CHARS;
+                }
 
-                if (padding[i] < len) {
+                // compute the max for each column
+                if (len > padding[i]) {
                     padding[i] = len;
                 }
             }
@@ -1179,16 +1187,21 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         while (this.advanceRow()) {
             for (int i = 0; i < columnCount; i++) {
                 Object value = this.get(i, this.getColumnType(i));
+                String valueStr;
                 if (this.wasNull()) {
-                    value = "NULL";
+                    valueStr = "NULL";
                 }
                 else if (this.getColumnType(i) == VoltType.VARBINARY) {
-                    value = Encoder.hexEncode((byte[]) value);
+                    valueStr = Encoder.hexEncode((byte[]) value);
                 }
                 else {
-                    value = value.toString();
+                    valueStr = value.toString();
                 }
-                sb.append(String.format(fmt[i], value));
+                // truncate long values
+                if (valueStr.length() > MAX_PRINTABLE_CHARS) {
+                    valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELIPSIS.length()) + ELIPSIS;
+                }
+                sb.append(String.format(fmt[i], valueStr));
                 if (i < columnCount - 1) {
                     sb.append(" ");
                 }

@@ -225,6 +225,7 @@ CTX.INPUT['execution'] = """
 
 CTX.INPUT['executors'] = """
  abstractexecutor.cpp
+ aggregateexecutor.cpp
  deleteexecutor.cpp
  distinctexecutor.cpp
  executorutil.cpp
@@ -337,6 +338,10 @@ CTX.THIRD_PARTY_INPUT['crc'] = """
  crc32ctables.cc
 """
 
+CTX.THIRD_PARTY_INPUT['murmur3'] = """
+ MurmurHash3.cpp
+"""
+
 ###############################################################################
 # SPECIFY THE TESTS
 ###############################################################################
@@ -370,6 +375,7 @@ if whichtests in ("${eetestsuite}", "common"):
      nvalue_test
      pool_test
      tabletuple_test
+     elastic_hashinator_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):

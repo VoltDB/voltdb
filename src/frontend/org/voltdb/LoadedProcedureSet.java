@@ -44,14 +44,12 @@ public class LoadedProcedureSet {
     final ProcedureRunnerFactory m_runnerFactory;
     final long m_siteId;
     final int m_siteIndex;
-    final int m_numberOfPartitions;
     final SiteProcedureConnection m_site;
 
-    public LoadedProcedureSet(SiteProcedureConnection site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex, int numberOfPartitions) {
+    public LoadedProcedureSet(SiteProcedureConnection site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex) {
         m_runnerFactory = runnerFactory;
         m_siteId = siteId;
         m_siteIndex = siteIndex;
-        m_numberOfPartitions = numberOfPartitions;
         m_site = site;
     }
 
@@ -179,7 +177,7 @@ public class LoadedProcedureSet {
             }
 
             runner = m_runnerFactory.create(procedure, proc, csp);
-            procedure.initSysProc(m_numberOfPartitions, m_site, this, proc, catalogContext.cluster);
+            procedure.initSysProc(m_site, this, proc, catalogContext.cluster);
             builder.put(entry.getKey().intern(), runner);
         }
     }

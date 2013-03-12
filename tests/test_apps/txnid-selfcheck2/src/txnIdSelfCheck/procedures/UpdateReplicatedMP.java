@@ -28,7 +28,9 @@ import org.voltdb.VoltTable;
 public class UpdateReplicatedMP extends ReplicatedUpdateBaseProc {
 
     public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        return doWork(r_getCIDData, r_cleanUp, r_insert, p_getAdhocData,
+        VoltTable[] results = doWork(r_getCIDData, r_cleanUp, r_insert, p_getAdhocData,
                 cid, rid, value, rollback);
+
+        return doSummaryAndCombineResults(results);
     }
 }

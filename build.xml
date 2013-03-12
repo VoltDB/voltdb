@@ -86,6 +86,7 @@
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
 <property name='debian.package.dir'          value='obj/debian' />
+<property name='rpm.package.dir'             value='obj/rpms' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -714,7 +715,7 @@ CLEANING
 
 <target name='clean'
 	description="Remove all compiled and generated files."
-	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package, clean_bindoc, clean_other_gen">
+	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -854,6 +855,7 @@ JAR BUILDING
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
+            <include name="org/apache/cassandra_voltpatches/MurmurHash3.class"/>
             <include name="vanilla/**" />
             <include name="jsr166y/**" />
         </fileset>
@@ -1330,7 +1332,6 @@ TEST CASES
                 <include name='org/voltdb/network/**/*Test.class'/>
                 <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
-                <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
                 <!-- Excluded pro tests -->
@@ -1338,20 +1339,14 @@ TEST CASES
                 <exclude name="**/TestCommandLogReinitiator.class"/>
                 <exclude name="**/TestCommandLog.class"/>
                 <exclude name="**/TestLogReader.class"/>
-                <exclude name="**/TestTaskLog.class"/>
-                <exclude name="**/TestResponseSampler.class" />  <!-- fails legacy -->
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
-                <exclude name="**/TestSecondaryRejoin.class" />
-                <exclude name="**/TestSnapshotSaveTruncation.class" />
                 <!-- Exclude community tests -->
+                <!-- Recorded as ENG-4423 -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
-                <exclude name="**/TestNonDetermisticSeppuku.class" />
-                <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
-                <exclude name="**/TestSneakyExecutionOrderSuite.class" />
             </fileset>
         </tests>
     </run_junit>
@@ -1415,7 +1410,6 @@ TEST CASES
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
-                <exclude name="**/TestResponseSampler.class" />  <!-- regressed during 3.0 bugfix? -->
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- regressed during 3.0 bugfix? -->
             </fileset>
         </tests>
@@ -1708,7 +1702,7 @@ TEST CASES
         <arg line="-c 'rm -rf ${sqlcov.dir}'"/>
     </exec>
     <mkdir dir="${sqlcov.dir}" />
-    <condition property="enableiv2" value="${enableiv2}" else="false">
+    <condition property="enableiv2" value="${enableiv2}" else="true">
         <isset property="enableiv2"/>
     </condition>
     <condition property="" value="${env.VOLTBUILD}" else='release'>
@@ -2109,6 +2103,31 @@ DEBIAN PACKAGE CREATION
         description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
     <exec dir="." executable="sudo" failonerror="false">
         <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
+    </exec>
+</target>
+
+<!--
+***********************
+RPM PACKAGE CREATION
+***********************
+-->
+
+<target name="rpm_package"
+        depends="buildinfo"
+        description="Create RPM package">
+    <exec executable="python" failonerror="true">
+        <arg value="${base.dir}/tools/voltdb-install.py" />
+        <arg value="-R" />
+        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz" />
+    </exec>
+</target>
+
+<!-- This cleaning target is safe. It doesn't run as root. -->
+<target name="clean_rpm_package"
+	    depends=""
+        description="Remove all RPM build artifacts.">
+    <exec dir='.' executable='/bin/sh' failonerror='false'>
+        <arg line="-c 'rm -rfv ${rpm.package.dir}'" />
     </exec>
 </target>
 

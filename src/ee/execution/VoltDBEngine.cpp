@@ -59,6 +59,8 @@
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "common/LegacyHashinator.h"
+#include "common/ElasticHashinator.h"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
@@ -73,12 +75,12 @@
 #include "catalog/constraint.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/connector.h"
+#include "logging/LogManager.h"
 #include "plannodes/abstractplannode.h"
 #include "plannodes/abstractscannode.h"
 #include "plannodes/nodes.h"
 #include "plannodes/plannodeutil.h"
 #include "plannodes/plannodefragment.h"
-#include "executors/executors.h"
 #include "executors/executorutil.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
@@ -111,6 +113,7 @@ const int64_t AD_HOC_FRAG_ID = -1;
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentUndoQuantum(NULL),
+      m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
       m_currentOutputDepId(-1),
       m_currentInputDepId(-1),
@@ -161,7 +164,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t hostId,
                          string hostname,
                          int64_t tempTableMemoryLimit,
-                         int32_t totalPartitions)
+                         HashinatorType hashinatorType,
+                         char *hashinatorConfig)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -169,7 +173,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
-    m_totalPartitions = totalPartitions;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -211,6 +214,19 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
+
+    switch (hashinatorType) {
+    case HASHINATOR_LEGACY:
+        m_hashinator.reset(LegacyHashinator::newInstance(hashinatorConfig));
+        break;
+    case HASHINATOR_ELASTIC:
+        m_hashinator.reset(ElasticHashinator::newInstance(hashinatorConfig));
+        break;
+    default:
+        throwFatalException("Unknown hashinator type %d", hashinatorType);
+        break;
+    }
+
     return true;
 }
 
@@ -383,7 +399,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                 m_currentInputDepId = -1;
                 return ENGINE_ERRORCODE_ERROR;
             }
-        } catch (SerializableEEException &e) {
+        } catch (const SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
@@ -452,7 +468,7 @@ int VoltDBEngine::loadFragment(const char *plan, int32_t length, int64_t &fragId
                                               message);
             }
         }
-        catch (SerializableEEException &e)
+        catch (const SerializableEEException &e)
         {
             VOLT_TRACE("loadFragment: failed to initialize plan fragment");
             e.serialize(getExceptionOutputSerializer());
@@ -605,6 +621,45 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     return true;
 }
 
+bool
+VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
+    // covers column count
+    if (t1->columns().size() != t2->columnCount()) {
+        return false;
+    }
+
+    // make sure each column has same metadata
+    map<string, catalog::Column*>::const_iterator outerIter;
+    for (outerIter = t1->columns().begin();
+         outerIter != t1->columns().end();
+         outerIter++)
+    {
+        int index = outerIter->second->index();
+        int size = outerIter->second->size();
+        int32_t type = outerIter->second->type();
+        std::string name = outerIter->second->name();
+        bool nullable = outerIter->second->nullable();
+
+        if (t2->columnName(index).compare(name)) {
+            return false;
+        }
+
+        if (t2->schema()->columnLength(index) != size) {
+            return false;
+        }
+
+        if (t2->schema()->columnAllowNull(index) != nullable) {
+            return false;
+        }
+
+        if (t2->schema()->columnType(index) != type) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /*
  * Create catalog delegates for new catalog tables.
  * Create the tables themselves when new tables are needed.
@@ -679,13 +734,36 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
              */
             if (tcd->exportEnabled()) {
                 table->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                // note, this is the end of the line for export tables for now,
+                // don't allow them to change schema yet
+                continue;
             }
+            assert(!table->isExport());
 
-            vector<TableIndex*> currentIndexes = table->allIndexes();
+            //////////////////////////////////////////
+            // if the table schema has changed, build a new
+            // table and migrate tuples over to it, repopulating
+            // indexes as we go
+            //////////////////////////////////////////
+
+            if (!hasSameSchema(catalogTable, table)) {
+                char msg[512];
+                snprintf(msg, sizeof(msg), "Processing schema changes for %s\n",
+                         catalogTable->name().c_str());
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+
+                tcd->processSchemaChanges(*m_database, *catalogTable);
+
+                // don't continue on to modify/add/remove indexes, because the
+                // call above should rebuild them all anyway
+                continue;
+            }
 
             //////////////////////////////////////////
             // find all of the indexes to add
             //////////////////////////////////////////
+
+            vector<TableIndex*> currentIndexes = table->allIndexes();
 
             // iterate over indexes for this table in the catalog
             map<string, catalog::Index*>::const_iterator indexIter;
@@ -854,7 +932,7 @@ VoltDBEngine::loadTable(int32_t tableId,
 
     try {
         table->loadTuplesFrom(serializeIn);
-    } catch (SerializableEEException e) {
+    } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
     return true;
@@ -1147,7 +1225,7 @@ void VoltDBEngine::printReport() {
 
 bool VoltDBEngine::isLocalSite(const NValue& value)
 {
-    int index = TheHashinator::hashinate(value, m_totalPartitions);
+    int index = m_hashinator->hashinate(value);
     return index == m_partitionId;
 }
 
@@ -1265,7 +1343,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           message);
         }
-    } catch (SerializableEEException &e) {
+    } catch (const SerializableEEException &e) {
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
         return -1;
@@ -1587,4 +1665,19 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     }
     return table->hashCode();
 }
+
+void VoltDBEngine::updateHashinator(HashinatorType type, const char *config) {
+    switch (type) {
+    case HASHINATOR_LEGACY:
+        m_hashinator.reset(LegacyHashinator::newInstance(config));
+        break;
+    case HASHINATOR_ELASTIC:
+        m_hashinator.reset(ElasticHashinator::newInstance(config));
+        break;
+    default:
+        throwFatalException("Unknown hashinator type %d", type);
+        break;
+    }
+}
+
 }

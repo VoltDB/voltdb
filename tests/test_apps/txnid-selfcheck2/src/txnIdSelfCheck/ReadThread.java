@@ -49,13 +49,17 @@ public class ReadThread extends Thread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
     final Semaphore txnsOutstanding = new Semaphore(100);
+    final boolean allowInProcAdhoc;
 
-    public ReadThread(Client client, int threadCount, int threadOffset) {
+    public ReadThread(Client client, int threadCount, int threadOffset,
+            boolean allowInProcAdhoc)
+    {
         setName("ReadThread");
 
         this.client = client;
         this.threadCount = threadCount;
         this.threadOffset = threadOffset;
+        this.allowInProcAdhoc = allowInProcAdhoc;
     }
 
     void shutdown() {
@@ -117,7 +121,7 @@ public class ReadThread extends Thread {
             boolean inprocAdhoc = (counter % 23) == 0;
             counter++;
             String procName = replicated ? "ReadMP" : "ReadSP";
-            if (inprocAdhoc) procName += "InProcAdHoc";
+            if (inprocAdhoc && allowInProcAdhoc) procName += "InProcAdHoc";
             byte cid = (byte) (r.nextInt(threadCount) + threadOffset);
 
             // call a transaction

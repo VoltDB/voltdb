@@ -47,7 +47,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
-import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
@@ -114,6 +113,7 @@ public class TestIv2RejoinCoordinator {
         m_coordinator = null;
         m_snapshotDaemon = null;
         m_clientInterface = null;
+        m_cis.clear();
         reset(m_volt);
         VoltDB.wasCrashCalled = false;
     }
@@ -166,7 +166,7 @@ public class TestIv2RejoinCoordinator {
     @Test
     public void testBlockingBasic() throws Exception {
         createCoordinator(false);
-        m_coordinator.startRejoin();
+        m_coordinator.startJoin(null, null);
         // verify the first site is started
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
@@ -216,7 +216,7 @@ public class TestIv2RejoinCoordinator {
     @Test
     public void testReplayFinishedBeforeSnapshot() throws Exception {
         createCoordinator(false);
-        m_coordinator.startRejoin();
+        m_coordinator.startJoin(null, null);
 
         // fake a replay finished response for site 2 before snapshot stream finishes
         RejoinMessage msg3 = new RejoinMessage(2l, RejoinMessage.Type.REPLAY_FINISHED);

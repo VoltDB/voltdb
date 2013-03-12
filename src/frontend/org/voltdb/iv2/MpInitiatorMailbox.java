@@ -169,7 +169,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     public MpInitiatorMailbox(int partitionId,
             Scheduler scheduler,
             HostMessenger messenger, RepairLog repairLog,
-            RejoinProducer rejoinProducer)
+            JoinProducerBase rejoinProducer)
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
         m_taskThread.start();

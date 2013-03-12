@@ -17,10 +17,7 @@
 
 package org.voltdb.iv2;
 
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -54,6 +51,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -73,7 +71,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.MiscUtils;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
@@ -92,7 +89,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     final int m_snapshotPriority;
 
     // Partition count is important for some reason.
-    final int m_numberOfPartitions;
+    int m_numberOfPartitions;
 
     // What type of EE is controlled
     final BackendTarget m_backend;
@@ -102,9 +99,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private final static int kStateRejoining = 1;
     private final static int kStateReplayingRejoin = 2;
     private int m_rejoinState;
-    private TaskLog m_rejoinTaskLog;
-    private RejoinProducer.ReplayCompletionAction m_replayCompletionAction;
-    private final VoltDB.START_ACTION m_startAction;
+    private final TaskLog m_rejoinTaskLog;
+    private JoinProducerBase.JoinCompletionAction m_replayCompletionAction;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -286,6 +282,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public void setNumberOfPartitions(int partitionCount) {
+            Site.this.setNumberOfPartitions(partitionCount);
+        }
+
+        @Override
         public SiteProcedureConnection getSiteProcedureConnection()
         {
             return Site.this;
@@ -303,8 +304,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp) {
-            return Site.this.updateCatalog(diffCmds, context, csp, false);
+        public boolean updateCatalog(String diffCmds, CatalogContext context,
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+        {
+            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false);
         }
     };
 
@@ -324,6 +327,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             StatsAgent agent,
             MemoryStats memStats,
             String coreBindIds,
+            TaskLog rejoinTaskLog,
             PartitionDRGateway drGateway)
     {
         m_siteId = siteId;
@@ -332,8 +336,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_startAction = startAction;
-        m_rejoinState = VoltDB.createForRejoin(startAction) ? kStateRejoining : kStateRunning;
+        m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == VoltDB.START_ACTION
+                .JOIN ? kStateRejoining :
+                kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
@@ -342,6 +347,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
+        m_rejoinTaskLog = rejoinTaskLog;
         m_drGateway = drGateway;
 
         if (agent != null) {
@@ -398,59 +404,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 return (now - 5) > m_lastTxnTime;
             }
         });
-
-        if (m_startAction == VoltDB.START_ACTION.LIVE_REJOIN) {
-            initializeForLiveRejoin();
-        }
-
-        if (m_rejoinTaskLog == null) {
-            m_rejoinTaskLog = new TaskLog() {
-                @Override
-                public void logTask(TransactionInfoBaseMessage message)
-                        throws IOException {
-                }
-
-                @Override
-                public TransactionInfoBaseMessage getNextMessage()
-                        throws IOException {
-                    return null;
-                }
-
-                @Override
-                public void setEarliestTxnId(long txnId) {
-                }
-
-                @Override
-                public boolean isEmpty() throws IOException {
-                    return true;
-                }
-
-                @Override
-                public void close() throws IOException {
-                }
-            };
-        }
-    }
-
-
-    void initializeForLiveRejoin()
-    {
-        // Construct task log and start logging task messages
-        File overflowDir =
-            new File(m_context.cluster.getVoltroot(), "rejoin_overflow");
-        Class<?> taskLogKlass =
-            MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Rejoin", false);
-        if (taskLogKlass != null) {
-            Constructor<?> taskLogConstructor;
-            try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
-                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir, true);
-            } catch (InvocationTargetException e) {
-                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e);
-            }
-        }
     }
 
     /** Create a native VoltDB execution engine */
@@ -469,7 +422,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        m_numberOfPartitions);
+                        TheHashinator.getConfiguredHashinatorType(),
+                        TheHashinator.getConfigureBytes(m_numberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
@@ -485,7 +439,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            m_numberOfPartitions);
+                            TheHashinator.getConfiguredHashinatorType(),
+                            TheHashinator.getConfigureBytes(m_numberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
         }
@@ -944,7 +899,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void setRejoinComplete(
-            RejoinProducer.ReplayCompletionAction replayComplete,
+            JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
@@ -1024,17 +979,36 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean isMPI)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         m_context = context;
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
-        if (!isMPI) {
-            //Necessary to quiesce before updating the catalog
-            //so export data for the old generation is pushed to Java.
-            m_ee.quiesce(m_lastCommittedTxnId);
-            m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
+        if (isMPI) {
+            // the rest of the work applies to sites with real EEs
+            return true;
         }
+
+        // if a snapshot is in process, wait for it to finish
+        // don't bother if this isn't a schema change
+        //
+        if (requiresSnapshotIsolationboolean && m_snapshotter.isEESnapshotting()) {
+            hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
+                    CoreUtils.getSiteIdFromHSId(m_siteId)));
+            try {
+                m_snapshotter.completeSnapshotWork(m_ee);
+                hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
+                        CoreUtils.getSiteIdFromHSId(m_siteId)));
+            }
+            catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB("Unexpected Interrupted Exception while finishing a snapshot for a catalog update.", true, e);
+            }
+        }
+
+        //Necessary to quiesce before updating the catalog
+        //so export data for the old generation is pushed to Java.
+        m_ee.quiesce(m_lastCommittedTxnId);
+        m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
 
         return true;
     }
@@ -1064,5 +1038,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (!foundMultipartTxnId) {
             VoltDB.crashLocalVoltDB("Didn't find a multipart txnid on restore", false, null);
         }
+    }
+
+    public void setNumberOfPartitions(int partitionCount)
+    {
+        m_numberOfPartitions = partitionCount;
+        m_ee.updateHashinator(TheHashinator.getConfiguredHashinatorType(),
+                TheHashinator.getConfigureBytes(m_numberOfPartitions));
     }
 }

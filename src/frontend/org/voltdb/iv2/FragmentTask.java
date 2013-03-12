@@ -108,6 +108,14 @@ public class FragmentTask extends TransactionTask
             new FragmentResponseMessage(m_task, m_initiator.getHSId());
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
+
+        // Set the dependencies even if this is a dummy response. This site could be the master
+        // on elastic join, so the fragment response message is actually going to the MPI.
+        for (int frag = 0; frag < m_task.getFragmentCount(); frag++) {
+            final int outputDepId = m_task.getOutputDepId(frag);
+            response.addDependency(outputDepId, null);
+        }
+
         m_initiator.deliver(response);
     }
 

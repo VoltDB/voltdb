@@ -6,17 +6,25 @@
 # This script DOES NOT do the removals - you need to run the
 # console output.
 
+#TODO: Make it handle incorrect password the 1st time, then abort
 
-# TODO: Make this find branches where the delete will findfail
-# because of matching tag and branch name
 
 from datetime import date, datetime, timedelta
+import getpass
 import os
+import re
 from subprocess import Popen
 import subprocess
 import sys
 
+import jiratools
+
 exclusions = []
+
+user = getpass.getuser()
+password = getpass.getpass('Enter your Jira password: ')
+jira_url = 'https://issues.voltdb.com/'
+#server_url = 'http://localhost:8080'
 
 def run_cmd(cmd):
     proc = Popen(cmd.split(' '),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -45,8 +53,7 @@ def get_branch_list(merged):
     #Filter others from list
     branches = list(set(branches) - set(exclusions))
     branches.sort()
-    #for b in branches:
-    #    print '  ' + b
+
     return branches
 
 def make_delete_branches_script(branches, do_it):
@@ -56,13 +63,36 @@ def make_delete_branches_script(branches, do_it):
     for b in branches:
         cmd = 'git push origin --delete %s%s' % \
             (b.split('origin/')[1], other_args)
-        print cmd
+        comment = get_jira_info(b)
+        print "%30s %s" %(cmd, comment)
+
+def get_jira_info(b):
+
+    comment = ''
+    rg = re.compile('(eng)-?(\d+)', re.IGNORECASE)
+    m = rg.search(b)
+    if m:
+        issue = m.group(1) + '-' + m.group(2)
+        #print "##Getting %s" % issue
+        ticket = jiratools.get_jira_issue(jira_url, user, password, issue, 'summary,assignee')
+        if ticket:
+            assignee = 'Unassigned'
+            if ticket['fields']['assignee']:
+                assignee = ticket['fields']['assignee']['name']
+            summary = ticket['fields']['summary']
+            #issue_url = jira_url +  'browse/' + issue_key
+            comment = "%s: %s" % (assignee, summary)
+
+    return "   # " + comment
 
 def make_archive_branches_script(branches):
     for b in branches:
+        comment = get_jira_info(b)
         shortname = b.split('origin/')[1]
+        print
         print 'git tag -m "archiving branch %s" archive/%s %s' % (shortname, shortname, b)
-        print 'git push origin --delete %s' % shortname
+        print 'git push origin --delete %s %s' % (shortname, comment)
+
 
 def weed_out_newer_branches(branches,maxage):
     old_branches = []
@@ -98,8 +128,8 @@ if __name__ == "__main__":
     branch_list = get_branch_list(merged)
 
     if merged:
-        print ('\n#----------------\n#dry-run script:\n#----------------')
-        make_delete_branches_script(branch_list, False)
+        #print ('\n#----------------\n#dry-run script:\n#----------------')
+        #make_delete_branches_script(branch_list, False)
         print ('\n#----------------\n#real script:\n#----------------')
         make_delete_branches_script(branch_list, True)
     else:

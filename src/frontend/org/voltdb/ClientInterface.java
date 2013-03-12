@@ -91,12 +91,8 @@ import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
-import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
-import org.voltdb.iv2.LeaderCache;
-import org.voltdb.iv2.LeaderCacheReader;
-import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -158,11 +154,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final AtomicInteger m_numConnections = new AtomicInteger(0);
 
     /**
-     * IV2 stuff
-     */
-    private final LeaderCacheReader m_iv2Masters;
-
-    /**
      * ZooKeeper is used for @Promote to trigger a truncation snapshot.
      */
     ZooKeeper m_zk;
@@ -221,6 +212,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // clock time of last call to the initiator's tick()
     static final int POKE_INTERVAL = 1000;
 
+    // IV2 doesn't use this at all. Leave it here for now for legacy.
     private final int m_allPartitions[];
     private ImmutableMap<Integer, Long> m_localReplicas = ImmutableMap.<Integer, Long>builder().build();
     final long m_siteId;
@@ -1028,7 +1020,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (initiatorHSId != null) {
                     isShortCircuitRead = true;
                 } else {
-                    initiatorHSId = m_iv2Masters.get(partitions[0]);
+                    initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
                 }
             }
             else {
@@ -1216,16 +1208,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         registerMailbox(m_zk);
         m_siteId = m_mailbox.getHSId();
-        m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters);
-        m_iv2Masters.start(true);
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {
         try {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
-            final int partitionId = jsObj.getInt(BaseInitiator.JSON_PARTITION_ID);
-            final long initiatorHSId = jsObj.getLong(BaseInitiator.JSON_INITIATOR_HSID);
+            final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
+            final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
             for (final Connection c : m_connections) {
                 c.queueTask(new Runnable() {
                     @Override
@@ -1670,7 +1660,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void sendSentinelsToAllPartitions(long txnId)
     {
         for (int partition : m_allPartitions) {
-            final long initiatorHSId = m_iv2Masters.get(partition);
+            final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             /*
              * HACK! DR LoadMultipartitionTable generates sentinels here,
              * they pretend to be for replay so that the SPIs won't generate responses for them.
@@ -1694,7 +1684,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         // First parameter of the invocation is the partition ID
         int pid = (Integer) invocation.getParameterAtIndex(0);
-        final long initiatorHSId = m_iv2Masters.get(pid);
+        final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(pid);
         long handle = cihm.getHandle(true, pid, invocation.getClientHandle(), size, now,
                 invocation.getProcName(), initiatorHSId, true, false);
 
@@ -2134,43 +2124,59 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                     else if (result instanceof CatalogChangeResult) {
                         final CatalogChangeResult changeResult = (CatalogChangeResult) result;
-                        // create the execution site task
-                        StoredProcedureInvocation task = new StoredProcedureInvocation();
-                        task.procName = "@UpdateApplicationCatalog";
-                        task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
-                                       changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                       changeResult.deploymentCRC);
-                        task.clientHandle = changeResult.clientHandle;
-                        // DR stuff
-                        task.type = changeResult.invocationType;
-                        task.originalTxnId = changeResult.originalTxnId;
-                        task.originalUniqueId = changeResult.originalUniqueId;
 
-                        /*
-                         * Round trip the invocation to initialize it for command logging
-                         */
-                        FastSerializer fs = new FastSerializer();
-                        try {
-                            fs.writeObject(task);
-                            ByteBuffer source = fs.getBuffer();
-                            ByteBuffer copy = ByteBuffer.allocate(source.remaining());
-                            copy.put(source);
-                            copy.flip();
-                            FastDeserializer fds = new FastDeserializer(copy);
-                            task = new StoredProcedureInvocation();
-                            task.readExternal(fds);
-                        } catch (Exception e) {
-                            hostLog.fatal(e);
-                            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                        // if the catalog change is a null change
+                        if (changeResult.encodedDiffCommands.trim().length() == 0) {
+                            ClientResponseImpl shortcutResponse =
+                                    new ClientResponseImpl(
+                                            ClientResponseImpl.SUCCESS,
+                                            new VoltTable[0], "Catalog update with no changes was skipped.",
+                                            result.clientHandle);
+                            ByteBuffer buf = ByteBuffer.allocate(shortcutResponse.getSerializedSize() + 4);
+                            buf.putInt(buf.capacity() - 4);
+                            shortcutResponse.flattenToBuffer(buf);
+                            buf.flip();
+                            c.writeStream().enqueue(buf);
                         }
+                        else {
+                            // create the execution site task
+                            StoredProcedureInvocation task = new StoredProcedureInvocation();
+                            task.procName = "@UpdateApplicationCatalog";
+                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
+                                           changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                                           changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0);
+                            task.clientHandle = changeResult.clientHandle;
+                            // DR stuff
+                            task.type = changeResult.invocationType;
+                            task.originalTxnId = changeResult.originalTxnId;
+                            task.originalUniqueId = changeResult.originalUniqueId;
 
-                        // initiate the transaction. These hard-coded values from catalog
-                        // procedure are horrible, horrible, horrible.
-                        createTransaction(changeResult.connectionId, changeResult.hostname,
-                                changeResult.adminConnection,
-                                task, false, false, false, m_allPartitions,
-                                m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
-                                EstTime.currentTimeMillis(), false);
+                            /*
+                             * Round trip the invocation to initialize it for command logging
+                             */
+                            FastSerializer fs = new FastSerializer();
+                            try {
+                                fs.writeObject(task);
+                                ByteBuffer source = fs.getBuffer();
+                                ByteBuffer copy = ByteBuffer.allocate(source.remaining());
+                                copy.put(source);
+                                copy.flip();
+                                FastDeserializer fds = new FastDeserializer(copy);
+                                task = new StoredProcedureInvocation();
+                                task.readExternal(fds);
+                            } catch (Exception e) {
+                                hostLog.fatal(e);
+                                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                            }
+
+                            // initiate the transaction. These hard-coded values from catalog
+                            // procedure are horrible, horrible, horrible.
+                            createTransaction(changeResult.connectionId, changeResult.hostname,
+                                    changeResult.adminConnection,
+                                    task, false, false, false, m_allPartitions,
+                                    m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
+                                    EstTime.currentTimeMillis(), false);
+                        }
                     }
                     else {
                         throw new RuntimeException(
@@ -2180,7 +2186,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else {
                     ClientResponseImpl errorResponse =
                         new ClientResponseImpl(
-                                ClientResponseImpl.UNEXPECTED_FAILURE,
+                                ClientResponseImpl.GRACEFUL_FAILURE,
                                 new VoltTable[0], result.errorMsg,
                                 result.clientHandle);
                     ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
@@ -2286,9 +2292,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (m_snapshotDaemon != null) {
             m_snapshotDaemon.shutdown();
         }
-        if (m_iv2Masters != null) {
-            m_iv2Masters.shutdown();
-        }
         if (m_localReplicasBuilder != null) {
             m_localReplicasBuilder.join(10000);
             if (m_localReplicasBuilder.isAlive()) {
@@ -2318,7 +2321,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     final int thisHostId = CoreUtils.getHostIdFromHSId(m_mailbox.getHSId());
                     ImmutableMap.Builder<Integer, Long> localReplicas = ImmutableMap.builder();
-                    for (int partition : m_allPartitions) {
+                    for (int partition : m_cartographer.getPartitions()) {
                         for (Long replica : m_cartographer.getReplicasForPartition(partition)) {
                             if (CoreUtils.getHostIdFromHSId(replica) == thisHostId) {
                                 localReplicas.put(partition, replica);
@@ -2588,7 +2591,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param partitionId
      */
     public void sendSentinel(long txnId, int partitionId) {
-        final long initiatorHSId = m_iv2Masters.get(partitionId);
+        final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
         sendSentinel(txnId, initiatorHSId, -1, -1, true);
     }
 
@@ -2617,12 +2620,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void sendEOLMessage(int partitionId) {
         assert(m_isIV2Enabled);
-        final long initiatorHSId;
-        if (partitionId == MpInitiator.MP_INIT_PID) {
-            initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
-        } else {
-            initiatorHSId = m_iv2Masters.get(partitionId);
-        }
+        final long initiatorHSId = m_cartographer.getHSIdForMaster(partitionId);
         Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(false);
         m_mailbox.send(initiatorHSId, message);
     }

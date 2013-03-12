@@ -34,6 +34,7 @@ import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -41,6 +42,8 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
+
+import com.google.common.base.Charsets;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -117,7 +120,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        LoadFragment(26);
+        LoadFragment(26),
+        updateHashinator(27);
         Commands(final int id) {
             m_id = id;
         }
@@ -506,7 +510,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int tempTableMemory,
             final BackendTarget target,
             final int port,
-            final int totalPartitions) {
+            final HashinatorType type,
+            final byte config[]) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -524,7 +529,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
-        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory, totalPartitions);
+        initialize(
+                m_clusterIndex,
+                m_siteId,
+                m_partitionId,
+                m_hostId,
+                m_hostname,
+                1024 * 1024 * tempTableMemory,
+                type,
+                config);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -557,7 +570,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final long tempTableMemory,
-            final int totalPartitions)
+            final HashinatorType hashinatorType,
+            final byte hashinatorConfig[])
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -571,13 +585,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
-        m_data.putInt(totalPartitions);
-        m_data.putShort((short)hostname.length());
-        try {
-            m_data.put(hostname.getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        m_data.putInt(hashinatorType.typeId());
+        m_data.putInt(hashinatorConfig.length);
+        m_data.putInt((short)hostname.length());
+        m_data.put(hashinatorConfig);
+        m_data.put(hostname.getBytes(Charsets.UTF_8));
         try {
             m_data.flip();
             m_connection.write();
@@ -1283,7 +1295,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, int partitionCount)
+    public int hashinate(Object value, HashinatorType type, byte config[])
     {
         ParameterSet parameterSet = new ParameterSet();
         parameterSet.setParameters(value);
@@ -1297,7 +1309,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         m_data.clear();
         m_data.putInt(Commands.Hashinate.m_id);
-        m_data.putInt(partitionCount);
+        m_data.putInt(type.typeId());
+        m_data.putInt(config.length);
+        m_data.put(config);
         m_data.put(fser.getBuffer());
         try {
             m_data.flip();
@@ -1313,6 +1327,23 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             part.flip();
             return part.getInt();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void updateHashinator(HashinatorType type, byte[] config)
+    {
+        m_data.clear();
+        m_data.putInt(Commands.updateHashinator.m_id);
+        m_data.putInt(type.typeId());
+        m_data.putInt(config.length);
+        m_data.put(config);
+        try {
+            m_data.flip();
+            m_connection.write();
         } catch (final Exception e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);

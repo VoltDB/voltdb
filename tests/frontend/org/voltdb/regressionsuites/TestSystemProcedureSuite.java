@@ -304,8 +304,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         if (VoltDB.checkTestEnvForIv2()) {
             results = client.callProcedure("@Statistics", "TOPO", 0).getResults();
             // one aggregate table returned
-            assertEquals(1, results.length);
+            assertEquals(2, results.length);
             System.out.println("Test TOPO table: " + results[0].toString());
+            System.out.println("Test TOPO table: " + results[1].toString());
             VoltTable topo = results[0];
             // Make sure we can find the MPI, at least
             boolean found = false;
