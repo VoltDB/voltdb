@@ -23,8 +23,11 @@
 
 namespace voltdb {
 
-TupleOutputStream::TupleOutputStream(void *data, std::size_t length)
-  : ReferenceSerializeOutput(data, length), m_rowCount(0), m_rowCountPosition(0)
+TupleOutputStream::TupleOutputStream(void *data, std::size_t length) :
+    ReferenceSerializeOutput(data, length),
+    m_rowCount(0),
+    m_rowCountPosition(0),
+    m_totalBytesSerialized(0)
 {
 }
 
@@ -37,6 +40,7 @@ std::size_t TupleOutputStream::startRows(int32_t partitionId)
     writeInt(partitionId);
     m_rowCount = 0;
     m_rowCountPosition = reserveBytes(4);
+    m_totalBytesSerialized = 0;
     return m_rowCountPosition;
 }
 
@@ -46,7 +50,9 @@ std::size_t TupleOutputStream::writeRow(TupleSerializer &serializer, const Table
     serializer.serializeTo(tuple, this);
     const std::size_t endPos = position();
     m_rowCount++;
-    return endPos - startPos;
+    std::size_t bytesSerialized = endPos - startPos;
+    m_totalBytesSerialized += bytesSerialized;
+    return bytesSerialized;
 }
 
 bool TupleOutputStream::canFit(std::size_t nbytes) const

@@ -52,7 +52,6 @@ void TupleOutputStreamProcessor::clearState()
     m_maxTupleLength = 0;
     m_predicates = NULL;
     m_table = NULL;
-    m_totalBytesSerialized = 0;
 }
 
 /** Convenience method to create and add a new TupleOutputStream. */
@@ -81,14 +80,6 @@ void TupleOutputStreamProcessor::open(PersistentTable &table,
     m_totalPartitions = totalPartitions;
     for (TupleOutputStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         iter->startRows(partitionId);
-    }
-    m_totalBytesSerialized = 0;
-    // Recalculate the serialization throttle threshold based on the number of partitions.
-    if (m_totalPartitions > 0) {
-        m_bytesSerializedThreshold = m_bytesSerializedThresholdPerPartition * m_totalPartitions;
-    }
-    else {
-        m_bytesSerializedThreshold = m_bytesSerializedThresholdPerPartition;
     }
 }
 
@@ -137,16 +128,15 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTupl
                 throwFatalException(
                     "TupleOutputStreamProcessor::writeRow() failed because buffer has no space.");
             }
-            m_totalBytesSerialized += iter->writeRow(serializer, tuple);
-            // Is this buffer capable of handling another tuple after this one is done?
-            if (!yield && !iter->canFit(m_maxTupleLength)) {
-                yield = true;
+            iter->writeRow(serializer, tuple);
+            // Check if we'll need to yield after handling this row.
+            if (!yield) {
+                // Yield when the buffer is not capable of handling another tuple
+                // or when the total bytes serialized threshold is exceeded.
+                yield = (   !iter->canFit(m_maxTupleLength)
+                         || iter->getTotalBytesSerialized() > m_bytesSerializedThreshold);
             }
         }
-    }
-    // Yield control when the bytes threshold is hit to allow other work.
-    if (!yield && m_totalBytesSerialized >= m_bytesSerializedThreshold) {
-        yield = true;
     }
     return yield;
 }

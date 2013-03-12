@@ -72,8 +72,7 @@ private:
     std::size_t m_maxTupleLength;
 
     /** Pause serialization after this many bytes per partition. */
-    static const std::size_t m_bytesSerializedThresholdPerPartition = 512 * 1024;
-    std::size_t m_bytesSerializedThreshold;
+    static const std::size_t m_bytesSerializedThreshold = 512 * 1024;
 
     /** Table receiving tuples. */
     PersistentTable *m_table;
@@ -83,9 +82,6 @@ private:
 
     /** Predicates for filtering. May remain non-NULL after open() if empty. */
     StreamPredicateList *m_predicates;
-
-    /** Keep track of bytes written for throttling to yield control. */
-    std::size_t m_totalBytesSerialized;
 
     /** Private method used by constructors, etc. to clear state. */
     void clearState();

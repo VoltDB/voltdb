@@ -67,10 +67,19 @@ public:
      */
     void endRows();
 
+    /**
+     * Access the total bytes serialized counter.
+     */
+    std::size_t getTotalBytesSerialized() const {
+        return m_totalBytesSerialized;
+    }
+
 private:
 
     int32_t     m_rowCount;
     std::size_t m_rowCountPosition;
+    /** Keep track of bytes written for throttling to yield control. */
+    std::size_t m_totalBytesSerialized;
 };
 
 } // namespace voltdb
