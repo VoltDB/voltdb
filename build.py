@@ -40,7 +40,7 @@ CTX = BuildContext(sys.argv)
 # these are the base compile options that get added to every compile step
 # this does not include header/lib search paths or specific flags for
 #  specific targets
-CTX.CPPFLAGS = """-Wall -Wextra -Werror -Woverloaded-virtual
+CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -pthread
@@ -55,7 +55,7 @@ if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
 
 # linker flags
-CTX.LDFLAGS = """ -g3 -rdynamic"""
+CTX.LDFLAGS += """ -g3 -rdynamic"""
 CTX.LASTLDFLAGS = """ -ldl"""
 
 if CTX.COVERAGE:
@@ -211,6 +211,10 @@ CTX.INPUT['common'] = """
  DefaultTupleSerializer.cpp
  executorcontext.cpp
  serializeio.cpp
+ StreamPredicate.cpp
+ StreamPredicateList.cpp
+ TupleOutputStream.cpp
+ TupleOutputStreamProcessor.cpp
 """
 
 CTX.INPUT['execution'] = """
@@ -331,7 +335,7 @@ CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
 
 CTX.THIRD_PARTY_INPUT['crc'] = """
  crc32c.cc
- crc32ctables.cc 
+ crc32ctables.cc
 """
 
 ###############################################################################

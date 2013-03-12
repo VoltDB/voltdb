@@ -52,8 +52,9 @@
 #include <vector>
 #include <cassert>
 
-#include "boost/shared_ptr.hpp"
-#include "json_spirit/json_spirit.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
+#include <json_spirit/json_spirit.h>
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"
@@ -65,6 +66,7 @@
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
+#include "common/TupleOutputStream.h"
 #include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
@@ -80,10 +82,6 @@
 
 #define MAX_BATCH_COUNT 1000
 #define MAX_PARAM_COUNT 1000 // or whatever
-
-namespace boost {
-template <typename T> class shared_ptr;
-}
 
 namespace catalog {
 class Catalog;
@@ -103,8 +101,6 @@ class SerializeInput;
 class SerializeOutput;
 class Table;
 class CatalogDelegate;
-class ReferenceSerializeInput;
-class ReferenceSerializeOutput;
 class PlanNodeFragment;
 class ExecutorContext;
 class RecoveryProtoMsg;
@@ -352,19 +348,39 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
          */
-        bool activateTableStream(const CatalogId tableId, const TableStreamType streamType);
+        bool activateTableStream(
+                const CatalogId tableId,
+                const TableStreamType streamType,
+                ReferenceSerializeInput &serializeIn);
 
         /**
-         * Serialize more tuples from the specified table that has an active stream of the specified type
-         * Returns the number of bytes worth of tuple data serialized or 0 if there are no more.
-         * Returns -1 if the table is not in COW mode. The table continues to be in COW (although no copies are made)
-         * after all tuples have been serialize until the last call to cowSerializeMore which returns 0 (and deletes
-         * the COW context). Further calls will return -1
+         * Serialize tuples to output streams from a table in COW mode.
+         * Overload that serializes a stream position array.
+         * Returns:
+         *  0-n: remaining tuple count
+         *  -1: streaming was completed by the previous call
+         *  -2: error, e.g. when no longer in COW mode.
+         * Note that -1 is only returned once after the previous call serialized all
+         * remaining tuples. Further calls are considered errors and will return -2.
          */
-        int tableStreamSerializeMore(
-                ReferenceSerializeOutput *out,
-                CatalogId tableId,
-                const TableStreamType streamType);
+        int64_t tableStreamSerializeMore(const CatalogId tableId,
+                                         const TableStreamType streamType,
+                                         ReferenceSerializeInput &serializeIn);
+
+        /**
+         * Serialize tuples to output streams from a table in COW mode.
+         * Overload that populates a position vector provided by the caller.
+         * Returns:
+         *  0-n: remaining tuple count
+         *  -1: streaming was completed by the previous call
+         *  -2: error, e.g. when no longer in COW mode.
+         * Note that -1 is only returned once after the previous call serialized all
+         * remaining tuples. Further calls are considered errors and will return -2.
+         */
+        int64_t tableStreamSerializeMore(const CatalogId tableId,
+                                         const TableStreamType streamType,
+                                         ReferenceSerializeInput &serializeIn,
+                                         std::vector<int> &retPositions);
 
         /*
          * Apply the updates in a recovery message.
@@ -409,7 +425,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool hasSameSchema(catalog::Table *t1, voltdb::Table *t2);
 
         void printReport();
-
 
         /**
          * Keep a list of executors for runtime - intentionally near the top of VoltDBEngine
