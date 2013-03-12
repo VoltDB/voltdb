@@ -39,6 +39,7 @@ public class InitiateResponseMessage extends VoltMessage {
     private long m_connectionId;
     private boolean m_commit;
     private boolean m_recovering;
+    private boolean m_mispartitioned;
     private boolean m_readOnly;
     private ClientResponseImpl m_response;
 
@@ -135,6 +136,14 @@ public class InitiateResponseMessage extends VoltMessage {
         m_recovering = recovering;
     }
 
+    public boolean isMispartitioned() {
+        return m_mispartitioned;
+    }
+
+    public void setMispartitioned(boolean mispartitioned) {
+        m_mispartitioned = mispartitioned;
+    }
+
     public ClientResponseImpl getClientResponseData() {
         return m_response;
     }
@@ -159,7 +168,8 @@ public class InitiateResponseMessage extends VoltMessage {
             + 8 // client interface handle
             + 8 // client connection id
             + 1 // read only
-            + 1; // node recovering indication
+            + 1 // node recovering indication
+            + 1; // mispartitioned invocation
 
         msgsize += m_response.getSerializedSize();
 
@@ -178,6 +188,7 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.putLong(m_connectionId);
         buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
+        buf.put((byte) (m_mispartitioned == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -194,6 +205,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_connectionId = buf.getLong();
         m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
+        m_mispartitioned = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
