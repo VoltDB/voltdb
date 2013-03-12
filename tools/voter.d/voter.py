@@ -30,13 +30,13 @@ import os
 def build(runner):
     if not runner.opts.conditional or not os.path.exists('voter.jar'):
         runner.java.compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
-    runner.call('volt.compile', 'obj', 'voter.jar')
+    runner.call('volt.compile', '-c', 'obj', '-o', 'voter.jar', 'ddl.sql')
 
 @VOLT.Command(description = 'Clean the Voter build output.')
 def clean(runner):
     runner.shell('rm', '-rfv', 'obj', 'debugoutput', 'voter.jar', 'voltdbroot')
 
-@VOLT.Server('start',
+@VOLT.Server('create',
              description = 'Start the Voter VoltDB server.',
              command_arguments = 'voter.jar',
              classpath = 'obj')
