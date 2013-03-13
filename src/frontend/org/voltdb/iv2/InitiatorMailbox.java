@@ -57,7 +57,7 @@ public class InitiatorMailbox implements Mailbox
     private final int m_partitionId;
     protected final Scheduler m_scheduler;
     private final HostMessenger m_messenger;
-    private final RepairLog m_repairLog;
+    protected final RepairLog m_repairLog;
     private final RejoinProducer m_rejoinProducer;
     private final LeaderCacheReader m_masterLeaderCache;
     private long m_hsId;
