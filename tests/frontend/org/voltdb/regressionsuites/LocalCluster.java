@@ -459,7 +459,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories, role);
+            startOne(i, clearLocalDataDirectories, role, START_ACTION.CREATE);
         }
 
         printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
@@ -543,8 +543,9 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode)
+    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode, START_ACTION startAction)
     {
+        PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
         try {
             cmdln.internalPort(portGenerator.next());
@@ -578,6 +579,12 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             cmdln.zkport(portGenerator.next());
+
+            if (startAction == START_ACTION.JOIN) {
+                cmdln.startCommand(startAction.name());
+                int portNoToRejoin = m_cmdLines.get(0).internalPort();
+                cmdln.leader(":" + portNoToRejoin);
+            }
 
             // If local directories are being cleared
             // generate a new subroot, otherwise reuse the existing directory
@@ -629,7 +636,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
-            PipeToFile ptf = new PipeToFile(
+            ptf = new PipeToFile(
                     testoutputdir +
                     File.separator +
                     "LC-" +
@@ -647,6 +654,10 @@ public class LocalCluster implements VoltServerConfig {
             log.error("Failed to start cluster process:" + ex.getMessage(), ex);
             assert (false);
         }
+
+        if (startAction == START_ACTION.JOIN) {
+            waitOnPTFReady(ptf, true, System.currentTimeMillis(), System.currentTimeMillis(), hostId);
+        }
     }
 
     /**
@@ -663,21 +674,32 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost, boolean liveRejoin) {
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, liveRejoin);
+        return recoverOne(
+                false,
+                0,
+                hostId,
+                portOffset,
+                rejoinHost,
+                liveRejoin ? START_ACTION.LIVE_REJOIN : START_ACTION.JOIN);
+    }
+
+    public void joinOne(int hostId) {
+        startOne(hostId, true, ReplicationRole.NONE, START_ACTION.JOIN);
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, false);
+        return recoverOne(false, 0, hostId, portOffset, rejoinHost, START_ACTION.REJOIN);
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId) {
-        return recoverOne( logtime, startTime, hostId, null, "", false);
+        return recoverOne( logtime, startTime, hostId, null, "", START_ACTION.REJOIN);
     }
 
     // Re-start a (dead) process. HostId is the enumberation of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
+    @SuppressWarnings("incomplete-switch")
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
-                               String rejoinHost, boolean liveRejoin) {
+                               String rejoinHost, START_ACTION startAction) {
 
         // Lookup the client interface port of the rejoin host
         // I have no idea why this code ignores the user's input
@@ -686,7 +708,9 @@ public class LocalCluster implements VoltServerConfig {
         if (rejoinHostId == null || m_hasLocalServer) {
             rejoinHostId = 0;
         }
+
         int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
+
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
@@ -713,11 +737,15 @@ public class LocalCluster implements VoltServerConfig {
             // some tests need this
             rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
 
-            if (liveRejoin) {
+            switch (startAction) {
+            case LIVE_REJOIN:
                 rejoinCmdLn.startCommand(START_ACTION.LIVE_REJOIN.name());
-            } else {
+                break;
+            case REJOIN:
                 rejoinCmdLn.startCommand(START_ACTION.REJOIN.name());
+                break;
             }
+
             // This shouldn't collide but apparently it sucks.
             // Bump it to avoid collisions on rejoin.
             if (m_debug) {
@@ -781,6 +809,13 @@ public class LocalCluster implements VoltServerConfig {
             assert (false);
         }
 
+        return waitOnPTFReady(ptf, logtime, startTime, start, hostId);
+    }
+
+    /*
+     * Wait for the PTF to report initialization/rejoin
+     */
+    private boolean waitOnPTFReady(PipeToFile ptf, boolean logtime, long startTime, long start, int hostId) {
         // wait for the joining site to be ready
         synchronized (ptf) {
             if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
@@ -1164,6 +1199,4 @@ public class LocalCluster implements VoltServerConfig {
         }
         return retval;
     }
-
-
 }
