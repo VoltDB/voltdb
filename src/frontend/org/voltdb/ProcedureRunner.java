@@ -366,6 +366,9 @@ public class ProcedureRunner {
             int partition = TheHashinator.hashToPartition(parameterAtIndex);
             if (partition != m_site.getCorrespondingPartitionId()) {
                 // Wrong partition, should restart the txn
+                if (log.isTraceEnabled()) {
+                    log.trace("Txn " + txnState.getInvocation().getProcName() + " needs restart");
+                }
                 return false;
             }
         }

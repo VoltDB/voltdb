@@ -899,6 +899,119 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     /**
+     * Runs on the network thread to prepare client response. If a transaction needs to be
+     * restarted, it will get restarted here.
+     */
+    private class ClientResponseWork implements DeferredSerialization {
+        private final ClientInterfaceHandleManager cihm;
+        private final InitiateResponseMessage response;
+        private final StoredProcedureInvocation invocation;
+        private final Procedure catProc;
+        private ClientResponseImpl clientResponse;
+
+        private ClientResponseWork(InitiateResponseMessage response,
+                                   ClientInterfaceHandleManager cihm,
+                                   Procedure catProc)
+        {
+            this.response = response;
+            this.clientResponse = response.getClientResponseData();
+            this.invocation = response.getInvocation();
+            this.cihm = cihm;
+            this.catProc = catProc;
+        }
+
+        @Override
+        public ByteBuffer[] serialize() throws IOException
+        {
+            // HACK-O-RIFFIC
+            // For now, figure out if this is a transaction that was ignored
+            // by the ReplaySequencer and just remove the handle from the CIHM
+            // without removing any handles before it which we haven't seen yet.
+            ClientInterfaceHandleManager.Iv2InFlight clientData;
+            if (clientResponse != null &&
+                    clientResponse.getStatusString() != null &&
+                    clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
+                clientData = cihm.removeHandle(response.getClientInterfaceHandle());
+            }
+            else {
+                clientData = cihm.findHandle(response.getClientInterfaceHandle());
+            }
+            if (clientData == null) {
+                return new ByteBuffer[] {};
+            }
+            final long now = System.currentTimeMillis();
+            final int delta = (int)(now - clientData.m_creationTime);
+
+            if (restartTransaction(clientData.m_messageSize, now)) {
+                // If the transaction is successfully restarted, don't send a response to the
+                // client yet.
+                return new ByteBuffer[] {};
+            }
+
+            /*
+             * Log initiator stats
+             */
+            cihm.m_acg.logTransactionCompleted(
+                    cihm.connection.connectionId(),
+                    cihm.connection.getHostnameOrIP(),
+                    clientData.m_procName,
+                    delta,
+                    clientResponse.getStatus());
+
+            clientResponse.setClientHandle(clientData.m_clientHandle);
+            clientResponse.setClusterRoundtrip(delta);
+            clientResponse.setHash(null); // not part of wire protocol
+
+            ByteBuffer results = ByteBuffer.allocate(clientResponse.getSerializedSize() + 4);
+            results.putInt(results.capacity() - 4);
+            clientResponse.flattenToBuffer(results);
+            return new ByteBuffer[] { results };
+        }
+
+        @Override
+        public void cancel() {
+        }
+
+        /**
+         * Checks if the transaction needs to be restarted, if so, restart it.
+         * @param messageSize the original message size when the invocation first came in
+         * @param now the current timestamp
+         * @return true if the transaction is restarted successfully, false otherwise.
+         */
+        private boolean restartTransaction(int messageSize, long now)
+        {
+            if (response.isMispartitioned()) {
+                // Restart a mis-partitioned transaction
+                assert(invocation != null);
+                boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
+
+                try {
+                    int partition = getPartitionForProcedure(catProc.getPartitionparameter(),
+                            catProc.getPartitioncolumn().getType(), invocation);
+                    createTransaction(cihm.connection.connectionId(),
+                            null, false, invocation,
+                            catProc.getReadonly(),
+                            catProc.getSinglepartition(),
+                            catProc.getEverysite(),
+                            new int[] {partition}, 1,
+                            cihm.connection,
+                            messageSize,
+                            now,
+                            allowMismatchedResults);
+                    return true;
+                } catch (Exception e) {
+                    assert(clientResponse == null);
+                    clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
+                            new VoltTable[]{},
+                            "Fail to get the partition for a restarted transaction" + e.getMessage());
+                }
+            }
+
+            return false;
+        }
+    }
+
+    /**
      * Invoked when DTXN backpressure starts
      *
      */
@@ -1126,66 +1239,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             public void deliver(final VoltMessage message) {
                 if (m_isIV2Enabled) {
                     if (message instanceof InitiateResponseMessage) {
+                        final CatalogContext catalogContext = m_catalogContext.get();
                         // forward response; copy is annoying. want slice of response.
-                        final InitiateResponseMessage response = (InitiateResponseMessage)message;
+                        InitiateResponseMessage response = (InitiateResponseMessage)message;
+                        StoredProcedureInvocation invocation = response.getInvocation();
                         Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
-                        final ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
+                        ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
+                        Procedure procedure = null;
+
+                        if (invocation != null) {
+                            procedure = catalogContext.procedures.get(invocation.getProcName());
+                        }
+
                         //Can be null on hangup
                         if (cihm != null) {
                             //Pass it to the network thread like a ninja
                             //Only the network can use the CIHM
                             cihm.connection.writeStream().enqueue(
-                                    new DeferredSerialization() {
-
-                                        @Override
-                                        public ByteBuffer[] serialize()
-                                                throws IOException {
-                                            ClientResponseImpl clientResponse = response.getClientResponseData();
-                                            // HACK-O-RIFFIC
-                                            // For now, figure out if this is a transaction that was ignored
-                                            // by the ReplaySequencer and just remove the handle from the CIHM
-                                            // without removing any handles before it which we haven't seen yet.
-                                            ClientInterfaceHandleManager.Iv2InFlight clientData;
-                                            if (clientResponse.getStatusString() != null &&
-                                                clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
-                                                clientData = cihm.removeHandle(response.getClientInterfaceHandle());
-                                            }
-                                            else {
-                                                clientData = cihm.findHandle(response.getClientInterfaceHandle());
-                                            }
-                                            if (clientData == null) {
-                                                return new ByteBuffer[] {};
-                                            }
-                                            final long now = System.currentTimeMillis();
-                                            final int delta = (int)(now - clientData.m_creationTime);
-
-                                            /*
-                                             * Log initiator stats
-                                             */
-                                            cihm.m_acg.logTransactionCompleted(
-                                                    cihm.connection.connectionId(),
-                                                    cihm.connection.getHostnameOrIP(),
-                                                    clientData.m_procName,
-                                                    delta,
-                                                    clientResponse.getStatus());
-
-                                            clientResponse.setClientHandle(clientData.m_clientHandle);
-                                            clientResponse.setClusterRoundtrip(delta);
-                                            clientResponse.setHash(null); // not part of wire protocol
-
-                                            ByteBuffer results =
-                                                    ByteBuffer.allocate(
-                                                            clientResponse.getSerializedSize() + 4);
-                                            results.putInt(results.capacity() - 4);
-                                            clientResponse.flattenToBuffer(results);
-                                            return new ByteBuffer[] { results };
-                                        }
-
-                                        @Override
-                                        public void cancel() {
-                                        }
-
-                            });
+                                    new ClientResponseWork(response, cihm, procedure));
                         }
                     } else if (message instanceof BinaryPayloadMessage) {
                         handlePartitionFailOver((BinaryPayloadMessage)message);
