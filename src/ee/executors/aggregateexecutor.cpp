@@ -126,7 +126,11 @@ public:
     }
     virtual void advance(const NValue& val) = 0;
     virtual NValue finalize() { return m_value; }
-
+    virtual void resetAgg()
+    {
+        m_haveAdvanced = false;
+        m_value.setNull();
+    }
 protected:
     bool m_haveAdvanced;
     NValue m_value;
@@ -196,6 +200,12 @@ public:
         return finalizeResult;
     }
 
+    virtual void resetAgg()
+    {
+        m_haveAdvanced = false;
+        m_count = 0;
+    }
+
 private:
     D ifDistinct;
     int64_t m_count;
@@ -223,6 +233,12 @@ public:
         return ValueFactory::getBigIntValue(m_count);
     }
 
+    virtual void resetAgg()
+    {
+        m_haveAdvanced = false;
+        m_count = 0;
+    }
+
 private:
     D ifDistinct;
     int64_t m_count;
@@ -241,6 +257,12 @@ public:
     virtual NValue finalize()
     {
         return ValueFactory::getBigIntValue(m_count);
+    }
+
+    virtual void resetAgg()
+    {
+        m_haveAdvanced = false;
+        m_count = 0;
     }
 
 private:
@@ -337,9 +359,38 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
 struct AggregateRow
 {
     void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
-    { return memoryPool.allocate(size + (sizeof(void*) * nAggs)); }
+    {
+        // allocate nAggs +1 for null terminator: see resetAggs, and destructor.
+        // Would it be cleaner to have a count data member? Not by much.
+        return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
+    }
     void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
+
+    ~AggregateRow()
+    {
+        // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
+        for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
+            // All the aggs inherit no-op delete operators, so, "delete" is really just destructor invocation.
+            // The destructor being invoked is the implicit specialization of Agg's destructor.
+            // The compiler generates it to invoke the destructor (if any) of the distinct value set (if any).
+            // It must be called because the pooled Agg object only embeds the (boost) set's "head".
+            // The "body" is allocated by boost via its defaulted stl allocator as the set grows
+            // -- AND it is not completely deallocated when "clear" is called.
+            // This AggregateRow destructor would not be required at all if distinct was based on a home-grown
+            // pool-aware hash, incapable of leaking outside the pool.
+            delete m_aggregates[ii];
+
+        }
+    }
+
+    void resetAggs()
+    {
+        // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
+        for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
+            m_aggregates[ii]->resetAgg();
+        }
+    }
 
     // A tuple from the group of tuples being aggregated. Source of pass through columns.
     TableTuple m_passThroughTuple;
@@ -536,7 +587,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
 
     VOLT_TRACE("finalizing..");
     for (HashAggregateMapType::const_iterator iter = hash.begin(); iter != hash.end(); iter++) {
-        insertOutputTuple(iter->second);
+        AggregateRow *aggregateRow = iter->second;
+        insertOutputTuple(aggregateRow);
+        delete aggregateRow;
     }
     return true;
 }
@@ -554,6 +607,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     // TODO: A separate concrete class (AggregateTableExecutor) could make that case much simpler/faster.
 
     AggregateRow* aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
+    boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row(aggregateRow);
     Table* input_table = m_abstractNode->getInputTables()[0];
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
@@ -608,8 +662,8 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
                 VOLT_TRACE("new group!");
                 // Output old row.
                 insertOutputTuple(aggregateRow);
-                // Start new row.
-                initAggInstances(aggregateRow);
+                // Recycle the aggs to start a new row.
+                aggregateRow->resetAggs();
                 break;
             }
         }

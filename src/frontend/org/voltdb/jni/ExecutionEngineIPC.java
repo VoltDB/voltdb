@@ -183,7 +183,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             // order. this hurts .. but I'm not sure of a better way.
             m_dataNetwork.clear();
             final int amt = m_data.remaining();
-            m_dataNetwork.putInt(amt + 4);
+            m_dataNetwork.putInt(4 + amt);
+            if (m_dataNetwork.capacity() < (4 + amt)) {
+                throw new IOException("Catalog data size (" + (4 + amt) +
+                                      ") exceeds ExecutionEngineIPC's hard-coded data buffer capacity (" +
+                                      m_dataNetwork.capacity() + ")");
+            }
             m_dataNetwork.limit(4 + amt);
             m_dataNetwork.rewind();
             while (m_dataNetwork.hasRemaining()) {
@@ -507,7 +512,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_connection = new Connection(target, port);
 
         // voltdbipc assumes host byte order everywhere
-        m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+        // Arbitrarily set to 20MB when 10MB crashed for an arbitrarily scaled unit test.
+        m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
         m_dataNetwork = m_dataNetworkOrigin.b;
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
