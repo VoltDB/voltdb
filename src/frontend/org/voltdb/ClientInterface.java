@@ -2431,27 +2431,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @return The partition best set up to execute the procedure.
      * @throws Exception
      */
-    int getPartitionForProcedure(int partitionIndex, int partitionType,
-            StoredProcedureInvocation task)
-    throws Exception
+    static int getPartitionForProcedure(int partitionIndex, int partitionType,
+                                        StoredProcedureInvocation task)
+            throws Exception
     {
         Object invocationParameter = task.getParameterAtIndex(partitionIndex);
-        final VoltType partitionParamType = VoltType.get((byte)partitionType);
-
-        // Special case: if the user supplied a string for a number column,
-        // try to do the conversion. This makes it substantially easier to
-        // load CSV data or other untyped inputs that match DDL without
-        // requiring the loader to know precise the schema.
-        if ((invocationParameter != null) &&
-            (invocationParameter.getClass() == String.class) &&
-            (partitionParamType.isNumber()))
-        {
-            invocationParameter = ParameterConverter.stringToLong(
-                    invocationParameter,
-                    partitionParamType.classFromType());
-        }
-
-        return TheHashinator.hashToPartition(invocationParameter);
+        return TheHashinator.getPartitionForParameter(partitionType, invocationParameter);
     }
 
     @Override

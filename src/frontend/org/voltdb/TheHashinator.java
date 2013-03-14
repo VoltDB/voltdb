@@ -161,6 +161,33 @@ public abstract class TheHashinator {
     }
 
     /**
+     * Given the type of the targeting partition parameter and an object,
+     * coerce the object to the correct type and hash it.
+     * @return The partition best set up to execute the procedure.
+     * @throws Exception
+     */
+    public static int getPartitionForParameter(int partitionType, Object invocationParameter)
+            throws Exception
+    {
+        final VoltType partitionParamType = VoltType.get((byte)partitionType);
+
+        // Special case: if the user supplied a string for a number column,
+        // try to do the conversion. This makes it substantially easier to
+        // load CSV data or other untyped inputs that match DDL without
+        // requiring the loader to know precise the schema.
+        if ((invocationParameter != null) &&
+                (invocationParameter.getClass() == String.class) &&
+                (partitionParamType.isNumber()))
+        {
+            invocationParameter = ParameterConverter.stringToLong(
+                    invocationParameter,
+                    partitionParamType.classFromType());
+        }
+
+        return hashToPartition(invocationParameter);
+    }
+
+    /**
      * Update the hashinator in a thread safe manner with a newer version of the hash function.
      * A version number must be provided and the new config will only be used if it is greater than
      * the current version of the hash function.
