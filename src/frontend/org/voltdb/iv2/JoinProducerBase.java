@@ -39,7 +39,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected final String m_whoami;
     protected final SiteTaskerQueue m_taskQueue;
     protected InitiatorMailbox m_mailbox = null;
-    protected long m_coordinatorHsId;
+    protected long m_coordinatorHsId = Long.MIN_VALUE;
     protected final SettableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent>
             m_completionMonitorAwait = SettableFuture.create();
     protected JoinCompletionAction m_completionAction = null;
