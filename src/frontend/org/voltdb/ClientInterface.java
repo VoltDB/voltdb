@@ -907,17 +907,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final InitiateResponseMessage response;
         private final StoredProcedureInvocation invocation;
         private final Procedure catProc;
+        private final Config sysProc;
         private ClientResponseImpl clientResponse;
 
         private ClientResponseWork(InitiateResponseMessage response,
                                    ClientInterfaceHandleManager cihm,
-                                   Procedure catProc)
+                                   Procedure catProc,
+                                   Config sysProc)
         {
             this.response = response;
             this.clientResponse = response.getClientResponseData();
             this.invocation = response.getInvocation();
             this.cihm = cihm;
             this.catProc = catProc;
+            this.sysProc = sysProc;
         }
 
         @Override
@@ -983,16 +986,34 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (response.isMispartitioned()) {
                 // Restart a mis-partitioned transaction
                 assert(invocation != null);
-                boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
+                int partitionParamIndex;
+                int partitionParamType;
+                boolean isReadonly;
+                boolean allowMismatchedResults;
+
+                if (sysProc != null) {
+                    // For SP AdHoc, the first param is the partition param as a string,
+                    // the original type of the parameter is stored as the second parameter
+                    partitionParamIndex = 0;
+                    partitionParamType = ((Byte) invocation.getParameterAtIndex(1)).intValue();
+                    isReadonly = sysProc.getReadonly();
+                    allowMismatchedResults = false;
+                } else {
+                    assert(catProc != null);
+                    partitionParamIndex = catProc.getPartitionparameter();
+                    partitionParamType = catProc.getPartitioncolumn().getType();
+                    isReadonly = catProc.getReadonly();
+                    allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
+                }
 
                 try {
-                    int partition = getPartitionForProcedure(catProc.getPartitionparameter(),
-                            catProc.getPartitioncolumn().getType(), invocation);
+                    int partition = getPartitionForProcedure(partitionParamIndex,
+                            partitionParamType, invocation);
                     createTransaction(cihm.connection.connectionId(),
                             null, false, invocation,
-                            catProc.getReadonly(),
-                            catProc.getSinglepartition(),
-                            catProc.getEverysite(),
+                            isReadonly,
+                            true, // Only SP could be mis-partitioned
+                            false, // Only SP could be mis-partitioned
                             new int[] {partition}, 1,
                             cihm.connection,
                             messageSize,
@@ -1246,9 +1267,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                         ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
                         Procedure procedure = null;
+                        Config sysProc = null;
 
                         if (invocation != null) {
                             procedure = catalogContext.procedures.get(invocation.getProcName());
+                            sysProc = SystemProcedureCatalog.listing.get(invocation.getProcName());
                         }
 
                         //Can be null on hangup
@@ -1256,7 +1279,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             //Pass it to the network thread like a ninja
                             //Only the network can use the CIHM
                             cihm.connection.writeStream().enqueue(
-                                    new ClientResponseWork(response, cihm, procedure));
+                                    new ClientResponseWork(response, cihm, procedure, sysProc));
                         }
                     } else if (message instanceof BinaryPayloadMessage) {
                         handlePartitionFailOver((BinaryPayloadMessage)message);
@@ -2099,7 +2122,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         assert(buf.hasArray());
-        task.setParams(buf.array());
+        if (isSinglePartition) {
+            // Send the partitioning parameter and its type along so that the site can check if
+            // it's mis-partitioned.
+            task.setParams(plannedStmtBatch.partitionParam.toString(),
+                    VoltType.typeFromObject(plannedStmtBatch.partitionParam).getValue(),
+                    buf.array());
+        } else {
+            task.setParams(buf.array());
+        }
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         /*

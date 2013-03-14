@@ -359,20 +359,43 @@ public class ProcedureRunner {
      * @return true if the txn hashes to the current partition, false otherwise
      */
     public boolean checkPartition(TransactionState txnState) {
-        // TODO: only checks user procs now, AdHocs need to be handled slightly differently
-        if (m_catProc.getSinglepartition() && !m_isSysProc) {
-            int partitionparameter = m_catProc.getPartitionparameter();
-            Object parameterAtIndex = txnState.getInvocation().getParameterAtIndex(partitionparameter);
-            int partition = TheHashinator.hashToPartition(parameterAtIndex);
-            if (partition != m_site.getCorrespondingPartitionId()) {
-                // Wrong partition, should restart the txn
-                if (log.isTraceEnabled()) {
-                    log.trace("Txn " + txnState.getInvocation().getProcName() + " needs restart");
-                }
-                return false;
+        if (m_catProc.getSinglepartition()) {
+            StoredProcedureInvocation invocation = txnState.getInvocation();
+            int parameterType;
+            Object parameterAtIndex;
+
+            if (m_isSysProc && invocation.getProcName().startsWith("@AdHoc")) {
+                // For adhoc, the first parameter is the partition parameter as a string,
+                // the original type of the parameter is stored as the second parameter
+                parameterAtIndex = invocation.getParameterAtIndex(0);
+                parameterType = ((Byte) invocation.getParameterAtIndex(1)).intValue();
+            } else if (!m_isSysProc) {
+                parameterType = m_catProc.getPartitioncolumn().getType();
+                int partitionparameter = m_catProc.getPartitionparameter();
+                parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
+            } else {
+                // Non-AdHoc sysprocs are not checked
+                return true;
             }
+
+            try {
+                int partition = TheHashinator.getPartitionForParameter(parameterType, parameterAtIndex);
+                if (partition == m_site.getCorrespondingPartitionId()) {
+                    return true;
+                } else {
+                    // Wrong partition, should restart the txn
+                    if (log.isTraceEnabled()) {
+                        log.trace("Txn " + txnState.getInvocation().getProcName() +
+                                " will be restarted");
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Unable to check partitioning of transaction " + txnState.spHandle, e);
+            }
+            return false;
+        } else {
+            return true;
         }
-        return true;
     }
 
     public void setupTransaction(TransactionState txnState) {

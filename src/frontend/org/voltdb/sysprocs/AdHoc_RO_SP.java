@@ -47,7 +47,10 @@ public class AdHoc_RO_SP extends AdHocBase {
      *
      * @return  results as VoltTable array
      */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] serializedBatchData) {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+                           String partitionParam,
+                           byte partitionParamType,
+                           byte[] serializedBatchData) {
         return runAdHoc(ctx, serializedBatchData);
     }
 
