@@ -58,7 +58,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.primitives.Ints;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -654,7 +653,10 @@ public class Inits {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
                 }
 
-                int[] allPartitions = Ints.toArray(m_rvdb.m_cartographer.getPartitions());
+                int[] allPartitions = new int[m_rvdb.m_configuredNumberOfPartitions];
+                for (int ii = 0; ii < allPartitions.length; ii++) {
+                    allPartitions[ii] = ii;
+                }
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
 

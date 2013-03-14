@@ -251,7 +251,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
-    // The configured license api: use to decide enterprise/cvommunity edition feature enablement
+    // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
 
     @Override
