@@ -57,6 +57,9 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.Ints;
+
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
  * To add a task, create a nested subclass of InitWork in the Inits class.
@@ -623,7 +626,6 @@ public class Inits {
                 m_rvdb.getStatsAgent().getMailbox(
                             VoltDB.instance().getHostMessenger(),
                             statsAgentHSId);
-                m_rvdb.getMailboxPublisher().publish(VoltDB.instance().getHostMessenger().getZK());
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
                             VoltDB.instance().getHostMessenger(),
                             m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));
@@ -646,7 +648,7 @@ public class Inits {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
                 }
 
-                int[] allPartitions = m_rvdb.getSiteTracker().getAllPartitions();
+                int[] allPartitions = Ints.toArray(m_rvdb.m_cartographer.getPartitions());
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
 
@@ -662,14 +664,13 @@ public class Inits {
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      m_rvdb.m_siteTracker.getAllHosts());
+                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()));
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to establish a ZooKeeper connection: " +
                             e.getMessage(), false, e);
                 }
 
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
-                m_rvdb.m_restoreAgent.setSiteTracker(m_rvdb.m_siteTracker);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
 

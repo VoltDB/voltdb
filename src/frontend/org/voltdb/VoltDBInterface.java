@@ -23,10 +23,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -70,7 +68,6 @@ public interface VoltDBInterface
 
     public VoltDB.Configuration getConfig();
     public CatalogContext getCatalogContext();
-    public SiteTracker getSiteTracker();
     public String getBuildString();
     public String getVersionString();
     public HostMessenger getHostMessenger();
@@ -81,7 +78,6 @@ public interface VoltDBInterface
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
-    public MailboxPublisher getMailboxPublisher();
     public SiteTracker getSiteTrackerForSnapshot();
 
     /**

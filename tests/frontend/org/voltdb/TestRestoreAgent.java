@@ -534,7 +534,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                      allPartitions,
                                                      all_hosts);
         restoreAgent.setCatalogContext(context);
-        restoreAgent.setSiteTracker(siteTrackers.get(hostId));
         assert(initiator != null);
         restoreAgent.setInitiator(initiator);
         return restoreAgent;

@@ -121,13 +121,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private String m_prefixAndSeparator;
     private Future<?> m_snapshotTask;
 
+    private SnapshotSchedule m_lastKnownSchedule = null;
+
     private final HashMap<Long, ProcedureCallback> m_procedureCallbacks = new HashMap<Long, ProcedureCallback>();
 
     private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
 
     // true if this SnapshotDaemon is the one responsible for generating
     // snapshots
-    private boolean m_isActive = false;
+    private boolean m_isAutoSnapshotLeader = false;
+    private Future<?> m_autoSnapshotTask = null;
     private long m_nextSnapshotTime;
 
     /**
@@ -241,6 +244,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         @Override
                         public void run() {
                             try {
+                                m_isAutoSnapshotLeader = true;
+                                if (m_lastKnownSchedule != null) {
+                                    makeActivePrivate(m_lastKnownSchedule);
+                                }
                                 electedTruncationLeader();
                             } catch (Exception e) {
                                 VoltDB.crashLocalVoltDB("Exception in snapshot daemon electing master via ZK", true, e);
@@ -1042,7 +1049,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     /**
      * Make this SnapshotDaemon responsible for generating snapshots
      */
-    public ListenableFuture<Void> makeActive(final SnapshotSchedule schedule)
+    public ListenableFuture<Void> mayGoActiveOrInactive(final SnapshotSchedule schedule)
     {
         return m_es.submit(new Callable<Void>() {
             @Override
@@ -1054,49 +1061,63 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private void makeActivePrivate(final SnapshotSchedule schedule) {
-        m_isActive = true;
-        m_frequency = schedule.getFrequencyvalue();
-        m_retain = schedule.getRetain();
-        m_path = schedule.getPath();
-        m_prefix = schedule.getPrefix();
-        m_prefixAndSeparator = m_prefix + "_";
-        final String frequencyUnitString = schedule.getFrequencyunit().toLowerCase();
-        assert(frequencyUnitString.length() == 1);
-        final char frequencyUnit = frequencyUnitString.charAt(0);
+        m_lastKnownSchedule = schedule;
+        if (schedule.getEnabled()) {
+            m_frequency = schedule.getFrequencyvalue();
+            m_retain = schedule.getRetain();
+            m_path = schedule.getPath();
+            m_prefix = schedule.getPrefix();
+            m_prefixAndSeparator = m_prefix + "_";
+            final String frequencyUnitString = schedule.getFrequencyunit().toLowerCase();
+            assert(frequencyUnitString.length() == 1);
+            final char frequencyUnit = frequencyUnitString.charAt(0);
 
-        switch (frequencyUnit) {
-        case 's':
-            m_frequencyUnit = TimeUnit.SECONDS;
-            break;
-        case 'm':
-            m_frequencyUnit = TimeUnit.MINUTES;
-            break;
-        case 'h':
-            m_frequencyUnit = TimeUnit.HOURS;
-            break;
-            default:
-                throw new RuntimeException("Frequency unit " + frequencyUnitString + "" +
-                        " in snapshot schedule is not one of d,m,h");
+            switch (frequencyUnit) {
+            case 's':
+                m_frequencyUnit = TimeUnit.SECONDS;
+                break;
+            case 'm':
+                m_frequencyUnit = TimeUnit.MINUTES;
+                break;
+            case 'h':
+                m_frequencyUnit = TimeUnit.HOURS;
+                break;
+                default:
+                    throw new RuntimeException("Frequency unit " + frequencyUnitString + "" +
+                            " in snapshot schedule is not one of d,m,h");
+            }
+            m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
+            m_nextSnapshotTime = System.currentTimeMillis() + m_frequencyInMillis;
         }
-        m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
-        m_nextSnapshotTime = System.currentTimeMillis() + m_frequencyInMillis;
-        m_es.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    doPeriodicWork(System.currentTimeMillis());
-                } catch (Exception e) {
-                    SNAP_LOG.warn("Error doing periodic snapshot management work", e);
+
+        if (m_isAutoSnapshotLeader) {
+            if (schedule.getEnabled()) {
+                if (m_autoSnapshotTask == null) {
+                    m_autoSnapshotTask = m_es.scheduleAtFixedRate(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                doPeriodicWork(System.currentTimeMillis());
+                            } catch (Exception e) {
+                                SNAP_LOG.warn("Error doing periodic snapshot management work", e);
+                            }
+                        }
+                    }, 0, m_periodicWorkInterval, TimeUnit.MILLISECONDS);
+                }
+            } else {
+                if (m_autoSnapshotTask != null) {
+                    m_autoSnapshotTask.cancel(false);
+                    m_autoSnapshotTask = null;
                 }
             }
-        }, 0, m_periodicWorkInterval, TimeUnit.MILLISECONDS);
+        }
     }
 
     public void makeInactive() {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                m_isActive = false;
+
                 m_snapshots.clear();
             }
         });
@@ -1133,7 +1154,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return null if there is no work to do or a sysproc with parameters if there is work
      */
     private void doPeriodicWork(final long now) {
-        if (!m_isActive)
+        if (m_autoSnapshotTask == null)
         {
             setState(State.STARTUP);
             return;

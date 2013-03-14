@@ -23,18 +23,19 @@
 
 package org.voltdb;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.*;
-
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
@@ -44,11 +45,9 @@ import org.json_voltpatches.JSONStringer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
+import org.mockito.ArgumentCaptor;
 import org.voltcore.network.Connection;
 import org.voltcore.network.WriteStream;
-
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
@@ -388,11 +387,12 @@ public class TestSnapshotDaemon {
 
 
         final SnapshotSchedule schedule = new SnapshotSchedule();
+        schedule.setEnabled(true);
         schedule.setFrequencyunit("q");
         threwException = false;
         SnapshotDaemon d = getSnapshotDaemon();
         try {
-            Future<Void> future = d.makeActive(schedule);
+            Future<Void> future = d.mayGoActiveOrInactive(schedule);
             future.get();
         } catch (Throwable t) {
             threwException = true;
@@ -400,14 +400,14 @@ public class TestSnapshotDaemon {
         assertTrue(threwException);
 
         schedule.setFrequencyunit("s");
-        d.makeActive(schedule);
+        d.mayGoActiveOrInactive(schedule);
 
         schedule.setFrequencyunit("m");
-        d.makeActive(schedule);
+        d.mayGoActiveOrInactive(schedule);
 
         schedule.setFrequencyunit("h");
 
-        d.makeActive(schedule);
+        d.mayGoActiveOrInactive(schedule);
         threwException = false;
         try {
             Future<Void> future = d.processClientResponse(null);
@@ -426,8 +426,9 @@ public class TestSnapshotDaemon {
         schedule.setPath("/tmp");
         schedule.setPrefix("woobie");
         schedule.setRetain(2);
+        schedule.setEnabled(true);
         SnapshotDaemon d = getSnapshotDaemon();
-        d.makeActive(schedule);
+        d.mayGoActiveOrInactive(schedule);
         checkForSnapshotScan(m_initiator);
         return d;
     }

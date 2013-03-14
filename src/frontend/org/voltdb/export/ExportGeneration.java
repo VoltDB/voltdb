@@ -610,7 +610,7 @@ public class ExportGeneration {
     private Set<Integer> addDataSources(
             Table table, int hostId)
     {
-        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
+        SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
         List<Long> sites = siteTracker.getSitesForHost(hostId);
 
         Set<Integer> partitions = new HashSet<Integer>();

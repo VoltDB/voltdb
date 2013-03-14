@@ -73,7 +73,6 @@ import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.FastSerializer;
@@ -113,7 +112,6 @@ public class TestClientInterface {
         m_volt = mock(VoltDBInterface.class);
         m_statsAgent = mock(StatsAgent.class);
         m_messenger = mock(HostMessenger.class);
-        m_initiator = mock(TransactionInitiator.class);
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
         m_zk = mock(ZooKeeper.class);
@@ -130,9 +128,8 @@ public class TestClientInterface {
         doReturn(m_zk).when(m_messenger).getZK();
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
-        doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
-                                       m_context, m_messenger, ReplicationRole.NONE, m_initiator,
+                                       m_context, m_messenger, ReplicationRole.NONE,
                                        m_cartographer, m_allPartitions));
 
         //m_mb = m_ci.m_mailbox;
