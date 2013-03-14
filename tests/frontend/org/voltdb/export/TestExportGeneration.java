@@ -45,6 +45,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
@@ -59,6 +60,7 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 
 public class TestExportGeneration {
 
@@ -143,6 +145,7 @@ public class TestExportGeneration {
             new AtomicReference<Matcher<VoltMessage>>();
     LocalMailbox m_mbox;
 
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     @Before
     public void setUp() throws Exception {
 
@@ -160,7 +163,8 @@ public class TestExportGeneration {
 
         m_exportGeneration = new ExportGeneration( 0L, m_doOnDrain, m_dataDirectory);
         m_exportGeneration.initializeGenerationFromCatalog(
-                m_connector, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger()
+                m_connector, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
+                (List)ImmutableList.of(Pair.of(m_part, CoreUtils.getHSIdFromHostAndSite(m_host, m_site)))
                 );
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {

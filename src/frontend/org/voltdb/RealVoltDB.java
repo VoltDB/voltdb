@@ -33,7 +33,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -65,7 +64,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -81,7 +79,6 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.UsersType;
-import org.voltdb.dtxn.DtxnInitiatorMailbox;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
@@ -219,6 +216,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private final AtomicBoolean m_hasStartedSampler = new AtomicBoolean(false);
 
     final VoltDBSiteFailureFaultHandler m_faultHandler = new VoltDBSiteFailureFaultHandler(this);
+
+    List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit;
 
     RestoreAgent m_restoreAgent = null;
 
@@ -415,11 +414,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * and then update the topology listing itself as a replacement for one of the missing host ids.
              * Then it does a compare and set of the topology.
              */
-            ArrayDeque<Mailbox> siteMailboxes = null;
             ClusterConfig clusterConfig = null;
-            DtxnInitiatorMailbox initiatorMailbox = null;
-            long initiatorHSId = 0;
             JSONObject topo = getTopology(config.m_startAction, joinCoordinator);
+            m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
             try {
                 clusterConfig = new ClusterConfig(topo);
                 m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
@@ -448,8 +445,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         Integer partition = partitions.get(ii);
                         m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
                     }
-                    m_iv2Initiators = createIv2Initiators(partitions,
-                            m_catalogContext.cluster.getVoltroot(), m_config.m_startAction);
+                    m_iv2Initiators = createIv2Initiators(
+                            partitions,
+                            m_catalogContext.cluster.getVoltroot(),
+                            m_config.m_startAction,
+                            m_partitionsToSitesAtStartupForExportInit);
                     m_iv2InitiatorStartingTxnIds.put(
                             MpInitiator.MP_INIT_PID,
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
@@ -762,7 +762,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     private List<Initiator> createIv2Initiators(Collection<Integer> partitions, String voltroot,
-                                                START_ACTION startAction)
+                                                START_ACTION startAction,
+                                                List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit)
     {
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
@@ -770,6 +771,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent,
                     m_snapshotCompletionMonitor, voltroot, startAction);
             initiators.add(initiator);
+            m_partitionsToSitesAtStartupForExportInit.add(Pair.of(partition, initiator.getInitiatorHSId()));
         }
         return initiators;
     }
@@ -1564,8 +1566,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             csp));
             m_catalogContext.logDebuggingInfoFromCatalog();
 
+            //Construct the list of partitions and sites because it simply doesn't exist anymore
+            SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
+            List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
+
+            List<Pair<Integer,Long>> partitions = new ArrayList<Pair<Integer, Long>>();
+            for (Long site : sites) {
+                Integer partition = siteTracker.getPartitionForSite(site);
+                partitions.add(Pair.of(partition, site));
+            }
+
             // 1. update the export manager.
-            ExportManager.instance().updateCatalog(m_catalogContext);
+            ExportManager.instance().updateCatalog(m_catalogContext, partitions);
 
             // 2. update client interface (asynchronously)
             //    CI in turn updates the planner thread.
