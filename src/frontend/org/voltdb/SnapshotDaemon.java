@@ -438,6 +438,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 if (stat == null) {
                     try {
                         m_zk.create(VoltZK.snapshot_truncation_master, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                        m_isAutoSnapshotLeader = true;
+                        if (m_lastKnownSchedule != null) {
+                            makeActivePrivate(m_lastKnownSchedule);
+                        }
                         electedTruncationLeader();
                         return;
                     } catch (NodeExistsException e) {
@@ -1154,7 +1158,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return null if there is no work to do or a sysproc with parameters if there is work
      */
     private void doPeriodicWork(final long now) {
-        if (m_autoSnapshotTask == null)
+        if (m_lastKnownSchedule == null)
         {
             setState(State.STARTUP);
             return;
