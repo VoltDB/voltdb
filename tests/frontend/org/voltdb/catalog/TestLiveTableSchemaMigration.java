@@ -93,6 +93,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
             System.out.printf("POST: %s\n", TableHelper.ddlForTable(t2));
 
             TableHelper.migrateTable(t1, t2);
+            t2 = TableHelper.sortTable(t2);
 
             ClientConfig clientConfig = new ClientConfig();
             client = ClientFactory.createClient(clientConfig);
@@ -105,6 +106,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
             System.out.println(response.toJSONString());
 
             VoltTable t3 = client.callProcedure("@AdHoc", "select * from FOO").getResults()[0];
+            t3 = TableHelper.sortTable(t3);
 
             // compare the tables
             StringBuilder sb = new StringBuilder();
