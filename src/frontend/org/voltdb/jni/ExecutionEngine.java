@@ -170,7 +170,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 // to avoid any changes to the WorkUnit's list. But do not
                 // copy the table data.
                 final ArrayDeque<VoltTable> deque = new ArrayDeque<VoltTable>();
-                deque.addAll(e.getValue());
+                for (VoltTable depTable : e.getValue()) {
+                    // A joining node will respond with null
+                    if (depTable != null) {
+                        deque.add(depTable);
+                    }
+                }
                 // intentionally overwrite the previous dependency id.
                 // would a lookup and a clear() be faster?
                 m_depsById.put(e.getKey(), deque);
@@ -211,12 +216,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             }
             for (final Object dependency : dependencies) {
                 if (dependency == null) {
-                    hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyContainedNull.name(),
-                                   new Object[] { dependencyId },
-                            null);
-                    VoltDB.crashLocalVoltDB("No additional info.", false, null);
-                    // Prevent warnings.
-                    return;
+                    // A joining node will respond with null
+                    continue;
                 }
                 if (log.isTraceEnabled()) {
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
