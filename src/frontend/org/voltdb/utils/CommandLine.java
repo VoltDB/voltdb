@@ -549,6 +549,10 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add(org.apache.commons.lang3.StringUtils.join(m_ipcPorts, ","));
         }
 
+        if (target() == BackendTarget.NATIVE_EE_IPC) {
+            cmdline.add("ipc");
+        }
+
         if (m_tag != null) {
             cmdline.add("tag"); cmdline.add(m_tag);
         }

@@ -56,6 +56,7 @@
 #include <exception>
 #include <arpa/inet.h>
 #include <cassert>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 #include "bytearray.h"
 #include "debuglog.h"
@@ -377,7 +378,7 @@ public:
         return byte != 0;
     }
 
-    std::size_t position() {
+    std::size_t position() const {
         return position_;
     }
 
@@ -466,7 +467,7 @@ public:
         initialize(buffer, capacity);
     }
 
-    size_t remaining() {
+    size_t remaining() const {
         return capacity_ - position_;
     }
 
@@ -532,7 +533,7 @@ public:
         setPosition(0);
     }
 
-    int remaining() {
+    size_t remaining() const {
         return bytes_.length() - static_cast<int>(position());
     }
 

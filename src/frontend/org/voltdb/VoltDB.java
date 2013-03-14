@@ -125,7 +125,9 @@ public class VoltDB {
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-        /** use normal JNI backend or optional IPC or HSQLDB backends */
+        /** select normal JNI backend.
+         *  IPC, Valgrind, and HSQLDB are the other options.
+         */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
         /** leader hostname */
