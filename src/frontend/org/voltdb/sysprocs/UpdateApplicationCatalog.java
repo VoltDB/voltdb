@@ -41,6 +41,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
 import com.google.common.base.Throwables;
+import org.voltdb.utils.VoltTableUtil;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
@@ -91,15 +92,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair(DEP_updateCatalog, result);
         } else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
-            VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-            List<VoltTable> deps = dependencies.get(DEP_updateCatalog);
-            for (VoltTable dep : deps) {
-                while (dep.advanceRow())
-                {
-                    // this will add the active row of table
-                    result.add(dep);
-                }
-            }
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateCatalog));
             return new DependencyPair(DEP_updateCatalogAggregate, result);
         } else {
             VoltDB.crashLocalVoltDB(

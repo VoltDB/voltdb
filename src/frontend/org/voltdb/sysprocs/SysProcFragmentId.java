@@ -154,4 +154,8 @@ public class SysProcFragmentId
     // @Update application catalog
     public static final long PF_updateCatalog = 210;
     public static final long PF_updateCatalogAggregate = 211;
+
+    // @Update topology
+    public static final long PF_updateTopology = 230;
+    public static final long PF_updateTopologyAggregate = 231;
 }

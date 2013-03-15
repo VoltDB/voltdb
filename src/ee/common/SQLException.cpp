@@ -65,7 +65,7 @@ SQLException::SQLException(std::string sqlState, std::string message, int intern
     assert(m_sqlState.length() == 5);
 }
 
-void SQLException::p_serialize(ReferenceSerializeOutput *output) {
+void SQLException::p_serialize(ReferenceSerializeOutput *output) const {
     const char* sqlState = m_sqlState.c_str();
     for (int ii = 0; ii < 5; ii++) {
         output->writeByte(sqlState[ii]);

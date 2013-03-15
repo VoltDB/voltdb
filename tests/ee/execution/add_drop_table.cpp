@@ -52,8 +52,15 @@ class AddDropTableTest : public Test {
                              m_exceptionBuffer, 4096);
 
         m_engine->resetReusedResultOutputBuffer();
-        m_engine->initialize(m_clusterId, m_siteId, m_partitionId,
-                             m_hostId, m_hostName, DEFAULT_TEMP_TABLE_MEMORY, 3);
+        int partitionCount = 3;
+        m_engine->initialize(m_clusterId,
+                             m_siteId,
+                             m_partitionId,
+                             m_hostId,
+                             m_hostName,
+                             DEFAULT_TEMP_TABLE_MEMORY,
+                             HASHINATOR_LEGACY,
+                             (char*)&partitionCount);
 
         std::string initialCatalog =
           "add / clusters cluster\n"

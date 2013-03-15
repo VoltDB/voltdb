@@ -60,6 +60,28 @@ public class ClusterConfig
         return partitions;
     }
 
+    /**
+     * Add a list of hosts to the current topology.
+     *
+     * This method modifies the topology in place.
+     *
+     * @param newHosts The number of new hosts to add
+     * @param topo The existing topology, which will have the host count updated in-place.
+     */
+    public static void addHosts(int newHosts, JSONObject topo) throws JSONException
+    {
+        ClusterConfig config = new ClusterConfig(topo);
+        int kfactor = config.getReplicationFactor();
+
+        if (newHosts != kfactor + 1) {
+            VoltDB.crashLocalVoltDB("Only adding " + (kfactor + 1) + " nodes at a time is " +
+                    "supported, currently trying to add " + newHosts, false, null);
+        }
+
+        // increase host count
+        topo.put("hostcount", config.getHostCount() + newHosts);
+    }
+
     public ClusterConfig(int hostCount, int sitesPerHost, int replicationFactor)
     {
         m_hostCount = hostCount;

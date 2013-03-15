@@ -35,6 +35,7 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
@@ -284,7 +285,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
-     * @param c Buffer to serialize tuple data too
+     * @param bbcontainers Buffers to receive serialized tuple data
      * @param tableId Catalog ID of the table to serialize
      * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
      *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
@@ -408,7 +409,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * THIS METHOD IS CURRENTLY ONLY USED FOR TESTING
      */
-    public abstract int hashinate(Object value, int partitionCount);
+    public abstract int hashinate(Object value, TheHashinator.HashinatorType type, byte config[]);
+
+    /**
+     * Updates the hashinator with new config
+     * @param type hashinator type
+     * @param config new hashinator config
+     */
+    public abstract void updateHashinator(TheHashinator.HashinatorType type, byte[] config);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -453,7 +461,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int hostId,
             byte hostname[],
             long tempTableMemory,
-            int totalPartitions);
+            int hashinatorType,
+            byte hashinatorConfig[]);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.
@@ -568,12 +577,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Use the EE's hashinator to compute the partition to which the
      * value provided in the input parameter buffer maps.  This is
-     * currently a test-only method.
-     * @param pointer
-     * @param partitionCount
+     * currently a test-only method. Hashinator type and config are also
+     * in the parameter buffer
      * @return
      */
-    protected native int nativeHashinate(long pointer, int partitionCount);
+    protected native int nativeHashinate(long pointer);
+
+    /**
+     * Updates the EE's hashinator
+     */
+    protected native void nativeUpdateHashinator(long pointer);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated
@@ -611,22 +624,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
+     * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type
      * @param pointer Pointer to an engine instance
-     * @param bufferPointer Buffer to serialize data to
-     * @param offset Offset into the buffer to start serializing to
-     * @param length length of the buffer
      * @param tableId Catalog ID of the table to serialize
      * @param streamType type of stream to pull data from
-     * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
-     *         -1 is returned if there is an error (such as the table not being COW mode).
+     * @param data Serialized buffer count and array
+     * @return remaining tuple count, 0 when done, or -1 for an error.
+     * array of per-buffer byte counts with an extra leading int that is set to
+     *         the count of unstreamed tuples, 0 when done, or -1 indicating an error
+     *         (such as the table not being COW mode).
      */
-    protected native int nativeTableStreamSerializeMore(long pointer, long bufferPointer, int offset, int length, int tableId, int streamType);
+    protected native long nativeTableStreamSerializeMore(long pointer, int tableId, int streamType, byte[] data);
 
     /**
      * Process a recovery message and load the data it contains.
