@@ -80,6 +80,7 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.InitiatorStats;
+import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
@@ -255,6 +256,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
+    private LatencyStats m_latencyStats;
 
     @Override
     public LicenseApi getLicenseApi() {
@@ -305,7 +307,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_messenger = null;
             m_startMode = null;
             m_statsAgent = new StatsAgent();
-            m_initiatorStats = new InitiatorStats(0);
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
             m_snapshotCompletionMonitor = null;
@@ -541,6 +542,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_partitionCountStats = new PartitionCountStats(m_cartographer);
             m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
                     0, m_partitionCountStats);
+            m_initiatorStats = new InitiatorStats(m_myHostId);
+            m_latencyStats = new LatencyStats(m_myHostId);
 
             /*
              * Initialize the command log on rejoin before configuring the IV2
@@ -1471,6 +1474,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_computationService = null;
                 m_catalogContext = null;
                 m_initiatorStats = null;
+                m_latencyStats = null;
 
                 AdHocCompilerCache.clearVersionCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
