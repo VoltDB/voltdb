@@ -19,92 +19,133 @@
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
+#include "common/TupleOutputStream.h"
 #include "common/FatalException.hpp"
+#include "common/StreamPredicate.h"
+#include "common/StreamPredicateList.h"
 #include <algorithm>
 #include <cassert>
+#include <iostream>
+#include <boost/exception/exception.hpp>
 
 namespace voltdb {
 
-CopyOnWriteContext::CopyOnWriteContext(PersistentTable *table, TupleSerializer *serializer, int32_t partitionId) :
+CopyOnWriteContext::CopyOnWriteContext(
+        PersistentTable &table,
+        TupleSerializer &serializer,
+        int32_t partitionId,
+        const std::vector<std::string> &predicateStrings,
+        int32_t totalPartitions,
+        int64_t totalTuples) :
              m_table(table),
-             m_backedUpTuples(TableFactory::getCopiedTempTable(table->databaseId(),
-                                                               "COW of " + table->name(),
-                                                               table, NULL)),
-             m_serializer(serializer), m_pool(2097152, 320), m_blocks(m_table->m_data),
-             m_iterator(new CopyOnWriteIterator(table, m_blocks.begin(), m_blocks.end())),
-             m_maxTupleLength(serializer->getMaxSerializedTupleSize(table->schema())),
-             m_tuple(table->schema()), m_finishedTableScan(false), m_partitionId(partitionId),
-             m_tuplesSerialized(0) {}
+             m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
+                                                               "COW of " + table.name(),
+                                                               &table, NULL)),
+             m_serializer(serializer),
+             m_pool(2097152, 320),
+             m_blocks(m_table.m_data),
+             m_iterator(new CopyOnWriteIterator(&table, m_blocks.begin(), m_blocks.end())),
+             m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
+             m_tuple(table.schema()),
+             m_finishedTableScan(false),
+             m_partitionId(partitionId),
+             m_totalPartitions(totalPartitions),
+             m_totalTuples(totalTuples),
+             m_tuplesRemaining(totalTuples)
+{
+    // Parse predicate strings. The factory type determines the kind of
+    // predicates that get generated.
+    // Throws an exception to be handled by caller on errors.
+    std::ostringstream errmsg;
+    if (!m_predicates.parseStrings(predicateStrings, errmsg)) {
+        throwFatalException("CopyOnWriteContext() failed to parse predicate strings.");
+    }
+}
 
-bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
-    out->writeInt(m_partitionId);
-    int rowsSerialized = 0;
-    const std::size_t rowCountPosition = out->reserveBytes(4);
+/*
+ * Serialize to multiple output streams.
+ * Return remaining tuple count, 0 if done, or -1 on error.
+ */
+int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStreams) {
 
-    TableTuple tuple(m_table->schema());
-    if (out->remaining() < (m_maxTupleLength + sizeof(int32_t))) {
-        throwFatalException("Serialize more should never be called "
-                "a 2nd time after return indicating there is no more data");
-//        out->writeInt(0);
-//        assert(false);
-//        return false;
+    // Don't expect to be re-called after streaming all the tuples.
+    if (m_tuplesRemaining == 0) {
+        throwFatalException("serializeMore() was called again after streaming completed.")
     }
 
-    std::size_t bytesSerialized = 0;
-    while (out->remaining() >= (m_maxTupleLength + sizeof(int32_t))) {
-        const bool hadMore = m_iterator->next(tuple);
-
-        /**
-         * After this finishes scanning the persistent table switch to scanning
-         * the temp table with the tuples that were backed up
-         */
-        if (!hadMore) {
-            if (m_finishedTableScan) {
-                out->writeIntAt( rowCountPosition, rowsSerialized);
-                return false;
-            } else {
-                m_finishedTableScan = true;
-                m_iterator.reset(m_backedUpTuples.get()->makeIterator());
-                continue;
-            }
-        }
-
-        const std::size_t tupleStartPosition = out->position();
-        m_serializer->serializeTo( tuple, out);
-        const std::size_t tupleEndPosition = out->position();
-        m_tuplesSerialized++;
-        rowsSerialized++;
-
-        /*
-         * If this is the table scan, check to see if the tuple is pending delete
-         * and return the tuple if it is
-         */
-        if (!m_finishedTableScan && tuple.isPendingDelete()) {
-            assert(!tuple.isPendingDeleteOnUndoRelease());
-            if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
-            {
-                m_table->decreaseStringMemCount(tuple.getNonInlinedMemorySize());
-            }
-            tuple.setPendingDeleteFalse();
-            tuple.freeObjectColumns();
-            CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-            //Save the extra lookup if possible
-            m_table->deleteTupleStorage(tuple, iter->m_currentBlock);
-        }
-
-        // If we have serialized more than 512Kb of tuple data, stop for a while
-        bytesSerialized += tupleEndPosition - tupleStartPosition;
-        if (bytesSerialized >= 1024 * 512) {
-            break;
-        }
+    // Need to initialize the output stream list.
+    if (outputStreams.empty()) {
+        throwFatalException("serializeMore() expects at least one output stream.");
     }
-    /*
-     * Number of rows serialized is not known until the end. Written at the end so it
-     * can be included in the CRC. It will be moved back to the front
-     * to match the table serialization format when chunk is read later.
-     */
-    out->writeIntAt( rowCountPosition, rowsSerialized);
-    return true;
+    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates, m_totalPartitions);
+
+    //=== Tuple processing loop
+
+    TableTuple tuple(m_table.schema());
+
+    // Set to true to break out of the loop after the tuples dry up
+    // or the byte count threshold is hit.
+    bool yield = false;
+    while (!yield) {
+
+        // Next tuple?
+        if (m_iterator->next(tuple)) {
+
+            if (m_tuplesRemaining > 0) {
+                m_tuplesRemaining--;
+            }
+
+            /*
+             * Write the tuple to all the output streams.
+             * Done if any of the buffers filled up.
+             */
+            yield = outputStreams.writeRow(m_serializer, tuple);
+
+            /*
+             * If this is the table scan, check to see if the tuple is pending
+             * delete and return the tuple if it is
+             */
+            if (!m_finishedTableScan && tuple.isPendingDelete()) {
+                assert(!tuple.isPendingDeleteOnUndoRelease());
+                if (m_table.m_schema->getUninlinedObjectColumnCount() != 0)
+                {
+                    m_table.decreaseStringMemCount(tuple.getNonInlinedMemorySize());
+                }
+                tuple.setPendingDeleteFalse();
+                tuple.freeObjectColumns();
+                CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+                //Save the extra lookup if possible
+                m_table.deleteTupleStorage(tuple, iter->m_currentBlock);
+            }
+
+        } else if (!m_finishedTableScan) {
+            /*
+             * After scanning the persistent table switch to scanning the temp
+             * table with the tuples that were backed up.
+             */
+            m_finishedTableScan = true;
+            m_iterator.reset(m_backedUpTuples.get()->makeIterator());
+
+        } else {
+            /*
+             * No more tuples in the temp table and had previously finished the
+             * persistent table.
+             */
+            if (m_tuplesRemaining > 0) {
+                throwFatalException("serializeMore() expected remaining tuple count to go to zero.")
+            }
+            m_tuplesRemaining = 0;
+            yield = true;
+        }
+
+    }
+    // end tuple processing while loop
+
+    // Need to close the output streams and insert row counts.
+    outputStreams.close();
+
+    // Done when the table scan is finished and iteration is complete.
+    return (m_tuplesRemaining >= 0 ? m_tuplesRemaining : std::numeric_limits<int32_t>::max());
 }
 
 bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
@@ -126,14 +167,14 @@ bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
     }
     if (i == m_blocks.end()) {
         i--;
-        if (i.key() + m_table->m_tableAllocationSize < address) {
+        if (i.key() + m_table.m_tableAllocationSize < address) {
             return true;
         }
         //OK it is in the very last block
     } else {
         if (i.key() != address) {
             i--;
-            if (i.key() + m_table->m_tableAllocationSize < address) {
+            if (i.key() + m_table.m_tableAllocationSize < address) {
                 return true;
             }
             //OK... this is in this particular block
@@ -179,7 +220,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     }
     if (i == m_blocks.end()) {
         i--;
-        if (i.key() + m_table->m_tableAllocationSize < address) {
+        if (i.key() + m_table.m_tableAllocationSize < address) {
             tuple.setDirtyFalse();
             return;
         }
@@ -187,7 +228,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     } else {
         if (i.key() != address) {
             i--;
-            if (i.key() + m_table->m_tableAllocationSize < address) {
+            if (i.key() + m_table.m_tableAllocationSize < address) {
                 tuple.setDirtyFalse();
                 return;
             }
