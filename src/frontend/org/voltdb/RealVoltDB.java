@@ -79,6 +79,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
@@ -156,6 +157,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private MemoryStats m_memoryStats = null;
     private StatsManager m_statsManager = null;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
+    private InitiatorStats m_initiatorStats;
     int m_myHostId;
     long m_depCRC = -1;
     String m_serializedCatalog;
@@ -303,6 +305,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_messenger = null;
             m_startMode = null;
             m_statsAgent = new StatsAgent();
+            m_initiatorStats = new InitiatorStats(0);
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
             m_snapshotCompletionMonitor = null;
@@ -534,12 +537,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_memoryStats = new MemoryStats();
             m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
                     0, m_memoryStats);
-            if (isIV2Enabled()) {
-                m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
-                m_partitionCountStats = new PartitionCountStats(m_cartographer);
-            } else {
-                m_partitionCountStats = new PartitionCountStats(clusterConfig.getPartitionCount());
-            }
+            m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+            m_partitionCountStats = new PartitionCountStats(m_cartographer);
             m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
                     0, m_partitionCountStats);
 
@@ -1257,10 +1256,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         } catch (Exception ignored) {
             try {
                 InputStream buildstringStream = new FileInputStream("version.txt");
-                while ((b = (byte) buildstringStream.read()) != -1) {
-                    sb.append((char)b);
+                try {
+                    while ((b = (byte) buildstringStream.read()) != -1) {
+                        sb.append((char)b);
+                    }
+                    versionString = sb.toString().trim();
+                } finally {
+                    buildstringStream.close();
                 }
-                versionString = sb.toString().trim();
             }
             catch (Exception ignored2) {
                 log.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
@@ -1467,6 +1470,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_computationService.awaitTermination(1, TimeUnit.DAYS);
                 m_computationService = null;
                 m_catalogContext = null;
+                m_initiatorStats = null;
 
                 AdHocCompilerCache.clearVersionCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
