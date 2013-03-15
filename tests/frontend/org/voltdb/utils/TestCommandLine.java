@@ -70,6 +70,7 @@ public class TestCommandLine
         cl.debugPort(1234);
         cl.zkport(4321);
         cl.buildDir("dood");
+        cl.voltRoot("goober");
         cl.javaLibraryPath("sweet");
         cl.rmiHostName("springsteen");
         cl.log4j("whats");
