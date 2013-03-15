@@ -45,6 +45,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * Access key/value tables of cluster info that correspond to the REST
@@ -108,7 +109,7 @@ public class SystemInformation extends VoltSystemProcedure
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationOverviewAggregate)
         {
-            VoltTable result = unionTables(dependencies.get(DEP_DISTRIBUTE));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_DISTRIBUTE));
             return new DependencyPair(DEP_AGGREGATE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationDeployment)

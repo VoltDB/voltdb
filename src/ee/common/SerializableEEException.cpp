@@ -26,7 +26,7 @@ namespace voltdb {
 SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
     m_exceptionType(exceptionType), m_message(message) {}
 
-void SerializableEEException::serialize(ReferenceSerializeOutput *output) {
+void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
     const std::size_t lengthPosition = output->reserveBytes(sizeof(int32_t));
     output->writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();

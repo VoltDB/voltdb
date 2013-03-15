@@ -171,7 +171,7 @@ public class TestIv2RejoinCoordinatorLive {
     @Test
     public void testLiveBasic() throws Exception {
         createCoordinator(true);
-        m_coordinator.startRejoin();
+        m_coordinator.startJoin(null, null);
         RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_1");
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
@@ -226,7 +226,7 @@ public class TestIv2RejoinCoordinatorLive {
     @Test
     public void testReplayFinishedBeforeSnapshot() throws Exception {
         createCoordinator(true);
-        m_coordinator.startRejoin();
+        m_coordinator.startJoin(null, null);
 
         // fake a replay finished response for site 2 before snapshot stream finishes
         RejoinMessage msg3 = new RejoinMessage(2l, RejoinMessage.Type.REPLAY_FINISHED);

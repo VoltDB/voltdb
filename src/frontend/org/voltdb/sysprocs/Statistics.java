@@ -40,6 +40,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * Access the TABLE, PRCOEDURE, INITIATOR, IOSTATS, or PARTITIONCOUNT statistics.
@@ -152,7 +153,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_tableData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_tableAggregator) {
-            VoltTable result = unionTables(dependencies.get(DEP_tableData));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_tableData));
             return new DependencyPair(DEP_tableAggregator, result);
         }
 
@@ -179,7 +180,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_indexData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_indexAggregator) {
-            VoltTable result = unionTables(dependencies.get(DEP_indexData));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_indexData));
             return new DependencyPair(DEP_indexAggregator, result);
         }
 
@@ -202,7 +203,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_procedureData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_procedureAggregator) {
-            VoltTable result = unionTables(dependencies.get(DEP_procedureData));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_procedureData));
             return new DependencyPair(DEP_procedureAggregator, result);
         }
         //  PLANNER statistics
@@ -220,7 +221,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_plannerData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_plannerAggregator) {
-            VoltTable result = unionTables(dependencies.get(DEP_plannerData));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_plannerData));
             return new DependencyPair(DEP_plannerAggregator, result);
         }
         //  STARVATION statistics
@@ -242,7 +243,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_starvationData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_starvationDataAggregator) {
-            VoltTable result = unionTables(dependencies.get(DEP_starvationData));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_starvationData));
             return new DependencyPair(DEP_starvationDataAggregator, result);
         }
         //INITIATOR statistics
@@ -272,7 +273,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_initiatorData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_initiatorAggregator) {
-            VoltTable result = unionTables(dependencies.get(DEP_initiatorData));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_initiatorData));
             return new DependencyPair(DEP_initiatorAggregator, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_nodeMemory) {
@@ -301,7 +302,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_nodeMemory, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_nodeMemoryAggregator) {
-            VoltTable result = unionTables(dependencies.get(DEP_nodeMemory));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_nodeMemory));
             return new DependencyPair(DEP_nodeMemoryAggregator, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_partitionCount) {
@@ -347,13 +348,7 @@ public class Statistics extends VoltSystemProcedure {
             }
             return new DependencyPair(DEP_ioData, result);
         } else if (fragmentId == SysProcFragmentId.PF_ioDataAggregator) {
-            final VoltTable result = new VoltTable(ioColumnInfo);
-            List<VoltTable> dep = dependencies.get(DEP_ioData);
-            for (VoltTable t : dep) {
-                while (t.advanceRow()) {
-                    result.add(t);
-                }
-            }
+            final VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_ioData));
             return new DependencyPair(DEP_ioDataAggregator, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_liveClientData) {
@@ -390,7 +385,7 @@ public class Statistics extends VoltSystemProcedure {
             return new DependencyPair(DEP_liveClientData, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_liveClientDataAggregator) {
-            VoltTable result = unionTables(dependencies.get(DEP_liveClientData));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_liveClientData));
             return new DependencyPair(DEP_liveClientDataAggregator, result);
         }
         assert (false);
@@ -454,7 +449,7 @@ public class Statistics extends VoltSystemProcedure {
                                                  catalogIds,
                                                  interval != 0,
                                                  now));
-                results = new VoltTable[] {unionTables(allResults)};
+                results = new VoltTable[] {VoltTableUtil.unionTables(allResults)};
             } else {
                 results = spResults;
             }

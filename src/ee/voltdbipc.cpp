@@ -32,6 +32,8 @@
 #include "common/SegvException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/TheHashinator.h"
+#include "common/LegacyHashinator.h"
+#include "common/ElasticHashinator.h"
 #include "execution/IPCTopend.h"
 #include "execution/VoltDBEngine.h"
 #include "common/ThreadLocalPool.h"
@@ -129,6 +131,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    char data[0];
 }__attribute__((packed)) activate_tablestream;
 
 /*
@@ -138,7 +141,8 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
-    int bufferSize;
+    int bufferCount;
+    char data[0];
 }__attribute__((packed)) tablestream_serialize_more;
 
 /*
@@ -160,7 +164,8 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int32_t partitionCount;
+    int32_t hashinatorType;
+    int32_t configLength;
     char data[0];
 }__attribute__((packed)) hashinate_msg;
 
@@ -233,6 +238,8 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
     m_engine = NULL;
     m_counter = 0;
     m_reusedResultBuffer = NULL;
+    m_tupleBuffer = NULL;
+    m_tupleBufferSize = 0;
     m_terminate = false;
 
     setupSigHandler();
@@ -241,6 +248,7 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
 VoltDBIPC::~VoltDBIPC() {
     delete m_engine;
     delete [] m_reusedResultBuffer;
+    delete [] m_tupleBuffer;
     delete [] m_exceptionBuffer;
 }
 
@@ -322,6 +330,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           loadFragment(cmd);
           result = kErrorCode_None;
           break;
+      case 27:
+          updateHashinator(cmd);
+          result = kErrorCode_None;
+          break;
       default:
         result = stub(cmd);
     }
@@ -363,7 +375,7 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
     // rather than in hard-to-maintain "execute method" boilerplate code like this.
     } catch (const FatalException& e) {
         crashVoltDB(e);
-    } catch (SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
+    } catch (const SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
 
     return kErrorCode_Error;
 }
@@ -384,7 +396,7 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
         if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -406,9 +418,10 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t totalPartitions;
-        int16_t hostnameLength;
-        char hostname[0];
+        int32_t hashinatorType;
+        int32_t hashinatorConfigLength;
+        int32_t hostnameLength;
+        char data[0];
     }__attribute__((packed));
     struct initialize * cs = (struct initialize*) cmd;
 
@@ -418,27 +431,34 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
-    cs->hostnameLength = ntohs(cs->hostnameLength);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->totalPartitions = ntohl(cs->totalPartitions);
-    std::string hostname(cs->hostname, cs->hostnameLength);
+    cs->hashinatorType = ntohl(cs->hashinatorType);
+    cs->hashinatorConfigLength = ntohl(cs->hashinatorConfigLength);
+    cs->hostnameLength = ntohl(cs->hostnameLength);
+
+    std::string hostname(cs->data + cs->hashinatorConfigLength, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
         m_exceptionBuffer = new char[MAX_MSG_SZ];
         m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
+        // The tuple buffer gets expanded (doubled) as needed, but never compacted.
+        m_tupleBufferSize = MAX_MSG_SZ;
+        m_tupleBuffer = new char[m_tupleBufferSize];
+
         if (m_engine->initialize(cs->clusterId,
                                  cs->siteId,
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
                                  cs->tempTableMemory,
-                                 cs->totalPartitions) == true) {
+                                 (HashinatorType)cs->hashinatorType,
+                                 (char*)cs->data) == true) {
             return kErrorCode_Success;
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -472,7 +492,7 @@ int8_t VoltDBIPC::releaseUndoToken(struct ipc_command *cmd) {
 
     try {
         m_engine->releaseUndoToken(ntohll(cs->token));
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -489,7 +509,7 @@ int8_t VoltDBIPC::undoUndoToken(struct ipc_command *cmd) {
 
     try {
         m_engine->undoUndoToken(ntohll(cs->token));
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -513,7 +533,7 @@ int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
     try {
         // no return code. can't fail!
         m_engine->tick(ntohll(cs->time), ntohll(cs->lastSpHandle));
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -530,7 +550,7 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
 
     try {
         m_engine->quiesce(ntohll(cs->lastSpHandle));
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -587,7 +607,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
         pool->purge();
         m_engine->resizePlanCache(); // shrink cache if need be
     }
-    catch (FatalException e) {
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -637,7 +657,7 @@ void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
         if (m_engine->loadFragment(load->data, planFragLength, fragId, wasHit, cacheSize)) {
             ++errors;
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -682,7 +702,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         } else {
             return kErrorCode_Error;
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -692,7 +712,7 @@ int8_t VoltDBIPC::setLogLevels(struct ipc_command *cmd) {
     int64_t logLevels = *((int64_t*)&cmd->data[0]);
     try {
         m_engine->getLogManager()->setLogLevels(logLevels);
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Success;
@@ -877,7 +897,7 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
         } else {
             sendException(kErrorCode_Error);
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 }
@@ -887,13 +907,19 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     const voltdb::CatalogId tableId = ntohl(activateTableStreamCommand->tableId);
     const voltdb::TableStreamType streamType =
             static_cast<voltdb::TableStreamType>(ntohl(activateTableStreamCommand->streamType));
+
+    // Provide access to the serialized message data, i.e. the predicates.
+    void* offset = activateTableStreamCommand->data;
+    int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(activate_tablestream));
+    ReferenceSerializeInput serialize_in(offset, sz);
+
     try {
-        if (m_engine->activateTableStream(tableId, streamType)) {
+        if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -904,32 +930,90 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
     const voltdb::CatalogId tableId = ntohl(tableStreamSerializeMore->tableId);
     const voltdb::TableStreamType streamType =
             static_cast<voltdb::TableStreamType>(ntohl(tableStreamSerializeMore->streamType));
-    const int bufferLength = ntohl(tableStreamSerializeMore->bufferSize);
-    assert(bufferLength < MAX_MSG_SZ - 5);
-
-    if (bufferLength >= MAX_MSG_SZ - 5) {
-        char msg[3];
-        msg[0] = kErrorCode_Error;
-        *reinterpret_cast<int16_t*>(&msg[1]) = 0;//exception length 0
-        writeOrDie(m_fd, (unsigned char*)msg, sizeof(int8_t) + sizeof(int16_t));
-    }
-
+    // Need to adapt the simpler incoming data describing buffers to conform to
+    // what VoltDBEngine::tableStreamSerializeMore() needs. The incoming data
+    // is an array of buffer lengths. The outgoing data must be an array of
+    // ptr/offset/length triplets referencing segments of m_tupleBuffer, which
+    // is reallocated as needed.
+    const int bufferCount = ntohl(tableStreamSerializeMore->bufferCount);
     try {
-        ReferenceSerializeOutput out(m_reusedResultBuffer + 5, bufferLength);
-        int serialized = m_engine->tableStreamSerializeMore( &out, tableId, streamType);
-        m_reusedResultBuffer[0] = kErrorCode_Success;
-        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(serialized);
 
-        /*
-         * Already put the -1 code into the message.
-         * Set it 0 so toWrite has the correct number of bytes
-         */
-        if (serialized == -1) {
-            serialized = 0;
+        if (bufferCount <= 0) {
+            throwFatalException("Bad buffer count in tableStreamSerializeMore: %d", bufferCount);
         }
-        const ssize_t toWrite = serialized + 5;
-        writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, toWrite);
-    } catch (FatalException e) {
+
+        // Need two passes, one to determine size, the other to populate buffer
+        // data. Can't do this until the base buffer is properly allocated.
+        // Note that m_reusedResultBuffer is used for input data and
+        // m_tupleBuffer is used for output data.
+
+        void *inptr = tableStreamSerializeMore->data;
+        int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(tablestream_serialize_more));
+        ReferenceSerializeInput in1(inptr, sz);
+
+        // Pass 1 - calculate size and allow for status code byte and count length integers.
+        size_t outputSize = 1;
+        for (size_t i = 0; i < bufferCount; i++) {
+            outputSize += in1.readInt() + 4;
+        }
+
+        // Reallocate buffer as needed.
+        // Avoid excessive thrashing by over-allocating in powers of 2.
+        if (outputSize > m_tupleBufferSize) {
+            while (outputSize > m_tupleBufferSize) {
+                m_tupleBufferSize *= 2;
+            }
+            delete [] m_tupleBuffer;
+            m_tupleBuffer = new char[m_tupleBufferSize];
+        }
+
+        // Pass 2 - rescan input stream and generate final buffer data.
+        ReferenceSerializeInput in2(inptr, sz);
+        // 1 byte status and 4 byte count
+        int offset = 5;
+        ReferenceSerializeOutput out1(m_reusedResultBuffer, MAX_MSG_SZ);
+        out1.writeInt(bufferCount);
+        for (size_t i = 0; i < bufferCount; i++) {
+            int length = in2.readInt();
+            out1.writeLong((long)m_tupleBuffer);
+            // Allow for the length int written later.
+            offset += 4;
+            out1.writeInt(offset);
+            out1.writeInt(length);
+            offset += length;
+        }
+
+        // Perform table stream serialization.
+        ReferenceSerializeInput out2(m_reusedResultBuffer, MAX_MSG_SZ);
+        std::vector<int> positions;
+        int64_t remaining = m_engine->tableStreamSerializeMore(tableId, streamType, out2, positions);
+
+        // Finalize the tuple buffer by adding the status code, buffer count,
+        // and remaining tuple count.
+        // Inject positions (lengths) into previously skipped int-size gaps.
+        m_tupleBuffer[0] = kErrorCode_Success;
+        if (remaining > 0) {
+            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
+            offset = 1 + sizeof(int32_t);
+            *reinterpret_cast<int64_t*>(&m_tupleBuffer[offset]) = htonll(remaining);
+            offset += static_cast<int>(sizeof(int64_t));
+            std::vector<int>::const_iterator ipos;
+            for (ipos = positions.begin(); ipos != positions.end(); ++ipos) {
+                int length = *ipos;
+                *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
+                offset += length + static_cast<int>(sizeof(int32_t));
+            }
+        } else {
+            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
+            // If we failed or finished just set the count and stop right there.
+            *reinterpret_cast<int64_t*>(&m_tupleBuffer[5]) = htonll(remaining);
+            outputSize = 1 + sizeof(int32_t) + sizeof(int64_t);
+        }
+
+        // Ship it.
+        writeOrDie(m_fd, (unsigned char*)m_tupleBuffer, outputSize);
+
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 }
@@ -994,8 +1078,24 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     hashinate_msg* hash = (hashinate_msg*)cmd;
     NValueArray& params = m_engine->getParameterContainer();
 
-    int32_t partCount = ntohl(hash->partitionCount);
-    void* offset = hash->data;
+    HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
+    int32_t configLength = ntohl(hash->configLength);
+    boost::scoped_ptr<TheHashinator> hashinator;
+    switch (hashinatorType) {
+    case HASHINATOR_LEGACY:
+        hashinator.reset(LegacyHashinator::newInstance(hash->data));
+        break;
+    case HASHINATOR_ELASTIC:
+        hashinator.reset(ElasticHashinator::newInstance(hash->data));
+        break;
+    default:
+        try {
+            throwFatalException("Unrecognized hashinator type %d", hashinatorType);
+        } catch (const FatalException &e) {
+            crashVoltDB(e);
+        }
+    }
+    void* offset = hash->data + configLength;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(hash));
     ReferenceSerializeInput serialize_in(offset, sz);
 
@@ -1006,9 +1106,9 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         Pool *pool = m_engine->getStringPool();
         deserializeParameterSetCommon(cnt, serialize_in, params, pool);
         retval =
-            voltdb::TheHashinator::hashinate(params[0], partCount);
+            hashinator->hashinate(params[0]);
         pool->purge();
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -1016,6 +1116,17 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     response[0] = kErrorCode_Success;
     *reinterpret_cast<int32_t*>(&response[1]) = htonl(retval);
     writeOrDie(m_fd, (unsigned char*)response, 5);
+}
+
+void VoltDBIPC::updateHashinator(struct ipc_command *cmd) {
+    hashinate_msg* hash = (hashinate_msg*)cmd;
+
+    HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
+    try {
+        m_engine->updateHashinator(hashinatorType, hash->data);
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
 }
 
 void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {

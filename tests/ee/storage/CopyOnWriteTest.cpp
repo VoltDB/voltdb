@@ -27,6 +27,8 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
+#include "common/TupleOutputStream.h"
+#include "common/TupleOutputStreamProcessor.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
@@ -38,8 +40,11 @@
 #include "common/DefaultTupleSerializer.h"
 #include <vector>
 #include <string>
+#include <iostream>
 #include <stdint.h>
+#include <stdarg.h>
 #include <boost/foreach.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 using namespace voltdb;
 
@@ -47,6 +52,39 @@ using namespace voltdb;
  * Counter for unique primary key values
  */
 static int32_t m_primaryKeyIndex = 0;
+
+// Selects extra-small quantity for debugging.
+// Remember to comment out before checking in.
+//#define EXTRA_SMALL
+
+#if defined(EXTRA_SMALL)
+
+// Extra small quantities for quick debugging runs.
+const size_t TUPLE_COUNT = 10;
+const size_t BUFFER_SIZE = 1024;
+const size_t NUM_REPETITIONS = 2;
+const size_t NUM_MUTATIONS = 5;
+
+#elif defined(MEMCHECK)
+
+// The smaller quantity is used for memcheck runs.
+const size_t TUPLE_COUNT = 1000;
+const size_t BUFFER_SIZE = 131072;
+const size_t NUM_REPETITIONS = 10;
+const size_t NUM_MUTATIONS = 10;
+
+#else
+
+// Normal/full run quantities.
+const size_t TUPLE_COUNT = 174762;
+const size_t BUFFER_SIZE = 131072;
+const size_t NUM_REPETITIONS = 10;
+const size_t NUM_MUTATIONS = 10;
+
+#endif
+
+// Maximum quantity for detailed error display.
+const size_t MAX_DETAIL_COUNT = 50;
 
 /**
  * The strategy of this test is to create a table with 5 blocks of tuples with the first column (primary key)
@@ -64,7 +102,8 @@ public:
         m_tuplesInsertedInLastUndo = 0;
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
+        int partitionCount = 1;
+        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, HASHINATOR_LEGACY, (char*)&partitionCount);
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
@@ -87,6 +126,8 @@ public:
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+
+        m_tupleWidth = (sizeof(int32_t) * 2) + (sizeof(int64_t) * 7);
 
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
@@ -185,7 +226,7 @@ public:
         m_tuplesInsertedInLastUndo = 0;
     }
 
-    void doRandomTableMutation(Table *table) {
+void doRandomTableMutation(Table *table) {
         int rand = ::rand();
         int op = rand % 3;
         switch (op) {
@@ -250,16 +291,14 @@ public:
     int32_t m_tuplesDeletedInLastUndo;
 
     int64_t m_undoToken;
+
+    int32_t m_tupleWidth;
 };
 
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     initTable(true);
 
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 174762;
-#endif
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
 
     voltdb::TableIterator& iterator = m_table->iterator();
@@ -309,14 +348,10 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
 
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(true);
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 174762;
-#endif
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     DefaultTupleSerializer serializer;
-    for (int qq = 0; qq < 10; qq++) {
+    for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
@@ -334,13 +369,14 @@ TEST_F(CopyOnWriteTest, BigTest) {
         m_table->activateCopyOnWrite(&serializer, 0);
 
         stx::btree_set<int64_t> COWTuples;
-        char serializationBuffer[131072];
+        char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            ReferenceSerializeOutput out( serializationBuffer, 131072);
-            m_table->serializeMore(&out);
-            const int serialized = static_cast<int>(out.position());
-            if (out.position() == 0) {
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
+            m_table->serializeMore(outputStreams);
+            const int serialized = static_cast<int>(outputStream.position());
+            if (serialized == 0) {
                 break;
             }
             int ii = 12;//skip partition id and row count and first tuple length
@@ -355,9 +391,9 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 68;
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
-            for (int jj = 0; jj < 10; jj++) {
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
             }
         }
@@ -397,16 +433,12 @@ TEST_F(CopyOnWriteTest, BigTest) {
 
 TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     initTable(true);
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 174762;
-#endif
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
     DefaultTupleSerializer serializer;
-    for (int qq = 0; qq < 10; qq++) {
+    for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
@@ -424,13 +456,14 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         m_table->activateCopyOnWrite(&serializer, 0);
 
         stx::btree_set<int64_t> COWTuples;
-        char serializationBuffer[131072];
+        char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            ReferenceSerializeOutput out( serializationBuffer, 131072);
-            m_table->serializeMore(&out);
-            const int serialized = static_cast<int>(out.position());
-            if (out.position() == 0) {
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
+            m_table->serializeMore(outputStreams);
+            const int serialized = static_cast<int>(outputStream.position());
+            if (serialized == 0) {
                 break;
             }
             int ii = 12;//skip partition id and row count and first tuple length
@@ -445,9 +478,9 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 68;
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
-            for (int jj = 0; jj < 10; jj++) {
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
             }
             doRandomUndo();
@@ -491,16 +524,12 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 
 TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     initTable(true);
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 174762;
-#endif
+    int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
     DefaultTupleSerializer serializer;
-    for (int qq = 0; qq < 10; qq++) {
+    for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
@@ -518,13 +547,14 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         m_table->activateCopyOnWrite(&serializer, 0);
 
         stx::btree_set<int64_t> COWTuples;
-        char serializationBuffer[131072];
+        char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
-            ReferenceSerializeOutput out( serializationBuffer, 131072);
-            m_table->serializeMore(&out);
-            const int serialized = static_cast<int>(out.position());
-            if (out.position() == 0) {
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
+            m_table->serializeMore(outputStreams);
+            const int serialized = static_cast<int>(outputStream.position());
+            if (serialized == 0) {
                 break;
             }
             int ii = 12;//skip partition id and row count and first tuple length
@@ -539,9 +569,9 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 }
                 ASSERT_TRUE(inserted);
                 totalInserted++;
-                ii += 68;
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
-            for (int jj = 0; jj < 10; jj++) {
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
                 doRandomTableMutation(m_table);
             }
             m_engine->undoUndoToken(m_undoToken);
@@ -579,6 +609,283 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 
         ASSERT_EQ(originalTuples.size(), COWTuples.size());
         ASSERT_TRUE(originalTuples == COWTuples);
+    }
+}
+
+// Handy types and values.
+typedef std::pair<int32_t, int32_t> HashRange;
+typedef stx::btree_set<int64_t> TupleSet;
+
+/** Tool object holds test state and conveniently displays errors. */
+class MultiStreamTestTool {
+public:
+    MultiStreamTestTool(PersistentTable& table, size_t npartitions) :
+        table(table),
+        npartitions(npartitions),
+        iteration(-1),
+        nerrors(0),
+        showTuples(TUPLE_COUNT <= MAX_DETAIL_COUNT)
+    {
+        strcpy(stage, "Initialize");
+        TableTuple tuple(table.schema());
+        size_t i = 0;
+        voltdb::TableIterator& iterator = table.iterator();
+        while (iterator.next(tuple)) {
+            int64_t value = *reinterpret_cast<int64_t*>(tuple.address() + 1);
+            values.push_back(value);
+            valueSet.insert(std::pair<int64_t,size_t>(value, i++));
+        }
+    }
+
+    void iterate() {
+        iteration++;
+    }
+
+    void context(const std::string& msg, ...) {
+        va_list args;
+        va_start(args, msg);
+        vsnprintf(stage, sizeof stage, msg.c_str(), args);
+        va_end(args);
+    }
+
+    void verror(const std::string& msg, va_list args) {
+        char buffer[256];
+        vsnprintf(buffer, sizeof buffer, msg.c_str(), args);
+        if (nerrors++ == 0) {
+            std::cerr << std::endl;
+        }
+        std::cerr << "ERROR(iteration=" << iteration << ": " << stage << "): " << buffer << std::endl;
+    }
+
+    void error(const std::string& msg, ...) {
+        va_list args;
+        va_start(args, msg);
+        verror(msg, args);
+        va_end(args);
+    }
+
+    void valueError(int32_t* pvalues, const std::string& msg, ...) {
+        if (showTuples) {
+            std::cerr << std::endl << "=== Tuples ===" << std::endl;
+            size_t n = 0;
+            for (std::vector<int64_t>::iterator i = values.begin(); i != values.end(); ++i) {
+                std::cerr << ++n << " " << *i << std::endl;
+            }
+            std::cerr << std::endl;
+            showTuples = false;
+        }
+        int64_t value = *reinterpret_cast<int64_t*>(pvalues);
+        std::ostringstream os;
+        os << msg << " value=" << value << "(" << pvalues[0] << "," << pvalues[1] << ") index=";
+        std::map<int64_t,size_t>::const_iterator ifound = valueSet.find(value);
+        if (ifound != valueSet.end()) {
+            os << ifound->second;
+        }
+        else {
+            os << "???";
+        }
+        os << " modulus=" << value % npartitions;
+        va_list args;
+        va_start(args, msg);
+        verror(os.str(), args);
+        va_end(args);
+    }
+
+    void diff(TupleSet set1, TupleSet set2) {
+        std::vector<int64_t> diff;
+        std::insert_iterator<std::vector<int64_t> > idiff( diff, diff.begin());
+        std::set_difference(set1.begin(), set1.end(), set2.begin(), set2.end(), idiff);
+        if (diff.size() <= MAX_DETAIL_COUNT) {
+            for (int ii = 0; ii < diff.size(); ii++) {
+                int32_t *values = reinterpret_cast<int32_t*>(&diff[ii]);
+                valueError(values, "tuple");
+            }
+        }
+        else {
+            error("(%lu tuples)", diff.size());
+        }
+    }
+
+    PersistentTable& table;
+    size_t npartitions;
+    int iteration;
+    char stage[256];
+    size_t nerrors;
+    std::vector<int64_t> values;
+    std::map<int64_t,size_t> valueSet;
+    bool showTuples;
+};
+
+/**
+ * Exercise the multi-COW.
+ */
+TEST_F(CopyOnWriteTest, MultiStreamTest) {
+
+    // Constants
+    const int32_t npartitions = 7;
+    const int tupleCount = TUPLE_COUNT;
+
+    DefaultTupleSerializer serializer;
+
+    initTable(true);
+    addRandomUniqueTuples(m_table, tupleCount);
+
+    MultiStreamTestTool tool(*m_table, npartitions);
+
+    for (size_t iteration = 0; iteration < NUM_REPETITIONS; iteration++) {
+
+        tool.iterate();
+
+        int totalInserted = 0;              // Total tuple counter.
+        boost::scoped_ptr<char> buffers[npartitions];   // Stream buffers.
+        std::vector<std::string> strings(npartitions);  // Range strings.
+        HashRange ranges[npartitions];  // Raw ranges.
+        TupleSet before[npartitions];   // Tuple values by partition before streaming.
+        TupleSet after[npartitions];    // Tuple values by partition after streaming.
+
+        // Prepare streams by generating ranges and range strings based on
+        // the desired number of partitions/predicates.
+        // Since integer hashes use a simple modulus we just need to provide
+        // the partition number for the range.
+        // Also prepare a buffer for each stream.
+        for (int32_t i = 0; i < npartitions; i++) {
+            buffers[i].reset(new char[BUFFER_SIZE]);
+            ranges[i] = std::pair<int32_t, int32_t>(i, i);
+            std::ostringstream os;
+            os << i << ':' << i;
+            strings[i] = os.str();
+        }
+
+        tool.context("precalculate");
+
+        // Map original tuples to expected partitions using a simple
+        // modulus hash and the ranges generated above.
+        voltdb::TableIterator& iterator = m_table->iterator();
+        int partCol = m_table->partitionColumn();
+        TableTuple tuple(m_table->schema());
+        while (iterator.next(tuple)) {
+            int64_t value = *reinterpret_cast<int64_t*>(tuple.address() + 1);
+            int32_t ipart = (int32_t)(ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions);
+            bool inserted = before[ipart].insert(value).second;
+            if (!inserted) {
+                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                tool.error("Duplicate primary key %d iteration=%lu", primaryKey, iteration);
+            }
+            ASSERT_TRUE(inserted);
+        }
+
+        tool.context("activate");
+
+        bool alreadyActivated = m_table->activateCopyOnWrite(&serializer, 0, strings, npartitions);
+        if (alreadyActivated) {
+            tool.error("COW was previously activated");
+        }
+        ASSERT_FALSE(alreadyActivated);
+
+        int64_t remaining = tupleCount;
+        while (remaining > 0) {
+
+            // Prepare output streams and their buffers.
+            TupleOutputStreamProcessor outputStreams;
+            for (int32_t i = 0; i < npartitions; i++) {
+                outputStreams.add((void*)buffers[i].get(), BUFFER_SIZE);
+            }
+
+            remaining = m_table->serializeMore(outputStreams);
+
+            // Per-predicate iterators.
+            TupleOutputStreamProcessor::iterator outputStream = outputStreams.begin();
+
+            // Record the final result of streaming to each partition/predicate.
+            for (size_t ipart = 0; ipart < npartitions; ipart++) {
+
+                tool.context("serialize: partition=%lu remaining=%lld", ipart, remaining);
+
+                const int serialized = static_cast<int>(outputStream->position());
+                if (serialized > 0) {
+                    // Skip partition id, row count and first tuple length.
+                    int ibuf = sizeof(int32_t) * 3;
+                    while (ibuf < (serialized - sizeof(int32_t))) {
+                        int32_t values[2];
+                        values[0] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf));
+                        values[1] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf+4));
+                        int64_t value = *reinterpret_cast<int64_t*>(values);
+                        const bool inserted = after[ipart].insert(value).second;
+                        if (!inserted) {
+                            tool.valueError(values, "Buffer duplicate: ipart=%lu totalInserted=%d ibuf=%d",
+                                            ipart, totalInserted, ibuf);
+                        }
+                        ASSERT_TRUE(inserted);
+
+                        totalInserted++;
+
+                        // Account for tuple data and second tuple length.
+                        ibuf += static_cast<int>(m_tupleWidth + sizeof(int32_t));
+                    }
+                }
+
+                // Mozy along to the next predicate/partition.
+                // Do a silly cross-check that the iterator doesn't end prematurely.
+                ++outputStream;
+                ASSERT_TRUE(ipart == npartitions - 1 || outputStream != outputStreams.end());
+            }
+
+            // Mutate the table.
+            for (size_t imutation = 0; imutation < NUM_MUTATIONS; imutation++) {
+                doRandomTableMutation(m_table);
+            }
+        }
+
+        // Summarize partitions with incorrect tuple counts.
+        for (size_t ipart = 0; ipart < npartitions; ipart++) {
+            tool.context("check size: partition=%lu", ipart);
+            if (before[ipart].size() != after[ipart].size()) {
+                tool.error("Size mismatch: expected=%lu actual=%lu",
+                           before[ipart].size(), after[ipart].size());
+            }
+        }
+
+        // Summarize partitions where before and after aren't equal.
+        for (size_t ipart = 0; ipart < npartitions; ipart++) {
+            tool.context("check equality: partition=%lu", ipart);
+            if (before[ipart] != after[ipart]) {
+                tool.error("Not equal");
+            }
+        }
+
+        // Look for tuples that are missing from partitions.
+        for (size_t ipart = 0; ipart < npartitions; ipart++) {
+            tool.context("missing: partition=%lu", ipart);
+            tool.diff(before[ipart], after[ipart]);
+        }
+
+        // Look for extra tuples that don't belong in partitions.
+        for (size_t ipart = 0; ipart < npartitions; ipart++) {
+            tool.context("extra: partition=%lu", ipart);
+            tool.diff(after[ipart], before[ipart]);
+        }
+
+        // Check tuple diff for each predicate/partition.
+        for (size_t ipart = 0; ipart < npartitions; ipart++) {
+            tool.context("check equality: partition=%lu", ipart);
+            ASSERT_EQ(before[ipart].size(), after[ipart].size());
+            ASSERT_TRUE(before[ipart] == after[ipart]);
+        }
+
+        // Check for dirty tuples.
+        tool.context("check dirty");
+        int numTuples = 0;
+        iterator = m_table->iterator();
+        while (iterator.next(tuple)) {
+            if (tuple.isDirty()) {
+                tool.error("Found tuple %d is active and dirty at end of COW",
+                           ValuePeeker::peekAsInteger(tuple.getNValue(0)));
+            }
+            numTuples++;
+            ASSERT_FALSE(tuple.isDirty());
+        }
+        ASSERT_EQ(numTuples, tupleCount + (m_tuplesInserted - m_tuplesDeleted));
+        ASSERT_EQ(tool.nerrors, 0);
     }
 }
 
