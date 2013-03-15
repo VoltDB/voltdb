@@ -289,7 +289,69 @@ public class TestClientInterface {
      * initiates the txn.
      */
     @Test
-    public void testFinishedAdHocPlanning() throws Exception {
+    public void testFinishedSPAdHocPlanning() throws Exception {
+        when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
+                any(StoredProcedureInvocation.class),
+                anyBoolean(), anyBoolean(), anyBoolean(),
+                any(int[].class), anyInt(), anyObject(),
+                anyInt(), anyLong(), anyBoolean())).thenReturn(true);
+
+        // Need a batch and a statement
+        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
+                "select * from a where i = 3", 3, 0, 0, "localhost", false,
+                ProcedureInvocationType.ORIGINAL, 0, 0, null);
+        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a where i = 3".getBytes
+                (VoltDB.UTF8ENCODING),
+                new CorePlan(new byte[0],
+                        null,
+                        false,
+                        false,
+                        true,
+                        new VoltType[0],
+                        0),
+                new ParameterSet(),
+                null,
+                null,
+                3);
+        plannedStmtBatch.addStatement(s);
+        m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
+
+        ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
+        ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
+                ArgumentCaptor.forClass(StoredProcedureInvocation.class);
+        verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
+                invocationCaptor.capture(),
+                boolCaptor.capture(), boolCaptor.capture(),
+                boolCaptor.capture(),
+                any(int[].class), anyInt(),
+                anyObject(), anyInt(), anyLong(),
+                boolCaptor.capture());
+        List<Boolean> boolValues = boolCaptor.getAllValues();
+        assertFalse(boolValues.get(0)); // is admin
+        assertTrue(boolValues.get(1));  // readonly
+        assertTrue(boolValues.get(2)); // single-part
+        assertFalse(boolValues.get(3)); // every site
+        assertEquals("@AdHoc_RO_SP", invocationCaptor.getValue().getProcName());
+
+        // SP AdHoc should have partitioning parameter serialized in the parameter set
+        Object partitionParam = invocationCaptor.getValue().getParameterAtIndex(0);
+        byte partitionParamType = (Byte) invocationCaptor.getValue().getParameterAtIndex(1);
+        byte[] serializedData = (byte[]) invocationCaptor.getValue().getParameterAtIndex(2);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
+        assertTrue(partitionParam instanceof String);
+        assertEquals("3", partitionParam);
+        assertEquals(VoltType.INTEGER.getValue(), partitionParamType);
+        assertEquals(1, statements.length);
+        String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
+        assertEquals("select * from a where i = 3", sql);
+    }
+
+    /**
+     * Fake an adhoc compiler result and return it to the CI, see if CI
+     * initiates the txn.
+     */
+    @Test
+    public void testFinishedMPAdHocPlanning() throws Exception {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
                                            any(StoredProcedureInvocation.class),
                                            anyBoolean(), anyBoolean(), anyBoolean(),
