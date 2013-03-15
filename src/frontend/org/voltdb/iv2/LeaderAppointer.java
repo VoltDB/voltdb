@@ -17,12 +17,14 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 
 import java.util.HashSet;
@@ -32,8 +34,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
@@ -52,6 +57,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 
 import org.voltdb.client.ClientResponse;
@@ -86,11 +92,12 @@ public class LeaderAppointer implements Promotable
 
     private final HostMessenger m_hostMessenger;
     private final ZooKeeper m_zk;
-    private final int m_partitionCount;
-    private final BabySitter[] m_partitionWatchers;
+    // This should only be accessed through getInitialPartitionCount() on cluster startup.
+    private final int m_initialPartitionCount;
+    private final Map<Integer, BabySitter> m_partitionWatchers;
     private final LeaderCache m_iv2appointees;
     private final LeaderCache m_iv2masters;
-    private final PartitionCallback[] m_callbacks;
+    private final Map<Integer, PartitionCallback> m_callbacks;
     private final int m_kfactor;
     private final JSONObject m_topo;
     private final MpInitiator m_MPI;
@@ -229,6 +236,11 @@ public class LeaderAppointer implements Promotable
                 if (missingHSIds.contains(m_currentLeader)) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
                 }
+                // If this partition doesn't have a leader yet, and we have new replicas added,
+                // elect a leader.
+                if (m_currentLeader == Long.MAX_VALUE && !updatedHSIds.isEmpty()) {
+                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                }
             }
             m_replicas.clear();
             m_replicas.addAll(updatedHSIds);
@@ -245,13 +257,46 @@ public class LeaderAppointer implements Promotable
             Set<Long> currentLeaders = new HashSet<Long>(cache.values());
             tmLog.debug("Updated leaders: " + currentLeaders);
             if (m_state.get() == AppointerState.CLUSTER_START) {
-                if (currentLeaders.size() == m_partitionCount) {
-                    tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
-                    m_state.set(AppointerState.DONE);
-                    m_MPI.acceptPromotion();
-                    m_startupLatch.countDown();
+                try {
+                    if (currentLeaders.size() == getInitialPartitionCount()) {
+                        tmLog.debug("Leader appointment complete, promoting MPI and unblocking.");
+                        m_state.set(AppointerState.DONE);
+                        m_MPI.acceptPromotion();
+                        m_startupLatch.countDown();
+                    }
+                } catch (IllegalAccessException e) {
+                    // This should never happen
+                    VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
                 }
             }
+        }
+    };
+
+
+    Watcher m_partitionCallback = new Watcher() {
+        @Override
+        public void process(WatchedEvent event)
+        {
+            m_es.submit(new Runnable() {
+                @Override
+                public void run()
+                {
+                    try {
+                        List<String> children = m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
+                        tmLog.info("Noticed partition change " + children + ", " +
+                                "currenctly watching " + m_partitionWatchers.keySet());
+                        for (String child : children) {
+                            int pid = LeaderElector.getPartitionFromElectionDir(child);
+                            if (!m_partitionWatchers.containsKey(pid) && pid != MpInitiator.MP_INIT_PID) {
+                                watchPartition(pid, MoreExecutors.sameThreadExecutor());
+                            }
+                        }
+                        tmLog.info("Done " + m_partitionWatchers.keySet());
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Cannot read leader initiator directory", false, e);
+                    }
+                }
+            });
         }
     };
 
@@ -266,9 +311,9 @@ public class LeaderAppointer implements Promotable
         m_kfactor = kfactor;
         m_topo = topology;
         m_MPI = mpi;
-        m_partitionCount = numberOfPartitions;
-        m_callbacks = new PartitionCallback[m_partitionCount];
-        m_partitionWatchers = new BabySitter[m_partitionCount];
+        m_initialPartitionCount = numberOfPartitions;
+        m_callbacks = new HashMap<Integer, PartitionCallback>();
+        m_partitionWatchers = new HashMap<Integer, BabySitter>();
         m_iv2appointees = new LeaderCache(m_zk, VoltZK.iv2appointees);
         m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
         m_partitionDetectionEnabled = partitionDetectionEnabled;
@@ -288,11 +333,18 @@ public class LeaderAppointer implements Promotable
             tmLog.debug("LeaderAppointer in startup");
             m_state.set(AppointerState.CLUSTER_START);
         }
-        else if ((m_iv2appointees.pointInTimeCache().size() != m_partitionCount) ||
-                 (m_iv2masters.pointInTimeCache().size() != m_partitionCount)) {
-            // If we are promoted and the appointees or masters set is partial, the previous appointer failed
-            // during startup (at least for now, until we add add/remove a partition on the fly).
-            VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
+        else if (m_state.get() == AppointerState.INIT) {
+            try {
+                if ((m_iv2appointees.pointInTimeCache().size() != getInitialPartitionCount()) ||
+                        (m_iv2masters.pointInTimeCache().size() != getInitialPartitionCount())) {
+                    // If we are promoted and the appointees or masters set is partial, the previous appointer failed
+                    // during startup (at least for now, until we add add/remove a partition on the fly).
+                    VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
+                }
+            } catch (IllegalAccessException e) {
+                // This should never happen
+                VoltDB.crashLocalVoltDB("Failed to get partition count", true, e);
+            }
         }
         else {
             tmLog.debug("LeaderAppointer in repair");
@@ -306,20 +358,18 @@ public class LeaderAppointer implements Promotable
             // appointed leaders publish themselves as the actual leaders.
             m_startupLatch = new CountDownLatch(1);
             writeKnownLiveNodes(m_hostMessenger.getLiveHostIds());
-            for (int i = 0; i < m_partitionCount; i++) {
-                String dir = LeaderElector.electionDirForPartition(i);
-                // Race along with all of the replicas for this partition to create the ZK parent node
-                try {
-                    m_zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                } catch (KeeperException.NodeExistsException e) {
-                    // expected on all nodes that don't start() first.
+            try {
+                for (int i = 0; i < getInitialPartitionCount(); i++) {
+                    addPartitionZKNode(m_zk, i);
+                    watchPartition(i, m_es);
                 }
-                m_callbacks[i] = new PartitionCallback(i);
-                Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, m_callbacks[i],
-                        m_es);
-                m_partitionWatchers[i] = sitterstuff.getFirst();
+            } catch (IllegalAccessException e) {
+                // This should never happen
+                VoltDB.crashLocalVoltDB("Failed to get partition count on startup", true, e);
             }
             m_startupLatch.await();
+
+            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
         }
         else {
             // If we're taking over for a failed LeaderAppointer, we know when
@@ -334,14 +384,58 @@ public class LeaderAppointer implements Promotable
             for (Entry<Integer, Long> master : masters.entrySet()) {
                 int partId = master.getKey();
                 String dir = LeaderElector.electionDirForPartition(partId);
-                m_callbacks[partId] = new PartitionCallback(partId, master.getValue());
+                m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
                 Pair<BabySitter, List<String>> sitterstuff =
-                    BabySitter.blockingFactory(m_zk, dir, m_callbacks[partId], m_es);
-                m_partitionWatchers[partId] = sitterstuff.getFirst();
+                    BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
+                m_partitionWatchers.put(partId, sitterstuff.getFirst());
             }
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
         }
+    }
+
+    /**
+     * Creates the ZK node for the given partition.
+     *
+     * @param zk A ZK instance
+     * @param pid The partition ID
+     * @throws KeeperException
+     * @throws InterruptedException
+     */
+    public static void addPartitionZKNode(ZooKeeper zk, int pid)
+            throws KeeperException, InterruptedException
+    {
+        String dir = LeaderElector.electionDirForPartition(pid);
+        // Race along with all of the replicas for this partition to create the ZK parent node
+        try {
+            zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            // expected on all nodes that don't start() first.
+        }
+    }
+
+    /**
+     * Watch the partition ZK dir in the leader appointer.
+     *
+     * This should be called on the elected leader appointer only. m_callbacks and
+     * m_partitionWatchers are only accessed on initialization, promotion,
+     * or elastic add node.
+     *
+     * @param pid The partition ID
+     * @param es The executor service to use to construct the baby sitter
+     * @throws KeeperException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    void watchPartition(int pid, ExecutorService es) throws InterruptedException,
+            ExecutionException
+    {
+        tmLog.info("Start watching partition " + pid);
+        String dir = LeaderElector.electionDirForPartition(pid);
+        m_callbacks.put(pid, new PartitionCallback(pid));
+        Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk,
+                dir, m_callbacks.get(pid), es);
+        m_partitionWatchers.put(pid, sitterstuff.getFirst());
     }
 
     private long assignLeader(int partitionId, List<Long> children)
@@ -540,12 +634,21 @@ public class LeaderAppointer implements Promotable
     private boolean isClusterKSafe()
     {
         boolean retval = true;
-        for (int i = 0; i < m_partitionCount; i++) {
-            String dir = LeaderElector.electionDirForPartition(i);
+        List<String> partitionDirs = null;
+
+        try {
+            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to read partitions from ZK", true, e);
+        }
+
+        for (String partitionDir : partitionDirs) {
+            int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
                 List<String> replicas = m_zk.getChildren(dir, null, null);
                 if (replicas.isEmpty()) {
-                    tmLog.fatal("K-Safety violation: No replicas found for partition: " + i);
+                    tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
                 }
             }
@@ -554,6 +657,23 @@ public class LeaderAppointer implements Promotable
             }
         }
         return retval;
+    }
+
+    /**
+     * Gets the initial cluster partition count on startup. This can only be called during
+     * initialization. Calling this after initialization throws, because the partition count may
+     * not reflect the actual partition count in the cluster.
+     *
+     * @return
+     */
+    private int getInitialPartitionCount() throws IllegalAccessException
+    {
+        AppointerState currentState = m_state.get();
+        if (currentState != AppointerState.INIT && currentState != AppointerState.CLUSTER_START) {
+            throw new IllegalAccessException("Getting cached partition count after cluster " +
+                    "startup");
+        }
+        return m_initialPartitionCount;
     }
 
     public void onReplayCompletion()
@@ -566,7 +686,7 @@ public class LeaderAppointer implements Promotable
         try {
             m_iv2appointees.shutdown();
             m_iv2masters.shutdown();
-            for (BabySitter watcher : m_partitionWatchers) {
+            for (BabySitter watcher : m_partitionWatchers.values()) {
                 watcher.shutdown();
             }
         }

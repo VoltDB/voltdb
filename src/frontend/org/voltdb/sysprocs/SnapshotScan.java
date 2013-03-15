@@ -45,6 +45,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltTableUtil;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotScan extends VoltSystemProcedure {
@@ -190,20 +191,10 @@ public class SnapshotScan extends VoltSystemProcedure {
             }
             return new DependencyPair( DEP_snapshotScan, results);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotScanResults) {
-            final VoltTable results = constructFragmentResultsTable();
             TRACE_LOG.trace("Aggregating Snapshot Scan  results");
             assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_snapshotScan);
-            for (VoltTable table : dep)
-            {
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    results.add(table);
-                }
-            }
-            return new
-                DependencyPair( DEP_snapshotScanResults, results);
+            final VoltTable results = VoltTableUtil.unionTables(dependencies.get(DEP_snapshotScan));
+            return new DependencyPair( DEP_snapshotScanResults, results);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotDigestScan)
         {
             final VoltTable results = constructDigestResultsTable();
@@ -261,20 +252,10 @@ public class SnapshotScan extends VoltSystemProcedure {
             }
             return new DependencyPair( DEP_snapshotDigestScan, results);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotDigestScanResults) {
-            final VoltTable results = constructDigestResultsTable();
             TRACE_LOG.trace("Aggregating Snapshot Digest Scan  results");
             assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_snapshotDigestScan);
-            for (VoltTable table : dep)
-            {
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    results.add(table);
-                }
-            }
-            return new
-                DependencyPair( DEP_snapshotDigestScanResults, results);
+            final VoltTable results = VoltTableUtil.unionTables(dependencies.get(DEP_snapshotDigestScan));
+            return new DependencyPair( DEP_snapshotDigestScanResults, results);
         } else if (fragmentId == SysProcFragmentId.PF_hostDiskFreeScan)
         {
             final VoltTable results = constructDiskFreeResultsTable();
@@ -314,20 +295,10 @@ public class SnapshotScan extends VoltSystemProcedure {
             }
             return new DependencyPair( DEP_hostDiskFreeScan, results);
         } else if (fragmentId == SysProcFragmentId.PF_hostDiskFreeScanResults) {
-            final VoltTable results = constructDiskFreeResultsTable();
             TRACE_LOG.trace("Aggregating disk free results");
             assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_hostDiskFreeScan);
-            for (VoltTable table : dep)
-            {
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    results.add(table);
-                }
-            }
-            return new
-                DependencyPair( DEP_hostDiskFreeScanResults, results);
+            final VoltTable results = VoltTableUtil.unionTables(dependencies.get(DEP_hostDiskFreeScan));
+            return new DependencyPair( DEP_hostDiskFreeScanResults, results);
         }
         assert (false);
         return null;

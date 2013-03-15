@@ -605,12 +605,10 @@ public class Inits {
 
         @Override
         public void run() {
-            int hostCount = m_deployment.getCluster().getHostcount();
-            int kFactor = m_deployment.getCluster().getKfactor();
-            int sitesPerHost = m_deployment.getCluster().getSitesperhost();
-
             // Initialize the complex partitioning scheme
-            TheHashinator.initialize((hostCount * sitesPerHost) / (kFactor + 1));
+            TheHashinator.initialize(
+                    TheHashinator.getConfiguredHashinatorClass(),
+                    TheHashinator.getConfigureBytes(m_rvdb.m_configuredNumberOfPartitions));
         }
     }
 
@@ -642,7 +640,7 @@ public class Inits {
 
         @Override
         public void run() {
-            if (!m_isRejoin && !m_config.m_isRejoinTest) {
+            if (!m_isRejoin && !m_config.m_isRejoinTest && !m_rvdb.m_joining) {
                 String snapshotPath = null;
                 if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();

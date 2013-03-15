@@ -83,7 +83,7 @@ public class VoltDB {
     public static final String ANON_STMT_NAME = "sql";
 
     public enum START_ACTION {
-        CREATE, RECOVER, REJOIN, LIVE_REJOIN
+        CREATE, RECOVER, REJOIN, LIVE_REJOIN, JOIN
     }
 
     public static boolean createForRejoin(VoltDB.START_ACTION startAction)
@@ -125,7 +125,9 @@ public class VoltDB {
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-        /** use normal JNI backend or optional IPC or HSQLDB backends */
+        /** select normal JNI backend.
+         *  IPC, Valgrind, and HSQLDB are the other options.
+         */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
         /** leader hostname */
@@ -373,6 +375,8 @@ public class VoltDB {
                     m_startAction = START_ACTION.LIVE_REJOIN;
                 } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
                     m_startAction = START_ACTION.LIVE_REJOIN;
+                } else if (arg.startsWith("join")) {
+                    m_startAction = START_ACTION.JOIN;
                 }
 
                 else if (arg.equals("replica")) {
@@ -491,7 +495,8 @@ public class VoltDB {
             }
 
             // require deployment file location
-            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
+            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN
+                    && m_startAction != START_ACTION.JOIN) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;

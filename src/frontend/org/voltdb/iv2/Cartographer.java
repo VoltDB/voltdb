@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -66,7 +67,6 @@ public class Cartographer extends StatsSource
     private final Set<Long> m_currentSPMasters = new HashSet<Long>();
     private final HostMessenger m_hostMessenger;
     private final ZooKeeper m_zk;
-    private final int m_numberOfPartitions;
     private final Set<Integer> m_allMasters = new HashSet<Integer>();
 
     public static final String JSON_PARTITION_ID = "partitionId";
@@ -159,10 +159,9 @@ public class Cartographer extends StatsSource
         }
     }
 
-    public Cartographer(HostMessenger hostMessenger, int numberOfPartitions)
+    public Cartographer(HostMessenger hostMessenger)
     {
         super(false);
-        m_numberOfPartitions = numberOfPartitions;
         m_hostMessenger = hostMessenger;
         m_zk = hostMessenger.getZK();
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
@@ -251,6 +250,29 @@ public class Cartographer extends StatsSource
         }
         throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
                                    CoreUtils.hsIdToString(hsid));
+    }
+
+    /**
+     * Returns the IDs of the partitions currently in the cluster.
+     * @return A list of partition IDs
+     */
+    public static List<Integer> getPartitions(ZooKeeper zk) {
+        List<Integer> partitions = new ArrayList<Integer>();
+        try {
+            List<String> children = zk.getChildren(VoltZK.leaders_initiators, null);
+            for (String child : children) {
+                partitions.add(LeaderElector.getPartitionFromElectionDir(child));
+            }
+        } catch (KeeperException e) {
+            VoltDB.crashLocalVoltDB("Failed to get partition IDs from ZK", true, e);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Failed to get partition IDs from ZK", true, e);
+        }
+        return partitions;
+    }
+
+    public List<Integer> getPartitions() {
+        return Cartographer.getPartitions(m_zk);
     }
 
     /**
@@ -364,15 +386,45 @@ public class Cartographer extends StatsSource
     public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
     {
         ClusterConfig clusterConfig = new ClusterConfig(topology);
-        hostLog.info("Computing partitions to replace.  Total partitions: " + m_numberOfPartitions);
+        hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
         Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
-        for (int i = 0; i < m_numberOfPartitions; i++) {
+        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
             repsPerPart.put(i, getReplicaCountForPartition(i));
         }
         List<Integer> partitions = computeReplacementPartitions(repsPerPart, clusterConfig.getReplicationFactor(),
-                clusterConfig.getSitesPerHost(), m_numberOfPartitions);
+                clusterConfig.getSitesPerHost(), clusterConfig.getPartitionCount());
         hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
         return partitions;
+    }
+
+    /**
+     * Compute the new partition IDs to add to the cluster based on the new topology.
+     *
+     * @param  zk Zookeeper client
+     * @param topo The new topology which should include the new host count
+     * @return A list of partitions IDs to add to the cluster.
+     * @throws JSONException
+     */
+    public static List<Integer> getPartitionsToAdd(ZooKeeper zk, JSONObject topo)
+            throws JSONException
+    {
+        ClusterConfig  clusterConfig = new ClusterConfig(topo);
+        List<Integer> newPartitions = new ArrayList<Integer>();
+        Set<Integer> existingParts = new HashSet<Integer>(getPartitions(zk));
+        // Remove MPI
+        existingParts.remove(MpInitiator.MP_INIT_PID);
+        int partsToAdd = clusterConfig.getPartitionCount() - existingParts.size();
+
+        if (partsToAdd > 0) {
+            hostLog.info("Computing new partitions to add. Total partitions: " + clusterConfig.getPartitionCount());
+            for (int i = 0; newPartitions.size() != partsToAdd; i++) {
+                if (!existingParts.contains(i)) {
+                    newPartitions.add(i);
+                }
+            }
+            hostLog.info("Adding " + partsToAdd + " partitions: " + newPartitions);
+        }
+        return newPartitions;
     }
 
     private List<MailboxNodeContent> getMailboxNodeContentList()

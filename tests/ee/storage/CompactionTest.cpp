@@ -27,6 +27,8 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
+#include "common/TupleOutputStream.h"
+#include "common/TupleOutputStreamProcessor.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
@@ -67,7 +69,8 @@ public:
         m_tuplesInsertedInLastUndo = 0;
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
+        int partitionCount = 1;
+        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, HASHINATOR_LEGACY, (char*)&partitionCount);
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
@@ -398,8 +401,9 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
 #endif
         char serializationBuffer[serializationBufferSize];
         while (true) {
-            ReferenceSerializeOutput out( serializationBuffer, serializationBufferSize);
-            m_table->serializeMore(&out);
+            TupleOutputStreamProcessor outs( serializationBuffer, serializationBufferSize);
+            TupleOutputStream &out = outs.at(0);
+            m_table->serializeMore(outs);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
                 break;
@@ -539,8 +543,9 @@ TEST_F(CompactionTest, TestENG897) {
     //std::cout << "Starting snapshot serialization" << std::endl;
     char serializationBuffer[2097152];
     while (true) {
-        ReferenceSerializeOutput out( serializationBuffer, 2097152);
-        m_table->serializeMore(&out);
+        TupleOutputStreamProcessor outs( serializationBuffer, 2097152);
+        TupleOutputStream &out = outs.at(0);
+        m_table->serializeMore(outs);
         if (out.position() == 0) {
             break;
         }

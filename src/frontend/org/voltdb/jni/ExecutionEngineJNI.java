@@ -28,6 +28,7 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -92,7 +93,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
-            final int totalPartitions)
+            final TheHashinator.HashinatorType hashinatorType,
+            final byte hashinatorConfig[])
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -117,7 +119,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     hostId,
                     getStringBytes(hostname),
                     tempTableMemory * 1024 * 1024,
-                    totalPartitions);
+                    hashinatorType.typeId(), hashinatorConfig);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
             @Override
@@ -468,12 +470,59 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType) {
-        return nativeActivateTableStream( pointer, tableId, streamType.ordinal());
+        FastSerializer fs = new FastSerializer();
+        try {
+            fs.writeInt(0);                 // Predicate count
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), fs.getBytes());
     }
 
     @Override
     public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        return nativeTableStreamSerializeMore(pointer, c.address, c.b.position(), c.b.remaining(), tableId, streamType.ordinal());
+        FastSerializer fs = new FastSerializer();
+        try {
+            fs.writeInt(1);                 // Buffer count
+            fs.writeLong(c.address);        // Pointer
+            fs.writeInt(c.b.position());    // Offset
+            fs.writeInt(c.b.remaining());   // Length
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        long remaining = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
+        int[] positions = null;
+        //TODO: Pass remaining count back to caller.
+        // -1 is end of stream.
+        if (remaining == -1) {
+            return 0;
+        }
+        // -2 is an error.
+        if (remaining == -2) {
+            return -1;
+        }
+        assert(deserializer != null);
+        deserializer.clear();
+        int count;
+        try {
+            count = deserializer.readInt();
+            if (count > 0) {
+                positions = new int[count];
+                for (int i = 0; i < count; i++) {
+                    positions[i] = deserializer.readInt();
+                }
+                //TODO: Support multiple streams.
+                assert(positions.length == 1);
+                return positions[0];
+            }
+        } catch (final IOException ex) {
+            LOG.error("Failed to deserialize position array" + ex);
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+
+        return 0;
     }
 
     /**
@@ -511,10 +560,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, int partitionCount)
+    public int hashinate(Object value, TheHashinator.HashinatorType hashinatorType, byte hashinatorConfig[])
     {
         ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        parameterSet.setParameters(value, hashinatorType.typeId(), hashinatorConfig);
 
         // serialize the param set
         fsForParameterSet.clear();
@@ -524,7 +573,24 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(exception); // can't happen
         }
 
-        return nativeHashinate(pointer, partitionCount);
+        return nativeHashinate(pointer);
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator.HashinatorType type, byte[] config)
+    {
+        ParameterSet parameterSet = new ParameterSet();
+        parameterSet.setParameters(type.typeId(), config);
+
+        // serialize the param set
+        fsForParameterSet.clear();
+        try {
+            parameterSet.writeExternal(fsForParameterSet);
+        } catch (final IOException exception) {
+            throw new RuntimeException(exception); // can't happen
+        }
+
+        nativeUpdateHashinator(pointer);
     }
 
     @Override

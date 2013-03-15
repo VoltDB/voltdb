@@ -35,6 +35,7 @@ import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.rejoin.TaskLog;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -59,35 +60,45 @@ public abstract class BaseInitiator implements Initiator
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, boolean forRejoin)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, String voltroot,
+            VoltDB.START_ACTION startAction)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        RejoinProducer rejoinProducer = forRejoin ?
-            new RejoinProducer(m_partitionId, scheduler.m_tasks) :
-            null;
+        boolean isLiveRejoin = startAction == VoltDB.START_ACTION.LIVE_REJOIN;
+        JoinProducerBase joinProducer;
+
+        if (startAction == VoltDB.START_ACTION.JOIN) {
+            joinProducer = new JoinProducer(m_partitionId, scheduler.m_tasks);
+        } else if (VoltDB.createForRejoin(startAction)) {
+            joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, voltroot,
+                    isLiveRejoin);
+        } else {
+            joinProducer = null;
+        }
+
         if (m_partitionId == MpInitiator.MP_INIT_PID) {
             m_initiatorMailbox = new MpInitiatorMailbox(
                     m_partitionId,
                     m_scheduler,
                     m_messenger,
                     m_repairLog,
-                    rejoinProducer);
+                    joinProducer);
         } else {
             m_initiatorMailbox = new InitiatorMailbox(
                     m_partitionId,
                     m_scheduler,
                     m_messenger,
                     m_repairLog,
-                    rejoinProducer);
+                    joinProducer);
         }
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
-        if (rejoinProducer != null) {
-            rejoinProducer.setMailbox(m_initiatorMailbox);
+        if (joinProducer != null) {
+            joinProducer.setMailbox(m_initiatorMailbox);
         }
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
@@ -128,6 +139,11 @@ public abstract class BaseInitiator implements Initiator
                 startAction = VoltDB.START_ACTION.CREATE;
             }
 
+            TaskLog taskLog = null;
+            if (m_initiatorMailbox.getJoinProducer() != null) {
+                taskLog = m_initiatorMailbox.getJoinProducer().getTaskLog();
+            }
+
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -141,6 +157,7 @@ public abstract class BaseInitiator implements Initiator
                                        agent,
                                        memStats,
                                        coreBindIds,
+                                       taskLog,
                                        drGateway);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
@@ -149,8 +166,7 @@ public abstract class BaseInitiator implements Initiator
                     m_executionSite,
                     prf,
                     m_initiatorMailbox.getHSId(),
-                    0, // this has no meaning
-                    numberOfPartitions);
+                    0); // this has no meaning
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);

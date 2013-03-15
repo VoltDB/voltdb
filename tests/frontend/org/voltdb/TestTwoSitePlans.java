@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
 
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.catalog.Catalog;
@@ -97,10 +98,20 @@ public class TestTwoSitePlans extends TestCase {
 
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> site1Reference = new AtomicReference<ExecutionEngine>();
+        final byte configBytes[] = LegacyHashinator.getConfigureBytes(2);
         Thread site1Thread = new Thread() {
             @Override
             public void run() {
-                site1Reference.set(new ExecutionEngineJNI(cluster.getRelativeIndex(), 1, 0, 0, "", 100, 2));
+                site1Reference.set(
+                        new ExecutionEngineJNI(
+                                cluster.getRelativeIndex(),
+                                1,
+                                0,
+                                0,
+                                "",
+                                100,
+                                HashinatorType.LEGACY,
+                                configBytes));
             }
         };
         site1Thread.start();
@@ -110,7 +121,16 @@ public class TestTwoSitePlans extends TestCase {
         Thread site2Thread = new Thread() {
             @Override
             public void run() {
-                site2Reference.set(new ExecutionEngineJNI(cluster.getRelativeIndex(), 2, 1, 0, "", 100, 2));
+                site2Reference.set(
+                        new ExecutionEngineJNI(
+                                cluster.getRelativeIndex(),
+                                2,
+                                1,
+                                0,
+                                "",
+                                100,
+                                HashinatorType.LEGACY,
+                                configBytes));
             }
         };
         site2Thread.start();

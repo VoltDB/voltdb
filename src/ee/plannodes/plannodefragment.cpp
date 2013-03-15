@@ -118,7 +118,7 @@ PlanNodeFragment::fromJSONObject(json_spirit::Object &obj)
         try {
             node = AbstractPlanNode::fromJSONObject(planNodesArray[ii].get_obj());
         }
-        catch (SerializableEEException &ex) {
+        catch (const SerializableEEException &ex) {
             delete pnf;
             throw;
         }
@@ -144,7 +144,7 @@ PlanNodeFragment::fromJSONObject(json_spirit::Object &obj)
     try {
         pnf->loadFromJSONObject(obj);
     }
-    catch (SerializableEEException &eeEx) {
+    catch (const SerializableEEException &eeEx) {
         delete pnf;
         throw;
     }
