@@ -71,6 +71,7 @@ public class TestCommandLine
         cl.zkport(4321);
         cl.buildDir("dood");
         cl.javaLibraryPath("sweet");
+        cl.rmiHostName("springsteen");
         cl.log4j("whats");
         cl.voltFilePrefix("mine");
         cl.setInitialHeap(470);

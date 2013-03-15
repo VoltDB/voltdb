@@ -89,6 +89,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.zkport = zkport;
         cl.buildDir = buildDir;
         cl.java_library_path = java_library_path;
+        cl.rmi_host_name = rmi_host_name;
         cl.log4j = log4j;
         cl.voltFilePrefix = voltFilePrefix;
         cl.initialHeap = initialHeap;
@@ -241,6 +242,12 @@ public class CommandLine extends VoltDB.Configuration
     String java_library_path = "";
     public CommandLine javaLibraryPath(String javaLibraryPath) {
         java_library_path = javaLibraryPath;
+        return this;
+    }
+
+    String rmi_host_name = "";
+    public CommandLine rmiHostName(String rmiHostName) {
+        rmi_host_name = rmiHostName;
         return this;
     }
 
@@ -415,6 +422,8 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-XX:-ReduceInitialCardMarks");
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-Djava.library.path=" + java_library_path);
+        if (rmi_host_name != null)
+            cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
         cmdline.add("-Dlog4j.configuration=" + log4j);
         if (m_vemTag != null) {
             cmdline.add("-D" + VEM_TAG_PROPERTY + "=" + m_vemTag);
