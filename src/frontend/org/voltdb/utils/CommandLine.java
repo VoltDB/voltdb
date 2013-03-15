@@ -435,8 +435,8 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add(javaExecutable);
         cmdline.add("-XX:-ReduceInitialCardMarks");
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
-        if (rmi_host_name != null)
         cmdline.add("-Djava.library.path=" + java_library_path);
+        if (rmi_host_name != null)
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
         cmdline.add("-Dlog4j.configuration=" + log4j);
         if (m_vemTag != null) {
