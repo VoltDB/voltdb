@@ -1080,6 +1080,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
+        hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
+        consoleLog.info(String.format("Host id of this node is: %d", m_myHostId));
 
         // Semi-hacky check to see if we're attempting to rejoin to ourselves.
         // The leader node gets assigned host ID 0, always, so if we're the
