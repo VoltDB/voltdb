@@ -79,6 +79,22 @@ public class VoltDB {
         }
     }
 
+    // Utility to try to figure out if this is a test case.  Various junit targets in
+    // build.xml set this environment variable to give us a hint
+    public static boolean isThisATest()
+    {
+        String test = System.getenv().get("VOLT_JUSTATEST");
+        if (test == null) {
+            test = System.getProperty("VOLT_JUSTATEST");
+        }
+        if (test != null && test.equalsIgnoreCase("YESYESYES")) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
@@ -621,6 +637,11 @@ public class VoltDB {
      * human readable stack traces for all java threads in the current process.
      */
     public static void dropStackTrace(String message) {
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a stack trace during a junit test.");
+            return;
+        }
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
         String dateString = sdf.format(new Date());
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
@@ -697,6 +718,10 @@ public class VoltDB {
         crashMessage = errMsg;
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
+        }
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a crash file during a junit test.");
         }
         // end test code
 

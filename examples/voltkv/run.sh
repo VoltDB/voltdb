@@ -93,6 +93,28 @@ function async-benchmark() {
         --latencytarget=6
 }
 
+function oneshot-benchmark() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkv.OneShotBenchmark \
+        --displayinterval=5 \
+        --duration=20 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=1.00 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --entropy=127 \
+        --usecompression=false \
+        --ratelimit=100000 \
+        --autotune=true \
+        --latencytarget=2 \
+        --oneshotratio=0.5 \
+        --mpratelimit=1000
+}
+
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
