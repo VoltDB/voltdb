@@ -26,9 +26,8 @@ import org.voltdb.utils.Encoder;
 public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
 
     public static final String COMMUNITY_MISSING_UAC_ERROR_MSG =
-            "The UpdateApplicationCatalog system procedure is part of the " +
-            "VoltDB Enterprise Edition. It is not a supported operation in " +
-            "the Community Edititon.";
+            "@UpdateApplicationCatalog is an Enterprise-only feature. " +
+            "It is not supported in the VoltDB Community Edition.";
 
     public UpdateCatalogAcceptancePolicy(boolean isOn) {
         super(isOn);
