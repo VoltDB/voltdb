@@ -85,6 +85,7 @@ public class LocalCluster implements VoltServerConfig {
     int m_nextIPCPort = 10000;
     ArrayList<Process> m_cluster = new ArrayList<Process>();
     int perLocalClusterExtProcessIndex = 0;
+    VoltProjectBuilder m_builder;
 
     // Dedicated paths in the filesystem to be used as a root for each process
     ArrayList<File> m_subRoots = new ArrayList<File>();
@@ -645,7 +646,9 @@ public class LocalCluster implements VoltServerConfig {
                     "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                     ".txt",
                     proc.getInputStream(),
-                    PipeToFile.m_initToken, false, proc);
+                    startAction == START_ACTION.JOIN ? PipeToFile.m_rejoinToken : PipeToFile.m_initToken,
+                    false,
+                    proc);
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -657,6 +660,11 @@ public class LocalCluster implements VoltServerConfig {
 
         if (startAction == START_ACTION.JOIN) {
             waitOnPTFReady(ptf, true, System.currentTimeMillis(), System.currentTimeMillis(), hostId);
+        }
+
+        if (hostId > (m_hostCount - 1)) {
+            m_hostCount++;
+            this.m_compiled = false; //Host count changed, should recompile
         }
     }
 
@@ -890,7 +898,9 @@ public class LocalCluster implements VoltServerConfig {
            m_cluster.set(hostNum, null);
            ptf = m_pipes.get(hostNum);
            m_pipes.set(hostNum, null);
-           procs = m_eeProcs.get(hostNum);
+           if (m_eeProcs.size() > hostNum) {
+               procs = m_eeProcs.get(hostNum);
+           }
         }
 
         if (ptf != null && ptf.m_filename != null) {
@@ -905,13 +915,15 @@ public class LocalCluster implements VoltServerConfig {
         //     new File(ptf.m_filename).delete();
         // }
 
-        for (EEProcess eeproc : procs) {
-            if (forceKillEEProcs) {
-                eeproc.destroy();
+        if (procs != null) {
+            for (EEProcess eeproc : procs) {
+                if (forceKillEEProcs) {
+                    eeproc.destroy();
+                }
+                eeproc.waitForShutdown();
             }
-            eeproc.waitForShutdown();
+            procs.clear();
         }
-        procs.clear();
     }
 
     public void shutDownExternal() throws InterruptedException {
