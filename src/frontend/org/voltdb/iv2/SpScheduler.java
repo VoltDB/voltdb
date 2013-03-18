@@ -782,6 +782,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             logThis = (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly());
         }
 
+        // Check to see if this is the final task for this txn, and if so, if we can close it out early
+        // Right now, this just means read-only.
+        // NOTE: this overlaps slightly with CompleteTransactionMessage handling completion.  It's so tiny
+        // that for now, meh, but if this scope grows then it should get refactored out
+        if (msg.isFinalTask() && txn.isReadOnly()) {
+            m_outstandingTxns.remove(msg.getTxnId());
+        }
+
         TransactionTask task;
         if (msg.isSysProcTask()) {
             task =
