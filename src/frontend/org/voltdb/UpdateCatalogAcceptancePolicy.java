@@ -24,6 +24,12 @@ import org.voltdb.utils.Encoder;
  * Check update catalog parameters.
  */
 public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
+
+    public static final String COMMUNITY_MISSING_UAC_ERROR_MSG =
+            "The UpdateApplicationCatalog system procedure is part of the " +
+            "VoltDB Enterprise Edition. It is not a supported operation in " +
+            "the Community Edititon.";
+
     public UpdateCatalogAcceptancePolicy(boolean isOn) {
         super(isOn);
     }
@@ -34,6 +40,14 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
                                 Config sysProc) {
         if (!invocation.procName.equals("@UpdateApplicationCatalog")) {
             return null;
+        }
+
+        // give a nice error message for the community edition
+        if (VoltDB.instance().getConfig().m_isEnterprise == false) {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    COMMUNITY_MISSING_UAC_ERROR_MSG,
+                    invocation.clientHandle);
         }
 
         ParameterSet params = invocation.getParams();
