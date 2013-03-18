@@ -903,7 +903,7 @@ PureJavaCrc32c has an Intel clause added
  * and licensed under the BSD license.
  */
 ================================================================================
-Apache Cassandra GCInspector.java
+Apache Cassandra GCInspector.java, MumurHash.java
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -921,6 +921,10 @@ Apache Cassandra GCInspector.java
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+================================================================================
+//-----------------------------------------------------------------------------
+// MurmurHash3 was written by Austin Appleby, and is placed in the public
+// domain. The author hereby disclaims copyright to this source code.
 ================================================================================
 Linked with or Included in VoltDB example applications
 ================================================================================

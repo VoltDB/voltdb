@@ -79,11 +79,27 @@ public class VoltDB {
         }
     }
 
+    // Utility to try to figure out if this is a test case.  Various junit targets in
+    // build.xml set this environment variable to give us a hint
+    public static boolean isThisATest()
+    {
+        String test = System.getenv().get("VOLT_JUSTATEST");
+        if (test == null) {
+            test = System.getProperty("VOLT_JUSTATEST");
+        }
+        if (test != null && test.equalsIgnoreCase("YESYESYES")) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
     public enum START_ACTION {
-        CREATE, RECOVER, REJOIN, LIVE_REJOIN
+        CREATE, RECOVER, REJOIN, LIVE_REJOIN, JOIN
     }
 
     public static boolean createForRejoin(VoltDB.START_ACTION startAction)
@@ -125,7 +141,9 @@ public class VoltDB {
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-        /** use normal JNI backend or optional IPC or HSQLDB backends */
+        /** select normal JNI backend.
+         *  IPC, Valgrind, and HSQLDB are the other options.
+         */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
         /** leader hostname */
@@ -373,6 +391,8 @@ public class VoltDB {
                     m_startAction = START_ACTION.LIVE_REJOIN;
                 } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
                     m_startAction = START_ACTION.LIVE_REJOIN;
+                } else if (arg.startsWith("join")) {
+                    m_startAction = START_ACTION.JOIN;
                 }
 
                 else if (arg.equals("replica")) {
@@ -491,7 +511,8 @@ public class VoltDB {
             }
 
             // require deployment file location
-            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
+            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN
+                    && m_startAction != START_ACTION.JOIN) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
@@ -616,6 +637,11 @@ public class VoltDB {
      * human readable stack traces for all java threads in the current process.
      */
     public static void dropStackTrace(String message) {
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a stack trace during a junit test.");
+            return;
+        }
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
         String dateString = sdf.format(new Date());
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
@@ -692,6 +718,10 @@ public class VoltDB {
         crashMessage = errMsg;
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
+        }
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a crash file during a junit test.");
         }
         // end test code
 

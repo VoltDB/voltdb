@@ -121,6 +121,8 @@ private:
 
     void hashinate(struct ipc_command* cmd);
 
+    void updateHashinator(struct ipc_command *cmd);
+
     void threadLocalPoolAllocations();
 
     void sendException( int8_t errorCode);
@@ -138,6 +140,10 @@ private:
     char *m_reusedResultBuffer;
     char *m_exceptionBuffer;
     bool m_terminate;
+
+    // The tuple buffer gets expanded (doubled) as needed, but never compacted.
+    char *m_tupleBuffer;
+    size_t m_tupleBufferSize;
 };
 
 #endif /* VOLTDBIPC_H_ */

@@ -24,6 +24,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
@@ -203,8 +204,14 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, int partitionCount) {
+    public int hashinate(Object value, HashinatorType type, byte config[]) {
         return 0;
+    }
+
+    @Override
+    public void updateHashinator(HashinatorType type, byte[] config)
+    {
+
     }
 
     @Override

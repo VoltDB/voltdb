@@ -126,13 +126,13 @@ public class InitiatorMailbox implements Mailbox
     public InitiatorMailbox(int partitionId,
             Scheduler scheduler,
             HostMessenger messenger, RepairLog repairLog,
-            RejoinProducer rejoinProducer)
+            JoinProducerBase joinProducer)
     {
         m_partitionId = partitionId;
         m_scheduler = scheduler;
         m_messenger = messenger;
         m_repairLog = repairLog;
-        m_rejoinProducer = rejoinProducer;
+        m_joinProducer = joinProducer;
 
         m_masterLeaderCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
         try {
@@ -151,10 +151,15 @@ public class InitiatorMailbox implements Mailbox
         m_allInitiatorMailboxes.add(this);
     }
 
+    public JoinProducerBase getJoinProducer()
+    {
+        return m_joinProducer;
+    }
+
     // enforce restriction on not allowing promotion during rejoin.
     public boolean acceptPromotion()
     {
-        return m_rejoinProducer == null || m_rejoinProducer.acceptPromotion();
+        return m_joinProducer == null || m_joinProducer.acceptPromotion();
     }
 
     /*
@@ -258,7 +263,7 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof RejoinMessage) {
-            m_rejoinProducer.deliver((RejoinMessage)message);
+            m_joinProducer.deliver((RejoinMessage) message);
             return;
         }
         m_repairLog.deliver(message);

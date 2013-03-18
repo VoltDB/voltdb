@@ -42,7 +42,7 @@ public:
     ConstraintFailureException(PersistentTable *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type);
     virtual ~ConstraintFailureException();
 protected:
-    void p_serialize(ReferenceSerializeOutput *output);
+    void p_serialize(ReferenceSerializeOutput *output) const;
 
     PersistentTable *m_table;
     TableTuple m_tuple;

@@ -212,6 +212,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // clock time of last call to the initiator's tick()
     static final int POKE_INTERVAL = 1000;
 
+    // IV2 doesn't use this at all. Leave it here for now for legacy.
     private final int m_allPartitions[];
     private ImmutableMap<Integer, Long> m_localReplicas = ImmutableMap.<Integer, Long>builder().build();
     final long m_siteId;
@@ -2320,7 +2321,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     final int thisHostId = CoreUtils.getHostIdFromHSId(m_mailbox.getHSId());
                     ImmutableMap.Builder<Integer, Long> localReplicas = ImmutableMap.builder();
-                    for (int partition : m_allPartitions) {
+                    for (int partition : m_cartographer.getPartitions()) {
                         for (Long replica : m_cartographer.getReplicasForPartition(partition)) {
                             if (CoreUtils.getHostIdFromHSId(replica) == thisHostId) {
                                 localReplicas.put(partition, replica);

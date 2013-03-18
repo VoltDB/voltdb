@@ -21,6 +21,7 @@ import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.TimeZone;
 
 import org.voltcore.utils.Pair;
@@ -152,5 +153,37 @@ public class VoltTableUtil {
         toCSVWriter(writer, vt, columns);
         String csvString = sw.toString();
         return Pair.of(csvString.length(), csvString.getBytes(com.google.common.base.Charsets.UTF_8));
+    }
+
+    /**
+     * Utility to aggregate a list of tables sharing a schema. Common for
+     * sysprocs to do this, to aggregate results.
+     */
+    public static VoltTable unionTables(List<VoltTable> operands) {
+        VoltTable result = null;
+
+        // Locate the first non-null table to get the schema
+        for (VoltTable vt : operands) {
+            if (vt != null) {
+                VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
+                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
+                            vt.getColumnType(ii));
+                }
+                result = new VoltTable(columns);
+                break;
+            }
+        }
+
+        if (result != null) {
+            for (VoltTable vt : operands) {
+                // elastic joining nodes will return null tables
+                while (vt != null && vt.advanceRow()) {
+                    result.add(vt);
+                }
+            }
+        }
+
+        return result;
     }
 }
