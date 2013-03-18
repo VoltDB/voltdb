@@ -540,7 +540,7 @@ public class OneShotBenchmark {
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         long currentTime = System.currentTimeMillis();
         long previousTime = currentTime;
-        int slice = 4;
+        int slice = 20;
         long permits = config.mpratelimit / slice;
         while (benchmarkEndTime > currentTime) {
             // Decide whether to perform a GET or PUT operation
