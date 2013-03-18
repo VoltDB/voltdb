@@ -42,6 +42,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * Wrapper for native Execution Engine library. There are two implementations,
@@ -171,8 +172,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 // copy the table data.
                 final ArrayDeque<VoltTable> deque = new ArrayDeque<VoltTable>();
                 for (VoltTable depTable : e.getValue()) {
-                    // A joining node will respond with null
-                    if (depTable != null) {
+                    // A joining node will respond with a table that has this status code
+                    if (depTable.getStatusCode() != VoltTableUtil.NULL_DEPENDENCY_STATUS) {
                         deque.add(depTable);
                     }
                 }
@@ -216,8 +217,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             }
             for (final Object dependency : dependencies) {
                 if (dependency == null) {
-                    // A joining node will respond with null
-                    continue;
+                    hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyContainedNull.name(),
+                                   new Object[] { dependencyId },
+                            null);
+                    VoltDB.crashLocalVoltDB("No additional info.", false, null);
+                    // Prevent warnings.
+                    return;
                 }
                 if (log.isTraceEnabled()) {
                     log.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),

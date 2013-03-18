@@ -28,6 +28,7 @@ public enum LogKeys {
     //in more specialized bundles
     //HOST log strings
     host_ExecutionSite_DependencyNotFound,
+    host_ExecutionSite_DependencyContainedNull,
     host_ExecutionSite_DependencyNotVoltTable,
     host_ExecutionSite_Initializing,
     host_ExecutionSite_FailedConstruction,
