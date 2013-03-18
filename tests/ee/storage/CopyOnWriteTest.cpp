@@ -30,6 +30,7 @@
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "execution/VoltDBEngine.h"
+#include "expressions/expressions.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
@@ -55,7 +56,7 @@ static int32_t m_primaryKeyIndex = 0;
 
 // Selects extra-small quantity for debugging.
 // Remember to comment out before checking in.
-//#define EXTRA_SMALL
+#define EXTRA_SMALL
 
 #if defined(EXTRA_SMALL)
 
@@ -619,9 +620,9 @@ typedef stx::btree_set<int64_t> TupleSet;
 /** Tool object holds test state and conveniently displays errors. */
 class MultiStreamTestTool {
 public:
-    MultiStreamTestTool(PersistentTable& table, size_t npartitions) :
+    MultiStreamTestTool(PersistentTable& table, size_t nparts) :
         table(table),
-        npartitions(npartitions),
+        nparts(nparts),
         iteration(-1),
         nerrors(0),
         showTuples(TUPLE_COUNT <= MAX_DETAIL_COUNT)
@@ -684,7 +685,7 @@ public:
         else {
             os << "???";
         }
-        os << " modulus=" << value % npartitions;
+        os << " modulus=" << value % nparts;
         va_list args;
         va_start(args, msg);
         verror(os.str(), args);
@@ -706,8 +707,113 @@ public:
         }
     }
 
+    //=== Some convenience methods for building a JSON string.
+
+    static std::string json_block(const std::string& body) {
+        std::ostringstream os;
+        os << '{' << body << '}';
+        return os.str();
+    }
+
+    static std::string json_string(const std::string& name,
+                                   const std::string& value) {
+        std::ostringstream os;
+        os << '"' << name << '"' << ':' << '"' << value << '"';
+        return os.str();
+    }
+
+    static std::string json_other(const std::string& name,
+                                  const std::string& value) {
+        std::ostringstream os;
+        os << '"' << name << '"' << ':' << value;
+        return os.str();
+    }
+
+    static std::string json_int(const std::string& name,
+                                int value) {
+        std::ostringstream os;
+        os << '"' << name << '"' << ':' << value;
+        return os.str();
+    }
+
+    static std::string expr_value_string(const std::string& type,
+                                         const std::string& value) {
+        std::ostringstream os;
+        os << json_string("TYPE", "VALUE_CONSTANT") << ','
+           << json_string("VALUE_TYPE", type) << ','
+           << json_int("VALUE_SIZE", 0) << ','
+           << json_other("ISNULL", "false") << ','
+           << json_other("VALUE", value);
+        return os.str();
+    }
+
+    static std::string expr_value_int(const std::string& type,
+                                      int value) {
+        std::ostringstream os;
+        os << json_string("TYPE", "VALUE_CONSTANT") << ','
+        << json_string("VALUE_TYPE", type) << ','
+        << json_int("VALUE_SIZE", 0) << ','
+        << json_other("ISNULL", "false") << ','
+        << json_int("VALUE", value);
+        return os.str();
+    }
+
+    static std::string expr_value_tuple(const std::string& type,
+                                        const std::string& tblname,
+                                        int32_t colidx,
+                                        const std::string& colname) {
+        std::ostringstream os;
+        os << json_string("TYPE", "VALUE_TUPLE") << ','
+           << json_string("VALUE_TYPE", type) << ','
+           << json_int("VALUE_SIZE", 0) << ','
+           << json_string("TABLE_NAME", tblname) << ','
+           << json_int("COLUMN_IDX", colidx) << ','
+           << json_string("COLUMN_NAME", colname) << ','
+           << json_other("COLUMN_ALIAS", "null");
+        return os.str();
+    }
+
+    static std::string expr_binary_op(const std::string& op,
+                                      const std::string& type,
+                                      const std::string& left,
+                                      const std::string& right) {
+        std::ostringstream os;
+        os << json_string("TYPE", op) << ','
+           << json_string("VALUE_TYPE", type) << ','
+           << json_int("VALUE_SIZE", 0) << ','
+           << json_other("LEFT", json_block(left)) << ','
+           << json_other("RIGHT", json_block(right));
+        return os.str();
+    }
+
+    // Work around unsupported modulus operator with other integer operators:
+    //    Should be: result = (value % nparts) == ipart
+    //  Work-around: result = (value - ((value / nparts) * nparts)) == ipart
+    std::string generatePredicateString(int32_t ipart) {
+        std::string tblname = table.name();
+        int colidx = table.partitionColumn();
+        std::string colname = table.columnName(colidx);
+        std::string jvalue = expr_value_tuple("INTEGER", tblname, colidx, colname);
+        const std::string json =
+        json_block(
+            expr_binary_op("COMPARE_EQUAL", "INTEGER",
+                expr_binary_op("OPERATOR_MINUS", "INTEGER",
+                    expr_value_tuple("INTEGER", tblname, colidx, colname),
+                    expr_binary_op("OPERATOR_MULTIPLY", "INTEGER",
+                        expr_binary_op("OPERATOR_DIVIDE", "INTEGER",
+                                       expr_value_tuple("INTEGER", tblname, colidx, colname),
+                                       expr_value_int("INTEGER", (int)nparts)),
+                        expr_value_int("INTEGER", (int)nparts)
+                    )
+                ),
+                expr_value_int("INTEGER", (int)ipart)
+            )
+        );
+        return json;
+    }
+
     PersistentTable& table;
-    size_t npartitions;
+    size_t nparts;
     int iteration;
     char stage[256];
     size_t nerrors;
@@ -739,7 +845,6 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         int totalInserted = 0;              // Total tuple counter.
         boost::scoped_ptr<char> buffers[npartitions];   // Stream buffers.
         std::vector<std::string> strings(npartitions);  // Range strings.
-        HashRange ranges[npartitions];  // Raw ranges.
         TupleSet before[npartitions];   // Tuple values by partition before streaming.
         TupleSet after[npartitions];    // Tuple values by partition after streaming.
 
@@ -750,16 +855,12 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         // Also prepare a buffer for each stream.
         for (int32_t i = 0; i < npartitions; i++) {
             buffers[i].reset(new char[BUFFER_SIZE]);
-            ranges[i] = std::pair<int32_t, int32_t>(i, i);
-            std::ostringstream os;
-            os << i << ':' << i;
-            strings[i] = os.str();
+            strings[i] = tool.generatePredicateString(i);
         }
 
         tool.context("precalculate");
 
-        // Map original tuples to expected partitions using a simple
-        // modulus hash and the ranges generated above.
+        // Map original tuples to expected partitions.
         voltdb::TableIterator& iterator = m_table->iterator();
         int partCol = m_table->partitionColumn();
         TableTuple tuple(m_table->schema());

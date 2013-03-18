@@ -18,6 +18,9 @@
 #ifndef STREAMPREDICATE_H_
 #define STREAMPREDICATE_H_
 
+#include <boost/scoped_ptr.hpp>
+#include "expressions/abstractexpression.h"
+
 namespace voltdb
 {
 class TableTuple;
@@ -37,17 +40,20 @@ public:
      * Accept or reject a tuple.
      * Return true if the predicate accepts the tuple.
      */
-    bool accept(PersistentTable &table, const TableTuple &tuple, int32_t totalPartitions) const;
+    bool accept(const TableTuple &tuple) const
+    {
+        return m_expr.get()->eval(&tuple).isTrue();
+    }
 
 private:
 
     // Should go through parse() factory method to construct a predicate.
-    //TODO: min/max hash is temporary pending full expression support.
-    StreamPredicate(int32_t minHash, int32_t maxHash)
-      : m_minHash(minHash), m_maxHash(maxHash) {}
+    StreamPredicate(AbstractExpression *expr) : m_expr(expr) {
+        // All code in this class assumes the expression tree is non-null.
+        assert(expr != NULL);
+    }
 
-    int32_t m_minHash;
-    int32_t m_maxHash;
+    boost::scoped_ptr<AbstractExpression> m_expr;
 };
 
 }

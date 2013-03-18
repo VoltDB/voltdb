@@ -17,10 +17,12 @@
 
 #include <string>
 #include <limits>
+#include <json_spirit/json_spirit.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include "StreamPredicate.h"
 #include "StreamPredicateList.h"
+#include "expressions/abstractexpression.h"
 
 namespace voltdb
 {
@@ -35,25 +37,36 @@ bool StreamPredicateList::parseStrings(
         std::ostringstream& errmsg)
 {
     bool failed = false;
-    std::size_t npreds = predicateStrings.size();
-    for (std::size_t ipred = 0; ipred < npreds; ipred++) {
-        std::string pred = predicateStrings.at(ipred);
-        std::vector<std::string> snums;
+    for (std::vector<std::string>::const_iterator iter = predicateStrings.begin();
+         iter != predicateStrings.end(); ++iter) {
+        bool predFailed = false;
         try {
-            boost::split(snums, pred, boost::is_any_of(":"));
-            if (snums.size() == 2) {
-                int32_t minHash = boost::lexical_cast<int32_t>(snums[0]);
-                int32_t maxHash = boost::lexical_cast<int32_t>(snums[1]);
-                push_back(new StreamPredicate(minHash, maxHash));
+            json_spirit::Object json;
+            json_spirit::Value predicateValue;
+            json_spirit::read(*iter, predicateValue);
+            if (!(predicateValue == json_spirit::Value::null)) {
+                json_spirit::Object predicateObject = predicateValue.get_obj();
+                AbstractExpression *expr = AbstractExpression::buildExpressionTree(predicateObject);
+                if (expr != NULL) {
+                    // Got ourselves a predicate expression tree!
+                    push_back(new StreamPredicate(expr));
+                }
+                else {
+                    errmsg << "Predicate JSON generated a NULL expression tree";
+                    predFailed = true;
+                }
             }
             else {
-                errmsg << "Bad range predicate '" << pred << std::endl;
-                failed = true;
+                errmsg << "Stream predicate JSON document is NULL";
+                predFailed = true;
             }
         }
         catch(std::exception &exc) {
-            errmsg << "Failed to parse range predicate '" << pred
-            << "': " << exc.what() << std::endl;
+            errmsg << "Exception occurred while parsing stream predicate: " << exc.what();
+            predFailed = true;
+        }
+        if (predFailed) {
+            errmsg << std::endl << (*iter) << std::endl;
             failed = true;
         }
     }

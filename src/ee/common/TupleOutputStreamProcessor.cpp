@@ -116,7 +116,7 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTupl
         // Get approval from corresponding output stream predicate, if provided.
         bool accepted = true;
         if (!m_predicates->empty()) {
-            accepted = ipredicate->accept(*m_table, tuple, m_totalPartitions);
+            accepted = ipredicate->accept(tuple);
             // Keep walking through predicates in lock-step with the streams.
             // As with first() we expect a predicate to be available for each and every stream.
             // It was already checked, so just assert here.
