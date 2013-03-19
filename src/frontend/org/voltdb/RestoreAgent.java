@@ -53,7 +53,6 @@ import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -428,11 +427,6 @@ SnapshotCompletionInterest
 
     public void setCatalogContext(CatalogContext context) {
         m_replayAgent.setCatalogContext(context);
-    }
-
-    public void setSiteTracker(SiteTracker siteTracker)
-    {
-        m_replayAgent.setSiteTracker(siteTracker);
     }
 
     public void setInitiator(TransactionCreator initiator) {
@@ -1069,20 +1063,18 @@ SnapshotCompletionInterest
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions, m_allPartitions.length,
+                                          m_allPartitions,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis(),
-                                          false);
+                                          EstTime.currentTimeMillis());
         } else {
             m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
                                           txnId, System.currentTimeMillis(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions, m_allPartitions.length,
+                                          m_allPartitions,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis(),
-                                          false);
+                                          EstTime.currentTimeMillis());
         }
     }
 

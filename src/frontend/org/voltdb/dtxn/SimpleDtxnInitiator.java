@@ -57,7 +57,6 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.VoltDB;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -119,7 +118,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         consoleLog.info("Initializing initiator ID: " + initiatorId  +
                 ", SiteID: " + CoreUtils.hsIdToString(m_siteId));
 
-        m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);
+        m_idManager = null;
         m_hostId = hostId;
         m_mailbox.setInitiator(this);
     }
@@ -134,19 +133,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final boolean isSinglePartition,
                                   final boolean isEveryPartition,
                                   final int partitions[],
-                                  final int numPartitions,
                                   final Object clientData,
                                   final int messageSize,
-                                  final long now,
-                                  final boolean allowMismatchedResults)
+                                  final long now)
     {
         long txnId;
         txnId = m_idManager.getNextUniqueTransactionId();
         boolean retval =
             createTransaction(connectionId, connectionHostname, adminConnection, txnId,
                               txnId, invocation,
-                              isReadOnly, isSinglePartition, isEveryPartition, partitions,
-                              numPartitions, clientData, messageSize, now, allowMismatchedResults);
+                              isReadOnly, isSinglePartition, isEveryPartition, partitions, clientData, messageSize, now);
         return retval;
     }
 
@@ -162,15 +158,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final boolean isSinglePartition,
                                   final boolean isEveryPartition,
                                   final int partitions[],
-                                  final int numPartitions,
                                   final Object clientData,
                                   final int messageSize,
-                                  final long now,
-                                  final boolean allowMismatchedResults)
+                                  final long now)
     {
         assert(invocation != null);
         assert(partitions != null);
-        assert(numPartitions >= 1);
 
         if (invocation.getType() == ProcedureInvocationType.REPLICATED)
         {
@@ -200,7 +193,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
         else
         {
-            SiteTracker tracker = VoltDB.instance().getSiteTracker();
+            SiteTracker tracker = null;
             List<Long> sitesOnThisHost = tracker.getSitesForHost(m_hostId);
             // Choose coordinator using round robin technique.
             // Check for wrapping around before using the round robin index to
@@ -252,7 +245,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         connectionId,
                                                         connectionHostname,
                                                         adminConnection,
-                                                        allowMismatchedResults);
+                                                        false);
             dispatchMultiPartitionTxn(txn);
             return true;
         }
@@ -275,7 +268,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     @Override
     public void sendHeartbeat(final long txnId) {
-        final SiteTracker st = VoltDB.instance().getSiteTracker();
+        final SiteTracker st = null;
         long remoteHeartbeatTargets[][] = st.getRemoteSites();
         long localHeartbeatTargets[] = st.getLocalSites();
 
@@ -325,7 +318,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              long now)
     {
         List<Long> siteIds;
-        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
+        SiteTracker siteTracker = null;
 
         // Special case the common 1 partition case -- cheap via SiteTracker
         if (partitions.length == 1) {
@@ -493,7 +486,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     @Override
     public synchronized void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
-        SiteTracker st = VoltDB.instance().getSiteTracker();
+        SiteTracker st = null;
         for (Long executorSiteId : executorSiteIds) {
             m_safetyState.addState(executorSiteId, st.m_sitesToPartitionsImmutable.get(executorSiteId));
         }

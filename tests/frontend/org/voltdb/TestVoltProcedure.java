@@ -276,7 +276,7 @@ public class TestVoltProcedure extends TestCase {
         site = new MockExecutionSite(
                 executionSiteId,
                 VoltDB.instance().getCatalogContext().catalog.serialize(),
-                VoltDB.instance().getSiteTracker()) {
+                null) {
 
             @Override
             public int getCorrespondingPartitionId() {
