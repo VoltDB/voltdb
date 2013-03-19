@@ -869,6 +869,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
             VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
             results[0].addRow("FAILURE", e.toString());
+            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
             return results;
         }
 
@@ -900,6 +901,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
             VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
             results[0].addRow("FAILURE", e.toString());
+            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
             return results;
         }
         assert(relevantTableNames != null);
