@@ -310,12 +310,10 @@ public class TestClientInterface {
 
         // SP AdHoc should have partitioning parameter serialized in the parameter set
         Object partitionParam = message.getStoredProcedureInvocation().getParameterAtIndex(0);
-        byte partitionParamType = (Byte) message.getStoredProcedureInvocation().getParameterAtIndex(1);
-        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2);
+        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(1);
         AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
-        assertTrue(partitionParam instanceof String);
-        assertEquals("3", partitionParam);
-        assertEquals(VoltType.INTEGER.getValue(), partitionParamType);
+        assertTrue(partitionParam instanceof byte[]);
+        assertTrue(Arrays.equals(TheHashinator.valueToBytes(3), (byte[]) partitionParam));
         assertEquals(1, statements.length);
         String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
         assertEquals("select * from a where i = 3", sql);
@@ -473,8 +471,8 @@ public class TestClientInterface {
     public void testLoadSinglePartTable() throws IOException {
         VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
         table.addRow(1);
-        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", "a", table);
-        readAndCheck(msg, "@LoadSinglepartitionTable", 1, false, false, true, false);
+        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", new byte[] {4}, "a", table);
+        readAndCheck(msg, "@LoadSinglepartitionTable", new byte[] {4}, false, false, true, false);
     }
 
     @Test
