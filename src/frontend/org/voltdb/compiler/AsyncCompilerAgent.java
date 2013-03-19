@@ -17,6 +17,7 @@
 
 package org.voltdb.compiler;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
@@ -31,12 +32,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 
@@ -107,8 +103,20 @@ public class AsyncCompilerAgent {
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
-            final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
-            w.completionHandler.onCompletion(result);
+            if (VoltDB.instance().getConfig().m_isEnterprise) {
+                try {
+                    Class<?> acahClz = getClass().getClassLoader().loadClass("org.voltdb.compiler.AsyncCompilerAgentHelper");
+                    Object acah = acahClz.newInstance();
+                    Method acahPrepareMethod = acahClz.getMethod(
+                            "prepareApplicationCatalogDiff", new Class<?>[] { CatalogChangeWork.class });
+                    final AsyncCompilerResult result = (AsyncCompilerResult) acahPrepareMethod.invoke(acah, w);
+                    w.completionHandler.onCompletion(result);
+                }
+                catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Error preparing catalog diff.", true, e);
+                }
+            }
+            assert(false); // shouldn't get here in community edition
         }
     }
 
@@ -184,83 +192,4 @@ public class AsyncCompilerAgent {
         }
         return plannedStmtBatch;
     }
-
-    private AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
-        // create the change result and set up all the boiler plate
-        CatalogChangeResult retval = new CatalogChangeResult();
-        retval.clientData = work.clientData;
-        retval.clientHandle = work.clientHandle;
-        retval.connectionId = work.connectionId;
-        retval.adminConnection = work.adminConnection;
-        retval.hostname = work.hostname;
-        retval.invocationType = work.invocationType;
-        retval.originalTxnId = work.originalTxnId;
-        retval.originalUniqueId = work.originalUniqueId;
-
-        // catalog change specific boiler plate
-        retval.catalogBytes = work.catalogBytes;
-        retval.deploymentString = work.deploymentString;
-
-        // get the diff between catalogs
-        try {
-            // try to get the new catalog from the params
-            String newCatalogCommands = CatalogUtil.loadCatalogFromJar(work.catalogBytes, null);
-            if (newCatalogCommands == null) {
-                retval.errorMsg = "Unable to read from catalog bytes";
-                return retval;
-            }
-            Catalog newCatalog = new Catalog();
-            newCatalog.execute(newCatalogCommands);
-
-            String deploymentString = work.deploymentString;
-            // work.deploymentString could be null if it wasn't provided to UpdateApplicationCatalog
-            if (deploymentString == null) {
-                // Go get the deployment string from ZK.  Hope it's there and up-to-date.  Yeehaw!
-                byte[] deploymentBytes =
-                    VoltDB.instance().getHostMessenger().getZK().getData(VoltZK.deploymentBytes, false, null);
-                if (deploymentBytes != null) {
-                    deploymentString = new String(deploymentBytes, "UTF-8");
-                }
-                if (deploymentBytes == null || deploymentString == null) {
-                    retval.errorMsg = "No deployment file provided and unable to recover previous " +
-                        "deployment settings.";
-                    return retval;
-                }
-            }
-
-            retval.deploymentCRC =
-                CatalogUtil.compileDeploymentStringAndGetCRC(newCatalog, deploymentString, false);
-            if (retval.deploymentCRC < 0) {
-                retval.errorMsg = "Unable to read from deployment file string";
-                return retval;
-            }
-
-            // get the current catalog
-            CatalogContext context = VoltDB.instance().getCatalogContext();
-
-            // store the version of the catalog the diffs were created against.
-            // verified when / if the update procedure runs in order to verify
-            // catalogs only move forward
-            retval.expectedCatalogVersion = context.catalogVersion;
-
-            // compute the diff in StringBuilder
-            CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
-            if (!diff.supported()) {
-                retval.errorMsg = "The requested catalog change is not a supported change at this time. " + diff.errors();
-                return retval;
-            }
-
-            // since diff commands can be stupidly big, compress them here
-            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
-            retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            retval.encodedDiffCommands = null;
-            retval.errorMsg = e.getMessage();
-        }
-
-        return retval;
-    }
-
 }
