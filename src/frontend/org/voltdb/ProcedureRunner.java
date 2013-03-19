@@ -361,22 +361,9 @@ public class ProcedureRunner {
     public boolean checkPartition(TransactionState txnState) {
         if (m_catProc.getSinglepartition()) {
             StoredProcedureInvocation invocation = txnState.getInvocation();
-            int parameterType;
-            Object parameterAtIndex;
-
-            if (m_isSysProc && invocation.getProcName().startsWith("@AdHoc")) {
-                // For adhoc, the first parameter is the partition parameter as a string,
-                // the original type of the parameter is stored as the second parameter
-                parameterAtIndex = invocation.getParameterAtIndex(0);
-                parameterType = ((Byte) invocation.getParameterAtIndex(1)).intValue();
-            } else if (!m_isSysProc) {
-                parameterType = m_catProc.getPartitioncolumn().getType();
-                int partitionparameter = m_catProc.getPartitionparameter();
-                parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
-            } else {
-                // Non-AdHoc sysprocs are not checked
-                return true;
-            }
+            int parameterType = m_catProc.getPartitioncolumn().getType();
+            int partitionparameter = m_catProc.getPartitionparameter();
+            Object parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
 
             try {
                 int partition = TheHashinator.getPartitionForParameter(parameterType, parameterAtIndex);
