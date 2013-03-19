@@ -286,7 +286,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database &catalo
                                constraintutil::getTypeName(type).c_str(),
                                catalog_constraint->name().c_str(),
                                catalogTable.name().c_str());
-                    return false;
+                    return NULL;
                 }
                 // Make sure they didn't declare more than one primary key index
                 else if (pkey_index_id.size() > 0) {
@@ -296,7 +296,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database &catalo
                                catalogTable.name().c_str(),
                                catalog_constraint->index()->name().c_str(),
                                pkey_index_id.c_str());
-                    return false;
+                    return NULL;
                 }
                 pkey_index_id = catalog_constraint->index()->name();
                 break;
@@ -311,7 +311,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database &catalo
                                constraintutil::getTypeName(type).c_str(),
                                catalog_constraint->name().c_str(),
                                catalogTable.name().c_str());
-                    return false;
+                    return NULL;
                 }
                 break;
             // Unsupported
@@ -327,7 +327,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database &catalo
                 VOLT_ERROR("Invalid constraint type '%s' for '%s'",
                            constraintutil::getTypeName(type).c_str(),
                            catalog_constraint->name().c_str());
-                return false;
+                return NULL;
         }
     }
 

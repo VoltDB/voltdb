@@ -85,9 +85,9 @@ import org.voltdb.sysprocs.saverestore.TableSaveFileState;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltTableUtil;
 
 import com.google.common.primitives.Longs;
-import org.voltdb.utils.VoltTableUtil;
 
 @ProcInfo (
         singlePartition = false
@@ -869,6 +869,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
             VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
             results[0].addRow("FAILURE", e.toString());
+            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
             return results;
         }
 
@@ -900,6 +901,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
             VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
             results[0].addRow("FAILURE", e.toString());
+            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
             return results;
         }
         assert(relevantTableNames != null);
@@ -953,6 +955,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
         }
         if (results != null) {
+            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
             return results;
         }
 
@@ -1496,6 +1499,11 @@ public class SnapshotRestore extends VoltSystemProcedure
                     {
                         // this will actually add the active row of results[0]
                         restore_results[0].add(results[0]);
+
+                        // if any table at any site fails... then the whole proc fails
+                        if (results[0].getString("RESULT").equalsIgnoreCase("FAILURE")) {
+                            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
+                        }
                     }
                 }
 
