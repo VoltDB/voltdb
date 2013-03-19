@@ -29,15 +29,15 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
-import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 
 
 public class TestPartitionedTableSaveFileState extends TestCase
@@ -238,7 +238,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
         Table test_table = m_voltDB.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTracker());
+            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTrackerForSnapshot());
         checkPlanFragments(test_plan, partitionsToDistribute);
         for (int i = 0; i < number_of_partitions; i++)
         {
@@ -278,7 +278,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
         Table test_table = m_voltDB.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTracker());
+            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTrackerForSnapshot());
         checkPlanFragments(test_plan, partitionsToDistribute);
     }
 
@@ -324,7 +324,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
         Table test_table = m_voltDB.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTracker());
+            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTrackerForSnapshot());
         checkPlanFragments(test_plan, partitionsToDistribute);
     }
 
@@ -361,7 +361,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
         Table test_table = m_voltDB.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTracker());
+            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTrackerForSnapshot());
         checkPlanFragments(test_plan, partitionsToDistribute);
     }
 

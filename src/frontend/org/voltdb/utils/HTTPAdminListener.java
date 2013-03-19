@@ -44,7 +44,6 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.CatalogContext;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
@@ -192,10 +191,7 @@ public class HTTPAdminListener {
 
             try {
                 // handle the basic info page below this
-
-                CatalogContext context = VoltDB.instance().getCatalogContext();
-
-                SiteTracker st = VoltDB.instance().getSiteTracker();
+                SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
 
                 // get the cluster info
                 String clusterinfo = st.getAllHosts().size() + " hosts ";

@@ -859,7 +859,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 new Object[] { String.valueOf(m_siteId) }, null);
 
         m_context = voltdb.getCatalogContext();
-        m_tracker = VoltDB.instance().getSiteTracker();
+        m_tracker = null;//VoltDB.instance().getSiteTracker();
         final int partitionId = m_tracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
@@ -1897,7 +1897,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Aborting rejoin due to a remote node failure. Retry again.", false, null);
         }
-        SiteTracker newTracker = VoltDB.instance().getSiteTracker();
+        SiteTracker newTracker = null;//VoltDB.instance().getSiteTracker();
         HashSet<SiteFailureFault> failures = message.m_failedSites;
 
         // Fix context and associated site tracker first - need

@@ -25,10 +25,9 @@ package org.voltdb.regressionsuites;
 
 import java.io.BufferedReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.IOException;
-
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /* class pipes a process's output to a file name.
@@ -38,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
     public class PipeToFile extends Thread {
         final static String m_initToken = "Server completed init";
         final static String m_rejoinToken = "Node rejoin completed";
-        final static String m_initiatorID = "Initializing initiator ID:";
+        final static String m_hostID = "Host id of this node is: ";
 
         FileWriter m_writer ;
         BufferedReader m_input;
@@ -95,7 +94,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
                     }
 
                     // look for the non-exec site id
-                    if (data.contains(m_initiatorID)) {
+                    if (data.contains(m_hostID)) {
                         // INITIALIZING INITIATOR ID: 1, SITEID: 0
                         String[] split = data.split(" ");
                         synchronized(this) {

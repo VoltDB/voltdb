@@ -49,10 +49,8 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
-import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
-import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -79,7 +77,6 @@ public class MockVoltDB implements VoltDBInterface
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
             new HashMap<MailboxType, List<MailboxNodeContent>>();
-    private final MailboxPublisher m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes + "/0");
 
     public MockVoltDB() {
         this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
@@ -479,18 +476,8 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public SiteTracker getSiteTracker() {
-        return m_siteTracker;
-    }
-
-    @Override
     public SiteTracker getSiteTrackerForSnapshot() {
         return m_siteTracker;
-    }
-
-    @Override
-    public MailboxPublisher getMailboxPublisher() {
-        return m_mailboxPublisher;
     }
 
     @Override

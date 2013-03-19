@@ -51,7 +51,6 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.VoltFile;
@@ -362,21 +361,26 @@ public class ExportGeneration {
     void initializeGenerationFromCatalog(
             final Connector conn,
             int hostId,
-            HostMessenger messenger)
+            HostMessenger messenger,
+            List<Pair<Integer, Long>> partitions)
     {
-        Set<Integer> partitions = new HashSet<Integer>();
-
         /*
          * Now create datasources based on the catalog
          */
         Iterator<ConnectorTableInfo> tableInfoIt = conn.getTableinfo().iterator();
+        //Only populate partitions in use if export is actually happening
+        Set<Integer> partitionsInUse = new HashSet<Integer>();
         while (tableInfoIt.hasNext()) {
             ConnectorTableInfo next = tableInfoIt.next();
             Table table = next.getTable();
-            partitions.addAll(addDataSources(table, hostId));
+            addDataSources(table, hostId, partitions);
+
+            for (Pair<Integer, Long> p : partitions) {
+                partitionsInUse.add(p.getFirst());
+            }
         }
 
-        createAndRegisterAckMailboxes(partitions, messenger);
+        createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
@@ -423,7 +427,6 @@ public class ExportGeneration {
         messenger.createMailbox(null, m_mbox);
 
         for (Integer partition : localPartitions) {
-
             final String partitionDN =  m_mailboxesZKPath + "/" + partition;
             ZKUtil.asyncMkdirs(m_zk, partitionDN);
 
@@ -468,6 +471,7 @@ public class ExportGeneration {
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
+
                     for( ExportDataSource eds:
                         m_dataSourcesByPartition.get( partition).values()) {
                         eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
@@ -607,16 +611,12 @@ public class ExportGeneration {
     }
 
     // silly helper to add datasources for a table catalog object
-    private Set<Integer> addDataSources(
-            Table table, int hostId)
+    private void addDataSources(
+            Table table, int hostId, List<Pair<Integer, Long>> partitions)
     {
-        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
-        List<Long> sites = siteTracker.getSitesForHost(hostId);
-
-        Set<Integer> partitions = new HashSet<Integer>();
-        for (Long site : sites) {
-            Integer partition = siteTracker.getPartitionForSite(site);
-            partitions.add(partition);
+        for (Pair<Integer, Long> p : partitions) {
+            Integer partition = p.getFirst();
+            Long site = p.getSecond();
 
             /*
              * IOException can occur if there is a problem
@@ -648,7 +648,6 @@ public class ExportGeneration {
                         table.getTypeName() + " host id " + hostId, true, e);
             }
         }
-        return partitions;
     }
 
     public void pushExportBuffer(int partitionId, String signature, long uso,
