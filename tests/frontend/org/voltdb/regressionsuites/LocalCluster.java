@@ -688,7 +688,7 @@ public class LocalCluster implements VoltServerConfig {
                 hostId,
                 portOffset,
                 rejoinHost,
-                liveRejoin ? START_ACTION.LIVE_REJOIN : START_ACTION.JOIN);
+                liveRejoin ? START_ACTION.LIVE_REJOIN : START_ACTION.REJOIN);
     }
 
     public void joinOne(int hostId) {
@@ -744,15 +744,7 @@ public class LocalCluster implements VoltServerConfig {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
             // some tests need this
             rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
-
-            switch (startAction) {
-            case LIVE_REJOIN:
-                rejoinCmdLn.startCommand(START_ACTION.LIVE_REJOIN.name());
-                break;
-            case REJOIN:
-                rejoinCmdLn.startCommand(START_ACTION.REJOIN.name());
-                break;
-            }
+            rejoinCmdLn.startCommand(startAction.name());
 
             // This shouldn't collide but apparently it sucks.
             // Bump it to avoid collisions on rejoin.

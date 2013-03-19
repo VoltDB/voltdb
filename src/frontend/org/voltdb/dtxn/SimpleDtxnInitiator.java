@@ -133,19 +133,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final boolean isSinglePartition,
                                   final boolean isEveryPartition,
                                   final int partitions[],
-                                  final int numPartitions,
                                   final Object clientData,
                                   final int messageSize,
-                                  final long now,
-                                  final boolean allowMismatchedResults)
+                                  final long now)
     {
         long txnId;
         txnId = m_idManager.getNextUniqueTransactionId();
         boolean retval =
             createTransaction(connectionId, connectionHostname, adminConnection, txnId,
                               txnId, invocation,
-                              isReadOnly, isSinglePartition, isEveryPartition, partitions,
-                              numPartitions, clientData, messageSize, now, allowMismatchedResults);
+                              isReadOnly, isSinglePartition, isEveryPartition, partitions, clientData, messageSize, now);
         return retval;
     }
 
@@ -161,15 +158,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final boolean isSinglePartition,
                                   final boolean isEveryPartition,
                                   final int partitions[],
-                                  final int numPartitions,
                                   final Object clientData,
                                   final int messageSize,
-                                  final long now,
-                                  final boolean allowMismatchedResults)
+                                  final long now)
     {
         assert(invocation != null);
         assert(partitions != null);
-        assert(numPartitions >= 1);
 
         if (invocation.getType() == ProcedureInvocationType.REPLICATED)
         {
@@ -251,7 +245,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         connectionId,
                                                         connectionHostname,
                                                         adminConnection,
-                                                        allowMismatchedResults);
+                                                        false);
             dispatchMultiPartitionTxn(txn);
             return true;
         }

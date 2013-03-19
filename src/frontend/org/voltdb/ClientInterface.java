@@ -954,11 +954,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isSinglePartition,
             final boolean isEveryPartition,
             final int partitions[],
-            final int numPartitions,
             final Object clientData,
             final int messageSize,
-            final long now,
-            final boolean allowMismatchedResults)
+            final long now)
     {
         return createTransaction(
                 connectionId,
@@ -971,11 +969,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isSinglePartition,
                 isEveryPartition,
                 partitions,
-                numPartitions,
                 clientData,
                 messageSize,
                 now,
-                allowMismatchedResults,
                 false);  // is for replay.
     }
 
@@ -991,11 +987,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isSinglePartition,
             final boolean isEveryPartition,
             final int partitions[],
-            final int numPartitions,
             final Object clientData,
             final int messageSize,
             final long now,
-            final boolean allowMismatchedResults,
             final boolean isForReplay)
     {
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
@@ -1605,10 +1599,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 false,      // read only
                 true,       // single partition
                 false,      // every site
-                involvedPartitions, involvedPartitions.length,
+                involvedPartitions,
                 ccxn, buf.capacity(),
-                System.currentTimeMillis(),
-                false);     // allow mismatched results
+                System.currentTimeMillis());
         return null;
     }
 
@@ -1679,10 +1672,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sysProc.getReadonly(),
                 sysProc.getSinglepartition(),
                 sysProc.getEverysite(),
-                involvedPartitions, involvedPartitions.length,
+                involvedPartitions,
                 ccxn, buf.capacity(),
-                System.currentTimeMillis(),
-                false);
+                System.currentTimeMillis());
         return null;
     }
 
@@ -1710,11 +1702,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sysProc.getSinglepartition(),
                 sysProc.getEverysite(),
                 m_allPartitions,
-                m_allPartitions.length,
                 ccxn,
                 buf.capacity(),
-                System.currentTimeMillis(),
-                false);
+                System.currentTimeMillis());
 
         return null;
     }
@@ -1863,10 +1853,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sysProc.getReadonly(),
                     sysProc.getSinglepartition(),
                     sysProc.getEverysite(),
-                    involvedPartitions, involvedPartitions.length,
+                    involvedPartitions,
                     ccxn, buf.capacity(),
-                    now,
-                    false);
+                    now);
 
         }
 
@@ -1912,10 +1901,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
                         catProc.getEverysite(),
-                        involvedPartitions, involvedPartitions.length,
+                        involvedPartitions,
                         ccxn, buf.capacity(),
-                        now,
-                        allowMismatchedResults);
+                        now);
             if (!success) {
                 // HACK: this return is for the DR agent so that it
                 // will move along on duplicate replicated transactions
@@ -2012,22 +2000,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
-        // ENG-3288 - Non-deterministic read-only queries tolerate mismatched results.
-        boolean allowMismatchedResults = false;
-        if (plannedStmtBatch.isReadOnly()) {
-            for (AdHocPlannedStatement stmt : plannedStmtBatch.plannedStatements) {
-                if (stmt.core.isNonDeterministic) {
-                    allowMismatchedResults = true;
-                    break;
-                }
-            }
-        }
         // initiate the transaction
         createTransaction(plannedStmtBatch.connectionId, plannedStmtBatch.hostname,
                 plannedStmtBatch.adminConnection, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
-                partitions, partitions.length, plannedStmtBatch.clientData,
-                serializedSize, EstTime.currentTimeMillis(), allowMismatchedResults);
+                partitions, plannedStmtBatch.clientData,
+                serializedSize, EstTime.currentTimeMillis());
     }
 
     /*
@@ -2136,8 +2114,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             createTransaction(changeResult.connectionId, changeResult.hostname,
                                     changeResult.adminConnection,
                                     task, false, false, false, m_allPartitions,
-                                    m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
-                                    EstTime.currentTimeMillis(), false);
+                                    changeResult.clientData, task.getSerializedSize(),
+                                    EstTime.currentTimeMillis());
                         }
                     }
                     else {
@@ -2358,16 +2336,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         });
         spi.clientHandle = clientData;
         // initiate the transaction
-        boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
         createTransaction(m_snapshotDaemonAdapter.connectionId(),
                 "SnapshotDaemon",
                 true, // treat the snapshot daemon like it's on an admin port
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
-                m_allPartitions, m_allPartitions.length,
+                m_allPartitions,
                 m_snapshotDaemonAdapter,
-                0, EstTime.currentTimeMillis(),
-                allowMismatchedResults);
+                0, EstTime.currentTimeMillis());
     }
 
     /**

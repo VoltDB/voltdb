@@ -1063,20 +1063,18 @@ SnapshotCompletionInterest
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions, m_allPartitions.length,
+                                          m_allPartitions,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis(),
-                                          false);
+                                          EstTime.currentTimeMillis());
         } else {
             m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
                                           txnId, System.currentTimeMillis(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions, m_allPartitions.length,
+                                          m_allPartitions,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis(),
-                                          false);
+                                          EstTime.currentTimeMillis());
         }
     }
 
