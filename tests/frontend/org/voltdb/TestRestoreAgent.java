@@ -205,15 +205,13 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isSinglePartition,
                                       boolean isEverySite,
                                       int[] partitions,
-                                      int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now,
-                                      boolean allowMismatchedResults) {
+                                      long now) {
             createTransaction(connectionId, connectionHostname, adminConnection,
                               0, 0, invocation, isReadOnly, isSinglePartition,
-                              isEverySite, partitions, numPartitions,
-                              clientData, messageSize, now, allowMismatchedResults);
+                              isEverySite, partitions,
+                              clientData, messageSize, now);
             return true;
         }
 
@@ -228,11 +226,9 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isSinglePartition,
                                       boolean isEverySite,
                                       int[] partitions,
-                                      int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now,
-                                      boolean allowMismatchedResults) {
+                                      long now) {
             String procName = invocation.procName;
             if (!procCounts.containsKey(procName)) {
                 m_unexpectedSPIs.add(procName);
@@ -534,7 +530,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                      allPartitions,
                                                      all_hosts);
         restoreAgent.setCatalogContext(context);
-        restoreAgent.setSiteTracker(siteTrackers.get(hostId));
         assert(initiator != null);
         restoreAgent.setInitiator(initiator);
         return restoreAgent;

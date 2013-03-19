@@ -16,12 +16,11 @@
  */
 package org.voltdb;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
-import java.util.ArrayList;
 import java.util.concurrent.Semaphore;
 
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public interface CommandLog {
@@ -52,8 +51,6 @@ public interface CommandLog {
             String coreBinding);
 
     public abstract boolean needsInitialization();
-
-    public abstract void log(InitiateTaskMessage message);
 
     /*
      * Returns a boolean indicating whether synchronous command logging is enabled.

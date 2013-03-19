@@ -130,11 +130,6 @@ public class TransactionIdManager {
         // if the cluster has one node, allow clocks to be changed up to one week
         VoltDBInterface instance = VoltDB.instance();
         if (instance != null) {
-            CatalogContext context = instance.getCatalogContext();
-            if ((context != null) && (VoltDB.instance().getSiteTracker().getAllHosts().size() == 1)) {
-                // millis * seconds * minutes * hours * days = 1 week
-                BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 1000 * 60 * 60 * 24 * 7;
-            }
         }
     }
 

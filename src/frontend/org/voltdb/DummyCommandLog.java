@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
@@ -32,9 +31,6 @@ public class DummyCommandLog implements CommandLog {
     public boolean needsInitialization() {
         return false;
     }
-
-    @Override
-    public void log(InitiateTaskMessage message) {}
 
     @Override
     public void shutdown() throws InterruptedException {}

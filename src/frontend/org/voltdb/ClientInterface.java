@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
@@ -71,7 +70,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -88,11 +86,10 @@ import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
-import org.voltdb.dtxn.SimpleDtxnInitiator;
-import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -134,7 +131,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
-    private final TransactionInitiator m_initiator;
 
     /*
      * This lock must be held while checking and signaling a backpressure condition
@@ -794,7 +790,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void stopped(Connection c) {
             m_numConnections.decrementAndGet();
-            m_initiator.removeConnectionStats(connectionId());
             /*
              * It's necessary to free all the resources held by the IV2 ACG tracking.
              * Outstanding requests may actually still be at large
@@ -959,11 +954,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isSinglePartition,
             final boolean isEveryPartition,
             final int partitions[],
-            final int numPartitions,
             final Object clientData,
             final int messageSize,
-            final long now,
-            final boolean allowMismatchedResults)
+            final long now)
     {
         return createTransaction(
                 connectionId,
@@ -976,11 +969,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isSinglePartition,
                 isEveryPartition,
                 partitions,
-                numPartitions,
                 clientData,
                 messageSize,
                 now,
-                allowMismatchedResults,
                 false);  // is for replay.
     }
 
@@ -996,78 +987,60 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isSinglePartition,
             final boolean isEveryPartition,
             final int partitions[],
-            final int numPartitions,
             final Object clientData,
             final int messageSize,
             final long now,
-            final boolean allowMismatchedResults,
             final boolean isForReplay)
     {
-        if (m_isIV2Enabled) {
-            final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
+        final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
-            Long initiatorHSId = null;
-            boolean isShortCircuitRead = false;
+        Long initiatorHSId = null;
+        boolean isShortCircuitRead = false;
 
-            /*
-             * If this is a read only single part, check if there is a local replica,
-             * if there is, send it to the replica as a short circuit read
-             */
-            if (isSinglePartition && !isEveryPartition) {
-                if (isReadOnly) {
-                    initiatorHSId = m_localReplicas.get(partitions[0]);
-                }
-                if (initiatorHSId != null) {
-                    isShortCircuitRead = true;
-                } else {
-                    initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
-                }
+        /*
+         * If this is a read only single part, check if there is a local replica,
+         * if there is, send it to the replica as a short circuit read
+         */
+        if (isSinglePartition && !isEveryPartition) {
+            if (isReadOnly) {
+                initiatorHSId = m_localReplicas.get(partitions[0]);
             }
-            else {
-                //Multi-part transactions go to the multi-part coordinator
-                initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
+            if (initiatorHSId != null) {
+                isShortCircuitRead = true;
+            } else {
+                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
             }
-
-            if (initiatorHSId == null) {
-                hostLog.error("Failed to find master initiator for partition: "
-                        + Integer.toString(partitions[0]) + ". Transaction not initiated.");
-                return false;
-            }
-
-            long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    messageSize, now, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
-
-            Iv2InitiateTaskMessage workRequest =
-                new Iv2InitiateTaskMessage(m_siteId,
-                        initiatorHSId,
-                        Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-                        txnId,
-                        uniqueId,
-                        isReadOnly,
-                        isSinglePartition,
-                        invocation,
-                        handle,
-                        connectionId,
-                        isForReplay);
-
-            Iv2Trace.logCreateTransaction(workRequest);
-            m_mailbox.send(initiatorHSId, workRequest);
-            return true;
-        } else {
-            return m_initiator.createTransaction(connectionId,
-                                                 connectionHostname,
-                                                 adminConnection,
-                                                 invocation,
-                                                 isReadOnly,
-                                                 isSinglePartition,
-                                                 isEveryPartition,
-                                                 partitions,
-                                                 numPartitions,
-                                                 clientData,
-                                                 messageSize,
-                                                 now,
-                                                 allowMismatchedResults);
         }
+        else {
+            //Multi-part transactions go to the multi-part coordinator
+            initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
+        }
+
+        if (initiatorHSId == null) {
+            hostLog.error("Failed to find master initiator for partition: "
+                    + Integer.toString(partitions[0]) + ". Transaction not initiated.");
+            return false;
+        }
+
+        long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
+                messageSize, now, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
+
+        Iv2InitiateTaskMessage workRequest =
+            new Iv2InitiateTaskMessage(m_siteId,
+                    initiatorHSId,
+                    Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
+                    txnId,
+                    uniqueId,
+                    isReadOnly,
+                    isSinglePartition,
+                    invocation,
+                    handle,
+                    connectionId,
+                    isForReplay);
+
+        Iv2Trace.logCreateTransaction(workRequest);
+        m_mailbox.send(initiatorHSId, workRequest);
+        return true;
     }
 
 
@@ -1081,7 +1054,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             HostMessenger messenger,
             CatalogContext context,
             ReplicationRole replicationRole,
-            SimpleDtxnInitiator initiator,
             Cartographer cartographer,
             int partitionCount,
             int port,
@@ -1091,26 +1063,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create a list of all partitions
         int[] allPartitions = new int[partitionCount];
         int index = 0;
-        for (Integer partition : VoltDB.instance().getSiteTracker().m_partitionsToSitesImmutable.keySet()) {
-            allPartitions[index++] = partition;
+        for (Integer partition : cartographer.getPartitions()) {
+            if (partition != MpInitiator.MP_INIT_PID) {
+                allPartitions[index++] = partition;
+            }
         }
 
         /*
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, messenger, replicationRole, initiator, cartographer, allPartitions);
+           port, adminPort, context, messenger, replicationRole, cartographer, allPartitions);
 
-        initiator.setClientInterface(ci);
         return ci;
     }
 
     ClientInterface(int port, int adminPort, CatalogContext context, HostMessenger messenger,
-                    ReplicationRole replicationRole, TransactionInitiator initiator,
+                    ReplicationRole replicationRole,
                     Cartographer cartographer, int[] allPartitions) throws Exception
     {
         m_catalogContext.set(context);
-        m_initiator = initiator;
         m_cartographer = cartographer;
 
         // pre-allocate single partition array
@@ -1206,7 +1178,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         messenger.createMailbox(m_mailbox.getHSId(), m_mailbox);
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         m_zk = messenger.getZK();
-        registerMailbox(m_zk);
         m_siteId = m_mailbox.getHSId();
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
@@ -1258,18 +1229,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             buf.flip();
             c.writeStream().enqueue(buf);
         }
-    }
-
-    /**
-     * Publishes the HSId of this execution site to ZK
-     * @param zk
-     * @param partitionId
-     * @throws Exception
-     */
-    private void registerMailbox(ZooKeeper zk) throws Exception {
-        MailboxNodeContent mnc = new MailboxNodeContent(m_mailbox.getHSId(), null);
-        VoltDB.instance().getMailboxPublisher().registerMailbox(MailboxType.ClientInterface, mnc);
-        VoltDB.instance().getMailboxPublisher().publish(zk);
     }
 
     private void registerPolicies(ReplicationRole replicationRole) {
@@ -1368,10 +1327,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // in the cluster, make our SnapshotDaemon responsible for snapshots
     public void mayActivateSnapshotDaemon() {
         SnapshotSchedule schedule = m_catalogContext.get().database.getSnapshotschedule().get("default");
-        if (VoltDB.instance().getSiteTracker().isFirstHost() &&
-            schedule != null && schedule.getEnabled())
+        if (schedule != null)
         {
-            final ListenableFuture<Void> future = m_snapshotDaemon.makeActive(schedule);
+            final ListenableFuture<Void> future = m_snapshotDaemon.mayGoActiveOrInactive(schedule);
             future.addListener(new Runnable() {
                 @Override
                 public void run() {
@@ -1384,8 +1342,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
             }, MoreExecutors.sameThreadExecutor());
-        } else {
-            m_snapshotDaemon.makeInactive();
         }
     }
 
@@ -1643,10 +1599,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 false,      // read only
                 true,       // single partition
                 false,      // every site
-                involvedPartitions, involvedPartitions.length,
+                involvedPartitions,
                 ccxn, buf.capacity(),
-                System.currentTimeMillis(),
-                false);     // allow mismatched results
+                System.currentTimeMillis());
         return null;
     }
 
@@ -1717,10 +1672,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sysProc.getReadonly(),
                 sysProc.getSinglepartition(),
                 sysProc.getEverysite(),
-                involvedPartitions, involvedPartitions.length,
+                involvedPartitions,
                 ccxn, buf.capacity(),
-                System.currentTimeMillis(),
-                false);
+                System.currentTimeMillis());
         return null;
     }
 
@@ -1748,11 +1702,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sysProc.getSinglepartition(),
                 sysProc.getEverysite(),
                 m_allPartitions,
-                m_allPartitions.length,
                 ccxn,
                 buf.capacity(),
-                System.currentTimeMillis(),
-                false);
+                System.currentTimeMillis());
 
         return null;
     }
@@ -1901,10 +1853,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sysProc.getReadonly(),
                     sysProc.getSinglepartition(),
                     sysProc.getEverysite(),
-                    involvedPartitions, involvedPartitions.length,
+                    involvedPartitions,
                     ccxn, buf.capacity(),
-                    now,
-                    false);
+                    now);
 
         }
 
@@ -1950,10 +1901,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
                         catProc.getEverysite(),
-                        involvedPartitions, involvedPartitions.length,
+                        involvedPartitions,
                         ccxn, buf.capacity(),
-                        now,
-                        allowMismatchedResults);
+                        now);
             if (!success) {
                 // HACK: this return is for the DR agent so that it
                 // will move along on duplicate replicated transactions
@@ -2050,22 +2000,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
-        // ENG-3288 - Non-deterministic read-only queries tolerate mismatched results.
-        boolean allowMismatchedResults = false;
-        if (plannedStmtBatch.isReadOnly()) {
-            for (AdHocPlannedStatement stmt : plannedStmtBatch.plannedStatements) {
-                if (stmt.core.isNonDeterministic) {
-                    allowMismatchedResults = true;
-                    break;
-                }
-            }
-        }
         // initiate the transaction
         createTransaction(plannedStmtBatch.connectionId, plannedStmtBatch.hostname,
                 plannedStmtBatch.adminConnection, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
-                partitions, partitions.length, plannedStmtBatch.clientData,
-                serializedSize, EstTime.currentTimeMillis(), allowMismatchedResults);
+                partitions, plannedStmtBatch.clientData,
+                serializedSize, EstTime.currentTimeMillis());
     }
 
     /*
@@ -2174,8 +2114,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             createTransaction(changeResult.connectionId, changeResult.hostname,
                                     changeResult.adminConnection,
                                     task, false, false, false, m_allPartitions,
-                                    m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
-                                    EstTime.currentTimeMillis(), false);
+                                    changeResult.clientData, task.getSerializedSize(),
+                                    EstTime.currentTimeMillis());
                         }
                     }
                     else {
@@ -2244,13 +2184,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
         }, 200, 200, TimeUnit.MILLISECONDS);
-    }
-
-    /*
-     * This is now a pre-IV2 only method
-     */
-    public final void processPeriodicWork() {
-        m_initiator.tick();
     }
 
     /**
@@ -2403,16 +2336,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         });
         spi.clientHandle = clientData;
         // initiate the transaction
-        boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
         createTransaction(m_snapshotDaemonAdapter.connectionId(),
                 "SnapshotDaemon",
                 true, // treat the snapshot daemon like it's on an admin port
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
-                m_allPartitions, m_allPartitions.length,
+                m_allPartitions,
                 m_snapshotDaemonAdapter,
-                0, EstTime.currentTimeMillis(),
-                allowMismatchedResults);
+                0, EstTime.currentTimeMillis());
     }
 
     /**
@@ -2535,47 +2466,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final Map<Long, Pair<String, long[]>> client_stats =
             new HashMap<Long, Pair<String, long[]>>();
 
-        if (m_isIV2Enabled) {
-            // m_cihm hashes connectionId to a ClientInterfaceHandleManager
-            // ClientInterfaceHandleManager has the connection object.
-            for (Map.Entry<Long, ClientInterfaceHandleManager> e : m_cihm.entrySet()) {
-                // The internal CI adapters report negative connection ids and
-                // aren't included in public stats.
-                if (e.getKey() > 0) {
-                    long adminMode = e.getValue().isAdmin ? 1 : 0;
-                    long readWait = e.getValue().connection.readStream().dataAvailable();
-                    long writeWait = e.getValue().connection.writeStream().getOutstandingMessageCount();
-                    long outstandingTxns = e.getValue().getOutstandingTxns();
-                    client_stats.put(
-                            e.getKey(), new Pair<String, long[]>(
-                                e.getValue().connection.getHostnameOrIP(),
-                                new long[] {adminMode, readWait, writeWait, outstandingTxns}));
-                }
-            }
-        }
-        else {
-            Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
-
-            // put all the live connections in the stats map, then fill in admin and
-            // outstanding txn info from the inflight stats
-            for (Connection c : m_connections) {
-                if (!client_stats.containsKey(c.connectionId())) {
-                    client_stats.put(
-                            c.connectionId(),
-                            new Pair<String, long[]>(c.getHostnameOrIP(),
-                                new long[]{0,
-                                    c.readStream().dataAvailable(),
-                                    c.writeStream().getOutstandingMessageCount(),
-                                    0})
-                            );
-                }
-            }
-
-            for (Entry<Long, long[]> stat : inflight_txn_stats.entrySet()) {
-                if (client_stats.containsKey(stat.getKey())) {
-                    client_stats.get(stat.getKey()).getSecond()[0] = stat.getValue()[0];
-                    client_stats.get(stat.getKey()).getSecond()[3] = stat.getValue()[1];
-                }
+        // m_cihm hashes connectionId to a ClientInterfaceHandleManager
+        // ClientInterfaceHandleManager has the connection object.
+        for (Map.Entry<Long, ClientInterfaceHandleManager> e : m_cihm.entrySet()) {
+            // The internal CI adapters report negative connection ids and
+            // aren't included in public stats.
+            if (e.getKey() > 0) {
+                long adminMode = e.getValue().isAdmin ? 1 : 0;
+                long readWait = e.getValue().connection.readStream().dataAvailable();
+                long writeWait = e.getValue().connection.writeStream().getOutstandingMessageCount();
+                long outstandingTxns = e.getValue().getOutstandingTxns();
+                client_stats.put(
+                        e.getKey(), new Pair<String, long[]>(
+                            e.getValue().connection.getHostnameOrIP(),
+                            new long[] {adminMode, readWait, writeWait, outstandingTxns}));
             }
         }
         return client_stats;
