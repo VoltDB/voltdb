@@ -23,7 +23,7 @@ import org.voltdb.VoltTable;
 
 @ProcInfo(
     singlePartition = true,
-    partitionInfo = "DUMMY: 4"
+    partitionInfo = "DUMMY: 0"
 )
 /**
  * Execute a user-provided read-only single-partition SQL statement.
@@ -48,8 +48,7 @@ public class AdHoc_RO_SP extends AdHocBase {
      * @return  results as VoltTable array
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-                           String partitionParam,
-                           byte partitionParamType,
+                           byte[] partitionParam,
                            byte[] serializedBatchData) {
         return runAdHoc(ctx, serializedBatchData);
     }
