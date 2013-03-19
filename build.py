@@ -326,6 +326,7 @@ CTX.INPUT['logging'] = """
 CTX.THIRD_PARTY_INPUT['json_spirit'] = """
  json_spirit_reader.cpp
  json_spirit_value.cpp
+ json_spirit_writer.cpp
 """
 
 CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
