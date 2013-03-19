@@ -310,7 +310,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     }
 
     public boolean isTransactionallySuccessful() {
-        return (status == SUCCESS) || (status == OPERATIONAL_FAILURE);
+        return isTransactionallySuccessful(status);
     }
 
     public static boolean isTransactionallySuccessful(byte status) {
