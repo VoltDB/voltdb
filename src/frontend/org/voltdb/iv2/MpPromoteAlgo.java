@@ -133,12 +133,14 @@ public class MpPromoteAlgo implements RepairAlgo
         for (Long hsid : m_survivors) {
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
+        m_replicaRepairStructs.put(m_mailbox.getHSId(), new ReplicaRepairStruct());
 
         tmLog.info(m_whoami + "found " + m_survivors.size()
                  + " surviving leaders to repair. "
                  + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
+        m_mailbox.send(m_mailbox.getHSId(), logRequest);
     }
 
     /** Process a new repair log response */

@@ -9,5 +9,6 @@ PARTITION TABLE store ON COLUMN key;
 
 CREATE PROCEDURE FROM CLASS voltkv.procedures.Initialize;
 CREATE PROCEDURE FROM CLASS voltkv.procedures.Get;
+CREATE PROCEDURE FROM CLASS voltkv.procedures.GetMP;
 CREATE PROCEDURE FROM CLASS voltkv.procedures.Put;
 CREATE PROCEDURE FROM CLASS voltkv.procedures.Remove;

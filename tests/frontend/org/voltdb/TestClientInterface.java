@@ -365,14 +365,17 @@ public class TestClientInterface {
 
     @Test
     public void testUpdateCatalog() throws IOException {
-        String catalogHex = Encoder.hexEncode("blah");
-        ByteBuffer msg = createMsg("@UpdateApplicationCatalog", catalogHex, "blah");
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNull(resp);
-        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
-                                 captor.capture());
-        assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
+        // only makes sense in pro (sysproc suite has a complementary test for community)
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            String catalogHex = Encoder.hexEncode("blah");
+            ByteBuffer msg = createMsg("@UpdateApplicationCatalog", catalogHex, "blah");
+            ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+            assertNull(resp);
+            ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
+            verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
+                                     captor.capture());
+            assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
+        }
     }
 
     @Test

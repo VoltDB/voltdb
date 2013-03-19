@@ -150,12 +150,17 @@ public class TestClientFeatures extends TestCase {
         client2.createConnection("localhost");
         TableHelper.fillTableWithBigintPkey(t, 400, client2, new Random(), 0, 1);
 
-        // run a catalog update that *might* normally timeout
-        long start = System.nanoTime();
-        response = client.callProcedure("@UpdateApplicationCatalog", catalogToUpdate, depBuilder.getXML());
-        double duration = (System.nanoTime() - start) / 1000000000.0;
-        System.out.printf("Catalog update duration in seconds: %.2f\n", duration);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        long start;
+        double duration;
+
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            // run a catalog update that *might* normally timeout
+            start = System.nanoTime();
+            response = client.callProcedure("@UpdateApplicationCatalog", catalogToUpdate, depBuilder.getXML());
+            duration = (System.nanoTime() - start) / 1000000000.0;
+            System.out.printf("Catalog update duration in seconds: %.2f\n", duration);
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        }
 
         // run a blocking snapshot that *might* normally timeout
         start = System.nanoTime();

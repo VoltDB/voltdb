@@ -744,9 +744,17 @@ CLEANING
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf doc/javadoc/procedure-api/* doc/javadoc/java-client-api/*'"/>
   </exec>
-
 </target>
 
+<target name='cleanugh' description="Remove stack traces and crash dumps dropped by tests">
+    <exec dir='.' executable='/bin/sh'>
+        <arg line="-c 'rm -f voltdb_crash*.txt'"/>
+    </exec>
+    <exec dir='.' executable='/bin/sh'>
+        <arg line="-c 'rm -f host*-*-*.txt'"/>
+    </exec>
+</target>
+                        
 <target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
   <exec dir='.' executable='/bin/sh' failonerror='false'>
     <arg line="-c 'rm -rf /tmp/myApp*.tmp *.vpt *.digest'"/>
@@ -1267,6 +1275,9 @@ TEST CASES
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />
             <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
+            <!-- Leave breadcrumbs so we can figure out deep in the bowels of VoltDB if
+                 this is a test -->
+            <env key="VOLT_JUSTATEST" value="YESYESYES" />
             <!-- Following two env vars are used by Java code
                  when running ant check -Dbuild=memcheck
                  The voltdbipc client is used in concert with valgrind

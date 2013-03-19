@@ -762,6 +762,10 @@ public class TestJSONInterface extends TestCase {
         assertTrue(r.statusString.contains("rejected due to too many recent rejected attempts"));
         System.out.println(r.statusString);
 
+        // the update catalog test below is for enterprise only
+        if (VoltDB.instance().getConfig().m_isEnterprise == false) {
+            return;
+        }
 
         // ENG-963 below here
         // do enough to get a new deployment file

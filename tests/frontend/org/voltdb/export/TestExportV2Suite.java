@@ -30,7 +30,6 @@ import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -97,57 +96,6 @@ public class TestExportV2Suite extends TestExportBase {
             params = convertValsToParams("NO_NULLS", i, rowdata);
             client.callProcedure("Insert", params);
         }
-        quiesceAndVerify(client, m_verifier);
-    }
-
-    // Test Export of an ADDED table.
-    //
-    public void testExportAndAddedTable() throws Exception {
-        System.out.println("testExportAndAddedTable");
-        final Client client = getClient();
-
-        // add a new table
-        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.jar");
-        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml");
-        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
-                                                                             new File(deploymentURL));
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-
-        // verify that it exports
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow( "ADDED_TABLE", i, convertValsToRow(i, 'I', rowdata));
-            final Object[]  params = convertValsToParams("ADDED_TABLE", i, rowdata);
-            client.callProcedure("InsertAddedTable", params);
-        }
-
-        quiesceAndVerify(client, m_verifier);
-    }
-
-    //  Test Export of a DROPPED table.  Queues some data to a table.
-    //  Then drops the table and verifies that Export can successfully
-    //  drain the dropped table. IE, drop table doesn't lose Export data.
-    //
-    public void testExportAndDroppedTable() throws Exception {
-        System.out.println("testExportAndDroppedTable");
-        Client client = getClient();
-        for (int i=0; i < 10; i++) {
-            final Object[] rowdata = TestSQLTypesSuite.m_midValues;
-            m_verifier.addRow("NO_NULLS", i, convertValsToRow(i, 'I', rowdata));
-            final Object[] params = convertValsToParams("NO_NULLS", i, rowdata);
-            client.callProcedure("Insert", params);
-        }
-
-        // now drop the no-nulls table
-        final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
-        final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
-        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
-                                                                             new File(deploymentURL));
-        assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
-
-        client = getClient();
-
-        // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);
     }
 
