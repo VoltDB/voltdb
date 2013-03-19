@@ -20,7 +20,6 @@
 #include <json_spirit/json_spirit.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-#include "StreamPredicate.h"
 #include "StreamPredicateList.h"
 #include "expressions/abstractexpression.h"
 
@@ -49,7 +48,7 @@ bool StreamPredicateList::parseStrings(
                 AbstractExpression *expr = AbstractExpression::buildExpressionTree(predicateObject);
                 if (expr != NULL) {
                     // Got ourselves a predicate expression tree!
-                    push_back(new StreamPredicate(expr));
+                    push_back(expr);
                 }
                 else {
                     errmsg << "Predicate JSON generated a NULL expression tree";
