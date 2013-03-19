@@ -76,6 +76,13 @@ public interface ClientResponse {
     public static final byte TXN_RESTART = -8;
 
     /**
+     * Status code indicating that the transaction completed and did not roll back, but some part
+     * of the operation didn't succeed. For example, this is returned when a snapshot restore operation
+     * fails to restore one table out of many.
+     */
+    public static final byte OPERATIONAL_FAILURE = -9;
+
+    /**
      * Default value for the user specified app status code field
      */
     public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;

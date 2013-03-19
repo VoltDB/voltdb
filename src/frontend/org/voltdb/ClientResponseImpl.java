@@ -309,6 +309,14 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return appStatusString;
     }
 
+    public boolean isTransactionallySuccessful() {
+        return (status == SUCCESS) || (status == OPERATIONAL_FAILURE);
+    }
+
+    public static boolean isTransactionallySuccessful(byte status) {
+        return (status == SUCCESS) || (status == OPERATIONAL_FAILURE);
+    }
+
     @Override
     public String toJSONString() {
         JSONStringer js = new JSONStringer();

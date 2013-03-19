@@ -91,9 +91,11 @@ public class ProcedureRunner {
     // per txn state (are reset after call)
     //
     protected TransactionState m_txnState; // used for sysprocs only
-    // Status code that can be set by stored procedure upon invocation that will be returned with the response.
-    protected byte m_statusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
+    protected byte m_statusCode = ClientResponse.SUCCESS;
     protected String m_statusString = null;
+    // Status code that can be set by stored procedure upon invocation that will be returned with the response.
+    protected byte m_appStatusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
+    protected String m_appStatusString = null;
     // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
     // a given call don't re-seed and generate the same number over and over
     private Random m_cachedRNG = null;
@@ -191,8 +193,10 @@ public class ProcedureRunner {
 
     public ClientResponseImpl call(Object... paramListIn) {
         // verify per-txn state has been reset
-        assert(m_statusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
+        assert(m_statusCode == ClientResponse.SUCCESS);
         assert(m_statusString == null);
+        assert(m_appStatusCode == ClientResponse.UNINITIALIZED_APP_STATUS_CODE);
+        assert(m_appStatusString == null);
         assert(m_cachedRNG == null);
 
         // reset the hash of results
@@ -208,7 +212,6 @@ public class ProcedureRunner {
         try {
             m_statsCollector.beginProcedure();
 
-            byte status = ClientResponse.SUCCESS;
             VoltTable[] results = null;
 
             // inject sysproc execution context as the first parameter.
@@ -224,8 +227,8 @@ public class ProcedureRunner {
                 m_statsCollector.endProcedure(false, true, null, null);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
-                status = ClientResponse.GRACEFUL_FAILURE;
-                return getErrorResponse(status, msg, null);
+                m_statusCode = ClientResponse.GRACEFUL_FAILURE;
+                return getErrorResponse(m_statusCode, msg, null);
             }
 
             for (int i = 0; i < m_paramTypes.length; i++) {
@@ -241,8 +244,8 @@ public class ProcedureRunner {
                     m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.toString();
-                    status = ClientResponse.GRACEFUL_FAILURE;
-                    return getErrorResponse(status, msg, null);
+                    m_statusCode = ClientResponse.GRACEFUL_FAILURE;
+                    return getErrorResponse(m_statusCode, msg, null);
                 }
             }
 
@@ -317,14 +320,14 @@ public class ProcedureRunner {
 
             if (retval == null)
                 retval = new ClientResponseImpl(
-                        status,
                         m_statusCode,
-                        m_statusString,
+                        m_appStatusCode,
+                        m_appStatusString,
                         results,
-                        null);
+                        m_statusString);
 
             int hash = (int) m_inputCRC.getValue();
-            if ((retval.getStatus() == ClientResponse.SUCCESS) && (hash != 0)) {
+            if (!ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
                 retval.setHash(hash);
             }
             if ((m_txnState != null) && // may be null for tests
@@ -342,8 +345,10 @@ public class ProcedureRunner {
 
             // reset other per-txn state
             m_txnState = null;
-            m_statusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
+            m_statusCode = ClientResponse.SUCCESS;
             m_statusString = null;
+            m_appStatusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
+            m_appStatusString = null;
             m_cachedRNG = null;
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
@@ -370,11 +375,11 @@ public class ProcedureRunner {
     }
 
     public void setAppStatusCode(byte statusCode) {
-        m_statusCode = statusCode;
+        m_appStatusCode = statusCode;
     }
 
     public void setAppStatusString(String statusString) {
-        m_statusString = statusString;
+        m_appStatusString = statusString;
     }
 
     /*
@@ -875,8 +880,8 @@ public class ProcedureRunner {
 
        return new ClientResponseImpl(
                status,
-               m_statusCode,
-               m_statusString,
+               m_appStatusCode,
+               m_appStatusString,
                new VoltTable[0],
                msgOut.toString(), e);
    }
