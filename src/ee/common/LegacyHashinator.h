@@ -49,23 +49,6 @@ public:
 protected:
 
    /**
-    * Given a long value, pick a partition to store the data.
-    *
-    * @param value The value to hash.
-    * @param partitionCount The number of partitions to choose from.
-    * @return A value between 0 and partitionCount-1, hopefully pretty evenly
-    * distributed.
-    */
-   int32_t hashinate(int64_t value) const {
-       // special case this hard to hash value to 0 (in both c++ and java)
-       if (value == INT64_MIN) return 0;
-
-       // hash the same way java does
-       int32_t index = static_cast<int32_t>(value^(static_cast<uint64_t>(value) >> 32));
-       return abs(index % partitionCount);
-   }
-
-   /**
     * Designed to mimic Java string hashing where the hash function is defined as
     * s[0]*31^(n-1) + s[1]*31^(n-2) + ... + s[n-1]
     *

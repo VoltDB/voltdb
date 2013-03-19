@@ -58,7 +58,9 @@ class TheHashinator {
         case VALUE_TYPE_INTEGER:
         case VALUE_TYPE_BIGINT:
         {
-            return hashinate(ValuePeeker::peekAsRawInt64(value));
+            int64_t hash_val = ValuePeeker::peekAsRawInt64(value);
+            // This assumes that the target machine is little endian
+            return hashinate(reinterpret_cast<char *>(&hash_val), 8);
         }
         case VALUE_TYPE_VARBINARY:
         case VALUE_TYPE_VARCHAR:
@@ -76,15 +78,6 @@ class TheHashinator {
 
   protected:
     TheHashinator() {}
-
-    /**
-     * Given a long value, pick a partition to store the data.
-     *
-     * @param value The value to hash.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
-     * distributed.
-     */
-    virtual int32_t hashinate(int64_t value) const = 0;
 
     /*
      * Given a piece of UTF-8 encoded character data OR binary data

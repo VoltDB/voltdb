@@ -114,7 +114,7 @@ public class TestTheHashinator extends TestCase {
         TheHashinator.initialize(getHashinatorClass(), configBytes);
 
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        int javahash = TheHashinator.hashinateLong(valueToHash);
+        int javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -145,7 +145,7 @@ public class TestTheHashinator extends TestCase {
 
         long valueToHash = 0;
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        int javahash = TheHashinator.hashinateLong(valueToHash);
+        int javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -155,7 +155,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 1;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -165,7 +165,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 2;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -175,7 +175,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 3;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -212,7 +212,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
             for (long valueToHash : values) {
                 int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-                int javahash = TheHashinator.hashinateLong(valueToHash);
+                int javahash = TheHashinator.hashToPartition(valueToHash);
                 if (eehash != javahash) {
                     System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
                 }
@@ -240,7 +240,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
             // this will produce negative values, which is desired here.
             final long valueToHash = r.nextLong();
-            final int javahash = TheHashinator.hashinateLong(valueToHash);
+            final int javahash = TheHashinator.hashToPartition(valueToHash);
             final int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
             if (eehash != javahash) {
                 System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
@@ -274,7 +274,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
 
             int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-            int javahash = TheHashinator.hashinateString(valueToHash);
+            int javahash = TheHashinator.hashToPartition(valueToHash);
             if (eehash != javahash) {
                 partitionCount++;
             }

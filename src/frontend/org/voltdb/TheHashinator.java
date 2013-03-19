@@ -18,6 +18,8 @@
 package org.voltdb;
 
 import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
@@ -86,24 +88,10 @@ public abstract class TheHashinator {
      * get the same handling once they the string is converted to UTF-8 binary
      * so there is only one protected method for bytes.
      *
-     * The same trick can't be done for longs because modulus is used by the legacy
-     * hashinator
+     * Longs are converted to bytes in little endian order.
      */
-    abstract protected int pHashinateLong(long value);
     abstract protected int pHashinateBytes(byte[] bytes);
     abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
-
-    /**
-     * Given a long value, pick a partition to store the data.
-     *
-     * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
-     * distributed.
-     */
-    static int hashinateLong(long value) {
-        return instance.get().getSecond().pHashinateLong(value);
-    }
 
     /**
      * Given an byte[] bytes, pick a partition to store the data.
@@ -114,19 +102,11 @@ public abstract class TheHashinator {
      * distributed.
      */
     static int hashinateBytes(byte[] bytes) {
-        return instance.get().getSecond().pHashinateBytes(bytes);
-    }
-
-    /**
-     * Given an String value, pick a partition to store the data.
-     *
-     * @param value The value to hash.
-     * @param partitionCount The number of partitions to choose from.
-     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
-     * distributed.
-     */
-    static int hashinateString(String value) {
-        return instance.get().getSecond().pHashinateBytes(value.getBytes(Charsets.UTF_8));
+        if (bytes == null) {
+            return 0;
+        } else {
+            return instance.get().getSecond().pHashinateBytes(bytes);
+        }
     }
 
     /**
@@ -135,29 +115,42 @@ public abstract class TheHashinator {
      * @return The id of the partition desired.
      */
     public static int hashToPartition(Object obj) {
-        int index = 0;
-        if (obj == null || VoltType.isNullVoltType(obj))
-        {
-            index = 0;
-        }
-        else if (obj instanceof Long) {
-            long value = ((Long) obj).longValue();
-            index = hashinateLong(value);
+        return hashinateBytes(valueToBytes(obj));
+    }
+
+    /**
+     * Converts the object into bytes for hashing.
+     * @param obj
+     * @return null if the obj is null or is a Volt null type.
+     */
+    public static byte[] valueToBytes(Object obj) {
+        long value = 0;
+        byte[] retval = null;
+
+        if (VoltType.isNullVoltType(obj)) {
+            return null;
+        } else if (obj instanceof Long) {
+            value = ((Long) obj).longValue();
         } else if (obj instanceof String ) {
-            index = hashinateString((String) obj);
+            retval = ((String) obj).getBytes(Charsets.UTF_8);
         } else if (obj instanceof Integer) {
-            long value = ((Integer)obj).intValue();
-            index = hashinateLong(value);
+            value = ((Integer)obj).intValue();
         } else if (obj instanceof Short) {
-            long value = ((Short)obj).shortValue();
-            index = hashinateLong(value);
+            value = ((Short)obj).shortValue();
         } else if (obj instanceof Byte) {
-            long value = ((Byte)obj).byteValue();
-            index = hashinateLong(value);
+            value = ((Byte)obj).byteValue();
         } else if (obj instanceof byte[]) {
-            index = hashinateBytes((byte[]) obj );
+            retval = (byte[]) obj;
         }
-        return index;
+
+        if (retval == null) {
+            ByteBuffer buf = ByteBuffer.allocate(8);
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+            buf.putLong(value);
+            retval = buf.array();
+        }
+
+        return retval;
     }
 
     /**
