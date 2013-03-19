@@ -327,7 +327,7 @@ public class ProcedureRunner {
                         m_statusString);
 
             int hash = (int) m_inputCRC.getValue();
-            if (!ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
+            if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
                 retval.setHash(hash);
             }
             if ((m_txnState != null) && // may be null for tests
