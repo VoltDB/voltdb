@@ -220,6 +220,37 @@ class TV  : public AE {
 };
 
 /*
+ * Hash range expression mock object
+ */
+class HR : public AE {
+public:
+	HR(int hashColumn, int64_t ranges[][], int numRanges) :
+		AE(EXPRESSION_TYPE_HASH_RANGE, VALUE_TYPE_BIGINT, 8),
+		m_hashColumn(hashColumn),
+		m_ranges(ranges),
+		m_numRanges(numRanges) {
+
+	}
+
+    virtual void serialize(json_spirit::Object &json) {
+        AE::serialize(json);
+        json.push_back(json_spirit::Pair("HASH_COLUMN", json_spirit::Value(m_hashColumn)));
+        json_spirit::Array array;
+        for (int ii = 0; ii < m_numRanges; ii++) {
+        	json_spirit::Object range;
+        	range.push_back(json_spirit::Pair("RANGE_START", m_ranges[ii][0]));
+        	range.push_back(json_spirit::Pair("RANGE_END", m_ranges[ii][0]));
+        	array.push_back(range);
+        }
+        json.push_back(json_spirit::Pair("RANGES", array));
+    }
+
+	const int m_hashColumn;
+	const int64_t m_ranges[][];
+	const int m_numRanges;
+};
+
+/*
    helpers to build trivial left-associative trees
    that is (a, *, b, +, c) returns (a * b) + c
    and (a, +, b, * c) returns (a + b) * c
@@ -320,6 +351,11 @@ TEST_F(ExpressionTest, SimpleMultiplication) {
     NValue r2 = e2->eval(&junk,NULL);
     ASSERT_EQ(ValuePeeker::peekAsBigInt(r2), 13LL);
 }
+
+/*
+ * Show that the hash range expression correctly selects (or doesn't) rows in ranges
+ */
+TEST_F(ExpressionTest, SimpleMultiplication) {
 
 int main() {
      return TestSuite::globalInstance()->runAll();
