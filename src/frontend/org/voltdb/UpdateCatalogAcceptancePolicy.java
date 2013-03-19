@@ -18,6 +18,7 @@ package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.Encoder;
 
 /**
@@ -31,7 +32,7 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
     @Override
     public ClientResponseImpl shouldAccept(AuthUser user,
                                 StoredProcedureInvocation invocation,
-                                Config sysProc) {
+                                Procedure sysProc) {
         if (!invocation.procName.equals("@UpdateApplicationCatalog")) {
             return null;
         }

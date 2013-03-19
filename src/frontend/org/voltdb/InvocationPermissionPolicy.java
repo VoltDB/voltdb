@@ -47,7 +47,26 @@ public class InvocationPermissionPolicy extends InvocationAcceptancePolicy {
     public ClientResponseImpl shouldAccept(AuthUser user,
             StoredProcedureInvocation invocation,
             Procedure proc) {
-        if (!user.hasPermission(proc)) {
+        if (invocation.procName.startsWith("@AdHoc")) {
+            // AdHoc requires unique permission. Then has to plan in a separate thread.
+            if (!user.hasAdhocPermission()) {
+                authLog.l7dlog(Level.INFO,
+                        LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
+                        new String[] {user.m_name}, null);
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0], "User does not have @AdHoc permission",
+                        invocation.clientHandle);
+            }
+        } else if (proc.getSystemproc() && !user.hasSystemProcPermission()) {
+            authLog.l7dlog(Level.INFO,
+                    LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
+                    new String[] { user.m_name, invocation.procName },
+                    null);
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0],
+                    "User " + user.m_name + " does not have sysproc permission",
+                    invocation.clientHandle);
+        } else if (!user.hasPermission(proc)) {
             authLog.l7dlog(Level.INFO,
                            LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),
                            new String[] { user.m_name, invocation.procName }, null);
@@ -58,42 +77,4 @@ public class InvocationPermissionPolicy extends InvocationAcceptancePolicy {
         }
         return null;
     }
-
-    /**
-     * Determine whether or not the current user has permission to call this
-     * system procedure.
-     *
-     * @see org.voltdb.InvocationAcceptancePolicy#shouldAccept(org.voltdb.AuthSystem.AuthUser,
-     *      org.voltdb.StoredProcedureInvocation,
-     *      org.voltdb.SystemProcedureCatalog.Config,
-     *      org.voltcore.network.WriteStream)
-     */
-    @Override
-    public ClientResponseImpl shouldAccept(AuthUser user,
-                                StoredProcedureInvocation invocation,
-                                Config sysProc) {
-        if (invocation.procName.startsWith("@AdHoc")) {
-            // AdHoc requires unique permission. Then has to plan in a separate thread.
-            if (!user.hasAdhocPermission()) {
-                authLog.l7dlog(Level.INFO,
-                               LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
-                               new String[] {user.m_name}, null);
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0], "User does not have @AdHoc permission",
-                        invocation.clientHandle);
-            }
-        } else if (!user.hasSystemProcPermission()) {
-            authLog.l7dlog(Level.INFO,
-                           LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
-                           new String[] { user.m_name, invocation.procName },
-                           null);
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0],
-                        "User " + user.m_name + " does not have sysproc permission",
-                        invocation.clientHandle);
-        }
-
-        return null;
-    }
-
 }
