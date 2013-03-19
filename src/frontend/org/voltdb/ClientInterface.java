@@ -945,7 +945,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final long now = System.currentTimeMillis();
             final int delta = (int)(now - clientData.m_creationTime);
 
-            if (restartTransaction(clientData.m_messageSize, now)) {
+            // Reuse the creation time of the original invocation to have accurate internal latency
+            if (restartTransaction(clientData.m_messageSize, clientData.m_creationTime)) {
                 // If the transaction is successfully restarted, don't send a response to the
                 // client yet.
                 return new ByteBuffer[] {};
