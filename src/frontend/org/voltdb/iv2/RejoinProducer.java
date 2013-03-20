@@ -57,7 +57,7 @@ public class RejoinProducer extends JoinProducerBase {
 
     // True: use live rejoin; false use community blocking implementation.
     private boolean m_liveRejoin;
-    private final TaskLog m_rejoinTaskLog;
+    private TaskLog m_rejoinTaskLog = null;
 
     boolean useLiveRejoin()
     {
@@ -149,18 +149,12 @@ public class RejoinProducer extends JoinProducerBase {
     // m_currentlyRejoining gates promotion to master. If the rejoin producer
     // is instantiated, it must complete its execution and set currentlyRejoining
     // to false.
-    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue, String voltroot,
-                          boolean isLiveRejoin)
+    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue, boolean isLiveRejoin)
     {
         super(partitionId, "Rejoin producer:" + partitionId + " ", taskQueue);
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
 
-        if (isLiveRejoin) {
-            m_rejoinTaskLog = initializeForLiveRejoin(voltroot, m_partitionId);
-        } else {
-            m_rejoinTaskLog = initializeForCommunityRejoin();
-        }
         REJOINLOG.debug(m_whoami + "created.");
     }
 
@@ -236,8 +230,13 @@ public class RejoinProducer extends JoinProducerBase {
     }
 
     @Override
-    public TaskLog getTaskLog()
+    public TaskLog constructTaskLog(String voltroot)
     {
+        if (m_liveRejoin) {
+            m_rejoinTaskLog = initializeForLiveRejoin(voltroot, m_partitionId);
+        } else {
+            m_rejoinTaskLog = initializeForCommunityRejoin();
+        }
         return m_rejoinTaskLog;
     }
 
