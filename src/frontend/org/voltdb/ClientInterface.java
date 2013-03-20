@@ -1832,49 +1832,51 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return error;
         }
 
-        // these have helpers that do all the work...
-        if (task.procName.equals("@AdHoc")) {
-            return dispatchAdHoc(task, handler, ccxn, false);
-        } else if (task.procName.equals("@UpdateApplicationCatalog")) {
-            return dispatchUpdateApplicationCatalog(task, handler, ccxn);
-        } else if (task.procName.equals("@LoadMultipartitionTable")) {
+        if (catProc.getSystemproc()) {
+            // these have helpers that do all the work...
+            if (task.procName.equals("@AdHoc")) {
+                return dispatchAdHoc(task, handler, ccxn, false);
+            } else if (task.procName.equals("@UpdateApplicationCatalog")) {
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+            } else if (task.procName.equals("@LoadMultipartitionTable")) {
                 /*
                  * For IV2 DR: This will generate a sentinel for each partition,
                  * but doesn't initiate the invocation. It will fall through to
                  * the shared dispatch of sysprocs.
                  */
-            if (VoltDB.instance().isIV2Enabled() &&
-                    task.getType() == ProcedureInvocationType.REPLICATED) {
-                sendSentinelsToAllPartitions(task.getOriginalTxnId());
+                if (VoltDB.instance().isIV2Enabled() &&
+                        task.getType() == ProcedureInvocationType.REPLICATED) {
+                    sendSentinelsToAllPartitions(task.getOriginalTxnId());
+                }
+            } else if (task.procName.equals("@SnapshotSave")) {
+                m_snapshotDaemon.requestUserSnapshot(task, ccxn);
+                return null;
+            } else if (task.procName.equals("@Statistics")) {
+                return dispatchStatistics(catProc, buf, task, handler, ccxn);
+            } else if (task.procName.equals("@Promote")) {
+                return dispatchPromote(catProc, buf, task, handler, ccxn);
             }
-        } else if (task.procName.equals("@SnapshotSave")) {
-            m_snapshotDaemon.requestUserSnapshot(task, ccxn);
-            return null;
-        } else if (task.procName.equals("@Statistics")) {
-            return dispatchStatistics(catProc, buf, task, handler, ccxn);
-        } else if (task.procName.equals("@Promote")) {
-            return dispatchPromote(catProc, buf, task, handler, ccxn);
-        }
 
-        // If you're going to copy and paste something, CnP the pattern
-        // up above.  -rtb.
+            // If you're going to copy and paste something, CnP the pattern
+            // up above.  -rtb.
 
-        // Verify that admin mode sysprocs are called from a client on the
-        // admin port, otherwise return a failure
-        if (task.procName.equals("@Pause") || task.procName.equals("@Resume")) {
-            if (!handler.isAdmin()) {
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0],
-                        "" + task.procName + " is not available to this client",
-                        task.clientHandle);
+            // Verify that admin mode sysprocs are called from a client on the
+            // admin port, otherwise return a failure
+            if (task.procName.equals("@Pause") || task.procName.equals("@Resume")) {
+                if (!handler.isAdmin()) {
+                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0],
+                            "" + task.procName + " is not available to this client",
+                            task.clientHandle);
+                }
             }
-        }
-        else if (task.procName.equals("@SystemInformation")) {
-            ParameterSet params = task.getParams();
-            // hacky: support old @SystemInformation behavior by
-            // filling in a missing selector to get the overview key/value info
-            if (params.toArray().length == 0) {
-                task.setParams("OVERVIEW");
+            else if (task.procName.equals("@SystemInformation")) {
+                ParameterSet params = task.getParams();
+                // hacky: support old @SystemInformation behavior by
+                // filling in a missing selector to get the overview key/value info
+                if (params.toArray().length == 0) {
+                    task.setParams("OVERVIEW");
+                }
             }
         }
 
