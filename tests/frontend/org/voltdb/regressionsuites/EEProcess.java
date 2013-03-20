@@ -57,7 +57,7 @@ public class EEProcess {
     public static final List<String> m_valgrindErrors = Collections
             .synchronizedList(new ArrayList<String>());
 
-    EEProcess(final BackendTarget target, String logfile) {
+    EEProcess(final BackendTarget target, int siteCount, String logfile) {
         if (target != BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             return;
         }
@@ -66,12 +66,14 @@ public class EEProcess {
             System.out.println("Running " + target);
         }
         final ArrayList<String> args = new ArrayList<String>();
-        final String voltdbIPCPath = System.getenv("VOLTDBIPC_PATH");
-        args.add("valgrind");
+        final String voltdbIPCPath = //System.getenv("VOLTDBIPC_PATH");
+                "/Users/jhugg/Documents/workspace/voltdb2/obj/debug/prod/voltdbipc";
+
+        /*args.add("valgrind");
         args.add("--leak-check=full");
         args.add("--show-reachable=yes");
         args.add("--num-callers=32");
-        args.add("--error-exitcode=-1");
+        args.add("--error-exitcode=-1");*/
         /*
          * VOLTDBIPC_PATH is set as part of the regression suites and ant
          * check In that scenario junit will handle logging of Valgrind
@@ -82,6 +84,7 @@ public class EEProcess {
             args.add("--log-file=" + logfile);
         }
         args.add(voltdbIPCPath == null ? "./voltdbipc" : voltdbIPCPath);
+        args.add(String.valueOf(siteCount));
 
         final ProcessBuilder pb = new ProcessBuilder(args);
         //pb.redirectErrorStream(true);
@@ -121,6 +124,19 @@ public class EEProcess {
                 pidString = pidString.substring(2);
                 pidString = pidString.substring(0, pidString.indexOf("="));
                 m_eePID = pidString;
+            }
+
+            String siteCountString = stdout.readLine();
+            if (siteCountString == null) {
+                failure = true;
+            } else {
+                if (verbose) {
+                    System.out.println("Site count string \"" + siteCountString + "\"");
+                }
+                siteCountString = siteCountString.substring(2);
+                siteCountString = siteCountString.substring(0, siteCountString.indexOf("="));
+                int siteCount2 = Integer.valueOf(siteCountString);
+                assert(siteCount2 == siteCount);
             }
 
             String portString = stdout.readLine();

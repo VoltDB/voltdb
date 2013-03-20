@@ -102,7 +102,7 @@ public class LocalCluster implements VoltServerConfig {
     ArrayList<CommandLine> m_cmdLines = null;
     ServerThread m_localServer = null;
     ProcessBuilder m_procBuilder;
-    private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
+    private final ArrayList<EEProcess> m_eeProcs = new ArrayList<EEProcess>();
 
     // Produce a (presumably) available IP port number.
     public final PortGenerator portGenerator = new PortGenerator();
@@ -337,16 +337,12 @@ public class LocalCluster implements VoltServerConfig {
         portGenerator.next();
         portGenerator.next();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            for (EEProcess proc : m_eeProcs.get(0)) {
-                assert(proc != null);
-                cmdln.ipcPort(proc.port());
-            }
+            EEProcess proc = m_eeProcs.get(0);
+            assert(proc != null);
+            cmdln.m_ipcPort = proc.port();
         }
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
-            // set 1 port per site
-            for (int i = 0; i < m_siteCount; i++) {
-                cmdln.m_ipcPorts.add(portGenerator.next());
-            }
+            cmdln.m_ipcPort = portGenerator.next();
         }
 
         // for debug, dump the command line to a unique file.
@@ -439,12 +435,8 @@ public class LocalCluster implements VoltServerConfig {
 
         m_eeProcs.clear();
         for (int ii = 0; ii < m_hostCount; ii++) {
-            ArrayList<EEProcess> procs = new ArrayList<EEProcess>();
-            m_eeProcs.add(procs);
-            for (int zz = 0; zz < m_siteCount; zz++) {
-                String logfile = "LocalCluster_host_" + ii + "_site" + zz + ".log";
-                procs.add(new EEProcess(templateCmdLine.target(), logfile));
-            }
+            String logfile = "LocalCluster_host_" + ii + ".log";
+            m_eeProcs.add(new EEProcess(templateCmdLine.target(), m_siteCount, logfile));
         }
 
         m_pipes.clear();
@@ -530,9 +522,8 @@ public class LocalCluster implements VoltServerConfig {
         int retval = 0;
         try {
             retval = proc.waitFor();
-            for (EEProcess eeproc : m_eeProcs.get(procIndex)) {
-                eeproc.waitForShutdown();
-            }
+            EEProcess eeProc = m_eeProcs.get(procIndex);
+            eeProc.waitForShutdown();
         } catch (InterruptedException e) {
             log.info("External VoltDB process is acting crazy.");
         } finally {
@@ -564,10 +555,9 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
             if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-                for (EEProcess proc : m_eeProcs.get(hostId)) {
-                    assert(proc != null);
-                    cmdln.ipcPort(proc.port());
-                }
+                EEProcess proc = m_eeProcs.get(hostId);
+                assert(proc != null);
+                cmdln.m_ipcPort = proc.port();
             }
 
             cmdln.port(portGenerator.nextClient());
@@ -705,7 +695,6 @@ public class LocalCluster implements VoltServerConfig {
 
     // Re-start a (dead) process. HostId is the enumberation of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
-    @SuppressWarnings("incomplete-switch")
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
                                String rejoinHost, START_ACTION startAction) {
 
@@ -722,20 +711,15 @@ public class LocalCluster implements VoltServerConfig {
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
-        ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
-        for (EEProcess proc : eeProcs) {
-            try {
-                proc.waitForShutdown();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+        EEProcess eeProc = m_eeProcs.get(hostId);
+        try {
+            eeProc.waitForShutdown();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
-        eeProcs.clear();
         if (templateCmdLine.target().isIPC) {
-            for (int ii = 0; ii < m_siteCount; ii++) {
-                String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
-                eeProcs.add(new EEProcess(templateCmdLine.target(), logfile));
-            }
+            String logfile = "LocalCluster_host_" + hostId + ".log";
+            m_eeProcs.set(hostId, new EEProcess(templateCmdLine.target(), m_siteCount, logfile));
         }
 
         PipeToFile ptf = null;
@@ -882,7 +866,7 @@ public class LocalCluster implements VoltServerConfig {
     private void silentShutdownSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {
         Process proc = null;
         //PipeToFile ptf = null;
-        ArrayList<EEProcess> procs = null;
+        EEProcess eeProc = null;
         PipeToFile ptf;
         synchronized (this) {
            proc = m_cluster.get(hostNum);
@@ -891,7 +875,7 @@ public class LocalCluster implements VoltServerConfig {
            ptf = m_pipes.get(hostNum);
            m_pipes.set(hostNum, null);
            if (m_eeProcs.size() > hostNum) {
-               procs = m_eeProcs.get(hostNum);
+               eeProc = m_eeProcs.get(hostNum);
            }
         }
 
@@ -907,14 +891,11 @@ public class LocalCluster implements VoltServerConfig {
         //     new File(ptf.m_filename).delete();
         // }
 
-        if (procs != null) {
-            for (EEProcess eeproc : procs) {
-                if (forceKillEEProcs) {
-                    eeproc.destroy();
-                }
-                eeproc.waitForShutdown();
+        if (eeProc != null) {
+            if (forceKillEEProcs) {
+                eeProc.destroy();
             }
-            procs.clear();
+            eeProc.waitForShutdown();
         }
     }
 
@@ -955,17 +936,15 @@ public class LocalCluster implements VoltServerConfig {
 
         if (m_cluster != null) m_cluster.clear();
 
-        for (ArrayList<EEProcess> procs : m_eeProcs) {
-            for (EEProcess proc : procs) {
-                try {
-                    proc.waitForShutdown();
-                } catch (InterruptedException e) {
-                    log.error("Unable to wait for EEProcess to die: " + proc.toString(), e);
-                }
+        for (EEProcess proc : m_eeProcs) {
+            try {
+                proc.waitForShutdown();
+            } catch (InterruptedException e) {
+                log.error("Unable to wait for EEProcess to die: " + proc.toString(), e);
             }
         }
 
-        if (templateCmdLine.target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+        /*if (templateCmdLine.target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             if (!EEProcess.m_valgrindErrors.isEmpty()) {
                 String failString = "";
                 for (final String error : EEProcess.m_valgrindErrors) {
@@ -973,7 +952,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
                 org.junit.Assert.fail(failString);
             }
-        }
+        }*/
 
         m_eeProcs.clear();
     }

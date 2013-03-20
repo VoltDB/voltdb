@@ -1003,7 +1003,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             target,
-                            VoltDB.instance().getConfig().m_ipcPorts.remove(0),
+                            VoltDB.instance().getConfig().m_ipcPort,
                             TheHashinator.getConfiguredHashinatorType(),
                             TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);

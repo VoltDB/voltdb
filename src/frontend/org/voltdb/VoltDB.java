@@ -24,10 +24,8 @@ import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -137,7 +135,7 @@ public class VoltDB {
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
 
-        public List<Integer> m_ipcPorts = Collections.synchronizedList(new LinkedList<Integer>());
+        public int m_ipcPort = 10000;
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -431,12 +429,9 @@ public class VoltDB {
                     m_pathToDeployment = args[++i];
                 } else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
-                } else if (arg.equalsIgnoreCase("ipcports")) {
-                    String portList = args[++i];
-                    String ports[] = portList.split(",");
-                    for (String port : ports) {
-                        m_ipcPorts.add(Integer.valueOf(port));
-                    }
+                } else if (arg.equalsIgnoreCase("ipcport")) {
+                    String portStr = args[++i];
+                    m_ipcPort = Integer.valueOf(portStr);
                 } else if (arg.equals("enableiv2")) {
                     m_enableIV2 = true;
                 } else {
@@ -500,14 +495,6 @@ public class VoltDB {
             if (m_leader == null) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
-            }
-
-            if (m_backend.isIPC) {
-                if (m_ipcPorts.isEmpty()) {
-                    isValid = false;
-                    hostLog.fatal("Specified an IPC backend but did not supply a , " +
-                            " separated list of ports via ipcports param");
-                }
             }
 
             // require deployment file location

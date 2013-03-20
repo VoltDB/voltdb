@@ -235,13 +235,13 @@ public class TestCRUDSuite extends RegressionSuite {
         }
 
         // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_VALGRIND_IPC);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
 
         // CLUSTER
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_VALGRIND_IPC);
         boolean t2 = config.compile(project);
         assertTrue(t2);
         builder.addServerConfig(config);
