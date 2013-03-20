@@ -16,7 +16,6 @@
  */
 
 #include "TupleOutputStream.h"
-#include "StreamPredicate.h"
 #include "TupleSerializer.h"
 #include "tabletuple.h"
 #include <limits>

@@ -30,6 +30,7 @@
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "execution/VoltDBEngine.h"
+#include "expressions/expressions.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
@@ -45,6 +46,8 @@
 #include <stdarg.h>
 #include <boost/foreach.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include <json_spirit/json_spirit.h>
+#include <json_spirit/json_spirit_writer.h>
 
 using namespace voltdb;
 
@@ -619,9 +622,9 @@ typedef stx::btree_set<int64_t> TupleSet;
 /** Tool object holds test state and conveniently displays errors. */
 class MultiStreamTestTool {
 public:
-    MultiStreamTestTool(PersistentTable& table, size_t npartitions) :
+    MultiStreamTestTool(PersistentTable& table, size_t nparts) :
         table(table),
-        npartitions(npartitions),
+        nparts(nparts),
         iteration(-1),
         nerrors(0),
         showTuples(TUPLE_COUNT <= MAX_DETAIL_COUNT)
@@ -684,7 +687,7 @@ public:
         else {
             os << "???";
         }
-        os << " modulus=" << value % npartitions;
+        os << " modulus=" << value % nparts;
         va_list args;
         va_start(args, msg);
         verror(os.str(), args);
@@ -706,8 +709,82 @@ public:
         }
     }
 
+    //=== Some convenience methods for building a JSON expression.
+
+    // Assume non-ridiculous copy semantics for Object.
+    // Structured JSON-building for readibility, not efficiency.
+
+    static json_spirit::Object expr_value(const std::string& type, const json_spirit::Pair& valuePair) {
+        json_spirit::Object o;
+        o.push_back(json_spirit::Pair("TYPE", "VALUE_CONSTANT"));
+        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
+        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
+        o.push_back(json_spirit::Pair("ISNULL", false));
+        o.push_back(valuePair);
+        return o;
+    }
+
+    static json_spirit::Object expr_value(const std::string& type, int ivalue) {
+        return expr_value(type, json_spirit::Pair("VALUE", ivalue));
+    }
+
+    static json_spirit::Object expr_value_tuple(const std::string& type,
+                                                const std::string& tblname,
+                                                int32_t colidx,
+                                                const std::string& colname) {
+        json_spirit::Object o;
+        o.push_back(json_spirit::Pair("TYPE", "VALUE_TUPLE"));
+        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
+        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
+        o.push_back(json_spirit::Pair("TABLE_NAME", tblname));
+        o.push_back(json_spirit::Pair("COLUMN_IDX", colidx));
+        o.push_back(json_spirit::Pair("COLUMN_NAME", colname));
+        o.push_back(json_spirit::Pair("COLUMN_ALIAS", json_spirit::Value())); // null
+        return o;
+    }
+
+    static json_spirit::Object expr_binary_op(const std::string& op,
+                                              const std::string& type,
+                                              const json_spirit::Object& left,
+                                              const json_spirit::Object& right) {
+        json_spirit::Object o;
+        o.push_back(json_spirit::Pair("TYPE", op));
+        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
+        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
+        o.push_back(json_spirit::Pair("LEFT", left));
+        o.push_back(json_spirit::Pair("RIGHT", right));
+        return o;
+    }
+
+    // Work around unsupported modulus operator with other integer operators:
+    //    Should be: result = (value % nparts) == ipart
+    //  Work-around: result = (value - ((value / nparts) * nparts)) == ipart
+    std::string generatePredicateString(int32_t ipart) {
+        std::string tblname = table.name();
+        int colidx = table.partitionColumn();
+        std::string colname = table.columnName(colidx);
+        json_spirit::Object jsonTuple = expr_value_tuple("INTEGER", tblname, colidx, colname);
+        json_spirit::Object json =
+            expr_binary_op("COMPARE_EQUAL", "INTEGER",
+                expr_binary_op("OPERATOR_MINUS", "INTEGER",
+                    jsonTuple,
+                    expr_binary_op("OPERATOR_MULTIPLY", "INTEGER",
+                        expr_binary_op("OPERATOR_DIVIDE", "INTEGER",
+                                       jsonTuple,
+                                       expr_value("INTEGER", (int)nparts)),
+                        expr_value("INTEGER", (int)nparts)
+                    )
+                ),
+                expr_value("INTEGER", (int)ipart)
+            );
+
+        std::ostringstream os;
+        json_spirit::write(json, os);
+        return os.str();
+    }
+
     PersistentTable& table;
-    size_t npartitions;
+    size_t nparts;
     int iteration;
     char stage[256];
     size_t nerrors;
@@ -739,7 +816,6 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         int totalInserted = 0;              // Total tuple counter.
         boost::scoped_ptr<char> buffers[npartitions];   // Stream buffers.
         std::vector<std::string> strings(npartitions);  // Range strings.
-        HashRange ranges[npartitions];  // Raw ranges.
         TupleSet before[npartitions];   // Tuple values by partition before streaming.
         TupleSet after[npartitions];    // Tuple values by partition after streaming.
 
@@ -750,16 +826,12 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         // Also prepare a buffer for each stream.
         for (int32_t i = 0; i < npartitions; i++) {
             buffers[i].reset(new char[BUFFER_SIZE]);
-            ranges[i] = std::pair<int32_t, int32_t>(i, i);
-            std::ostringstream os;
-            os << i << ':' << i;
-            strings[i] = os.str();
+            strings[i] = tool.generatePredicateString(i);
         }
 
         tool.context("precalculate");
 
-        // Map original tuples to expected partitions using a simple
-        // modulus hash and the ranges generated above.
+        // Map original tuples to expected partitions.
         voltdb::TableIterator& iterator = m_table->iterator();
         int partCol = m_table->partitionColumn();
         TableTuple tuple(m_table->schema());
