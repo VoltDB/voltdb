@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <boost/ptr_container/ptr_vector.hpp>
 #include "StreamPredicateList.h"
-#include "StreamPredicate.h"
 
 namespace voltdb {
 

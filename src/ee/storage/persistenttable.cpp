@@ -58,7 +58,6 @@
 #include "common/FatalException.hpp"
 #include "common/types.h"
 #include "common/RecoveryProtoMessage.h"
-#include "common/StreamPredicate.h"
 #include "common/StreamPredicateList.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
