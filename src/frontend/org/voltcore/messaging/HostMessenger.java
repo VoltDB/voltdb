@@ -33,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
@@ -673,14 +672,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return hostname;
     }
 
-    public List<Integer> getLiveHostIds() throws KeeperException, InterruptedException
+    public List<Integer> getLiveHostIds()
     {
         List<Integer> hostids = new ArrayList<Integer>();
-
-        for (String host : m_zk.getChildren(CoreZK.hosts, false, null))
-        {
-            hostids.add(Integer.parseInt(host.substring(host.indexOf("host") + "host".length())));
-        }
+        hostids.addAll(m_foreignHosts.keySet());
+        hostids.add(m_localHostId);
         return hostids;
     }
 

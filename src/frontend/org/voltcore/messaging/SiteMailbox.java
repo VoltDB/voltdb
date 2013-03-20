@@ -40,8 +40,7 @@ public class SiteMailbox implements Mailbox {
         public boolean needsInitialization() {
             return false;
         }
-        @Override
-        public void log(InitiateTaskMessage message) {}
+
         @Override
         public void shutdown() throws InterruptedException {}
         @Override
@@ -108,7 +107,7 @@ public class SiteMailbox implements Mailbox {
         if (message instanceof InitiateTaskMessage) {
             InitiateTaskMessage msg = (InitiateTaskMessage)message;
             if (!msg.isReadOnly()) {
-                m_commandLog.log(msg);
+                //m_commandLog.log(msg);
             }
         } else if (message instanceof HeartbeatMessage) {
             HeartbeatMessage msg = (HeartbeatMessage)message;

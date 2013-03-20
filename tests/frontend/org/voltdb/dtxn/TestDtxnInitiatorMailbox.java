@@ -123,10 +123,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEveryPartition,
-                                      int[] partitions, int numPartitions,
+                                      int[] partitions,
                                       Object clientData, int messageSize,
-                                      long now,
-                                      boolean allowMismatchedResults)
+                                      long now)
         {
             return true;
         }
@@ -142,11 +141,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       boolean isSinglePartition,
                                       boolean isEverySite,
                                       int[] partitions,
-                                      int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now,
-                                      boolean allowMismatchedResults)
+                                      long now)
         {
             return true;
         }

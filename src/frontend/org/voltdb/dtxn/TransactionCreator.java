@@ -34,11 +34,9 @@ public interface TransactionCreator
             boolean isSinglePartition,
             boolean isEverySite,
             int partitions[],
-            int numPartitions,
             Object clientData,
             int messageSize,
-            long now,
-            boolean allowMismatchedResults);
+            long now);
 
     // Create a transaction using the provided txnId.
     public boolean createTransaction(
@@ -52,11 +50,9 @@ public interface TransactionCreator
             boolean isSinglePartition,
             boolean isEverySite,
             int partitions[],
-            int numPartitions,
             Object clientData,
             int messageSize,
-            long now,
-            boolean allowMismatchedResults);
+            long now);
 
     public void setSendHeartbeats(boolean val);
     public void sendHeartbeat(long txnId);

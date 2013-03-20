@@ -62,7 +62,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -1098,11 +1097,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
         Database database = cluster.getDatabases().get("database");
         CatalogMap<Table> tables = database.getTables();
-        SiteTracker st = VoltDB.instance().getSiteTracker();
-        int num_hosts = st.m_numberOfHosts;
+        int num_hosts = 1;
         int replicated = 0;
         int total_tables = 0;
-        int expected_entries = st.m_numberOfExecutionSites;
+        int expected_entries = 3;
 
         for (Table table : tables)
         {
