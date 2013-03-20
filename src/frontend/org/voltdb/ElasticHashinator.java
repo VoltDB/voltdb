@@ -100,13 +100,6 @@ public class ElasticHashinator extends TheHashinator {
         return buf.array();
     }
 
-    @Override
-    protected int pHashinateLong(long value) {
-        if (value == Long.MIN_VALUE) return 0;
-
-        return partitionForToken(MurmurHash3.hash3_x64_128(value));
-    }
-
     /**
      * For a given a value hash, find the token that corresponds to it. This will
      * be the first token <= the value hash, or if the value hash is < the first token in the ring,
@@ -127,6 +120,13 @@ public class ElasticHashinator extends TheHashinator {
             //System.out.println("Last entry token " + tokens.lastEntry().getKey());
             return tokens.lastEntry().getValue();
         }
+    }
+
+    @Override
+    protected int pHashinateLong(long value) {
+        if (value == Long.MIN_VALUE) return 0;
+
+        return partitionForToken(MurmurHash3.hash3_x64_128(value));
     }
 
     @Override

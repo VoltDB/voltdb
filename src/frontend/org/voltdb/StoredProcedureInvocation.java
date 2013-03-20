@@ -159,7 +159,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     /** Read into an serialized parameter buffer to extract a single parameter */
     Object getParameterAtIndex(int partitionIndex) {
         try {
-            return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams);
+            return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams.duplicate());
         }
         catch (IOException ex) {
             throw new RuntimeException("Invalid partitionIndex", ex);

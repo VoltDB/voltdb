@@ -63,21 +63,4 @@ public abstract class InvocationAcceptancePolicy {
             Procedure proc) {
         return null;
     }
-
-    /**
-     * Determine if we should accept a system procedure invocation.
-     *
-     * Inheriting class should override this method if it's targeting a system
-     * procedure invocation.
-     *
-     * @param Current user
-     * @param invocation The invocation
-     * @param proc The system procedure catalog object
-     * @param s Write stream to queue error responses
-     * @return ClientResponseImpl with error or null if accepted
-     */
-    public ClientResponseImpl shouldAccept(AuthUser user, StoredProcedureInvocation invocation,
-            Config sysProc) {
-        return null;
-    }
 }
