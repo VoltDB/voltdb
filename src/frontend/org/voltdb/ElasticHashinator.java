@@ -123,6 +123,13 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     @Override
+    protected int pHashinateLong(long value) {
+        if (value == Long.MIN_VALUE) return 0;
+
+        return partitionForToken(MurmurHash3.hash3_x64_128(value));
+    }
+
+    @Override
     protected int pHashinateBytes(byte[] bytes) {
         ByteBuffer buf = ByteBuffer.wrap(bytes);
         final long token = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);

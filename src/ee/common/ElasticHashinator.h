@@ -75,6 +75,21 @@ public:
     ~ElasticHashinator() {}
 protected:
 
+    /**
+     * Given a long value, pick a partition to store the data.
+     *
+     * @param value The value to hash.
+     * @param partitionCount The number of partitions to choose from.
+     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
+     * distributed.
+     */
+    int32_t hashinate(int64_t value) const {
+        // special case this hard to hash value to 0 (in both c++ and java)
+        if (value == INT64_MIN) return 0;
+
+        return partitionForToken(MurmurHash3_x64_128(value));
+    }
+
     /*
      * Given a piece of UTF-8 encoded character data OR binary data
      * pick a partition to store the data

@@ -88,10 +88,24 @@ public abstract class TheHashinator {
      * get the same handling once they the string is converted to UTF-8 binary
      * so there is only one protected method for bytes.
      *
-     * Longs are converted to bytes in little endian order.
+     * Longs are converted to bytes in little endian order for elastic, modulus for legacy.
      */
+    abstract protected int pHashinateLong(long value);
     abstract protected int pHashinateBytes(byte[] bytes);
     abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
+
+    /**
+     * Given a long value, pick a partition to store the data. It's only called for legacy
+     * hashinator, elastic hashinator hashes all types the same way through hashinateBytes().
+     *
+     * @param value The value to hash.
+     * @param partitionCount The number of partitions to choose from.
+     * @return A value between 0 and partitionCount-1, hopefully pretty evenly
+     * distributed.
+     */
+    static int hashinateLong(long value) {
+        return instance.get().getSecond().pHashinateLong(value);
+    }
 
     /**
      * Given an byte[] bytes, pick a partition to store the data.
@@ -115,6 +129,25 @@ public abstract class TheHashinator {
      * @return The id of the partition desired.
      */
     public static int hashToPartition(Object obj) {
+        HashinatorType type = getConfiguredHashinatorType();
+        if (type == HashinatorType.LEGACY) {
+            // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
+            if (obj == null || VoltType.isNullVoltType(obj)) {
+                return 0;
+            } else if (obj instanceof Long) {
+                long value = ((Long) obj).longValue();
+                return hashinateLong(value);
+            } else if (obj instanceof Integer) {
+                long value = ((Integer)obj).intValue();
+                return hashinateLong(value);
+            } else if (obj instanceof Short) {
+                long value = ((Short)obj).shortValue();
+                return hashinateLong(value);
+            } else if (obj instanceof Byte) {
+                long value = ((Byte)obj).byteValue();
+                return hashinateLong(value);
+            }
+        }
         return hashinateBytes(valueToBytes(obj));
     }
 

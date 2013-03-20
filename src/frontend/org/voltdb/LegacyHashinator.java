@@ -28,6 +28,16 @@ public class LegacyHashinator extends TheHashinator {
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
     @Override
+    protected int pHashinateLong(long value) {
+        // special case this hard to hash value to 0 (in both c++ and java)
+        if (value == Long.MIN_VALUE) return 0;
+
+        // hash the same way c++ does
+        int index = (int)(value^(value>>>32));
+        return java.lang.Math.abs(index % catalogPartitionCount);
+    }
+
+    @Override
     protected int pHashinateBytes(byte[] bytes) {
         int hashCode = 0;
         int offset = 0;
