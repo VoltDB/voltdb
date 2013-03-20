@@ -131,7 +131,9 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * persistent table.
              */
             if (m_tuplesRemaining > 0) {
-                throwFatalException("serializeMore() expected remaining tuple count to go to zero.")
+                throwFatalException("serializeMore(): Non-zero remaining tuple count (%lld). "
+                                    "Original count was %lld",
+                                    m_tuplesRemaining, m_totalTuples);
             }
             m_tuplesRemaining = 0;
             yield = true;
