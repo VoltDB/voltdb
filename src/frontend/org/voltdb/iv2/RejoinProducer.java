@@ -56,8 +56,8 @@ public class RejoinProducer extends JoinProducerBase {
     private RejoinSiteProcessor m_rejoinSiteProcessor;
 
     // True: use live rejoin; false use community blocking implementation.
-    private boolean m_liveRejoin;
-    private final TaskLog m_rejoinTaskLog;
+    private final boolean m_liveRejoin;
+    private TaskLog m_rejoinTaskLog = null;
 
     boolean useLiveRejoin()
     {
@@ -149,18 +149,13 @@ public class RejoinProducer extends JoinProducerBase {
     // m_currentlyRejoining gates promotion to master. If the rejoin producer
     // is instantiated, it must complete its execution and set currentlyRejoining
     // to false.
-    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue, String voltroot,
-                          boolean isLiveRejoin)
+    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue, boolean isLiveRejoin)
     {
         super(partitionId, "Rejoin producer:" + partitionId + " ", taskQueue);
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
+        m_liveRejoin = isLiveRejoin;
 
-        if (isLiveRejoin) {
-            m_rejoinTaskLog = initializeForLiveRejoin(voltroot, m_partitionId);
-        } else {
-            m_rejoinTaskLog = initializeForCommunityRejoin();
-        }
         REJOINLOG.debug(m_whoami + "created.");
     }
 
@@ -223,9 +218,11 @@ public class RejoinProducer extends JoinProducerBase {
     public void deliver(RejoinMessage message)
     {
         if (message.getType() == RejoinMessage.Type.INITIATION) {
+            assert(m_liveRejoin);
             doInitiation(message);
         }
         else if (message.getType() == RejoinMessage.Type.INITIATION_COMMUNITY) {
+            assert(m_liveRejoin == false);
             doInitiation(message);
         }
         else {
@@ -236,8 +233,13 @@ public class RejoinProducer extends JoinProducerBase {
     }
 
     @Override
-    public TaskLog getTaskLog()
+    public TaskLog constructTaskLog(String voltroot)
     {
+        if (m_liveRejoin) {
+            m_rejoinTaskLog = initializeForLiveRejoin(voltroot, m_partitionId);
+        } else {
+            m_rejoinTaskLog = initializeForCommunityRejoin();
+        }
         return m_rejoinTaskLog;
     }
 
@@ -266,7 +268,6 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void doInitiation(RejoinMessage message)
     {
-        m_liveRejoin = message.getType() == RejoinMessage.Type.INITIATION;
         m_coordinatorHsId = message.m_sourceHSId;
         m_rejoinSiteProcessor = new StreamSnapshotSink();
         String snapshotNonce = message.getSnapshotNonce();
