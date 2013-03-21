@@ -118,7 +118,7 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     {
         if (!m_receivedFirstFragment) {
             // no-op, wait for the first fragment
-        } else if (m_receivedFirstFragment && !m_firstFragResponseSent) {
+        } else if (!m_firstFragResponseSent) {
             // Received first fragment but haven't notified the coordinator
             sendFirstFragResponse();
         } else if (m_completionMonitorAwait.isDone()) {
@@ -126,6 +126,7 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
             SnapshotCompletionInterest.SnapshotCompletionEvent event = null;
             try {
                 event = m_completionMonitorAwait.get();
+                assert(event != null);
             } catch (InterruptedException e) {
                 // isDone() already returned true, this shouldn't happen
                 VoltDB.crashLocalVoltDB("Impossible interruption happend", true, e);
