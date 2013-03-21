@@ -56,7 +56,7 @@ public class RejoinProducer extends JoinProducerBase {
     private RejoinSiteProcessor m_rejoinSiteProcessor;
 
     // True: use live rejoin; false use community blocking implementation.
-    private boolean m_liveRejoin;
+    private final boolean m_liveRejoin;
     private TaskLog m_rejoinTaskLog = null;
 
     boolean useLiveRejoin()
@@ -154,6 +154,7 @@ public class RejoinProducer extends JoinProducerBase {
         super(partitionId, "Rejoin producer:" + partitionId + " ", taskQueue);
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
+        m_liveRejoin = isLiveRejoin;
 
         REJOINLOG.debug(m_whoami + "created.");
     }
@@ -217,9 +218,11 @@ public class RejoinProducer extends JoinProducerBase {
     public void deliver(RejoinMessage message)
     {
         if (message.getType() == RejoinMessage.Type.INITIATION) {
+            assert(m_liveRejoin);
             doInitiation(message);
         }
         else if (message.getType() == RejoinMessage.Type.INITIATION_COMMUNITY) {
+            assert(m_liveRejoin == false);
             doInitiation(message);
         }
         else {
@@ -265,7 +268,6 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void doInitiation(RejoinMessage message)
     {
-        m_liveRejoin = message.getType() == RejoinMessage.Type.INITIATION;
         m_coordinatorHsId = message.m_sourceHSId;
         m_rejoinSiteProcessor = new StreamSnapshotSink();
         String snapshotNonce = message.getSnapshotNonce();
