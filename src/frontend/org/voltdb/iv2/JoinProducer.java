@@ -24,6 +24,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.TaskLog;
 
@@ -154,13 +155,14 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     @Override
     public void logTask(TransactionInfoBaseMessage message) throws IOException
     {
+        assert(!(message instanceof Iv2InitiateTaskMessage));
         if (message instanceof FragmentTaskMessage) {
             if (JOINLOG.isTraceEnabled()) {
                 JOINLOG.trace("P" + m_partitionId + " received first fragment");
             }
             m_receivedFirstFragment = true;
-            m_taskLog.logTask(message);
         }
+        m_taskLog.logTask(message);
     }
 
     @Override
