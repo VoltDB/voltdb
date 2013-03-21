@@ -49,7 +49,7 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
         }
     }
 
-    JoinProducer(int partitionId, SiteTaskerQueue taskQueue)
+    public JoinProducer(int partitionId, SiteTaskerQueue taskQueue)
     {
         super(partitionId, "Join producer:" + partitionId + " ", taskQueue);
         m_completionAction = new CompletionAction();

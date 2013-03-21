@@ -105,7 +105,7 @@ public abstract class JoinProducerBase extends SiteTasker {
             m_snapshotTxnId = txnId;
         }
 
-        protected long getSnapshotTxnId()
+        public long getSnapshotTxnId()
         {
             return m_snapshotTxnId;
         }
