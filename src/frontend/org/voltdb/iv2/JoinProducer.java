@@ -36,6 +36,9 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     private final LinkedBlockingDeque<Pair<Integer, ByteBuffer>> m_snapshotData =
             new LinkedBlockingDeque<Pair<Integer, ByteBuffer>>();
     private boolean m_receivedFirstFragment = false;
+    // true if the site has notified the coordinator about the receipt of the first fragment
+    // message
+    private boolean m_firstFragResponseSent = false;
 
     private class CompletionAction extends JoinCompletionAction {
         @Override
@@ -49,6 +52,21 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     {
         super(partitionId, "Join producer:" + partitionId + " ", taskQueue);
         m_completionAction = new CompletionAction();
+    }
+
+    /**
+     * Notify the coordinator that this site has received the first fragment message
+     */
+    private void sendFirstFragResponse()
+    {
+        if (JOINLOG.isDebugEnabled()) {
+            JOINLOG.debug("P" + m_partitionId + " sending first fragment response to coordinator " +
+                    CoreUtils.hsIdToString(m_coordinatorHsId));
+        }
+        RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(),
+                RejoinMessage.Type.FIRST_FRAGMENT_RECEIVED);
+        m_mailbox.send(m_coordinatorHsId, msg);
+        m_firstFragResponseSent = true;
     }
 
     @Override
@@ -98,6 +116,9 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     {
         if (!m_receivedFirstFragment) {
             // no-op, wait for the first fragment
+        } else if (m_receivedFirstFragment && !m_firstFragResponseSent) {
+            // Received first fragment but haven't notified the coordinator
+            sendFirstFragResponse();
         } else if (m_completionMonitorAwait.isDone()) {
             JOINLOG.info("P" + m_partitionId + " run for rejoin is complete");
             SnapshotCompletionInterest.SnapshotCompletionEvent event = null;
@@ -131,14 +152,10 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     public void logTask(TransactionInfoBaseMessage message) throws IOException
     {
         if (message instanceof FragmentTaskMessage) {
-            JOINLOG.info("P" + m_partitionId + " received first fragment, " +
-                    "sending to mailbox " + CoreUtils.hsIdToString(m_coordinatorHsId));
-            if (!m_receivedFirstFragment) {
-                RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(),
-                        RejoinMessage.Type.FIRST_FRAGMENT_RECEIVED);
-                m_mailbox.send(m_coordinatorHsId, msg);
-                m_receivedFirstFragment = true;
+            if (JOINLOG.isTraceEnabled()) {
+                JOINLOG.trace("P" + m_partitionId + " received first fragment");
             }
+            m_receivedFirstFragment = true;
         }
     }
 

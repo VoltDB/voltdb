@@ -18,6 +18,7 @@ package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.Procedure;
 
 /**
  * Check ad hoc query parameters.
@@ -30,7 +31,7 @@ public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
     @Override
     public ClientResponseImpl shouldAccept(AuthUser user,
             StoredProcedureInvocation invocation,
-            Config sysProc) {
+            Procedure sysProc) {
 
         if (!invocation.procName.equals("@AdHoc")) {
             return null;
