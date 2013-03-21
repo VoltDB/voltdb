@@ -63,7 +63,8 @@ function client() {
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
         --servers=localhost \
-        --targetrssmb=2048 \
+        --targetrssmb=0 \
+        --targetrowcount=100000 \
         --pathtodeployment=`pwd`/deployment.xml
 }
 
