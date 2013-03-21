@@ -46,6 +46,7 @@ public class SchemaChangeClient {
     static SchemaChangeConfig config = null;
     static String deploymentString = null;
     static Random rand = new Random(0);
+    static Topology topo = null;
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -54,7 +55,10 @@ public class SchemaChangeClient {
      */
     static class SchemaChangeConfig extends CLIConfig {
         @Option(desc = "Target RSS per server in MB.")
-        long targetrssmb = 1024 * 4;
+        int targetrssmb = 1024 * 4;
+
+        @Option(desc = "Maximum number of rows to load (times sites for replicated tables).")
+        long targetrowcount = Long.MAX_VALUE;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -64,7 +68,8 @@ public class SchemaChangeClient {
 
         @Override
         public void validate() {
-            if (targetrssmb < 512) exitWithMessageAndUsage("targetrssmb must be >= 512");
+            if (targetrssmb < 0) exitWithMessageAndUsage("targetrssmb must be >= 0");
+            if (targetrowcount < 0) exitWithMessageAndUsage("targetrowcount must be >= 0");
         }
     }
 
@@ -72,9 +77,7 @@ public class SchemaChangeClient {
      * Perform a schema change to a mutated version of the current table (80%) or
      * to a new table entirely (20%, drops and adds the new table).
      */
-    static VoltTable catalogChange(VoltTable t1) throws Exception {
-        boolean newTable = (t1 == null) || (rand.nextInt(4) == 0); // 20% chance of a new table
-
+    static VoltTable catalogChange(VoltTable t1, boolean newTable) throws Exception {
         CatalogBuilder builder = new CatalogBuilder();
         VoltTable t2 = null;
         String currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
@@ -85,7 +88,7 @@ public class SchemaChangeClient {
             t2 = TableHelper.getTotallyRandomTable(newName, rand);
         }
         else {
-            t2 = TableHelper.mutateTable(t1, rand);
+            t2 = TableHelper.mutateTable(t1, false, rand);
         }
 
         System.out.printf("New Schema:\n%s\n", TableHelper.ddlForTable(t2));
@@ -130,6 +133,41 @@ public class SchemaChangeClient {
         return t2;
     }
 
+    static class Topology {
+        final int hosts;
+        final int sites;
+        final int partitions;
+
+        Topology(int hosts, int sites, int partitions) {
+            assert(hosts > 0); assert(sites > 0); assert(partitions > 0);
+            this.hosts = hosts; this.sites = sites; this.partitions = partitions;
+        }
+    }
+
+    static Topology getCluterTopology(Client client) throws Exception {
+        int hosts = -1;
+        int sitesPerHost = -1;
+        int k = -1;
+
+        VoltTable result = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
+        result.resetRowPosition();
+        while (result.advanceRow()) {
+            String key = result.getString(0);
+            String value = result.getString(1);
+            if (key.equals("hostcount")) {
+                hosts = Integer.parseInt(value);
+            }
+            if (key.equals("sitesperhost")) {
+                sitesPerHost = Integer.parseInt(value);
+            }
+            if (key.equals("kfactor")) {
+                k = Integer.parseInt(value);
+            }
+        }
+
+        return new Topology(hosts, hosts * sitesPerHost, (hosts * sitesPerHost) / (k + 1));
+    }
+
     /**
      * Count the number of tuples in the table.
      */
@@ -160,11 +198,21 @@ public class SchemaChangeClient {
      * Re-add odd rows until RSS target met (makes buffers out of order).
      */
     static void loadTable(VoltTable t) throws Exception {
+        // if #partitions is odd, delete every 2 - if even, delete every 3
+        int n = 3 - (topo.partitions % 2);
+
+        int redundancy = topo.sites / topo.partitions;
+        long realRowCount = (config.targetrowcount * topo.hosts) / redundancy;
+        // if replicated
+        if (TableHelper.getTableName(t).equals("B")) {
+            realRowCount /= topo.partitions;
+        }
+
         System.out.printf("loading table\n");
         long max = maxId(t);
-        TableHelper.fillTableWithBigintPkey(t, 1200, client, rand, max + 1, 1);
-        TableHelper.deleteOddRows(t, client);
-        TableHelper.fillTableWithBigintPkey(t, 1200, client, rand, 1, 2);
+        TableHelper.fillTableWithBigintPkey(t, config.targetrssmb, realRowCount, client, rand, max + 1, 1);
+        TableHelper.deleteEveryNRows(t, client, n);
+        TableHelper.fillTableWithBigintPkey(t, config.targetrssmb, realRowCount, client, rand, 1, n);
     }
 
     /**
@@ -222,39 +270,45 @@ public class SchemaChangeClient {
             client.createConnection(server);
         }
 
+        // get the topo
+        topo = getCluterTopology(client);
+
         // kick this off with a random schema
-        VoltTable t = catalogChange(null);
+        VoltTable t = catalogChange(null, true);
 
         for (int i = 0; i < 50; i++) {
             // make sure the table is full and mess around with it
             loadTable(t);
-            String tableName = TableHelper.getTableName(t);
 
-            // deterministically sample some rows
-            VoltTable preT = sample(t);
-            //System.out.printf("First sample:\n%s\n", preT.toFormattedString());
+            for (int j = 0; j < 50; j++) {
+                String tableName = TableHelper.getTableName(t);
 
-            // move to an entirely new table or migrated schema
-            t = catalogChange(t);
+                // deterministically sample some rows
+                VoltTable preT = sample(t);
+                //System.out.printf("First sample:\n%s\n", preT.toFormattedString());
 
-            // if the table has been migrated, check the data
-            if (TableHelper.getTableName(t).equals(tableName)) {
-                VoltTable guessT = t.clone(4096 * 1024);
-                //System.out.printf("Empty clone:\n%s\n", guessT.toFormattedString());
+                // move to an entirely new table or migrated schema
+                t = catalogChange(t, (j == 0) && (rand.nextInt(5) == 0));
 
-                TableHelper.migrateTable(preT, guessT);
-                //System.out.printf("Java migration:\n%s\n", guessT.toFormattedString());
+                // if the table has been migrated, check the data
+                if (TableHelper.getTableName(t).equals(tableName)) {
+                    VoltTable guessT = t.clone(4096 * 1024);
+                    //System.out.printf("Empty clone:\n%s\n", guessT.toFormattedString());
 
-                // deterministically sample the same rows
-                VoltTable postT = sample(t);
-                //System.out.printf("Second sample:\n%s\n", postT.toFormattedString());
+                    TableHelper.migrateTable(preT, guessT);
+                    //System.out.printf("Java migration:\n%s\n", guessT.toFormattedString());
 
-                postT.resetRowPosition();
-                preT.resetRowPosition();
-                StringBuilder sb = new StringBuilder();
-                if (!TableHelper.deepEqualsWithErrorMsg(postT, guessT, sb)) {
-                    System.err.println(sb.toString());
-                    assert(false);
+                    // deterministically sample the same rows
+                    VoltTable postT = sample(t);
+                    //System.out.printf("Second sample:\n%s\n", postT.toFormattedString());
+
+                    postT.resetRowPosition();
+                    preT.resetRowPosition();
+                    StringBuilder sb = new StringBuilder();
+                    if (!TableHelper.deepEqualsWithErrorMsg(postT, guessT, sb)) {
+                        System.err.println(sb.toString());
+                        assert(false);
+                    }
                 }
             }
         }
