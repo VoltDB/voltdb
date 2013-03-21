@@ -17,10 +17,7 @@
 
 package org.voltdb.iv2;
 
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -42,8 +39,6 @@ import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 
-import org.voltdb.utils.MiscUtils;
-
 /**
  * Manages the lifecycle of snapshot serialization to a site
  * for the purposes of rejoin.
@@ -57,7 +52,6 @@ public class RejoinProducer extends JoinProducerBase {
 
     // True: use live rejoin; false use community blocking implementation.
     private final boolean m_liveRejoin;
-    private TaskLog m_rejoinTaskLog = null;
 
     boolean useLiveRejoin()
     {
@@ -155,28 +149,7 @@ public class RejoinProducer extends JoinProducerBase {
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
         m_liveRejoin = isLiveRejoin;
-
         REJOINLOG.debug(m_whoami + "created.");
-    }
-
-    private static TaskLog initializeForLiveRejoin(String voltroot, int pid)
-    {
-        // Construct task log and start logging task messages
-        File overflowDir = new File(voltroot, "rejoin_overflow");
-        Class<?> taskLogKlass =
-                MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Rejoin", false);
-        if (taskLogKlass != null) {
-            Constructor<?> taskLogConstructor;
-            try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
-                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir, true);
-            } catch (InvocationTargetException e) {
-                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e);
-            }
-        }
-        return null;
     }
 
     private static TaskLog initializeForCommunityRejoin()
@@ -236,11 +209,11 @@ public class RejoinProducer extends JoinProducerBase {
     public TaskLog constructTaskLog(String voltroot)
     {
         if (m_liveRejoin) {
-            m_rejoinTaskLog = initializeForLiveRejoin(voltroot, m_partitionId);
+            m_taskLog = initializeTaskLog(voltroot, m_partitionId);
         } else {
-            m_rejoinTaskLog = initializeForCommunityRejoin();
+            m_taskLog = initializeForCommunityRejoin();
         }
-        return m_rejoinTaskLog;
+        return m_taskLog;
     }
 
     // cancel and maybe rearm the snapshot data-segment watchdog.
