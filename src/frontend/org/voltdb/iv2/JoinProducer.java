@@ -35,6 +35,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 public class JoinProducer extends JoinProducerBase implements TaskLog {
     private final LinkedBlockingDeque<Pair<Integer, ByteBuffer>> m_snapshotData =
             new LinkedBlockingDeque<Pair<Integer, ByteBuffer>>();
+    // true if the site has received the first fragment task message
     private boolean m_receivedFirstFragment = false;
     // true if the site has notified the coordinator about the receipt of the first fragment
     // message
