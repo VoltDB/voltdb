@@ -65,7 +65,7 @@ public class TestMidRejoinDeath extends RejoinTestBase {
             Thread.sleep(3000);
 
             VoltTable t = TableHelper.quickTable("TEST_INLINED_STRING (PKEY:INTEGER, VALUE:VARCHAR36-N, VALUE1:VARCHAR17700-N) P(0)");
-            TableHelper.fillTableWithBigintPkey(t, 512, client, new Random(0), 0, 1);
+            TableHelper.fillTableWithBigintPkey(t, 512, 0, client, new Random(0), 0, 1);
 
             // try to rejoin, but expect this to fail after 10-15 seconds
             // because the "rejoindeathtest" property is set and that will
