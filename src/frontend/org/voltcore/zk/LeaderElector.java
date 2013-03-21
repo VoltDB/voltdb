@@ -16,11 +16,11 @@
  */
 package org.voltcore.zk;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -41,13 +41,14 @@ public class LeaderElector {
     private final byte[] data;
     private final LeaderNoticeHandler cb;
     private String node = null;
+    private String lastHighest = null;
 
     private volatile String leader = null;
     private volatile boolean isLeader = false;
     private final ExecutorService es;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
 
-    private final Runnable eventHandler = new Runnable() {
+    private final Runnable electionEventHandler = new Runnable() {
         @Override
         public void run() {
             try {
@@ -74,11 +75,39 @@ public class LeaderElector {
         }
     };
 
+    private final Runnable childrenEventHandler = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                checkForNewChildren();
+            } catch (KeeperException.ConnectionLossException e) {
+                // lost the full connection. some test cases do this...
+                // means shutdoown without the elector being
+                // shutdown; ignore.
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (Exception e) {
+                org.voltdb.VoltDB.crashLocalVoltDB(
+                        "Unexepected failure in LeaderElector.", true, e);
+            }
+        }
+    };
+
+    private final Watcher childWatcher = new Watcher() {
+        @Override
+        public void process(WatchedEvent event) {
+            if (!m_done.get()) {
+                es.submit(childrenEventHandler);
+            }
+        }
+    };
+
     private final Watcher watcher = new Watcher() {
         @Override
         public void process(WatchedEvent event) {
             if (!m_done.get()) {
-                es.submit(eventHandler);
+                es.submit(electionEventHandler);
             }
         }
     };
@@ -129,7 +158,8 @@ public class LeaderElector {
     public void start(boolean block) throws KeeperException, InterruptedException, ExecutionException
     {
         node = createParticipantNode(zk, dir, prefix, data);
-        Future<?> task = es.submit(eventHandler);
+        Future<?> task = es.submit(electionEventHandler);
+        es.submit(childrenEventHandler);
         if (block) {
             task.get();
         }
@@ -181,12 +211,13 @@ public class LeaderElector {
          * the lowest node.
          */
         List<String> children = zk.getChildren(dir, false);
-        ZKUtil.sortSequentialNodes(children);
+        Collections.sort(children);
         String lowest = null;
         String previous = null;
         ListIterator<String> iter = children.listIterator();
         while (iter.hasNext()) {
             String child = ZKUtil.joinZKPath(dir, iter.next());
+
             if (lowest == null) {
                 lowest = child;
                 previous = child;
@@ -213,6 +244,40 @@ public class LeaderElector {
         }
 
         return lowest;
+    }
+
+    /*
+     * Check for new nodes and notify that there are new nodes
+     */
+    private void checkForNewChildren() throws KeeperException, InterruptedException {
+        /*
+         * Iterate through the sorted list of children and find the given node,
+         * then setup a watcher on the previous node if it exists, otherwise the
+         * previous of the previous...until we reach the beginning, then we are
+         * the lowest node.
+         */
+        List<String> children = zk.getChildren(dir, childWatcher);
+        Collections.sort(children);
+        ListIterator<String> iter = children.listIterator();
+        boolean newHighest = false;
+        while (iter.hasNext()) {
+            final String node = iter.next();
+
+            if (lastHighest == null) {
+                lastHighest = node;
+                newHighest = true;
+            } else {
+                if (node.compareTo(lastHighest) > 0) {
+                    lastHighest = node;
+                    newHighest = true;
+                }
+            }
+        }
+        if (newHighest) {
+            if (cb != null) {
+                cb.noticedNewNode();
+            }
+        }
     }
 
     public static String electionDirForPartition(int partition) {

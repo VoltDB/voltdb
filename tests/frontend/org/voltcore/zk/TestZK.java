@@ -28,16 +28,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.zk.LeaderElector;
-import org.apache.zookeeper_voltpatches.*;
-import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
-import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.data.Stat;
-
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -229,7 +222,7 @@ public class TestZK extends ZKTestBase {
         nodes.add("/a/b/node0000000000");
         nodes.add("/a/b/node0000010234");
         nodes.add("/a/b/node0000000234");
-        ZKUtil.sortSequentialNodes(nodes);
+        Collections.sort(nodes);
 
         Iterator<String> iter = nodes.iterator();
         assertEquals("/a/b/node0000000000", iter.next());
