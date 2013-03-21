@@ -60,7 +60,7 @@ public abstract class BaseInitiator implements Initiator
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, String voltroot,
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
             VoltDB.START_ACTION startAction)
     {
         m_zkMailboxNode = zkMailboxNode;
@@ -73,8 +73,7 @@ public abstract class BaseInitiator implements Initiator
         if (startAction == VoltDB.START_ACTION.JOIN) {
             joinProducer = new JoinProducer(m_partitionId, scheduler.m_tasks);
         } else if (VoltDB.createForRejoin(startAction)) {
-            joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, voltroot,
-                    isLiveRejoin);
+            joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, isLiveRejoin);
         } else {
             joinProducer = null;
         }
@@ -141,7 +140,7 @@ public abstract class BaseInitiator implements Initiator
 
             TaskLog taskLog = null;
             if (m_initiatorMailbox.getJoinProducer() != null) {
-                taskLog = m_initiatorMailbox.getJoinProducer().getTaskLog();
+                taskLog = m_initiatorMailbox.getJoinProducer().constructTaskLog(catalogContext.cluster.getVoltroot());
             }
 
             m_executionSite = new Site(m_scheduler.getQueue(),

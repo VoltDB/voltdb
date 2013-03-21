@@ -451,7 +451,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                     m_iv2Initiators = createIv2Initiators(
                             partitions,
-                            m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction,
                             m_partitionsToSitesAtStartupForExportInit);
                     m_iv2InitiatorStartingTxnIds.put(
@@ -763,7 +762,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return topo;
     }
 
-    private List<Initiator> createIv2Initiators(Collection<Integer> partitions, String voltroot,
+    private List<Initiator> createIv2Initiators(Collection<Integer> partitions,
                                                 START_ACTION startAction,
                                                 List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit)
     {
@@ -771,7 +770,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent,
-                    m_snapshotCompletionMonitor, voltroot, startAction);
+                    m_snapshotCompletionMonitor, startAction);
             initiators.add(initiator);
             m_partitionsToSitesAtStartupForExportInit.add(Pair.of(partition, initiator.getInitiatorHSId()));
         }

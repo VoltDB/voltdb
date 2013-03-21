@@ -82,7 +82,7 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     }
 
     @Override
-    public TaskLog getTaskLog()
+    public TaskLog constructTaskLog(String voltroot)
     {
         return this;
     }
