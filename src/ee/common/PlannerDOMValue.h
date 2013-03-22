@@ -146,7 +146,7 @@ namespace voltdb {
     /**
      * Class that parses the JSON document and provides the root.
      * Also owns the memory, as it's sole member var is not a reference, but a value.
-     * This means if you're still using the DOM when this object gets popped off the 
+     * This means if you're still using the DOM when this object gets popped off the
      * stack, bad things might happen. Best to use the DOM and be done with it.
      */
     class PlannerDomRoot {
