@@ -22,6 +22,9 @@
 
 #include "rapidjson/document.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 namespace voltdb {
 
     /**
