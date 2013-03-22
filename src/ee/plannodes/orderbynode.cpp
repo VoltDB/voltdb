@@ -121,38 +121,25 @@ OrderByPlanNode::debugInfo(const string& spacer) const
 }
 
 void
-OrderByPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    json_spirit::Value sortColumnsValue =
-        json_spirit::find_value(obj, "SORT_COLUMNS");
-    if (sortColumnsValue == json_spirit::Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "OrderByPlanNode::loadFromJSONObject:"
-                                      " Can't find SORT_COLUMNS value");
-    }
-    json_spirit::Array sortColumnsArray = sortColumnsValue.get_array();
+    PlannerDomValue sortColumnsArray = obj.valueForKey("SORT_COLUMNS");
 
-    for (int ii = 0; ii < sortColumnsArray.size(); ii++)
-    {
-        json_spirit::Object sortColumn = sortColumnsArray[ii].get_obj();
+    for (int i = 0; i < sortColumnsArray.arrayLen(); i++) {
+        PlannerDomValue sortColumn = sortColumnsArray.valueAtIndex(i);
         bool hasDirection = false, hasExpression = false;
-        for (int zz = 0; zz < sortColumn.size(); zz++)
-        {
-            if (sortColumn[zz].name_ == "SORT_DIRECTION")
-            {
-                hasDirection = true;
-                string sortDirectionTypeString = sortColumn[zz].value_.get_str();
-                m_sortDirections.
-                    push_back(stringToSortDirection(sortDirectionTypeString));
-            }
-            else if (sortColumn[zz].name_ == "SORT_EXPRESSION")
-            {
-                hasExpression = true;
-                m_sortExpressions.
-                    push_back(AbstractExpression::buildExpressionTree(sortColumn[zz].value_.get_obj()));
-            }
+
+        if (sortColumn.hasNonNullKey("SORT_DIRECTION")) {
+            hasDirection = true;
+            std::string sortDirectionStr = sortColumn.valueForKey("SORT_DIRECTION").asStr();
+            m_sortDirections.push_back(stringToSortDirection(sortDirectionStr));
         }
+        if (sortColumn.hasNonNullKey("SORT_EXPRESSION")) {
+            hasExpression = true;
+            PlannerDomValue exprDom = sortColumn.valueForKey("SORT_EXPRESSION");
+            m_sortExpressions.push_back(AbstractExpression::buildExpressionTree(exprDom));
+        }
+
         if (!(hasExpression && hasDirection)) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           "OrderByPlanNode::loadFromJSONObject:"

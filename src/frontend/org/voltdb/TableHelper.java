@@ -486,11 +486,23 @@ public class TableHelper {
      * 3. Widening columns.
      * 4. Re-ordering columns.
      */
-    public static VoltTable mutateTable(VoltTable table, Random rand) {
-        int columnDrops =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
-        int columnAdds =     Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
-        int columnGrows =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
-        int columnReorders = Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
+    public static VoltTable mutateTable(VoltTable table, boolean allowIdenty, Random rand) {
+        int totalMutations = 0;
+        int columnDrops;
+        int columnAdds;
+        int columnGrows;
+        int columnReorders;
+
+        // pick values for the various kinds of mutations
+        // don't allow all zeros unless allowIdentidy == true
+        do {
+            columnDrops =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
+            columnAdds =     Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
+            columnGrows =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
+            columnReorders = Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
+            totalMutations = columnDrops + columnAdds + columnGrows + columnReorders;
+        }
+        while ((allowIdenty == false) && (totalMutations == 0));
 
         System.out.printf("Mutations: %d %d %d %d\n", columnDrops, columnAdds, columnGrows, columnReorders);
 
@@ -796,17 +808,32 @@ public class TableHelper {
      * assume the first column is the bigint pkey. Note, this works with other integer keys, but
      * your keyspace is pretty small.
      *
+     * If mb == 0, then maxRows is used. If maxRows == 0, then mb is used.
+     *
      * @param table Table with or without schema metadata.
      * @param mb Target RSS (approximate)
+     * @param maxRows Target maximum rows
      * @param client To load with.
      * @param rand To generate random data with.
      * @param offset Generated pkey values start here.
      * @param jump Generated pkey values increment by this value.
      * @throws Exception
      */
-    public static void fillTableWithBigintPkey(VoltTable table, final int mb, final Client client, Random rand, long offset, long jump) throws Exception {
-        System.out.printf("Filling table %s with rows starting with pkey id %d (every %d rows) until RSS=%dmb\n",
-                table.m_name, offset, jump, mb);
+    public static void fillTableWithBigintPkey(VoltTable table, int mb,
+            long maxRows, final Client client, Random rand,
+            long offset, long jump) throws Exception
+    {
+        // make sure some kind of limit is set
+        assert((maxRows > 0) || (mb > 0));
+        assert(maxRows >= 0);
+        assert(mb >= 0);
+        final int mbTarget = mb > 0 ? mb : Integer.MAX_VALUE;
+        if (maxRows == 0) {
+            maxRows = Long.MAX_VALUE;
+        }
+
+        System.out.printf("Filling table %s with rows starting with pkey id %d (every %d rows) until either RSS=%dmb or rowcount=%d\n",
+                table.m_name, offset, jump, mbTarget, maxRows);
 
         // find the primary key, assume first col if not found
         int pkeyColIndex = getBigintPrimaryKeyIndexIfExists(table);
@@ -842,7 +869,7 @@ public class TableHelper {
                         rss.set(tempRss);
                         System.out.printf("RSS=%dmb\n", tempRss);
                         // bail when done
-                        if (tempRss > mb) {
+                        if (tempRss > mbTarget) {
                             return;
                         }
                     }
@@ -856,13 +883,17 @@ public class TableHelper {
         long rows = 0;
         rssThread.start();
         final String insertProcName = table.m_name.toUpperCase() + ".insert";
-        while (rss.get() < mb) {
+        while (rss.get() < mbTarget) {
             Object[] row = randomRow(table, Integer.MAX_VALUE, rand);
             row[pkeyColIndex] = i;
             client.callProcedure(insertCallback, insertProcName, row);
             rows++;
             if ((rows % 100000) == 0) {
                 System.out.printf("Loading 100000 rows. %d inserts sent (%d max id).\n", rows, i);
+            }
+            // if row limit is set, break if it's hit
+            if (rows >= maxRows) {
+                break;
             }
             i += jump;
         }
@@ -884,7 +915,7 @@ public class TableHelper {
      * works great for my one-site testing.
      *
      */
-    public static void deleteOddRows(VoltTable table, Client client) throws Exception {
+    public static long deleteEveryNRows(VoltTable table, Client client, int n) throws Exception {
         // find the primary key, assume first col if not found
         int pkeyColIndex = getBigintPrimaryKeyIndexIfExists(table);
         if (pkeyColIndex == -1) {
@@ -922,7 +953,7 @@ public class TableHelper {
         // delete 100k rows at a time until nothing comes back
         long deleted = 0;
         final String deleteProcName = table.m_name.toUpperCase() + ".delete";
-        for (int i = 1; i <= maxId; i += 2) {
+        for (int i = 1; i <= maxId; i += n) {
             client.callProcedure(callback, deleteProcName, i);
             outstanding.incrementAndGet();
             deleted++;
@@ -940,5 +971,7 @@ public class TableHelper {
             Thread.yield();
         }
         System.out.printf("Deleted %d odd rows\n", deleteCount.get());
+
+        return deleteCount.get();
     }
 }

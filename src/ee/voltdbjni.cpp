@@ -110,7 +110,6 @@
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
-#include "json_spirit/json_spirit.h"
 #include "boost/pool/pool.hpp"
 #include "crc/crc32c.h"
 #include "boost/crc.hpp"

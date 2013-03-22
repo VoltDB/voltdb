@@ -52,15 +52,10 @@
 
 namespace voltdb {
 
-void InsertPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
+void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);
-    json_spirit::Value multiPartitionValue = json_spirit::find_value(obj, "MULTI_PARTITION");
-    if (multiPartitionValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "InsertPlanNode::loadFromJSONObject:"
-                                      " Can't find MULTI_PARTITION value");
-    }
-    m_multiPartition = multiPartitionValue.get_bool();
+
+    m_multiPartition = obj.valueForKey("MULTI_PARTITION").asBool();
 }
 
 }
