@@ -148,7 +148,7 @@ public class TestClientFeatures extends TestCase {
         // get a client with a normal timout
         Client client2 = ClientFactory.createClient();
         client2.createConnection("localhost");
-        TableHelper.fillTableWithBigintPkey(t, 400, client2, new Random(), 0, 1);
+        TableHelper.fillTableWithBigintPkey(t, 400, 0, client2, new Random(), 0, 1);
 
         long start;
         double duration;

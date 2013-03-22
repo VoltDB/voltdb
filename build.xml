@@ -199,6 +199,24 @@ PRIMARY ENTRY POINTS
         <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
+<target name='check_sql'
+    depends="licensecheck, compile, voltdbipc"
+    description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
+    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+        <arg value="eecheck" />
+        <arg value="junit_sql" />
+        <arg value="distcheck" />
+        <arg value="pythonfser" />
+        <arg value="-Dbuild=${build}" />
+        <arg value="-DtimeoutLength=${timeoutLength}" />
+        <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
+    </exec>
+</target>
 
 <target name="quarantine"
     depends="compile, ee"
@@ -1328,8 +1346,7 @@ TEST CASES
     </sequential>
 </target>
 
-<target
-    name="junit"
+<target name="junit"
     description="Execute JUnit test suites.">
     <run_junit>
         <tests>
@@ -1358,6 +1375,30 @@ TEST CASES
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name='junit_sql'
+    description="Execute JUnit test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <!-- Standard junit fileset -->
+                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltdb/**/Test*.class'/>
+                <include name='org/voltdb/utils/**/*Test.class'/>
+                <!-- Exclude many tests not directly related to sql functionality -->
+                <exclude name="**/*$*.class"/>
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name='org/voltdb/dtxn/Test*.class'/>
+                <exclude name="**/TestCommandLog*.class" />
+                <exclude name="**/TestExport*.class"/>
+                <exclude name="**/TestLogReader.class"/>
+                <exclude name="**/TestMaliciousClientSuite.class" />
+                <exclude name="**/Test*Restore*.class" />
+                <exclude name="**/Test*Rejoin*.class" />
             </fileset>
         </tests>
     </run_junit>

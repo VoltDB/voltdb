@@ -435,6 +435,10 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     // map from existing table
     int columnSourceMap[columnCount];
 
+    // Indicator that object allocation is required in the column assignment,
+    // to cover an explosion from an inline-sized to an out-of-line-sized string.
+    bool columnExploded[columnCount];
+
     vector<std::string> oldColumnNames = existingTable->getColumnNames();
 
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
@@ -444,27 +448,31 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     {
         std::string colName = colIter->first;
         catalog::Column *column = colIter->second;
-        int index = column->index();
+        int newIndex = column->index();
 
         // assign a default value, if one exists
         ValueType defaultColType = static_cast<ValueType>(column->defaulttype());
         if (defaultColType == VALUE_TYPE_INVALID) {
-            defaults[index] = ValueFactory::getNullValue();
+            defaults[newIndex] = ValueFactory::getNullValue();
         }
         else {
             std::string defaultValue = column->defaultvalue();
-            defaults[index] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue);
+            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue);
         }
 
         // find a source column in the existing table, if one exists
-        columnSourceMap[index] = -1; // -1 is code for not found, use defaults
-        for (int j = 0; j < oldColumnNames.size(); j++) {
-            if (oldColumnNames[j].compare(colName) == 0) {
-                columnSourceMap[index] = j;
+        columnSourceMap[newIndex] = -1; // -1 is code for not found, use defaults
+        for (int oldIndex = 0; oldIndex < oldColumnNames.size(); oldIndex++) {
+            if (oldColumnNames[oldIndex].compare(colName) == 0) {
+                columnSourceMap[newIndex] = oldIndex;
+                columnExploded[newIndex] = (m_table->schema()->columnIsInlined(oldIndex) &&
+                                            ! newTable->schema()->columnIsInlined(newIndex));
                 break;
             }
         }
     }
+
+    TableTuple scannedTuple(m_table->schema());
 
     // going to run until the source table has no allocated blocks
     size_t blocksLeft = existingTable->allocatedBlockCount();
@@ -472,7 +480,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
 
         TableIterator &iterator = m_table->iterator();
         TableTuple &tupleToInsert = newTable->tempTuple();
-        TableTuple scannedTuple(m_table->schema());
 
         while (iterator.next(scannedTuple)) {
 
@@ -482,6 +489,9 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
             for (int i = 0; i < columnCount; i++) {
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
+                    if (columnExploded[i]) {
+                        value.allocatePersistentObjectFromInlineValue();
+                    }
                     tupleToInsert.setNValue(i, value);
                 }
                 else {

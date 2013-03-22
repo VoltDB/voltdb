@@ -21,31 +21,32 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * This samples uses the native asynchronous request processing protocol
- * to post requests to the VoltDB server, thus leveraging to the maximum
- * VoltDB's ability to run requests in parallel on multiple database
- * partitions, and multiple servers.
+ * This sample uses multiple threads to post synchronous requests to the
+ * VoltDB server, simulating multiple client application posting
+ * synchronous requests to the database, using the native VoltDB client
+ * library.
  *
- * While asynchronous processing is (marginally) more convoluted to work
- * with and not adapted to all workloads, it is the preferred interaction
- * model to VoltDB as it guarantees blazing performance.
+ * It also has the additional option to add a number of threads submitting
+ * one-shot multipartition reads to the cluster, which might reflect
+ * an infrequently performed query submitted against a high-velocity intake
+ * stream.
  *
- * Because there is a risk of 'firehosing' a database cluster (if the
- * cluster is too slow (slow or too few CPUs), this sample performs
- * self-tuning to target a specific latency (10ms by default).
- * This tuning process, as demonstrated here, is important and should be
- * part of your pre-launch evalution so you can adequately provision your
- * VoltDB cluster with the number of servers required for your needs.
+ * While synchronous processing can cause performance bottlenecks (each
+ * caller waits for a transaction answer before calling another
+ * transaction), the VoltDB cluster at large is still able to perform at
+ * blazing speeds when many clients are connected to it.
  */
 
 package voltkv;
 
-import java.util.Map.Entry;
+import java.util.ArrayList;
 
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
@@ -58,7 +59,6 @@ import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
-import org.voltdb.client.ProcedureCallback;
 
 public class OneShotBenchmark {
 
@@ -71,6 +71,7 @@ public class OneShotBenchmark {
     final KVConfig config;
     // Reference to the database connection we will use
     final Client client;
+    final Client mpClient;
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
@@ -80,9 +81,14 @@ public class OneShotBenchmark {
     final PayloadProcessor processor;
     // random number generator with constant seed
     final Random rand = new Random(0);
+    // Flags to tell the worker threads to stop or go
+    AtomicBoolean warmupComplete = new AtomicBoolean(false);
+    AtomicBoolean benchmarkComplete = new AtomicBoolean(false);
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
+    final ClientStatsContext mpFullStatsContext;
+    final ClientStatsContext mpPeriodicStatsContext;
 
     // kv benchmark state
     final AtomicLong successfulGets = new AtomicLong(0);
@@ -90,12 +96,6 @@ public class OneShotBenchmark {
     final AtomicLong failedGets = new AtomicLong(0);
     final AtomicLong rawGetData = new AtomicLong(0);
     final AtomicLong networkGetData = new AtomicLong(0);
-
-    final AtomicLong successfulGetMPs = new AtomicLong(0);
-    final AtomicLong missedGetMPs = new AtomicLong(0);
-    final AtomicLong failedGetMPs = new AtomicLong(0);
-    final AtomicLong rawGetMPData = new AtomicLong(0);
-    final AtomicLong networkGetMPData = new AtomicLong(0);
 
     final AtomicLong successfulPuts = new AtomicLong(0);
     final AtomicLong failedPuts = new AtomicLong(0);
@@ -112,7 +112,7 @@ public class OneShotBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 120;
+        int duration = 10;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 5;
@@ -144,23 +144,14 @@ public class OneShotBenchmark {
         @Option(desc = "Compress values on the client side.")
         boolean usecompression= false;
 
-        @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 100000;
+        @Option(desc = "Number of concurrent threads synchronously calling SP procedures.")
+        int threads = 40;
 
-        @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = true;
-
-        @Option(desc = "Server-side latency target for auto-tuning.")
-        int latencytarget = 5;
+        @Option(desc = "Number of concurrent threads synchronously calling MP procedures.")
+        int mpthreads = 3;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
-
-        @Option(desc = "Fraction of load which is one-shot MP reads.")
-        double oneshotratio = 0.0;
-
-        @Option(desc = "Maximum one-shot MP read rate.")
-        int mpratelimit = 2000;
 
         @Override
         public void validate() {
@@ -178,11 +169,8 @@ public class OneShotBenchmark {
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
 
-            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (mpratelimit <= 0) exitWithMessageAndUsage("mpratelimit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
-            if (oneshotratio < 0) exitWithMessageAndUsage("oneshotratio must be >= 0");
-            if (oneshotratio > 1) exitWithMessageAndUsage("oneshotratio must be <= 1");
+            if (threads < 0) exitWithMessageAndUsage("threads must be => 0");
+            if (mpthreads < 0) exitWithMessageAndUsage("mpthreads must be => 0");
         }
     }
 
@@ -194,7 +182,7 @@ public class OneShotBenchmark {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
-            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
+            if (benchmarkComplete.get() == false) {
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
             }
         }
@@ -210,17 +198,15 @@ public class OneShotBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-        if (config.autotune) {
-            clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
-        }
-        else {
-            clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
-        }
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
+
+        ClientConfig mpClientConfig = new ClientConfig("", "", new StatusListener());
+        mpClient = ClientFactory.createClient(mpClientConfig);
+        mpPeriodicStatsContext = mpClient.createStatsContext();
+        mpFullStatsContext = mpClient.createStatsContext();
 
         processor = new PayloadProcessor(config.keysize, config.minvaluesize,
                 config.maxvaluesize, config.entropy, config.poolsize, config.usecompression);
@@ -238,7 +224,7 @@ public class OneShotBenchmark {
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
-    void connectToOneServerWithRetry(String server) {
+    static void connectToOneServerWithRetry(Client client, String server) {
         int sleep = 1000;
         while (true) {
             try {
@@ -262,7 +248,7 @@ public class OneShotBenchmark {
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    void connect(String servers) throws InterruptedException {
+    static void connect(final Client client, String servers) throws InterruptedException {
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
@@ -273,7 +259,7 @@ public class OneShotBenchmark {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    connectToOneServerWithRetry(server);
+                    connectToOneServerWithRetry(client, server);
                     connections.countDown();
                 }
             }).start();
@@ -311,6 +297,13 @@ public class OneShotBenchmark {
                 stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
+        stats = mpPeriodicStatsContext.fetchAndResetBaseline().getStats();
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("MP Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
+                stats.kPercentileLatency(0.95));
     }
 
     /**
@@ -321,6 +314,7 @@ public class OneShotBenchmark {
      */
     public synchronized void printResults() throws Exception {
         ClientStats stats = fullStatsContext.fetch().getStats();
+
         // 1. Get/Put performance results
         String display = "\n" +
                          HORIZONTAL_RULE +
@@ -328,10 +322,6 @@ public class OneShotBenchmark {
                          HORIZONTAL_RULE +
                          "\nA total of %,d operations were posted...\n" +
                          " - GETs: %,9d Operations (%,d Misses and %,d Failures)\n" +
-                         "         %,9d MB in compressed store data\n" +
-                         "         %,9d MB in uncompressed application data\n" +
-                         "         Network Throughput: %6.3f Gbps*\n" +
-                         " - GMPs: %,9d Operations (%,d Misses and %,d Failures)\n" +
                          "         %,9d MB in compressed store data\n" +
                          "         %,9d MB in uncompressed application data\n" +
                          "         Network Throughput: %6.3f Gbps*\n" +
@@ -346,8 +336,6 @@ public class OneShotBenchmark {
         long oneMB = (1024 * 1024);
         double getThroughput = networkGetData.get() + (successfulGets.get() * config.keysize);
                getThroughput /= (oneGigabit * config.duration);
-        double getMPThroughput = networkGetMPData.get() + (successfulGetMPs.get() * config.keysize);
-               getMPThroughput /= (oneGigabit * config.duration);
         long totalPuts = successfulPuts.get() + failedPuts.get();
         double putThroughput = networkGetData.get() + (totalPuts * config.keysize);
                putThroughput /= (oneGigabit * config.duration);
@@ -358,15 +346,11 @@ public class OneShotBenchmark {
                 networkGetData.get() / oneMB,
                 rawGetData.get() / oneMB,
                 getThroughput,
-                successfulGetMPs.get(), missedGetMPs.get(), failedGetMPs.get(),
-                networkGetMPData.get() / oneMB,
-                rawGetMPData.get() / oneMB,
-                getMPThroughput,
                 successfulPuts.get(), failedPuts.get(),
                 networkPutData.get() / oneMB,
                 rawPutData.get() / oneMB,
                 putThroughput,
-                getThroughput + getMPThroughput + putThroughput);
+                getThroughput + putThroughput);
 
         // 2. Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -386,93 +370,134 @@ public class OneShotBenchmark {
             System.out.printf("99th percentile latency:       %,9d ms\n", e.getValue().kPercentileLatency(.99));
         }
 
+        mpFullStatsContext.fetch();
+        for (Entry<String, ClientStats> e : mpFullStatsContext.getStatsByProc().entrySet()) {
+            System.out.println("\nMP PROC: " + e.getKey());
+            System.out.printf("Average throughput:            %,9d txns/sec\n", e.getValue().getTxnThroughput());
+            System.out.printf("Average latency:               %,9.2f ms\n", e.getValue().getAverageLatency());
+            System.out.printf("95th percentile latency:       %,9d ms\n", e.getValue().kPercentileLatency(.95));
+            System.out.printf("99th percentile latency:       %,9d ms\n", e.getValue().kPercentileLatency(.99));
+        }
+
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        if (config.autotune) {
-            System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
-        }
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
+        System.out.printf("Reported Internal Avg MP Latency: %,9.2f ms\n",
+                mpFullStatsContext.getStats().getAverageInternalLatency());
 
         // 3. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
     }
 
     /**
-     * Callback to handle the response to a stored procedure call.
-     * Tracks response types.
+     * While <code>benchmarkComplete</code> is set to false, run as many
+     * synchronous procedure calls as possible and record the results.
      *
      */
-    class GetCallback implements ProcedureCallback {
+    class KVThread implements Runnable {
+
+        final boolean m_sp;
+        final Client m_client;
+
+        KVThread(Client client, boolean sp)
+        {
+            m_sp = sp;
+            m_client = client;
+        }
+
         @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            // Track the result of the operation (Success, Failure, Payload traffic...)
-            if (response.getStatus() == ClientResponse.SUCCESS) {
-                final VoltTable pairData = response.getResults()[0];
-                // Cache miss (Key does not exist)
-                if (pairData.getRowCount() == 0) {
-                    missedGets.incrementAndGet();
+        public void run() {
+            while (warmupComplete.get() == false) {
+                if (m_sp) {
+                    // Decide whether to perform a GET or PUT operation
+                    if (rand.nextDouble() < config.getputratio) {
+                        // Get a key/value pair, synchronously
+                        try {
+                            m_client.callProcedure("Get", processor.generateRandomKeyForRetrieval());
+                        }
+                        catch (Exception e) {}
+                    }
+                    else {
+                        // Put a key/value pair, synchronously
+                        final PayloadProcessor.Pair pair = processor.generateForStore();
+                        try {
+                            m_client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        }
+                        catch (Exception e) {}
+                    }
                 }
                 else {
-                    final PayloadProcessor.Pair pair =
-                            processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
-                                                        pairData.fetchRow(0).getVarbinary(1));
-                    successfulGets.incrementAndGet();
-                    networkGetData.addAndGet(pair.getStoreValueLength());
-                    rawGetData.addAndGet(pair.getRawValueLength());
+                    try {
+                        m_client.callProcedure("GetMP", processor.generateRandomKeyForRetrieval());
+                    }
+                    catch (Exception e) {}
                 }
             }
-            else {
-                failedGets.incrementAndGet();
-            }
-        }
-    }
 
-    class PutCallback implements ProcedureCallback {
-        final long storeValueLength;
-        final long rawValueLength;
+            while (benchmarkComplete.get() == false) {
+                if (m_sp) {
+                    // Decide whether to perform a GET or PUT operation
+                    if (rand.nextDouble() < config.getputratio) {
+                        // Get a key/value pair, synchronously
+                        try {
+                            ClientResponse response = m_client.callProcedure("Get",
+                                    processor.generateRandomKeyForRetrieval());
 
-        PutCallback(PayloadProcessor.Pair pair) {
-            storeValueLength = pair.getStoreValueLength();
-            rawValueLength = pair.getRawValueLength();
-        }
-
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            // Track the result of the operation (Success, Failure, Payload traffic...)
-            if (response.getStatus() == ClientResponse.SUCCESS) {
-                successfulPuts.incrementAndGet();
-            }
-            else {
-                failedPuts.incrementAndGet();
-            }
-            networkPutData.addAndGet(storeValueLength);
-            rawPutData.addAndGet(rawValueLength);
-        }
-    }
-
-    class GetMPCallback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            // Track the result of the operation (Success, Failure, Payload traffic...)
-            if (response.getStatus() == ClientResponse.SUCCESS) {
-                final VoltTable pairData = response.getResults()[0];
-                // Cache miss (Key does not exist)
-                if (pairData.getRowCount() == 0) {
-                    missedGetMPs.incrementAndGet();
+                            final VoltTable pairData = response.getResults()[0];
+                            // Cache miss (Key does not exist)
+                            if (pairData.getRowCount() == 0)
+                                missedGets.incrementAndGet();
+                            else {
+                                final PayloadProcessor.Pair pair =
+                                    processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
+                                            pairData.fetchRow(0).getVarbinary(1));
+                                successfulGets.incrementAndGet();
+                                networkGetData.addAndGet(pair.getStoreValueLength());
+                                rawGetData.addAndGet(pair.getRawValueLength());
+                            }
+                        }
+                        catch (Exception e) {
+                            failedGets.incrementAndGet();
+                        }
+                    }
+                    else {
+                        // Put a key/value pair, synchronously
+                        final PayloadProcessor.Pair pair = processor.generateForStore();
+                        try {
+                            m_client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                            successfulPuts.incrementAndGet();
+                        }
+                        catch (Exception e) {
+                            failedPuts.incrementAndGet();
+                        }
+                        networkPutData.addAndGet(pair.getStoreValueLength());
+                        rawPutData.addAndGet(pair.getRawValueLength());
+                    }
                 }
                 else {
-                    final PayloadProcessor.Pair pair =
-                            processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
-                                                        pairData.fetchRow(0).getVarbinary(1));
-                    successfulGetMPs.incrementAndGet();
-                    networkGetMPData.addAndGet(pair.getStoreValueLength());
-                    rawGetMPData.addAndGet(pair.getRawValueLength());
+                    try {
+                        ClientResponse response = m_client.callProcedure("GetMP",
+                                processor.generateRandomKeyForRetrieval());
+
+                        final VoltTable pairData = response.getResults()[0];
+                        // Cache miss (Key does not exist)
+                        if (pairData.getRowCount() == 0)
+                            missedGets.incrementAndGet();
+                        else {
+                            final PayloadProcessor.Pair pair =
+                                processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
+                                        pairData.fetchRow(0).getVarbinary(1));
+                            successfulGets.incrementAndGet();
+                            networkGetData.addAndGet(pair.getStoreValueLength());
+                            rawGetData.addAndGet(pair.getRawValueLength());
+                        }
+                    }
+                    catch (Exception e) {
+                        failedGets.incrementAndGet();
+                    }
                 }
-            }
-            else {
-                failedGetMPs.incrementAndGet();
             }
         }
     }
@@ -489,7 +514,8 @@ public class OneShotBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         // connect to one or more servers, loop until success
-        connect(config.servers);
+        connect(client, config.servers);
+        connect(mpClient, config.servers);
 
         // preload keys if requested
         System.out.println();
@@ -509,69 +535,54 @@ public class OneShotBenchmark {
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
-        // Run the benchmark loop for the requested warmup time
-        // The throughput may be throttled depending on client configuration
-        System.out.println("Warming up...");
-        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-        while (warmupEndTime > System.currentTimeMillis()) {
-            // Decide whether to perform a GET or PUT operation
-            if (rand.nextDouble() < config.getputratio) {
-                // Get a key/value pair, asynchronously
-                client.callProcedure(new NullCallback(), "Get", processor.generateRandomKeyForRetrieval());
-            }
-            else {
-                // Put a key/value pair, asynchronously
-                final PayloadProcessor.Pair pair = processor.generateForStore();
-                client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
-            }
+        // create/start the requested number of threads
+        ArrayList<Thread> kvThreads = new ArrayList<Thread>();
+        for (int i = 0; i < config.threads; ++i) {
+            kvThreads.add(new Thread(new KVThread(client, true)));
         }
+        for (int i = 0; i < config.mpthreads; ++i) {
+            kvThreads.add(new Thread(new KVThread(mpClient, false)));
+        }
+
+        for (Thread thread : kvThreads) {
+            thread.start();
+        }
+
+        // Run the benchmark loop for the requested warmup time
+        System.out.println("Warming up...");
+        Thread.sleep(1000l * config.warmup);
+
+        // signal to threads to end the warmup phase
+        warmupComplete.set(true);
 
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
+        mpFullStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
+
         schedulePeriodicStats();
 
-        // Run the benchmark loop for the requested duration
-        // The throughput may be throttled depending on client configuration
+        // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");
-        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-        long currentTime = System.currentTimeMillis();
-        long previousTime = currentTime;
-        int slice = 20;
-        long permits = config.mpratelimit / slice;
-        while (benchmarkEndTime > currentTime) {
-            // Decide whether to perform a GET or PUT operation
-            if (rand.nextDouble() < config.getputratio) {
-                // Decide whether to do a one-shot MP or an SP GET
-                if (permits > 0 && rand.nextDouble() < config.oneshotratio) {
-                    client.callProcedure(new GetMPCallback(), "GetMP", processor.generateRandomKeyForRetrieval());
-                    --permits;
-                }
-                else {
-                    // Get a key/value pair, asynchronously
-                    client.callProcedure(new GetCallback(), "Get", processor.generateRandomKeyForRetrieval());
-                }
-            }
-            else {
-                // Put a key/value pair, asynchronously
-                final PayloadProcessor.Pair pair = processor.generateForStore();
-                client.callProcedure(new PutCallback(pair), "Put", pair.Key, pair.getStoreValue());
-            }
-            currentTime = System.currentTimeMillis();
-            if ((currentTime - previousTime) >= (1000 / slice)) {
-                permits = config.mpratelimit / slice;
-                previousTime = currentTime;
-            }
-        }
+        Thread.sleep(1000l * config.duration);
+
+        // stop the threads
+        benchmarkComplete.set(true);
 
         // cancel periodic stats printing
         timer.cancel();
 
         // block until all outstanding txns return
         client.drain();
+        mpClient.drain();
+
+        // join on the threads
+        for (Thread t : kvThreads) {
+            t.join();
+        }
 
         // print the summary results
         printResults();
