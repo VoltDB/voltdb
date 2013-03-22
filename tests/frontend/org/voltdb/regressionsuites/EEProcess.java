@@ -66,14 +66,13 @@ public class EEProcess {
             System.out.println("Running " + target);
         }
         final ArrayList<String> args = new ArrayList<String>();
-        final String voltdbIPCPath = //System.getenv("VOLTDBIPC_PATH");
-                "/Users/jhugg/Documents/workspace/voltdb2/obj/debug/prod/voltdbipc";
+        final String voltdbIPCPath = System.getenv("VOLTDBIPC_PATH");
 
-        /*args.add("valgrind");
+        args.add("valgrind");
         args.add("--leak-check=full");
         args.add("--show-reachable=yes");
         args.add("--num-callers=32");
-        args.add("--error-exitcode=-1");*/
+        args.add("--error-exitcode=-1");
         /*
          * VOLTDBIPC_PATH is set as part of the regression suites and ant
          * check In that scenario junit will handle logging of Valgrind
