@@ -69,7 +69,7 @@ class SendPlanNode : public AbstractPlanNode {
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+        virtual void loadFromJSONObject(PlannerDomValue obj);
 };
 
 }

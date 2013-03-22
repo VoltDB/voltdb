@@ -92,19 +92,8 @@ DistinctPlanNode::debugInfo(const string &spacer) const
 }
 
 void
-DistinctPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+DistinctPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    json_spirit::Value distinctExpressionValue =
-        find_value(obj, "DISTINCT_EXPRESSION");
-    if (distinctExpressionValue == json_spirit::Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "DistinctPlanNode::loadFromJSONObject: "
-                                      "Can't find DISTINCT_EXPRESSION value");
-    }
-
-    json_spirit::Object distinctExpressionObject =
-        distinctExpressionValue.get_obj();
-    m_distinctExpression =
-        AbstractExpression::buildExpressionTree(distinctExpressionObject);
+    PlannerDomValue value = obj.valueForKey("DISTINCT_EXPRESSION");
+    m_distinctExpression = AbstractExpression::buildExpressionTree(value);
 }

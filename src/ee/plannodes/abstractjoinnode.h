@@ -69,7 +69,7 @@ public:
     virtual std::string debugInfo(const std::string& spacer) const;
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj);
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
     //
     // This is the predicate to figure out whether a joined tuple should
