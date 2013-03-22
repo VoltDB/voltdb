@@ -59,6 +59,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTableUtil;
 
 public class ProcedureRunner {
 
@@ -1300,21 +1301,11 @@ public class ProcedureRunner {
            // get isReplicated flag from either the catalog statement or the plan,
            // depending on whether it's pre-planned or unplanned
            final SQLStmt stmt = batch.get(i).stmt;
-           boolean isReplicated;
            if (stmt.catStmt != null) {
-               isReplicated = stmt.catStmt.getReplicatedtabledml();
            }
            else {
                final SQLStmtPlan plan = stmt.getPlan();
                assert(plan != null);
-               isReplicated = plan.isReplicatedTableDML();
-           }
-
-           // if replicated divide by the replication factor
-           if (isReplicated) {
-               long newVal = state.m_results[i].asScalarLong() / m_site.getReplicatedDMLDivisor();
-               state.m_results[i] = new VoltTable(new VoltTable.ColumnInfo("modified_tuples", VoltType.BIGINT));
-               state.m_results[i].addRow(newVal);
            }
        }
 
