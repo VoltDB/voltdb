@@ -53,7 +53,6 @@
 #include <stdexcept>
 #include <string>
 
-using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
