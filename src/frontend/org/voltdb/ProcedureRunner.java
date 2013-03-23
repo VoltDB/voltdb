@@ -1297,16 +1297,6 @@ public class ProcedureRunner {
            assert(matchingTablesForId != null);
            assert(matchingTablesForId.size() == 1);
            state.m_results[i] = matchingTablesForId.get(0);
-
-           // get isReplicated flag from either the catalog statement or the plan,
-           // depending on whether it's pre-planned or unplanned
-           final SQLStmt stmt = batch.get(i).stmt;
-           if (stmt.catStmt != null) {
-           }
-           else {
-               final SQLStmtPlan plan = stmt.getPlan();
-               assert(plan != null);
-           }
        }
 
        return state.m_results;

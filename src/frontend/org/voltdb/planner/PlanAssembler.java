@@ -846,7 +846,6 @@ public class PlanAssembler {
             // count expression represented by the count configured above). But
             // this is sufficient for now.  This looks identical to the above
             // TVE but it's logically different so we'll create a fresh one.
-            // And yes, oh, oh, it's magic</elo>
             TupleValueExpression tve = new TupleValueExpression();
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
