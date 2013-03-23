@@ -49,7 +49,6 @@
 #include "catalog/table.h"
 #include "catalog/column.h"
 
-using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
@@ -120,23 +119,11 @@ AbstractScanPlanNode::debugInfo(const string &spacer) const
 }
 
 void
-AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    json_spirit::Value targetTableNameValue =
-        json_spirit::find_value(obj, "TARGET_TABLE_NAME");
-    if (targetTableNameValue == json_spirit::Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractScanPlanNode::loadFromJSONObject:"
-                                      " Couldn't find TARGET_TABLE_NAME value");
-    }
+    m_targetTableName = obj.valueForKey("TARGET_TABLE_NAME").asStr();
 
-    m_targetTableName = targetTableNameValue.get_str();
-
-    json_spirit::Value predicateValue = json_spirit::find_value(obj, "PREDICATE");
-    if (!(predicateValue == json_spirit::Value::null))
-    {
-        json_spirit::Object predicateObject = predicateValue.get_obj();
-        m_predicate = AbstractExpression::buildExpressionTree(predicateObject);
+    if (obj.hasNonNullKey("PREDICATE")) {
+        m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
     }
 }

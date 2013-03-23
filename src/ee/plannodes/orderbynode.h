@@ -70,7 +70,7 @@ public:
     std::string debugInfo(const std::string &spacer) const;
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj);
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
     std::vector<AbstractExpression*> m_sortExpressions;
     /**

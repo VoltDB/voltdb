@@ -91,7 +91,7 @@ ReceivePlanNode::debugInfo(const string& spacer) const
 }
 
 void
-ReceivePlanNode::loadFromJSONObject(json_spirit::Object& obj)
+ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     // This space intentionally left blank.
 }

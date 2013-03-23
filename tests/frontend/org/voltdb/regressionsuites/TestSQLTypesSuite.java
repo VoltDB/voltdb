@@ -111,7 +111,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                     || ((d2 == VoltType.NULL_FLOAT) && (d1 <= d2))) {
                 return true;
             }
-            return (d1.compareTo(d2) == 0);
+            return (Math.abs(d1 - d2) < 0.0000000001);
         case STRING:
             // System.out.println("\tComparing " + lhs + " == " + rhs);
             if ((lhs == null || lhs == VoltType.NULL_STRING_OR_VARBINARY)
