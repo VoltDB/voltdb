@@ -20,7 +20,7 @@
 using namespace std;
 using namespace voltdb;
 
-SchemaColumn::SchemaColumn(PlannerDomValue colObject) : m_colObject(colObject)
+SchemaColumn::SchemaColumn(PlannerDomValue colObject)
 {
     bool contains_table_name = false;
     bool contains_column_name = false;
@@ -28,36 +28,36 @@ SchemaColumn::SchemaColumn(PlannerDomValue colObject) : m_colObject(colObject)
     bool contains_type = false;
     bool contains_size = false;
 
-    if (m_colObject.hasKey("TABLE_NAME")) {
+    if (colObject.hasKey("TABLE_NAME")) {
         contains_table_name = true;
-        m_tableName = m_colObject.valueForKey("TABLE_NAME").asStr();
+        m_tableName = colObject.valueForKey("TABLE_NAME").asStr();
     }
 
-    if (m_colObject.hasKey("COLUMN_NAME")) {
+    if (colObject.hasKey("COLUMN_NAME")) {
         contains_column_name = true;
-        m_columnName = m_colObject.valueForKey("COLUMN_NAME").asStr();
+        m_columnName = colObject.valueForKey("COLUMN_NAME").asStr();
     }
 
-    if (m_colObject.hasKey("COLUMN_ALIAS")) {
+    if (colObject.hasKey("COLUMN_ALIAS")) {
         contains_column_alias = true;
-        m_columnAlias = m_colObject.valueForKey("COLUMN_ALIAS").asStr();
+        m_columnAlias = colObject.valueForKey("COLUMN_ALIAS").asStr();
     }
 
-    if (m_colObject.hasKey("TYPE")) {
+    if (colObject.hasKey("TYPE")) {
         contains_type = true;
-        string colObjectTypeString = m_colObject.valueForKey("TYPE").asStr();
+        string colObjectTypeString = colObject.valueForKey("TYPE").asStr();
         m_type = stringToValue(colObjectTypeString);
     }
 
-    if (m_colObject.hasKey("SIZE")) {
+    if (colObject.hasKey("SIZE")) {
         contains_size = true;
-        m_size = m_colObject.valueForKey("SIZE").asInt();
+        m_size = colObject.valueForKey("SIZE").asInt();
     }
 
     m_expression = NULL;
     // lazy vector search
 
-    PlannerDomValue columnExpressionValue = m_colObject.valueForKey("EXPRESSION");
+    PlannerDomValue columnExpressionValue = colObject.valueForKey("EXPRESSION");
 
     m_expression = AbstractExpression::buildExpressionTree(columnExpressionValue);
 

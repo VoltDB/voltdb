@@ -105,7 +105,7 @@ namespace voltdb {
         }
 
         bool hasNonNullKey(const char *key) const {
-            if (!m_value.HasMember(key)) {
+            if (!hasKey(key)) {
                 return false;
             }
             rapidjson::Value &value = m_value[key];
