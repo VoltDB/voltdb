@@ -52,8 +52,6 @@ public:
     AbstractExpression* getExpression();
 
 private:
-    const PlannerDomValue m_colObject;
-
     std::string m_tableName;
     std::string m_columnName;
     std::string m_columnAlias;

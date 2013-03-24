@@ -48,7 +48,6 @@
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/types.h"
-#include "common/PlannerDomValue.h"
 #include "expressions/expressionutil.h"
 
 #include <sstream>

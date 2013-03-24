@@ -23,8 +23,6 @@
 
 package schemachange;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -62,9 +60,6 @@ public class SchemaChangeClient {
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
-
-        @Option(desc = "Path to the deployment.")
-        String pathtodeployment = "deployment.xml";
 
         @Override
         public void validate() {
@@ -112,7 +107,7 @@ public class SchemaChangeClient {
             System.out.println("Starting catalog update to change schema.");
         }
 
-        ClientResponse cr = client.callProcedure("@UpdateApplicationCatalog", catalogData, deploymentString);
+        ClientResponse cr = client.callProcedure("@UpdateApplicationCatalog", catalogData, null);
         assert(cr.getStatus() == ClientResponse.SUCCESS);
 
         long end = System.nanoTime();
@@ -234,32 +229,11 @@ public class SchemaChangeClient {
         return t2;
     }
 
-    private static String readFileAsString(String filePath) throws java.io.IOException{
-        StringBuilder fileData = new StringBuilder();
-        BufferedReader reader = new BufferedReader(new FileReader(filePath));
-        String line = null;
-        while((line = reader.readLine()) != null){
-            fileData.append(line);
-        }
-        reader.close();
-        return fileData.toString();
-    }
-
     public static void main(String[] args) throws Exception {
         VoltDB.setDefaultTimezone();
 
         config = new SchemaChangeConfig();
         config.parse("SchemaChangeClient", args);
-
-        try {
-            deploymentString = readFileAsString(config.pathtodeployment);
-        }
-        catch (Exception e) {
-            deploymentString = "<?xml version=\"1.0\"?><deployment>" +
-                    "<cluster hostcount=\"1\" sitesperhost=\"1\" kfactor=\"0\" />" +
-                    "<httpd enabled=\"true\"><jsonapi enabled=\"true\" /></httpd>" +
-                    "<snapshot prefix=\"schemachange\" frequency=\"1s\" retain=\"2\"/></deployment>";
-        }
 
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setProcedureCallTimeout(30 * 60 * 1000); // 30 min
