@@ -19,7 +19,6 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -64,14 +63,6 @@ public interface CommandLog {
             Object durabilityHandle);
 
     public abstract void shutdown() throws InterruptedException;
-
-    /**
-     * @param failedInitiators
-     * @param faultedTxns
-     * @return null if the logger is not initialized
-     */
-    public abstract Semaphore logFault(Set<Long> failedInitiators,
-                                       Set<Long> faultedTxns);
 
     /**
      * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log

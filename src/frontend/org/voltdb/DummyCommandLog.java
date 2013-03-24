@@ -19,7 +19,6 @@ package org.voltdb;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -34,12 +33,6 @@ public class DummyCommandLog implements CommandLog {
 
     @Override
     public void shutdown() throws InterruptedException {}
-
-    @Override
-    public Semaphore logFault(Set<Long> failedInitiators,
-                              Set<Long> faultedTxns) {
-        return new Semaphore(1);
-    }
 
     @Override
     public long getFaultSequenceNumber() {
